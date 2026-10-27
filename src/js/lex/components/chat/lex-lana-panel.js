@@ -31,7 +31,6 @@
        context-type="document_chat"
        placeholder="Ask about this document..."
        tools-locked="true"
-       default-tool="document_chat"
        thread-title="Document Context"
      ></lex-lana-panel>
 
@@ -131,18 +130,6 @@
       console.warn('[lex-lana-panel] Failed to hydrate conversation metadata:', err);
       return null;
     });
-  }
-
-  function getConversationDocumentCandidates(conversationId, options) {
-    var client = requireApi();
-    if (!client) return Promise.reject(new Error('api not available'));
-    if (Lex.Chat && typeof Lex.Chat.ConversationsApiClient === 'function') {
-      return new Lex.Chat.ConversationsApiClient(client).getDocumentCandidates(conversationId, options);
-    }
-    if (typeof client.getConversationDocumentCandidates === 'function') {
-      return client.getConversationDocumentCandidates(conversationId, options);
-    }
-    return Promise.reject(new Error('canonical conversation document candidates API not available'));
   }
 
   var stylesInjected = false;
@@ -1060,25 +1047,6 @@
       this._toast('error', 'Could not update context suggestion');
     }
 
-    _searchDocuments(query, composerEl) {
-      if (!composerEl || typeof composerEl.setDocumentResults !== 'function') return;
-      var convId = this._chatEl && this._chatEl.conversationId;
-      if (!convId || !window.api) {
-        composerEl.setDocumentResults([]);
-        return;
-      }
-      getConversationDocumentCandidates(convId, {
-        search: query || '',
-        limit: 10
-      })
-        .then(function (data) {
-          composerEl.setDocumentResults((data && (data.document_candidates || data.files || data.candidates)) || []);
-        })
-        .catch(function () {
-          composerEl.setDocumentResults([]);
-        });
-    }
-
     _escapeHtml(value) {
       return String(value == null ? '' : value)
         .split('&').join('&amp;')
@@ -1337,18 +1305,6 @@
 
       container.addEventListener('lex-chat-context-promotion-action', function (e) {
         self._requestContextPromotionAction(e.detail || {});
-      });
-
-      container.addEventListener('lex-chat-manage-documents', function () {
-        var convId = self._chatEl && self._chatEl.conversationId;
-        if (window.ChatFileDrawer && convId) {
-          window.ChatFileDrawer.open(convId, self.matterId || null);
-        }
-      });
-
-      container.addEventListener('lex-composer-document-search', function (e) {
-        var composer = self._chatEl && self._chatEl.querySelector('lex-chat-composer');
-        self._searchDocuments((e.detail && e.detail.query) || '', composer);
       });
 
       container.addEventListener('lex-chat-agentic-followup', function (e) {

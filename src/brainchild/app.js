@@ -1,25 +1,26 @@
 /*
  * Brainchild surface controller (Slice A).
  *
- * Thin client: presentation + light wiring only. Row normalization is delegated
- * to the shared, pure window.DocumentLibraryMapper module so doc-studio and this
- * page stay on one contract. The Org scope reuses the existing storage +
- * deck-studio endpoints (same query params as doc-studio's loadLibrary, to keep
- * row ordering consistent). The My scope is a stubbed "connect Brainchild" empty
- * state until the loopback vault bridge lands in Slice B.
+ * Thin client: presentation + light wiring only. The Org scope uses the same
+ * organization library tables as Doc Studio (window.DocStudioLibraryTable:
+ * stored documents server-paged, Doc Studio files client-side). The My scope
+ * reads vault notes over the Electron bridge into a client-side table
+ * (window.BrainchildTable). Both follow docs/TABLE-STANDARD.md.
  */
 (function () {
   'use strict';
 
-  var mapper = window.DocumentLibraryMapper || null;
   // Phase C: pure payload builder + gate predicate. Presentation only here; all
   // org-isolation / embedding / audit authority lives on the backend.
   var promoteBuilder = window.BrainchildPromoteBuilder || null;
+  // Table rows, renderers and filters (docs/TABLE-STANDARD.md).
+  var libraryTables = window.DocStudioLibraryTable || null;
+  var notesTable = window.BrainchildTable || null;
 
   var state = {
     scope: 'org',
-    orgRows: null,
-    orgLoading: false,
+    orgLoaded: false,
+    mySearch: '',
     myRows: null,
     myLoading: false,
     // Phase B: cached brainchild bridge status (degraded | linked | connected).
@@ -36,6 +37,7 @@
     myPanel: document.getElementById('bcMyPanel'),
     myEmpty: document.getElementById('bcMyEmpty'),
     myTable: document.getElementById('bcMyTable'),
+    myList: document.getElementById('bcMyList'),
     myBanner: document.getElementById('bcMyBanner'),
     status: document.getElementById('bcStatus')
   };
@@ -139,66 +141,70 @@
     if (els.status) els.status.textContent = message || '';
   }
 
-  // ---- Org scope: reuse the Library data layer -----------------------------
+  // ---- Org scope: the shared organization library tables -------------------
+  //
+  // Stored documents page on the server and Doc Studio files load as one list,
+  // so they are two tables behind the toolbar's Source select (never one
+  // merged, capped list). See src/js/shared/doc-studio-library-table.js.
 
-  async function loadOrgLibrary() {
-    var errors = [];
-    var presentations = [];
-    var documents = [];
-
-    try {
-      var presResponse = await apiFetch('/api/v1/deck-studio/presentations?limit=100');
-      if (!presResponse.ok) throw new Error('Request failed with ' + presResponse.status);
-      var presPayload = await presResponse.json();
-      presentations = Array.isArray(presPayload.presentations) ? presPayload.presentations : [];
-    } catch (error) {
-      errors.push('Doc Studio files: ' + error.message);
+  // apiFetch + JSON, rejecting on HTTP errors (the shared tables' contract).
+  async function fetchJson(path) {
+    var response = await apiFetch(path);
+    if (!response.ok) {
+      var error = new Error('Request failed with ' + response.status);
+      error.status = response.status;
+      throw error;
     }
-
-    try {
-      var docResponse = await apiFetch('/api/v1/storage/library/files?page_size=200&sort_by=updated_at&sort_order=desc');
-      if (!docResponse.ok) throw new Error('Request failed with ' + docResponse.status);
-      var docPayload = await docResponse.json();
-      documents = Array.isArray(docPayload.documents)
-        ? docPayload.documents
-        : (Array.isArray(docPayload.files) ? docPayload.files : []);
-    } catch (error) {
-      errors.push('stored documents: ' + error.message);
-    }
-
-    var rows = mapper
-      ? mapper.normalizeLibraryItems({ documents: documents, presentations: presentations }, 'org')
-      : [];
-
-    state.orgRows = rows;
-
-    if (errors.length) {
-      setStatus('Library loaded with limited sources (' + errors.join('; ') + ').');
-    } else {
-      setStatus('');
-    }
-    return rows;
+    return response.json();
   }
 
-  function renderOrgTable() {
-    if (!els.orgTable || typeof els.orgTable.setData !== 'function') return;
-    els.orgTable.setData(Array.isArray(state.orgRows) ? state.orgRows : []);
-  }
-
-  async function ensureOrgLoaded() {
-    if (state.orgLoading) return;
-    if (Array.isArray(state.orgRows)) {
-      renderOrgTable();
+  function openOrgRow(row) {
+    if (!row) return;
+    if (row._kind === 'storage' && row._fileId) {
+      var params = new URLSearchParams({ id: row._fileId });
+      if (row._matterId) params.set('matter_id', row._matterId);
+      window.location.href = '../file-viewer.html?' + params.toString();
       return;
     }
-    state.orgLoading = true;
-    setStatus('Loading organization documents…');
-    try {
-      await loadOrgLibrary();
-      renderOrgTable();
-    } finally {
-      state.orgLoading = false;
+    if (row._kind === 'deck' && row._presentationId) {
+      window.location.href = '../doc-studio/?id=' + encodeURIComponent(row._presentationId);
     }
+  }
+
+  var orgLibrary = libraryTables && els.orgTable
+    ? libraryTables.createController({
+      ids: {
+        search: 'bcOrgSearch',
+        sort: 'bcOrgSort',
+        order: 'bcOrgSortOrder',
+        source: 'bcOrgSource',
+        count: 'bcOrgCount',
+        sectionTitle: 'bcOrgSectionTitle',
+        sectionCount: 'bcOrgSectionCount',
+        storedTable: 'bcOrgTable',
+        studioTable: 'bcOrgStudioTable'
+      },
+      fetchJson: fetchJson,
+      defaultSource: 'stored',
+      linkPrefix: '../',
+      onOpen: openOrgRow,
+      onError: function (message) {
+        setStatus(message ? 'Some library sources could not be loaded (' + message + ').' : '');
+      }
+    })
+    : null;
+
+  function ensureOrgLoaded() {
+    if (!orgLibrary || state.orgLoaded) return;
+    state.orgLoaded = true;
+    setStatus('');
+    whenTablesDefined().then(function () { orgLibrary.reload(); });
+  }
+
+  function whenTablesDefined() {
+    return window.customElements && typeof window.customElements.whenDefined === 'function'
+      ? window.customElements.whenDefined('lex-table')
+      : Promise.resolve();
   }
 
   // ---- My scope: Brainchild MCP bridge (Phase B) ---------------------------
@@ -206,11 +212,11 @@
   // The renderer is presentation-only here. All node/spawn/MCP logic lives in
   // Electron main (src/electron-brainchild-manager.js) and is reached through
   // the contextIsolation-safe window.electronAPI.brainchild.* bridge. We fetch
-  // notes via list_notes, shape them through the shared mapper, and fall back
+  // notes via list_notes, shape them through BrainchildTable, and fall back
   // to the connect/degraded states when the bridge reports it's not linked.
 
   // Read the user's vault note list over the MCP bridge. Returns the raw note
-  // DTOs (path/title/...) — shaping is delegated to the mapper. On any failure
+  // DTOs (path/title/...) — shaping is delegated to BrainchildTable. On any failure
   // we return an empty array so the My panel degrades gently instead of crashing.
   async function fetchBrainchildNotes(/* scope */) {
     if (!brainchild) return [];
@@ -241,7 +247,7 @@
     return state.brainchildStatus;
   }
 
-  // Drive the My panel through the same mapper contract as Org. Notes are
+  // Drive the My panel. Notes are
   // fetched over the bridge, normalized, and either rendered or replaced by the
   // connect/degraded empty state.
   async function ensureMyLoaded() {
@@ -255,9 +261,7 @@
       await refreshBrainchildStatus();
       var linked = state.brainchildStatus && state.brainchildStatus.status !== 'degraded';
       var notes = linked ? await fetchBrainchildNotes('my') : [];
-      state.myRows = mapper
-        ? mapper.normalizeLibraryItems({ notes: notes }, 'my')
-        : [];
+      state.myRows = notesTable ? notesTable.mapNotes(notes) : [];
       renderMyPanel();
     } finally {
       state.myLoading = false;
@@ -315,7 +319,8 @@
     if (els.myTable && typeof els.myTable.setData === 'function') {
       els.myTable.setData(rows);
     }
-    if (els.myTable) els.myTable.classList.toggle('bc-hidden', !hasRows);
+    if (els.myList) els.myList.classList.toggle('bc-hidden', !hasRows);
+    updateMyCount();
     if (els.myEmpty) els.myEmpty.classList.toggle('bc-hidden', hasRows);
     renderMyBanner();
   }
@@ -463,11 +468,11 @@
       }
       // Success: the personal copy remains in the vault (COPY semantics).
       toast('success', 'Note promoted to your organization. Your copy stays in Brainchild.');
-      // Close the owning modal the way Lex itself does (emits lex-close, which
-      // the open() handler wires to modal.remove()).
+      // Close the owning modal through Lex.Modal.open's close lifecycle
+      // (exit animation, then removal).
       var modal = button && button.closest ? button.closest('lex-modal') : null;
-      if (modal && typeof modal.emit === 'function') {
-        modal.emit('lex-close');
+      if (modal && typeof modal.removeAfterClose === 'function') {
+        modal.removeAfterClose();
       } else if (modal && modal.remove) {
         modal.remove();
       }
@@ -482,19 +487,16 @@
     }
   }
 
-  // Write into the lex-modal's body slot rather than replacing the host element.
-  // After Lex.Modal.open() the component has already rendered its chrome
-  // (overlay/backdrop/panel/header/close button) into light DOM; reassigning
-  // modal.innerHTML would wipe that chrome (and render() will not rebuild it
-  // because _rendered is already true). Targeting the body keeps the modal a
-  // real modal — positioning, backdrop, scroll-lock, and the close (X) button.
-  // Guarded for null because the body may not be present on the first microtask.
+  // Write into this preview's own content root (passed to Lex.Modal.open as
+  // content) rather than the host element or the component's internal body.
+  // Reassigning modal.innerHTML would wipe the chrome lex-modal already
+  // rendered (render() does not rebuild it), and the body markup is the
+  // component's private structure.
+  var PREVIEW_ROOT_SELECTOR = '[data-bc-preview-root]';
   function setModalBody(modal, html) {
     if (!modal) return;
-    var body = modal.querySelector('.lex-modal-body slot-content') ||
-      modal.querySelector('.lex-modal-body') ||
-      modal;
-    body.innerHTML = html;
+    var root = modal.querySelector(PREVIEW_ROOT_SELECTOR);
+    if (root) root.innerHTML = html;
   }
 
   async function openNotePreview(row) {
@@ -503,8 +505,8 @@
     if (!vaultPath) return;
 
     var modal = window.Lex.Modal.open({
-      heading: row.filename || 'Note',
-      content: '<div class="bc-preview"><p class="bc-preview-meta">Loading…</p></div>',
+      heading: row.name || 'Note',
+      content: '<div data-bc-preview-root><div class="bc-preview"><p class="bc-preview-meta">Loading…</p></div></div>',
       size: 'lg',
       hideActions: true
     });
@@ -561,6 +563,72 @@
       var row = findMyRow(detail.id);
       if (row) openNotePreview(row);
     });
+  }
+
+  // ---- My notes table: toolbar search / sort / count -----------------------
+
+  function myFiltered() {
+    var source = els.myTable && els.myTable.dataSource;
+    return Boolean(state.mySearch) || Boolean(source && source._filters && source._filters.size);
+  }
+
+  function updateMyCount() {
+    var table = els.myTable;
+    if (!table || !notesTable) return;
+    var total = table.dataSource && table.dataSource.pagination ? table.dataSource.pagination.total : 0;
+    var label = notesTable.countLabel(total);
+    ['bcMyCount', 'bcMySectionCount'].forEach(function (id) {
+      var node = document.getElementById(id);
+      if (node) node.textContent = label;
+    });
+    table.emptyText = notesTable.emptyText(myFiltered());
+  }
+
+  function applyMySort(column, direction) {
+    var table = els.myTable;
+    if (!table || !table.dataSource) return;
+    table.sortBy = column;
+    table.sortDir = direction;
+    table.dataSource.setSort(column, direction);
+  }
+
+  function wireMyTable() {
+    var table = els.myTable;
+    if (!table || !notesTable || typeof table.setCellRenderers !== 'function') return;
+    // Renderers and filters before the first setData.
+    table.setCellRenderers(notesTable.renderers());
+    table.setColumnFilterOptions(notesTable.filterOptions());
+    table.addEventListener('lex-filter-change', updateMyCount);
+    table.addEventListener('lex-data-loaded', updateMyCount);
+    var sort = document.getElementById('bcMySort');
+    var order = document.getElementById('bcMySortOrder');
+    function currentOrder() { return order && order.dataset.order === 'asc' ? 'asc' : 'desc'; }
+    table.addEventListener('sort-change', function (event) {
+      if (!event.detail) return;
+      if (sort && sort.value !== event.detail.sortBy) sort.value = event.detail.sortBy;
+      if (order) order.dataset.order = event.detail.sortDir === 'asc' ? 'asc' : 'desc';
+    });
+    if (sort) {
+      sort.addEventListener('lex-change', function (event) {
+        applyMySort((event.detail && event.detail.value) || 'updated_at', currentOrder());
+      });
+    }
+    if (order) {
+      order.addEventListener('click', function () {
+        order.dataset.order = currentOrder() === 'asc' ? 'desc' : 'asc';
+        applyMySort(sort ? sort.value : 'updated_at', currentOrder());
+      });
+    }
+    var search = document.getElementById('bcMySearch');
+    if (search) {
+      ['lex-input', 'lex-change'].forEach(function (name) {
+        search.addEventListener(name, function (event) {
+          state.mySearch = String((event.detail && event.detail.value) || '').trim();
+          if (table.dataSource) table.dataSource.setSearch(state.mySearch);
+          updateMyCount();
+        });
+      });
+    }
   }
 
   // ---- Scope switching -----------------------------------------------------
@@ -681,6 +749,7 @@
     wireScopeToggle();
     wireConnectAction();
     wireRowClick();
+    wireMyTable();
     var initialScope = (els.scopeToggle && els.scopeToggle.value) || 'org';
     applyScope(initialScope);
   }
@@ -691,8 +760,7 @@
   window.LanaBrainchild = {
     state: state,
     reloadOrg: function () {
-      state.orgRows = null;
-      return ensureOrgLoaded();
+      return orgLibrary ? orgLibrary.reload() : null;
     },
     reloadMy: function () {
       state.myRows = null;

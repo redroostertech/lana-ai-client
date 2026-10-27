@@ -42,6 +42,7 @@
         'js/lex/components/foundation/lex-tabs.js',
         'js/lex/components/foundation/lex-accordion.js',
         'js/lex/components/form/lex-select.js',
+        'js/lex/components/form/lex-dropdown-btn.js',
         'js/lex/components/form/lex-checkbox.js',
         'js/lex/components/form/lex-textarea.js',
         'js/lex/components/data/lex-table.js',
@@ -75,6 +76,9 @@
         'js/services/document-create-modal.js',
         'js/workspace-switcher.js',
         'js/workspace-billable-hours.js',
+        'js/shared/library-column-filters.js',
+        'js/admin/admin-table-kit.js',
+        'js/shared/workspace-details-tables.js',
         'js/workspace-details.js'
       ],
       stylesheets: [
@@ -91,7 +95,9 @@
     'matters/timeline.html': {
       title: 'Matter Timeline',
       activeNav: 'workspaces',
-      scripts: [],
+      scripts: [
+        'js/lex/components/form/lex-select.js'
+      ],
       stylesheets: []
     },
 
@@ -99,6 +105,7 @@
       title: 'Matter Skills',
       activeNav: 'workspaces',
       scripts: [
+        'js/lex/components/form/lex-select.js',
         'js/matter-skills.js'
       ],
       stylesheets: [
@@ -115,10 +122,14 @@
         'js/lex/components/foundation/lex-banner.js',
         'js/lex/components/foundation/lex-card.js',
         'js/lex/components/foundation/lex-modal.js',
+        'js/lex/components/form/lex-input.js',
         'js/lex/components/form/lex-select.js',
+        'js/lex/components/foundation/lex-empty.js',
+        'js/lex/components/data/lex-table.js',
         'js/lex/components/form/lex-segmented.js',
         'js/lex/components/data/lex-pagination.js',
         'js/services/document-create-modal.js',
+        'js/shared/library-column-filters.js',
         'js/document-library.js',
         'js/companion-bridge-consent.js',
         'js/lex/chat/lex-chat.format.js',
@@ -162,12 +173,15 @@
         'js/lex/components/foundation/lex-empty.js',
         'js/lex/components/foundation/lex-modal.js',
         'js/lex/components/foundation/lex-spinner.js',
+        'js/lex/components/form/lex-input.js',
         'js/lex/components/form/lex-select.js',
+        'js/lex/components/data/lex-table.js',
         'js/lex/components/form/lex-segmented.js',
         'js/lex/components/data/lex-pagination.js',
         'js/shared/document-studio-templates-mapper.js',
         'js/document-studio-api.js',
         'js/services/document-create-modal.js',
+        'js/shared/library-column-filters.js',
         'js/document-library-templates.js',
         'js/companion-bridge-consent.js',
         'js/lex/chat/lex-chat.format.js',
@@ -203,6 +217,8 @@
       title: 'File Editor',
       activeNav: 'document-library',
       scripts: [
+        'js/lex/components/form/lex-select.js',
+        'js/lex/components/form/lex-dropdown-btn.js',
         'js/time-utils.js',
         'js/app-catalog.js',
         'js/lex/components/foundation/lex-drawer.js',
@@ -252,6 +268,10 @@
         'js/lex/components/foundation/lex-modal.js',
         'js/lex/components/form/lex-input.js',
         'js/lex/components/form/lex-select.js',
+        'js/lex/components/form/lex-dropdown-btn.js',
+        'js/lex/components/data/lex-table.js',
+        'js/shared/library-column-filters.js',
+        'js/shared/list-query-params.js',
         // Brainchild scope: shared mapper + promote builder + scope controller
         'js/shared/document-library-mapper.js',
         'js/shared/brainchild-promote-builder.js',
@@ -275,6 +295,7 @@
         'js/lex/components/foundation/lex-modal.js',
         'js/lex/components/form/lex-input.js',
         'js/lex/components/form/lex-select.js',
+        'js/lex/components/form/lex-dropdown-btn.js',
         'js/lex/components/form/lex-checkbox.js',
         'js/lex/components/form/lex-textarea.js',
         // Page controller
@@ -321,6 +342,7 @@
       title: 'Help & Support',
       activeNav: 'help',
       scripts: [
+        'js/lex/components/form/lex-select.js',
         'js/help.js'
       ],
       stylesheets: []
@@ -405,6 +427,7 @@
     // admin/health.html — standalone page (not routed)
     // admin/organizations.html — standalone page (not routed)
     // admin/roles.html — standalone page (not routed)
+    // admin/run-books.html — standalone page (not routed)
 
     'admin/roles_manager.html': {
       title: 'Role Manager',
@@ -430,6 +453,9 @@
       title: 'Analytics',
       activeNav: 'reports',
       scripts: [
+        'js/shared/current-pipeline-presentation.js',
+        'js/shared/acquisition-source-presentation.js',
+        'js/shared/opportunity-intake-presentation.js',
         'js/vendor/chart.js',
         'js/vendor/jspdf.umd.min.js',
         'js/vendor/jspdf.plugin.autotable.min.js',
@@ -459,6 +485,12 @@
       title: 'Library',
       activeNav: 'insights-library',
       scripts: [
+        'js/lex/components/foundation/lex-badge.js',
+        'js/lex/components/foundation/lex-modal.js',
+        'js/lex/components/form/lex-input.js',
+        'js/lex/components/form/lex-select.js',
+        'js/shared/library-column-filters.js',
+        'js/shared/metric-tables.js',
         'js/admin/dashboard-catalog.js',
         'js/admin/dashboard-library.js'
       ],
@@ -471,6 +503,9 @@
       title: 'Dashboard',
       activeNav: 'insights-dashboard',
       scripts: [
+        'js/shared/current-pipeline-presentation.js',
+        'js/shared/acquisition-source-presentation.js',
+        'js/shared/opportunity-intake-presentation.js',
         'js/dashboard/metric-goal-comparison.js',
         'js/admin/dashboard-detail.js'
       ],
@@ -483,6 +518,7 @@
       title: 'Dashboard Builder',
       activeNav: 'insights-library',
       scripts: [
+        'js/lex/components/form/lex-select.js',
         'js/admin/dashboard-builder.js'
       ],
       stylesheets: [
@@ -493,8 +529,20 @@
     'admin/plugins.html': {
       title: 'Plugins',
       activeNav: 'admin',
-      scripts: [],
-      stylesheets: []
+      scripts: [
+        'js/lex/components/foundation/lex-breadcrumb.js',
+        'js/lex/components/foundation/lex-banner.js',
+        'js/lex/components/foundation/lex-badge.js',
+        'js/lex/components/foundation/lex-tabs.js',
+        'js/lex/components/form/lex-select.js',
+        'js/lex/components/data/lex-table.js',
+        'js/shared/library-column-filters.js',
+        'js/admin/admin-table-kit.js',
+        'js/admin/admin-plugins.js'
+      ],
+      stylesheets: [
+        'css/admin/admin-tables.css'
+      ]
     },
 
     'admin/search-analytics.html': {
@@ -525,11 +573,16 @@
         'js/components/management-board-components.js',
         'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js',
         'js/services/session-tracking-service.js',
+        'js/lex/components/form/lex-select.js',
+        'js/lex/components/data/lex-table.js',
+        'js/shared/library-column-filters.js',
+        'js/admin/admin-table-kit.js',
         'js/pages/management-boards-team-performance.js',
         'js/pages/management-boards-main.js'
       ],
       stylesheets: [
         'css/session-tracking.css',
+        'css/admin/admin-tables.css',
         'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
       ]
     },
@@ -537,7 +590,9 @@
     'admin/onboarding_management.html': {
       title: 'Onboarding Management',
       activeNav: 'admin',
-      scripts: [],
+      scripts: [
+        'js/lex/components/form/lex-select.js'
+      ],
       stylesheets: [
         'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
       ]
@@ -548,6 +603,10 @@
       title: 'Analytics',
       activeNav: 'reports',
       scripts: [
+        'js/lex/components/form/lex-select.js',
+        'js/shared/current-pipeline-presentation.js',
+        'js/shared/acquisition-source-presentation.js',
+        'js/shared/opportunity-intake-presentation.js',
         'js/vendor/chart.js',
         'js/vendor/jspdf.umd.min.js',
         'js/vendor/jspdf.plugin.autotable.min.js',
@@ -564,6 +623,7 @@
       title: 'Module Execution Dashboard',
       activeNav: 'reports',
       scripts: [
+        'js/lex/components/form/lex-select.js',
         'js/vendor/chart.js',
         'js/vendor/jspdf.umd.min.js',
         'js/vendor/jspdf.plugin.autotable.min.js'
@@ -587,6 +647,8 @@
       title: 'Connector',
       activeNav: 'connectors',
       scripts: [
+        'js/lex/components/form/lex-select.js',
+        'js/lex/components/form/lex-dropdown-btn.js',
         'js/utils/event-display-names.js',
         'js/services/feature-tracker.js',
         'js/activity-heatmap.js',
@@ -601,6 +663,7 @@
       title: 'CRM Connectors',
       activeNav: 'connectors',
       scripts: [
+        'js/lex/components/form/lex-select.js',
         'js/connectors.js'
       ],
       stylesheets: []
@@ -617,6 +680,7 @@
       title: 'Communications Connectors',
       activeNav: 'connectors',
       scripts: [
+        'js/lex/components/form/lex-select.js',
         'js/connectors.js'
       ],
       stylesheets: []
@@ -633,6 +697,7 @@
       title: 'Case Management Connectors',
       activeNav: 'connectors',
       scripts: [
+        'js/lex/components/form/lex-select.js',
         'js/connectors.js'
       ],
       stylesheets: []
@@ -651,6 +716,7 @@
       title: 'ActionStep Dashboard',
       activeNav: 'connectors',
       scripts: [
+        'js/lex/components/form/lex-select.js',
         'js/chunked-uploader.js'
       ],
       stylesheets: []
@@ -660,6 +726,7 @@
       title: 'Leadly CRM Dashboard',
       activeNav: 'connectors',
       scripts: [
+        'js/lex/components/form/lex-select.js',
         'js/chunked-uploader.js'
       ],
       stylesheets: []
@@ -679,6 +746,7 @@
       title: 'Workflow Builder',
       activeNav: 'workflows',
       scripts: [
+        'js/lex/components/form/lex-select.js',
         'js/services/feature-tracker.js',
         'js/workflows.js',
         'js/workflow-builder.js',
@@ -702,9 +770,18 @@
       title: 'Active Workflows',
       activeNav: 'workflows',
       scripts: [
-        'js/workflows.js'
+        'js/lex/components/foundation/lex-badge.js',
+        'js/lex/components/foundation/lex-drawer.js',
+        'js/lex/components/form/lex-select.js',
+        'js/lex/components/data/lex-table.js',
+        'js/shared/library-column-filters.js',
+        'js/admin/admin-table-kit.js',
+        'js/workflows.js',
+        'js/pages/workflows-active.js'
       ],
-      stylesheets: []
+      stylesheets: [
+        'css/admin/admin-tables.css'
+      ]
     },
 
     'workflows/execution-logs.html': {

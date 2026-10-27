@@ -83,6 +83,13 @@
     reviewReleasing: false,
     reviewRestoring: false,
     // askLanaDrawer/askLanaChatEl/askLanaThreadsEl removed — managed by lex-lana-panel
+    // Opened from a chat source: { page, quote, chunkIndex } from the URL.
+    citationFocus: null,
+    citationFocusApplied: false,
+    // Read-only highlight drawn over the embed for the cited passage. It is
+    // merged into the overlay list and never saved with the draft.
+    citationAnnotation: null,
+    citationPdfBytes: null,
     _lanaSessionBootstrapped: false
   };
 
@@ -1514,9 +1521,14 @@
     return normalizeBackReferrer(state.referrerPage) || fallbackBackReferrer();
   }
 
-  function navigateBack() {
+  async function navigateBack() {
     if (state.metadataChanged) {
-      if (!confirm('You have unsaved changes. Leave anyway?')) return;
+      var leave = await Lex.Modal.confirmAsync('Unsaved changes', 'You have unsaved changes. Leave anyway?', {
+        confirmText: 'Leave',
+        cancelText: 'Stay',
+        variant: 'danger'
+      });
+      if (!leave) return;
     }
     var target = targetBackRoute();
     if (target) {
@@ -3085,19 +3097,15 @@
         'This removes the released document from the active workspace versions. The immutable release record remains for audit, and the viewer will roll back to the previous version or original document.' +
       '</p>' +
     '</div>';
-    if (typeof Lex !== 'undefined' && Lex.Modal && typeof Lex.Modal.open === 'function') {
-      Lex.Modal.open({
-        heading: 'Delete Version',
-        size: 'md',
-        content: content,
-        confirmText: 'Delete Version',
-        cancelText: 'Cancel',
-        variant: 'danger',
-        onConfirm: run
-      });
-    } else if (window.confirm('Delete ' + label + '?')) {
-      run();
-    }
+    Lex.Modal.open({
+      heading: 'Delete Version',
+      size: 'md',
+      content: content,
+      confirmText: 'Delete Version',
+      cancelText: 'Cancel',
+      variant: 'danger',
+      onConfirm: run
+    });
   }
 
   async function acceptBaselineRevisionsForReviewMode() {
@@ -3227,26 +3235,15 @@
         notify((error && error.message) || 'Failed to revert review change', 'error');
       });
     };
-    if (typeof Lex !== 'undefined' && Lex.Modal && typeof Lex.Modal.open === 'function') {
-      Lex.Modal.open({
-        heading: title,
-        size: 'sm',
-        content: reviewRevertConfirmationContent(change, section),
-        confirmText: confirmText,
-        cancelText: 'Cancel',
-        variant: section === 'released' ? 'default' : 'danger',
-        onConfirm: run
-      });
-      return;
-    }
-    if (typeof Lex !== 'undefined' && Lex.Modal && typeof Lex.Modal.confirm === 'function') {
-      Lex.Modal.confirm(title, reviewChangePreviewText(change), run, {
-        confirmText: confirmText,
-        variant: section === 'released' ? 'default' : 'danger'
-      });
-      return;
-    }
-    if (window.confirm(title + '?\n\n' + reviewChangePreviewText(change))) run();
+    Lex.Modal.open({
+      heading: title,
+      size: 'sm',
+      content: reviewRevertConfirmationContent(change, section),
+      confirmText: confirmText,
+      cancelText: 'Cancel',
+      variant: section === 'released' ? 'default' : 'danger',
+      onConfirm: run
+    });
   }
 
   function confirmReviewHistoryChangeEdit(index) {
@@ -3825,7 +3822,9 @@
     var editor = state.editorInstance;
     if (!editor || typeof editor.setAnnotations !== 'function') return;
     try {
-      editor.setAnnotations(LanaDocumentReview.embedAnnotationsFrom(reviewAnnotationThreads()));
+      var annotations = LanaDocumentReview.embedAnnotationsFrom(reviewAnnotationThreads()) || [];
+      if (state.citationAnnotation) annotations = annotations.concat([state.citationAnnotation]);
+      editor.setAnnotations(annotations);
     } catch (error) {
       console.warn('[FileViewerPage] Annotation overlay failed:', error);
     }
@@ -4456,21 +4455,14 @@
     };
 
     var details = releaseConfirmationDetails();
-    var message = releaseConfirmationMessage();
-    if (typeof Lex !== 'undefined' && Lex.Modal && typeof Lex.Modal.open === 'function') {
-      Lex.Modal.open({
-        heading: 'Release Version',
-        size: 'md',
-        content: releaseConfirmationContent(details),
-        confirmText: 'Release Version',
-        cancelText: 'Cancel',
-        onConfirm: run
-      });
-    } else if (typeof Lex !== 'undefined' && Lex.Modal && typeof Lex.Modal.confirm === 'function') {
-      Lex.Modal.confirm('Release Version', message, run, { confirmText: 'Release Version' });
-    } else if (window.confirm(message)) {
-      run();
-    }
+    Lex.Modal.open({
+      heading: 'Release Version',
+      size: 'md',
+      content: releaseConfirmationContent(details),
+      confirmText: 'Release Version',
+      cancelText: 'Cancel',
+      onConfirm: run
+    });
   }
 
   function findBannerActionTarget(event) {
@@ -4718,6 +4710,10 @@
       // missing enrichment must not delay the page.
       loadEnrichmentPanel(response);
       loadMetadata(response);
+      // Opened from a chat source: go to the cited page and passage.
+      applyCitationFocus().catch(function (error) {
+        console.warn('[FileViewerPage] Could not show the cited passage:', error);
+      });
       if (window.LanaActivityEvents && typeof window.LanaActivityEvents.documentOpened === 'function') {
         window.LanaActivityEvents.documentOpened(response, { surface: 'file_viewer' });
       }
@@ -4751,12 +4747,166 @@
   // Content Loaders
   // =========================================================================
 
+  // =========================================================================
+  // Cited passage focus (opened from a chat source)
+  // =========================================================================
+
+  var CITATION_ANNOTATION_ID = 'chat-citation-focus';
+
+  function citationNotFoundNote(focus) {
+    return focus && focus.page
+      ? 'Opened at page ' + focus.page + '. The quoted passage could not be located in this view.'
+      : 'The quoted passage could not be located in this view.';
+  }
+
+  async function applyCitationFocus() {
+    var focus = state.citationFocus;
+    if (!focus || state.citationFocusApplied) return;
+    state.citationFocusApplied = true;
+    var Focus = window.FileViewerCitationFocus;
+    if (!Focus) return;
+
+    var editor = state.editorInstance;
+    if (editor) {
+      var mode = typeof editor.documentMode === 'function' ? editor.documentMode() : null;
+      if (mode === 'pdf') {
+        await focusCitationInEditorPdf(editor, focus);
+      } else {
+        focusCitationInEditorText(editor, focus);
+      }
+      return;
+    }
+
+    var docx = document.getElementById('viewerDocx');
+    var text = document.getElementById('viewerText');
+    var target = docx && !docx.classList.contains('hidden') ? docx
+      : text && !text.classList.contains('hidden') ? text
+        : null;
+    if (target) {
+      var mark = focus.quote ? Focus.highlightInElement(target, focus.quote) : null;
+      if (mark) {
+        if (typeof mark.scrollIntoView === 'function') mark.scrollIntoView({ block: 'center' });
+      } else if (focus.quote) {
+        notify(citationNotFoundNote(focus), 'info');
+      }
+      return;
+    }
+
+    // The plain PDF fallback opened at #page=N; it cannot draw a highlight.
+    if (focus.quote) notify(citationNotFoundNote(focus), 'info');
+  }
+
+  function showCitationAnnotation(editor, anchor) {
+    state.citationAnnotation = { id: CITATION_ANNOTATION_ID, kind: 'highlight', anchor: anchor };
+    syncViewerAnnotations();
+    var located = false;
+    try { located = typeof editor.locateAnnotation === 'function' && editor.locateAnnotation(CITATION_ANNOTATION_ID); } catch (_) { located = false; }
+    return located;
+  }
+
+  function jumpToEditorPage(editor, selector, page) {
+    if (!page) return false;
+    var host = document.getElementById('viewerEditor');
+    var pages = host ? host.querySelectorAll(selector) : [];
+    var el = pages && pages.length >= page ? pages[page - 1] : null;
+    if (!el) return false;
+    if (typeof editor.jumpTo === 'function') editor.jumpTo(el);
+    else if (typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'start' });
+    return true;
+  }
+
+  function focusCitationInEditorText(editor, focus) {
+    var anchor = null;
+    if (focus.quote && typeof editor.findText === 'function') {
+      try { anchor = editor.findText(focus.quote); } catch (_) { anchor = null; }
+    }
+    if (anchor && showCitationAnnotation(editor, anchor)) return;
+    jumpToEditorPage(editor, '.le-page', focus.page);
+    if (focus.quote) notify(citationNotFoundNote(focus), 'info');
+  }
+
+  async function focusCitationInEditorPdf(editor, focus) {
+    jumpToEditorPage(editor, '.le-pdf-page', focus.page);
+    if (!focus.quote) return;
+    var anchor = await findPdfCitationAnchor(focus);
+    if (anchor && showCitationAnnotation(editor, anchor)) return;
+    notify(citationNotFoundNote(focus), 'info');
+  }
+
+  /**
+   * Search the cited page (then its neighbours) of the PDF for the quote with
+   * the pdf.js build the editor service already serves, and return a
+   * "pdf-page/1" anchor in page points, or null.
+   */
+  async function findPdfCitationAnchor(focus) {
+    var bytes = state.citationPdfBytes;
+    state.citationPdfBytes = null;
+    var baseUrl = getEditorServiceBase();
+    if (!bytes || !baseUrl) return null;
+    var pdfjs = await import('pdfjs-dist');
+    if (pdfjs.GlobalWorkerOptions && !pdfjs.GlobalWorkerOptions.workerSrc) {
+      pdfjs.GlobalWorkerOptions.workerSrc = baseUrl + '/pdfjs/pdf.worker.min.mjs';
+    }
+    var pdf = await pdfjs.getDocument({ data: new Uint8Array(bytes), isEvalSupported: false }).promise;
+    try {
+      var order = window.FileViewerCitationFocus.pageProbeOrder(focus.page, pdf.numPages);
+      for (var i = 0; i < order.length; i++) {
+        var page = await pdf.getPage(order[i]);
+        var viewport = page.getViewport({ scale: 1 });
+        var content = await page.getTextContent();
+        var found = window.FileViewerCitationFocus.pdfQuoteRects(content.items, focus.quote, function (x, y) {
+          return viewport.convertToViewportPoint(x, y);
+        });
+        if (found) return { space: 'pdf-page/1', page: order[i], rects: found.rects };
+      }
+      return null;
+    } finally {
+      if (typeof pdf.destroy === 'function') pdf.destroy();
+    }
+  }
+
+  function onChatCitationClick(event) {
+    var detail = event && event.detail ? event.detail : {};
+    var citation = detail.citation || null;
+    var docId = String(detail.documentId || (citation && (citation.document_id || citation.documentId || citation.doc_id)) || '');
+    var current = state.currentFile && state.currentFile.id ? String(state.currentFile.id) : '';
+    var Evidence = window.Lex && Lex.Chat && Lex.Chat.Evidence;
+    if (!docId || !current || docId !== current || !Evidence || !window.FileViewerCitationFocus) return;
+    if (citation && Evidence.citationKind(citation) === 'authority') return;
+    event.preventDefault();
+    var nav = Evidence.buildCitationViewerNavigation({ documentId: docId, citation: citation, page: detail.page });
+    state.citationFocus = window.FileViewerCitationFocus.fromParams(new URLSearchParams(nav.params));
+    state.citationFocusApplied = false;
+    state.citationAnnotation = null;
+    if (state.citationFocus) {
+      var editor = state.editorInstance;
+      var isPdf = editor && typeof editor.documentMode === 'function' && editor.documentMode() === 'pdf';
+      if (isPdf && state.citationFocus.quote) {
+        refetchPdfBytesForFocus().then(applyCitationFocus).catch(function (error) {
+          console.warn('[FileViewerPage] Could not show the cited passage:', error);
+        });
+        return;
+      }
+      applyCitationFocus().catch(function (error) {
+        console.warn('[FileViewerPage] Could not show the cited passage:', error);
+      });
+    }
+  }
+
+  async function refetchPdfBytesForFocus() {
+    var response = await fetch(getFileDownloadUrl(state.currentFile), { headers: getAuthHeaders() });
+    await assertFetchOk(response, 'Failed to fetch PDF');
+    state.citationPdfBytes = await response.arrayBuffer();
+  }
+
   async function loadFileContent(file) {
     shutdownEditorInstance();
     hideAllViewers();
     hideFormatNotice();
     state.editorMode = 'view';
     state.viewerPlainText = null;
+    state.citationAnnotation = null;
+    state.citationPdfBytes = null;
     state.reviewState = null;
     resetReviewBaselineRevisions();
     state.reviewBatches = [];
@@ -4842,6 +4992,10 @@
     });
     await assertFetchOk(response, 'Failed to fetch PDF');
     var arrayBuffer = await response.arrayBuffer();
+    if (state.citationFocus && !state.citationFocusApplied && state.citationFocus.quote) {
+      // A private copy: pdf.js may transfer the buffer it is handed.
+      state.citationPdfBytes = arrayBuffer.slice(0);
+    }
     if (isEditorEnabled() && isEditorPreviewFile(file)) {
       var renderedWithEditor = await loadFileInEditor(file, arrayBuffer);
       if (renderedWithEditor) return;
@@ -4849,7 +5003,8 @@
     var blob = new Blob([arrayBuffer], { type: file.content_type || 'application/pdf' });
     var objectUrl = URL.createObjectURL(blob);
     var iframe = document.getElementById('viewerIframe');
-    iframe.src = objectUrl + '#page=' + state.citationPage;
+    var citedPage = state.citationFocus && !state.citationFocusApplied ? state.citationFocus.page : null;
+    iframe.src = citedPage ? objectUrl + '#page=' + citedPage : objectUrl;
     iframe.classList.remove('hidden');
     hideLoading();
   }
@@ -4999,6 +5154,8 @@
       state.editorMode = 'view';
 
       editor.on('annotation-selected', function (detail) {
+        // The cited-passage highlight has no review card.
+        if (detail && detail.id === CITATION_ANNOTATION_ID) return;
         focusReviewAnnotationCard(detail && detail.id);
       });
       editor.on('annotation-region-selected', function (detail) {
@@ -5196,11 +5353,7 @@
     };
 
     var msg = 'Permanently delete "' + name + '"? The file, its embeddings, and related metadata will be removed. This cannot be undone.';
-    if (typeof Lex !== 'undefined' && Lex.Modal && typeof Lex.Modal.confirm === 'function') {
-      Lex.Modal.confirm('Delete File', msg, run);
-    } else if (window.confirm(msg)) {
-      run();
-    }
+    Lex.Modal.confirm('Delete File', msg, run);
   }
 
   async function convertCurrentPdfToDocx() {
@@ -5425,7 +5578,11 @@
     var viewPanel = document.getElementById('metaViewMode');
     var editPanel = document.getElementById('metaEditMode');
     var footer = document.getElementById('metaActionsFooter');
-    var footerShell = footer && footer.closest ? footer.closest('.lex-drawer-footer') : null;
+    var drawer = footer && footer.closest ? footer.closest('lex-drawer') : null;
+    var setFooterVisible = function (visible) {
+      footer.classList.toggle('hidden', !visible);
+      if (drawer && typeof drawer.setFooterVisible === 'function') drawer.setFooterVisible(visible);
+    };
 
     if (toggle && toggle.value !== mode) {
       toggle.value = mode;
@@ -5434,13 +5591,11 @@
     if (mode === 'view') {
       viewPanel.classList.remove('hidden');
       editPanel.classList.add('hidden');
-      footer.classList.add('hidden');
-      if (footerShell) footerShell.classList.add('hidden');
+      setFooterVisible(false);
     } else {
       viewPanel.classList.add('hidden');
       editPanel.classList.remove('hidden');
-      footer.classList.remove('hidden');
-      if (footerShell) footerShell.classList.remove('hidden');
+      setFooterVisible(true);
     }
   }
 
@@ -5878,6 +6033,12 @@
     var requestedPage = Number(params.get('page'));
     state.citationPage = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
     state.explicitVersionView = params.get('version_view') === '1';
+    state.citationFocus = window.FileViewerCitationFocus
+      ? window.FileViewerCitationFocus.fromParams(params)
+      : null;
+    // A source clicked in a chat on this page for the document already open
+    // focuses in place instead of reloading the viewer.
+    document.addEventListener('lex-chat-citation-click', onChatCitationClick);
 
     // Read referrer context
     var ctx = Lex.Nav.consume();

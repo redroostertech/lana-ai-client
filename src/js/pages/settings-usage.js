@@ -99,6 +99,8 @@
       periodStart: root.period_start || root.periodStart || null,
       periodEnd: root.period_end || root.periodEnd || null,
       messages: firstNumber([root.messages, root.message_count, root.total_messages, root.total_messages_sent]),
+      messagesSent: firstOwnNumber(root, ['messages_sent']),
+      messagesReceived: firstOwnNumber(root, ['messages_received']),
       uploads: firstNumber([root.documents_uploaded, root.upload_count, root.total_documents_uploaded]),
       conversations: firstNumber([root.conversations, root.conversation_count, root.total_conversations]),
       totalTokens: firstNumber([
@@ -216,11 +218,17 @@
       conversationTotal = firstNumber([pagination.total, state.conversations.total]);
     }
 
-    setText('sv2-message-count', formatCount(usage.messages));
+    // Sent (input) and received (output) when the server splits them.
+    var hasMessageSplit = usage.messagesSent !== null && usage.messagesReceived !== null;
+    setText('sv2-message-count', formatCount(hasMessageSplit
+      ? usage.messagesSent + usage.messagesReceived
+      : usage.messages));
     setText('sv2-upload-count', formatCount(usage.uploads));
     setText('sv2-conversation-count', formatCount(conversationTotal));
     setText('sv2-estimated-tokens', formatCount(usage.totalTokens));
-    setText('sv2-message-detail', usage.period ? 'In selected period' : 'Recent activity');
+    setText('sv2-message-detail', hasMessageSplit
+      ? formatCount(usage.messagesSent) + ' sent · ' + formatCount(usage.messagesReceived) + ' received'
+      : (usage.period ? 'In selected period' : 'Recent activity'));
     setText('sv2-upload-detail', usage.period ? 'In selected period' : 'Recent activity');
     setText('sv2-conversation-detail', usage.conversations === null && conversationTotal !== null
       ? 'All-time total'

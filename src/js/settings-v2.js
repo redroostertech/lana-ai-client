@@ -500,44 +500,38 @@
         '<p style="margin-bottom:16px;font-size:var(--lex-body-sm-size);color:var(--lex-text-secondary);">Scan this QR code with your authenticator app:</p>' +
         '<img src="' + esc(result.qr_code) + '" alt="MFA QR Code" style="display:block;margin:0 auto 16px;max-width:200px;">' +
         '<p style="font-size:var(--lex-body-xs-size);color:var(--lex-text-tertiary);margin-bottom:16px;">Or enter this key manually: <strong>' + esc(result.secret) + '</strong></p>' +
-        '<lex-input id="sv2-mfa-verify-input" placeholder="Enter 6-digit code" maxlength="6"></lex-input>' +
-        '<div style="margin-top:16px;">' +
-          '<lex-btn id="sv2-mfa-verify-btn" variant="primary" size="sm">Verify &amp; Enable</lex-btn>' +
-        '</div>';
+        '<lex-input id="sv2-mfa-verify-input" placeholder="Enter 6-digit code" maxlength="6"></lex-input>';
 
-      Lex.Modal.open({
+      var modal = Lex.Modal.open({
         heading: 'Setup Two-Factor Authentication',
         content: content,
         hideActions: true,
-        size: 'md'
+        size: 'md',
+        footerContent: '<lex-btn id="sv2-mfa-verify-btn" variant="primary" size="sm">Verify &amp; Enable</lex-btn>'
       });
 
-      // Wire verify button after modal opens
-      setTimeout(function () {
-        var verifyBtn = document.getElementById('sv2-mfa-verify-btn');
-        if (verifyBtn) {
-          verifyBtn.addEventListener('click', function () {
-            var tokenInput = document.getElementById('sv2-mfa-verify-input');
-            var token = tokenInput ? tokenInput.value : '';
-            if (!token) {
-              if (tokenInput) tokenInput.error = 'Please enter the 6-digit code';
-              return;
-            }
+      // Lex.Modal.open renders synchronously; query within this modal only.
+      var verifyBtn = modal.querySelector('#sv2-mfa-verify-btn');
+      if (verifyBtn) {
+        verifyBtn.addEventListener('click', function () {
+          var tokenInput = modal.querySelector('#sv2-mfa-verify-input');
+          var token = tokenInput ? tokenInput.value : '';
+          if (!token) {
+            if (tokenInput) tokenInput.error = 'Please enter the 6-digit code';
+            return;
+          }
 
-            verifyBtn.loading = true;
-            api.verifyMfa(token).then(function () {
-              Lex.Toast.success('MFA enabled successfully');
-              // Close modal
-              var modal = document.querySelector('lex-modal[open]');
-              if (modal) modal.open = false;
-              loadMfaStatus();
-            }).catch(function () {
-              if (tokenInput) tokenInput.error = 'Invalid code. Please try again.';
-              verifyBtn.loading = false;
-            });
+          verifyBtn.loading = true;
+          api.verifyMfa(token).then(function () {
+            Lex.Toast.success('MFA enabled successfully');
+            closeOpenedModal(modal);
+            loadMfaStatus();
+          }).catch(function () {
+            if (tokenInput) tokenInput.error = 'Invalid code. Please try again.';
+            verifyBtn.loading = false;
           });
-        }
-      }, 100);
+        });
+      }
     }).catch(function (error) {
       Lex.Toast.error(error.message || 'Failed to setup MFA');
     });
@@ -547,54 +541,60 @@
     var content = document.createElement('div');
     content.innerHTML =
       '<p class="sv2-modal-copy">Confirm your account password to disable two-factor authentication.</p>' +
-      '<lex-input id="sv2-mfa-disable-password" label="Password" type="password" required="true"></lex-input>' +
-      '<div class="sv2-form-actions">' +
-        '<lex-btn id="sv2-mfa-disable-confirm-btn" variant="danger" size="sm">Disable MFA</lex-btn>' +
-        '<lex-btn id="sv2-mfa-disable-cancel-btn" variant="ghost" size="sm">Cancel</lex-btn>' +
-      '</div>';
+      '<lex-input id="sv2-mfa-disable-password" label="Password" type="password" required="true"></lex-input>';
 
     var modal = Lex.Modal.open({
       heading: 'Disable MFA',
       content: content,
       hideActions: true,
       size: 'sm',
-      closeOnOverlay: true
+      closeOnOverlay: true,
+      footerContent:
+        '<lex-btn id="sv2-mfa-disable-cancel-btn" variant="ghost" size="sm">Cancel</lex-btn>' +
+        '<lex-btn id="sv2-mfa-disable-confirm-btn" variant="danger" size="sm">Disable MFA</lex-btn>'
     });
 
-    setTimeout(function () {
-      var passwordInput = document.getElementById('sv2-mfa-disable-password');
-      var confirmBtn = document.getElementById('sv2-mfa-disable-confirm-btn');
-      var cancelBtn = document.getElementById('sv2-mfa-disable-cancel-btn');
+    // Lex.Modal.open renders synchronously; query within this modal only.
+    var passwordInput = modal.querySelector('#sv2-mfa-disable-password');
+    var confirmBtn = modal.querySelector('#sv2-mfa-disable-confirm-btn');
+    var cancelBtn = modal.querySelector('#sv2-mfa-disable-cancel-btn');
 
-      if (cancelBtn) {
-        cancelBtn.addEventListener('click', function () {
-          if (modal) modal.open = false;
-        });
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', function () {
+        closeOpenedModal(modal);
+      });
+    }
+
+    if (!confirmBtn) return;
+    confirmBtn.addEventListener('click', function () {
+      var password = passwordInput ? passwordInput.value : '';
+      if (!password) {
+        if (passwordInput) passwordInput.error = 'Password is required';
+        return;
       }
 
-      if (!confirmBtn) return;
-      confirmBtn.addEventListener('click', function () {
-        var password = passwordInput ? passwordInput.value : '';
-        if (!password) {
-          if (passwordInput) passwordInput.error = 'Password is required';
-          return;
+      confirmBtn.loading = true;
+      api.disableMfa(password).then(function () {
+        Lex.Toast.success('MFA disabled');
+        closeOpenedModal(modal);
+        loadMfaStatus();
+      }).catch(function (error) {
+        if (passwordInput && error && (error.status === 400 || error.status === 401)) {
+          passwordInput.error = error.message || 'Invalid password';
+        } else {
+          Lex.Toast.error(error.message || 'Failed to disable MFA');
         }
-
-        confirmBtn.loading = true;
-        api.disableMfa(password).then(function () {
-          Lex.Toast.success('MFA disabled');
-          if (modal) modal.open = false;
-          loadMfaStatus();
-        }).catch(function (error) {
-          if (passwordInput && error && (error.status === 400 || error.status === 401)) {
-            passwordInput.error = error.message || 'Invalid password';
-          } else {
-            Lex.Toast.error(error.message || 'Failed to disable MFA');
-          }
-          confirmBtn.loading = false;
-        });
+        confirmBtn.loading = false;
       });
-    }, 100);
+    });
+  }
+
+  // Close a modal created by Lex.Modal.open through its own close lifecycle
+  // (exit animation, then removal) so its ids never linger in the document.
+  function closeOpenedModal(modal) {
+    if (!modal) return;
+    if (typeof modal.removeAfterClose === 'function') modal.removeAfterClose();
+    else modal.open = false;
   }
 
 
@@ -1825,22 +1825,16 @@
     if (!row || row.status !== 'connected' || !row.source_id || row.supports_sync === false) return '';
     var value = currentSyncFrequency(row);
     var options = [
-      ['manual', 'Manual'],
-      ['hourly', 'Hourly'],
-      ['daily', 'Daily'],
-      ['weekly', 'Weekly']
+      { value: 'manual', label: 'Manual' },
+      { value: 'hourly', label: 'Hourly' },
+      { value: 'daily', label: 'Daily' },
+      { value: 'weekly', label: 'Weekly' }
     ];
-    var html =
-      '<label class="sv2-connection-sync-control">' +
+    return '<span class="sv2-connection-sync-control">' +
         '<span>Sync</span>' +
-        '<select class="sv2-connection-sync-select" data-source-id="' + esc(row.source_id || '') + '" data-current-value="' + esc(value) + '">';
-    for (var i = 0; i < options.length; i++) {
-      html += '<option value="' + options[i][0] + '"' + (value === options[i][0] ? ' selected' : '') + '>' +
-        options[i][1] +
-      '</option>';
-    }
-    html += '</select></label>';
-    return html;
+        '<lex-select size="sm" class="sv2-connection-sync-select" aria-label="Sync frequency" data-source-id="' + esc(row.source_id || '') + '" data-current-value="' + esc(value) + '"' +
+          ' options="' + esc(JSON.stringify(options)) + '" value="' + esc(value) + '"></lex-select>' +
+      '</span>';
   }
 
   function renderUserConnectionsRows(rows) {
@@ -1911,7 +1905,7 @@
     }
     var selects = dom.userConnectionsContent.querySelectorAll('.sv2-connection-sync-select');
     for (var j = 0; j < selects.length; j++) {
-      selects[j].addEventListener('change', handleUserConnectionSyncFrequencyChange);
+      selects[j].addEventListener('lex-change', handleUserConnectionSyncFrequencyChange);
     }
   }
 
@@ -2061,17 +2055,15 @@
     return formatted.relative || value;
   }
 
-  function renderEntityFilterOptions(counts, selected) {
-    var html = '<option value="">All entities</option>';
+  function entityFilterOptions(counts) {
+    var options = [{ value: '', label: 'All entities' }];
     for (var i = 0; i < (counts || []).length; i++) {
       var count = counts[i] || {};
       var entity = count.entity_type || '';
       if (!entity) continue;
-      html += '<option value="' + esc(entity) + '"' + (selected === entity ? ' selected' : '') + '>' +
-        esc(entity) + ' (' + esc(String(count.count || 0)) + ')' +
-      '</option>';
+      options.push({ value: String(entity), label: entity + ' (' + String(count.count || 0) + ')' });
     }
-    return html;
+    return options;
   }
 
   function renderConnectionDataRecords(payload) {
@@ -2131,9 +2123,9 @@
 
     body.innerHTML =
       '<div class="sv2-connection-data-toolbar">' +
-        '<select class="sv2-connection-data-entity" aria-label="Entity type">' +
-          renderEntityFilterOptions(payload.entity_counts || [], state.entityType || '') +
-        '</select>' +
+        '<lex-select size="sm" class="sv2-connection-data-entity" aria-label="Entity type" placeholder="All entities"' +
+          ' options="' + esc(JSON.stringify(entityFilterOptions(payload.entity_counts || []))) + '"' +
+          ' value="' + esc(state.entityType || '') + '"></lex-select>' +
         '<input class="sv2-connection-data-search" type="search" placeholder="Search records" value="' + esc(state.query || '') + '">' +
         '<lex-btn size="sm" variant="secondary" icon="search" data-action="filter-data">Search</lex-btn>' +
         '<lex-btn size="sm" variant="danger" icon="trash-2" data-action="delete-data">Delete data</lex-btn>' +

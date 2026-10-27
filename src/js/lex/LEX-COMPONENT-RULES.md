@@ -100,6 +100,11 @@ defineLex('my-component', MyComponent);
 - `this.listen(el, event, handler)` — auto-cleaned event listener
 - `this.delegate(event, selector, handler)` — event delegation
 - `this._scheduleUpdate()` — trigger re-render via `queueMicrotask`
+- `Lex.LexElement.cloneContent(node)` — deep-copy authored content; Lex descendants that already rendered are copied from their source children, not their rendered markup
+
+**Properties set before upgrade are kept.** `el.options = [...]` on a `<lex-*>` whose script has not loaded yet (or `document.createElement` before the definition) is captured in the constructor and re-applied once the accessor exists; it wins over the matching attribute, as it would after upgrade.
+
+**Slotted children survive any script load order.** A component captures its children with `cloneContent`, so a `<lex-btn>` inside a `<lex-modal>`/`<lex-drawer>` footer renders one `<button>` even when `lex-btn.js` loads first (it used to render a button inside a button).
 
 ### Responsive Layout: Size From the Component, Not the Window
 
@@ -265,20 +270,25 @@ Lex.state.onAuthChange(callback); // subscribe
 
 ### `<lex-btn>`
 
+**`form="formId"`** submits that form from outside it (e.g. a modal footer) — no hidden submit buttons or requestSubmit helpers.
+
 **Purpose:** Primary interactive button with icon support, loading state, and variants.
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `label` | String | — | Button text |
-| `variant` | String | `'primary'` | `primary`, `secondary`, `danger`, `ghost`, `link` |
+| `label` | String | `''` | Button text when the element has no children (`<lex-btn label="Save">` or `btn.label = 'Save'`). Children win when present. Escaped. |
+| `variant` | String | `'primary'` | `primary`, `secondary`, `danger`, `success`, `warning`, `info`, `ghost` |
 | `size` | String | `'md'` | `sm`, `md`, `lg` |
-| `icon` | String | — | Lucide icon name (left position) |
-| `iconRight` | String | — | Icon on right side |
-| `iconOnly` | Boolean | `false` | Icon-only circular button |
+| `leadingIcon` | String | `''` | Lex.Icons (Lucide) name before the text (`leading-icon`) |
+| `trailingIcon` | String | `''` | Icon after the text (`trailing-icon`) |
+| `icon` | Boolean | `false` | Icon-only (square padding) |
+| `badge` | Number | `0` | Notification bubble (`>99` shows `99+`) |
 | `loading` | Boolean | `false` | Shows spinner, disables click |
 | `disabled` | Boolean | `false` | Disabled state |
 | `type` | String | `'button'` | `button`, `submit`, `reset` |
-| `href` | String | — | If set, renders as `<a>` tag |
+| `form` | String | `''` | id of a `<form>` or `<lex-form>` this button submits from outside it |
+
+There is no `href`; for navigation use a link or `Lex.Nav.go()` in a click handler.
 
 **Events:** Standard click (no custom events).
 
@@ -314,6 +324,8 @@ Lex.state.onAuthChange(callback); // subscribe
 
 ### `<lex-modal>`
 
+**Footer and header:** `footer-content` (first render only), or children with `data-slot="footer"` (they replace the built-in confirm/cancel), or `modal.setFooterContent(html)` after render. `modal.setHeaderActions(html)`. `hide-close` removes the header close button. Call `modal.keepOpen()` in a `lex-confirm` listener to stay open. For window.confirm/alert/prompt use `Lex.Modal.confirmAsync/alertAsync/prompt` (escaped text). Never reach into `.lex-modal-title`/`.lex-modal-close`.
+
 **Purpose:** Centered overlay dialog with backdrop, focus trap, scroll lock, and confirm/cancel actions.
 
 | Property | Type | Default | Description |
@@ -326,13 +338,24 @@ Lex.state.onAuthChange(callback); // subscribe
 | `variant` | String | `'default'` | `default`, `danger` |
 | `hideActions` | Boolean | `false` | Hide footer buttons |
 | `closeOnOverlay` | Boolean | `true` | Close when clicking backdrop |
+| `hideClose` | Boolean | `false` | No header close button (`hide-close`) |
+| `closeOnEscape` | Boolean | `true` | `close-on-escape="false"` stops Escape from closing |
+| `flush` | Boolean | `false` | No body padding (tables, lists, editors edge to edge) |
+| `width` | String | `''` | Any CSS length (`720px`, `60rem`, `90vw`); overrides the `size` max-width |
+| `palette` | Boolean | `false` | Command-palette layout: top-aligned at 12vh, no header, flush body, 640px wide unless `width` is set, no built-in confirm/cancel. Focus trap and Escape still apply; `heading` becomes the dialog's `aria-label`. Set before the first render. |
+
+**Instance API:** `modal.contentRoot` (the element body content lives in; use it instead of querying `.lex-modal-body`), `setFooterContent(html)`, `setHeaderActions(html)`, `keepOpen()`.
 
 **Events:** `lex-confirm`, `lex-cancel`, `lex-close`
 
 **Static API:**
 ```javascript
-Lex.Modal.confirm({ heading: 'Delete?', body: '...', variant: 'danger' })
-  .then(confirmed => { if (confirmed) { ... } });
+if (await Lex.Modal.confirmAsync('Delete?', 'This cannot be undone.', { variant: 'danger' })) { ... }
+const modal = Lex.Modal.open({
+  heading, content, size, hideActions, footerContent,
+  hideClose: true, closeOnEscape: false, flush: true, width: '720px'
+});
+const palette = Lex.Modal.open({ heading: 'Command palette', palette: true, content: paletteEl });
 ```
 
 **Rules:**
@@ -342,6 +365,8 @@ Lex.Modal.confirm({ heading: 'Delete?', body: '...', variant: 'danger' })
 
 ### `<lex-drawer>`
 
+**Header actions and footer:** children with `data-slot="header-actions"` move into the header and `data-slot="footer"` into the footer. `drawer.setHeaderActions([...])`, `drawer.setFooterVisible(bool)`, `drawer.contentRoot` (the element page content lives in; use it rather than querying `.lex-drawer-body`).
+
 **Purpose:** Slide-in side panel from left or right edge with same overlay infrastructure as modal.
 
 | Property | Type | Default | Description |
@@ -349,10 +374,11 @@ Lex.Modal.confirm({ heading: 'Delete?', body: '...', variant: 'danger' })
 | `heading` | String | — | Drawer title |
 | `open` | Boolean | `false` | Controls visibility |
 | `side` | String | `'right'` | `left`, `right` |
-| `width` | String | `'400px'` | Panel width |
+| `width` | String | `'md'` | `sm` (320px), `md` (420px), `lg`, `xl`, `full` |
 | `confirmText` | String | `'Save'` | Footer confirm button |
 | `cancelText` | String | `'Cancel'` | Footer cancel button |
 | `showFooter` | Boolean | `false` | Show footer with actions |
+| `flush` | Boolean | `false` | No body padding; also `Lex.Drawer.open({ flush: true })` |
 
 **Events:** `lex-confirm`, `lex-cancel`, `lex-close`
 
@@ -515,13 +541,24 @@ All form components use the `withFormField` mixin, providing: `name`, `label`, `
 
 | Own Property | Type | Default | Description |
 |-------------|------|---------|-------------|
-| `options` | Array | `[]` | `[{ value, label, icon?, disabled? }]` or `['string']` |
+| `options` | Array | `[]` | `[{ value, label, description?, group?, disabled? }]`, `['string']`, or `{ divider: true }` separators |
 | `multiple` | Boolean | `false` | Multi-select mode |
 | `searchable` | Boolean | `false` | Filterable dropdown |
-| `placeholder` | String | — | Placeholder text |
+| `placeholder` | String | `'Select...'` | Placeholder text |
 | `clearable` | Boolean | `false` | Allow clearing selection |
+| `visibleLimit` | Number | `0` | Show only the first N options until the user searches (`visible-limit`) |
 
-**Events:** `lex-change { name, value }`
+**Events:** `lex-change { name, value }` — `value` is a string, or an array under `multiple`.
+
+**Behaviour:**
+- Option values are compared as strings: `{ value: 2 }` works, and `select.value` reads back `'2'`.
+- `{ disabled: true }` options and `{ divider: true }` separators cannot be chosen; arrow keys skip them.
+- Single: a `value` that matches no option shows the placeholder (the value is kept, so options loaded later still select it).
+- `multiple`: `select.value` is an array of strings; the setter takes an array, a JSON array string or a comma-separated string.
+- `.options` / `.value` assigned before the element upgrades are kept.
+- `select.focus()` focuses the trigger. Inside a native `<form>`, the form's `reset` restores the value the select had when it first connected.
+- Option, clear and pill-remove clicks call `preventDefault`, so a lex-select inside a `<label>` does not reopen.
+- Keyboard (non-searchable): ArrowDown/Enter/Space opens; ArrowUp/ArrowDown move; Enter/Space selects; Escape closes.
 
 ### `<lex-toggle>`
 
@@ -607,10 +644,54 @@ Button that opens a dropdown action menu (not a value selector).
 
 | Own Property | Type | Default | Description |
 |-------------|------|---------|-------------|
-| `label` | String | — | Button label |
-| `items` | Array | `[]` | `[{ value, label, icon?, variant? }]` |
+| `buttonLabel` | String | `'Actions'` | Trigger text (`button-label`); the accessible name of an icon-only trigger when there is no `aria-label` |
+| `options` | Array | `[]` | Items (below) |
+| `variant` | String | `'secondary'` | `primary`, `secondary`, `ghost` |
+| `icon` | String | `''` | Lex.Icons name shown on the trigger |
+| `iconOnly` | Boolean | `false` | Icon-only trigger (`icon-only`): no text, no chevron. Give the element an `aria-label`. |
+| `align` | String | `'start'` | `end` lines the menu up with the trigger's right edge (header menus at the right edge) |
+| `floating` | Boolean | `false` | Render the open menu in a body-level layer (`position: fixed`) so a card, table row, drawer or modal with `overflow: hidden/auto` cannot clip it. Set it on every menu inside such a container (row/card kebabs, drawer and modal header menus). |
+| `searchable` | Boolean | `false` | Search box in the menu |
+| `disabled` | Boolean | `false` | Disabled trigger |
 
-**Events:** `item-click { value, label }`
+**Items:** `{ value, label, icon?, description?, href?, target?, variant?: 'danger', danger?: true, disabled?: true }`, or `{ divider: true }` for a separator. `href` renders the item as a link (`javascript:`/`data:` URLs are dropped); clicking it emits `lex-select` and then follows the link.
+
+**Events:** `lex-select { value, label, item }` (`value` is the string form)
+
+**Keyboard and ARIA:** ArrowDown/Enter/Space on the trigger opens and focuses the first item; ArrowUp/ArrowDown/Home/End move (skipping separators and disabled items); Enter/Space activates; Escape closes and returns focus to the trigger (without closing an enclosing modal); Tab closes. Roles `menu` / `menuitem` / `separator`; trigger carries `aria-haspopup="menu"`, `aria-expanded`, `aria-controls`.
+
+**`floating`:** the menu opens below the trigger and flips above when there is less room below (capping its height when neither side fits), honours `align="end"`, clamps to the viewport, and re-positions on scroll (capture phase, so any scrolling ancestor counts) and resize. It stacks at `--lex-z-floating` (2000), above lex-modal/lex-drawer (`--lex-z-modal`) and page topbars. Outside click, Escape (an enclosing modal stays open), keyboard navigation and `lex-select` (still emitted on the element, so `closest()` lookups from the event work) behave as without it. `aria-controls` names the floating menu; while it is open the menu is not inside the element, so tests and code find it with `document.getElementById(trigger.getAttribute('aria-controls'))`, never `el.querySelector('.lex-ddbtn-item')`. The layer is removed on close and when the element disconnects. Not the default, because existing code reads the open menu from inside the element (the header user menu does).
+
+### `Lex.Menu.openAt(anchor, items, opts)`
+
+A floating menu at any rect, for menus with no trigger of their own: autocomplete at a text caret (`range.getBoundingClientRect()`), a picker under a toolbar button. Defined in `lex-dropdown-btn.js` (load that script). The host keeps DOM focus (a contenteditable keeps its caret) and forwards keys.
+
+```javascript
+const menu = Lex.Menu.openAt(() => range.getBoundingClientRect(), items, {
+  heading: 'Template variables', hint: '#{{entity:property_key}}',
+  search: { value: '', placeholder: 'Search...', onInput: (q) => menu.update(filter(q)) },
+  onBack: () => { /* back one level */ },
+  tabSelects: true, owner: editorEl, align: 'center', gap: 8,
+  onSelect: (item, index) => { insert(item); menu.close(); },
+  onClose: (reason) => { /* 'escape' | 'outside' | 'host' */ }
+});
+editorEl.addEventListener('keydown', (e) => { if (menu.open && menu.handleKey(e)) e.preventDefault(); });
+menu.update(nextItems);   // filtering as the user types; opts merge, highlight kept unless opts.activeIndex
+```
+
+- **anchor:** a DOMRect-like box, or a function returning one (re-read on scroll/resize, so the menu follows a caret in a scrolling page).
+- **items:** `{ value, label, description?, meta?, icon?, avatar?, disabled?, data? }` or `{ divider: true }`. `meta` is a monospace second line, `avatar` short text (initials) in a circle, `data` anything the host wants back in `onSelect`.
+- **opts:** `align` start/center/end, `placement` bottom/top, `gap`, `margin`, `width`, `id`, `className`, `ariaLabel`, `heading`, `hint`, `onBack`, `search`, `emptyText`, `activeIndex`, `tabSelects`, `owner` (gets `aria-expanded`, `aria-controls`, `aria-activedescendant`), `ignoreOutside(target)`, `onSelect`, `onActiveChange`, `onClose`.
+- **Controller:** `element`, `open`, `activeIndex`, `items`, `update(items, opts)`, `reposition()`, `setActive(i)`, `move(delta)`, `select(i?)`, `handleKey(event)` (true when used: ArrowUp/ArrowDown/Home/End move and wrap past dividers and disabled items, Enter (and Tab with `tabSelects`) selects, Escape closes; with no selectable items only Escape is used, so Enter falls through to the editor), `focusSearch()`, `close()`.
+- **Behaviour:** placement as `floating` above. Selecting does not close the menu: the host closes it or drills into another level with `update()`. A mousedown inside the menu (except its search box) is prevented so focus stays in the host. Escape is caught in the capture phase (an enclosing modal stays open); a mousedown outside closes it. Because `update()` replaces the rows, a document-level click handler that runs after a pick should test `event.composedPath()` rather than `closest()` on the detached row.
+- **Positioning helper:** `Lex.Floating.compute(anchorRect, { width, height }, { width, height }, { align, placement, gap, margin })` returns `{ top, left, placement, maxHeight }` (pure, for tests); `Lex.Floating.place(el, rect, opts)` and `Lex.Floating.track(el, getRect, opts)` (in `lex.core.js`) position a fixed element and follow scroll/resize.
+
+```html
+<lex-dropdown-btn icon="settings" icon-only aria-label="Account menu" align="end" variant="ghost"
+  options='[{"label":"Settings","href":"settings-v2.html","icon":"settings"},{"divider":true},
+            {"value":"logout","label":"Log out","icon":"log-out","variant":"danger"}]'>
+</lex-dropdown-btn>
+```
 
 ### `<lex-form>`
 
@@ -624,10 +705,13 @@ Form container that orchestrates validation and value collection.
 
 ```javascript
 const form = document.querySelector('lex-form');
-form.getValues();    // { name: 'value', ... }
-form.validate();     // { valid, errors: [{name, message}] }
-form.reset();        // Clear validation, reset values
+form.getValues();      // { name: 'value', ... }
+form.validate();       // { valid, errors: [{name, message}] }
+form.reset();          // Clear validation, reset values
+form.requestSubmit();  // Validate and emit lex-submit, as a submit click does
 ```
+
+**Submitting from outside** (e.g. a modal footer): give the lex-form an `id` and point a submit button at it — `<lex-btn type="submit" form="editUserForm">Save</lex-btn>`. A submit button inside a lex-form whose `form` names a different form is left to that form. lex-form does not wrap a native `<form>`; there is no browser submission.
 
 ### Form Decision Guide
 
@@ -686,13 +770,40 @@ Sortable, searchable, filterable, paginated data table with selection and bulk a
 | `sortBy` | String | — | Default sort column |
 | `sortDir` | String | `'asc'` | Default sort direction |
 | `compact` | Boolean | `false` | Reduced padding |
-| `columnFilters` | Boolean | `false` | Per-column filter dropdowns |
+| `columnFilters` | Boolean | `false` | Per-column filter dropdowns. Server-paged tables show one only on columns given `setColumnFilterOptions`; blank-label columns never get one |
+| `searchKeys` | String | all columns | Comma-separated columns the client-side search looks in |
+| `sortableColumns` | String | all | Comma-separated keys whose headers sort; empty = none |
 | `emptyText` | String | `'No data found'` | Empty state message |
 | `bulkActions` | Array | `[]` | `[{ label, action, variant?, icon? }]` |
 
-Plus `withDataSource` properties: `endpoint`, `limit`, `autoFetch`, `searchable`, `filterable`, `selectable`, `linkedTo`, `idKey`.
+Plus `withDataSource` properties: `endpoint`, `limit`, `autoFetch`, `searchable`, `filterable`, `selectable`, `linkedTo`, `idKey`, `serverPaging`.
 
-**Events:** `row-click`, `sort-change`, `selection-change`, `bulk-action`, `lex-filter-change`, `lex-data-loaded`
+**State API (use instead of private `dataSource._*` fields):** `table.setError(message)` (error state in either mode), `table.setSearch(term)`, `table.searchText`, `table.pagination`, `table.filteredRows` (client: all matching rows across pages), `table.restoreQuery({ search, sortBy, sortDir, filters, page, limit })` and `table.resetQuery()` (both set state without fetching).
+
+**Events:** `row-click`, `sort-change`, `selection-change`, `bulk-action`, `lex-filter-change`, `lex-data-loaded`, `lex-query-change` (server paging)
+
+**Page-level table standard** (layout, toolbar, data mode, dates, filters, widths, pagination, and the migration inventory): `docs/TABLE-STANDARD.md`. Every list page follows it.
+
+**Server paging:** use `server-paging` when the API pages and sorts itself and its parameter names differ from `endpoint` mode's (`page`/`limit`/`sortBy`/`sortOrder`/`q`). The page owns the request; the table owns paging and sort state.
+```javascript
+// <lex-table id="files" server-paging sortable-columns="name,updated_at" sort-by="updated_at" sort-dir="desc" limit="20">
+table.addEventListener('lex-query-change', async (e) => {
+  const { page, limit, sortBy, sortDir, search, filters } = e.detail;
+  try {
+    const res = await api.get(/* map the query to the API's params */);
+    table.setServerData(rows, res.pagination);   // { page, limit|page_size, total, totalPages|total_pages }
+  } catch (err) { table.setServerError(err.message); }
+});
+table.requestServerQuery();                      // first load
+table.requestServerQuery({ resetPage: true });   // after a filter outside the table changes
+```
+**RULE:** with `server-paging`, list in `sortable-columns` only what the API can sort, and keep filters outside the table (column filters would only see one page).
+
+**Supplied column-filter options:** `table.setColumnFilterOptions({ col: { options: [{ value, label }], single } })` replaces the values derived from the rows (a server-paged table shows a filter only on columns given options). On a client-side table, add `match(cellValue, selectedValues)` to filter by predicate instead of exact value, e.g. date ranges:
+```javascript
+table.setColumnFilterOptions({ created_at: { single: true, options: LanaLibraryColumnFilters.EDITED_RANGE_OPTIONS,
+  match: (cell, values) => LanaLibraryColumnFilters.inEditedRange(cell, values[0]) } });
+```
 
 **Selection API:**
 ```javascript

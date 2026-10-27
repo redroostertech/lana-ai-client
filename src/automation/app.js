@@ -11,14 +11,15 @@ import { getApiUrl } from './js/shared/api-base-url.js';
 import { renderConnectors } from './js/views/connectors.js';
 import { renderConnectorDetail, teardownConnectorDetail } from './js/views/connector-detail.js';
 import { buildChecklist, renderHome } from './js/views/home.js';
-import { renderLibrary, toggleAutomation } from './js/views/library.js';
+import { invalidateLibraryTable, renderLibrary, toggleAutomation } from './js/views/library.js';
 import {
   createLibraryDetailState,
   handleLibraryDetailClick,
   loadLibraryDetailAutomation,
   loadMatterAttachments,
   loadAutomationRuns,
-  renderLibraryDetail
+  renderLibraryDetail,
+  syncLibraryDetailModals
 } from './js/views/library-detail.js';
 import {
   applyTemplate,
@@ -43,8 +44,8 @@ import {
   updateBuilderAction,
   validateBuilder
 } from './js/views/builder.js';
-import { renderRuns } from './js/views/runs.js';
-import { renderApprovals } from './js/views/approvals.js';
+import { invalidateRunsTable, renderRuns } from './js/views/runs.js';
+import { invalidateApprovalsTable, renderApprovals } from './js/views/approvals.js';
 import { indexConnectors, findConnectorById, normalizeConnector, buildLanaClientConnectorUrl } from './js/shared/connectors.js';
 import { hasAdminRole } from './js/shared/access.js';
 import { formatFileSize } from './js/shared/utils.js';
@@ -108,12 +109,8 @@ const state = {
   actionCatalog: [],
   matters: [],
   runs: [],
-  runsPagination: {
-    total: 0,
-    limit: 25,
-    offset: 0,
-    has_more: false
-  },
+  // Server-paged table state (query, search, last page) per list view.
+  tables: {},
   selectedRunId: null,
   selectedRunDetail: null,
   selectedRunArtifactId: null,
@@ -203,14 +200,20 @@ const API_PATH_FALLBACKS = {
   '/api/v1/automation/templates': '/api/templates',
   '/api/automations': '/api/v1/automations',
   '/api/v1/automations': '/api/automations',
+  '/api/automations/facets': '/api/v1/automations/facets',
+  '/api/v1/automations/facets': '/api/automations/facets',
   '/api/automation-actions': '/api/v1/automation-actions',
   '/api/v1/automation-actions': '/api/automation-actions',
   '/api/matters': '/api/v1/matters',
   '/api/v1/matters': '/api/matters',
   '/api/executions': '/api/v1/automation/executions',
   '/api/v1/automation/executions': '/api/executions',
+  '/api/executions/facets': '/api/v1/automation/executions/facets',
+  '/api/v1/automation/executions/facets': '/api/executions/facets',
   '/api/approvals/inbox': '/api/v1/approvals/inbox',
   '/api/v1/approvals/inbox': '/api/approvals/inbox',
+  '/api/approvals/inbox/facets': '/api/v1/approvals/inbox/facets',
+  '/api/v1/approvals/inbox/facets': '/api/approvals/inbox/facets',
   '/api/connectors': '/api/v1/connectors/registry/catalog',
   '/api/v1/connectors/registry/catalog': '/api/connectors',
   '/api/integrations/connectors': '/api/v1/integrations/connectors',
@@ -302,7 +305,6 @@ function cacheElements() {
   els.flash = document.getElementById('flash');
   els.viewContent = document.getElementById('view-content');
   els.templateModal = document.getElementById('template-modal');
-  els.templateModalTitle = document.getElementById('template-modal-title');
   els.templateModalDescription = document.getElementById('template-modal-description');
   els.templateModalRecommended = document.getElementById('template-modal-recommended');
   els.templateModalApps = document.getElementById('template-modal-apps');
@@ -324,19 +326,31 @@ function cacheElements() {
   els.connectorImportSubmit = document.getElementById('connector-import-submit');
 
   els.connectorConfirmModal = document.getElementById('connector-confirm-modal');
-  els.connectorConfirmTitle = document.getElementById('connector-confirm-title');
   els.connectorConfirmMessage = document.getElementById('connector-confirm-message');
   els.connectorConfirmSubmit = document.getElementById('connector-confirm-submit');
   els.connectorConfirmCancel = document.getElementById('connector-confirm-cancel');
 
   els.connectorAddInstanceModal = document.getElementById('connector-add-instance-modal');
-  els.connectorAddInstanceConnectorName = document.getElementById('connector-add-instance-connector-name');
   els.connectorAddInstanceLabel = document.getElementById('connector-add-instance-label');
   els.connectorAddInstanceHelper = document.getElementById('connector-add-instance-helper');
   els.connectorAddInstanceKey = document.getElementById('connector-add-instance-key');
   els.connectorAddInstanceForm = document.getElementById('connector-add-instance-form');
   els.connectorAddInstanceError = document.getElementById('connector-add-instance-error');
   els.connectorAddInstanceSubmit = document.getElementById('connector-add-instance-submit');
+}
+
+// The five automation dialogs are lex-modals: the component owns the backdrop,
+// header close, Escape and focus trap. These helpers keep the call sites short.
+function setModalOpen(modal, open) {
+  if (modal) modal.open = Boolean(open);
+}
+
+// lex-btn renders its label inside <slot-content>; writing textContent on the
+// host would replace its inner <button>.
+function setLexBtnText(btn, text) {
+  if (!btn) return;
+  const slot = btn.querySelector('slot-content');
+  (slot || btn).textContent = text;
 }
 
 function bindGlobalEvents() {
@@ -369,10 +383,23 @@ function bindGlobalEvents() {
   document.body.addEventListener('click', onAppClick);
   document.body.addEventListener('input', onAppInput);
   document.body.addEventListener('change', onAppInput);
+  document.body.addEventListener('lex-change', onAppInput);
   document.body.addEventListener('lex-composer-send', onHomeComposerSend);
   document.body.addEventListener('lex-close', onAppLexClose);
+  // Header close / Escape / backdrop on a lex-modal emit lex-close; run the
+  // same state reset the Cancel buttons do.
+  els.templateModal?.addEventListener('lex-close', () => closeTemplateModal());
+  els.checkDataModal?.addEventListener('lex-close', () => closeCheckDataModal());
+  els.connectorImportModal?.addEventListener('lex-close', () => closeConnectorImportModal());
+  els.connectorConfirmModal?.addEventListener('lex-close', () => closeConnectorConfirmModal());
+  els.connectorAddInstanceModal?.addEventListener('lex-close', () => closeAddInstanceModal());
+  // Footer "Create Instance" is <lex-btn type="submit" form=…>; Enter in the
+  // key field submits the same form.
+  els.connectorAddInstanceForm?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    submitAddInstance();
+  });
   document.body.addEventListener('breadcrumb-navigate', onBreadcrumbNavigate);
-  document.addEventListener('keydown', onGlobalKeydown);
 
   // Dirty-state guard: warn before the user closes/reloads the tab while in
   // edit mode with unsaved changes.
@@ -396,6 +423,12 @@ function bindGlobalEvents() {
 }
 
 function onAppLexClose(event) {
+  // The publish dialog's header close, backdrop and Escape: same as Cancel.
+  if (event.target?.matches?.('[data-builder-publish-modal]')) {
+    state.builder.publishModalOpen = false;
+    return;
+  }
+
   if (event.target?.matches?.('[data-run-detail-drawer]')) {
     state.selectedRunId = null;
     state.selectedRunDetail = null;
@@ -748,7 +781,7 @@ async function onBreadcrumbNavigate(event) {
 
   // Dirty-state guard when leaving the builder in edit mode
   if (state.currentView === 'builder' && state.builder.editMode?.isEdit && builderIsDirty()) {
-    if (!window.confirm('Discard unsaved changes to this automation?')) {
+    if (!(await window.Lex.Modal.confirmAsync('Discard changes', 'Discard unsaved changes to this automation?', { confirmText: 'Discard', variant: 'danger' }))) {
       return;
     }
     state.builder.editMode = { isEdit: false, automationId: null, originalAutomation: null, loading: false };
@@ -849,6 +882,7 @@ async function refreshCurrentView() {
       rebuildConnectorIndex();
       break;
     case 'library':
+      invalidateLibraryTable(createContext());
       await loadLibraryData();
       break;
     case 'library-detail': {
@@ -872,10 +906,11 @@ async function refreshCurrentView() {
       await loadOnboardingState();
       break;
     case 'runs':
-      await loadRuns();
+      // The Run History table loads its own page when it renders.
+      invalidateRunsTable(createContext());
       break;
     case 'approvals':
-      await loadApprovals();
+      invalidateApprovalsTable(createContext());
       break;
     default:
       break;
@@ -899,6 +934,8 @@ function renderCurrentView() {
   if (state.currentView === 'connector-detail') renderConnectorDetail(context);
   if (state.currentView === 'library') renderLibrary(context);
   if (state.currentView === 'library-detail') renderLibraryDetail(context);
+  // Library-detail dialogs live outside #view-content; close them on any other view.
+  else syncLibraryDetailModals(context, {});
   if (state.currentView === 'builder') renderBuilder(context);
   if (state.currentView === 'runs') renderRuns(context);
   if (state.currentView === 'approvals') renderApprovals(context);
@@ -1091,35 +1128,10 @@ async function tryResumeSession() {
 }
 
 async function onAppClick(event) {
-  if (event.target.closest('[data-connector-import-close]') || event.target.closest('[data-connector-import-overlay]')) {
-    closeConnectorImportModal();
-    return;
-  }
-
-  if (event.target.closest('[data-connector-confirm-close]') || event.target.closest('[data-connector-confirm-overlay]')) {
-    closeConnectorConfirmModal();
-    return;
-  }
-
-  if (event.target.closest('[data-add-instance-close]') || event.target.closest('[data-add-instance-overlay]')) {
-    closeAddInstanceModal();
-    return;
-  }
-
-  if (event.target.closest('[data-check-data-modal-close]') || event.target.closest('[data-check-data-modal-overlay]')) {
-    closeCheckDataModal();
-    return;
-  }
-
   if (event.target.closest('[data-check-data-go]')) {
     closeCheckDataModal();
     setView('connectors');
     await refreshCurrentView();
-    return;
-  }
-
-  if (event.target.closest('[data-template-modal-close]') || event.target.closest('[data-template-modal-overlay]')) {
-    closeTemplateModal();
     return;
   }
 
@@ -1279,7 +1291,10 @@ async function onAppClick(event) {
       onSelect: (eventType) => {
         if (triggerSelect) {
           triggerSelect.value = eventType;
-          triggerSelect.dispatchEvent(new Event('change', { bubbles: true }));
+          triggerSelect.dispatchEvent(new CustomEvent('lex-change', {
+            bubbles: true,
+            detail: { name: triggerSelect.name || '', value: eventType }
+          }));
         }
       }
     });
@@ -1329,7 +1344,7 @@ async function onAppClick(event) {
     const context = createContext();
     // In edit mode, confirm before replacing the loaded config with a template
     if (state.builder.editMode?.isEdit) {
-      if (!window.confirm('Replace current configuration with a Quick Start template? Unsaved changes will be lost.')) {
+      if (!(await window.Lex.Modal.confirmAsync('Start from a template', 'Replace current configuration with a Quick Start template? Unsaved changes will be lost.', { confirmText: 'Replace', variant: 'danger' }))) {
         return;
       }
       // Clear edit mode since user is explicitly starting fresh from a template
@@ -1342,6 +1357,8 @@ async function onAppClick(event) {
 
   if (event.target.closest('#create-automation-btn')) {
     state.builder.publishModalOpen = false;
+    const publishModal = document.getElementById('builder-publish-modal');
+    if (publishModal) publishModal.open = false;
     await createAutomation(createContext());
     return;
   }
@@ -1351,7 +1368,7 @@ async function onAppClick(event) {
   if (cancelEditBtn) {
     const automationId = cancelEditBtn.dataset.editAutomationId || null;
     if (state.builder.editMode?.isEdit && builderIsDirty()) {
-      if (!window.confirm('Discard unsaved changes to this automation?')) {
+      if (!(await window.Lex.Modal.confirmAsync('Discard changes', 'Discard unsaved changes to this automation?', { confirmText: 'Discard', variant: 'danger' }))) {
         return;
       }
     }
@@ -1398,7 +1415,7 @@ async function onAppClick(event) {
     const automationId = builderDeleteBtn.dataset.editAutomationId;
     const automationName = builderDeleteBtn.dataset.editAutomationName || 'this automation';
     if (!automationId) return;
-    if (!window.confirm(`Delete "${automationName}"? This cannot be undone.`)) return;
+    if (!(await window.Lex.Modal.confirmAsync('Delete automation', `Delete "${automationName}"? This cannot be undone.`, { confirmText: 'Delete', variant: 'danger' }))) return;
     try {
       await fetchJson(`/api/v1/automations/${encodeURIComponent(automationId)}`, {
         method: 'DELETE',
@@ -1447,33 +1464,6 @@ async function onAppClick(event) {
       state.filters.connectors.page = page;
       renderCurrentView();
     }
-    return;
-  }
-
-  const runsPageButton = event.target.closest('[data-runs-page]');
-  if (runsPageButton) {
-    const page = parseInt(runsPageButton.dataset.runsPage, 10);
-    if (Number.isFinite(page) && state.filters.runs) {
-      state.filters.runs.page = page;
-      await loadRuns();
-      renderCurrentView();
-    }
-    return;
-  }
-
-  const runsSortButton = event.target.closest('[data-runs-sort]');
-  if (runsSortButton && state.filters.runs) {
-    const field = runsSortButton.dataset.runsSort;
-    if (!field) return;
-    if (state.filters.runs.sortBy === field) {
-      state.filters.runs.sortDir = state.filters.runs.sortDir === 'asc' ? 'desc' : 'asc';
-    } else {
-      state.filters.runs.sortBy = field;
-      state.filters.runs.sortDir = 'asc';
-    }
-    state.filters.runs.page = 1;
-    await loadRuns();
-    renderCurrentView();
     return;
   }
 
@@ -1680,6 +1670,17 @@ async function loadLibraryData() {
 }
 
 async function onAppInput(event) {
+  // Builder dropdowns are lex-select: their committed value arrives as
+  // lex-change (handled like a native change). The input/change events of
+  // the search box inside a lex-select are not field edits, and other lex
+  // form controls emit lex-change alongside their own native events.
+  if (event.type === 'lex-change') {
+    if (event.target.tagName !== 'LEX-SELECT') return;
+  } else if (event.target.closest && event.target.closest('lex-select')) {
+    return;
+  }
+  const isCommit = event.type === 'change' || event.type === 'lex-change';
+
   // "Build with Lana" description — store without re-rendering so the textarea
   // keeps focus while typing (re-render wipes and rebuilds the DOM).
   const designPromptField = event.target.closest('[data-design-prompt]');
@@ -1698,7 +1699,7 @@ async function onAppInput(event) {
 
   // Inline visibility selector in the builder edit page — PATCH immediately
   const builderVisibilityField = event.target.closest('[data-builder-visibility]');
-  if (builderVisibilityField && event.type === 'change') {
+  if (builderVisibilityField && isCommit) {
     const automationId = builderVisibilityField.dataset.editAutomationId;
     const nextVisibility = builderVisibilityField.value;
     if (!automationId) return;
@@ -1757,7 +1758,7 @@ async function onAppInput(event) {
       }
     }
 
-    if (fieldName === 'scopeType' || fieldName === 'matterId' || fieldName === 'matterSearch' || event.type === 'change') {
+    if (fieldName === 'scopeType' || fieldName === 'matterId' || fieldName === 'matterSearch' || isCommit) {
       renderCurrentView();
     }
 
@@ -1793,12 +1794,6 @@ async function onAppInput(event) {
       state.filters[filterView][key] = Number.isNaN(nextValue) ? filterField.value : nextValue;
       if ((filterView === 'connectors' || filterView === 'library' || filterView === 'runs') && key !== 'page') {
         state.filters[filterView].page = 1;
-      }
-      if (filterView === 'runs') {
-        loadRuns()
-          .then(() => renderCurrentView())
-          .catch((error) => flash(error.message || 'Failed to refresh runs.', true));
-        return;
       }
       if (filterView === 'library') {
         await showLibraryLoadingState();
@@ -1928,7 +1923,7 @@ function openTemplateModal(templateId) {
   const steps = buildTemplateSteps(template);
   const appTypes = resolveTemplateAppTypes(template);
 
-  els.templateModalTitle.textContent = template.name || 'Automation Template';
+  els.templateModal.heading = template.name || 'Automation Template';
   els.templateModalDescription.textContent = template.description || template.bestFor || 'Use this template to launch your workflow quickly.';
   els.templateModalRecommended.textContent = template.bestFor || 'Recommended for you';
   els.templateModalApps.innerHTML = appTypes.map((typeLabel) => `
@@ -1941,14 +1936,13 @@ function openTemplateModal(templateId) {
     </li>
   `).join('');
   els.templateModalTry.dataset.templateId = template.id;
-  els.templateModalTry.textContent = 'Continue to Builder';
+  setLexBtnText(els.templateModalTry, 'Continue to Builder');
 
-  els.templateModal.classList.remove('hidden');
+  setModalOpen(els.templateModal, true);
 }
 
 function closeTemplateModal() {
-  if (!els.templateModal) return;
-  els.templateModal.classList.add('hidden');
+  setModalOpen(els.templateModal, false);
 }
 
 function openCheckDataModal(templateId) {
@@ -1974,12 +1968,11 @@ function openCheckDataModal(templateId) {
     </li>
   `).join('');
 
-  els.checkDataModal.classList.remove('hidden');
+  setModalOpen(els.checkDataModal, true);
 }
 
 function closeCheckDataModal() {
-  if (!els.checkDataModal) return;
-  els.checkDataModal.classList.add('hidden');
+  setModalOpen(els.checkDataModal, false);
 }
 
 function buildTemplateSteps(template) {
@@ -2079,41 +2072,6 @@ function resolveTemplateAppTypes(template) {
     .slice(0, 4);
 }
 
-function onGlobalKeydown(event) {
-  // Enter submits the Add Instance form when the key input is focused
-  if (
-    event.key === 'Enter' &&
-    els.connectorAddInstanceModal &&
-    !els.connectorAddInstanceModal.classList.contains('hidden') &&
-    document.activeElement === els.connectorAddInstanceKey
-  ) {
-    event.preventDefault();
-    submitAddInstance();
-    return;
-  }
-
-  if (event.key !== 'Escape') return;
-  if (els.connectorAddInstanceModal && !els.connectorAddInstanceModal.classList.contains('hidden')) {
-    closeAddInstanceModal();
-    return;
-  }
-  if (els.connectorImportModal && !els.connectorImportModal.classList.contains('hidden')) {
-    closeConnectorImportModal();
-    return;
-  }
-  if (els.connectorConfirmModal && !els.connectorConfirmModal.classList.contains('hidden')) {
-    closeConnectorConfirmModal();
-    return;
-  }
-  if (els.checkDataModal && !els.checkDataModal.classList.contains('hidden')) {
-    closeCheckDataModal();
-    return;
-  }
-  if (els.templateModal && !els.templateModal.classList.contains('hidden')) {
-    closeTemplateModal();
-  }
-}
-
 async function loadDashboard() {
   // The current Core API does not expose an automation dashboard endpoint.
   // Keep the state initialized without probing a missing route at startup.
@@ -2157,45 +2115,6 @@ async function loadMatters() {
 
   if (state.builder.scopeType === 'matter' && !state.builder.matterId && state.matters.length) {
     state.builder.matterId = state.matters[0].matter_id || state.matters[0].id;
-  }
-}
-
-async function loadRuns() {
-  const runFilters = state.filters.runs || {};
-  const query = new URLSearchParams();
-  const page = Math.max(parseInt(runFilters.page, 10) || 1, 1);
-  const perPage = Math.max(parseInt(runFilters.perPage, 10) || 25, 1);
-  const offset = (page - 1) * perPage;
-  const searchQuery = String(runFilters.query || '').trim();
-
-  query.set('limit', String(perPage));
-  query.set('offset', String(offset));
-  if (runFilters.state && runFilters.state !== 'all') query.set('status', runFilters.state);
-  if (searchQuery) query.set('query', searchQuery);
-  if (runFilters.sortBy) query.set('sort_by', String(runFilters.sortBy));
-  if (runFilters.sortDir) query.set('sort_dir', String(runFilters.sortDir));
-
-  const payload = await fetchJson(`/api/executions?${query.toString()}`, {
-    headers: authHeaders()
-  });
-
-  state.runs = payload.data || [];
-  state.runsPagination = payload.pagination || {
-    total: state.runs.length,
-    limit: perPage,
-    offset,
-    has_more: false
-  };
-
-  if (state.selectedRunId) {
-    const stillVisible = state.runs.some((run) => run.execution_id === state.selectedRunId);
-    if (!stillVisible) {
-      state.selectedRunId = null;
-      state.selectedRunDetail = null;
-      state.selectedRunArtifactId = null;
-      state.selectedRunArtifactDetail = null;
-      state.selectedRunArtifactLoading = false;
-    }
   }
 }
 
@@ -2337,7 +2256,7 @@ async function controlRunExecution(executionId, action) {
       headers: authHeaders(),
       body: JSON.stringify({ action })
     });
-    await loadRuns();
+    invalidateRunsTable(createContext());
     if (state.selectedRunId === executionId) {
       await loadRunDetail(executionId);
     }
@@ -2617,20 +2536,18 @@ function openConnectorConfirmModal(mode, connectorId) {
     ? `Permanently delete "${connector.name}"? All synced data, configuration, and custom UI files will be removed. This cannot be undone.`
     : `Uninstall "${connector.name}"? The connection will be disconnected but configuration and synced data will be preserved.`;
 
-  if (els.connectorConfirmTitle) els.connectorConfirmTitle.textContent = title;
+  els.connectorConfirmModal.heading = title;
   if (els.connectorConfirmMessage) els.connectorConfirmMessage.textContent = body;
   if (els.connectorConfirmSubmit) {
-    els.connectorConfirmSubmit.textContent = mode === 'delete' ? 'Delete Permanently' : 'Uninstall';
+    setLexBtnText(els.connectorConfirmSubmit, mode === 'delete' ? 'Delete Permanently' : 'Uninstall');
     els.connectorConfirmSubmit.setAttribute('variant', mode === 'delete' ? 'danger' : 'primary');
   }
 
-  els.connectorConfirmModal.classList.remove('hidden');
+  setModalOpen(els.connectorConfirmModal, true);
 }
 
 function closeConnectorConfirmModal() {
-  if (els.connectorConfirmModal) {
-    els.connectorConfirmModal.classList.add('hidden');
-  }
+  setModalOpen(els.connectorConfirmModal, false);
   state.connectorConfirm = { mode: null, connectorId: null, busy: false };
 }
 
@@ -2687,9 +2604,7 @@ function openAddInstanceModal(slug) {
     error: null
   };
 
-  if (els.connectorAddInstanceConnectorName) {
-    els.connectorAddInstanceConnectorName.textContent = connector.name || slug;
-  }
+  els.connectorAddInstanceModal.heading = `Add ${connector.name || slug} Instance`;
   if (els.connectorAddInstanceLabel) {
     els.connectorAddInstanceLabel.textContent = multi.instance_label || 'Instance name';
   }
@@ -2709,7 +2624,7 @@ function openAddInstanceModal(slug) {
     els.connectorAddInstanceSubmit.removeAttribute('disabled');
   }
 
-  els.connectorAddInstanceModal.classList.remove('hidden');
+  setModalOpen(els.connectorAddInstanceModal, true);
 
   // Focus the input after the modal renders
   requestAnimationFrame(() => {
@@ -2721,7 +2636,7 @@ function openAddInstanceModal(slug) {
 
 function closeAddInstanceModal() {
   if (!els.connectorAddInstanceModal) return;
-  els.connectorAddInstanceModal.classList.add('hidden');
+  setModalOpen(els.connectorAddInstanceModal, false);
   state.connectorAddInstance = {
     open: false,
     slug: null,
@@ -2813,12 +2728,12 @@ function openConnectorImportModal(opts = {}) {
   };
   resetConnectorImportDom();
   applyConnectorImportModalContext();
-  els.connectorImportModal.classList.remove('hidden');
+  setModalOpen(els.connectorImportModal, true);
 }
 
 function closeConnectorImportModal() {
   if (!els.connectorImportModal) return;
-  els.connectorImportModal.classList.add('hidden');
+  setModalOpen(els.connectorImportModal, false);
   state.connectorImport = {
     open: false,
     selectedFile: null,
@@ -2834,26 +2749,25 @@ function closeConnectorImportModal() {
 // Update the import modal chrome (title, description, submit label) based on
 // whether we're running a fresh import or an "Update <connector>" flow.
 function applyConnectorImportModalContext() {
-  const titleEl = document.getElementById('connector-import-modal-title');
   const descEl = els.connectorImportModal?.querySelector('.template-modal-description');
   const submitEl = els.connectorImportSubmit;
   const ctx = state.connectorImport;
 
   if (ctx?.targetConnectorId && ctx.targetConnectorName) {
-    if (titleEl) titleEl.textContent = `Update ${ctx.targetConnectorName}`;
+    if (els.connectorImportModal) els.connectorImportModal.heading = `Update ${ctx.targetConnectorName}`;
     if (descEl) {
       descEl.innerHTML = `Upload a ZIP package to update <strong>${escapeHtmlSafe(ctx.targetConnectorName)}</strong>. ` +
         'The new version will replace the current files and apply to every instance of this connector. ' +
         'The manifest must match — uploading a ZIP for a different connector will be rejected.';
     }
-    if (submitEl) submitEl.textContent = 'Upload Update';
+    if (submitEl) setLexBtnText(submitEl, 'Upload Update');
   } else {
-    if (titleEl) titleEl.textContent = 'Import Connector';
+    if (els.connectorImportModal) els.connectorImportModal.heading = 'Import Connector';
     if (descEl) {
       descEl.innerHTML = 'Upload a ZIP package containing <code>manifest.json</code>, <code>connector.json</code>, and optional UI assets. ' +
         'The backend validates the manifest, hook code, and UI files before installing.';
     }
-    if (submitEl) submitEl.textContent = 'Upload Connector';
+    if (submitEl) setLexBtnText(submitEl, 'Upload Connector');
   }
 }
 
@@ -3067,24 +2981,6 @@ async function refreshConnectorHealth() {
   }
 }
 
-async function loadApprovals() {
-  const payload = await fetchJson('/api/approvals/inbox?limit=100', {
-    headers: authHeaders()
-  });
-  state.approvals = payload.approvals || payload.data || [];
-
-  if (state.selectedApprovalId) {
-    const selectedStillVisible = state.approvals.some((approval) => {
-      const id = approval.approval_id || approval.id || approval.title || approval.approval_type || '';
-      return String(id) === String(state.selectedApprovalId);
-    });
-    if (!selectedStillVisible) {
-      state.selectedApprovalId = null;
-      state.selectedApprovalDetail = null;
-    }
-  }
-}
-
 async function loadApprovalDetail(approvalId, fallbackApproval = null) {
   if (!approvalId) return;
   const localApproval = fallbackApproval || state.approvals.find((approval) => {
@@ -3121,7 +3017,7 @@ async function decideApproval(approvalId, action, comments = '') {
       headers: authHeaders(),
       body: JSON.stringify({ comments })
     });
-    await loadApprovals();
+    invalidateApprovalsTable(createContext());
     state.selectedApprovalId = null;
     state.selectedApprovalDetail = null;
     flash(`Approval ${action === 'approve' ? 'approved' : 'rejected'}.`);

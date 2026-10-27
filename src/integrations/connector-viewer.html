@@ -61,124 +61,28 @@
       min-width: 220px;
     }
 
-    .connector-switcher-trigger {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.375rem 0.625rem;
-      border: none;
-      border-radius: 0.5rem;
-      background: transparent;
-      color: var(--lex-topbar-text, #111827);
-      font-family: inherit;
-      font-size: var(--lex-h5-size, 1.125rem);
-      font-weight: 600;
-      cursor: pointer;
+    .connector-switcher lex-dropdown-btn {
       max-width: 100%;
-      transition: background 0.15s ease;
     }
 
-    .connector-switcher-trigger:hover,
-    .connector-switcher-trigger[aria-expanded="true"] {
+    .connector-switcher .lex-ddbtn-trigger {
+      max-width: 100%;
+      padding: 0.375rem 0.625rem;
+      border-radius: 0.5rem;
+      color: var(--lex-topbar-text, #111827);
+      font-size: var(--lex-h5-size, 1.125rem);
+      font-weight: 600;
+    }
+
+    .connector-switcher .lex-ddbtn-trigger--open {
       background: var(--lex-bg-tertiary, #f3f4f6);
     }
 
-    .connector-switcher-trigger-label {
+    .connector-switcher .lex-ddbtn-label {
+      min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      min-width: 0;
-    }
-
-    .connector-switcher-chevron {
-      flex-shrink: 0;
-      width: 16px;
-      height: 16px;
-      color: var(--lex-text-tertiary, #6b7280);
-      transition: transform 0.2s ease;
-    }
-
-    .connector-switcher-trigger[aria-expanded="true"] .connector-switcher-chevron {
-      transform: rotate(180deg);
-    }
-
-    .connector-switcher-panel {
-      position: fixed;
-      z-index: 10000;
-      min-width: 280px;
-      max-width: 360px;
-      max-height: 60vh;
-      overflow-y: auto;
-      background: #ffffff;
-      border: 1px solid #e5e7eb;
-      border-radius: 0.75rem;
-      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15);
-      padding: 0.375rem;
-      display: none;
-    }
-
-    .connector-switcher-panel[data-open="true"] {
-      display: block;
-    }
-
-    .connector-switcher-search {
-      position: sticky;
-      top: 0;
-      background: #ffffff;
-      padding: 0.25rem 0.25rem 0.5rem;
-      border-bottom: 1px solid #f1f5f9;
-      margin-bottom: 0.25rem;
-    }
-
-    .connector-switcher-search input {
-      width: 100%;
-      box-sizing: border-box;
-      padding: 0.4rem 0.625rem;
-      font-size: 0.8125rem;
-      border: 1px solid #e5e7eb;
-      border-radius: 0.5rem;
-      outline: none;
-      background: #f9fafb;
-    }
-
-    .connector-switcher-search input:focus {
-      border-color: #2563eb;
-      background: #fff;
-    }
-
-    .connector-switcher-option {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      width: 100%;
-      padding: 0.5rem 0.625rem;
-      border: none;
-      background: transparent;
-      border-radius: 0.5rem;
-      font-family: inherit;
-      font-size: 0.875rem;
-      text-align: left;
-      color: #111827;
-      cursor: pointer;
-    }
-
-    .connector-switcher-option:hover,
-    .connector-switcher-option:focus {
-      background: #f3f4f6;
-      outline: none;
-    }
-
-    .connector-switcher-option[aria-current="true"] {
-      background: #eff6ff;
-      color: #1d4ed8;
-      font-weight: 600;
-    }
-
-    .connector-switcher-empty {
-      padding: 0.75rem;
-      text-align: center;
-      font-size: 0.8125rem;
-      color: #6b7280;
     }
 
     .connector-mono {
@@ -249,6 +153,11 @@
         position: sticky;
         top: 1.5rem;
       }
+    }
+    /* The open record / log row in the lex-tables (marker rendered in a cell). */
+    #connectorDataTable tr:has([data-rtk-selected]) td,
+    #connectorLogsTable tr:has([data-rtk-selected]) td {
+      background: #eff6ff;
     }
   </style>
   <link rel="stylesheet" href="../css/lex-chat.css">
@@ -343,12 +252,7 @@
                     <div class="mt-4 space-y-4">
                       <div>
                         <label for="syncFrequency" class="mb-2 block text-sm font-medium text-gray-700">Sync Frequency</label>
-                        <select id="syncFrequency" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
-                          <option value="manual">Manual</option>
-                          <option value="hourly">Hourly</option>
-                          <option value="daily">Daily</option>
-                          <option value="weekly">Weekly</option>
-                        </select>
+                        <lex-select id="syncFrequency" options='[{"value":"manual","label":"Manual"},{"value":"hourly","label":"Hourly"},{"value":"daily","label":"Daily"},{"value":"weekly","label":"Weekly"}]' value="manual"></lex-select>
                       </div>
                       <div id="scheduledTimeGroup" class="hidden">
                         <label for="scheduledSyncTime" class="mb-2 block text-sm font-medium text-gray-700">Scheduled Time</label>
@@ -386,7 +290,7 @@
                     <div class="flex flex-wrap items-start justify-between gap-4">
                       <div>
                         <div class="connector-label">Data Filters</div>
-                        <div class="mt-2 text-sm text-gray-500">Use broad search plus field rules to narrow synced connector data the way analytics tools do.</div>
+                        <div class="mt-2 text-sm text-gray-500">Add field rules (payload paths such as data.email) to narrow synced connector data the way analytics tools do.</div>
                       </div>
                       <div class="flex flex-wrap gap-2">
                         <button type="button" onclick="addDataRule()" class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
@@ -396,38 +300,7 @@
                     </div>
 
                     <div class="mt-5 space-y-5">
-                      <label class="block">
-                        <div class="mb-2 text-sm font-medium text-gray-900">Search Everything</div>
-                        <input id="dataSearchInput" type="search" placeholder="Search IDs, names, emails, payload text..." class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
-                      </label>
-
-                      <label class="block">
-                        <div class="mb-2 text-sm font-medium text-gray-900">Entity Type</div>
-                        <select id="entityTypeFilter" onchange="refreshDataPreview()" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
-                          <option value="">All entity types</option>
-                        </select>
-                      </label>
-
-                      <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-1">
-                        <label class="block">
-                          <div class="mb-2 text-sm font-medium text-gray-900">Sort By</div>
-                          <select id="dataSortBy" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
-                            <option value="synced_at">Last Synced</option>
-                            <option value="source_created_at">Source Created</option>
-                            <option value="source_updated_at">Source Updated</option>
-                            <option value="entity_type">Entity Type</option>
-                            <option value="external_id">External ID</option>
-                            <option value="annotation_count">Annotations</option>
-                          </select>
-                        </label>
-                        <label class="block">
-                          <div class="mb-2 text-sm font-medium text-gray-900">Direction</div>
-                          <select id="dataSortDir" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
-                            <option value="desc">Descending</option>
-                            <option value="asc">Ascending</option>
-                          </select>
-                        </label>
-                      </div>
+                      <div class="text-xs text-gray-500">Search, sort, entity type and the column filters live on the Synced Data table. Field rules here narrow it further.</div>
 
                       <div id="dataRulesContainer" class="space-y-3"></div>
 
@@ -436,7 +309,7 @@
                           Clear
                         </button>
                         <button type="button" onclick="applyDataFilters()" class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
-                          Apply Filters
+                          Apply Rules
                         </button>
                       </div>
                     </div>
@@ -447,13 +320,11 @@
                     <div class="mt-2 text-sm text-gray-500">Route the current selection to a matter. Leave the picker on <span class="font-medium text-gray-700">Unassigned</span> to create a new matter when you assign.</div>
 
                     <div class="mt-5 space-y-5">
-                      <label class="block">
+                      <div class="block">
                         <div class="mb-2 text-sm font-medium text-gray-900">Target Matter</div>
-                        <select id="dataMatterSelect" onchange="onMatterDropdownChange()" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
-                          <option value="">Unassigned (create new matter)</option>
-                        </select>
+                        <lex-select id="dataMatterSelect" searchable placeholder="Unassigned (create new matter)" options='[{"value":"","label":"Unassigned (create new matter)"}]' value=""></lex-select>
                         <div id="matterDropdownHint" class="mt-2 text-xs text-blue-700"></div>
-                      </label>
+                      </div>
 
                       <div id="cascadePanel" class="hidden space-y-3"></div>
 
@@ -481,7 +352,6 @@
                     </div>
                   </div>
 
-                  <div id="dataGroupsPanel" class="rounded-2xl border border-gray-200 p-5"></div>
                 </aside>
 
                 <div class="output-main space-y-6">
@@ -498,14 +368,17 @@
                     </div>
                   </div>
 
-                  <div id="dataPreviewTable" class="overflow-x-auto rounded-2xl border border-gray-200"></div>
+                  <div id="dataPreviewTable"></div>
 
-                  <div id="dataPreviewPagination" class="hidden flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 p-4"></div>
+                  <div id="dataGroupsPanel" class="rounded-2xl border border-gray-200 p-5">
+                    <div class="connector-label">Grouped Collections</div>
+                    <div class="mt-2 mb-4 text-sm text-gray-500">Assign collections such as sheets or entity groups to matters without hand-editing records one by one.</div>
+                    <div id="dataGroupsMount"></div>
+                  </div>
                 </div>
               </div>
-              <div id="recordDetailBackdrop" class="hidden fixed inset-0 z-30 bg-slate-900/20 backdrop-blur-[1px]" onclick="closeRecordDetail()"></div>
-              <div id="recordDetailPanel" class="hidden fixed inset-y-0 right-0 z-40 w-full max-w-2xl overflow-y-auto border-l border-gray-200 bg-white shadow-2xl"></div>
-              <div id="assignMatterModal" class="hidden"></div>
+              <lex-drawer id="recordDetailPanel" heading="Record detail" subtitle="Inspect the source payload, review annotations, and shortlist corrections without overwriting the synced snapshot." width="xl" flush></lex-drawer>
+              <lex-modal id="assignMatterModal" heading="Assign to matter" size="lg" width="672px"></lex-modal>
             </section>
 
             <section id="tab-logs" class="connector-tabpane space-y-6">
@@ -515,11 +388,10 @@
                 </button>
               </div>
 
-              <div id="logsMeta" class="text-sm text-gray-500"></div>
-              <div id="logsTable" class="overflow-x-auto rounded-2xl border border-gray-200"></div>
+              <div id="logsMeta" class="hidden text-sm text-gray-500"></div>
+              <div id="logsTable"></div>
 
-              <div id="logDetailBackdrop" class="hidden fixed inset-0 z-30 bg-slate-900/20 backdrop-blur-[1px]" onclick="closeLogDetail()"></div>
-              <div id="logDetailPanel" class="hidden fixed inset-y-0 right-0 z-40 w-full max-w-2xl overflow-y-auto border-l border-gray-200 bg-white shadow-2xl"></div>
+              <lex-drawer id="logDetailPanel" heading="Sync log detail" width="xl" flush></lex-drawer>
             </section>
 
             <section id="tab-docs" class="connector-tabpane space-y-6">
@@ -558,8 +430,14 @@
   <script src="../js/lex/components/foundation/lex-toast.js"></script>
   <script src="../js/lex/components/foundation/lex-spinner.js"></script>
   <script src="../js/lex/components/foundation/lex-btn.js"></script>
+  <script src="../js/lex/components/foundation/lex-modal.js"></script>
+  <script src="../js/lex/components/foundation/lex-drawer.js"></script>
   <script src="../js/lex/components/foundation/lex-empty.js"></script>
   <script src="../js/lex/components/form/lex-select.js"></script>
+  <script src="../js/lex/components/form/lex-dropdown-btn.js"></script>
+  <script src="../js/lex/components/form/lex-input.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/data/lex-table.js"></script>
   <script src="../js/lex/components/layout/lex-sidebar.js"></script>
   <script src="../js/lex/components/layout/lex-topbar.js"></script>
   <script src="../js/lex/components/layout/lex-conversation-item.js"></script>
@@ -567,6 +445,10 @@
   <script src="../js/lex/components/layout/lex-app.js"></script>
   <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
   <script src="../js/lex/lex-page-init.js"></script>
+  <script src="../js/shared/library-column-filters.js"></script>
+  <script src="../insights/js/record-table-kit.js"></script>
+  <script src="js/integration-tables.js"></script>
+  <script src="js/connector-viewer-tables.js"></script>
 
   <script>
     const urlParams = new URLSearchParams(window.location.search);
@@ -581,8 +463,6 @@
       summary: null,
       configResponse: null,
       dataPreview: null,
-      dataPreviewOffset: 0,
-      dataPreviewLimit: 25,
       dataGroups: null,
       logs: null,
       matterOptions: [],
@@ -634,6 +514,30 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+    }
+
+    // lex-select helpers. Options are { value, label } with string values;
+    // the attribute form is for HTML strings built before the element exists.
+    function lexSelectOptionsAttr(options) {
+      return escapeHtml(JSON.stringify(options.map((option) => ({
+        value: String(option?.value ?? ''),
+        label: String(option?.label ?? option?.value ?? ''),
+      }))));
+    }
+
+    function readLexSelectValues(element) {
+      if (!element) return [];
+      const value = element.value;
+      if (Array.isArray(value)) return value.map((item) => String(item));
+      if (typeof value === 'string' && value) {
+        try {
+          const parsed = JSON.parse(value);
+          return Array.isArray(parsed) ? parsed.map((item) => String(item)) : [];
+        } catch (_error) {
+          return [];
+        }
+      }
+      return [];
     }
 
     function formatNumber(value) {
@@ -1351,7 +1255,18 @@
       return state.sourceId || state.connectorType || state.connectorId || '';
     }
 
-    const CONNECTOR_SWITCHER_CHEVRON = '<svg class="connector-switcher-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>';
+    // Topbar connector switcher: a floating lex-dropdown-btn (its menu sits
+    // at body level, so the topbar neither clips it nor wipes it when it
+    // re-renders). The trigger reads the current connector; picking another
+    // opens that connector's viewer.
+    function connectorSwitcherItems(selectedKey) {
+      return state.connectorOptions.map((connector) => {
+        const key = getConnectorOptionKey(connector);
+        const item = { value: key, label: getConnectorDisplayName(connector) };
+        if (key === selectedKey) item.icon = 'check';
+        return item;
+      });
+    }
 
     function renderConnectorHeaderSelector() {
       const topbar = document.querySelector('lex-topbar');
@@ -1368,145 +1283,23 @@
       });
       const triggerLabel = (selected && getConnectorDisplayName(selected)) || state.connectorName || 'Select connector';
       const selectedKey = selected ? getConnectorOptionKey(selected) : currentValue;
+      const searchable = state.connectorOptions.length > 8;
 
       center.innerHTML = `
         <div class="connector-switcher">
-          <button
-            type="button"
-            id="connectorSwitcherTrigger"
-            class="connector-switcher-trigger"
-            aria-haspopup="listbox"
-            aria-expanded="false"
-            aria-label="Select connector"
-          >
-            <span class="connector-switcher-trigger-label">${escapeHtml(triggerLabel)}</span>
-            ${CONNECTOR_SWITCHER_CHEVRON}
-          </button>
+          <lex-dropdown-btn id="connectorSwitcher" class="connector-switcher-menu" floating variant="ghost"
+            aria-label="Select connector"${searchable ? ' searchable' : ''}></lex-dropdown-btn>
         </div>
       `;
-
-      // Render the panel as a body-level portal so it isn't clipped or
-      // wiped by the topbar's reactive lifecycle. Recreate on each render
-      // to drop stale listeners that closed over a previous trigger.
-      const existingPanel = document.getElementById('connectorSwitcherPanel');
-      if (existingPanel) existingPanel.remove();
-      const panel = document.createElement('div');
-      panel.id = 'connectorSwitcherPanel';
-      panel.className = 'connector-switcher-panel';
-      panel.setAttribute('role', 'listbox');
-      panel.setAttribute('aria-label', 'Available connectors');
-      panel.dataset.open = 'false';
-      document.body.appendChild(panel);
-
-      const trigger = document.getElementById('connectorSwitcherTrigger');
-      if (!trigger) return;
-
-      const showSearch = state.connectorOptions.length > 8;
-      let searchTerm = '';
-
-      const renderPanelContents = () => {
-        const term = searchTerm.trim().toLowerCase();
-        const filtered = state.connectorOptions.filter((connector) => {
-          if (!term) return true;
-          return getConnectorDisplayName(connector).toLowerCase().includes(term);
-        });
-
-        const searchHtml = showSearch
-          ? `<div class="connector-switcher-search"><input type="text" placeholder="Search connectors..." value="${escapeHtml(searchTerm)}" autocomplete="off" /></div>`
-          : '';
-
-        const optionsHtml = filtered.length === 0
-          ? '<div class="connector-switcher-empty">No connectors found</div>'
-          : filtered.map((connector) => {
-              const key = getConnectorOptionKey(connector);
-              const label = getConnectorDisplayName(connector);
-              const isCurrent = key === selectedKey;
-              return `
-                <button type="button" class="connector-switcher-option" role="option" data-key="${escapeHtml(key)}" aria-current="${isCurrent ? 'true' : 'false'}">
-                  ${escapeHtml(label)}
-                </button>
-              `;
-            }).join('');
-
-        panel.innerHTML = searchHtml + optionsHtml;
-
-        if (showSearch) {
-          const input = panel.querySelector('.connector-switcher-search input');
-          if (input) {
-            input.addEventListener('input', (e) => {
-              searchTerm = e.target.value;
-              renderPanelContents();
-              const refocus = panel.querySelector('.connector-switcher-search input');
-              if (refocus) {
-                refocus.focus();
-                refocus.setSelectionRange(searchTerm.length, searchTerm.length);
-              }
-            });
-          }
-        }
-
-        panel.querySelectorAll('.connector-switcher-option').forEach((btn) => {
-          btn.addEventListener('click', () => {
-            const key = btn.dataset.key;
-            const connector = state.connectorOptions.find((option) => getConnectorOptionKey(option) === key);
-            closePanel();
-            if (connector) {
-              window.location.href = buildConnectorViewerUrl(connector);
-            }
-          });
-        });
-      };
-
-      const positionPanel = () => {
-        const rect = trigger.getBoundingClientRect();
-        panel.style.top = `${Math.round(rect.bottom + 6)}px`;
-        panel.style.left = `${Math.round(rect.left)}px`;
-        panel.style.minWidth = `${Math.max(rect.width, 280)}px`;
-      };
-
-      const openPanel = () => {
-        searchTerm = '';
-        renderPanelContents();
-        positionPanel();
-        panel.dataset.open = 'true';
-        trigger.setAttribute('aria-expanded', 'true');
-        document.addEventListener('mousedown', onOutsideMouseDown, true);
-        document.addEventListener('keydown', onKeyDown, true);
-        window.addEventListener('resize', positionPanel);
-        window.addEventListener('scroll', positionPanel, true);
-        if (showSearch) {
-          const input = panel.querySelector('.connector-switcher-search input');
-          if (input) input.focus();
-        }
-      };
-
-      const closePanel = () => {
-        panel.dataset.open = 'false';
-        trigger.setAttribute('aria-expanded', 'false');
-        document.removeEventListener('mousedown', onOutsideMouseDown, true);
-        document.removeEventListener('keydown', onKeyDown, true);
-        window.removeEventListener('resize', positionPanel);
-        window.removeEventListener('scroll', positionPanel, true);
-      };
-
-      const onOutsideMouseDown = (e) => {
-        if (!panel.contains(e.target) && !trigger.contains(e.target)) {
-          closePanel();
-        }
-      };
-
-      const onKeyDown = (e) => {
-        if (e.key === 'Escape') {
-          closePanel();
-          trigger.focus();
-        }
-      };
-
-      trigger.addEventListener('click', () => {
-        if (panel.dataset.open === 'true') {
-          closePanel();
-        } else {
-          openPanel();
+      const menu = center.querySelector('#connectorSwitcher');
+      if (!menu) return;
+      menu.buttonLabel = triggerLabel;
+      menu.options = connectorSwitcherItems(selectedKey);
+      menu.addEventListener('lex-select', (event) => {
+        const key = event.detail ? event.detail.value : '';
+        const connector = state.connectorOptions.find((option) => getConnectorOptionKey(option) === key);
+        if (connector) {
+          window.location.href = buildConnectorViewerUrl(connector);
         }
       });
     }
@@ -2064,8 +1857,9 @@
         }
 
         if (element.multiple) {
-          draft[name] = Array.from(element.selectedOptions || [])
-            .map((option) => option.value)
+          draft[name] = (element.tagName === 'LEX-SELECT'
+            ? readLexSelectValues(element)
+            : Array.from(element.selectedOptions || []).map((option) => option.value))
             .filter(Boolean);
           return;
         }
@@ -2185,69 +1979,42 @@
     function renderDeleteConfigModal() {
       const existing = document.getElementById('deleteConfigModal');
       if (!state.deleteConfigModalOpen) {
-        if (existing) existing.remove();
+        if (existing) {
+          existing.open = false;
+          existing.remove();
+        }
         return;
       }
       if (existing) return;
 
-      const modal = document.createElement('div');
+      // lex-modal supplies the backdrop, close button, Escape and focus trap.
+      const modal = document.createElement('lex-modal');
       modal.id = 'deleteConfigModal';
-      modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 p-4';
+      modal.setAttribute('heading', 'Delete configuration?');
+      modal.setAttribute('size', 'sm');
       modal.innerHTML = `
-        <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-          <div class="flex items-start gap-3">
-            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5">
-                <path d="M12 9v4" />
-                <path d="M12 17h.01" />
-                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
-              </svg>
-            </div>
-            <div class="flex-1">
-              <h3 class="text-base font-semibold text-gray-900">Delete configuration?</h3>
-              <p class="mt-2 text-sm text-gray-600">
-                This will clear saved credentials and settings for <span class="font-semibold">${escapeHtml(state.connectorName || 'this connector')}</span>.
-                Any running sync schedule will stop. You&rsquo;ll need to re-enter credentials and re-authorize to use this connector again.
-                This action cannot be undone.
-              </p>
-            </div>
-          </div>
-          <div class="mt-6 flex flex-wrap justify-end gap-3">
-            <button type="button" onclick="closeDeleteConfigModal()" class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
-              Cancel
-            </button>
-            <button type="button" id="confirmDeleteConfigBtn" onclick="confirmDeleteConfig()" class="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">
-              Delete Configuration
-            </button>
-          </div>
-        </div>
+        <p class="text-sm text-gray-600">
+          This will clear saved credentials and settings for <span class="font-semibold">${escapeHtml(state.connectorName || 'this connector')}</span>.
+          Any running sync schedule will stop. You&rsquo;ll need to re-enter credentials and re-authorize to use this connector again.
+          This action cannot be undone.
+        </p>
+        <lex-btn data-slot="footer" variant="secondary" onclick="closeDeleteConfigModal()">Cancel</lex-btn>
+        <lex-btn data-slot="footer" id="confirmDeleteConfigBtn" variant="danger" onclick="confirmDeleteConfig()">Delete Configuration</lex-btn>
       `;
+      modal.addEventListener('lex-close', () => closeDeleteConfigModal());
       document.body.appendChild(modal);
-
-      // Dismiss on backdrop click (but not on card click).
-      modal.addEventListener('click', function (event) {
-        if (event.target === modal) {
-          closeDeleteConfigModal();
-        }
-      });
+      modal.open = true;
     }
 
     async function confirmDeleteConfig() {
       const button = document.getElementById('confirmDeleteConfigBtn');
-      const originalLabel = button ? button.textContent : '';
       try {
-        if (button) {
-          button.disabled = true;
-          button.textContent = 'Deleting...';
-        }
+        if (button) button.loading = true;
         await disconnectConnector();
         state.editingConfig = false;
         closeDeleteConfigModal();
       } catch (error) {
-        if (button) {
-          button.disabled = false;
-          button.textContent = originalLabel || 'Delete Configuration';
-        }
+        if (button) button.loading = false;
         // disconnectConnector already surfaces the error via showPageAlert.
       }
     }
@@ -3010,20 +2777,16 @@
               </div>
             ` : ''}
             ${authModes.length > 1 ? `
-              <label class="block">
+              <div class="block">
                 <div class="mb-2 text-sm font-medium text-gray-900">Authentication Method</div>
-                <select
+                <lex-select
                   id="authModeSelect"
                   name="auth_type"
-                  onchange="handleAuthModeChange()"
-                  class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                >
-                  ${authModes.map((mode) => `
-                    <option value="${escapeHtml(mode.type)}" ${mode.type === selectedAuthType ? 'selected' : ''}>${escapeHtml(getAuthModeDisplayLabel(mode))}</option>
-                  `).join('')}
-                </select>
+                  options="${lexSelectOptionsAttr(authModes.map((mode) => ({ value: mode.type, label: getAuthModeDisplayLabel(mode) })))}"
+                  value="${escapeHtml(authModes.some((mode) => mode.type === selectedAuthType) ? selectedAuthType : (authModes[0]?.type || ''))}"
+                ></lex-select>
                 <p class="mt-2 text-xs text-gray-500">The shared viewer renders the selected auth path from the connector package. Save before testing or connecting.</p>
-              </label>
+              </div>
             ` : ''}
             ${authFields.map((field) => renderField(field, currentConfig[field.name])).join('')}
           ` : ''}
@@ -3069,7 +2832,10 @@
       const syncValue = currentConfig.sync_frequency || 'manual';
       syncFrequency.value = ['manual', 'hourly', 'daily', 'weekly'].includes(syncValue) ? syncValue : 'manual';
       scheduledSyncTime.value = currentConfig.scheduled_sync_time || '';
-      syncFrequency.onchange = updateSyncSettingsVisibility;
+      if (!syncFrequency.dataset.lexChangeBound) {
+        syncFrequency.dataset.lexChangeBound = '1';
+        syncFrequency.addEventListener('lex-change', updateSyncSettingsVisibility);
+      }
       updateSyncSettingsVisibility();
 
       const configStatusSummary = document.getElementById('configStatusSummary');
@@ -3347,16 +3113,10 @@
                   </div>
 
                   <div class="space-y-7">
-                    <label class="block">
+                    <div class="block">
                       <div class="mb-3 text-sm font-medium text-gray-900">Method</div>
-                      <select id="customRequestMethod" ${disabledAttr} class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200${inputDisabledClass}">
-                        <option value="GET">GET</option>
-                        <option value="POST">POST</option>
-                        <option value="PUT">PUT</option>
-                        <option value="PATCH">PATCH</option>
-                        <option value="DELETE">DELETE</option>
-                      </select>
-                    </label>
+                      <lex-select id="customRequestMethod" ${disabledAttr} options='[{"value":"GET","label":"GET"},{"value":"POST","label":"POST"},{"value":"PUT","label":"PUT"},{"value":"PATCH","label":"PATCH"},{"value":"DELETE","label":"DELETE"}]' value="GET"></lex-select>
+                    </div>
 
                     <label class="block">
                       <div class="mb-3 text-sm font-medium text-gray-900">Endpoint Path</div>
@@ -3454,17 +3214,8 @@
         .filter((f) => f.value !== '__data_path__')
         .map((f) => f.value);
 
-      const fieldOptions = (selectedField, isDataPathMode) => DATA_RULE_FIELDS
-        .map((f) => {
-          const isSelected = (f.value === '__data_path__' && isDataPathMode)
-            || (f.value === selectedField && !isDataPathMode);
-          return `<option value="${f.value}" ${isSelected ? 'selected' : ''}>${f.label}</option>`;
-        })
-        .join('');
-
-      const operatorOptions = (selected) => DATA_RULE_OPERATORS
-        .map((o) => `<option value="${o.value}" ${selected === o.value ? 'selected' : ''}>${o.label}</option>`)
-        .join('');
+      const fieldOptionsAttr = lexSelectOptionsAttr([{ value: '', label: 'Pick a field…' }].concat(DATA_RULE_FIELDS));
+      const operatorOptionsAttr = lexSelectOptionsAttr(DATA_RULE_OPERATORS);
 
       container.innerHTML = state.dataRules.map((rule, index) => {
         const valueless = isValuelessOperator(rule.operator);
@@ -3479,10 +3230,7 @@
         return `
           <div class="data-rule-row space-y-2 rounded-xl border border-gray-200 bg-gray-50 p-3" data-index="${index}" data-mode="${treatAsDataPath ? 'data' : 'indexed'}">
             <div class="flex items-start gap-2">
-              <select data-role="field" onchange="onDataRuleFieldChange(${index}, this.value)" class="flex-1 min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
-                <option value="" ${!fieldRaw ? 'selected' : ''}>Pick a field…</option>
-                ${fieldOptions(fieldSelectValue, treatAsDataPath)}
-              </select>
+              <lex-select data-role="field" data-rule-index="${index}" class="flex-1 min-w-0" size="sm" searchable placeholder="Pick a field…" options="${fieldOptionsAttr}" value="${escapeHtml(fieldSelectValue)}"></lex-select>
               <button type="button" onclick="removeDataRule(${index})" aria-label="Remove rule" class="shrink-0 rounded-lg border border-gray-200 bg-white p-2 text-gray-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
                   <path d="M18 6 6 18" /><path d="m6 6 12 12" />
@@ -3494,9 +3242,7 @@
               <input data-role="data-path" type="text" value="${escapeHtml(dataPathValue)}" placeholder="e.g. matter_id" class="flex-1 min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
             </div>
             <div class="flex items-start gap-2">
-              <select data-role="operator" onchange="onDataRuleOperatorChange(${index}, this.value)" class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" style="flex: 0 0 auto; max-width: 50%;">
-                ${operatorOptions(rule.operator || 'contains')}
-              </select>
+              <lex-select data-role="operator" data-rule-index="${index}" size="sm" options="${operatorOptionsAttr}" value="${escapeHtml(rule.operator || 'contains')}" style="flex: 0 0 auto; max-width: 50%;"></lex-select>
               <input data-role="value" type="text" value="${escapeHtml(rule.value || '')}" placeholder="Value" class="flex-1 min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 ${valueless ? 'hidden' : ''}">
             </div>
           </div>
@@ -3562,19 +3308,33 @@
       renderDataRuleBuilder();
     }
 
-    function getCurrentDataFilters() {
+    function getSubmittableDataRules() {
       syncDataRulesFromDom();
-      const submittable = state.dataRules.filter((rule) => {
+      return state.dataRules.filter((rule) => {
         if (!rule.field || rule.field === '__data_path__') return false;
         if (isValuelessOperator(rule.operator)) return true;
         return String(rule.value || '') !== '';
       });
+    }
+
+    // The Synced Data table's current query (toolbar search, sort, entity and
+    // column filters) plus the sidebar's field rules, in the shape the data,
+    // groups and bulk endpoints take. Bulk actions on "all filtered" send this,
+    // so they act on exactly the rows the table shows.
+    function getCurrentDataFilters() {
+      const table = dataTableController && dataTableController.table;
+      const query = table && table.dataSource
+        ? table.dataSource.query
+        : { sortBy: 'synced_at', sortDir: 'desc', filters: {} };
+      const params = window.LanaConnectorViewerTables.dataParams(query, { rules: getSubmittableDataRules() });
+      let filters = [];
+      try { filters = JSON.parse(params.get('filters') || '[]'); } catch (_error) { filters = []; }
       return {
-        q: document.getElementById('dataSearchInput')?.value.trim() || '',
-        entity_type: document.getElementById('entityTypeFilter')?.value || '',
-        sort_by: document.getElementById('dataSortBy')?.value || 'synced_at',
-        sort_dir: document.getElementById('dataSortDir')?.value || 'desc',
-        filters: submittable
+        q: params.get('q') || '',
+        entity_type: params.get('entity_type') || '',
+        sort_by: params.get('sort_by') || 'synced_at',
+        sort_dir: params.get('sort_dir') || 'desc',
+        filters
       };
     }
 
@@ -3601,23 +3361,21 @@
 
       if (field.type === 'select') {
         const currentValue = value == null ? '' : String(value);
+        const optionValues = fieldOptions.map((option) => String(option?.value ?? ''));
+        // A native select shows its first option when the value is not offered.
+        const selectedValue = optionValues.includes(currentValue) ? currentValue : (optionValues[0] || '');
         return `
-          <label class="block">
+          <div class="block">
             <div class="mb-2 text-sm font-medium text-gray-900">${safeLabel} ${requiredMark}</div>
-            <select
+            <lex-select
               name="${safeName}"
               data-required="${field.required ? 'true' : 'false'}"
               ${field.required ? 'required' : ''}
-              class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-            >
-              ${fieldOptions.map((option) => {
-                const optionValue = String(option?.value ?? '');
-                const optionLabel = String(option?.label ?? optionValue);
-                return `<option value="${escapeHtml(optionValue)}" ${optionValue === currentValue ? 'selected' : ''}>${escapeHtml(optionLabel)}</option>`;
-              }).join('')}
-            </select>
+              options="${lexSelectOptionsAttr(fieldOptions)}"
+              value="${escapeHtml(selectedValue)}"
+            ></lex-select>
             ${safeHelp}
-          </label>
+          </div>
         `;
       }
 
@@ -3628,23 +3386,19 @@
             ? value.split(',').map((item) => item.trim()).filter(Boolean)
             : []);
         return `
-          <label class="block">
+          <div class="block">
             <div class="mb-2 text-sm font-medium text-gray-900">${safeLabel} ${requiredMark}</div>
-            <select
+            <lex-select
               name="${safeName}"
               multiple
+              searchable
               data-required="${field.required ? 'true' : 'false'}"
               ${field.required ? 'required' : ''}
-              class="min-h-[140px] w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-            >
-              ${fieldOptions.map((option) => {
-                const optionValue = String(option?.value ?? '');
-                const optionLabel = String(option?.label ?? optionValue);
-                return `<option value="${escapeHtml(optionValue)}" ${selectedValues.includes(optionValue) ? 'selected' : ''}>${escapeHtml(optionLabel)}</option>`;
-              }).join('')}
-            </select>
+              options="${lexSelectOptionsAttr(fieldOptions)}"
+              value="${escapeHtml(JSON.stringify(selectedValues))}"
+            ></lex-select>
             ${safeHelp}
-          </label>
+          </div>
         `;
       }
 
@@ -3658,7 +3412,7 @@
         const errorMessage = state.dynamicFieldErrors[field.name];
         const buttonLabel = getDynamicDiscoveryButtonLabel(field);
         return `
-          <label class="block">
+          <div class="block">
             <div class="mb-2 flex flex-wrap items-center justify-between gap-3">
               <div class="text-sm font-medium text-gray-900">${safeLabel} ${requiredMark}</div>
               <button
@@ -3670,23 +3424,19 @@
                 ${escapeHtml(isLoading ? 'Loading…' : buttonLabel)}
               </button>
             </div>
-            <select
+            <lex-select
               name="${safeName}"
               multiple
+              searchable
               data-required="${field.required ? 'true' : 'false'}"
               ${field.required ? 'required' : ''}
-              class="min-h-[140px] w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-            >
-              ${fieldOptions.map((option) => {
-                const optionValue = String(option?.value ?? '');
-                const optionLabel = String(option?.label ?? optionValue);
-                return `<option value="${escapeHtml(optionValue)}" ${selectedValues.includes(optionValue) ? 'selected' : ''}>${escapeHtml(optionLabel)}</option>`;
-              }).join('')}
-            </select>
+              options="${lexSelectOptionsAttr(fieldOptions)}"
+              value="${escapeHtml(JSON.stringify(selectedValues))}"
+            ></lex-select>
             ${safeHelp}
             <p class="mt-2 text-xs text-gray-500">${fieldOptions.length ? `${fieldOptions.length} option${fieldOptions.length === 1 ? '' : 's'} available.` : 'No options loaded yet. Discover options after entering the required configuration above.'}</p>
             ${errorMessage ? `<p class="mt-2 text-xs text-red-600">${escapeHtml(errorMessage)}</p>` : ''}
-          </label>
+          </div>
         `;
       }
 
@@ -4415,7 +4165,7 @@
       if (response && response.created_matter && response.created_matter.id) {
         await loadMatterOptions();
         const select = document.getElementById('dataMatterSelect');
-        if (select) select.value = response.created_matter.id;
+        if (select) select.value = String(response.created_matter.id);
         renderMatterDropdownHint();
         updateAssignSelectedButton();
       }
@@ -4590,11 +4340,18 @@
     }
 
     function renderAssignDialog() {
-      const node = document.getElementById('assignMatterModal');
-      if (!node) return;
+      const modal = document.getElementById('assignMatterModal');
+      if (!modal) return;
+      // lex-modal supplies the header, close button, backdrop, Escape and
+      // focus trap; closing it any of those ways cancels the dialog.
+      if (!modal.__assignCloseBound) {
+        modal.__assignCloseBound = true;
+        modal.addEventListener('lex-close', () => closeAssignDialog());
+      }
+      const node = modal.contentRoot || modal;
       const dialog = state.assignDialog;
       if (!dialog || !dialog.open) {
-        node.classList.add('hidden');
+        modal.open = false;
         node.innerHTML = '';
         return;
       }
@@ -4620,18 +4377,16 @@
           </div>`
         : '<div class="rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-500">No rows in the current selection are already assigned to a matter.</div>';
 
-      const matterOptionsHtml = ['<option value="">Select a matter…</option>']
-        .concat(state.matterOptions.map((matter) => {
-          const label = matter.name || matter.matter_id || matter.client_name || 'Matter';
-          const selected = matter.id === dialog.targetMatterId ? ' selected' : '';
-          return `<option value="${escapeHtml(matter.id)}"${selected}>${escapeHtml(label)}</option>`;
-        }))
-        .join('');
+      const matterOptionsAttr = lexSelectOptionsAttr([{ value: '', label: 'Select a matter…' }]
+        .concat(state.matterOptions.map((matter) => ({
+          value: String(matter.id),
+          label: matter.name || matter.matter_id || matter.client_name || 'Matter',
+        }))));
 
       const existingPanelHtml = dialog.mode === 'existing' ? `
         <div class="mt-3 space-y-2">
           <label class="block text-xs font-medium text-gray-700">Matter</label>
-          <select id="assignDialogMatterSelect" onchange="setAssignDialogMatter(this.value)" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">${matterOptionsHtml}</select>
+          <lex-select id="assignDialogMatterSelect" searchable placeholder="Select a matter…" options="${matterOptionsAttr}" value="${escapeHtml(dialog.targetMatterId == null ? '' : String(dialog.targetMatterId))}"></lex-select>
         </div>` : '';
 
       const form = dialog.createForm || {};
@@ -4694,18 +4449,14 @@
         ${perRowPreviewHtml}
         <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
           ${singleCreateFieldsHtml}
-          <label class="block">
+          <div class="block">
             <div class="text-xs font-medium text-gray-700">Status</div>
-            <select onchange="updateAssignDialogField('status', this.value)" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
-              ${['active', 'pending', 'archived', 'closed'].map((s) => `<option value="${s}"${(form.status || 'active') === s ? ' selected' : ''}>${escapeHtml(s)}</option>`).join('')}
-            </select>
-          </label>
-          <label class="block">
+            <lex-select data-assign-dialog-field="status" class="mt-1" options="${lexSelectOptionsAttr(['active', 'pending', 'archived', 'closed'].map((s) => ({ value: s, label: titleCase(s) })))}" value="${escapeHtml(form.status || 'active')}"></lex-select>
+          </div>
+          <div class="block">
             <div class="text-xs font-medium text-gray-700">Matter Type</div>
-            <select onchange="updateAssignDialogField('matter_type', this.value)" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
-              ${['workspace', 'matter'].map((s) => `<option value="${s}"${(form.matter_type || 'workspace') === s ? ' selected' : ''}>${escapeHtml(s)}</option>`).join('')}
-            </select>
-          </label>
+            <lex-select data-assign-dialog-field="matter_type" class="mt-1" options="${lexSelectOptionsAttr(['workspace', 'matter'].map((s) => ({ value: s, label: titleCase(s) })))}" value="${escapeHtml(form.matter_type || 'workspace')}"></lex-select>
+          </div>
         </div>` : '';
 
       const cascadeHtml = dialog.cascadeAvailable
@@ -4745,17 +4496,10 @@
 
       const description = ctx.parentDescription || `${formatNumber(totals.rowCount)} row${totals.rowCount === 1 ? '' : 's'}`;
 
-      node.classList.remove('hidden');
       node.innerHTML = `
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-          <div class="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
-            <div class="flex items-start justify-between gap-3">
-              <div>
-                <div class="connector-label">Assign to matter</div>
-                <div class="mt-1 text-sm text-gray-600">${escapeHtml(description)} from this connector.</div>
-              </div>
-              <button type="button" onclick="closeAssignDialog()" class="rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-500 hover:bg-gray-50">Close</button>
-            </div>
+        <div>
+          <div>
+            <div class="text-sm text-gray-600">${escapeHtml(description)} from this connector.</div>
 
             <div class="mt-4">${skippedHtml}</div>
 
@@ -4780,14 +4524,14 @@
             <div class="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
               <span id="assignDialogTotalsText">${renderAssignDialogTotalsText(totals, targetLabel, skippedCount, { oneMatterPerRow: oneMatterPerRow && dialog.mode === 'create', matterCount: ctxParentRows.length })}</span>
             </div>
-
-            <div class="mt-6 flex justify-end gap-3">
-              <button type="button" onclick="closeAssignDialog()" class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
-              <button type="button" onclick="confirmAssignDialog()" ${canConfirm ? '' : 'disabled'} class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 ${canConfirm ? '' : 'opacity-60 cursor-not-allowed'}">${escapeHtml(confirmLabel)}</button>
-            </div>
           </div>
         </div>
       `;
+      modal.setFooterContent(`
+        <lex-btn variant="secondary" onclick="closeAssignDialog()">Cancel</lex-btn>
+        <lex-btn variant="primary" id="assignDialogConfirmBtn" onclick="confirmAssignDialog()" label="${escapeHtml(confirmLabel)}" ${canConfirm ? '' : 'disabled'}></lex-btn>
+      `);
+      modal.open = true;
     }
 
     function renderAssignDialogTotalsText(totals, targetLabel, skippedCount, options) {
@@ -5185,67 +4929,55 @@
         showPageAlert('Could not derive a filter key for this relationship.', 'error');
         return;
       }
-      const entitySelect = document.getElementById('entityTypeFilter');
-      if (entitySelect) entitySelect.value = childEntityType;
-      const searchInput = document.getElementById('dataSearchInput');
-      if (searchInput) searchInput.value = matchValue;
+      setDataQuery({ entityType: childEntityType, search: matchValue });
       closeRecordDetail();
       applyDataFilters();
       showPageAlert(`Filtered to ${rel.label} for ${parent.external_id || parent.entity_type}. Refine the search if unrelated rows appear.`, 'info');
     }
 
-    function renderDataGroups() {
-      const node = document.getElementById('dataGroupsPanel');
-      if (!node) return;
-      const groups = state.dataGroups && Array.isArray(state.dataGroups.groups) ? state.dataGroups.groups : [];
+    // Grouped collections: a client-side lex-table of every group the
+    // groups endpoint returns for the current filter (no cap). A group is an
+    // aggregate, so it has Last synced rather than a Created time.
+    let groupsTableReady = null;
 
-      if (!groups.length) {
-        node.innerHTML = `
-          <div class="connector-label">Grouped Collections</div>
-          <div class="mt-3 text-sm text-gray-500">No group breakdown is available for the current filter yet.</div>
-        `;
-        return;
+    function ensureGroupsTable() {
+      if (!groupsTableReady) {
+        const CVT = window.LanaConnectorViewerTables;
+        groupsTableReady = window.LanaRecordTableKit.mount(document.getElementById('dataGroupsMount'), {
+          id: 'connectorGroupsTable',
+          title: 'Groups',
+          noun: ['group', 'groups'],
+          ariaLabel: 'Grouped collections',
+          light: true,
+          searchPlaceholder: 'Search groups...',
+          emptyText: 'No group breakdown is available for the current filter yet.',
+          sortBy: 'last_synced_at',
+          sortDir: 'desc',
+          minWidth: 980,
+          columns: CVT.groupColumns()
+        }, {
+          rows: [],
+          onAction: (action, row) => {
+            if (action !== 'assign-group' || !row || !row._raw) return;
+            const group = row._raw;
+            assignGroupToMatter(
+              encodeURIComponent(group.group_type || ''),
+              encodeURIComponent(group.spreadsheet_id || ''),
+              encodeURIComponent(group.sheet_name || ''),
+              encodeURIComponent(group.entity_type || '')
+            );
+          }
+        });
       }
+      return groupsTableReady;
+    }
 
-      node.innerHTML = `
-        <div class="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div class="connector-label">Grouped Collections</div>
-            <div class="mt-2 text-sm text-gray-500">Assign collections such as sheets or entity groups to matters without hand-editing records one by one.</div>
-          </div>
-        </div>
-        <div class="mt-4 overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200 text-sm">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-4 py-3 text-left font-semibold text-gray-600">Group</th>
-                <th class="px-4 py-3 text-left font-semibold text-gray-600">Type</th>
-                <th class="px-4 py-3 text-left font-semibold text-gray-600">Rows</th>
-                <th class="px-4 py-3 text-left font-semibold text-gray-600">Assigned</th>
-                <th class="px-4 py-3 text-left font-semibold text-gray-600">Action</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200 bg-white">
-              ${groups.slice(0, 12).map((group) => `
-                <tr>
-                  <td class="px-4 py-3 align-top">
-                    <div class="font-semibold text-gray-900">${escapeHtml(group.label || group.sheet_name || titleCase(group.entity_type))}</div>
-                    <div class="mt-1 text-xs text-gray-500">${escapeHtml(group.group_key)}</div>
-                  </td>
-                  <td class="px-4 py-3 align-top text-gray-700">${escapeHtml(group.group_type)}</td>
-                  <td class="px-4 py-3 align-top text-gray-700">${formatNumber(group.row_count)}</td>
-                  <td class="px-4 py-3 align-top text-gray-700">${escapeHtml(group.assigned_matter_name || 'Unassigned')}</td>
-                  <td class="px-4 py-3 align-top">
-                    <button type="button" onclick="assignGroupToMatter('${encodeURIComponent(group.group_type || '')}', '${encodeURIComponent(group.spreadsheet_id || '')}', '${encodeURIComponent(group.sheet_name || '')}', '${encodeURIComponent(group.entity_type || '')}')" class="rounded-lg border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50">
-                      Assign Group
-                    </button>
-                  </td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-      `;
+    function renderDataGroups() {
+      if (!document.getElementById('dataGroupsMount')) return;
+      const groups = state.dataGroups && Array.isArray(state.dataGroups.groups) ? state.dataGroups.groups : [];
+      ensureGroupsTable().then((controller) => {
+        controller.setRows(groups.map(window.LanaConnectorViewerTables.groupRow));
+      });
     }
 
     function getValueByPath(obj, path) {
@@ -5300,10 +5032,9 @@
       const paths = [];
       collectFieldPaths(data, '', paths);
       paths.sort();
-      const options = ['<option value="">Select a field…</option>']
-        .concat(paths.map((p) => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`))
-        .concat(['<option value="__custom__">Custom path…</option>']);
-      return options.join('');
+      return [{ value: '', label: 'Select a field…' }]
+        .concat(paths.map((p) => ({ value: p, label: p })))
+        .concat([{ value: '__custom__', label: 'Custom path…' }]);
     }
 
     function renderInteractivePayload(record) {
@@ -5404,7 +5135,7 @@
       const proposedInput = document.getElementById('recordCorrectionValue');
       if (!select) return;
 
-      const hasOption = [...select.options].some((opt) => opt.value === path);
+      const hasOption = (select.options || []).some((opt) => opt.value === path);
       if (hasOption) {
         select.value = path;
         if (custom) custom.classList.add('hidden');
@@ -5496,38 +5227,22 @@
     }
 
     function renderRecordDetail() {
-      const node = document.getElementById('recordDetailPanel');
-      const backdrop = document.getElementById('recordDetailBackdrop');
-      if (!node) return;
+      const drawer = document.getElementById('recordDetailPanel');
+      if (!drawer) return;
+      bindDetailDrawerClose(drawer, closeRecordDetail);
+      const node = drawer.contentRoot || drawer;
 
       if (!state.selectedRecord) {
-        node.className = 'hidden fixed inset-y-0 right-0 z-40 w-full max-w-2xl overflow-y-auto border-l border-gray-200 bg-white shadow-2xl';
+        drawer.open = false;
         node.innerHTML = '';
-        if (backdrop) {
-          backdrop.classList.add('hidden');
-        }
         return;
       }
 
       const record = state.selectedRecord;
       const annotations = Array.isArray(state.recordAnnotations) ? state.recordAnnotations : [];
-      node.className = 'fixed inset-y-0 right-0 z-40 w-full max-w-2xl overflow-y-auto border-l border-gray-200 bg-white shadow-2xl';
-      if (backdrop) {
-        backdrop.classList.remove('hidden');
-      }
 
       node.innerHTML = `
-        <div class="min-h-full bg-white">
-          <div class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-gray-200 bg-white px-6 py-5">
-            <div>
-              <div class="connector-label">Record Detail</div>
-              <div class="mt-2 text-sm text-gray-500">Inspect the source payload, review annotations, and shortlist corrections without overwriting the synced snapshot.</div>
-            </div>
-            <button type="button" onclick="closeRecordDetail()" class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
-              Close
-            </button>
-          </div>
-
+        <div class="bg-white">
           <div class="space-y-6 p-6">
             <div class="grid gap-6 md:grid-cols-2">
               <div class="rounded-xl border border-gray-200 bg-white p-4">
@@ -5560,13 +5275,11 @@
               <div class="text-sm font-semibold text-gray-900">Propose A Correction</div>
               <div class="mt-2 text-sm text-gray-500">Suggest an edit without overwriting the source record. LANA stores the suggestion as a correction annotation.</div>
               <div class="mt-4 space-y-3">
-                <label class="block">
+                <div class="block">
                   <div class="mb-2 text-sm font-medium text-gray-900">Field</div>
-                  <select id="recordCorrectionFieldSelect" onchange="onCorrectionFieldSelectChange()" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
-                    ${renderCorrectionFieldOptions(record)}
-                  </select>
+                  <lex-select id="recordCorrectionFieldSelect" searchable placeholder="Select a field…" options="${lexSelectOptionsAttr(renderCorrectionFieldOptions(record))}" value=""></lex-select>
                   <input id="recordCorrectionFieldCustom" type="text" placeholder="Custom path, e.g. address.city" oninput="updateCurrentValueDisplay()" class="mt-2 hidden w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
-                </label>
+                </div>
                 <div id="recordCorrectionCurrentValueWrap" class="hidden rounded-lg border border-gray-200 bg-gray-50 p-3">
                   <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Current Value</div>
                   <div id="recordCorrectionCurrentValue" class="mt-2 break-words connector-mono text-xs text-gray-800"></div>
@@ -5613,6 +5326,7 @@
           </div>
         </div>
       `;
+      drawer.open = true;
     }
 
     function renderSourceAttributionSection(record) {
@@ -5746,27 +5460,19 @@
       // intentionally do NOT auto-open record detail because the row may
       // not be loaded yet.
       try {
-        const entitySelect = document.getElementById('entityTypeFilter');
-        if (entitySelect) {
-          // Only set if the option exists — otherwise leave the current filter
-          // alone so we don't put the select into an invalid state.
-          const hasOption = Array.from(entitySelect.options).some((opt) => opt.value === entityType);
-          if (hasOption) {
-            entitySelect.value = entityType;
-          }
-        }
-        const searchInput = document.getElementById('dataSearchInput')
-          || document.getElementById('dataPreviewSearchInput');
-        if (searchInput) {
-          searchInput.value = externalId;
-        }
+        // Only switch the entity filter when that entity type exists, so the
+        // filter never points at a value it does not offer.
+        const knownEntities = Object.keys((state.summary && state.summary.stats && state.summary.stats.entities) || {});
+        setDataQuery({
+          entityType: knownEntities.includes(entityType) ? entityType : undefined,
+          search: externalId
+        });
         if (state) {
-          state.dataPreviewOffset = 0;
           state.selectedRecordId = '';
           state.selectedRecord = null;
         }
         if (typeof refreshDataPreview === 'function') {
-          refreshDataPreview();
+          refreshDataPreview({ resetPage: true }).catch((error) => console.warn('filterDataPreviewToRecord failed', error));
         }
       } catch (err) {
         // Non-fatal: panel still rendered, jump just failed silently.
@@ -5779,17 +5485,13 @@
     // as filterToLinkedRecords (which goes the child direction).
     async function openParentRecord(parentEntityType, parentExternalId, parentRowId) {
       if (!parentEntityType || !parentExternalId) return;
-      const entitySelect = document.getElementById('entityTypeFilter');
-      if (entitySelect) entitySelect.value = parentEntityType;
-      const searchInput = document.getElementById('dataSearchInput');
-      if (searchInput) searchInput.value = String(parentExternalId);
+      setDataQuery({ entityType: parentEntityType, search: String(parentExternalId) });
       closeRecordDetail();
-      state.dataPreviewOffset = 0;
       state.selectedDataIds = [];
       state.selectedRowsById = {};
       state.selectionMode = 'manual';
       try {
-        await refreshDataPreview();
+        await refreshDataPreview({ resetPage: true });
         const rows = state.dataPreview && Array.isArray(state.dataPreview.data) ? state.dataPreview.data : [];
         const targetRow = (parentRowId && rows.find((r) => r.id === parentRowId))
           || rows.find((r) => String(r.external_id) === String(parentExternalId));
@@ -5919,6 +5621,26 @@
       `;
     }
 
+    // The record and log detail panels are lex-drawers: the drawer supplies
+    // the header, close button, backdrop, Escape and focus trap. Closing it
+    // any of those ways clears the selection the same as the page's close
+    // functions. Bound lazily because the drawers live in the page template.
+    function bindDetailDrawerClose(drawer, onClose) {
+      if (!drawer || drawer.__detailCloseBound) return;
+      drawer.__detailCloseBound = true;
+      drawer.addEventListener('lex-close', () => {
+        // Escape reaches every open overlay. When a dialog is stacked on
+        // this drawer (assign, delete annotation), Escape is meant for the
+        // dialog only, so reopen the drawer (it closes itself right after
+        // emitting lex-close).
+        if (document.querySelector('lex-modal[open]')) {
+          queueMicrotask(() => { drawer.open = true; });
+          return;
+        }
+        onClose();
+      });
+    }
+
     function closeRecordDetail() {
       state.selectedRecordId = '';
       state.selectedRecord = null;
@@ -5928,180 +5650,226 @@
       renderDataPreview();
     }
 
-    function renderDataPreviewPagination(node, info) {
-      if (!node) return;
-      const { limit, offset, total, hasMore } = info;
-      if (!total || total <= limit) {
-        node.classList.add('hidden');
-        node.classList.remove('flex');
-        node.innerHTML = '';
-        return;
-      }
-      const totalPages = Math.max(1, Math.ceil(total / limit));
-      const currentPage = Math.floor(offset / limit) + 1;
-      const isFirst = offset <= 0;
-      const isLast = !hasMore;
-      const btnBase = 'rounded-lg border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50';
-      const btnDisabled = 'rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-300 cursor-not-allowed';
+    // ── Synced data table (server-paged lex-table; docs/TABLE-STANDARD.md) ──
+    // The table owns search, sort, entity/column filters and paging; the
+    // sidebar keeps the field-rule builder. Every load goes through
+    // loadDataPage, which keeps state.dataPreview in step for the selection,
+    // bulk actions and record detail.
+    let dataTableController = null;
+    let dataTableReady = null;
+    let dataLoadSequence = 0;
+    let dataLoadWaiters = [];
+    let lastDataSelectionSignature = null;
 
-      node.classList.remove('hidden');
-      node.classList.add('flex');
-      node.innerHTML = `
-        <div class="text-sm text-gray-600">Page <span class="font-semibold text-gray-900">${formatNumber(currentPage)}</span> of <span class="font-semibold text-gray-900">${formatNumber(totalPages)}</span></div>
-        <div class="flex flex-wrap items-center gap-2">
-          <button type="button" onclick="goToDataPage('first')" ${isFirst ? 'disabled' : ''} class="${isFirst ? btnDisabled : btnBase}">First</button>
-          <button type="button" onclick="goToDataPage('prev')" ${isFirst ? 'disabled' : ''} class="${isFirst ? btnDisabled : btnBase}">Previous</button>
-          <button type="button" onclick="goToDataPage('next')" ${isLast ? 'disabled' : ''} class="${isLast ? btnDisabled : btnBase}">Next</button>
-          <button type="button" onclick="goToDataPage('last')" ${isLast ? 'disabled' : ''} class="${isLast ? btnDisabled : btnBase}">Last</button>
-        </div>
-      `;
+    function dataTableSpec() {
+      const CVT = window.LanaConnectorViewerTables;
+      return {
+        id: 'connectorDataTable',
+        title: 'Records',
+        noun: ['record', 'records'],
+        ariaLabel: 'Synced connector data',
+        serverPaging: true,
+        searchPlaceholder: 'Search IDs, names, emails, payload text...',
+        emptyText: 'No records to preview.',
+        filteredEmptyText: 'No matching records. Try a different search or clear the filters.',
+        sortBy: 'synced_at',
+        sortDir: 'desc',
+        sortableColumns: CVT.DATA_SORTABLE,
+        minWidth: 1120,
+        mainFilter: { key: 'entity_type', label: 'Entity', options: currentEntityOptions() },
+        columns: CVT.dataColumns({
+          isSelected: (id) => state.selectedDataIds.includes(id),
+          allFiltered: () => state.selectionMode === 'all-filtered',
+          isOpen: (id) => state.selectedRecordId === id
+        })
+      };
     }
 
-    function renderDataPreview() {
-      const meta = document.getElementById('dataPreviewMeta');
-      const container = document.getElementById('dataPreviewTable');
-      const paginationNode = document.getElementById('dataPreviewPagination');
-      const response = state.dataPreview;
-      const rows = response && Array.isArray(response.data) ? response.data : [];
-      const pagination = response && response.pagination ? response.pagination : null;
+    function currentEntityKeys() {
+      return Object.keys((state.summary && state.summary.stats && state.summary.stats.entities) || {});
+    }
 
-      if (!rows.length) {
+    function currentEntityOptions() {
+      return window.LanaConnectorViewerTables.entityOptions(currentEntityKeys());
+    }
+
+    // Entity and matter lists change after the summary / matters load.
+    function updateDataFilterOptions() {
+      if (!dataTableController) return;
+      const CVT = window.LanaConnectorViewerTables;
+      dataTableController.table.setColumnFilterOptions(CVT.dataServerFilters(currentEntityKeys(), state.matterOptions));
+      const select = document.getElementById(dataTableController.ids.filter);
+      if (select) {
+        const current = select.value || 'all';
+        select.options = [{ value: 'all', label: 'All' }].concat(currentEntityOptions());
+        select.value = current;
+      }
+    }
+
+    function ensureDataTable() {
+      if (!dataTableReady) {
+        const CVT = window.LanaConnectorViewerTables;
+        dataTableReady = window.LanaRecordTableKit.mount(document.getElementById('dataPreviewTable'), dataTableSpec(), {
+          load: loadDataPage,
+          serverFilters: CVT.dataServerFilters(currentEntityKeys(), state.matterOptions),
+          errorText: 'Connector data could not be loaded. Check your connection and try again.',
+          onRowClick: (row) => openRecordDetail(row.id),
+          onAction: (action, row) => {
+            if (action === 'inspect') openRecordDetail(row.id);
+            else if (action === 'flag') shortlistSingleRecord(row.id);
+          }
+        }).then((controller) => {
+          dataTableController = controller;
+          // Row checkboxes (lex-table's row-click ignores inputs).
+          controller.table.addEventListener('change', (event) => {
+            const box = event.target && event.target.closest ? event.target.closest('[data-select-row]') : null;
+            if (box) toggleDataSelection(box.getAttribute('data-select-row'), box.checked);
+          });
+          return controller;
+        });
+      }
+      return dataTableReady;
+    }
+
+    function settleDataWaiters(error) {
+      const waiters = dataLoadWaiters;
+      dataLoadWaiters = [];
+      waiters.forEach((resolve) => resolve(error || null));
+    }
+
+    async function loadDataPage(query) {
+      const seq = ++dataLoadSequence;
+      const CVT = window.LanaConnectorViewerTables;
+      const params = CVT.dataParams(query, { rules: getSubmittableDataRules() });
+      // A selection belongs to the filter it was made under (as the old
+      // Apply Filters did): a new search/filter starts a new selection.
+      const signature = CVT.selectionSignature(params);
+      if (lastDataSelectionSignature !== null && signature !== lastDataSelectionSignature) {
         state.selectedDataIds = [];
         state.selectedRowsById = {};
         state.selectionMode = 'manual';
-        renderBulkActionSummary();
-        renderSelectionToolbar();
-        renderRecordDetail();
-        meta.textContent = 'No connector data found for this filter.';
-        container.innerHTML = '<div class="p-8 text-center text-sm text-gray-500">No records to preview.</div>';
-        if (paginationNode) {
-          paginationNode.classList.add('hidden');
-          paginationNode.classList.remove('flex');
-          paginationNode.innerHTML = '';
+      }
+      lastDataSelectionSignature = signature;
+      try {
+        const response = await api.get(`${connectorApi('/data')}?${params.toString()}`);
+        if (seq !== dataLoadSequence) return { rows: [], pagination: {} };
+        state.dataPreview = response;
+        const rows = response && Array.isArray(response.data) ? response.data : [];
+        const pagination = window.LanaIntegrationTables.offsetPagination(response && response.pagination, query, rows.length);
+        // Hand rows back first, then refresh the selection / detail panels.
+        setTimeout(() => {
+          renderDataPreview();
+          settleDataWaiters(null);
+        }, 0);
+        return { rows: rows.map(CVT.dataRow), pagination };
+      } catch (error) {
+        if (seq === dataLoadSequence) settleDataWaiters(error);
+        throw error;
+      }
+    }
+
+    // Set the table's search and entity filter without fetching (jumps from
+    // record detail); the caller reloads from page 1.
+    function setDataQuery(changes) {
+      const table = dataTableController && dataTableController.table;
+      if (!table) return;
+      const query = table.dataSource ? table.dataSource.query : {};
+      const filters = Object.assign({}, query.filters || {});
+      if (changes.entityType !== undefined) {
+        if (changes.entityType) filters.entity_type = { operator: 'in', value: [changes.entityType] };
+        else delete filters.entity_type;
+      }
+      const search = changes.search !== undefined ? String(changes.search) : (query.search || '');
+      table.restoreQuery({ search, sortBy: query.sortBy, sortDir: query.sortDir, filters, limit: query.limit, page: 1 });
+      const searchNode = document.getElementById(dataTableController.ids.search);
+      if (searchNode) searchNode.value = search;
+      const filterNode = document.getElementById(dataTableController.ids.filter);
+      if (filterNode && changes.entityType !== undefined) filterNode.value = changes.entityType || 'all';
+    }
+
+    // Re-render the table's cells (checkboxes, open-row marker) and the
+    // selection, bulk-action and detail panels from state.dataPreview.
+    function renderDataPreview() {
+      const meta = document.getElementById('dataPreviewMeta');
+      const response = state.dataPreview;
+      const rows = response && Array.isArray(response.data) ? response.data : [];
+
+      if (!rows.length) {
+        if (response) {
+          state.selectedDataIds = [];
+          state.selectedRowsById = {};
+          state.selectionMode = 'manual';
         }
-        return;
-      }
-
-      if (state.selectedRecordId) {
-        state.selectedRecord = rows.find((row) => row.id === state.selectedRecordId) || state.selectedRecord;
-      }
-
-      if (pagination) {
-        const limit = pagination.limit || state.dataPreviewLimit || rows.length;
-        const offset = pagination.offset || 0;
-        const total = pagination.total || 0;
-        const start = total === 0 ? 0 : offset + 1;
-        const end = offset + rows.length;
-        meta.textContent = `Showing ${formatNumber(start)}–${formatNumber(end)} of ${formatNumber(total)} records`;
-        renderDataPreviewPagination(paginationNode, { limit, offset, total, hasMore: Boolean(pagination.has_more) });
+        if (meta) meta.textContent = response ? 'No connector data found for this filter.' : '';
       } else {
-        meta.textContent = `Showing ${rows.length} records`;
-        if (paginationNode) {
-          paginationNode.classList.add('hidden');
-          paginationNode.classList.remove('flex');
-          paginationNode.innerHTML = '';
+        if (state.selectedRecordId) {
+          state.selectedRecord = rows.find((row) => row.id === state.selectedRecordId) || state.selectedRecord;
         }
+        if (meta) meta.textContent = '';
       }
 
-      const allFiltered = state.selectionMode === 'all-filtered';
-      const headerChecked = allFiltered || (state.selectedDataIds.length > 0 && state.selectedDataIds.length === rows.length);
-
-      container.innerHTML = `
-        <table class="min-w-full divide-y divide-gray-200 text-sm">
-          <thead class="bg-gray-50">
-            <tr>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600">
-                <input type="checkbox" ${headerChecked ? 'checked' : ''} onchange="toggleAllDataSelection(this.checked)">
-              </th>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600">Entity</th>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600">External ID</th>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600">Matter</th>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600">Health</th>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600">Synced</th>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-200 bg-white">
-            ${rows.map((row) => `
-              <tr class="${state.selectedRecordId === row.id ? 'bg-blue-50' : ''}">
-                <td class="px-4 py-3 align-top">
-                  <input type="checkbox" ${(allFiltered || state.selectedDataIds.includes(row.id)) ? 'checked' : ''} onchange="toggleDataSelection('${escapeHtml(row.id)}', this.checked)">
-                </td>
-                <td class="px-4 py-3 align-top">
-                  <div class="font-semibold text-gray-900">${escapeHtml(titleCase(row.entity_type || 'record'))}</div>
-                </td>
-                <td class="px-4 py-3 align-top connector-mono text-gray-700">${escapeHtml(row.external_id || '')}</td>
-                <td class="px-4 py-3 align-top text-gray-700">${escapeHtml(row.matter_name || 'Unassigned')}</td>
-                <td class="px-4 py-3 align-top">
-                  <div class="flex flex-wrap gap-2">
-                    ${row.has_corrections ? getBadgeHtml('Corrections', 'badge-yellow') : ''}
-                    ${row.has_flags ? getBadgeHtml(row.flag_count > 1 ? `Flagged ×${row.flag_count}` : 'Flagged', 'badge-amber') : ''}
-                    ${(!row.has_corrections && !row.has_flags) ? getBadgeHtml('Clean', 'badge-green') : ''}
-                    ${row.annotation_count ? getBadgeHtml(`${row.annotation_count} note${row.annotation_count === 1 ? '' : 's'}`, 'badge-slate') : ''}
-                  </div>
-                </td>
-                <td class="px-4 py-3 align-top text-gray-600">${escapeHtml(formatDateTime(row.synced_at))}</td>
-                <td class="px-4 py-3 align-top">
-                  <div class="flex flex-wrap gap-2">
-                    <button type="button" onclick="openRecordDetail('${escapeHtml(row.id)}')" class="rounded-lg border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50">Inspect</button>
-                    <button type="button" onclick="shortlistSingleRecord('${escapeHtml(row.id)}')" class="rounded-lg border border-amber-200 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50">Flag</button>
-                  </div>
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      `;
+      if (dataTableController) {
+        dataTableController.table.setCellRenderers(window.LanaRecordTableKit.renderersFor(dataTableSpec()));
+      }
 
       renderBulkActionSummary();
       renderSelectionToolbar();
       renderRecordDetail();
-      scheduleCascadePanelRefresh();
+      if (rows.length) scheduleCascadePanelRefresh();
+    }
+
+    // ── Sync logs table (client-side: every page of .../logs) ──
+    let logsTableReady = null;
+    let logsRowsSource = null;
+
+    function ensureLogsTable() {
+      if (!logsTableReady) {
+        logsTableReady = window.LanaRecordTableKit.mount(document.getElementById('logsTable'), {
+          id: 'connectorLogsTable',
+          title: 'Sync logs',
+          noun: ['log', 'logs'],
+          ariaLabel: 'Sync logs',
+          searchPlaceholder: 'Search logs...',
+          emptyText: 'No execution logs yet.',
+          sortBy: 'created_at',
+          sortDir: 'desc',
+          minWidth: 1040,
+          columns: window.LanaConnectorViewerTables.logColumns({ isOpen: (id) => state.selectedLogId === id })
+        }, {
+          rows: [],
+          onRowClick: (row) => openLogDetail(row.id)
+        });
+      }
+      return logsTableReady;
     }
 
     function renderLogs() {
       const meta = document.getElementById('logsMeta');
-      const container = document.getElementById('logsTable');
       const response = state.logs;
       const rows = response && Array.isArray(response.logs) ? response.logs : [];
-      const pagination = response && response.pagination ? response.pagination : null;
+      const total = response && response.pagination ? Number(response.pagination.total) || rows.length : rows.length;
 
-      if (!rows.length) {
-        meta.textContent = 'No sync logs recorded yet.';
-        container.innerHTML = '<div class="p-8 text-center text-sm text-gray-500">No execution logs yet.</div>';
-        renderLogDetail();
-        return;
+      if (meta) {
+        const truncated = Boolean(response && response.truncated);
+        meta.textContent = truncated
+          ? `Showing the latest ${formatNumber(rows.length)} of ${formatNumber(total)} logs.`
+          : '';
+        meta.classList.toggle('hidden', !truncated);
       }
 
-      meta.textContent = pagination
-        ? `Showing ${rows.length} of ${formatNumber(pagination.total)} logs`
-        : `Showing ${rows.length} logs`;
-
-      container.innerHTML = `
-        <table class="min-w-full divide-y divide-gray-200 text-sm">
-          <thead class="bg-gray-50">
-            <tr>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600">Started</th>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600">Records</th>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600">Error</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-200 bg-white">
-            ${rows.map((row) => `
-              <tr class="cursor-pointer hover:bg-gray-50 ${state.selectedLogId === row.id ? 'bg-blue-50' : ''}" onclick="openLogDetail('${escapeHtml(row.id)}')">
-                <td class="px-4 py-3 align-top text-gray-700">${escapeHtml(formatDateTime(row.started_at))}</td>
-                <td class="px-4 py-3 align-top">${renderLogStatus(row.status)}</td>
-                <td class="px-4 py-3 align-top text-gray-700">
-                  Processed ${formatNumber(row.records && row.records.processed)}<br>
-                  Failed ${formatNumber(row.records && row.records.failed)}
-                </td>
-                <td class="px-4 py-3 align-top text-gray-600">${escapeHtml(row.error_message || '')}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      `;
+      if (document.getElementById('logsTable')) {
+        ensureLogsTable().then((controller) => {
+          if (logsRowsSource !== rows) {
+            logsRowsSource = rows;
+            controller.setRows(rows.map(window.LanaIntegrationTables.syncLogRow));
+          } else {
+            // Same rows: only the open-row marker changed.
+            controller.table.setCellRenderers(window.LanaRecordTableKit.renderersFor({
+              columns: window.LanaConnectorViewerTables.logColumns({ isOpen: (id) => state.selectedLogId === id })
+            }));
+          }
+        });
+      }
 
       renderLogDetail();
     }
@@ -6157,33 +5925,26 @@
         clearInterval(state.logDetailPollTimer);
         state.logDetailPollTimer = null;
       }
-      const panel = document.getElementById('logDetailPanel');
-      const backdrop = document.getElementById('logDetailBackdrop');
-      if (panel) {
-        panel.classList.add('hidden');
-        panel.innerHTML = '';
-      }
-      if (backdrop) {
-        backdrop.classList.add('hidden');
+      const drawer = document.getElementById('logDetailPanel');
+      if (drawer) {
+        drawer.open = false;
+        (drawer.contentRoot || drawer).innerHTML = '';
       }
       renderLogs();
     }
 
     function renderLogDetail() {
-      const panel = document.getElementById('logDetailPanel');
-      const backdrop = document.getElementById('logDetailBackdrop');
-      if (!panel) return;
+      const drawer = document.getElementById('logDetailPanel');
+      if (!drawer) return;
+      bindDetailDrawerClose(drawer, closeLogDetail);
+      const panel = drawer.contentRoot || drawer;
 
       const log = findSelectedLog();
       if (!log) {
-        panel.classList.add('hidden');
+        drawer.open = false;
         panel.innerHTML = '';
-        if (backdrop) backdrop.classList.add('hidden');
         return;
       }
-
-      panel.classList.remove('hidden');
-      if (backdrop) backdrop.classList.remove('hidden');
 
       const records = log.records || {};
       const changes = log.changes || {};
@@ -6205,18 +5966,10 @@
       const consoleOutputHtml = renderConsoleOutput(metadata);
 
       panel.innerHTML = `
-        <div class="min-h-full bg-white">
-          <div class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-gray-200 bg-white px-6 py-5">
-            <div>
-              <div class="flex items-center gap-3">
-                ${renderLogStatus(log.status)}
-                <div class="connector-label">Sync Log Detail</div>
-              </div>
-              <div class="mt-2 connector-mono text-xs text-gray-500">${escapeHtml(log.id || '')}</div>
-            </div>
-            <button type="button" onclick="closeLogDetail()" class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
-              Close
-            </button>
+        <div class="bg-white">
+          <div class="flex items-center gap-3 border-b border-gray-200 px-6 py-4">
+            ${renderLogStatus(log.status)}
+            <div class="connector-mono text-xs text-gray-500">${escapeHtml(log.id || '')}</div>
           </div>
 
           <div class="space-y-6 p-6">
@@ -6313,6 +6066,7 @@
           </div>
         </div>
       `;
+      drawer.open = true;
     }
 
     function renderConsoleOutput(metadata) {
@@ -6429,19 +6183,9 @@
       return `${(b / (1024 * 1024)).toFixed(2)} MB`;
     }
 
+    // Entity choices for the Synced Data table's Entity filter and column.
     function renderEntityFilterOptions() {
-      const select = document.getElementById('entityTypeFilter');
-      const entities = (state.summary && state.summary.stats && state.summary.stats.entities) || {};
-      const currentValue = select.value;
-      const options = ['<option value="">All entity types</option>']
-        .concat(Object.keys(entities).sort().map((entityType) => (
-          `<option value="${escapeHtml(entityType)}">${escapeHtml(entityType)}</option>`
-        )));
-
-      select.innerHTML = options.join('');
-      if ([...select.options].some((option) => option.value === currentValue)) {
-        select.value = currentValue;
-      }
+      updateDataFilterOptions();
     }
 
     function switchTab(tabName) {
@@ -6491,8 +6235,10 @@
       }
 
       fields.forEach((field) => {
+        // lex-select is not form-associated, so it is not in form.elements.
         const element = forms
-          .map((form) => form.elements[field.name])
+          .map((form) => form.elements[field.name]
+            || form.querySelector(`lex-select[name="${CSS.escape(field.name)}"]`))
           .find(Boolean);
         if (!element) return;
 
@@ -6512,8 +6258,9 @@
         }
 
         if (field.type === 'multiselect' || field.type === 'multiselect_dynamic') {
-          const selectedValues = Array.from(element.selectedOptions || [])
-            .map((option) => option.value)
+          const selectedValues = (element.tagName === 'LEX-SELECT'
+            ? readLexSelectValues(element)
+            : Array.from(element.selectedOptions || []).map((option) => option.value))
             .filter(Boolean);
           if (!selectedValues.length && !field.required) {
             return;
@@ -6600,18 +6347,17 @@
       const select = document.getElementById('dataMatterSelect');
       if (select) {
         const currentValue = select.value;
-        select.innerHTML = ['<option value="">Unassigned (create new matter)</option>']
-          .concat(state.matterOptions.map((matter) => (
-            `<option value="${escapeHtml(matter.id)}">${escapeHtml(matter.name || matter.matter_id || matter.client_name || 'Matter')}</option>`
-          )))
-          .join('');
-
-        if ([...select.options].some((option) => option.value === currentValue)) {
-          select.value = currentValue;
-        }
+        const options = [{ value: '', label: 'Unassigned (create new matter)' }]
+          .concat(state.matterOptions.map((matter) => ({
+            value: String(matter.id),
+            label: String(matter.name || matter.matter_id || matter.client_name || 'Matter'),
+          })));
+        select.options = options;
+        select.value = options.some((option) => option.value === currentValue) ? currentValue : '';
       }
       renderMatterDropdownHint();
       updateAssignSelectedButton();
+      updateDataFilterOptions();
     }
 
     async function refreshDataGroups() {
@@ -6625,26 +6371,32 @@
       renderDataGroups();
     }
 
-    async function refreshDataPreview() {
+    // Reload the Synced Data table (same page unless resetPage) and resolve
+    // once state.dataPreview holds the answer; rejects when the load fails.
+    async function refreshDataPreview(options = {}) {
       if (!state.sourceId) return;
 
-      const filters = getCurrentDataFilters();
-      const limit = state.dataPreviewLimit || 25;
-      const offset = Math.max(0, state.dataPreviewOffset || 0);
-      const query = new URLSearchParams({ limit: String(limit), offset: String(offset) });
-      if (filters.entity_type) query.set('entity_type', filters.entity_type);
-      if (filters.q) query.set('q', filters.q);
-      if (filters.sort_by) query.set('sort_by', filters.sort_by);
-      if (filters.sort_dir) query.set('sort_dir', filters.sort_dir);
-      if (filters.filters.length) query.set('filters', JSON.stringify(filters.filters));
-      state.dataPreview = await api.get(`${connectorApi('/data')}?${query.toString()}`);
-      renderDataPreview();
+      const firstLoad = !dataTableReady;
+      const settled = new Promise((resolve) => dataLoadWaiters.push(resolve));
+      const controller = await ensureDataTable();
+      // The first mount already asked for page 1.
+      if (!firstLoad) {
+        if (options.resetPage) controller.reloadFromFirstPage();
+        else controller.reload();
+      }
+      const error = await settled;
+      if (error) throw error;
       await refreshDataGroups();
     }
 
+    // The logs endpoint pages but cannot sort or filter, so the table loads
+    // every page (up to LOG_MAX_PAGES x LOG_PAGE_SIZE) and says when it stops.
     async function refreshLogs() {
       if (!state.sourceId) return;
-      state.logs = await api.get(`${connectorApi('/logs')}?limit=25`);
+      const result = await window.LanaConnectorViewerTables.loadAllLogs(
+        (limit, offset) => api.get(`${connectorApi('/logs')}?limit=${limit}&offset=${offset}`)
+      );
+      state.logs = { logs: result.logs, pagination: { total: result.total }, truncated: result.truncated };
       renderLogs();
     }
 
@@ -6654,7 +6406,11 @@
       try {
         const forms = [document.getElementById('configForm'), document.getElementById('webhooksForm')].filter(Boolean);
         const invalidForm = forms.find((form) => typeof form.reportValidity === 'function' && !form.reportValidity());
-        if (invalidForm) {
+        // lex-select is not form-associated, so reportValidity skips it.
+        const invalidSelect = forms
+          .flatMap((form) => Array.from(form.querySelectorAll('lex-select[required]')))
+          .find((select) => typeof select.validate === 'function' && !select.validate().valid);
+        if (invalidForm || invalidSelect) {
           throw new Error('Fill in the required configuration fields before saving.');
         }
 
@@ -6717,9 +6473,11 @@
     async function switchToLanaManagedCredentials() {
       if (!state.sourceId || !isLanaManagedAvailable()) return;
 
-      const confirmed = window.confirm(
-        `Remove your own OAuth app credentials for ${state.connectorName} and use LANA-managed credentials instead?\n\n` +
-        'Existing connections will need to be re-authorized.'
+      const confirmed = await Lex.Modal.confirmAsync(
+        'Use LANA-managed credentials',
+        `Remove your own OAuth app credentials for ${state.connectorName} and use LANA-managed credentials instead? ` +
+        'Existing connections will need to be re-authorized.',
+        { confirmText: 'Switch credentials', variant: 'danger' }
       );
       if (!confirmed) return;
 
@@ -7164,54 +6922,30 @@
     }
 
     function applyDataFilters() {
-      state.dataPreviewOffset = 0;
       state.selectedDataIds = [];
       state.selectedRowsById = {};
       state.selectionMode = 'manual';
-      refreshDataPreview().catch((error) => {
+      refreshDataPreview({ resetPage: true }).catch((error) => {
         console.error('[Connector Viewer] Failed to apply data filters', error);
         showPageAlert(error.message || 'Failed to apply filters.', 'error');
       });
     }
 
-    function goToDataPage(direction) {
-      const pagination = state.dataPreview && state.dataPreview.pagination;
-      if (!pagination) return;
-      const limit = pagination.limit || state.dataPreviewLimit || 25;
-      const total = pagination.total || 0;
-      const current = state.dataPreviewOffset || 0;
-      let next = current;
-
-      if (direction === 'next') {
-        next = current + limit;
-      } else if (direction === 'prev') {
-        next = current - limit;
-      } else if (direction === 'first') {
-        next = 0;
-      } else if (direction === 'last') {
-        next = Math.max(0, Math.floor(Math.max(0, total - 1) / limit) * limit);
-      }
-
-      next = Math.max(0, Math.min(next, Math.max(0, total - 1)));
-      if (next === current) return;
-
-      state.dataPreviewOffset = next;
-      refreshDataPreview().catch((error) => {
-        console.error('[Connector Viewer] Failed to change data page', error);
-        showPageAlert(error.message || 'Failed to load page.', 'error');
-      });
-    }
-
+    // Clears the field rules and the table's search, sort and filters.
     function clearDataFilters() {
       state.dataRules = [];
-      const searchNode = document.getElementById('dataSearchInput');
-      const entityNode = document.getElementById('entityTypeFilter');
-      const sortByNode = document.getElementById('dataSortBy');
-      const sortDirNode = document.getElementById('dataSortDir');
-      if (searchNode) searchNode.value = '';
-      if (entityNode) entityNode.value = '';
-      if (sortByNode) sortByNode.value = 'synced_at';
-      if (sortDirNode) sortDirNode.value = 'desc';
+      if (dataTableController) {
+        const ids = dataTableController.ids;
+        dataTableController.table.resetQuery();
+        const searchNode = document.getElementById(ids.search);
+        const filterNode = document.getElementById(ids.filter);
+        const sortNode = document.getElementById(ids.sort);
+        const orderNode = document.getElementById(ids.order);
+        if (searchNode) searchNode.value = '';
+        if (filterNode) filterNode.value = 'all';
+        if (sortNode) sortNode.value = 'synced_at';
+        if (orderNode) orderNode.dataset.order = 'desc';
+      }
       renderDataRuleBuilder();
       applyDataFilters();
     }
@@ -7448,7 +7182,7 @@
           ? `${formatNumber(count)} filtered row${count === 1 ? '' : 's'}`
           : `${formatNumber(count)} selected row${count === 1 ? '' : 's'}`;
 
-        if (!window.confirm(`Unassign ${target} from their current matters? Source data is not modified.`)) {
+        if (!(await Lex.Modal.confirmAsync('Unassign from matters', `Unassign ${target} from their current matters? Source data is not modified.`, { confirmText: 'Unassign' }))) {
           return;
         }
 
@@ -7509,66 +7243,43 @@
     function renderDeleteAnnotationModal() {
       const existing = document.getElementById('deleteAnnotationModal');
       if (!state.deleteAnnotationModal) {
-        if (existing) existing.remove();
+        if (existing) {
+          existing.open = false;
+          existing.remove();
+        }
         return;
       }
       if (existing) return;
 
+      // lex-modal supplies the backdrop, close button, Escape and focus trap.
       const dialog = state.deleteAnnotationModal;
-      const modal = document.createElement('div');
+      const modal = document.createElement('lex-modal');
       modal.id = 'deleteAnnotationModal';
-      modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 p-4';
+      modal.setAttribute('heading', 'Delete annotation?');
+      modal.setAttribute('size', 'sm');
       modal.innerHTML = `
-        <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-          <div class="flex items-start gap-3">
-            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5">
-                <path d="M12 9v4" />
-                <path d="M12 17h.01" />
-                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
-              </svg>
-            </div>
-            <div class="flex-1">
-              <h3 class="text-base font-semibold text-gray-900">Delete annotation?</h3>
-              <p class="mt-2 text-sm text-gray-600">
-                This will permanently remove the
-                <span class="font-semibold">${escapeHtml(dialog.annotationType)}</span>
-                annotation${dialog.summary ? ` (<span class="font-semibold">${escapeHtml(dialog.summary)}</span>)` : ''}
-                from this record. The synced source data is not modified.
-              </p>
-              ${dialog.createdAt ? `<p class="mt-2 text-xs text-gray-500">Created ${escapeHtml(formatDateTime(dialog.createdAt))}</p>` : ''}
-              <p class="mt-2 text-sm text-gray-600">This action cannot be undone.</p>
-            </div>
-          </div>
-          <div class="mt-6 flex flex-wrap justify-end gap-3">
-            <button type="button" onclick="closeDeleteAnnotationModal()" class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
-              Cancel
-            </button>
-            <button type="button" id="confirmDeleteAnnotationBtn" onclick="confirmDeleteAnnotation()" class="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60">
-              Delete Annotation
-            </button>
-          </div>
-        </div>
+        <p class="text-sm text-gray-600">
+          This will permanently remove the
+          <span class="font-semibold">${escapeHtml(dialog.annotationType)}</span>
+          annotation${dialog.summary ? ` (<span class="font-semibold">${escapeHtml(dialog.summary)}</span>)` : ''}
+          from this record. The synced source data is not modified.
+        </p>
+        ${dialog.createdAt ? `<p class="mt-2 text-xs text-gray-500">Created ${escapeHtml(formatDateTime(dialog.createdAt))}</p>` : ''}
+        <p class="mt-2 text-sm text-gray-600">This action cannot be undone.</p>
+        <lex-btn data-slot="footer" variant="secondary" onclick="closeDeleteAnnotationModal()">Cancel</lex-btn>
+        <lex-btn data-slot="footer" id="confirmDeleteAnnotationBtn" variant="danger" onclick="confirmDeleteAnnotation()">Delete Annotation</lex-btn>
       `;
+      modal.addEventListener('lex-close', () => closeDeleteAnnotationModal());
       document.body.appendChild(modal);
-
-      modal.addEventListener('click', function (event) {
-        if (event.target === modal) {
-          closeDeleteAnnotationModal();
-        }
-      });
+      modal.open = true;
     }
 
     async function confirmDeleteAnnotation() {
       const dialog = state.deleteAnnotationModal;
       if (!dialog || !state.sourceId || !state.selectedRecordId) return;
       const button = document.getElementById('confirmDeleteAnnotationBtn');
-      const originalLabel = button ? button.textContent : '';
       try {
-        if (button) {
-          button.disabled = true;
-          button.textContent = 'Deleting...';
-        }
+        if (button) button.loading = true;
         await api.delete(connectorApi(`/data-records/${state.selectedRecordId}/annotations/${dialog.annotationId}`));
         showPageAlert('Annotation deleted.', 'success');
         closeDeleteAnnotationModal();
@@ -7576,10 +7287,7 @@
       } catch (error) {
         console.error('[Connector Viewer] Failed to delete annotation', error);
         showPageAlert(error.message || 'Failed to delete annotation.', 'error');
-        if (button) {
-          button.disabled = false;
-          button.textContent = originalLabel || 'Delete Annotation';
-        }
+        if (button) button.loading = false;
       }
     }
 
@@ -7944,13 +7652,35 @@
     window.onDataRuleFieldChange = onDataRuleFieldChange;
     window.applyDataFilters = applyDataFilters;
     window.clearDataFilters = clearDataFilters;
-    window.goToDataPage = goToDataPage;
     window.toggleDataSelection = toggleDataSelection;
     window.toggleAllDataSelection = toggleAllDataSelection;
     window.selectPageRows = selectPageRows;
     window.selectAllFiltered = selectAllFiltered;
     window.clearAssignSelection = clearAssignSelection;
     window.onMatterDropdownChange = onMatterDropdownChange;
+
+    // lex-select fires lex-change (not change); one delegated listener routes
+    // the page's dropdowns to the handlers the native selects called inline.
+    document.addEventListener('lex-change', (event) => {
+      const target = event.target;
+      if (!target || target.tagName !== 'LEX-SELECT') return;
+      const value = event.detail ? event.detail.value : target.value;
+      if (target.id === 'dataMatterSelect') {
+        onMatterDropdownChange();
+      } else if (target.id === 'authModeSelect') {
+        handleAuthModeChange();
+      } else if (target.id === 'assignDialogMatterSelect') {
+        setAssignDialogMatter(value);
+      } else if (target.id === 'recordCorrectionFieldSelect') {
+        onCorrectionFieldSelectChange();
+      } else if (target.dataset.assignDialogField) {
+        updateAssignDialogField(target.dataset.assignDialogField, value);
+      } else if (target.dataset.role === 'field' && target.dataset.ruleIndex != null) {
+        onDataRuleFieldChange(Number(target.dataset.ruleIndex), value);
+      } else if (target.dataset.role === 'operator' && target.dataset.ruleIndex != null) {
+        onDataRuleOperatorChange(Number(target.dataset.ruleIndex), value);
+      }
+    });
     window.openRecordDetail = openRecordDetail;
     window.openParentRecord = openParentRecord;
     window.refreshParentRecordsForOpenRecord = refreshParentRecordsForOpenRecord;

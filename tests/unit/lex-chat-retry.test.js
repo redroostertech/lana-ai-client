@@ -157,7 +157,7 @@ describe('Lex Chat failed-generation recovery', () => {
         .mockImplementationOnce(() => completedStream())
     };
     const { chat, recoveryMessages } = makeHarness(source);
-    chat.chatMode = 'document';
+    chat.chatMode = 'agentic';
     chat.matterId = 'matter-original';
 
     const attachments = { files: [{ file_id: 'file-1', name: 'Evidence.pdf' }] };
@@ -185,7 +185,7 @@ describe('Lex Chat failed-generation recovery', () => {
     const [retryContent, retryOptions] = source.send.mock.calls[1];
     expect(retryContent).toBe('Analyze this document');
     expect(retryOptions).toEqual(expect.objectContaining({
-      contextType: 'document_chat',
+      contextType: 'agentic_mode',
       matterId: 'matter-original',
       attachments
     }));

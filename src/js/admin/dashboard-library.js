@@ -36,57 +36,51 @@
   // server round-trip per render.
   var pinnedIds = new Set();
 
-  function normalizeDashboardRecord(record, index) {
-    var layout = record.layout || {};
-    var type = layout.dashboard_type || record.key || 'owner';
-    return {
-      key: record.id || record.key,
-      id: record.id || null,
-      name: record.name,
-      description: record.description,
-      audience: layout.dashboard_type || record.audience || 'Configurable',
-      category: layout.category || record.category || 'Dashboard',
-      scope: record.scope || 'Organization-wide',
-      visibility: layout.visibility_label || record.visibility || 'Resource shares',
-      state: record.state || 'Active',
-      actions: record.id ? 'Actions' : '',
-      pin: record.id ? 'pin' : '',
-      tags: record.tags || layout.category || '',
-      href: record.id ? 'admin/dashboard-detail.html?id=' + encodeURIComponent(record.id) : (record.href || 'admin/dashboard-detail.html?type=' + encodeURIComponent(type)),
-      usageRank: record.usageRank || index + 1,
-      recentRank: record.recentRank || index + 1,
-    };
+  function tables() {
+    return window.LanaMetricTables;
   }
 
+  // Rows keep raw values (docs/TABLE-STANDARD.md section 5); renderers format.
+  function normalizeDashboardRecord(record, index) {
+    return tables().mapDashboardRecord(record, index);
+  }
+
+  function builtInDashboards() {
+    return dashboards().map(normalizeDashboardRecord);
+  }
+
+  // The library is small, so the table holds the whole set (client-side):
+  // read every page of the BI list rather than one capped page.
   async function loadDashboards() {
     if (!window.api || typeof window.api.listBIDashboards !== 'function') {
-      return dashboards();
+      return builtInDashboards();
     }
 
     try {
-      var response = await api.listBIDashboards(
-        { limit: 100, sort: 'name', order: 'asc' },
-        optionalRequestOptions(OPTIONAL_DASHBOARD_TIMEOUT_MS)
-      );
-      var rows = response && Array.isArray(response.data) ? response.data : [];
-      if (!rows.length) return dashboards();
-      return rows.map(normalizeDashboardRecord);
+      var result = await tables().fetchAllPages(async function (limit, offset) {
+        var response = await api.listBIDashboards(
+          { limit: limit, offset: offset, sort: 'updated_at', order: 'desc' },
+          optionalRequestOptions(OPTIONAL_DASHBOARD_TIMEOUT_MS)
+        );
+        return {
+          rows: response && Array.isArray(response.data) ? response.data : [],
+          total: response && response.pagination ? response.pagination.total : undefined
+        };
+      }, 100, 20);
+      if (!result.rows.length) return builtInDashboards();
+      return result.rows.map(normalizeDashboardRecord);
     } catch (err) {
       console.warn('[DashboardLibrary] Could not load BI dashboards:', err.message);
-      return dashboards();
+      return builtInDashboards();
     }
   }
 
+  // Row actions are plain buttons (no custom dropdown menu).
   function renderActions(item) {
     return item && item.id
-        ? '<div class="insights-action-menu">'
-          + '<button class="insights-action-menu__trigger" type="button" aria-label="Dashboard actions" data-dashboard-actions="' + escapeHtml(item.id) + '">&hellip;</button>'
-          + '<div class="insights-action-menu__panel" data-dashboard-actions-panel="' + escapeHtml(item.id) + '" hidden>'
-          + '<button type="button" data-dashboard-edit="' + escapeHtml(item.id) + '">Edit</button>'
-          + '<button type="button" class="is-danger" data-dashboard-delete="' + escapeHtml(item.id) + '" data-dashboard-name="' + escapeHtml(item.name) + '">Delete</button>'
-          + '</div>'
-          + '</div>'
-        : '';
+      ? '<button type="button" class="insights-library-action" data-dashboard-edit="' + escapeHtml(item.id) + '">Edit</button>'
+        + '<button type="button" class="insights-library-action is-danger" data-dashboard-delete="' + escapeHtml(item.id) + '" data-dashboard-name="' + escapeHtml(item.name) + '">Delete</button>'
+      : '';
   }
 
   // SVG icons lifted from the workspaces matters table so the dashboard
@@ -134,8 +128,8 @@
       return '<a class="insights-pinned-card" href="' + escapeHtml(item.href) + '" data-dashboard-pinned-card="' + escapeHtml(item.id) + '">'
         + '<button type="button" class="insights-pinned-card__pin" data-dashboard-pin-toggle="' + escapeHtml(item.id) + '" aria-label="Unpin dashboard" title="Unpin dashboard">' + PIN_ICON_FILLED + '</button>'
         + '<div class="insights-pinned-card__name">' + escapeHtml(item.name || 'Untitled dashboard') + '</div>'
-        + '<div class="insights-pinned-card__sub">' + escapeHtml(item.audience || item.category || '') + '</div>'
-        + '<div class="insights-pinned-card__pills">' + audiencePill(item.category) + statePill(item.state) + '</div>'
+        + '<div class="insights-pinned-card__sub">' + escapeHtml(tables().humanizeLabel(item.audience) || tables().capitalizeFirst(item.category)) + '</div>'
+        + '<div class="insights-pinned-card__pills">' + audiencePill(tables().capitalizeFirst(item.category)) + statePill(item.state) + '</div>'
         + '</a>';
     }).join('');
   }
@@ -174,47 +168,102 @@
     return sourceDashboards;
   }
 
+  function muted() {
+    return '<span class="insights-library-muted">—</span>';
+  }
+
+  function labelCell(text) {
+    return text ? escapeHtml(text) : muted();
+  }
+
+  // Dates go through Lex.Utils (API time is UTC; shown in the user's zone).
+  function absoluteTime(value) {
+    if (!value || !window.Lex || !Lex.Utils) return '';
+    var text = Lex.Utils.formatDateTime(value);
+    return text === 'Never' ? '' : text;
+  }
+
+  function relativeTime(value) {
+    if (!value || !window.Lex || !Lex.Utils) return '';
+    var text = Lex.Utils.timeAgo(value);
+    return text === '-' ? '' : text;
+  }
+
+  function cellRenderers() {
+    var shared = tables();
+    return {
+      pin: function (value, row) {
+        return renderPinCell(row);
+      },
+      name: function (value) {
+        return '<div class="insights-library-name">' + escapeHtml(value || 'Untitled dashboard') + '</div>';
+      },
+      audience: function (value) { return labelCell(shared.humanizeLabel(value)); },
+      category: function (value) { return labelCell(shared.capitalizeFirst(value)); },
+      scope: function (value) { return labelCell(shared.capitalizeFirst(value)); },
+      visibility: function (value) { return labelCell(shared.capitalizeFirst(value)); },
+      state: function (value) {
+        var label = shared.humanizeLabel(value || 'Active');
+        return '<lex-badge label="' + escapeHtml(label) + '" color="' + (/^active$/i.test(label) ? 'green' : 'gray') + '"></lex-badge>';
+      },
+      created_at: function (value) {
+        var text = absoluteTime(value);
+        return text ? '<time class="insights-library-time" datetime="' + escapeHtml(value) + '">' + escapeHtml(text) + '</time>' : muted();
+      },
+      updated_at: function (value) {
+        var text = relativeTime(value);
+        return text
+          ? '<time class="insights-library-time" datetime="' + escapeHtml(value) + '" title="' + escapeHtml(absoluteTime(value)) + '">' + escapeHtml(text) + '</time>'
+          : muted();
+      },
+      actions: function (value, row) {
+        return '<div class="insights-library-actions">' + renderActions(row) + '</div>';
+      },
+    };
+  }
+
+  var toolbar = null;
+
+  function syncEmptyState(table) {
+    var filtered = tables().emptyText(table, '', 'filtered') === 'filtered';
+    table.emptyText = filtered ? 'No matching dashboards. Try a different search or clear the filters.' : 'No dashboards yet';
+    table.emptyActionLabel = filtered ? '' : 'Create Dashboard';
+  }
+
   function renderDashboardLibrary(sourceDashboards) {
     var table = el('dashboardLibraryTable');
-    if (!table) return;
+    if (!table || typeof table.setData !== 'function') return;
 
-    if (typeof table.setCellRenderers === 'function') {
-      table.setCellRenderers({
-        pin: function (value, row) {
-          return renderPinCell(row);
-        },
-        name: function (value, row) {
-          return '<div class="insights-library-name">' + escapeHtml(value) + '</div>';
-        },
-        state: function (value) {
-          return '<span class="insights-library-pill insights-library-pill--active">' + escapeHtml(value || 'Active') + '</span>';
-        },
-        actions: function (value, row) {
-          return '<div class="insights-library-actions">' + renderActions(row) + '</div>';
-        },
-      });
+    // Filter pinned dashboards out of the main table — they live in the
+    // strip above and shouldn't be duplicated below. Mirrors the matters
+    // list behavior in workspace.js (currentMatters minus pinned ids).
+    var unpinned = sourceDashboards.filter(function (item) {
+      return !(item && item.id && pinnedIds.has(item.id));
+    });
+    var filters = tables().dashboardFilterOptions(unpinned);
+    table.setColumnFilterOptions(filters);
+    var audienceSelect = el('dashboardLibraryAudienceFilter');
+    if (audienceSelect) {
+      audienceSelect.options = [{ value: 'all', label: 'All' }].concat(filters.audience.options);
     }
-
-    if (typeof table.setData === 'function') {
-      // Filter pinned dashboards out of the main table — they live in the
-      // strip above and shouldn't be duplicated below. Mirrors the matters
-      // list behavior in workspace.js (currentMatters minus pinned ids).
-      var unpinned = sourceDashboards.filter(function (item) {
-        return !(item && item.id && pinnedIds.has(item.id));
-      });
-      table.setData(unpinned);
+    syncEmptyState(table);
+    table.setData(unpinned);
+    if (toolbar) {
+      toolbar.updateCount();
+      toolbar.syncToolbar();
     }
   }
 
-  function closeActionMenus() {
-    document.querySelectorAll('[data-dashboard-actions-panel]').forEach(function (panel) {
-      panel.hidden = true;
+  function confirmDelete(name) {
+    return Lex.Modal.confirmAsync('Delete dashboard', 'Delete "' + (name || 'this dashboard') + '"?', {
+      variant: 'danger',
+      confirmText: 'Delete'
     });
   }
 
   async function deleteDashboard(id, name, sourceDashboards) {
     if (!id) return sourceDashboards;
-    var confirmed = window.confirm('Delete "' + (name || 'this dashboard') + '"?');
+    var confirmed = await confirmDelete(name);
     if (!confirmed) return sourceDashboards;
 
     try {
@@ -240,15 +289,6 @@
       event.preventDefault();
       event.stopPropagation();
       togglePin(pinToggle.getAttribute('data-dashboard-pin-toggle'), state.sourceDashboards);
-      return;
-    }
-
-    var actions = event.target.closest('[data-dashboard-actions]');
-    if (actions) {
-      var panel = document.querySelector('[data-dashboard-actions-panel="' + actions.getAttribute('data-dashboard-actions') + '"]');
-      var wasHidden = !panel || panel.hidden;
-      closeActionMenus();
-      if (panel) panel.hidden = !wasHidden;
       return;
     }
 
@@ -287,7 +327,7 @@
     }
 
     var table = el('dashboardLibraryTable');
-    var state = { sourceDashboards: dashboards() };
+    var state = { sourceDashboards: [] };
 
     content.addEventListener('click', function (event) { onDashboardLibraryClick(event, state); });
     if (table) {
@@ -296,9 +336,31 @@
         if (row && row.href) Lex.Nav.go(row.href);
       });
     }
-    document.addEventListener('click', function (event) {
-      if (!event.target.closest('.insights-action-menu')) closeActionMenus();
-    });
+    var ready = window.customElements && typeof window.customElements.whenDefined === 'function'
+      ? window.customElements.whenDefined('lex-table')
+      : Promise.resolve();
+    ready.then(function () { startTable(table, state); });
+  }
+
+  function startTable(table, state) {
+    if (table) {
+      // Renderers must be registered before the first setData.
+      table.setCellRenderers(cellRenderers());
+      // Search also covers the description, which has no column.
+      table._getSearchColumns = function () {
+        return ['name', 'description', 'audience', 'category', 'scope', 'visibility', 'state'];
+      };
+      toolbar = tables().bindClientToolbar(table, {
+        search: 'dashboardLibrarySearch',
+        sort: 'dashboardLibrarySort',
+        order: 'dashboardLibrarySortOrder',
+        filter: 'dashboardLibraryAudienceFilter',
+        counts: ['dashboardLibraryCount', 'dashboardLibrarySectionCount']
+      }, { filterKey: 'audience', noun: ['dashboard', 'dashboards'], defaultSort: 'updated_at' });
+      table.addEventListener('lex-filter-change', function () { syncEmptyState(table); });
+      table.addEventListener('empty-action', function () { Lex.Nav.go('admin/dashboard-builder.html'); });
+    }
+    state.sourceDashboards = builtInDashboards();
     renderDashboardLibrary(state.sourceDashboards);
     renderPinnedStrip(state.sourceDashboards);
 

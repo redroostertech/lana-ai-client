@@ -6,7 +6,8 @@
  * 
  * Usage:
  *   1. Include this script after api.js
- *   2. Add the activity HTML structure (or call ActivityPanel.injectHTML())
+ *   2. Load lex-drawer.js; the module mounts its own <lex-drawer id="activityPanel">
+ *      unless the page declares one
  *   3. Call ActivityPanel.init() after DOM is ready
  */
 
@@ -25,78 +26,102 @@ window.ActivityPanel = (function() {
   let elements = {};
 
   /**
-   * Initialize the activity panel
-   * @param {Object} options - Configuration options
+   * Inner markup of the activity lex-drawer (title, close, backdrop, Escape,
+   * focus and scroll lock come from the component).
    */
-  function init(options = {}) {
-    if (state.isInitialized) return;
-
-    // Cache DOM elements
-    elements = {
-      panel: document.getElementById('activityPanel'),
-      list: document.getElementById('activityList'),
-      loading: document.getElementById('activityLoading'),
-      viewAllBtn: document.getElementById('viewAllActivityBtn'),
-      feedContainer: document.getElementById('activityFeed')
-    };
-
-    // Check required elements exist
-    if (!elements.panel) {
-      console.warn('ActivityPanel: Panel element not found. Call injectHTML() first or add elements manually.');
-      return;
-    }
-
-    // Bind events
-    bindEvents();
-
-    state.isInitialized = true;
-  }
-
-  /**
-   * Inject the activity panel HTML into the page
-   */
-  function injectHTML() {
-    const html = `
-    <!-- Activity Panel Overlay -->
-    <div id="activityOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
-
-    <!-- Activity Slide-out Panel -->
-    <div id="activityPanel" class="fixed inset-y-0 right-0 w-full sm:w-[28rem] bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
-      <!-- Panel Header -->
-      <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
-        <h2 class="text-lg font-semibold text-gray-900">Activity</h2>
-        <div class="flex items-center gap-3">
-          <button id="refreshActivityBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-            </svg>
-          </button>
-          <button id="closeActivityPanel" class="text-gray-400 hover:text-gray-600">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <!-- Activity List -->
+  const DRAWER_CONTENT = `
+    <div data-slot="header-actions" class="flex items-center gap-3">
+      <button type="button" id="refreshActivityBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh" aria-label="Refresh activity">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+        </svg>
+      </button>
+    </div>
+    <div class="flex flex-col" style="margin:-20px;height:calc(100% + 40px)">
       <div id="activityList" class="flex-1 overflow-y-auto">
-        <!-- Loading State -->
         <div id="activityLoading" class="p-8 text-center">
           <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
           <p class="text-gray-500 mt-3 text-sm">Loading activity...</p>
         </div>
       </div>
-
-      <!-- Loading More Indicator -->
-      <div id="activityLoadingMore" class="hidden p-4 border-t border-gray-100 text-center">
+      <div id="activityLoadingMore" class="hidden p-4 border-t border-gray-100 text-center flex-shrink-0">
         <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
       </div>
     </div>
-    `;
+  `;
 
-    // Inject at end of body
-    document.body.insertAdjacentHTML('beforeend', html);
+  function drawerDefined() {
+    return !!(window.customElements && window.customElements.get('lex-drawer'));
+  }
+
+  // lex-drawer.js usually loads at the end of <body>, after this script.
+  function whenDrawerReady(callback) {
+    if (drawerDefined() || document.readyState !== 'loading') {
+      callback(drawerDefined());
+      return;
+    }
+    document.addEventListener('DOMContentLoaded', () => callback(drawerDefined()), { once: true });
+  }
+
+  /**
+   * Mount the activity lex-drawer (idempotent). A page may declare its own
+   * <lex-drawer id="activityPanel">; otherwise the module appends one,
+   * replacing any legacy hand-built overlay/panel markup.
+   */
+  function mountDrawer() {
+    const existing = document.getElementById('activityPanel');
+    if (existing && existing.tagName === 'LEX-DRAWER') return existing;
+    if (!drawerDefined()) return null;
+
+    if (existing) existing.remove();
+    const legacyOverlay = document.getElementById('activityOverlay');
+    if (legacyOverlay) legacyOverlay.remove();
+
+    const drawer = document.createElement('lex-drawer');
+    drawer.id = 'activityPanel';
+    drawer.setAttribute('heading', 'Activity');
+    drawer.setAttribute('width', 'lg');
+    drawer.innerHTML = DRAWER_CONTENT;
+    document.body.appendChild(drawer);
+    return drawer;
+  }
+
+  /**
+   * Initialize the activity panel
+   * @param {Object} options - Configuration options
+   */
+  function init(options = {}) {
+    if (state.isInitialized) return;
+    state.isInitialized = true;
+
+    whenDrawerReady(() => {
+      mountDrawer();
+
+      // Cache DOM elements
+      elements = {
+        panel: document.getElementById('activityPanel'),
+        list: document.getElementById('activityList'),
+        loading: document.getElementById('activityLoading'),
+        refreshBtn: document.getElementById('refreshActivityBtn'),
+        viewAllBtn: document.getElementById('viewAllActivityBtn'),
+        feedContainer: document.getElementById('activityFeed')
+      };
+
+      if (!elements.panel || elements.panel.tagName !== 'LEX-DRAWER') {
+        console.warn('ActivityPanel: lex-drawer is not loaded on this page; the activity panel is unavailable.');
+        state.isInitialized = false;
+        return;
+      }
+
+      bindEvents();
+    });
+  }
+
+  /**
+   * Mount the activity panel (a lex-drawer appended to <body>).
+   */
+  function injectHTML() {
+    mountDrawer();
   }
 
   /**
@@ -106,6 +131,15 @@ window.ActivityPanel = (function() {
     // lex-drawer handles close button, overlay click, and Escape key internally
     if (elements.panel) {
       elements.panel.addEventListener('lex-close', close);
+    }
+
+    if (elements.refreshBtn) {
+      elements.refreshBtn.addEventListener('click', () => {
+        elements.refreshBtn.classList.add('animate-spin');
+        loadActivities(true).finally(() => {
+          setTimeout(() => elements.refreshBtn.classList.remove('animate-spin'), 300);
+        });
+      });
     }
 
     // View all button (on dashboard)

@@ -662,6 +662,36 @@
   }
 
   function renderMetricCard(metric) {
+    var intake = window.OpportunityIntakePresentation && window.OpportunityIntakePresentation.opportunityIntakePresentation(metric);
+    if (intake) {
+      var intakeId = metric.metric_key || metric.key;
+      metricInfoById[intakeId] = metric;
+      return '<article class="dash-metric-card"><div class="dash-metric-card__top"><div class="dash-metric-card__title">'
+        + escapeHtml(metric.title || metric.name || 'Opportunity intake') + '</div>'
+        + '<button class="dash-metric-card__info" type="button" aria-label="Metric details" data-metric-info="'
+        + escapeHtml(intakeId) + '">i</button></div>'
+        + window.OpportunityIntakePresentation.renderOpportunityIntake(intake, metric) + '</article>';
+    }
+    var acquisition = window.AcquisitionSourcePresentation && window.AcquisitionSourcePresentation.acquisitionSourcePresentation(metric);
+    if (acquisition) {
+      var acquisitionId = metric.metric_key || metric.key;
+      metricInfoById[acquisitionId] = metric;
+      return '<article class="dash-metric-card"><div class="dash-metric-card__top"><div class="dash-metric-card__title">'
+        + escapeHtml(metric.title || metric.name || 'Acquisition sources') + '</div>'
+        + '<button class="dash-metric-card__info" type="button" aria-label="Metric details" data-metric-info="'
+        + escapeHtml(acquisitionId) + '">i</button></div>'
+        + window.AcquisitionSourcePresentation.renderAcquisitionSource(acquisition) + '</article>';
+    }
+    var pipeline = window.CurrentPipelinePresentation && window.CurrentPipelinePresentation.currentPipelinePresentation(metric);
+    if (pipeline) {
+      var pipelineId = metric.metric_key || metric.key;
+      metricInfoById[pipelineId] = metric;
+      return '<article class="dash-metric-card"><div class="dash-metric-card__top"><div class="dash-metric-card__title">'
+        + escapeHtml(metric.title || metric.name || 'Current pipeline') + '</div>'
+        + '<button class="dash-metric-card__info" type="button" aria-label="Metric details" data-metric-info="'
+        + escapeHtml(pipelineId) + '">i</button></div>'
+        + window.CurrentPipelinePresentation.renderCurrentPipeline(pipeline) + '</article>';
+    }
     var title = metric.title || metric.name || humanize(metric.metric_key) || 'Metric';
     var value = formatMetricCardValue(metric);
     var cardId = metric.metric_key || metric.key || title;
@@ -944,7 +974,10 @@
 
   async function deleteCurrentDashboard() {
     if (!currentDashboardId) return;
-    var confirmed = window.confirm('Delete "' + (currentDashboardName || 'this dashboard') + '"?');
+    var confirmed = await Lex.Modal.confirmAsync('Delete dashboard', 'Delete "' + (currentDashboardName || 'this dashboard') + '"?', {
+      variant: 'danger',
+      confirmText: 'Delete'
+    });
     if (!confirmed) return;
 
     try {

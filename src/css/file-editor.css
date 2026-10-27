@@ -299,7 +299,7 @@
 .office-file-item:focus-visible,
 .office-doc-toolbar button:focus-visible,
 .office-selection-toolbar button:focus-visible,
-.office-format-select:focus-visible,
+.office-format-select .lex-select-trigger:focus-visible,
 .office-color-control:focus-within,
 .office-ruler-actions button:focus-visible,
 .office-title-input:focus-visible,
@@ -918,7 +918,7 @@
 }
 
 .office-doc-toolbar button,
-.office-format-select,
+.office-format-select .lex-select-trigger,
 .office-color-control {
   align-items: center;
   background: var(--office-panel-bg);
@@ -936,7 +936,7 @@
 }
 
 .office-doc-toolbar button:hover,
-.office-format-select:hover,
+.office-format-select .lex-select-trigger:hover:not(:disabled),
 .office-color-control:hover {
   background: var(--office-hover);
   border-color: var(--office-line-strong);
@@ -950,12 +950,19 @@
   color: var(--lex-text-accent);
 }
 
+/* Toolbar lex-selects: the host sizes the control, the trigger carries the
+   same box as the toolbar buttons. */
 .office-format-select {
+  display: inline-block;
+  min-width: 116px;
+}
+
+.office-format-select .lex-select-trigger {
   font: inherit;
   font-size: var(--lex-label-sm-size);
   font-weight: 650;
-  min-width: 116px;
-  padding: 0 28px 0 8px;
+  justify-content: space-between;
+  padding: 0 8px;
 }
 
 .office-format-select-narrow {
@@ -1542,7 +1549,6 @@
   gap: 6px;
 }
 
-.office-file-info-edit select,
 .office-file-info-edit input,
 .office-file-info-edit textarea {
   background: var(--office-rail-bg);
@@ -2451,186 +2457,6 @@
   margin: 0 1px;
   padding: 1px 5px;
   white-space: nowrap;
-}
-
-.office-template-variable-menu {
-  background: #fff;
-  border: 1px solid var(--lex-border-subtle, var(--office-line));
-  border-radius: 8px;
-  box-shadow: 0 12px 28px rgba(24, 20, 17, 0.14), 0 2px 8px rgba(24, 20, 17, 0.08);
-  max-height: min(340px, calc(100vh - 24px));
-  overflow: hidden;
-  position: fixed;
-  width: min(300px, calc(100vw - 24px));
-  z-index: var(--lex-z-popover);
-}
-
-.office-template-variable-menu[hidden] {
-  display: none;
-}
-
-.office-template-variable-menu-head {
-  border-bottom: 1px solid var(--office-line);
-  display: grid;
-  gap: 8px;
-  padding: 10px;
-}
-
-.office-template-variable-menu-title {
-  align-items: flex-start;
-  display: flex;
-  gap: 8px;
-}
-
-.office-template-variable-menu-title > span {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.office-template-variable-menu-head strong {
-  color: var(--lex-text-primary);
-  font-size: var(--lex-label-sm-size);
-  line-height: 1.2;
-}
-
-.office-template-variable-menu-head code,
-.office-template-variable-option code {
-  color: var(--lex-text-secondary);
-  font-family: var(--lex-font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
-  font-size: 11px;
-  line-height: 1.3;
-}
-
-.office-template-variable-back {
-  align-items: center;
-  background: var(--office-panel-bg);
-  border: 1px solid var(--office-line);
-  border-radius: var(--lex-radius-md);
-  color: var(--lex-text-primary);
-  cursor: pointer;
-  display: inline-flex;
-  flex: 0 0 auto;
-  height: 28px;
-  justify-content: center;
-  padding: 0;
-  width: 28px;
-}
-
-.office-template-variable-back:hover,
-.office-template-variable-back:focus-visible {
-  background: var(--office-hover);
-  border-color: var(--office-line-strong);
-  outline: none;
-}
-
-.office-template-variable-search {
-  background: #fff;
-  border: 1px solid var(--lex-border-default, var(--office-line-strong));
-  border-radius: 6px;
-  box-shadow: inset 0 0 0 1px transparent;
-  color: var(--lex-text-primary);
-  font: inherit;
-  font-size: var(--lex-body-sm-size);
-  height: 34px;
-  padding: 0 9px;
-  width: 100%;
-}
-
-.office-template-variable-search::placeholder {
-  color: var(--lex-text-tertiary, var(--lex-text-secondary));
-}
-
-.office-template-variable-search:focus {
-  border-color: var(--lex-color-primary-500, #5b3df5);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--lex-color-primary-500, #5b3df5) 16%, transparent);
-  outline: none;
-}
-
-.office-template-variable-options {
-  display: grid;
-  gap: 2px;
-  max-height: 228px;
-  overflow: auto;
-  padding: 6px;
-}
-
-.office-template-variable-option {
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  color: var(--lex-text-primary);
-  cursor: pointer;
-  display: grid;
-  font: inherit;
-  gap: 3px;
-  min-height: 38px;
-  padding: 7px 8px;
-  text-align: left;
-}
-
-.office-template-variable-option span {
-  font-size: var(--lex-label-sm-size);
-  font-weight: 700;
-}
-
-.office-template-variable-person {
-  align-items: center;
-  display: grid;
-  gap: 8px;
-  grid-template-columns: 32px minmax(0, 1fr);
-  min-height: 48px;
-}
-
-.office-template-variable-avatar {
-  align-items: center;
-  background: var(--office-hover);
-  border-radius: 999px;
-  color: var(--lex-text-secondary);
-  display: inline-flex;
-  font-size: 11px;
-  font-weight: 800;
-  height: 30px;
-  justify-content: center;
-  line-height: 1;
-  width: 30px;
-}
-
-.office-template-variable-person-copy {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.office-template-variable-person-copy strong,
-.office-template-variable-person-copy code {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.office-template-variable-person-copy strong {
-  font-size: var(--lex-label-sm-size);
-  line-height: 1.2;
-}
-
-.office-template-variable-option:hover,
-.office-template-variable-option.is-active {
-  background: var(--office-hover);
-  border-color: var(--lex-border-subtle, var(--office-line));
-}
-
-.office-template-variable-option:focus-visible {
-  border-color: var(--lex-color-primary-500, #5b3df5);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--lex-color-primary-500, #5b3df5) 14%, transparent);
-  outline: none;
-}
-
-.office-template-variable-empty {
-  color: var(--lex-text-secondary);
-  font-size: var(--lex-body-sm-size);
-  padding: 10px;
 }
 
 .office-review-change {

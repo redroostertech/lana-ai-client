@@ -556,6 +556,9 @@
   // ==========================================================================
 
   function renderMetricChart(metric, canvasId) {
+    if (window.AcquisitionSourcePresentation && window.AcquisitionSourcePresentation.isAcquisitionSource(metric)) return;
+    if (window.OpportunityIntakePresentation && window.OpportunityIntakePresentation.isOpportunityIntake(metric)) return;
+    if (window.CurrentPipelinePresentation && window.CurrentPipelinePresentation.isCurrentPipeline(metric)) return;
     if (!Array.isArray(metric.current)) {
       renderEmptyState(canvasId, 'No distribution data available');
       return;
@@ -657,55 +660,49 @@
   // Drilldown System
   // ==========================================================================
 
-  async function showLeadSourceDrilldown(metricKey, source) {
+  // The drilldown lex-modal: set its heading and open it.
+  function openDrilldownModal(heading) {
     var modal = document.getElementById('drilldownModal');
-    var title = document.getElementById('drilldownTitle');
     var content = document.getElementById('drilldownContent');
-    if (!modal || !title || !content) return;
+    if (!modal || !content) return null;
+    modal.heading = heading || 'Details';
+    modal.open = true;
+    return content;
+  }
 
-    title.textContent = 'Leads from: ' + source;
-    content.innerHTML = '<div class="text-center py-8"><div class="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto"></div><p class="text-gray-600 mt-4">Loading leads...</p></div>';
-    modal.classList.remove('hidden');
+  async function showLeadSourceDrilldown(metricKey, source) {
+    var content = openDrilldownModal('Leads from: ' + source);
+    if (!content) return;
+    content.innerHTML = '<div class="text-center py-8"><lex-spinner></lex-spinner><p class="text-gray-600 mt-4">Loading leads...</p></div>';
 
     try {
       var periodStart = LanaTime.utcDayStart(document.getElementById('periodStart').value);
       var periodEnd = LanaTime.utcDayEnd(document.getElementById('periodEnd').value);
+      var tables = window.ReportingTables;
+      var result = await tables.loadAllLeads(function (url) { return api.get(url); }, source, periodStart, periodEnd);
 
-      var response = await api.get('/api/v1/integrations/connector-data?entity_type=contact&source=' + encodeURIComponent(source) + '&start_date=' + periodStart + '&end_date=' + periodEnd);
-
-      if (!response || !response.data || response.data.length === 0) {
-        content.innerHTML = '<div class="text-center py-8 text-gray-500">No leads found for this source.</div>';
-        return;
-      }
-
-      var rowsHTML = response.data.map(function (lead) {
-        var name = (lead.data && lead.data.name) || ((lead.data && lead.data.firstName && lead.data.lastName) ? lead.data.firstName + ' ' + lead.data.lastName : 'N/A');
-        var email = (lead.data && lead.data.email) || 'N/A';
-        var phone = (lead.data && lead.data.phone) || 'N/A';
-        var company = (lead.data && lead.data.company) || 'N/A';
-        var created = formatDate(lead.source_created_at);
-        return '<tr class="hover:bg-gray-50">' +
-          '<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">' + name + '</td>' +
-          '<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">' + email + '</td>' +
-          '<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">' + phone + '</td>' +
-          '<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">' + company + '</td>' +
-          '<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">' + created + '</td></tr>';
-      }).join('');
-
-      content.innerHTML = '<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200">' +
-        '<thead class="bg-gray-50"><tr>' +
-        '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>' +
-        '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>' +
-        '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>' +
-        '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>' +
-        '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>' +
-        '</tr></thead><tbody class="bg-white divide-y divide-gray-200">' + rowsHTML + '</tbody></table></div>' +
-        '<div class="mt-4 text-sm text-gray-600 text-center">Showing ' + response.data.length + ' lead' + (response.data.length !== 1 ? 's' : '') +
-        (response.data.length >= 100 ? ' (limited to 100)' : '') + '</div>';
-
+      tables.mountClientTable(content, {
+        id: 'reportingLeadsTable',
+        title: 'Leads',
+        noun: ['lead', 'leads'],
+        columns: tables.LEAD_TABLE.columns,
+        labels: tables.LEAD_TABLE.labels,
+        rows: result.rows,
+        renderers: tables.leadRenderers(),
+        filterOptions: tables.leadFilterOptions(),
+        sortBy: 'created_at',
+        sortDir: 'desc',
+        idKey: 'id',
+        emptyText: 'No leads found for this source in the period',
+        ariaLabel: 'Leads from ' + source,
+        search: true,
+        note: result.truncated
+          ? 'Showing the newest ' + result.rows.length.toLocaleString() + ' leads. Narrow the period to see older ones.'
+          : ''
+      });
     } catch (error) {
       console.error('Failed to load lead source drilldown:', error);
-      content.innerHTML = '<div class="text-center py-8 text-red-600">Failed to load leads: ' + (error.message || 'Unknown error') + '</div>';
+      content.innerHTML = '<div class="text-center py-8 text-red-600">Failed to load leads: ' + escapeHtml(error.message || 'Unknown error') + '</div>';
     }
   }
 
@@ -726,13 +723,13 @@
       });
     } catch (error) {
       console.error('Failed to open drilldown:', error);
-      alert('Failed to load drilldown: ' + (error.message || 'Unknown error'));
+      Lex.Modal.alert('Drilldown unavailable', escapeHtml('Failed to load drilldown: ' + (error.message || 'Unknown error')));
     }
   }
 
   function closeDrilldownModal() {
     var modal = document.getElementById('drilldownModal');
-    if (modal) modal.classList.add('hidden');
+    if (modal) modal.open = false;
   }
 
   async function showFunnelStageDrilldown(stageInfo) {
@@ -758,13 +755,9 @@
     } catch (error) {
       console.error('Failed to open funnel drilldown:', error);
       // Fallback to simple modal if DrilldownRenderer fails
-      var modal = document.getElementById('drilldownModal');
-      var title = document.getElementById('drilldownTitle');
-      var content = document.getElementById('drilldownContent');
-      if (modal && title && content) {
-        title.textContent = (stageInfo.pipelineName || '') + ' — ' + (stageInfo.label || 'Stage');
-        content.innerHTML = '<div class="text-center py-8 text-red-600">Failed to load drilldown: ' + (error.message || 'Unknown error') + '</div>';
-        modal.classList.remove('hidden');
+      var content = openDrilldownModal((stageInfo.pipelineName || '') + ' — ' + (stageInfo.label || 'Stage'));
+      if (content) {
+        content.innerHTML = '<div class="text-center py-8 text-red-600">Failed to load drilldown: ' + escapeHtml(error.message || 'Unknown error') + '</div>';
       }
     }
   }
@@ -799,124 +792,9 @@
     }
   }
 
-  function attachCellTooltipHandlers() {
-    var existingTooltip = document.getElementById('cell-tooltip-popover');
-    if (existingTooltip) existingTooltip.remove();
-
-    document.querySelectorAll('.cell-tooltip-trigger').forEach(function (trigger) {
-      trigger.addEventListener('click', function (e) {
-        e.stopPropagation();
-        showCellTooltip(trigger);
-      });
-    });
-
-    document.addEventListener('click', function () {
-      var tooltip = document.getElementById('cell-tooltip-popover');
-      if (tooltip) tooltip.remove();
-    });
-  }
-
-  function showCellTooltip(trigger) {
-    var existingTooltip = document.getElementById('cell-tooltip-popover');
-    if (existingTooltip) {
-      existingTooltip.remove();
-      return;
-    }
-
-    var tooltipText = trigger.getAttribute('data-tooltip');
-    if (!tooltipText) return;
-
-    var tooltip = document.createElement('div');
-    tooltip.id = 'cell-tooltip-popover';
-    tooltip.className = 'absolute z-50 bg-gray-900 text-white text-sm rounded-lg shadow-lg p-3 max-w-xs';
-    tooltip.innerHTML = tooltipText;
-    tooltip.style.pointerEvents = 'none';
-
-    var rect = trigger.getBoundingClientRect();
-    tooltip.style.left = (rect.left + window.scrollX) + 'px';
-    tooltip.style.top = (rect.bottom + window.scrollY + 5) + 'px';
-    document.body.appendChild(tooltip);
-
-    setTimeout(function () {
-      var tooltipRect = tooltip.getBoundingClientRect();
-      if (tooltipRect.right > window.innerWidth) {
-        tooltip.style.left = (window.innerWidth - tooltipRect.width - 10) + 'px';
-      }
-      if (tooltipRect.bottom > window.innerHeight) {
-        tooltip.style.top = (rect.top + window.scrollY - tooltipRect.height - 5) + 'px';
-      }
-    }, 0);
-  }
-
-  function renderGenericDrilldown(content, config, rows, pagination, summary) {
-    var columns = config.columns;
-
-    function formatCellValue(value, type) {
-      if (value === null || value === undefined) return '-';
-      if (type === 'currency') {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
-      }
-      if (type === 'number') return new Intl.NumberFormat('en-US').format(value);
-      if (type === 'percentage') return parseFloat(value).toFixed(1) + '%';
-      if (type === 'date') {
-        if (!value) return '-';
-        return formatDateLong(value, { month: 'short' });
-      }
-      return value;
-    }
-
-    var summaryHTML = '';
-    if (summary) {
-      var summaryEntries = Object.entries(summary).map(function (entry) {
-        var key = entry[0];
-        var value = entry[1];
-        var label = key.split('_').map(function (w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join(' ');
-        return '<div><p class="text-xs text-gray-500">' + label + '</p><p class="text-lg font-semibold text-gray-900">' + formatCellValue(value, 'currency') + '</p></div>';
-      }).join('');
-      summaryHTML = '<div class="bg-gray-50 rounded-lg p-4 mb-6"><h3 class="text-sm font-semibold text-gray-700 mb-2">Summary</h3><div class="grid grid-cols-2 gap-4">' + summaryEntries + '</div></div>';
-    }
-
-    var headerHTML = columns.map(function (col) {
-      return '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">' + col.header + '</th>';
-    }).join('');
-
-    var bodyHTML = '';
-    if (rows.length > 0) {
-      bodyHTML = rows.map(function (row) {
-        var cellsHTML = columns.map(function (col) {
-          var formattedValue = formatCellValue(row[col.field], col.type);
-          var tooltipIcon = col.tooltip ? '<svg class="inline-block ml-1 h-4 w-4 text-gray-400 cursor-pointer hover:text-gray-600 cell-tooltip-trigger" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-tooltip="' + col.tooltip + '"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>' : '';
-          return '<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">' + formattedValue + tooltipIcon + '</td>';
-        }).join('');
-        return '<tr class="hover:bg-gray-50">' + cellsHTML + '</tr>';
-      }).join('');
-    } else {
-      bodyHTML = '<tr><td colspan="' + columns.length + '" class="px-6 py-8 text-center text-gray-500">No data available for this period</td></tr>';
-    }
-
-    var paginationHTML = '';
-    if (pagination && pagination.totalRecords > pagination.pageSize) {
-      paginationHTML = '<div class="mt-4 flex items-center justify-between border-t border-gray-200 pt-4">' +
-        '<p class="text-sm text-gray-600">Showing ' + rows.length + ' of ' + pagination.totalRecords + ' records</p>' +
-        '<p class="text-xs text-gray-500">(Pagination coming soon)</p></div>';
-    }
-
-    content.innerHTML = '<div class="p-6">' +
-      (config.description ? '<p class="text-sm text-gray-600 mb-4">' + config.description + '</p>' : '') +
-      summaryHTML +
-      '<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200">' +
-      '<thead class="bg-gray-50"><tr>' + headerHTML + '</tr></thead>' +
-      '<tbody class="bg-white divide-y divide-gray-200">' + bodyHTML + '</tbody></table></div>' +
-      paginationHTML + '</div>';
-
-    attachCellTooltipHandlers();
-  }
-
   async function showMetricDrilldown(metricKey, metricName) {
-    var modal = document.getElementById('drilldownModal');
-    var title = document.getElementById('drilldownTitle');
     var content = document.getElementById('drilldownContent');
-    if (!modal || !title || !content) return;
+    if (!content) return;
 
     try {
       var periodStart = LanaTime.utcDayStart(document.getElementById('periodStart').value);
@@ -926,16 +804,14 @@
       var hasGenericDrilldown = await tryGenericDrilldown(content, moduleKey, metricKey, periodStart, periodEnd);
       if (hasGenericDrilldown) return;
 
-      title.textContent = metricName + ' - Details';
-      content.innerHTML = '<div class="text-center py-8"><div class="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto"></div><p class="text-gray-600 mt-4">Loading data...</p></div>';
-      modal.classList.remove('hidden');
-
       // Default: drill-down not available for legacy metrics
+      openDrilldownModal(metricName + ' - Details');
       content.innerHTML = '<div class="text-center py-8 text-gray-500">Drill-down not available for this metric.</div>';
 
     } catch (error) {
       console.error('Failed to load metric drilldown:', error);
-      content.innerHTML = '<div class="text-center py-8 text-red-600">Failed to load data: ' + (error.message || 'Unknown error') + '</div>';
+      openDrilldownModal(metricName + ' - Details');
+      content.innerHTML = '<div class="text-center py-8 text-red-600">Failed to load data: ' + escapeHtml(error.message || 'Unknown error') + '</div>';
     }
   }
 
@@ -1133,16 +1009,14 @@
     var entry = _metricInfoRegistry[metricKey];
     if (!entry) return;
 
-    if (!(window.Lex && window.Lex.Modal && typeof window.Lex.Modal.open === 'function')) {
-      window.alert(entry.name + '\n\n' + (entry.description || ''));
-      return;
-    }
+    // lex-modal.js loads with the page; without it there is nowhere to show the info.
+    if (!(window.Lex && window.Lex.Modal && typeof window.Lex.Modal.open === 'function')) return;
 
     // Open the modal immediately with the loading skeleton so the UI feels
     // responsive even if the catalog fetch takes a beat.
     var modal = window.Lex.Modal.open({
       heading: entry.name,
-      content: renderMetricInfoBody(entry, null),
+      content: '<div data-metric-info-root>' + renderMetricInfoBody(entry, null) + '</div>',
       size: 'md',
       hideActions: true
     });
@@ -1152,10 +1026,10 @@
     var finalize = function (detail) {
       entry.detail = detail;
       var body = renderMetricInfoBody(entry, detail);
-      // Update ONLY the modal's body container. Setting modal.innerHTML would
-      // wipe the lex-modal's overlay/backdrop/dialog chrome (rendered by the
-      // component), making the modal vanish — the "flash" on open.
-      var bodyEl = modal && typeof modal.querySelector === 'function' ? modal.querySelector('.lex-modal-body') : null;
+      // Update ONLY our own content root inside the modal. Setting
+      // modal.innerHTML would wipe the lex-modal's chrome (the "flash" on
+      // open), and the component's internal body class is not public API.
+      var bodyEl = modal && typeof modal.querySelector === 'function' ? modal.querySelector('[data-metric-info-root]') : null;
       if (bodyEl) {
         bodyEl.innerHTML = body;
       }
@@ -1224,6 +1098,12 @@
   }
 
   function createMetricCard(metric) {
+    var intake = window.OpportunityIntakePresentation && window.OpportunityIntakePresentation.renderCard(metric);
+    if (intake) return intake;
+    var acquisition = window.AcquisitionSourcePresentation && window.AcquisitionSourcePresentation.renderCard(metric);
+    if (acquisition) return acquisition;
+    var pipeline = window.CurrentPipelinePresentation && window.CurrentPipelinePresentation.renderCard(metric);
+    if (pipeline) return pipeline;
     if (Array.isArray(metric.current)) {
       return createDistributionMetricCard(metric);
     }
@@ -1423,6 +1303,9 @@
     var grid = document.getElementById('metricsGrid');
     if (!grid) return;
     grid.innerHTML = metrics.map(function (metric) { return createMetricCard(metric); }).join('');
+    if (window.CurrentPipelinePresentation) window.CurrentPipelinePresentation.bindDetails(grid, openGenericDrilldown);
+    if (window.AcquisitionSourcePresentation) window.AcquisitionSourcePresentation.bindDetails(grid, openGenericDrilldown);
+    if (window.OpportunityIntakePresentation) window.OpportunityIntakePresentation.bindDetails(grid, openGenericDrilldown);
 
     requestAnimationFrame(function () { fitAllMetricCardText(grid); });
 
@@ -1785,6 +1668,15 @@
   }
 
   function renderVisualization(viz, data, uniqueId) {
+    var intake = window.OpportunityIntakePresentation && window.OpportunityIntakePresentation.visualization(viz, data,
+      function (sibling) { return renderVisualization(sibling, data, uniqueId); }, openGenericDrilldown);
+    if (intake) return intake;
+    var acquisition = window.AcquisitionSourcePresentation && window.AcquisitionSourcePresentation.visualization(viz, data,
+      function (sibling) { return renderVisualization(sibling, data, uniqueId); }, openGenericDrilldown);
+    if (acquisition) return acquisition;
+    var pipeline = window.CurrentPipelinePresentation && window.CurrentPipelinePresentation.visualization(viz, data,
+      function (sibling) { return renderVisualization(sibling, data, uniqueId); }, openGenericDrilldown);
+    if (pipeline) return pipeline;
     switch (viz.type) {
       case 'metric_grid': return renderMetricGrid(viz, uniqueId);
       case 'time_series':
@@ -1826,6 +1718,9 @@
     grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(260px, 1fr))';
     grid.id = 'grid-' + uniqueId;
     grid.innerHTML = viz.metrics.map(function (metric) { return createMetricCard(metric); }).join('');
+    if (window.CurrentPipelinePresentation) window.CurrentPipelinePresentation.bindDetails(grid, openGenericDrilldown);
+    if (window.AcquisitionSourcePresentation) window.AcquisitionSourcePresentation.bindDetails(grid, openGenericDrilldown);
+    if (window.OpportunityIntakePresentation) window.OpportunityIntakePresentation.bindDetails(grid, openGenericDrilldown);
     div.appendChild(grid);
 
     requestAnimationFrame(function () { fitAllMetricCardText(grid); });
@@ -2783,6 +2678,8 @@
     return div;
   }
 
+  // "table" visualization: the metric's breakdown rows in a client-side
+  // lex-table (the module returns every row in one response).
   function renderTable(viz, data, uniqueId) {
     var div = document.createElement('div');
     div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
@@ -2795,122 +2692,30 @@
     }
 
     if (!metric || !Array.isArray(metric.current)) {
-      div.innerHTML = '<h3 class="text-lg font-semibold text-gray-900 mb-4">' + (viz.title || 'Table') + '</h3>' +
+      div.innerHTML = '<h3 class="text-lg font-semibold text-gray-900 mb-4">' + escapeHtml(viz.title || 'Table') + '</h3>' +
         '<div class="text-gray-500 text-center py-8">No data available</div>';
       return div;
     }
 
-    var tableData = metric.current;
-    var columns = viz.columns || [
-      { field: 'label', header: 'Label', align: 'left' },
-      { field: 'count', header: 'Count', align: 'right' },
-      { field: 'value', header: 'Value', align: 'right', format: 'percent' }
-    ];
-
-    var filteredData = tableData.slice();
-    var currentPage = 1;
-    var rowsPerPage = 10;
-    var sortField = null;
-    var sortDirection = 'asc';
-
-    div.innerHTML = '<h3 class="text-lg font-semibold text-gray-900 mb-4">' + (viz.title || 'Table') + '</h3>' +
-      (viz.description ? '<p class="text-sm text-gray-500 mb-4">' + viz.description + '</p>' : '') +
-      '<div class="mb-4"><input type="text" id="search-' + uniqueId + '" placeholder="Search..." class="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>' +
-      '<div class="overflow-x-auto mb-4"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr id="table-header-' + uniqueId + '"></tr></thead>' +
-      '<tbody id="table-body-' + uniqueId + '" class="bg-white divide-y divide-gray-200"></tbody></table></div>' +
-      '<div class="flex items-center justify-between"><div class="text-sm text-gray-700">Showing <span id="start-' + uniqueId + '">1</span> to <span id="end-' + uniqueId + '">10</span> of <span id="total-' + uniqueId + '">0</span> results</div>' +
-      '<div class="flex gap-2"><button id="prev-' + uniqueId + '" class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed" disabled>Previous</button>' +
-      '<button id="next-' + uniqueId + '" class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">Next</button></div></div>';
-
-    function formatValue(value, column) {
-      if (column.format === 'percent' && typeof value === 'number') return value.toFixed(1) + '%';
-      if (typeof value === 'number') return value.toLocaleString();
-      return value;
-    }
-
-    function renderHeader() {
-      var headerRow = div.querySelector('#table-header-' + uniqueId);
-      if (!headerRow) return;
-      headerRow.innerHTML = columns.map(function (col) {
-        var isSorted = sortField === col.field;
-        var sortIcon = isSorted ? (sortDirection === 'asc' ? ' \u25B2' : ' \u25BC') : ' \u21C5';
-        return '<th class="px-4 py-3 text-' + (col.align || 'left') + ' text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none" data-field="' + col.field + '">' + col.header + sortIcon + '</th>';
-      }).join('');
-
-      headerRow.querySelectorAll('th').forEach(function (th) {
-        th.addEventListener('click', function () {
-          var field = th.dataset.field;
-          if (sortField === field) { sortDirection = sortDirection === 'asc' ? 'desc' : 'asc'; }
-          else { sortField = field; sortDirection = 'asc'; }
-          currentPage = 1;
-          render();
-        });
-      });
-    }
-
-    function renderBody() {
-      var tbody = div.querySelector('#table-body-' + uniqueId);
-      if (!tbody) return;
-      var sortedData = filteredData.slice();
-      if (sortField) {
-        sortedData.sort(function (a, b) {
-          var aVal = a[sortField]; var bVal = b[sortField];
-          if (typeof aVal === 'number' && typeof bVal === 'number') return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
-          aVal = String(aVal).toLowerCase(); bVal = String(bVal).toLowerCase();
-          if (sortDirection === 'asc') return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
-          return bVal < aVal ? -1 : bVal > aVal ? 1 : 0;
-        });
-      }
-      var startIdx = (currentPage - 1) * rowsPerPage;
-      var endIdx = Math.min(startIdx + rowsPerPage, sortedData.length);
-      var pageData = sortedData.slice(startIdx, endIdx);
-
-      tbody.innerHTML = pageData.map(function (row, idx) {
-        var cellsHTML = columns.map(function (col) {
-          return '<td class="px-4 py-3 text-' + (col.align || 'left') + ' text-sm text-gray-900">' + formatValue(row[col.field], col) + '</td>';
-        }).join('');
-        return '<tr class="' + (idx % 2 === 0 ? 'bg-white' : 'bg-gray-50') + '">' + cellsHTML + '</tr>';
-      }).join('');
-
-      var startEl = div.querySelector('#start-' + uniqueId);
-      var endEl = div.querySelector('#end-' + uniqueId);
-      var totalEl = div.querySelector('#total-' + uniqueId);
-      if (startEl) startEl.textContent = sortedData.length > 0 ? startIdx + 1 : 0;
-      if (endEl) endEl.textContent = endIdx;
-      if (totalEl) totalEl.textContent = sortedData.length;
-
-      var prevBtn = div.querySelector('#prev-' + uniqueId);
-      var nextBtn = div.querySelector('#next-' + uniqueId);
-      if (prevBtn) prevBtn.disabled = currentPage === 1;
-      if (nextBtn) nextBtn.disabled = endIdx >= sortedData.length;
-    }
-
-    function handleSearch(searchTerm) {
-      var term = searchTerm.toLowerCase().trim();
-      if (!term) { filteredData = tableData.slice(); }
-      else {
-        filteredData = tableData.filter(function (row) {
-          return columns.some(function (col) {
-            return String(row[col.field]).toLowerCase().indexOf(term) !== -1;
-          });
-        });
-      }
-      currentPage = 1;
-      render();
-    }
-
-    function render() { renderHeader(); renderBody(); }
-
-    setTimeout(function () {
-      var searchInput = div.querySelector('#search-' + uniqueId);
-      if (searchInput) searchInput.addEventListener('input', function (e) { handleSearch(e.target.value); });
-      var prevBtn = div.querySelector('#prev-' + uniqueId);
-      if (prevBtn) prevBtn.addEventListener('click', function () { if (currentPage > 1) { currentPage--; render(); } });
-      var nextBtn = div.querySelector('#next-' + uniqueId);
-      if (nextBtn) nextBtn.addEventListener('click', function () { var maxPage = Math.ceil(filteredData.length / rowsPerPage); if (currentPage < maxPage) { currentPage++; render(); } });
-      render();
-    }, 0);
-
+    var tables = window.ReportingTables;
+    var columns = tables.breakdownColumns(viz, metric.current);
+    var rows = metric.current.map(function (row, idx) { return tables.mapBreakdownRow(row, columns, idx); });
+    var host = document.createElement('div');
+    div.appendChild(host);
+    tables.mountClientTable(host, {
+      id: 'reportingTable-' + uniqueId,
+      className: 'reporting-breakdown-table',
+      title: viz.title || 'Table',
+      noun: ['row', 'rows'],
+      columns: columns.map(function (c) { return c.field; }),
+      labels: columns.map(function (c) { return c.header; }),
+      rows: rows,
+      renderers: tables.breakdownRenderers(columns),
+      filterOptions: tables.breakdownFilterOptions(columns, rows),
+      emptyText: 'No data available for this period',
+      search: true,
+      note: viz.description || ''
+    });
     return div;
   }
 
@@ -3026,12 +2831,12 @@
 
   function exportToPDF() {
     if (!currentModuleData) {
-      alert('No data to export. Please execute a module first.');
+      Lex.Modal.alert('Nothing to export', 'Run a module first, then export its results.');
       return;
     }
 
     var jsPDFLib = window.jspdf;
-    if (!jsPDFLib) { alert('PDF library not loaded.'); return; }
+    if (!jsPDFLib) { Lex.Modal.alert('Export unavailable', 'The PDF library did not load. Reload the page and try again.'); return; }
     var doc = new jsPDFLib.jsPDF();
 
     doc.setFontSize(20);
@@ -3075,7 +2880,7 @@
 
   function exportToCSV() {
     if (!currentModuleData) {
-      alert('No data to export. Please execute a module first.');
+      Lex.Modal.alert('Nothing to export', 'Run a module first, then export its results.');
       return;
     }
 
@@ -3286,9 +3091,16 @@
     }
   }
 
-  async function deleteImportedReport(reportId, reportName) {
-    if (!confirm('Delete imported report "' + reportName + '"? This cannot be undone.')) return;
+  function deleteImportedReport(reportId, reportName) {
+    Lex.Modal.confirm(
+      'Delete imported report',
+      'Delete imported report "' + escapeHtml(reportName) + '"? This cannot be undone.',
+      function () { performDeleteImportedReport(reportId, reportName); },
+      { variant: 'danger', confirmText: 'Delete' }
+    );
+  }
 
+  async function performDeleteImportedReport(reportId, reportName) {
     try {
       await api.delete('/api/v1/reporting/reports/' + reportId);
       showInfo('Report "' + reportName + '" deleted.');
@@ -3371,37 +3183,31 @@
           vizContainer.innerHTML = '<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center">' +
             '<p class="text-gray-500">No data returned. Check your report configuration and data sources.</p></div>';
         } else {
-          // Build a data table from the results
-          var columns = Object.keys(rows[0]);
-          var tableHtml = '<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">' +
-            '<div class="p-4 border-b border-gray-100 flex items-center justify-between">' +
-            '<h3 class="text-sm font-semibold text-gray-900">Results (' + rowCount + ' rows)</h3>' +
-            '</div>' +
-            '<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200">' +
-            '<thead class="bg-gray-50"><tr>';
-
-          columns.forEach(function (col) {
-            tableHtml += '<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">' + escapeHtml(col) + '</th>';
+          // Every returned row in a client-side lex-table.
+          var tables = window.ReportingTables;
+          var resultCols = tables.resultColumns(rows);
+          var resultRows = rows.map(function (row, idx) { return tables.mapResultRow(row, resultCols, idx); });
+          var card = document.createElement('div');
+          card.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6';
+          vizContainer.innerHTML = '';
+          vizContainer.appendChild(card);
+          var createdCol = resultCols.some(function (c) { return c.field === 'created_at'; });
+          tables.mountClientTable(card, {
+            id: 'reportingResultsTable',
+            className: 'reporting-results-table',
+            title: 'Results',
+            noun: ['row', 'rows'],
+            columns: resultCols.map(function (c) { return c.field; }),
+            labels: resultCols.map(function (c) { return c.header; }),
+            rows: resultRows,
+            renderers: tables.resultRenderers(resultCols),
+            filterOptions: tables.resultFilterOptions(resultCols, resultRows),
+            sortBy: createdCol ? 'created_at' : '',
+            sortDir: 'desc',
+            emptyText: 'No data returned',
+            search: true,
+            note: rowCount > rows.length ? 'The report returned ' + rows.length.toLocaleString() + ' of ' + Number(rowCount).toLocaleString() + ' rows.' : ''
           });
-          tableHtml += '</tr></thead><tbody class="bg-white divide-y divide-gray-200">';
-
-          var maxDisplay = Math.min(rows.length, 100);
-          for (var i = 0; i < maxDisplay; i++) {
-            tableHtml += '<tr>';
-            columns.forEach(function (col) {
-              var val = rows[i][col];
-              if (val === null || val === undefined) val = '';
-              tableHtml += '<td class="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">' + escapeHtml(String(val)) + '</td>';
-            });
-            tableHtml += '</tr>';
-          }
-
-          if (rows.length > 100) {
-            tableHtml += '<tr><td colspan="' + columns.length + '" class="px-4 py-3 text-sm text-gray-500 text-center">Showing first 100 of ' + rowCount + ' rows</td></tr>';
-          }
-
-          tableHtml += '</tbody></table></div></div>';
-          vizContainer.innerHTML = tableHtml;
         }
       }
 
@@ -3609,18 +3415,14 @@
 
   function openCustomizePanel() {
     var panel = document.getElementById('customizePanel');
-    var overlay = document.getElementById('customizeOverlay');
-    if (panel) panel.style.transform = 'translateX(0)';
-    if (overlay) overlay.classList.remove('hidden');
+    if (panel) panel.open = true;
     loadExistingCustomizations();
     loadAnalyticsCatalog();
   }
 
   function closeCustomizePanel() {
     var panel = document.getElementById('customizePanel');
-    var overlay = document.getElementById('customizeOverlay');
-    if (panel) panel.style.transform = 'translateX(100%)';
-    if (overlay) overlay.classList.add('hidden');
+    if (panel) panel.open = false;
   }
 
   async function loadAnalyticsCatalog() {
@@ -3702,7 +3504,7 @@
     var container = document.getElementById('custDimensionsContainer');
     if (!container) return;
 
-    var options = '';
+    var options = [{ value: '', label: 'Select column...' }];
     if (customizationCatalog && customizationCatalog.tables) {
       var allCols = {};
       customizationCatalog.tables.forEach(function (t) {
@@ -3714,19 +3516,25 @@
       });
       var keys = Object.keys(allCols);
       for (var k = 0; k < keys.length; k++) {
-        options += '<option value="' + keys[k] + '">' + escapeHtml(allCols[keys[k]]) + '</option>';
+        options.push({ value: keys[k], label: allCols[keys[k]] });
       }
     }
 
     var row = document.createElement('div');
     row.className = 'flex items-center gap-2';
-    row.innerHTML = '<select class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm cust-dimension-input">'
-      + '<option value="">Select column...</option>'
-      + options
-      + '</select>'
+    row.innerHTML = '<lex-select class="flex-1 cust-dimension-input" value="" searchable options="' + escapeHtml(JSON.stringify(options)) + '"></lex-select>'
       + '<button type="button" class="text-red-500 hover:text-red-700 text-xs" onclick="this.parentElement.remove()">Remove</button>';
     container.appendChild(row);
   }
+
+  var FILTER_OPERATOR_OPTIONS = [
+    { value: 'equals', label: 'Equals' },
+    { value: 'not_equals', label: 'Not equals' },
+    { value: 'contains', label: 'Contains' },
+    { value: 'in', label: 'In' },
+    { value: 'gt', label: 'Greater than' },
+    { value: 'lt', label: 'Less than' }
+  ];
 
   function addFilterRow() {
     var container = document.getElementById('custFiltersContainer');
@@ -3734,11 +3542,7 @@
     var row = document.createElement('div');
     row.className = 'flex items-center gap-2';
     row.innerHTML = '<input type="text" placeholder="Column" class="w-28 border border-gray-300 rounded px-2 py-1 text-sm cust-filter-col" maxlength="100">'
-      + '<select class="w-24 border border-gray-300 rounded px-2 py-1 text-sm cust-filter-op">'
-      + '<option value="equals">equals</option><option value="not_equals">not equals</option>'
-      + '<option value="contains">contains</option><option value="in">in</option>'
-      + '<option value="gt">greater than</option><option value="lt">less than</option>'
-      + '</select>'
+      + '<lex-select class="w-32 cust-filter-op" value="equals" options="' + escapeHtml(JSON.stringify(FILTER_OPERATOR_OPTIONS)) + '"></lex-select>'
       + '<input type="text" placeholder="Value" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm cust-filter-val" maxlength="255">'
       + '<button type="button" class="text-red-500 hover:text-red-700 text-xs" onclick="this.parentElement.remove()">Remove</button>';
     container.appendChild(row);
@@ -3773,7 +3577,7 @@
       var dimInputs = document.querySelectorAll('.cust-dimension-input');
       var dimensions = [];
       dimInputs.forEach(function (input) {
-        var val = input.value.trim ? input.value.trim() : input.value;
+        var val = String(input.value || '').trim();
         if (val) dimensions.push({ key: val });
       });
       data.dimension_overrides = {
@@ -3892,12 +3696,6 @@
     var customizeBtn = document.getElementById('customizeBtn');
     if (customizeBtn) customizeBtn.addEventListener('click', openCustomizePanel);
 
-    var closeBtn = document.getElementById('closeCustomizePanel');
-    if (closeBtn) closeBtn.addEventListener('click', closeCustomizePanel);
-
-    var overlayEl = document.getElementById('customizeOverlay');
-    if (overlayEl) overlayEl.addEventListener('click', closeCustomizePanel);
-
     var saveBtn = document.getElementById('saveCustomizationBtn');
     if (saveBtn) saveBtn.addEventListener('click', function () { saveCustomization(false); });
 
@@ -3920,7 +3718,7 @@
     ['custMetricMode', 'custDimensionMode', 'custFilterMode'].forEach(function (id) {
       var sel = document.getElementById(id);
       if (sel) {
-        sel.addEventListener('change', function () {
+        sel.addEventListener('lex-change', function () {
           var listId = id.replace('Mode', 'sList');
           var listEl = document.getElementById(listId);
           if (listEl) listEl.classList.toggle('hidden', !sel.value);

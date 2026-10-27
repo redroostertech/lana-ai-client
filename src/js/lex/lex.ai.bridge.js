@@ -195,12 +195,17 @@
       this._trackAndSend(message, 'action', e.detail);
     }
 
+    // A decision is sent bare, with no "[DECISION]" marker. The label is what
+    // the user saw on the card and what the backend matches the reply against;
+    // a marker in the message text ends up in the user's own transcript as
+    // their words. The interaction type still reaches ActivityContext through
+    // _trackAndSend, so nothing about the tracking side changes.
     _handleDecision(e) {
       const { value, label, custom } = e.detail || {};
       if (!value && !custom) return;
 
       const chosen = label || custom || value;
-      const message = `[DECISION] ${chosen}`;
+      const message = chosen;
 
       this._markResponded(e.target);
       this._trackAndSend(message, 'decision', e.detail);

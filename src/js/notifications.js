@@ -6,7 +6,7 @@
  * 
  * Usage:
  *   1. Include this script after api.js
- *   2. Add the notification HTML structure (or call NotificationPanel.injectHTML())
+ *   2. Load lex-drawer.js (the panel is a lex-drawer the module mounts itself)
  *   3. Call NotificationPanel.init() after DOM is ready
  */
 
@@ -410,20 +410,80 @@ window.NotificationPanel = (function() {
   let _badgeInterval = null;
 
   /**
-   * Initialize the notification panel
-   * @param {Object} options - Configuration options
-   * @param {boolean} options.autoLoadBadge - Load badge count on init (default: true)
-   * @param {number} options.refreshInterval - Badge refresh interval in ms (default: 60000)
+   * Inner markup of the notifications lex-drawer. The drawer supplies the
+   * title, close button, backdrop, Escape, focus trap and scroll lock; the
+   * header buttons ride in the drawer header via data-slot="header-actions".
    */
-  function init(options = {}) {
-    if (state.isInitialized) return;
+  const DRAWER_CONTENT = `
+    <div data-slot="header-actions" class="flex items-center gap-3">
+      <button type="button" id="viewAllNotificationsBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">View all</button>
+      <button type="button" id="markAllReadBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium hidden">Mark all read</button>
+      <button type="button" id="refreshNotificationsBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh" aria-label="Refresh notifications">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+        </svg>
+      </button>
+    </div>
+    <div class="flex flex-col" style="margin:-20px;height:calc(100% + 40px)">
+      <div class="flex border-b border-gray-200 px-6 flex-shrink-0">
+        <button type="button" id="filterAll" class="px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">All</button>
+        <button type="button" id="filterUnread" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700">Unread</button>
+      </div>
+      <div id="notificationList" class="flex-1 overflow-y-auto">
+        <div id="notificationLoading" class="p-8 text-center">
+          <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+          <p class="text-gray-500 mt-3 text-sm">Loading notifications...</p>
+        </div>
+      </div>
+      <div id="notificationLoadingMore" class="hidden p-4 border-t border-gray-100 text-center flex-shrink-0">
+        <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+      </div>
+    </div>
+  `;
 
-    const { autoLoadBadge = true, refreshInterval = 60000 } = options;
+  function drawerDefined() {
+    return !!(window.customElements && window.customElements.get('lex-drawer'));
+  }
 
-    // Cache DOM elements
+  // lex-drawer.js usually loads at the end of <body>, after this script. Wait
+  // for parsing to finish before deciding whether the component is available.
+  function whenDrawerReady(callback) {
+    if (drawerDefined() || document.readyState !== 'loading') {
+      callback(drawerDefined());
+      return;
+    }
+    document.addEventListener('DOMContentLoaded', () => callback(drawerDefined()), { once: true });
+  }
+
+  /**
+   * Mount the notifications lex-drawer (idempotent). Replaces any legacy
+   * hand-built overlay/panel markup a page still ships, so every page gets
+   * the same component. Returns the drawer, or null if lex-drawer is not
+   * loaded on this page.
+   */
+  function mountDrawer() {
+    const existing = document.getElementById('notificationPanel');
+    if (existing && existing.tagName === 'LEX-DRAWER') return existing;
+    if (!drawerDefined()) return null;
+
+    if (existing) existing.remove();
+    const legacyOverlay = document.getElementById('notificationOverlay');
+    if (legacyOverlay) legacyOverlay.remove();
+
+    const drawer = document.createElement('lex-drawer');
+    drawer.id = 'notificationPanel';
+    drawer.setAttribute('heading', 'Notifications');
+    drawer.setAttribute('width', 'md');
+    drawer.innerHTML = DRAWER_CONTENT;
+    document.body.appendChild(drawer);
+    return drawer;
+  }
+
+  function cacheElements() {
     elements = {
       btn: document.getElementById('notificationBtn'),
       panel: document.getElementById('notificationPanel'),
+      // Legacy (pages without lex-drawer) only:
       overlay: document.getElementById('notificationOverlay'),
       closeBtn: document.getElementById('closeNotificationPanel'),
       viewAllBtn: document.getElementById('viewAllNotificationsBtn'),
@@ -436,89 +496,54 @@ window.NotificationPanel = (function() {
       filterAll: document.getElementById('filterAll'),
       filterUnread: document.getElementById('filterUnread')
     };
+  }
 
-    // Check required elements exist
-    if (!elements.btn || !elements.panel) {
-      console.warn('NotificationPanel: Required elements not found. Call injectHTML() first or add elements manually.');
-      return;
-    }
-
-    // Bind events
-    bindEvents();
-
-    // Load initial badge count
-    if (autoLoadBadge) {
-      loadBadgeCount();
-      if (refreshInterval > 0) {
-        _badgeInterval = setInterval(loadBadgeCount, refreshInterval);
-      }
-    }
-
-    state.isInitialized = true;
+  function isDrawer() {
+    return !!(elements.panel && elements.panel.tagName === 'LEX-DRAWER');
   }
 
   /**
-   * Inject the notification panel HTML into the page
-   * @param {string} targetSelector - Selector for where to inject (default: after header)
+   * Initialize the notification panel
+   * @param {Object} options - Configuration options
+   * @param {boolean} options.autoLoadBadge - Load badge count on init (default: true)
+   * @param {number} options.refreshInterval - Badge refresh interval in ms (default: 60000)
    */
-  function injectHTML(targetSelector) {
-    const html = `
-    <!-- Notification Panel Overlay -->
-    <div id="notificationOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
+  function init(options = {}) {
+    if (state.isInitialized) return;
+    state.isInitialized = true;
 
-    <!-- Notification Slide-out Panel -->
-    <div id="notificationPanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
-      <!-- Panel Header -->
-      <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
-        <h2 class="text-lg font-semibold text-gray-900">Notifications</h2>
-        <div class="flex items-center gap-3">
-          <button id="viewAllNotificationsBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">View all</button>
-          <button id="markAllReadBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium hidden">Mark all read</button>
-          <button id="refreshNotificationsBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-            </svg>
-          </button>
-          <button id="closeNotificationPanel" class="text-gray-400 hover:text-gray-600">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-          </button>
-        </div>
-      </div>
+    const { autoLoadBadge = true, refreshInterval = 60000 } = options;
 
-      <!-- Filter Tabs -->
-      <div class="flex border-b border-gray-200 px-6 flex-shrink-0">
-        <button id="filterAll" class="px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">All</button>
-        <button id="filterUnread" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700">Unread</button>
-      </div>
+    whenDrawerReady((hasDrawer) => {
+      // Pages that do not load lex-drawer.js keep the legacy markup they
+      // ship (fallback until every page loads the component).
+      if (hasDrawer) mountDrawer();
+      cacheElements();
 
-      <!-- Notifications List -->
-      <div id="notificationList" class="flex-1 overflow-y-auto">
-        <!-- Loading State -->
-        <div id="notificationLoading" class="p-8 text-center">
-          <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
-          <p class="text-gray-500 mt-3 text-sm">Loading notifications...</p>
-        </div>
-      </div>
-
-      <!-- Loading More Indicator -->
-      <div id="notificationLoadingMore" class="hidden p-4 border-t border-gray-100 text-center flex-shrink-0">
-        <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
-      </div>
-    </div>
-    `;
-
-    if (targetSelector) {
-      const target = document.querySelector(targetSelector);
-      if (target) {
-        target.insertAdjacentHTML('afterend', html);
+      if (!elements.btn || !elements.panel) {
+        console.warn('NotificationPanel: Required elements not found. Load lex-drawer.js or add the panel markup.');
+        state.isInitialized = false;
         return;
       }
-    }
 
-    // Default: inject at end of body
-    document.body.insertAdjacentHTML('beforeend', html);
+      bindEvents();
+
+      if (autoLoadBadge) {
+        loadBadgeCount();
+        if (refreshInterval > 0) {
+          _badgeInterval = setInterval(loadBadgeCount, refreshInterval);
+        }
+      }
+    });
+  }
+
+  /**
+   * Mount the notification panel (a lex-drawer appended to <body>).
+   * Kept for API compatibility; the target selector is no longer needed
+   * because the drawer is a fixed overlay.
+   */
+  function injectHTML() {
+    mountDrawer();
   }
 
   /**
@@ -533,20 +558,21 @@ window.NotificationPanel = (function() {
       open();
     });
 
-    // Close panel
-    if (elements.closeBtn) {
-      elements.closeBtn.addEventListener('click', close);
-    }
-    if (elements.overlay) {
-      elements.overlay.addEventListener('click', close);
-    }
-
-    // Escape key to close
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && isOpen()) {
-        close();
+    // The drawer owns close, backdrop click and Escape. Legacy markup
+    // (pages without lex-drawer) still needs them wired by hand.
+    if (!isDrawer()) {
+      if (elements.closeBtn) {
+        elements.closeBtn.addEventListener('click', close);
       }
-    });
+      if (elements.overlay) {
+        elements.overlay.addEventListener('click', close);
+      }
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && isOpen()) {
+          close();
+        }
+      });
+    }
 
     // Filter tabs
     if (elements.filterAll) {
@@ -606,7 +632,9 @@ window.NotificationPanel = (function() {
    * Check if panel is open
    */
   function isOpen() {
-    return elements.panel && !elements.panel.classList.contains('translate-x-full');
+    if (!elements.panel) return false;
+    if (isDrawer()) return !!elements.panel.open;
+    return !elements.panel.classList.contains('translate-x-full');
   }
 
   /**
@@ -624,11 +652,15 @@ window.NotificationPanel = (function() {
       return;
     }
     
-    elements.panel.classList.remove('translate-x-full');
-    if (elements.overlay) {
-      elements.overlay.classList.remove('hidden');
+    if (isDrawer()) {
+      elements.panel.open = true;
+    } else {
+      elements.panel.classList.remove('translate-x-full');
+      if (elements.overlay) {
+        elements.overlay.classList.remove('hidden');
+      }
+      document.body.classList.add('overflow-hidden');
     }
-    document.body.classList.add('overflow-hidden');
     loadNotifications(true);
   }
 
@@ -637,7 +669,11 @@ window.NotificationPanel = (function() {
    */
   function close() {
     if (!elements.panel) return;
-    
+
+    if (isDrawer()) {
+      elements.panel.open = false;
+      return;
+    }
     elements.panel.classList.add('translate-x-full');
     if (elements.overlay) {
       elements.overlay.classList.add('hidden');

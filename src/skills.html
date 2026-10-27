@@ -54,12 +54,43 @@
       <!-- Breadcrumb — updated by skills.js when matter context is available -->
       <lex-breadcrumb id="skillsBreadcrumb" items='[{"label":"Skills"}]'></lex-breadcrumb>
 
-      <!-- Content card — header, table/grid body -->
-      <lex-card padding="none" style="margin-top:1rem;">
-        <!-- Card header — title, action buttons, view toggles -->
-        <div class="flex items-center justify-between p-4">
-          <div>
+      <!-- Search / Sort / Category toolbar: drives the list table and the grid -->
+      <div class="skills-toolbar bg-white rounded-lg shadow-sm border mb-4 mt-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and filter skills">
+        <div class="flex items-center gap-4 flex-wrap">
+          <div class="flex-1 min-w-[200px]">
+            <lex-input id="skillsSearch" placeholder="Search skills..." clearable="true" leading-icon="search"></lex-input>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Sort by:</label>
+            <lex-select
+              id="skillsSort"
+              options='[{"value":"created_at","label":"Created"},{"value":"skill_name","label":"Name"},{"value":"category","label":"Category"},{"value":"skill_type","label":"Type"},{"value":"version","label":"Version"},{"value":"installation_count","label":"Runs"}]'
+              value="created_at"
+            ></lex-select>
+          </div>
+          <lex-btn id="skillsSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+            <svg class="w-5 h-5" style="color: var(--lex-text-secondary)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+            </svg>
+          </lex-btn>
+          <div class="flex items-center gap-2">
+            <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Category:</label>
+            <lex-select
+              id="category-filter"
+              options='[{"value":"all","label":"All"}]'
+              value="all"
+            ></lex-select>
+          </div>
+          <div id="skillsCount" class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)"></div>
+        </div>
+      </div>
+
+      <!-- Section: heading with count, actions, view toggles, then table or grid -->
+      <section class="skills-section" aria-labelledby="skillsSectionHeading">
+        <div class="flex items-center justify-between flex-wrap gap-3 mb-3">
+          <div class="flex items-baseline gap-3">
             <h2 id="skillsSectionHeading" class="text-lg font-semibold" style="color: var(--lex-text-primary)">All Skills</h2>
+            <span id="skillsSectionCount" class="text-sm" style="color: var(--lex-text-secondary)" aria-live="polite"></span>
           </div>
           <div class="flex items-center gap-3">
             <lex-btn id="create-skill-btn" variant="primary" leading-icon="+">
@@ -83,33 +114,8 @@
           </div>
         </div>
 
-        <!-- Grid View: search + category filter + cards (hidden by default) -->
-        <div id="grid-view-container" class="hidden">
-          <div class="px-4 pb-4">
-            <div class="flex flex-col md:flex-row gap-3">
-              <div class="flex-1 relative">
-                <input
-                  type="text"
-                  id="search-input"
-                  placeholder="Search skills..."
-                  class="w-full pl-10 pr-4 py-2 rounded-lg skill-builder-input"
-                />
-                <svg class="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2" style="color: var(--lex-text-tertiary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                </svg>
-              </div>
-              <lex-select
-                id="category-filter"
-                placeholder="All Categories"
-                size="md"
-                style="width:200px;"
-                options='[{"value":"all","label":"All Categories"},{"value":"document-intelligence","label":"Document Intelligence"},{"value":"ai-assistance","label":"AI Assistance"},{"value":"automation","label":"Automation"},{"value":"workflow","label":"Workflow"},{"value":"integration","label":"Integration"}]'
-              ></lex-select>
-            </div>
-            <!-- Filter Chips -->
-            <div id="filter-chips" class="flex flex-wrap gap-2 mt-3"></div>
-          </div>
-
+        <!-- Grid View: cards (hidden by default); the toolbar above filters it -->
+        <div id="grid-view-container" class="skills-grid-card hidden">
           <!-- Loading State -->
           <div id="loading-state" class="flex justify-center py-16">
             <lex-spinner size="lg" label="Loading skills..."></lex-spinner>
@@ -129,26 +135,23 @@
           </div>
         </div>
 
-        <!-- List View: lex-table with built-in search, sort, filter, pagination -->
+        <!-- List View: client-side lex-table (the list arrives in one request) -->
         <lex-table
           id="skillsListView"
+          class="skills-table lex-table--card"
+          column-filters
           columns="skill_name,description,category,skill_type,version,installation_count,created_at"
           labels="Name,Description,Category,Type,Version,Runs,Created"
-          searchable
-          filterable
-          column-filters
-          compact
           sort-by="created_at"
           sort-dir="desc"
-          empty-text="No skills found"
-          empty-action-label="Create a skill"
+          limit="20"
           id-key="skill_id"
+          empty-text="No skills yet"
+          empty-action-label="Create a skill"
+          aria-label="Skills"
         ></lex-table>
 
-        <!-- Pagination (list view) -->
-        <lex-pagination id="list-pagination"></lex-pagination>
-
-      </lex-card>
+      </section>
 
       <!-- Skills Designer panel (drawer mode) -->
       <lex-lana-panel
@@ -169,14 +172,8 @@
     </main>
 
     <!-- Learn More Modal (hoisted to body by lex-page-init) -->
-    <div id="learn-more-modal" class="modal hidden" data-hoist>
-      <div class="modal-overlay"></div>
-      <div class="modal-content max-w-2xl">
-        <div class="modal-header">
-          <h3 class="text-xl font-semibold" style="color: var(--lex-text-primary);">About Skills</h3>
-          <button class="modal-close">&times;</button>
-        </div>
-        <div class="modal-body">
+    <lex-modal id="learn-more-modal" heading="About Skills" size="lg" data-hoist>
+        <div>
           <div class="flex items-start gap-4 mb-4">
             <div class="w-12 h-12 flex items-center justify-center rounded-lg flex-shrink-0" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);"><svg class="w-6 h-6" style="color: var(--lex-color-white, #fff);" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M15.39 4.39a1 1 0 0 0 1.68-.474 2.5 2.5 0 1 1 3.014 3.015 1 1 0 0 0-.474 1.68l1.683 1.682a2.414 2.414 0 0 1 0 3.414L19.61 15.39a1 1 0 0 1-1.68-.474 2.5 2.5 0 1 0-3.014 3.015 1 1 0 0 1 .474 1.68l-1.683 1.682a2.414 2.414 0 0 1-3.414 0L8.61 19.61a1 1 0 0 0-1.68.474 2.5 2.5 0 1 1-3.014-3.015 1 1 0 0 0 .474-1.68l-1.683-1.682a2.414 2.414 0 0 1 0-3.414L4.39 8.61a1 1 0 0 1 1.68.474 2.5 2.5 0 1 0 3.014-3.015 1 1 0 0 1-.474-1.68l1.683-1.682a2.414 2.414 0 0 1 3.414 0z"/></svg></div>
             <div>
@@ -210,39 +207,21 @@
             </div>
           </div>
         </div>
-        <div class="modal-footer">
-          <lex-btn id="learn-more-close-btn" variant="secondary">Close</lex-btn>
-        </div>
-      </div>
-    </div>
+        <lex-btn data-slot="footer" id="learn-more-close-btn" variant="secondary">Close</lex-btn>
+    </lex-modal>
 
     <!-- Skill Details Modal (hoisted to body by lex-page-init) -->
-    <div id="skill-details-modal" class="modal hidden" data-hoist>
-      <div class="modal-overlay"></div>
-      <div class="modal-content max-w-3xl">
-        <div class="modal-header">
-          <h3 class="text-xl font-semibold" style="color: var(--lex-text-primary);">Skill Details</h3>
-          <button class="modal-close">&times;</button>
-        </div>
-        <div id="skill-details-body" class="modal-body">
+    <lex-modal id="skill-details-modal" heading="Skill Details" width="768px" data-hoist>
+        <div id="skill-details-body">
           <!-- Populated by JS -->
         </div>
-        <div class="modal-footer">
-          <lex-btn id="modal-cancel-btn" variant="secondary">Close</lex-btn>
-          <lex-btn id="modal-install-btn" variant="primary">Install to Matter</lex-btn>
-        </div>
-      </div>
-    </div>
+        <lex-btn data-slot="footer" id="modal-cancel-btn" variant="secondary">Close</lex-btn>
+        <lex-btn data-slot="footer" id="modal-install-btn" variant="primary">Install to Matter</lex-btn>
+    </lex-modal>
 
     <!-- Matter Selector Modal -->
-    <div id="matter-selector-modal" class="modal hidden" data-hoist>
-      <div class="modal-overlay"></div>
-      <div class="modal-content max-w-2xl">
-        <div class="modal-header">
-          <h3 class="text-xl font-semibold" style="color: var(--lex-text-primary);">Install Skill to Matter</h3>
-          <button class="modal-close">&times;</button>
-        </div>
-        <div class="modal-body">
+    <lex-modal id="matter-selector-modal" heading="Install Skill to Matter" size="lg" data-hoist>
+        <div>
           <p class="text-sm mb-4" style="color: var(--lex-text-secondary);">Select one or more matters to install this skill:</p>
           <div class="relative mb-4">
             <input
@@ -260,41 +239,16 @@
             <!-- Populated by JS -->
           </div>
         </div>
-        <div class="modal-footer">
-          <lex-btn id="matter-modal-cancel-btn" variant="secondary">Cancel</lex-btn>
-          <lex-btn id="matter-modal-install-btn" variant="primary">Install</lex-btn>
-        </div>
-      </div>
-    </div>
+        <lex-btn data-slot="footer" id="matter-modal-cancel-btn" variant="secondary">Cancel</lex-btn>
+        <lex-btn data-slot="footer" id="matter-modal-install-btn" variant="primary">Install</lex-btn>
+    </lex-modal>
 
-    <!-- Skill Builder Modal (full-screen overlay) -->
-    <div id="createSkillModal" class="fixed inset-0 bg-white hidden flex-col" style="z-index: 10001;" data-hoist>
-      <!-- Modal Header -->
-      <div class="flex items-center justify-between px-6 py-4 shadow-sm"
-           style="border-bottom: 1px solid var(--lex-border-default); background: var(--lex-bg-primary);">
-        <div class="flex items-center gap-3">
-          <div class="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center"
-               style="background: var(--lex-bg-accent-muted);">
-            <svg class="w-6 h-6" style="color: var(--lex-text-accent);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-            </svg>
-          </div>
-          <div>
-            <h2 class="text-xl font-semibold" style="color: var(--lex-text-primary);">Skill Builder</h2>
-            <p class="text-sm" style="color: var(--lex-text-secondary);">Create a multi-step automated skill</p>
-          </div>
-        </div>
-        <lex-btn id="closeSkillBuilderBtn" variant="ghost" icon="true" title="Close builder">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </lex-btn>
-      </div>
-
+    <!-- Skill Builder (full-screen lex-modal; Escape and backdrop do not discard the draft) -->
+    <lex-modal id="createSkillModal" heading="Skill Builder" size="full" flush close-on-escape="false" close-on-overlay="false" data-hoist>
       <!-- Modal Body -->
-      <div class="flex-1 overflow-hidden flex">
+      <div class="flex items-stretch" style="min-height: 100%;">
         <!-- Left Panel - Intent Sequencer -->
-        <div class="flex-1 p-6 overflow-y-auto" style="background: var(--lex-bg-secondary);">
+        <div class="flex-1 min-w-0 p-6" style="background: var(--lex-bg-secondary);">
           <!-- Skill Header -->
           <div class="mb-6 rounded-lg p-5 shadow-sm"
                style="background: var(--lex-bg-primary); border: 1px solid var(--lex-border-default);">
@@ -338,7 +292,7 @@
         </div>
 
         <!-- Right Panel - MX Diagnostics & Step Palette -->
-        <div class="w-96 overflow-y-auto p-6"
+        <div class="w-96 flex-shrink-0 p-6"
              style="border-left: 1px solid var(--lex-border-default); background: var(--lex-bg-primary);">
 
           <!-- MX Diagnostics Panel -->
@@ -564,34 +518,18 @@
       </div>
 
       <!-- Modal Footer -->
-      <div class="flex items-center justify-between px-6 py-4"
-           style="border-top: 1px solid var(--lex-border-default); background: var(--lex-bg-secondary);">
-        <div class="text-sm" style="color: var(--lex-text-secondary);">
-          <span id="workflow-step-count">0</span> steps configured
-          <span id="skill-version-display" class="hidden ml-3 px-2 py-0.5 text-xs font-mono rounded"
-                style="background: var(--lex-bg-tertiary); color: var(--lex-text-secondary);">v1.0.0</span>
-        </div>
-        <div class="flex gap-3">
-          <lex-btn id="cancelSkillBuilderBtn" variant="secondary" size="md">Cancel</lex-btn>
-          <lex-btn id="saveSkillBtn" variant="primary" size="md">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-            Save Skill
-          </lex-btn>
-        </div>
+      <div data-slot="footer" class="mr-auto text-sm" style="color: var(--lex-text-secondary);">
+        <span id="workflow-step-count">0</span> steps configured
+        <span id="skill-version-display" class="hidden ml-3 px-2 py-0.5 text-xs font-mono rounded"
+              style="background: var(--lex-bg-tertiary); color: var(--lex-text-secondary);">v1.0.0</span>
       </div>
-    </div>
+      <lex-btn data-slot="footer" id="cancelSkillBuilderBtn" variant="secondary" size="md">Cancel</lex-btn>
+      <lex-btn data-slot="footer" id="saveSkillBtn" variant="primary" size="md" leading-icon="check">Save Skill</lex-btn>
+    </lex-modal>
 
     <!-- Skill Import Modal -->
-    <div id="skill-import-modal" class="modal hidden" data-hoist>
-      <div class="modal-overlay"></div>
-      <div class="modal-content max-w-2xl">
-        <div class="modal-header">
-          <h3 class="text-xl font-semibold" style="color: var(--lex-text-primary);">Import Skill Package</h3>
-          <button class="modal-close" id="skill-import-modal-close">&times;</button>
-        </div>
-        <div class="modal-body">
+    <lex-modal id="skill-import-modal" heading="Import Skill Package" size="lg" data-hoist>
+        <div>
           <!-- Info notice -->
           <div class="rounded-lg p-4 mb-5 flex gap-3"
                style="background: var(--lex-status-info-bg); border: 1px solid var(--lex-color-info-200, #bfdbfe);">
@@ -632,12 +570,9 @@
           <!-- Import result -->
           <div id="skill-import-result" class="hidden mb-4"></div>
         </div>
-        <div class="modal-footer">
-          <lex-btn id="skill-import-cancel-btn" variant="secondary">Cancel</lex-btn>
-          <lex-btn id="skill-import-confirm-btn" variant="primary" disabled>Import Skill</lex-btn>
-        </div>
-      </div>
-    </div>
+        <lex-btn data-slot="footer" id="skill-import-cancel-btn" variant="secondary">Cancel</lex-btn>
+        <lex-btn data-slot="footer" id="skill-import-confirm-btn" variant="primary" disabled>Import Skill</lex-btn>
+    </lex-modal>
 
   </template>
 
@@ -685,7 +620,6 @@
   <script src="js/lex/components/foundation/lex-loader.js"></script>
   <script src="js/lex/components/foundation/lex-toast.js"></script>
   <script src="js/lex/components/foundation/lex-spinner.js"></script>
-  <script src="js/lex/components/foundation/lex-btn.js"></script>
   <script src="js/lex/components/foundation/lex-empty.js"></script>
 
   <!-- Lex UI layout -->
@@ -701,9 +635,11 @@
   <script src="js/lex/components/foundation/lex-card.js"></script>
   <script src="js/lex/components/foundation/lex-drawer.js"></script>
   <script src="js/lex/components/foundation/lex-modal.js"></script>
+  <!-- lex-btn after lex-modal/lex-drawer: modal footers hold declarative lex-btns -->
+  <script src="js/lex/components/foundation/lex-btn.js"></script>
+  <script src="js/lex/components/form/lex-input.js"></script>
   <script src="js/lex/components/form/lex-select.js"></script>
   <script src="js/lex/components/data/lex-table.js"></script>
-  <script src="js/lex/components/data/lex-filter-bar.js"></script>
   <script src="js/lex/components/data/lex-pagination.js"></script>
 
   <!-- Ask LANA unified components -->
@@ -737,6 +673,8 @@
   <script src="js/shared/event-browser.js"></script>
 
   <!-- Page controller -->
+  <script src="js/shared/library-column-filters.js"></script>
+  <script src="js/shared/skills-table.js"></script>
   <script src="js/skills.js"></script>
 
   <!-- PAC bridge consent handler (Lex modal for token requests) -->

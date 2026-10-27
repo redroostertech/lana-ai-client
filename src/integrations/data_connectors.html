@@ -175,7 +175,8 @@
   <!-- ══════════════════════════════════════════════════════════════════ -->
 
   <!-- Connector Actions Modal (lex-modal — declarative, custom content) -->
-  <lex-modal id="connectorActionsModal" heading="Connector Actions" size="sm" hide-actions close-on-overlay>
+  <lex-modal id="connectorActionsModal" heading="Connector Actions" size="sm" close-on-overlay
+    footer-content='<lex-btn variant="secondary" onclick="closeConnectorActionsModal()">Cancel</lex-btn>'>
     <div id="connectorActionsContent">
       <!-- Header with Icon -->
       <div class="text-center mb-4 pb-4" style="border-bottom:1px solid var(--lex-border-subtle)">
@@ -257,10 +258,6 @@
           </svg>
         </button>
 
-        <!-- Cancel -->
-        <div class="pt-1">
-          <lex-btn variant="secondary" onclick="closeConnectorActionsModal()" style="width:100%">Cancel</lex-btn>
-        </div>
       </div>
     </div>
   </lex-modal>
@@ -270,7 +267,8 @@
   <!-- Delete Confirmation Modal: handled imperatively via Lex.Modal.confirm() in data_connectors.js -->
 
   <!-- Connector Details Modal (lex-modal — declarative, custom content) -->
-  <lex-modal id="connectorDetailsModal" heading="Connector Details" size="lg" hide-actions>
+  <lex-modal id="connectorDetailsModal" heading="Connector Details" size="lg"
+    footer-content='<lex-btn variant="secondary" onclick="closeDetailsModal()">Close</lex-btn><lex-btn variant="primary" id="detailsActionBtn">Connect</lex-btn>'>
     <div class="flex items-center gap-4 mb-4 pb-4" style="border-bottom:1px solid var(--lex-border-default)">
       <div id="detailsLogo" class="w-16 h-16 rounded-lg flex items-center justify-center flex-shrink-0" style="background:var(--lex-bg-tertiary)"></div>
       <div>
@@ -281,14 +279,11 @@
     <div id="detailsContent" class="space-y-6">
       <!-- Content will be dynamically inserted -->
     </div>
-    <div class="mt-6 pt-4 flex gap-3" style="border-top:1px solid var(--lex-border-default)">
-      <lex-btn variant="primary" id="detailsActionBtn" style="flex:1">Connect</lex-btn>
-      <lex-btn variant="secondary" onclick="closeDetailsModal()">Close</lex-btn>
-    </div>
   </lex-modal>
 
   <!-- Import Connector Modal (lex-modal — declarative, custom content) -->
-  <lex-modal id="importConnectorModal" heading="Import Connector Configuration" size="lg" hide-actions>
+  <lex-modal id="importConnectorModal" heading="Import Connector Configuration" size="lg"
+    footer-content='<lex-btn variant="secondary" onclick="closeImportConnectorModal()">Cancel</lex-btn><lex-btn variant="primary" id="importConnectorBtn" onclick="confirmImportConnector()" disabled><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg> Import Connector</lex-btn>'>
     <div class="space-y-6">
       <!-- Instructions -->
       <div class="rounded-lg p-4" style="background:var(--lex-status-info-bg);border:1px solid var(--lex-status-info)">
@@ -352,16 +347,6 @@
         <div id="validationStatus" class="mt-4"></div>
       </div>
 
-      <!-- Modal Footer Actions -->
-      <div class="flex items-center justify-end gap-3 pt-2" style="border-top:1px solid var(--lex-border-default)">
-        <lex-btn variant="secondary" onclick="closeImportConnectorModal()">Cancel</lex-btn>
-        <lex-btn variant="primary" id="importConnectorBtn" onclick="confirmImportConnector()" disabled>
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
-          </svg>
-          Import Connector
-        </lex-btn>
-      </div>
     </div>
   </lex-modal>
 

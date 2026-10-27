@@ -45,14 +45,13 @@
   var parsedConnectorConfig = null;
   var importTargetConnectorId = null;
   var importTargetConnectorName = null;
-  var searchTimeout = null;
   var pinnedConnectorsStorageKey = 'lana_automation_pinned_connectors';
   var pinnedConnectors = loadPinnedConnectors();
-  var connectorsCurrentPage = 1;
-  var connectorsPageSize = 12;
-  var connectorsSortKey = 'status';
-  var connectorsSortDirection = 'asc';
-  var connectorsFilteredCount = 0;
+  // Connector table (js/shared/connector-table.js): the mounted controller and
+  // its query, kept across reloads of the list.
+  var connectorTable = null;
+  var connectorTablePromise = null;
+  var connectorTableStore = { query: null };
 
   function resetState() {
     allConnectors = [];
@@ -65,14 +64,9 @@
     importTargetConnectorId = null;
     importTargetConnectorName = null;
     pinnedConnectors = loadPinnedConnectors();
-    if (searchTimeout) {
-      clearTimeout(searchTimeout);
-      searchTimeout = null;
-    }
-    connectorsCurrentPage = 1;
-    connectorsSortKey = 'status';
-    connectorsSortDirection = 'asc';
-    connectorsFilteredCount = 0;
+    connectorTable = null;
+    connectorTablePromise = null;
+    connectorTableStore = { query: null };
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────
@@ -127,16 +121,6 @@
     var sizes = ['Bytes', 'KB', 'MB', 'GB'];
     var i = Math.floor(Math.log(bytes) / Math.log(k));
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-  }
-
-  function formatAuthType(authType) {
-    var authTypeMap = {
-      'oauth2': 'OAuth 2.0',
-      'oauth2_or_api_key': 'OAuth 2.0 or API Key',
-      'api_key': 'API Key',
-      'basic': 'Basic Auth'
-    };
-    return authTypeMap[authType] || formatText(authType);
   }
 
   function normalizeConnectorScope(scope) {
@@ -225,11 +209,6 @@
     return normalized.id || normalized.raw.connector_id || normalized.raw.connector_type || normalized.name || '';
   }
 
-  function isConnectorPinned(connector) {
-    var key = getConnectorPinKey(connector);
-    return !!key && pinnedConnectors.indexOf(key) !== -1;
-  }
-
   function toggleConnectorPin(connectorId, event) {
     if (event) {
       event.preventDefault();
@@ -247,7 +226,7 @@
       pinnedConnectors = pinnedConnectors.filter(function (id) { return id !== key; });
     }
     savePinnedConnectors();
-    filterAvailableConnectors();
+    renderConnectorTable();
   }
 
   function normalizeConnector(connector) {
@@ -328,68 +307,6 @@
     }
 
     return 'not_connected';
-  }
-
-  function getConnectorStatusBadge(connector, installedConnectors) {
-    var status = getConnectorStatusKey(connector, installedConnectors);
-    var statusBadgeMap = {
-      connected:   { color: 'green',  label: 'Connected' },
-      not_connected: { color: 'gray', label: 'Not Connected' },
-      disconnected: { color: 'red', label: 'Disconnected' },
-      coming_soon: { color: 'yellow', label: 'Coming Soon' }
-    };
-    return statusBadgeMap[status] || statusBadgeMap.not_connected;
-  }
-
-  function getConnectorSortValue(connector, key) {
-    var normalized = normalizeConnector(connector);
-    var statusRank = {
-      connected: 0,
-      not_connected: 1,
-      disconnected: 2,
-      coming_soon: 3
-    };
-
-    if (key === 'status') {
-      var statusKey = getConnectorStatusKey(connector, currentInstalledConnectors);
-      return statusRank[statusKey] === undefined ? 99 : statusRank[statusKey];
-    }
-    if (key === 'category') return normalized.category || '';
-    if (key === 'auth') return normalized.auth_type || '';
-    if (key === 'scope') return formatConnectorScope(connector);
-    if (key === 'version') return normalized.version || '';
-    return normalized.name || '';
-  }
-
-  function sortConnectors(connectors) {
-    return connectors.slice().sort(function (a, b) {
-      var aVal = getConnectorSortValue(a, connectorsSortKey);
-      var bVal = getConnectorSortValue(b, connectorsSortKey);
-      var direction = connectorsSortDirection === 'desc' ? -1 : 1;
-      var aPinned = isConnectorPinned(a);
-      var bPinned = isConnectorPinned(b);
-
-      if (aPinned !== bPinned) return aPinned ? -1 : 1;
-
-      if (aVal < bVal) return -1 * direction;
-      if (aVal > bVal) return 1 * direction;
-
-      var aName = normalizeConnector(a).name.toLowerCase();
-      var bName = normalizeConnector(b).name.toLowerCase();
-      if (aName < bName) return -1;
-      if (aName > bName) return 1;
-      return 0;
-    });
-  }
-
-  function updateSortIndicators() {
-    var indicators = document.querySelectorAll('[data-sort-indicator]');
-    indicators.forEach(function (indicator) {
-      var key = indicator.getAttribute('data-sort-indicator');
-      indicator.textContent = key === connectorsSortKey
-        ? (connectorsSortDirection === 'asc' ? '↑' : '↓')
-        : '';
-    });
   }
 
   function buildCombinedConnectorList(installedConnectors, catalogConnectors) {
@@ -513,173 +430,108 @@
     });
   }
 
-  // ── Card rendering ──────────────────────────────────────────────────
+  // ── Connector table ─────────────────────────────────────────────────
 
-  function renderConnectorCard(connector) {
-    var hasCustomUI = !!(connector.ui_entry_point && connector.manifest);
-    var manifest = connector.manifest || {};
+  /** Status vocabulary of this page, in filter order. */
+  var CONNECTOR_STATUSES = {
+    connected:     { label: 'Connected',     color: 'green' },
+    not_connected: { label: 'Not connected', color: 'gray' },
+    disconnected:  { label: 'Disconnected',  color: 'red' },
+    coming_soon:   { label: 'Coming soon',   color: 'yellow' }
+  };
 
-    var normalizedConnector = {
-      id: connector.id || connector.connector_id || 'unknown',
-      name: manifest.name || connector.name || connector.connector_name || 'Unknown Connector',
-      description: manifest.description || connector.description || connector.connector_description || 'No description available',
-      status: connector.status || connector.auth_status || 'disconnected',
-      category: manifest.category || connector.category || connector.connector_category || 'unknown',
-      records: connector.records || connector.total_records || 0,
-      lastSync: connector.lastSync || connector.last_sync || connector.last_sync_at || null,
-      logo_url: manifest.icon || connector.logo_url || connector.logo || connector.icon || null,
-      vendor: manifest.vendor || connector.vendor || null,
-      auth_type: connector.auth_type || 'unknown',
-      capabilities: connector.capabilities || [],
-      tags: connector.tags || [],
-      documentation_url: connector.documentation_url || null,
-      ui_entry_point: connector.ui_entry_point || null,
-      ui_layout_id: connector.ui_layout_id || null,
-      connector_scope: normalizeConnectorScope(connector.connector_scope || connector.scope || manifest.scope)
+  var INFO_ICON = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+  var UPDATE_ICON = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-3-6.7L21 8"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 3v5h-5"></path></svg>';
+
+  /**
+   * One table row of raw values for a connector (docs/TABLE-STANDARD.md §5).
+   * @param {Object} connector
+   * @param {Array} installedConnectors
+   * @param {Array} pinned - pin keys
+   */
+  function mapConnectorRow(connector, installedConnectors, pinned) {
+    var normalized = normalizeConnector(connector);
+    var raw = normalized.raw || {};
+    var pinKey = getConnectorPinKey(connector);
+    var category = String(normalized.category || '').toLowerCase();
+    return {
+      id: String(normalized.id),
+      pin_key: pinKey,
+      pinned: pinKey && (pinned || []).indexOf(pinKey) !== -1 ? 'yes' : 'no',
+      name: normalized.name,
+      vendor: normalized.vendor || '',
+      description: normalized.description || '',
+      logo_url: normalized.logo_url || '',
+      category: category === 'case' ? 'case_management' : category,
+      auth_type: String(normalized.auth_type || '').toLowerCase(),
+      scope: normalized.connector_scope,
+      status: getConnectorStatusKey(connector, installedConnectors),
+      version: String(normalized.version || '').replace(/^v/i, ''),
+      created_at: raw.created_at || raw.installed_at || '',
+      update_slug: getConnectorUpdateSlug(connector),
+      _raw: raw
     };
-
-    /**
-     * Map connector status values to lex-badge color and label.
-     * Valid colors: gray | green | red | yellow | blue | indigo
-     */
-    var statusBadgeMap = {
-      connected:    { color: 'green',  label: 'Connected' },
-      active:       { color: 'green',  label: 'Active' },
-      installed:    { color: 'gray',   label: 'Not Connected' },
-      not_connected:{ color: 'gray',   label: 'Not Connected' },
-      disconnected: { color: 'red',    label: 'Disconnected' },
-      error:        { color: 'red',    label: 'Error' },
-      syncing:      { color: 'blue',   label: 'Syncing' },
-      coming_soon:  { color: 'yellow', label: 'Coming Soon' }
-    };
-
-    var displayStatus = normalizedConnector.status;
-    var badgeConfig = statusBadgeMap[displayStatus] || statusBadgeMap.disconnected;
-    var isComingSoon = displayStatus === 'coming_soon';
-    var isActive = displayStatus === 'connected' || displayStatus === 'active';
-    var isInstalled = displayStatus === 'installed' || displayStatus === 'not_connected';
-
-    var logoHtml = normalizedConnector.logo_url
-      ? '<img src="' + normalizedConnector.logo_url + '" alt="' + normalizedConnector.name + '" class="w-10 h-10 object-contain" onerror="this.parentElement.innerHTML=\'<span class=\\\'text-lg font-bold\\\' style=\\\'color:var(--lex-text-disabled)\\\'>' + normalizedConnector.name.charAt(0) + '</span>\'">'
-      : '<span class="text-lg font-bold" style="color:var(--lex-text-disabled)">' + normalizedConnector.name.charAt(0) + '</span>';
-
-    var timeAgoStr = normalizedConnector.lastSync ? Lex.Utils.timeAgo(normalizedConnector.lastSync) : 'Never';
-
-    var cardClick = '';
-    if (!isComingSoon) {
-      if (hasCustomUI) {
-        cardClick = 'onclick="openCustomConnectorUI(\'' + normalizedConnector.ui_entry_point + '\', \'' + normalizedConnector.name + '\', \'' + normalizedConnector.id + '\', \'' + (normalizedConnector.connector_id || normalizedConnector.connector_type || '') + '\', \'' + normalizedConnector.connector_scope + '\')"';
-      } else {
-        cardClick = 'onclick="openConnector(\'' + normalizedConnector.id + '\', \'' + normalizedConnector.category + '\')"';
-      }
-    }
-
-    /** SVG icon used inside detail icon-only buttons. */
-    var infoIconSvg = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
-
-    var buttonsHtml = '';
-    if (isComingSoon) {
-      buttonsHtml = '<lex-btn variant="ghost" size="sm" onclick="showConnectorDetails(\'' + normalizedConnector.id + '\', event)" style="width:100%">View Details</lex-btn>';
-    } else if (isActive) {
-      buttonsHtml = '<div class="flex gap-2">' +
-        '<lex-btn variant="primary" size="sm" onclick="showConnectorActionsModal(\'' + normalizedConnector.id + '\'); event.stopPropagation();" style="flex:1">Manage</lex-btn>' +
-        '<lex-btn variant="ghost" size="sm" icon="true" onclick="showConnectorDetails(\'' + normalizedConnector.id + '\', event)" aria-label="View details">' + infoIconSvg + '</lex-btn>' +
-        '</div>';
-    } else if (isInstalled) {
-      buttonsHtml = '<div class="flex gap-2">' +
-        '<lex-btn variant="primary" size="sm" onclick="showConnectorActionsModal(\'' + normalizedConnector.id + '\'); event.stopPropagation();" style="flex:1">Configure</lex-btn>' +
-        '<lex-btn variant="ghost" size="sm" icon="true" onclick="showConnectorDetails(\'' + normalizedConnector.id + '\', event)" aria-label="View details">' + infoIconSvg + '</lex-btn>' +
-        '</div>';
-    } else {
-      buttonsHtml = '<div class="flex gap-2">' +
-        '<lex-btn variant="primary" size="sm" onclick="showConnectorActionsModal(\'' + normalizedConnector.id + '\'); event.stopPropagation();" style="flex:1">Connect</lex-btn>' +
-        '<lex-btn variant="ghost" size="sm" icon="true" onclick="showConnectorDetails(\'' + normalizedConnector.id + '\', event)" aria-label="View details">' + infoIconSvg + '</lex-btn>' +
-        '</div>';
-    }
-
-    var rowClick = isComingSoon ? '' : cardClick;
-
-    return '<tr class="dc-row' + (isComingSoon ? ' opacity-60' : '') + '" tabindex="0" ' + rowClick + '>' +
-      '<td>' +
-        '<div class="flex items-center gap-3">' +
-          '<div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style="background:var(--lex-bg-tertiary)">' + logoHtml + '</div>' +
-          '<div class="min-w-0">' +
-            '<div class="font-semibold" style="color:var(--lex-text-primary)">' + normalizedConnector.name + '</div>' +
-          '</div>' +
-        '</div>' +
-      '</td>' +
-      '<td>' + formatText(normalizedConnector.category) + '</td>' +
-      '<td>' + formatAuthType(normalizedConnector.auth_type) + '</td>' +
-      '<td>' + renderScopeBadge(normalizedConnector) + '</td>' +
-      '<td><lex-badge color="' + badgeConfig.color + '" label="' + badgeConfig.label + '" size="sm"></lex-badge></td>' +
-      '<td>' + ((isActive || isInstalled) ? timeAgoStr : 'Never') + '</td>' +
-      '<td><div class="dc-row-actions">' + buttonsHtml + '</div></td>' +
-    '</tr>';
   }
 
-  function renderAvailableConnectorCard(connector, installedConnectors) {
-    var normalized = normalizeConnector(connector);
-    var statusKey = getConnectorStatusKey(connector, installedConnectors);
-    var isComingSoon = statusKey === 'coming_soon';
-    var action = getConnectorAction(connector, installedConnectors);
-    var badgeConfig = getConnectorStatusBadge(connector, installedConnectors);
-    var connectorId = normalized.id;
-    var safeId = escapeAttribute(connectorId);
-    var safeName = escapeAttribute(normalized.name);
-    var pinKey = getConnectorPinKey(connector);
-    var pinned = isConnectorPinned(connector);
-    var pinLabel = pinned ? 'Unpin connector' : 'Pin connector to top';
-    var pinIcon = pinned
-      ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.39 6.96L22 9.27l-5.45 4.73L17.82 22 12 18.27 6.18 22l1.27-7.99L2 9.27l7.61-.31L12 2z"/></svg>'
-      : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l2.39 6.96L22 9.27l-5.45 4.73L17.82 22 12 18.27 6.18 22l1.27-7.99L2 9.27l7.61-.31L12 2z"/></svg>';
-
-    var logoHtml = normalized.logo_url
-      ? '<img src="' + escapeAttribute(normalized.logo_url) + '" alt="' + safeName + '" class="w-10 h-10 object-contain" onerror="this.parentElement.innerHTML=\'<span class=\\\'text-lg font-bold\\\' style=\\\'color:var(--lex-text-accent)\\\'>' + escapeAttribute(normalized.name.charAt(0)) + '</span>\'">'
-      : '<span class="text-lg font-bold" style="color:var(--lex-text-accent)">' + escapeHtml(normalized.name.charAt(0)) + '</span>';
-
-    /** SVG icon used inside detail icon-only buttons. */
-    var infoIconSvgAvail = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
-
-    var actionButton = '';
+  /** Actions cell: Set up / Open / View details, plus Update for packages. */
+  function connectorActionsCell(row) {
+    var safeId = escapeAttribute(row.id);
+    var safeName = escapeAttribute(row.name);
+    var action = getConnectorAction(row._raw, currentInstalledConnectors);
+    var details = '<lex-btn variant="ghost" size="sm" icon="true" onclick="showConnectorDetails(\'' + safeId + '\', event)" aria-label="View details of ' + safeName + '" title="View details">' + INFO_ICON + '</lex-btn>';
+    var html;
     if (action === 'install') {
-      actionButton = '<div class="flex gap-2">' +
-        '<lex-btn variant="primary" size="sm" onclick="installConnector(\'' + safeId + '\', event); event.stopPropagation();" style="flex:1">Set Up</lex-btn>' +
-        '<lex-btn variant="ghost" size="sm" icon="true" onclick="showConnectorDetails(\'' + safeId + '\', event); event.stopPropagation();" aria-label="View details">' + infoIconSvgAvail + '</lex-btn>' +
-        '</div>';
+      html = '<lex-btn variant="primary" size="sm" onclick="installConnector(\'' + safeId + '\', event)">Set up</lex-btn>' + details;
     } else if (action === 'details') {
-      actionButton = '<lex-btn variant="ghost" size="sm" onclick="showConnectorDetails(\'' + safeId + '\', event); event.stopPropagation();" style="width:100%">View Details</lex-btn>';
+      html = '<lex-btn variant="ghost" size="sm" onclick="showConnectorDetails(\'' + safeId + '\', event)">View details</lex-btn>';
     } else {
-      actionButton = '<div class="flex gap-2">' +
-        '<lex-btn variant="primary" size="sm" onclick="openConnectorManage(\'' + safeId + '\'); event.stopPropagation();" style="flex:1">Open</lex-btn>' +
-        '<lex-btn variant="ghost" size="sm" icon="true" onclick="showConnectorDetails(\'' + safeId + '\', event); event.stopPropagation();" aria-label="View details">' + infoIconSvgAvail + '</lex-btn>' +
-        '</div>';
+      html = '<lex-btn variant="primary" size="sm" onclick="openConnectorManage(\'' + safeId + '\')">Open</lex-btn>' + details;
     }
+    if (row.update_slug) {
+      html += '<lex-btn variant="ghost" size="sm" icon="true" onclick="openConnectorUpdateModal(\'' + safeId + '\', event)" aria-label="Update ' + safeName + '" title="Update connector">' + UPDATE_ICON + '</lex-btn>';
+    }
+    return html;
+  }
 
-    var updateSlug = getConnectorUpdateSlug(connector);
-    var updateIconSvg = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-3-6.7L21 8"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 3v5h-5"></path></svg>';
-    var updateButton = updateSlug
-      ? '<lex-btn variant="ghost" size="sm" icon="true" onclick="openConnectorUpdateModal(\'' + safeId + '\', event)" aria-label="Update ' + safeName + '" title="Update connector">' + updateIconSvg + '</lex-btn>'
-      : '';
+  function connectorRows() {
+    return allAvailableConnectors.map(function (connector) {
+      return mapConnectorRow(connector, currentInstalledConnectors, pinnedConnectors);
+    });
+  }
 
-    return '<tr class="dc-row' + (isComingSoon ? ' opacity-75' : '') + '" data-connector-row="' + safeId + '" tabindex="0" role="button" aria-label="Open ' + safeName + '" onclick="handleConnectorRowSelection(\'' + safeId + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();handleConnectorRowSelection(\'' + safeId + '\')}">' +
-      '<td class="dc-pin-cell">' +
-        '<button type="button" class="dc-pin-btn' + (pinned ? ' is-pinned' : '') + '" onclick="toggleConnectorPin(\'' + escapeAttribute(pinKey) + '\', event)" aria-pressed="' + (pinned ? 'true' : 'false') + '" aria-label="' + escapeAttribute(pinLabel) + '" title="' + escapeAttribute(pinLabel) + '">' + pinIcon + '</button>' +
-      '</td>' +
-      '<td>' +
-        '<div class="flex items-center gap-3">' +
-          '<div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style="background:var(--lex-bg-accent-muted)">' + logoHtml + '</div>' +
-          '<div class="min-w-0">' +
-            '<div class="font-semibold" style="color:var(--lex-text-primary)">' + escapeHtml(normalized.name) + '</div>' +
-          '</div>' +
-        '</div>' +
-      '</td>' +
-      '<td>' + escapeHtml(formatText(normalized.category)) + '</td>' +
-      '<td>' + escapeHtml(formatAuthType(normalized.auth_type)) + '</td>' +
-      '<td>' + renderScopeBadge(normalized) + '</td>' +
-      '<td><lex-badge color="' + badgeConfig.color + '" label="' + badgeConfig.label + '" size="sm"></lex-badge></td>' +
-      '<td>' + escapeHtml(normalized.version ? 'v' + normalized.version : 'v1.0.0') + '</td>' +
-      '<td><div class="dc-row-actions">' + actionButton + updateButton + '</div></td>' +
-    '</tr>';
+  /** Mounts the table once, then refreshes its rows (keeping search, sort, filters, page). */
+  function renderConnectorTable() {
+    var shared = window.LanaConnectorTable;
+    var mountEl = document.getElementById('connectorTableMount');
+    if (!shared || !mountEl) return;
+    if (connectorTable) {
+      connectorTable.setRows(connectorRows());
+      return;
+    }
+    if (connectorTablePromise) {
+      connectorTablePromise.then(function () { if (connectorTable) connectorTable.setRows(connectorRows()); });
+      return;
+    }
+    mountEl.innerHTML = shared.sectionMarkup({
+      prefix: 'connectors',
+      tableId: 'connectorsTable',
+      title: 'Available to Configure',
+      subtitle: 'Connector packages available in the local platform catalog',
+      query: connectorTableStore.query
+    });
+    connectorTablePromise = shared.mount({
+      prefix: 'connectors',
+      tableId: 'connectorsTable',
+      rows: connectorRows(),
+      statuses: CONNECTOR_STATUSES,
+      store: connectorTableStore,
+      actionsCell: connectorActionsCell,
+      onPinClick: function (pinKey) { toggleConnectorPin(pinKey, null); },
+      onRowClick: function (row) { handleConnectorRowSelection(row.id); }
+    }).then(function (controller) {
+      connectorTable = controller;
+      return controller;
+    });
   }
 
   // ── Navigation ──────────────────────────────────────────────────────
@@ -852,32 +704,24 @@
 
   function openConnectorDashboardModal(url, connectorName) {
     var modal = document.getElementById('connectorDashboardModal');
+    if (!modal) return;
+    // lex-modal copies its children when it upgrades; look the frame up now.
     var frame = document.getElementById('connectorDashboardFrame');
-    var title = document.getElementById('connectorDashboardTitle');
-    var urlEl = document.getElementById('connectorDashboardUrl');
-    var openNewBtn = document.getElementById('connectorDashboardOpenNewBtn');
+    if (!frame) return;
 
-    if (!modal || !frame) return;
-
-    if (title) title.textContent = connectorName || 'Connector Dashboard';
-    if (urlEl) urlEl.textContent = url || '';
-    if (openNewBtn) {
-      openNewBtn.onclick = function () {
-        window.open(url, '_blank', 'noopener,noreferrer');
-      };
-    }
+    // No modal header: the embedded page has its own header and Back button.
+    modal.setAttribute('aria-label', connectorName || 'Connector dashboard');
     frame.src = url;
-    modal.classList.remove('hidden');
-    document.body.style.overflow = 'hidden';
+    modal.open = true;
   }
 
+  // Unload the dashboard (stops its timers and requests) and close the modal.
   function closeConnectorDashboardModal() {
     var modal = document.getElementById('connectorDashboardModal');
     var frame = document.getElementById('connectorDashboardFrame');
 
     if (frame) frame.src = 'about:blank';
-    if (modal) modal.classList.add('hidden');
-    document.body.style.overflow = '';
+    if (modal) modal.open = false;
   }
 
   // ── Install connector ───────────────────────────────────────────────
@@ -1006,14 +850,10 @@
       };
     }
 
-    // Update the lex-modal heading to reflect the connector name, then open it.
-    // lex-modal skips re-rendering after first render, so update the heading DOM directly.
+    // Show the connector name through the lex-modal heading property, then open it.
     var detailsModal = document.getElementById('connectorDetailsModal');
-    var detailsTitle = detailsModal ? detailsModal.querySelector('.lex-modal-title') : null;
-    if (detailsTitle) {
-      detailsTitle.textContent = nc.name;
-    }
     if (detailsModal) {
+      detailsModal.heading = nc.name || 'Connector Details';
       detailsModal.open = true;
     }
   }
@@ -1053,13 +893,9 @@
       }
     }
 
-    // Update the lex-modal heading to show the connector name.
-    // lex-modal skips re-rendering after first render, so update the heading DOM directly.
+    // Show the connector name through the lex-modal heading property.
     var modal = document.getElementById('connectorActionsModal');
-    var modalTitle = modal ? modal.querySelector('.lex-modal-title') : null;
-    if (modalTitle) {
-      modalTitle.textContent = connectorName;
-    }
+    if (modal) modal.heading = connectorName;
 
     var deleteButton = document.getElementById('actionDelete');
     deleteButton.style.display = 'flex';
@@ -1131,9 +967,10 @@
       '</label>' +
     '</div>';
 
-    Lex.Modal.confirm('Uninstall Connector', message, function () {
-      var purgeData = document.getElementById('purgeDataCheckbox') && document.getElementById('purgeDataCheckbox').checked;
-      confirmUninstallConnector(purgeData);
+    var confirmModal = Lex.Modal.confirm('Uninstall Connector', message, function () {
+      // Scope the lookup to this dialog rather than querying the whole document.
+      var purgeBox = confirmModal && confirmModal.querySelector('#purgeDataCheckbox');
+      confirmUninstallConnector(Boolean(purgeBox && purgeBox.checked));
     }, { variant: 'default', confirmText: 'Uninstall', cancelText: 'Cancel', size: 'sm' });
   }
 
@@ -1219,152 +1056,6 @@
     });
   }
 
-  // ── Search & filter ─────────────────────────────────────────────────
-
-  function filterAvailableConnectors() {
-    var searchInput = document.getElementById('connectorSearch');
-    var statusFilterEl = document.getElementById('statusFilter');
-    var categoryFilterEl = document.getElementById('categoryFilter');
-    var authTypeFilterEl = document.getElementById('authTypeFilter');
-
-    if (!searchInput || !statusFilterEl || !categoryFilterEl || !authTypeFilterEl) return;
-
-    // lex-input and lex-select both expose .value on the element directly.
-    var searchTerm = (searchInput.value || '').toLowerCase();
-    var statusVal = statusFilterEl.value || '';
-    var categoryVal = categoryFilterEl.value || '';
-    var authTypeVal = authTypeFilterEl.value || '';
-
-    var filtered = allAvailableConnectors.filter(function (connector) {
-      var normalized = normalizeConnector(connector);
-
-      if (searchTerm) {
-        var matchesSearch =
-          (normalized.name || '').toLowerCase().includes(searchTerm) ||
-          (normalized.vendor || '').toLowerCase().includes(searchTerm) ||
-          (normalized.description || '').toLowerCase().includes(searchTerm) ||
-          (normalized.tags || []).some(function (tag) { return String(tag).toLowerCase().includes(searchTerm); });
-
-        if (!matchesSearch) return false;
-      }
-
-      if (statusVal && getConnectorStatusKey(connector, currentInstalledConnectors) !== statusVal) return false;
-      if (categoryVal) {
-        var categoryMatches = normalized.category === categoryVal;
-        if (categoryVal === 'case_management') {
-          categoryMatches = categoryMatches || normalized.category === 'case';
-        }
-        if (!categoryMatches) return false;
-      }
-      if (authTypeVal && normalized.auth_type !== authTypeVal) return false;
-
-      return true;
-    });
-
-    connectorsFilteredCount = filtered.length;
-    renderAvailableConnectors(sortConnectors(filtered));
-  }
-
-  function renderAvailableConnectors(connectors) {
-    var availableContainer = document.getElementById('availableConnectors');
-    var noResultsMessage = document.getElementById('noResultsMessage');
-    var summaryEl = document.getElementById('connectorsPaginationSummary');
-    var pageLabelEl = document.getElementById('connectorsPageLabel');
-    var prevBtn = document.getElementById('connectorsPrevPage');
-    var nextBtn = document.getElementById('connectorsNextPage');
-    if (!availableContainer || !noResultsMessage) return;
-
-    var total = connectors.length;
-    var totalPages = Math.max(1, Math.ceil(total / connectorsPageSize));
-    if (connectorsCurrentPage > totalPages) connectorsCurrentPage = totalPages;
-    if (connectorsCurrentPage < 1) connectorsCurrentPage = 1;
-
-    if (total === 0) {
-      availableContainer.innerHTML = '<tr><td colspan="8" class="dc-empty">No connectors match the current filters.</td></tr>';
-      noResultsMessage.classList.add('hidden');
-      if (summaryEl) summaryEl.textContent = 'Showing 0 connectors';
-      if (pageLabelEl) pageLabelEl.textContent = 'Page 1 of 1';
-      if (prevBtn) prevBtn.disabled = true;
-      if (nextBtn) nextBtn.disabled = true;
-      updateSortIndicators();
-    } else {
-      var start = (connectorsCurrentPage - 1) * connectorsPageSize;
-      var end = Math.min(start + connectorsPageSize, total);
-      var pageRows = connectors.slice(start, end);
-
-      availableContainer.innerHTML = pageRows
-        .map(function (c) { return renderAvailableConnectorCard(c, currentInstalledConnectors); })
-        .join('');
-      noResultsMessage.classList.add('hidden');
-      if (summaryEl) summaryEl.textContent = 'Showing ' + (start + 1) + '-' + end + ' of ' + total + ' connectors';
-      if (pageLabelEl) pageLabelEl.textContent = 'Page ' + connectorsCurrentPage + ' of ' + totalPages;
-      if (prevBtn) prevBtn.disabled = connectorsCurrentPage <= 1;
-      if (nextBtn) nextBtn.disabled = connectorsCurrentPage >= totalPages;
-      updateSortIndicators();
-    }
-  }
-
-  function setupSearchAndFilters() {
-    var searchInput = document.getElementById('connectorSearch');
-    var statusFilterEl = document.getElementById('statusFilter');
-    var categoryFilterEl = document.getElementById('categoryFilter');
-    var authTypeFilterEl = document.getElementById('authTypeFilter');
-    var prevBtn = document.getElementById('connectorsPrevPage');
-    var nextBtn = document.getElementById('connectorsNextPage');
-
-    if (!searchInput || !statusFilterEl || !categoryFilterEl || !authTypeFilterEl) return;
-
-    function resetPageAndFilter() {
-      connectorsCurrentPage = 1;
-      filterAvailableConnectors();
-    }
-
-    // lex-input fires 'lex-input' on each keystroke (equivalent to native 'input').
-    searchInput.addEventListener('lex-input', function () {
-      if (searchTimeout) clearTimeout(searchTimeout);
-      searchTimeout = setTimeout(resetPageAndFilter, 300);
-    });
-
-    // lex-select fires 'lex-change' when a selection is made (equivalent to native 'change').
-    statusFilterEl.addEventListener('lex-change', resetPageAndFilter);
-    categoryFilterEl.addEventListener('lex-change', resetPageAndFilter);
-    authTypeFilterEl.addEventListener('lex-change', resetPageAndFilter);
-
-    document.querySelectorAll('[data-sort-key]').forEach(function (button) {
-      button.addEventListener('click', function () {
-        var key = button.getAttribute('data-sort-key');
-        if (!key) return;
-
-        if (connectorsSortKey === key) {
-          connectorsSortDirection = connectorsSortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
-          connectorsSortKey = key;
-          connectorsSortDirection = 'asc';
-        }
-
-        connectorsCurrentPage = 1;
-        filterAvailableConnectors();
-      });
-    });
-
-    if (prevBtn) {
-      prevBtn.addEventListener('click', function () {
-        if (connectorsCurrentPage <= 1) return;
-        connectorsCurrentPage -= 1;
-        filterAvailableConnectors();
-      });
-    }
-
-    if (nextBtn) {
-      nextBtn.addEventListener('click', function () {
-        var totalPages = Math.max(1, Math.ceil(connectorsFilteredCount / connectorsPageSize));
-        if (connectorsCurrentPage >= totalPages) return;
-        connectorsCurrentPage += 1;
-        filterAvailableConnectors();
-      });
-    }
-  }
-
   // ── Page refresh ────────────────────────────────────────────────────
 
   function refreshConnectorsPage() {
@@ -1414,18 +1105,14 @@
         allAvailableConnectors = buildCombinedConnectorList(installedConnectors, availableConnectors);
         currentInstalledConnectors = installedConnectors;
         allConnectors = buildCombinedConnectorList(allConnectors, allAvailableConnectors);
-        connectorsCurrentPage = 1;
-        connectorsFilteredCount = allAvailableConnectors.length;
-        filterAvailableConnectors();
+        renderConnectorTable();
         if (availableSection) availableSection.classList.remove('hidden');
       } else {
         console.warn('Connector catalog unavailable:', registryData.reason);
 
         allAvailableConnectors = installedConnectors.slice();
         currentInstalledConnectors = installedConnectors;
-        connectorsCurrentPage = 1;
-        connectorsFilteredCount = allAvailableConnectors.length;
-        filterAvailableConnectors();
+        renderConnectorTable();
         if (availableSection) availableSection.classList.remove('hidden');
       }
 
@@ -1954,9 +1641,6 @@
       _documentListeners.push({ event: 'lex-close', handler: actionsCloseHandler, target: actionsModal });
     }
 
-    // Search and filters
-    setupSearchAndFilters();
-
     // Drag and drop
     setupDragAndDrop();
 
@@ -1977,6 +1661,18 @@
     };
     window.addEventListener('message', embeddedBackHandler);
     _documentListeners.push({ event: 'message', handler: embeddedBackHandler, target: window });
+
+    // Header close button or Escape closes the lex-modal; unload the frame too.
+    var dashboardModal = document.getElementById('connectorDashboardModal');
+    if (dashboardModal) {
+      var dashboardCloseHandler = function (event) {
+        if (event.target !== dashboardModal) return;
+        var frame = document.getElementById('connectorDashboardFrame');
+        if (frame) frame.src = 'about:blank';
+      };
+      dashboardModal.addEventListener('lex-close', dashboardCloseHandler);
+      _documentListeners.push({ event: 'lex-close', handler: dashboardCloseHandler, target: dashboardModal });
+    }
 
     var embeddedOpenExternalHandler = function (event) {
       var data = event && event.data;
@@ -2030,7 +1726,6 @@
     exposeGlobal('openConnectorManage', openConnectorManage);
     exposeGlobal('openCustomConnectorUI', openCustomConnectorUI);
     exposeGlobal('refreshConnectorsPage', refreshConnectorsPage);
-    exposeGlobal('filterAvailableConnectors', filterAvailableConnectors);
 
     // Setup event listeners
     setupEventListeners();
@@ -2045,11 +1740,6 @@
     _timeouts.forEach(clearTimeout);
     _intervals = [];
     _timeouts = [];
-
-    if (searchTimeout) {
-      clearTimeout(searchTimeout);
-      searchTimeout = null;
-    }
 
     // Remove exposed window globals
     _globalFns.forEach(function (name) { delete window[name]; });
@@ -2070,10 +1760,17 @@
     selectedConnectorFile = null;
     parsedConnectorConfig = null;
 
-    // Clear search input so it doesn't persist on re-navigation
-    var searchEl = document.getElementById('connectorSearch');
-    if (searchEl) searchEl.value = '';
+    connectorTable = null;
+    connectorTablePromise = null;
   }
+
+  // Pure table logic, exposed for unit tests.
+  window.DataConnectorsTable = {
+    CONNECTOR_STATUSES: CONNECTOR_STATUSES,
+    mapConnectorRow: mapConnectorRow,
+    connectorActionsCell: connectorActionsCell,
+    buildCombinedConnectorList: buildCombinedConnectorList
+  };
 
   // ── Init — standalone page, called directly ────────────────────────
   onEnter();

@@ -181,6 +181,8 @@
           const set = Array.isArray(filter) ? filter : String(filter).split(',');
           return set.some(v => String(cell).toLowerCase() === String(v).trim().toLowerCase());
         }
+        case 'match':
+          return !filter || typeof filter.test !== 'function' || !!filter.test(cell);
         case 'between': {
           const [min, max] = Array.isArray(filter) ? filter : String(filter).split(',');
           const num = Number(cell);
@@ -260,6 +262,7 @@
       this._sortBy = '';
       this._sortDir = 'asc';
       this._clientSideMode = false;   // True when data injected via setData()
+      this._serverMode = false;       // True when the page fetches each page (setServerData())
     }
 
     // -----------------------------------------------------------------------
@@ -353,6 +356,16 @@
           sortBy: this._sortBy,
           sortDir: this._sortDir
         });
+      } else if (this._serverMode) {
+        // Server mode: the page re-fetches page 1 with the new query
+        this._pagination.page = 1;
+        this.requestServerQuery();
+        this.element.emit('lex-filter-change', {
+          filters: Object.fromEntries(this._filters),
+          searchQuery: this._searchQuery,
+          sortBy: this._sortBy,
+          sortDir: this._sortDir
+        });
       } else if (this.endpoint) {
         // Endpoint mode: re-fetch with updated params
         this._pagination.page = 1;
@@ -364,6 +377,59 @@
           sortDir: this._sortDir
         });
       }
+    }
+
+    // -----------------------------------------------------------------------
+    // Server mode — the page owns the request. The source keeps the paging,
+    // sort, search and filter state, emits 'lex-query-change' with it, and
+    // the page answers with setServerData(rows, pagination). Use it when the
+    // API pages, sorts or filters itself and its parameter names differ from
+    // the endpoint mode's (page/limit/sortBy/sortOrder/q).
+    // -----------------------------------------------------------------------
+
+    get query() {
+      return {
+        page: this._pagination.page,
+        limit: this._pagination.limit,
+        sortBy: this._sortBy,
+        sortDir: this._sortDir,
+        search: this._searchQuery,
+        filters: Object.fromEntries(this._filters)
+      };
+    }
+
+    requestServerQuery() {
+      this._loading = true;
+      this._error = null;
+      this.element._scheduleUpdate();
+      this.element.emit('lex-query-change', this.query);
+    }
+
+    setServerData(rows, pagination = {}) {
+      const list = Array.isArray(rows) ? rows : [];
+      const limit = Number(pagination.limit || pagination.page_size || pagination.pageSize) || this._pagination.limit;
+      const total = Number(pagination.total);
+      const totalPages = Number(pagination.totalPages || pagination.total_pages);
+      this._serverMode = true;
+      this._clientSideMode = false;
+      this._data = list;
+      this._pagination.page = Number(pagination.page) || this._pagination.page || 1;
+      this._pagination.limit = limit;
+      this._pagination.total = Number.isFinite(total) ? total : list.length;
+      this._pagination.totalPages = Number.isFinite(totalPages) && totalPages > 0
+        ? totalPages
+        : Math.max(1, Math.ceil(this._pagination.total / limit));
+      this._loading = false;
+      this._error = null;
+      this.element._scheduleUpdate();
+      this.element.emit('lex-data-loaded', { data: this._data, pagination: { ...this._pagination } });
+    }
+
+    setServerError(message) {
+      this._loading = false;
+      this._error = message || 'Failed to load data';
+      this.element._scheduleUpdate();
+      this.element.emit('lex-data-error', { error: this._error });
     }
 
     // -----------------------------------------------------------------------
@@ -487,6 +553,7 @@
         this.element._scheduleUpdate();
         return;
       }
+      if (this._serverMode) return this.requestServerQuery();
       return this.fetch();
     }
 
@@ -512,6 +579,7 @@
         this.element._scheduleUpdate();
         return;
       }
+      if (this._serverMode) return this.requestServerQuery();
       return this.fetch();
     }
 
@@ -522,6 +590,7 @@
         this.element._scheduleUpdate();
         return;
       }
+      if (this._serverMode) return this.requestServerQuery();
       return this.fetch();
     }
 
@@ -561,13 +630,16 @@
           filterable:   { type: Boolean, default: false },
           selectable:   { type: Boolean, default: false },
           linkedTo:     { type: String },
-          idKey:        { type: String, default: 'id' }
+          idKey:        { type: String, default: 'id' },
+          serverPaging: { type: Boolean, default: false }  // Page fetches each page; see LexDataSource server mode
         };
       }
 
       connected() {
         super.connected();
-        if (this.endpoint) {
+        if (this.serverPaging && !this.endpoint) {
+          this._ensureServerSource();
+        } else if (this.endpoint) {
           this.dataSource = new LexDataSource(this, {
             endpoint: this.endpoint,
             params: this._buildParams(),
@@ -611,8 +683,10 @@
       setData(data) {
         if (!this.dataSource) {
           this.dataSource = new LexDataSource(this, { autoFetch: false });
+          this.dataSource._pagination.limit = this.limit || 20;
         }
-        this.dataSource._pagination.limit = this.limit || 20;
+        // A refresh keeps the page size the user picked.
+        if (!this.dataSource._pagination.limit) this.dataSource._pagination.limit = this.limit || 20;
         this.dataSource._clientSideMode = true;
         this.dataSource._rawData = Array.isArray(data) ? [...data] : data;
         this.dataSource._data = data;
@@ -620,6 +694,118 @@
         this.dataSource._error = null;
         this.dataSource._reprocess();
         this._scheduleUpdate();
+      }
+
+      // -----------------------------------------------------------------------
+      // Server mode convenience methods (server-paging attribute)
+      // -----------------------------------------------------------------------
+
+      _ensureServerSource() {
+        if (!this.dataSource) {
+          this.dataSource = new LexDataSource(this, { autoFetch: false });
+          this.dataSource._pagination.limit = this.limit || 20;
+          if (this.sortBy) {
+            this.dataSource._sortBy = this.sortBy;
+            this.dataSource._sortDir = this.sortDir || 'asc';
+          }
+        }
+        this.dataSource._serverMode = true;
+        this.dataSource._clientSideMode = false;
+        return this.dataSource;
+      }
+
+      // Current { page, limit, sortBy, sortDir, search, filters }.
+      get serverQuery() {
+        return this._ensureServerSource().query;
+      }
+
+      // Ask the page for data: shows the loading state and emits
+      // 'lex-query-change'. Pass { resetPage: true } after an outside filter changes.
+      requestServerQuery(options = {}) {
+        const source = this._ensureServerSource();
+        if (options.resetPage) source._pagination.page = 1;
+        source.requestServerQuery();
+      }
+
+      // Hand one page of rows back: pagination accepts { page, limit|page_size,
+      // total, totalPages|total_pages }.
+      setServerData(rows, pagination) {
+        this._ensureServerSource().setServerData(rows, pagination);
+      }
+
+      setServerError(message) {
+        this._ensureServerSource().setServerError(message);
+      }
+
+      // Error state for either mode (client-side tables included); does not
+      // switch the table to server mode.
+      setError(message) {
+        if (!this.dataSource) this.dataSource = new LexDataSource(this, { autoFetch: false });
+        this.dataSource._loading = false;
+        this.dataSource._error = message || 'Failed to load data';
+        this._scheduleUpdate();
+        this.emit('lex-data-error', { error: this.dataSource._error });
+      }
+
+      // Search from a page toolbar: client tables filter, server tables ask
+      // the page for page 1 with the new term.
+      setSearch(term) {
+        if (!this.dataSource) this.dataSource = new LexDataSource(this, { autoFetch: false });
+        this.dataSource.setSearch(term || '');
+      }
+
+      // { page, limit, total, totalPages } for what the table shows.
+      get pagination() {
+        const source = this.dataSource;
+        if (!source) return { page: 1, limit: this.limit || 20, total: 0, totalPages: 0 };
+        return { ...source.pagination };
+      }
+
+      // Current search text (toolbar or built-in).
+      get searchText() {
+        return this.dataSource ? (this.dataSource._searchQuery || '') : '';
+      }
+
+      // Client-side tables: every row that matches the current filters and
+      // search, sorted, across all pages. Server tables: the current page.
+      get filteredRows() {
+        const source = this.dataSource;
+        if (!source) return [];
+        if (!source._clientSideMode || !Array.isArray(source._rawData)) return Array.isArray(source._data) ? source._data.slice() : [];
+        return LexDataPipeline.process(source._rawData, {
+          filters: source._filters,
+          searchQuery: source._searchQuery,
+          searchColumns: this._getSearchColumns ? this._getSearchColumns() : null,
+          sortBy: source._sortBy,
+          sortDir: source._sortDir,
+          page: 1,
+          limit: 0
+        }).data;
+      }
+
+      // Set the whole query without asking for data: search, sort, filters
+      // ({ col: { operator, value } }), page and limit. Missing keys reset
+      // (no search, no filters, page 1). Follow with requestServerQuery() or
+      // let a client-side table re-render.
+      restoreQuery(query = {}) {
+        if (!this.dataSource) this.dataSource = new LexDataSource(this, { autoFetch: false });
+        const source = this.dataSource;
+        source._searchQuery = query.search || '';
+        source._filters = new Map(Object.entries(query.filters || {}));
+        source._sortBy = query.sortBy || this.sortBy || null;
+        source._sortDir = query.sortDir || this.sortDir || 'asc';
+        if (query.limit) source._pagination.limit = Number(query.limit) || source._pagination.limit;
+        source._pagination.page = Number(query.page) || 1;
+        if (query.sortBy) this.sortBy = query.sortBy;
+        if (query.sortDir) this.sortDir = query.sortDir;
+        if (source._clientSideMode) source._reprocess();
+        this._scheduleUpdate();
+      }
+
+      // Back to the default query (attribute sort, no search or filters,
+      // page 1) without asking for data.
+      resetQuery() {
+        this.restoreQuery({ limit: this.dataSource ? this.dataSource._pagination.limit : this.limit });
       }
 
       // -----------------------------------------------------------------------

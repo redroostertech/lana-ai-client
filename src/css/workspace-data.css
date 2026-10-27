@@ -1,0 +1,170 @@
+/* Workspace Data (Connected Data) page: toolbar, records table, record
+   detail modal. Table layout follows docs/TABLE-STANDARD.md. */
+
+.ws-data-table-area {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 1rem 1rem;
+}
+
+.ws-data-toolbar {
+  border-color: var(--lex-border-default);
+}
+
+.ws-data-toolbar-label {
+  color: var(--lex-text-secondary);
+}
+
+.ws-data-section-title {
+  color: var(--lex-text-primary);
+}
+
+/* Records table: ID, Entity type, Connector, Data, Synced, Created, action */
+#wsDataTable th { white-space: nowrap; }
+#wsDataTable table { min-width: 1080px; table-layout: fixed; }
+#wsDataTable th:nth-child(1) { width: 132px; }
+#wsDataTable th:nth-child(2) { width: 168px; }
+#wsDataTable th:nth-child(3) { width: 16%; }
+#wsDataTable th:nth-child(5) { width: 176px; }
+#wsDataTable th:nth-child(6) { width: 176px; }
+#wsDataTable th:nth-child(7) { width: 88px; }
+/* Data takes the rest. */
+
+#wsDataTable td {
+  max-width: 0;
+  overflow: hidden;
+}
+
+.ws-data-cell-muted {
+  color: var(--lex-text-tertiary, var(--lex-text-secondary));
+}
+
+.ws-data-id-cell {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.ws-row-checkbox {
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.ws-data-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ws-data-summary,
+.ws-data-cell-text,
+.ws-data-connector-link {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ws-data-connector-link {
+  color: var(--lex-accent, #2563eb);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.ws-data-connector-link:hover {
+  color: var(--lex-accent-strong, var(--lex-accent, #1d4ed8));
+}
+
+.ws-data-time {
+  white-space: nowrap;
+}
+
+/* Records deleted at the source */
+.ws-data-cell--removed {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+.ws-data-action-cell {
+  align-items: center;
+  display: inline-flex;
+  gap: 4px;
+}
+
+.lex-ai-row-btn {
+  align-items: center;
+  background: var(--lex-surface-primary, #fff);
+  border: 1px solid var(--lex-border-default, #e5e7eb);
+  border-radius: 6px;
+  color: var(--lex-text-secondary, #6b7280);
+  cursor: pointer;
+  display: inline-flex;
+  height: 28px;
+  justify-content: center;
+  padding: 0;
+  transition: all 0.15s ease;
+  width: 28px;
+}
+
+.lex-ai-row-btn:hover,
+.lex-ai-row-btn:focus-visible {
+  background: #7c3aed;
+  border-color: #7c3aed;
+  color: #fff;
+}
+
+.ws-data-annotation-count,
+.ws-data-correction {
+  align-items: center;
+  color: #fff;
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 600;
+  height: 16px;
+  justify-content: center;
+  line-height: 1;
+  min-width: 16px;
+}
+
+.ws-data-annotation-count {
+  background: #2563eb;
+  border-radius: 9999px;
+  padding: 0 4px;
+}
+
+.ws-data-correction {
+  background: #d97706;
+  border-radius: 3px;
+  padding: 0 3px;
+}
+
+/* Record detail modal */
+.ws-data-record-subtitle {
+  color: var(--lex-text-secondary, #6b7280);
+  font-size: 12px;
+  margin: 0 0 0.5rem;
+}
+
+.ws-data-record-tabs {
+  border-bottom: 1px solid var(--lex-border-default, #e5e7eb);
+  display: flex;
+  margin-bottom: 1rem;
+}
+
+.ws-data-record-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--lex-text-secondary, #6b7280);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+}
+
+.ws-data-record-tab--active {
+  border-bottom-color: var(--lex-accent, #2563eb);
+  color: var(--lex-accent, #2563eb);
+}

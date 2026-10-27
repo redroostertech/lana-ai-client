@@ -16,6 +16,7 @@
   <script src="../js/services/feature-tracker.js"></script>
   <script src="../js/components.js"></script>
   <script src="../js/menu.js"></script>
+  <script src="../js/shared/header-user-menu.js"></script>
   <script src="../js/navigation-helpers.js"></script>
   <script src="../js/conversation-search-modal.js"></script>
   <script src="../js/notifications.js"></script>
@@ -30,6 +31,7 @@
   <script src="../js/pages/management-boards-team-performance.js"></script>
   <link rel="stylesheet" href="../css/session-tracking.css">
   <link rel="stylesheet" href="../css/lex-chat.css">
+  <link rel="stylesheet" href="../css/admin/admin-tables.css">
 
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
@@ -166,19 +168,7 @@
               </button>
 
               <!-- User Menu -->
-              <div class="relative" id="userMenu">
-                <button class="flex items-center gap-2 text-gray-700 hover:text-gray-900 p-1" title="Settings">
-                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                  </svg>
-                </button>
-                <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-                  <a href="../settings-v2.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
-                  <hr class="my-1">
-                  <button id="logoutBtn" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sign out</button>
-                </div>
-              </div>
+              <div class="relative" id="userMenu" data-header-user-menu data-settings-href="../settings-v2.html" data-login-href="../login.html"></div>
             </div>
           </div>
 
@@ -239,30 +229,64 @@
               </div>
             </div>
 
-            <!-- Custom Boards Section -->
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">Custom Boards</h3>
-
-            <!-- Search and Filters -->
-            <div class="mb-6 bg-white rounded-lg shadow p-4 flex flex-wrap gap-4">
-              <input type="search" id="boardSearch" placeholder="Search boards..." class="flex-1 min-w-[200px] px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-              <select id="boardTypeFilter" class="px-4 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer min-w-[140px]">
-                <option value="">All Types</option>
-                <option value="intake">Intake</option>
-                <option value="caseload">Caseload</option>
-                <option value="revenue">Revenue</option>
-                <option value="custom">Custom</option>
-              </select>
-              <select id="boardAccessFilter" class="px-4 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer min-w-[140px]">
-                <option value="all">All Boards</option>
-                <option value="my">My Boards</option>
-                <option value="public">Public Boards</option>
-              </select>
+            <!-- Custom boards: toolbar, heading, table (docs/TABLE-STANDARD.md) -->
+            <style>
+              /* Name, Type, Review frequency, Metrics, Access, Visibility, Status, Last review, Created */
+              #boardsTable table { min-width: 1180px; }
+              #boardsTable th { white-space: nowrap; }
+              #boardsTable th:nth-child(2) { width: 120px; }
+              #boardsTable th:nth-child(3) { width: 150px; }
+              #boardsTable th:nth-child(4) { width: 100px; }
+              #boardsTable th:nth-child(5) { width: 110px; }
+              #boardsTable th:nth-child(6) { width: 110px; }
+              #boardsTable th:nth-child(7) { width: 110px; }
+              #boardsTable th:nth-child(8) { width: 176px; }
+              #boardsTable th:nth-child(9) { width: 176px; }
+            </style>
+            <div class="bg-white rounded-lg shadow-sm border mb-4 mt-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and filter boards">
+              <div class="flex items-center gap-4 flex-wrap">
+                <div class="flex-1 min-w-[200px]">
+                  <lex-input id="boardsSearch" placeholder="Search boards..." clearable="true" leading-icon="search"></lex-input>
+                </div>
+                <div class="flex items-center gap-2">
+                  <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Sort by:</label>
+                  <lex-select id="boardsSort" options='[{"value":"created_at","label":"Created"},{"value":"name","label":"Name"},{"value":"board_type","label":"Type"},{"value":"last_review_at","label":"Last review"}]' value="created_at"></lex-select>
+                </div>
+                <lex-btn id="boardsSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+                  </svg>
+                </lex-btn>
+                <div class="flex items-center gap-2">
+                  <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Type:</label>
+                  <lex-select id="boardsTypeFilter" options='[{"value":"all","label":"All"},{"value":"intake","label":"Intake"},{"value":"caseload","label":"Caseload"},{"value":"revenue","label":"Revenue"},{"value":"custom","label":"Custom"}]' value="all"></lex-select>
+                </div>
+                <div id="boardsCount" class="admin-table-toolbar-label text-sm whitespace-nowrap"></div>
+              </div>
             </div>
 
-            <!-- Boards Grid -->
-            <div id="boardsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <!-- Board cards rendered here -->
-            </div>
+            <section aria-labelledby="boardsHeading">
+              <div class="flex items-center justify-between mb-3">
+                <h2 id="boardsHeading" class="admin-table-section-title text-lg font-semibold">Custom Boards</h2>
+                <span id="boardsSectionCount" class="admin-table-toolbar-label text-sm" aria-live="polite"></span>
+              </div>
+
+              <lex-table
+                id="boardsTable"
+                class="admin-table lex-table--card"
+                column-filters
+                server-paging
+                columns="name,board_type,review_frequency,metrics_count,access,visibility,status,last_review_at,created_at"
+                labels="Name,Type,Review frequency,Metrics,Access,Visibility,Status,Last review,Created"
+                sortable-columns="name,board_type,last_review_at,created_at"
+                sort-by="created_at"
+                sort-dir="desc"
+                limit="20"
+                id-key="id"
+                empty-text="No boards yet"
+                aria-label="Custom boards"
+              ></lex-table>
+            </section>
           </div>
 
         </main>
@@ -288,25 +312,12 @@
 
         <div class="mb-4">
           <label class="block text-sm font-medium text-gray-700 mb-2">Board Type</label>
-          <select id="boardType" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
-            <option value="">Select type...</option>
-            <option value="intake">Intake</option>
-            <option value="caseload">Caseload</option>
-            <option value="revenue">Revenue</option>
-            <option value="custom">Custom</option>
-          </select>
+          <lex-select id="boardType" class="w-full" required="true" placeholder="Select type..." options='[{"value":"","label":"Select type..."},{"value":"intake","label":"Intake"},{"value":"caseload","label":"Caseload"},{"value":"revenue","label":"Revenue"},{"value":"custom","label":"Custom"}]' value=""></lex-select>
         </div>
 
         <div class="mb-4">
           <label class="block text-sm font-medium text-gray-700 mb-2">Review Frequency</label>
-          <select id="reviewFrequency" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
-            <option value="">Select frequency...</option>
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
-            <option value="quarterly">Quarterly</option>
-            <option value="annual">Annual</option>
-          </select>
+          <lex-select id="reviewFrequency" class="w-full" required="true" placeholder="Select frequency..." options='[{"value":"","label":"Select frequency..."},{"value":"daily","label":"Daily"},{"value":"weekly","label":"Weekly"},{"value":"monthly","label":"Monthly"},{"value":"quarterly","label":"Quarterly"},{"value":"annual","label":"Annual"}]' value=""></lex-select>
         </div>
 
         <div class="mb-4">
@@ -510,11 +521,7 @@
                   </div>
                   <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Access Level *</label>
-                    <select id="teamAccessLevel" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
-                      <option value="admin">Admin - Full access</option>
-                      <option value="editor">Editor - Can submit metrics</option>
-                      <option value="viewer">Viewer - Read only</option>
-                    </select>
+                    <lex-select id="teamAccessLevel" class="w-full" required="true" options='[{"value":"admin","label":"Admin - Full access"},{"value":"editor","label":"Editor - Can submit metrics"},{"value":"viewer","label":"Viewer - Read only"}]' value="admin"></lex-select>
                   </div>
                 </div>
                 <div class="flex justify-end gap-3 mt-4">
@@ -1101,6 +1108,7 @@
   <!-- Lex UI core -->
   <script src="../js/lex/lex.core.js"></script>
   <script src="../js/lex/lex.icons.js"></script>
+  <script src="../js/lex/components/form/lex-dropdown-btn.js"></script>
   <script src="../js/lex/lex.data.js"></script>
   <script src="../js/lex/lex.forms.js"></script>
   <script src="../js/lex/lex.state.js"></script>
@@ -1116,6 +1124,11 @@
   <script src="../js/lex/components/foundation/lex-badge.js"></script>
   <script src="../js/lex/components/foundation/lex-modal.js"></script>
   <script src="../js/lex/components/foundation/lex-drawer.js"></script>
+  <script src="../js/lex/components/form/lex-input.js"></script>
+  <script src="../js/lex/components/form/lex-select.js"></script>
+  <script src="../js/lex/components/data/lex-table.js"></script>
+  <script src="../js/shared/library-column-filters.js"></script>
+  <script src="../js/admin/admin-table-kit.js"></script>
 
   <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>
 

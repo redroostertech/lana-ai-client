@@ -5,12 +5,25 @@
 (function (global) {
   'use strict';
 
-  var FILE_LIMIT = 12;
+  var TABLE_ID = 'documentLibraryTable';
+  // File families the library lists. Images are out of scope, so "All" asks
+  // for these four instead of sending no filter.
+  var LIBRARY_FAMILIES = ['document', 'spreadsheet', 'presentation', 'pdf'];
+  // Type column filter values: file extensions. The server lists the ones in
+  // use (GET /library/files/extensions); these stand in until it answers or
+  // when it predates that endpoint.
+  var DEFAULT_EXTENSIONS = ['docx', 'doc', 'pdf', 'txt', 'md', 'rtf', 'xlsx', 'xls', 'csv', 'pptx', 'ppt'];
+  // Size column filter: byte ranges, min inclusive, max exclusive.
+  var SIZE_RANGES = {
+    under_100kb: { label: 'Under 100 KB', min: null, max: 100 * 1024 },
+    '100kb_1mb': { label: '100 KB – 1 MB', min: 100 * 1024, max: 1024 * 1024 },
+    '1mb_10mb': { label: '1 MB – 10 MB', min: 1024 * 1024, max: 10 * 1024 * 1024 },
+    over_10mb: { label: 'Over 10 MB', min: 10 * 1024 * 1024, max: null }
+  };
   var loadSequence = 0;
-  var currentPage = 1;
   var searchTerm = '';
-  var documentType = '';
   var searchDebounce = null;
+  var openingFileIds = {};
 
   function el(id) {
     return document.getElementById(id);
@@ -32,14 +45,6 @@
     return '';
   }
 
-  function hydrateIcons(root) {
-    var scope = root || document;
-    var nodes = scope.querySelectorAll('[data-document-library-icon]');
-    for (var i = 0; i < nodes.length; i += 1) {
-      nodes[i].innerHTML = icon(nodes[i].getAttribute('data-document-library-icon'));
-    }
-  }
-
   function filesFromResponse(response) {
     if (!response) return [];
     if (Array.isArray(response.files)) return response.files;
@@ -56,36 +61,25 @@
     var source = response && (response.pagination || (response.data && response.data.pagination));
     source = source || {};
     var total = Number(source.total !== undefined ? source.total : (response && response.total));
-    if (!Number.isFinite(total)) total = Number(visibleCount || 0);
-    var totalPages = Number(source.total_pages !== undefined ? source.total_pages : source.totalPages);
-    if (!Number.isFinite(totalPages) || totalPages < 1) {
-      totalPages = Math.max(1, Math.ceil(total / FILE_LIMIT));
-    }
     return {
-      page: Number(source.page || currentPage) || 1,
-      total: total,
-      totalPages: totalPages
+      page: source.page,
+      page_size: source.page_size || source.limit,
+      total: Number.isFinite(total) ? total : Number(visibleCount || 0),
+      total_pages: source.total_pages !== undefined ? source.total_pages : source.totalPages
     };
   }
 
-  function setTableVisibility(visible) {
-    var columns = el('documentLibraryFileColumns');
-    if (columns) columns.hidden = !visible;
+  // Values a column filter selected: lex-table sends { operator: 'in', value: [...] }.
+  function filterValues(filter) {
+    if (!filter) return [];
+    var value = filter.value !== undefined ? filter.value : filter;
+    return (Array.isArray(value) ? value : [value]).map(String).filter(Boolean);
   }
 
-  function updatePagination(pagination) {
-    var pager = el('documentLibraryPagination');
-    if (!pager) return;
-    var total = pagination ? pagination.total : 0;
-    var totalPages = pagination ? pagination.totalPages : 1;
-    // Keep the public Lex component contract in sync with its rendered state.
-    // Consumers, accessibility tooling, and the other library surfaces read
-    // these declarative attributes rather than private reactive properties.
-    pager.setAttribute('page', String(pagination ? pagination.page : currentPage));
-    pager.setAttribute('total-pages', String(totalPages));
-    pager.setAttribute('total', String(total));
-    pager.setAttribute('limit', String(FILE_LIMIT));
-    pager.hidden = totalPages <= 1;
+  // The Type filter's families, or every library family (never images).
+  function fileFamilyParam(families) {
+    var picked = (families || []).filter(function (family) { return LIBRARY_FAMILIES.indexOf(family) !== -1; });
+    return (picked.length ? picked : LIBRARY_FAMILIES).join(',');
   }
 
   function fileName(file) {
@@ -117,17 +111,6 @@
 
   function editedAt(file) {
     return file.updated_at || file.document_updated_at || file.modified_at || file.last_modified_at || file.created_at || '';
-  }
-
-  function timestamp(value) {
-    var parsed = value ? new Date(value).getTime() : 0;
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-
-  function sortLatestEdited(files) {
-    return files.slice().sort(function (a, b) {
-      return timestamp(editedAt(b)) - timestamp(editedAt(a));
-    });
   }
 
   function extensionFor(file) {
@@ -170,164 +153,178 @@
     return (index === 0 ? Math.round(amount) : Number(amount.toFixed(1))) + ' ' + units[index];
   }
 
+  // Dates go through Lex.Utils: API timestamps are system time (UTC) and
+  // display in the user's timezone (profile, then org, then browser).
   function relativeTime(value) {
-    if (!value) return '';
-    if (global.LanaTime && typeof LanaTime.timeAgo === 'function') {
-      return LanaTime.timeAgo(value, { style: 'words' });
-    }
-    var date = new Date(value);
-    if (!Number.isFinite(date.getTime())) return '';
-    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    if (!value || !global.Lex || !Lex.Utils) return '';
+    var text = Lex.Utils.timeAgo(value);
+    return text === '-' ? '' : text;
   }
 
   function absoluteTime(value) {
-    if (!value) return '';
-    var date = new Date(value);
-    if (!Number.isFinite(date.getTime())) return '';
-    return date.toLocaleString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit'
+    if (!value || !global.Lex || !Lex.Utils) return '';
+    var text = Lex.Utils.formatDateTime(value);
+    return text === 'Never' ? '' : text;
+  }
+
+
+  function table() {
+    return el(TABLE_ID);
+  }
+
+  // The count shows in the toolbar and the section header, as on the Library.
+  function setCount(text) {
+    ['documentLibraryCount', 'documentLibraryRecentCount'].forEach(function (id) {
+      var count = el(id);
+      if (count) count.textContent = text;
     });
   }
 
-  function renderLoading() {
-    var host = el('documentLibraryRecentFiles');
-    var count = el('documentLibraryRecentCount');
-    if (!host) return;
-    if (count) count.textContent = '';
-    setTableVisibility(false);
-    updatePagination(null);
-    host.setAttribute('aria-busy', 'true');
-    host.innerHTML =
-      '<div class="document-library-skeleton" aria-hidden="true"></div>' +
-      '<div class="document-library-skeleton" aria-hidden="true"></div>' +
-      '<div class="document-library-skeleton" aria-hidden="true"></div>' +
-      '<div class="document-library-skeleton" aria-hidden="true"></div>';
+  function sortOrder() {
+    var button = el('documentLibrarySortOrder');
+    return button && button.dataset.order === 'asc' ? 'asc' : 'desc';
   }
 
-  function renderEmpty() {
-    var host = el('documentLibraryRecentFiles');
-    var count = el('documentLibraryRecentCount');
-    if (!host) return;
-    var filtered = Boolean(searchTerm || documentType);
-    if (count) count.textContent = '0 files';
-    setTableVisibility(false);
-    updatePagination(null);
-    host.setAttribute('aria-busy', 'false');
-    host.innerHTML =
-      '<div class="document-library-empty">' +
-        '<span class="document-library-empty-icon" data-document-library-icon="' + (filtered ? 'search' : 'file-plus') + '" aria-hidden="true"></span>' +
-        '<h3>' + (filtered ? 'No matching documents' : 'No edited files yet') + '</h3>' +
-        '<p>' + (filtered ? 'Try a different search or document type.' : 'Create your first document to get started.') + '</p>' +
-        (filtered ? '' : '<lex-btn variant="secondary" leading-icon="file-plus" data-action="new-document">New Document</lex-btn>') +
-      '</div>';
-    hydrateIcons(host);
+  // Toolbar sort drives the table, which asks the server for page 1.
+  function applySort(column, direction) {
+    var target = table();
+    if (!target || !target.dataSource) return;
+    target.sortBy = column;
+    target.sortDir = direction;
+    target.dataSource.setSort(column, direction);
   }
 
-  function renderError() {
-    var host = el('documentLibraryRecentFiles');
-    var count = el('documentLibraryRecentCount');
-    if (!host) return;
-    if (count) count.textContent = '';
-    setTableVisibility(false);
-    updatePagination(null);
-    host.setAttribute('aria-busy', 'false');
-    host.innerHTML =
-      '<div class="document-library-empty document-library-error" role="alert">' +
-        '<span class="document-library-empty-icon" data-document-library-icon="alert-circle" aria-hidden="true"></span>' +
-        '<h3>Files could not be loaded</h3>' +
-        '<p>Check your connection and try again.</p>' +
-        '<lex-btn variant="secondary" data-action="retry">Try again</lex-btn>' +
-      '</div>';
-    hydrateIcons(host);
+  // A header click sorted the table: mirror it in the toolbar.
+  function syncToolbarSort(column, direction) {
+    var select = el('documentLibrarySort');
+    var button = el('documentLibrarySortOrder');
+    if (select && select.value !== column) select.value = column;
+    if (button) button.dataset.order = direction === 'asc' ? 'asc' : 'desc';
   }
 
-  function renderFiles(files, pagination) {
-    var host = el('documentLibraryRecentFiles');
-    var count = el('documentLibraryRecentCount');
-    if (!host) return;
+  // Table column -> library API sort_by.
+  var SORT_BY_COLUMN = { name: 'name', size: 'file_size', created_at: 'created_at', updated_at: 'updated_at' };
 
-    var rows = sortLatestEdited(files).slice(0, FILE_LIMIT);
-    if (!rows.length) {
-      renderEmpty();
-      return;
-    }
+  function mapFileForTable(file) {
+    return {
+      id: file.id || file.document_id || file.file_id || '',
+      name: fileName(file),
+      type: filePresentation(file).label,
+      size: formatFileSize(file.file_size || file.size),
+      workspace: fileWorkspace(file),
+      created_at: file.created_at || '',
+      updated_at: editedAt(file),
+      _raw: file
+    };
+  }
 
-    var total = pagination && Number.isFinite(pagination.total) ? pagination.total : rows.length;
-    if (count) count.textContent = total + (total === 1 ? ' file' : ' files');
-    setTableVisibility(true);
-    updatePagination(pagination || { page: currentPage, total: total, totalPages: 1 });
-    host.setAttribute('aria-busy', 'false');
-    host.innerHTML = rows.map(function (file) {
-      var id = file.id || file.document_id || file.file_id || '';
-      var name = fileName(file);
-      var presentation = filePresentation(file);
-      var size = formatFileSize(file.file_size || file.size);
-      var meta = [presentation.label, size].filter(Boolean).join(' · ');
-      var edited = editedAt(file);
-      var editedLabel = relativeTime(edited);
-      var timeText = editedLabel ? 'Edited ' + editedLabel : 'Edit time unavailable';
-      var workspaceName = fileWorkspace(file);
-      var workspaceId = fileWorkspaceId(file);
-      var workspaceCell = workspaceId && workspaceName !== '—'
-        ? '<button class="document-library-file-workspace document-library-workspace-link" type="button" data-workspace-id="' + esc(workspaceId) + '" title="Open ' + esc(workspaceName) + ' workspace">' +
-            '<span class="document-library-mobile-label">Workspace</span>' +
-            '<span>' + esc(workspaceName) + '</span>' +
-          '</button>'
-        : '<span class="document-library-file-workspace">' +
-            '<span class="document-library-mobile-label">Workspace</span>' +
-            '<span>' + esc(workspaceName) + '</span>' +
+  function cellRenderers() {
+    return {
+      name: function (val, row) {
+        var presentation = filePresentation(row._raw);
+        return '<span class="document-library-file-cell">' +
+            '<span class="document-library-file-icon document-library-file-icon--' + esc(presentation.tone) + '" aria-hidden="true">' + icon(presentation.icon) + '</span>' +
+            '<span class="document-library-file-name" title="' + esc(val) + '">' + esc(val) + '</span>' +
           '</span>';
-
-      return (
-        '<div class="document-library-file" data-file-id="' + esc(id) + '" data-file-workspace-id="' + esc(workspaceId) + '"' +
-          (id ? ' role="link" tabindex="0"' : ' aria-disabled="true"') + ' aria-label="Open ' + esc(name) + '">' +
-          '<span class="document-library-file-icon document-library-file-icon--' + esc(presentation.tone) + '" data-document-library-icon="' + esc(presentation.icon) + '" aria-hidden="true"></span>' +
-          '<span class="document-library-file-primary">' +
-            '<span class="document-library-file-name" title="' + esc(name) + '">' + esc(name) + '</span>' +
-            '<span class="document-library-file-type">' + esc(meta) + '</span>' +
-          '</span>' +
-          workspaceCell +
-          '<time class="document-library-file-time" datetime="' + esc(edited) + '" title="' + esc(absoluteTime(edited)) + '">' +
-            '<span class="document-library-mobile-label">Last edited</span>' + esc(timeText) +
-          '</time>' +
-          '<span class="document-library-file-arrow" data-document-library-icon="chevron-right" aria-hidden="true"></span>' +
-        '</div>'
-      );
-    }).join('');
-    hydrateIcons(host);
+      },
+      type: function (val) {
+        return '<span class="document-library-cell-muted">' + esc(val || '\u2014') + '</span>';
+      },
+      size: function (val) {
+        return '<span class="document-library-cell-muted">' + esc(val || '\u2014') + '</span>';
+      },
+      workspace: function (workspaceName, row) {
+        var workspaceId = fileWorkspaceId(row._raw);
+        if (workspaceId && workspaceName !== '—') {
+          return '<button class="document-library-workspace-link" type="button" data-workspace-id="' + esc(workspaceId) + '" title="Open ' + esc(workspaceName) + ' workspace">' +
+              '<span>' + esc(workspaceName) + '</span>' +
+            '</button>';
+        }
+        return '<span class="document-library-cell-muted">' + esc(workspaceName) + '</span>';
+      },
+      created_at: function (created) {
+        return '<time class="document-library-file-time" datetime="' + esc(created) + '" title="' + esc(absoluteTime(created)) + '">' +
+            esc(absoluteTime(created) || '\u2014') +
+          '</time>';
+      },
+      updated_at: function (edited) {
+        return '<time class="document-library-file-time" datetime="' + esc(edited) + '" title="' + esc(absoluteTime(edited)) + '">' +
+            esc(relativeTime(edited) || '\u2014') +
+          '</time>';
+      }
+    };
   }
 
-  async function loadLatestFiles(page) {
+  // Empty copy depends on the filters outside the table: a filtered-empty
+  // state offers no create button.
+  function syncEmptyState(target, filters) {
+    var filtered = Boolean(searchTerm || Object.keys(filters || {}).length);
+    target.emptyText = filtered ? 'No matching documents. Try a different search or document type.' : 'No edited files yet';
+    target.emptyActionLabel = filtered ? '' : 'New Document';
+  }
+
+  // Answers the table's lex-query-change with one page from the library API.
+  async function loadLatestFiles(query) {
+    var target = table();
     var client = global.api;
+    if (!target) return;
     var sequence = ++loadSequence;
-    currentPage = Number(page || currentPage) || 1;
-    renderLoading();
+    query = query || target.serverQuery;
 
     if (!client || typeof client.get !== 'function') {
-      renderError();
+      target.setServerError('Files could not be loaded. The API client is unavailable.');
       return;
     }
 
     try {
       var params = new URLSearchParams();
-      params.set('page', String(currentPage));
-      params.set('page_size', String(FILE_LIMIT));
-      params.set('sort_by', 'updated_at');
-      params.set('sort_order', 'desc');
+      params.set('page', String(query.page || 1));
+      params.set('page_size', String(query.limit || 20));
+      params.set('sort_by', SORT_BY_COLUMN[query.sortBy] || 'updated_at');
+      params.set('sort_order', query.sortDir || 'desc');
+      var filters = query.filters || {};
+      // Toolbar Type select: a file family. Type column: extensions.
+      params.set('file_family', fileFamilyParam(filterValues(filters.file_family)));
+      var typeSelect = el('documentLibraryTypeFilter');
+      var family = filterValues(filters.file_family)[0] || 'all';
+      if (typeSelect && typeSelect.value !== family) typeSelect.value = family;
+      var extensions = filterValues(filters.type);
+      if (extensions.length) params.set('extensions', extensions.join(','));
+      var name = filterValues(filters.name)[0];
+      if (name) params.set('name', name);
+      var size = SIZE_RANGES[filterValues(filters.size)[0]];
+      if (size && size.min !== null) params.set('min_size', String(size.min));
+      if (size && size.max !== null) params.set('max_size', String(size.max));
+      var workspaces = filterValues(filters.workspace);
+      if (workspaces.length) params.set('workspaces', workspaces.join(','));
+      var ranges = global.LanaLibraryColumnFilters;
+      var edited = ranges ? ranges.editedRangeBounds(filterValues(filters.updated_at)[0]) : { after: '', before: '' };
+      if (edited.after) params.set('updated_after', edited.after);
+      if (edited.before) params.set('updated_before', edited.before);
+      var created = ranges ? ranges.editedRangeBounds(filterValues(filters.created_at)[0]) : { after: '', before: '' };
+      if (created.after) params.set('created_after', created.after);
+      if (created.before) params.set('created_before', created.before);
       if (searchTerm) params.set('search', searchTerm);
-      if (documentType) params.set('document_type', documentType);
       var response = await client.get('/api/v1/storage/library/files?' + params.toString());
       if (sequence !== loadSequence || !el('documentLibrary')) return;
       var files = filesFromResponse(response);
-      renderFiles(files, paginationFromResponse(response, files.length));
+      var pagination = paginationFromResponse(response, files.length);
+      syncEmptyState(target, filters);
+      setCount(pagination.total + (pagination.total === 1 ? ' file' : ' files'));
+      target.setServerData(files.map(mapFileForTable), pagination);
     } catch (error) {
       if (sequence !== loadSequence || !el('documentLibrary')) return;
       console.error('[DocumentLibrary] Failed to load latest edited files:', error);
-      renderError();
+      setCount('');
+      target.setServerError('Files could not be loaded. Check your connection and try again.');
+    }
+  }
+
+  // Outside filters changed: back to page 1 through the table.
+  function reloadFromFirstPage() {
+    var target = table();
+    if (target && typeof target.requestServerQuery === 'function') {
+      target.requestServerQuery({ resetPage: true });
     }
   }
 
@@ -358,10 +355,9 @@
     return !!error && (Number(error.status) === 403 || Number(error.status) === 404);
   }
 
-  async function openFile(fileId, workspaceId, row) {
-    if (!fileId) return;
-    if (row && row.getAttribute('aria-busy') === 'true') return;
-    if (row) row.setAttribute('aria-busy', 'true');
+  async function openFile(fileId, workspaceId) {
+    if (!fileId || openingFileIds[fileId]) return;
+    openingFileIds[fileId] = true;
     try {
       if (!global.api || typeof global.api.get !== 'function') {
         throw new Error('The API client is unavailable.');
@@ -388,7 +384,7 @@
         Lex.Toast.error((error && error.message) || 'The file could not be opened.');
       }
     } finally {
-      if (row) row.setAttribute('aria-busy', 'false');
+      delete openingFileIds[fileId];
     }
   }
 
@@ -416,50 +412,59 @@
       var actionTarget = event.target && event.target.closest ? event.target.closest('[data-action]') : null;
       if (actionTarget && actionTarget.getAttribute('data-action') === 'new-document') {
         openCreateDocument();
-        return;
-      }
-      if (actionTarget && actionTarget.getAttribute('data-action') === 'retry') {
-        loadLatestFiles();
-        return;
-      }
-      var fileTarget = event.target && event.target.closest ? event.target.closest('[data-file-id]') : null;
-      if (fileTarget) {
-        openFile(
-          fileTarget.getAttribute('data-file-id'),
-          fileTarget.getAttribute('data-file-workspace-id'),
-          fileTarget
-        );
       }
     });
-    root.addEventListener('keydown', function (event) {
-      var fileTarget = event.target && event.target.closest ? event.target.closest('[data-file-id]') : null;
-      if (!fileTarget || event.target !== fileTarget || (event.key !== 'Enter' && event.key !== ' ')) return;
-      event.preventDefault();
-      openFile(
-        fileTarget.getAttribute('data-file-id'),
-        fileTarget.getAttribute('data-file-workspace-id'),
-        fileTarget
-      );
+    // lex-table events bubble from #documentLibraryTable.
+    root.addEventListener('lex-query-change', function (event) {
+      if (!event.target || event.target.id !== TABLE_ID) return;
+      loadLatestFiles(event.detail);
     });
-    root.addEventListener('page-change', function (event) {
-      if (!event.target || event.target.id !== 'documentLibraryPagination') return;
-      var page = event.detail && event.detail.page;
-      if (page) loadLatestFiles(page);
+    root.addEventListener('row-click', function (event) {
+      if (!event.target || event.target.id !== TABLE_ID) return;
+      var row = event.detail && event.detail.row;
+      if (row && row.id) openFile(row.id, fileWorkspaceId(row._raw));
+    });
+    root.addEventListener('empty-action', function (event) {
+      if (!event.target || event.target.id !== TABLE_ID) return;
+      openCreateDocument();
+    });
+    root.addEventListener('sort-change', function (event) {
+      if (!event.target || event.target.id !== TABLE_ID || !event.detail) return;
+      syncToolbarSort(event.detail.sortBy, event.detail.sortDir);
+    });
+    root.addEventListener('click', function (event) {
+      var button = event.target && event.target.closest ? event.target.closest('#documentLibrarySortOrder') : null;
+      if (!button) return;
+      button.dataset.order = sortOrder() === 'asc' ? 'desc' : 'asc';
+      var select = el('documentLibrarySort');
+      applySort(select ? select.value : 'updated_at', sortOrder());
     });
     root.addEventListener('lex-change', function (event) {
-      if (!event.target || event.target.id !== 'documentLibraryTypeFilter') return;
-      documentType = String((event.detail && event.detail.value) || '');
-      currentPage = 1;
-      loadLatestFiles(1);
+      var id = event.target && event.target.id;
+      var value = String((event.detail && event.detail.value) || '');
+      if (id === 'documentLibraryTypeFilter') {
+        // A family filter held in the table's state (not a column), so the
+        // table's Clear filters resets it too.
+        var target = table();
+        if (!target) return;
+        if (value && value !== 'all') target.addFilter('file_family', 'in', [value]);
+        else target.removeFilter('file_family');
+      } else if (id === 'documentLibrarySort') {
+        applySort(value || 'updated_at', sortOrder());
+      }
     });
-    root.addEventListener('input', function (event) {
-      if (!event.target || event.target.id !== 'documentLibrarySearch') return;
-      global.clearTimeout(searchDebounce);
-      searchDebounce = global.setTimeout(function () {
-        searchTerm = event.target.value.trim();
-        currentPage = 1;
-        loadLatestFiles(1);
-      }, 350);
+    // lex-input emits lex-input while typing and lex-change on clear.
+    ['lex-input', 'lex-change'].forEach(function (name) {
+      root.addEventListener(name, function (event) {
+        if (!event.target || event.target.id !== 'documentLibrarySearch') return;
+        var value = String((event.detail && event.detail.value) || '').trim();
+        global.clearTimeout(searchDebounce);
+        searchDebounce = global.setTimeout(function () {
+          if (value === searchTerm) return;
+          searchTerm = value;
+          reloadFromFirstPage();
+        }, 350);
+      });
     });
   }
 
@@ -467,22 +472,79 @@
     var root = el('documentLibrary');
     if (!root) return;
     var search = el('documentLibrarySearch');
-    var typeFilter = el('documentLibraryTypeFilter');
-    searchTerm = search ? search.value.trim() : '';
-    documentType = typeFilter ? String(typeFilter.value || '') : '';
-    currentPage = 1;
+    searchTerm = search && search.value ? String(search.value).trim() : '';
     bindEvents(root);
-    hydrateIcons(root);
-    loadLatestFiles();
+    var ready = global.customElements && typeof global.customElements.whenDefined === 'function'
+      ? global.customElements.whenDefined('lex-table')
+      : Promise.resolve();
+    ready.then(function () {
+      var target = table();
+      if (!target) return;
+      // Renderers must be registered before the first page lands.
+      target.setCellRenderers(cellRenderers());
+      applyColumnFilterOptions(target);
+      reloadFromFirstPage();
+      if (global.LanaLibraryColumnFilters) {
+        global.LanaLibraryColumnFilters.loadWorkspaceOptions(global.api).then(function (options) {
+          if (table() !== target) return;
+          filterState.workspaces = options;
+          applyColumnFilterOptions(target);
+        });
+      }
+      loadExtensionOptions().then(function (extensions) {
+        if (table() !== target || !extensions.length) return;
+        filterState.extensions = extensions;
+        applyColumnFilterOptions(target);
+      });
+    });
+  }
+
+  var filterState = { workspaces: [], extensions: DEFAULT_EXTENSIONS };
+
+  // Extensions in use, most common first; [] when the server can't say.
+  async function loadExtensionOptions() {
+    var client = global.api;
+    if (!client || typeof client.get !== 'function') return [];
+    try {
+      var response = await client.get('/api/v1/storage/library/files/extensions');
+      var rows = (response && (response.extensions || (response.data && response.data.extensions))) || [];
+      return rows.map(function (row) { return String(row && row.value !== undefined ? row.value : row).toLowerCase(); })
+        .filter(Boolean);
+    } catch (_error) {
+      return [];
+    }
+  }
+
+  // Every column filters (the table standard): name by text, the rest by values.
+  function applyColumnFilterOptions(target) {
+    var shared = global.LanaLibraryColumnFilters;
+    var map = {
+      name: { text: true, placeholder: 'File name contains...' },
+      type: {
+        options: filterState.extensions.map(function (ext) { return { value: ext, label: ext.toUpperCase() }; })
+      },
+      size: {
+        single: true,
+        options: Object.keys(SIZE_RANGES).map(function (key) { return { value: key, label: SIZE_RANGES[key].label }; })
+      }
+    };
+    if (filterState.workspaces.length) map.workspace = { options: filterState.workspaces };
+    if (shared) {
+      map.created_at = { single: true, options: shared.EDITED_RANGE_OPTIONS };
+      map.updated_at = { single: true, options: shared.EDITED_RANGE_OPTIONS };
+    }
+    target.setColumnFilterOptions(map);
   }
 
   global.LanaDocumentLibrary = {
     init: init,
     loadLatestFiles: loadLatestFiles,
     filesFromResponse: filesFromResponse,
-    sortLatestEdited: sortLatestEdited,
+    fileFamilyParam: fileFamilyParam,
     currentFilters: function () {
-      return { search: searchTerm, documentType: documentType, page: currentPage, pageSize: FILE_LIMIT };
+      var target = table();
+      var query = target && target.dataSource ? target.dataSource.query : {};
+      return { search: searchTerm, filters: query.filters || {}, page: query.page || 1, pageSize: query.limit || 20 };
     }
   };
 

@@ -365,7 +365,8 @@ textarea {
   grid-column: 1 / -1;
 }
 
-.field span {
+.field > span,
+.setting-label > span {
   color: var(--lex-text-primary);
   font-size: 12px;
   font-weight: var(--lex-weight-semibold);

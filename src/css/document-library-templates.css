@@ -14,61 +14,13 @@
   justify-content: flex-end;
 }
 
-/* ---- Filter bar ----------------------------------------------------------- */
-.dst-filters {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin: 16px 0 12px;
-}
-
-/* Fills the row; collapses to a dropdown when its options do not fit */
-.dst-filters lex-segmented {
-  flex: 1 1 0;
-}
-
-/* Narrow page column (container from .document-library): stack the row */
-@container doc-library (max-width: 600px) {
-  .dst-filters {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .dst-filters lex-segmented {
-    flex: none;
-  }
-
-  .dst-search {
-    box-sizing: border-box;
-    width: 100%;
-  }
-}
-
-.dst-filter-label {
-  color: var(--lex-text-tertiary);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.dst-search {
-  width: 240px;
-  padding: 6px 12px;
-  border: 1px solid var(--lex-border-default);
-  border-radius: 6px;
-  font-size: 13px;
-  outline: none;
-  background: var(--lex-bg-primary);
-  color: var(--lex-text-primary);
-}
-
+/* ---- Toolbar: org-wide toggle (the rest is the shared Library toolbar) --- */
 .dst-orgwide {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: 14px;
+  white-space: nowrap;
   color: var(--lex-text-secondary);
   cursor: pointer;
   user-select: none;

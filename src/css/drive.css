@@ -137,3 +137,105 @@
   width: 1.25rem;
   height: 1.25rem;
 }
+
+/* List view (lex-table #listView / #filesListView): one table for every
+   scope; cells come from drive.js cell renderers. */
+.drive-list-table table {
+  table-layout: fixed;
+}
+
+.drive-list-table td {
+  overflow: hidden;
+}
+
+.drive-list-name-cell {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  min-width: 0;
+}
+
+.drive-list-icon {
+  color: var(--lex-text-accent);
+  flex-shrink: 0;
+  height: 20px;
+  width: 20px;
+}
+
+.drive-list-file-icon {
+  align-items: center;
+  display: inline-flex;
+  flex-shrink: 0;
+  height: 20px;
+  justify-content: center;
+  width: 20px;
+}
+
+.drive-list-name-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.drive-list-name,
+.drive-list-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drive-list-name {
+  color: var(--lex-text-primary);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.drive-list-sub {
+  color: var(--lex-text-secondary);
+  font-family: var(--lex-font-mono, ui-monospace, monospace);
+  font-size: 0.75rem;
+}
+
+.drive-list-muted {
+  color: var(--lex-text-secondary);
+  white-space: nowrap;
+}
+
+/* Column widths (docs/TABLE-STANDARD.md, section 8). Headers stay on one
+   line, dates never truncate, and below the min-width the table scrolls
+   sideways. Name takes the remaining width.
+   #listView: Name, Created By, Created, Size, actions (fits the
+   Knowledgebase "Promote to Org" button). */
+#listView th,
+#filesListView th { white-space: nowrap; }
+#listView table { min-width: 860px; }
+#listView th:nth-child(2) { width: 16%; }
+#listView th:nth-child(3) { width: 176px; }
+#listView th:nth-child(4) { width: 180px; }
+#listView th:nth-child(5) { width: 9.5rem; }
+
+#listView td:nth-child(5) {
+  text-align: right;
+}
+
+/* #filesListView: Name, Workspace, Created, Size */
+#filesListView table { min-width: 760px; }
+#filesListView th:nth-child(2) { width: 24%; }
+#filesListView th:nth-child(3) { width: 176px; }
+#filesListView th:nth-child(4) { width: 112px; }
+
+.drive-list-workspace-link {
+  background: none;
+  border: none;
+  color: var(--lex-accent, #3b5bdb);
+  cursor: pointer;
+  font: inherit;
+  font-weight: var(--lex-weight-semibold, 600);
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline;
+  text-overflow: ellipsis;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+}

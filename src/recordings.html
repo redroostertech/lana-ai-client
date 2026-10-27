@@ -27,42 +27,55 @@
 
   <template id="page-content">
     <main class="recordings-page">
-      <header class="recordings-page__header">
-        <div>
-          <h1 class="recordings-page__title">Recordings</h1>
-          <div class="recordings-page__meta">Captured meetings from PAC</div>
-        </div>
-        <div class="recordings-page__actions">
-          <lex-btn id="recordingsRefresh" variant="ghost" size="sm" aria-label="Refresh recordings">Refresh</lex-btn>
-        </div>
-      </header>
+      <lex-banner heading="Recordings" subtitle="Captured meetings from PAC">
+        <lex-btn id="recordingsRefresh" variant="ghost" size="sm" aria-label="Refresh recordings">Refresh</lex-btn>
+      </lex-banner>
 
-      <div class="recordings-page__toolbar">
-        <div class="recordings-page__filters">
-          <lex-segmented
-            id="recordingsStatusFilter"
-            value="all"
-            size="sm"
-            options='[{"value":"all","label":"All"},{"value":"ready","label":"Ready"},{"value":"transcribing","label":"Transcribing"},{"value":"failed","label":"Failed"}]'
-          ></lex-segmented>
-          <lex-select
-            id="recordingsScopeFilter"
-            value=""
-            size="sm"
-            placeholder="All scopes"
-            options='[{"value":"","label":"All scopes"},{"value":"private","label":"Private"},{"value":"organization","label":"Organization"},{"value":"matter","label":"Matter"}]'
-          ></lex-select>
+      <!-- Search / Sort / Filter toolbar (docs/TABLE-STANDARD.md) -->
+      <div class="bg-white rounded-lg shadow-sm border mb-4 mt-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and filter recordings">
+        <div class="flex items-center gap-4 flex-wrap">
+          <div class="flex-1 min-w-[200px]">
+            <lex-input id="recordingsSearch" placeholder="Search recordings..." clearable="true" leading-icon="search"></lex-input>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Sort by:</label>
+            <lex-select id="recordingsSort" options='[{"value":"created_at","label":"Created"}]' value="created_at"></lex-select>
+          </div>
+          <lex-btn id="recordingsSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+            </svg>
+          </lex-btn>
+          <div class="flex items-center gap-2">
+            <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Status:</label>
+            <lex-select id="recordingsStatusFilter" options='[{"value":"all","label":"All"},{"value":"ready","label":"Ready"},{"value":"transcribing","label":"Transcribing"},{"value":"uploading","label":"Uploading"},{"value":"pending","label":"Pending"},{"value":"failed","label":"Failed"},{"value":"archived","label":"Archived"}]' value="all"></lex-select>
+          </div>
+          <div id="recordingsCount" class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)"></div>
         </div>
-        <div id="recordingsCount" class="recordings-page__count">Loading recordings...</div>
       </div>
 
-      <div id="recordingsState" class="recordings-page__state"></div>
-      <div id="recordingsList" class="recordings-list" aria-live="polite"></div>
+      <section aria-labelledby="recordingsHeading">
+        <div class="flex items-center justify-between mb-3">
+          <h2 id="recordingsHeading" class="text-lg font-semibold" style="color: var(--lex-text-primary)">All Recordings</h2>
+          <span id="recordingsSectionCount" class="text-sm" style="color: var(--lex-text-secondary)" aria-live="polite"></span>
+        </div>
 
-      <div class="recordings-page__footer">
-        <lex-btn id="recordingsPrev" variant="secondary" size="sm" hidden>Previous</lex-btn>
-        <lex-btn id="recordingsNext" variant="secondary" size="sm" hidden>Next</lex-btn>
-      </div>
+        <lex-table
+          id="recordingsTable"
+          class="recordings-table lex-table--card"
+          column-filters
+          server-paging
+          columns="title,status,visibility,matter_id,owner_id,duration_ms,created_at"
+          labels="Recording,Status,Scope,Workspace,Owner,Duration,Created"
+          sortable-columns="created_at"
+          sort-by="created_at"
+          sort-dir="desc"
+          limit="20"
+          id-key="id"
+          empty-text="No recordings yet. Capture a meeting in PAC to see it here."
+          aria-label="Recordings"
+        ></lex-table>
+      </section>
     </main>
   </template>
 
@@ -103,6 +116,7 @@
   <script src="js/lex/components/foundation/lex-badge.js"></script>
   <script src="js/lex/components/foundation/lex-modal.js"></script>
   <script src="js/lex/components/form/lex-segmented.js"></script>
+  <script src="js/lex/components/form/lex-input.js"></script>
   <script src="js/lex/components/form/lex-select.js"></script>
   <script src="js/lex/components/layout/lex-sidebar.js"></script>
   <script src="js/lex/components/layout/lex-topbar.js"></script>
@@ -110,7 +124,11 @@
   <script src="js/lex/components/layout/lex-notification-panel.js"></script>
   <script src="js/lex/components/layout/lex-app.js"></script>
 
+  <script src="js/lex/components/foundation/lex-banner.js"></script>
+  <script src="js/lex/components/data/lex-table.js"></script>
   <script src="js/lex/lex-page-init.js"></script>
+  <script src="js/shared/library-column-filters.js"></script>
+  <script src="js/admin/admin-table-kit.js"></script>
   <script src="js/recordings.js"></script>
   <script src="js/companion-bridge-consent.js"></script>
   <script src="js/auth-guard.js"></script>

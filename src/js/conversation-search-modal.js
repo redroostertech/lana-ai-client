@@ -16,7 +16,12 @@ const ConversationSearchModal = {
    * Initialize the modal (call once on page load)
    */
   init() {
-    // Create modal HTML if it doesn't exist
+    if (this.modal) return true;
+    // The modal is a lex-modal. lex-modal.js may load after this init call
+    // (end of <body>); open() retries init once the component exists.
+    if (!(window.customElements && window.customElements.get('lex-modal'))) {
+      return false;
+    }
     if (!document.getElementById('conversationSearchModal')) {
       this.createModal();
     }
@@ -35,48 +40,32 @@ const ConversationSearchModal = {
    * Create the modal HTML
    */
   createModal() {
-    const modalHTML = `
-      <!-- Conversation Search Modal -->
-      <div id="conversationSearchModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4 z-50" onclick="if(event.target === this) ConversationSearchModal.close()">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col" onclick="event.stopPropagation()">
-          <!-- Modal Header -->
-          <div class="flex items-center justify-between p-6 border-b border-gray-200">
-            <div>
-              <h2 class="text-xl font-semibold text-gray-900">Search Conversations</h2>
-              <p class="text-sm text-gray-500 mt-0.5">Find your recent chats quickly</p>
-            </div>
-            <button onclick="ConversationSearchModal.close()" class="text-gray-400 hover:text-gray-600 transition-colors">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-              </svg>
-            </button>
-          </div>
-
-          <!-- Search Input -->
-          <div class="p-6 border-b border-gray-200">
-            <div class="relative">
-              <input
-                type="text"
-                id="conversationSearchInput"
-                placeholder="Search conversations by title, message, or matter name..."
-                class="w-full pl-10 pr-4 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                autocomplete="off"
-              >
-              <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-              </svg>
-            </div>
-          </div>
-
-          <!-- Search Results -->
-          <div id="conversationSearchResults" class="flex-1 overflow-y-auto p-6">
-            <p class="text-gray-500 text-sm text-center py-8">Start typing to search conversations...</p>
-          </div>
-        </div>
+    // lex-modal supplies the title, close button, backdrop, Escape and focus
+    // trap. Content is set before the element connects so it is captured once.
+    const modal = document.createElement('lex-modal');
+    modal.id = 'conversationSearchModal';
+    modal.setAttribute('heading', 'Search Conversations');
+    modal.setAttribute('size', 'lg');
+    modal.setAttribute('hide-actions', '');
+    modal.innerHTML = `
+      <p class="text-sm text-gray-500 -mt-2 mb-4">Find your recent chats quickly</p>
+      <div class="relative mb-4">
+        <input
+          type="text"
+          id="conversationSearchInput"
+          placeholder="Search conversations by title, message, or matter name..."
+          class="w-full pl-10 pr-4 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          autocomplete="off"
+        >
+        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+        </svg>
+      </div>
+      <div id="conversationSearchResults">
+        <p class="text-gray-500 text-sm text-center py-8">Start typing to search conversations...</p>
       </div>
     `;
-
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    document.body.appendChild(modal);
   },
 
   /**
@@ -104,22 +93,20 @@ const ConversationSearchModal = {
       }, 300);
     });
 
-    // Handle keyboard shortcuts
-    this.searchInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        this.close();
-      }
-    });
+    // The modal's close button, backdrop and Escape close it; reset state.
+    this.modal.addEventListener('lex-close', () => this.close());
   },
 
   /**
    * Open the modal
    */
   async open() {
-    if (!this.modal) this.init();
+    if (!this.modal && !this.init()) {
+      console.warn('[ConversationSearchModal] lex-modal is not loaded on this page');
+      return;
+    }
 
-    this.modal.classList.remove('hidden');
-    this.modal.classList.add('flex');
+    this.modal.open = true;
     this.isOpen = true;
 
     // Load recent conversations on open
@@ -137,8 +124,7 @@ const ConversationSearchModal = {
   close() {
     if (!this.modal) return;
 
-    this.modal.classList.add('hidden');
-    this.modal.classList.remove('flex');
+    if (this.modal.open) this.modal.open = false;
     this.isOpen = false;
 
     // Clear search
@@ -159,7 +145,7 @@ const ConversationSearchModal = {
         sortBy: 'last_activity',
         sortOrder: 'desc'
       });
-      const conversations = this.normalizeConversations(response);
+      const conversations = await this.withWorkspaceNames(this.normalizeConversations(response));
 
       if (conversations.length === 0) {
         this.renderEmpty('No recent conversations');
@@ -184,7 +170,9 @@ const ConversationSearchModal = {
         offset: 0,
         search: query
       });
-      const conversations = this.normalizeConversations(response);
+      const conversations = await this.withWorkspaceNames(this.normalizeConversations(response));
+      // A newer keystroke already replaced this search.
+      if (this.searchInput.value.trim() !== query) return;
 
       if (conversations.length === 0) {
         this.renderEmpty('No conversations found');
@@ -217,6 +205,20 @@ const ConversationSearchModal = {
     `;
     const html = conversations.map(conv => this.renderResultItem(conv, '')).join('');
     this.resultsContainer.innerHTML = header + html;
+  },
+
+  /**
+   * Conversation rows carry the workspace code, not its name; fill names in
+   * with the dock's shared lookup when it is loaded.
+   */
+  async withWorkspaceNames(conversations) {
+    const chat = window.Lex && window.Lex.Chat;
+    if (!chat || typeof chat.resolveWorkspaceNames !== 'function') return conversations;
+    const ids = conversations.filter(c => c && c.matter_id && !c.matter_name).map(c => c.matter_id);
+    if (ids.length) await chat.resolveWorkspaceNames(ids);
+    return conversations.map(c => (c && c.matter_id && !c.matter_name)
+      ? { ...c, matter_name: chat.workspaceName(c.matter_id) }
+      : c);
   },
 
   normalizeConversations(response) {
@@ -282,6 +284,9 @@ const ConversationSearchModal = {
     const escapedThreadId = String(threadId).replace(/'/g, "\\'");
     const escapedMatterId = String(matterId).replace(/'/g, "\\'");
 
+    this._selection = this._selection || new Map();
+    this._selection.set(String(threadId), { title, matterName });
+
     return `
       <div class="p-4 hover:bg-gray-50 rounded-lg cursor-pointer border border-gray-200 mb-3 transition-colors"
            onclick="ConversationSearchModal.selectConversation('${escapedThreadId}', '${escapedMatterId}')">
@@ -302,8 +307,20 @@ const ConversationSearchModal = {
    */
   selectConversation(threadId, matterId = '') {
     this.close();
+    const hints = (this._selection && this._selection.get(String(threadId))) || {};
 
     try {
+      const liveDock = window.Lex
+        && window.Lex.LanaDock
+        && typeof window.Lex.LanaDock.get === 'function'
+        && window.Lex.LanaDock.get();
+      if (liveDock && typeof liveDock.openConversation === 'function') {
+        liveDock.openConversation(threadId, matterId || null, {
+          title: hints.title || '',
+          matterName: hints.matterName || ''
+        });
+        return;
+      }
       if (typeof NavigationHelpers !== 'undefined'
           && typeof NavigationHelpers.navigateToConversation === 'function') {
         NavigationHelpers.navigateToConversation(threadId, matterId);
@@ -320,7 +337,7 @@ const ConversationSearchModal = {
       throw new Error('LANA dock navigation is not available');
     } catch (error) {
       console.error('[ConversationSearchModal.selectConversation] ERROR:', error);
-      alert(`Error selecting conversation: ${error.message}`);
+      window.Lex.Modal.alertAsync('Conversation Unavailable', `Error selecting conversation: ${error.message}`);
     }
   },
 
@@ -332,7 +349,8 @@ const ConversationSearchModal = {
 
     const escapedText = this.escapeHtml(text);
     const escapedQuery = this.escapeHtml(query);
-    const regex = new RegExp(`(${escapedQuery})`, 'gi');
+    const pattern = escapedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(${pattern})`, 'gi');
 
     return escapedText.replace(regex, '<mark class="bg-yellow-200 font-medium">$1</mark>');
   },
@@ -377,7 +395,7 @@ const ConversationSearchModal = {
    */
   formatTimestamp(dateString) {
     if (!dateString) return '';
-    return LanaTime.timeAgo(dateString, { maxDays: 7 }) || formatDateLong(dateString, { month: 'short' });
+    return LanaTime.timeAgo(dateString, { maxDays: 7 }) || window.Lex.Utils.formatDate(dateString);
   },
 
   /**

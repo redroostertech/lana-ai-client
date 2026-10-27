@@ -92,30 +92,67 @@
               <!-- Summary card -->
               <div id="bhSummaryCard" class="bh-stats">
               </div>
-              <!-- Filters bar -->
-              <div id="bhFiltersBar" class="bh-filters-bar"></div>
+              <style>
+                /* Time entries table (docs/TABLE-STANDARD.md section 8) */
+                .bh-date-input { padding: 0.25rem 0.5rem; border: 1px solid var(--lex-border-default, #e5e7eb); border-radius: 0.375rem; font-size: 0.8125rem; }
+                .bh-cell-name { color: var(--lex-text-primary); display: block; font-size: 13px; font-weight: 620; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                .bh-cell-text, .bh-cell-muted, .bh-cell-time { display: block; font-size: 12px; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                .bh-cell-text { color: var(--lex-text-primary); font-size: 13px; }
+                .bh-cell-muted, .bh-cell-time { color: var(--lex-text-secondary); }
+                .bh-cell-time { font-variant-numeric: tabular-nums; }
+                .bh-cell-hours { display: block; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--lex-color-blue-700, #1d4ed8); white-space: nowrap; }
+                .bh-row-actions { display: flex; gap: 0.25rem; justify-content: flex-end; flex-wrap: nowrap; }
+                .bh-row-btn { padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600; background: var(--lex-bg-primary, #fff); color: var(--lex-text-primary); border: 1px solid var(--lex-border-default, #e5e7eb); border-radius: 0.25rem; cursor: pointer; white-space: nowrap; font-family: inherit; }
+                .bh-row-btn--approve { background: var(--lex-color-green-50, #f0fdf4); color: var(--lex-color-green-700, #15803d); border-color: var(--lex-color-green-200, #bbf7d0); }
+                .bh-row-btn--reject { background: var(--lex-color-red-50, #fef2f2); color: var(--lex-color-red-700, #b91c1c); border-color: var(--lex-color-red-200, #fecaca); }
+                .bh-row-btn--warn { background: var(--lex-color-amber-50, #fffbeb); color: var(--lex-color-amber-700, #b45309); border-color: var(--lex-color-amber-200, #fde68a); }
+                .bh-overlap-list { display: flex; flex-direction: column; gap: 0.5rem; }
+                .bh-overlap-heading { font-size: 0.7rem; font-weight: 600; color: var(--lex-color-amber-800, #92400e); text-transform: uppercase; letter-spacing: 0.05em; }
+                .bh-overlap-item { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.625rem 0.75rem; border: 1px solid var(--lex-color-amber-200, #fde68a); border-radius: 0.375rem; }
+                .bh-overlap-item .bh-row-actions { justify-content: flex-start; flex-wrap: wrap; }
+                .bh-overlap-item .bh-cell-name { white-space: normal; }
+                #bhEntriesTable table { table-layout: fixed; min-width: 1180px; }
+                #bhEntriesTable th { white-space: nowrap; }
+                #bhEntriesTable td { overflow: hidden; }
+                #bhEntriesTable th:nth-child(1) { width: 44px; }
+                #bhEntriesTable th:nth-child(3) { width: 90px; }
+                #bhEntriesTable th:nth-child(4) { width: 140px; }
+                #bhEntriesTable th:nth-child(5) { width: 110px; }
+                #bhEntriesTable th:nth-child(6) { width: 120px; }
+                #bhEntriesTable th:nth-child(7), #bhEntriesTable th:nth-child(8) { width: 176px; }
+                #bhEntriesTable th:nth-child(9) { width: 210px; }
+              </style>
+              <!-- Toolbar: search, sort, status, period, count -->
+              <div id="bhFiltersBar" class="mb-4"></div>
               <!-- Time entries table -->
-              <div id="bhEntriesSection">
-                <div class="bh-entries__header">
-                  <div class="bh-entries__title">Time Entries</div>
-                  <div class="bh-entries__actions">
+              <section id="bhEntriesSection" aria-labelledby="bhEntriesHeading">
+                <div class="flex items-center justify-between mb-3" style="gap:0.75rem;flex-wrap:wrap;">
+                  <div class="flex items-center gap-3">
+                    <h2 id="bhEntriesHeading" class="text-lg font-semibold" style="color: var(--lex-text-primary)">Time Entries</h2>
+                    <span id="bhEntriesSectionCount" class="text-sm" style="color: var(--lex-text-secondary)" aria-live="polite"></span>
+                  </div>
+                  <div style="display:flex;gap:0.5rem;">
                     <lex-btn id="bhAddManualBtn" variant="primary" size="sm">+ New entry</lex-btn>
                     <lex-btn id="bhGenerateBtn" variant="outline" size="sm">Generate for Today</lex-btn>
                   </div>
                 </div>
-                <div id="bhEntriesLoading" class="animate-pulse flex flex-col gap-2">
-                  <div class="cc-skeleton bh-skeleton"></div>
-                  <div class="cc-skeleton bh-skeleton"></div>
-                  <div class="cc-skeleton bh-skeleton"></div>
-                </div>
-                <div id="bhEntriesList" class="bh-entries hidden">
-                </div>
-                <div id="bhEntriesEmpty" class="bh-entries__empty hidden">
-                  No time entries for this matter yet. Click "Generate for Today" to create drafts from today's activity.
-                </div>
-                <!-- Pagination -->
-                <div id="bhPagination" class="bh-pagination"></div>
-              </div>
+                <lex-table
+                  id="bhEntriesTable"
+                  class="lex-table--card"
+                  column-filters
+                  selectable
+                  bulk-actions='[{"label":"Approve selected","action":"approve"},{"label":"Reject selected","action":"reject","variant":"danger"}]'
+                  columns="description,duration_minutes,activity_type,source,status,start_time,created_at,actions"
+                  labels="Entry,Hours,Type,Source,Status,Worked,Created,Actions"
+                  search-keys="description,activity_type,status,source"
+                  sort-by="start_time"
+                  sort-dir="desc"
+                  limit="20"
+                  id-key="id"
+                  empty-text="No time entries for this period. Use &quot;Generate for Today&quot; to create drafts from today's activity."
+                  aria-label="Time entries"
+                ></lex-table>
+              </section>
             </div>
             <div id="tabContentDocGeneration" class="hidden p-6"></div>
             <div id="tabContentAnalytics" class="hidden p-6">
@@ -162,7 +199,23 @@
        ═══════════════════════════════════════════════════════════════════════ -->
 
   <!-- Task Modal -->
-  <lex-modal id="taskModal" heading="Create Task" size="lg" hide-actions>
+  <lex-modal id="taskModal" heading="Create Task" size="lg" hide-actions
+    footer-content='<div class="flex justify-between items-center w-full">
+      <div id="taskDeleteArea">
+        <button id="taskDeleteBtn" type="button" onclick="confirmDeleteTask()" class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete task">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+        </button>
+        <div id="taskDeleteConfirm" class="hidden flex items-center gap-2">
+          <span class="text-xs text-red-600">Delete this task?</span>
+          <button type="button" onclick="deleteTask(document.getElementById(&#39;taskId&#39;).value)" class="px-2 py-1 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded transition-colors">Yes, delete</button>
+          <button type="button" onclick="cancelDeleteTask()" class="px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded transition-colors">No</button>
+        </div>
+      </div>
+      <div class="flex gap-3">
+        <lex-btn type="button" onclick="closeTaskModal()" variant="secondary">Cancel</lex-btn>
+        <lex-btn id="taskSubmitBtn" type="submit" form="taskForm" variant="primary">Save Task</lex-btn>
+      </div>
+    </div>'>
       <form id="taskForm" onsubmit="saveTask(event)" class="p-6 space-y-5">
         <input type="hidden" id="taskId">
 
@@ -233,27 +286,12 @@
           </div>
         </div>
 
-        <div class="flex justify-between items-center pt-4 border-t border-gray-200">
-          <div id="taskDeleteArea">
-            <button id="taskDeleteBtn" type="button" onclick="confirmDeleteTask()" class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete task">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-            </button>
-            <div id="taskDeleteConfirm" class="hidden flex items-center gap-2">
-              <span class="text-xs text-red-600">Delete this task?</span>
-              <button type="button" onclick="deleteTask(document.getElementById('taskId').value)" class="px-2 py-1 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded transition-colors">Yes, delete</button>
-              <button type="button" onclick="cancelDeleteTask()" class="px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded transition-colors">No</button>
-            </div>
-          </div>
-          <div class="flex gap-3">
-            <lex-btn type="button" onclick="closeTaskModal()" variant="secondary">Cancel</lex-btn>
-            <lex-btn id="taskSubmitBtn" type="submit" variant="primary">Save Task</lex-btn>
-          </div>
-        </div>
       </form>
   </lex-modal>
 
   <!-- Create Task Plan Modal -->
-  <lex-modal id="taskPlanModal" heading="Create Task Plan" size="lg" hide-actions>
+  <lex-modal id="taskPlanModal" heading="Create Task Plan" size="lg" hide-actions
+    footer-content='<lex-btn type="button" onclick="closeTaskPlanModal()" variant="secondary">Cancel</lex-btn><lex-btn id="taskPlanSubmitBtn" type="submit" form="taskPlanForm" variant="primary">Save Task Plan</lex-btn>'>
     <form id="taskPlanForm" onsubmit="saveTaskPlan(event)" class="p-6 space-y-5">
       <lex-input id="taskPlanTitle" label="Plan name" required placeholder="e.g. New client intake checklist"></lex-input>
 
@@ -266,16 +304,12 @@
         </div>
         <div id="taskPlanItemsList" class="space-y-2"></div>
       </div>
-
-      <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
-        <lex-btn type="button" onclick="closeTaskPlanModal()" variant="secondary">Cancel</lex-btn>
-        <lex-btn type="submit" variant="primary">Save Task Plan</lex-btn>
-      </div>
     </form>
   </lex-modal>
 
   <!-- Contact Modal -->
-  <lex-modal id="contactModal" heading="Add Contact" size="lg" hide-actions>
+  <lex-modal id="contactModal" heading="Add Contact" size="lg" hide-actions
+    footer-content='<lex-btn type="button" onclick="closeContactModal()" variant="secondary">Cancel</lex-btn><lex-btn id="contactSubmitBtn" type="submit" form="contactForm" variant="primary">Save Contact</lex-btn>'>
       <form id="contactForm" onsubmit="saveContact(event)" class="p-6 space-y-5">
         <input type="hidden" id="contactMatterId">
 
@@ -301,11 +335,6 @@
         <lex-select id="contactType" label="Contact Type"
           options='[{"value":"contact:participant","label":"Participant"},{"value":"contact:opportunity","label":"Opportunity"},{"value":"contact:lead","label":"Lead"},{"value":"contact:other","label":"Other"}]'>
         </lex-select>
-
-        <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
-          <lex-btn type="button" onclick="closeContactModal()" variant="secondary">Cancel</lex-btn>
-          <lex-btn type="submit" variant="primary">Save Contact</lex-btn>
-        </div>
       </form>
   </lex-modal>
 
@@ -315,7 +344,8 @@
   </lex-modal>
 
   <!-- Edit Contact Modal -->
-  <lex-modal id="editContactModal" heading="Edit Contact" size="lg" hide-actions>
+  <lex-modal id="editContactModal" heading="Edit Contact" size="lg" hide-actions
+    footer-content='<lex-btn type="button" onclick="closeEditContactModal()" variant="secondary">Cancel</lex-btn><lex-btn id="editContactSubmitBtn" type="submit" form="editContactForm" variant="primary">Save Changes</lex-btn>'>
       <form id="editContactForm" onsubmit="updateContact(event)" class="p-6 space-y-5">
         <input type="hidden" id="editContactId">
         <input type="hidden" id="editContactMatterId">
@@ -342,11 +372,6 @@
         <lex-select id="editContactType" label="Contact Type"
           options='[{"value":"contact:participant","label":"Participant"},{"value":"contact:opportunity","label":"Opportunity"},{"value":"contact:lead","label":"Lead"},{"value":"contact:other","label":"Other"}]'>
         </lex-select>
-
-        <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
-          <lex-btn type="button" onclick="closeEditContactModal()" variant="secondary">Cancel</lex-btn>
-          <lex-btn type="submit" variant="primary">Save Changes</lex-btn>
-        </div>
       </form>
   </lex-modal>
 
@@ -422,8 +447,10 @@
   </lex-modal>
 
   <!-- Doc Studio Document Creation Modal -->
-  <lex-modal id="createDocStudioDocumentModal" heading="Create with Doc Studio" subtitle="Generate a workspace-specific file from selected or all workspace documents" size="lg" hide-actions close-on-overlay>
+  <lex-modal id="createDocStudioDocumentModal" heading="Create with Doc Studio" size="lg" hide-actions close-on-overlay
+    footer-content='<lex-btn type="button" id="cancelDocStudioDocumentBtn" variant="secondary">Cancel</lex-btn><lex-btn type="submit" form="createDocStudioDocumentForm" id="generateDocStudioDocumentBtn" variant="primary">Generate</lex-btn>'>
     <form id="createDocStudioDocumentForm" class="p-6 space-y-5">
+      <p class="text-sm text-gray-500">Generate a workspace-specific file from selected or all workspace documents</p>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <lex-select id="docStudioOutputFormat" label="Format"
           options='[{"value":"document","label":"Legal Document"},{"value":"presentation","label":"Presentation"},{"value":"webpage","label":"Webpage"}]'>
@@ -448,32 +475,25 @@
         <ol id="docStudioProgressSteps" class="mt-3 space-y-2 text-sm"></ol>
       </div>
       <div id="docStudioDocumentStatus" class="hidden rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600"></div>
-      <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
-        <lex-btn type="button" id="cancelDocStudioDocumentBtn" variant="secondary">Cancel</lex-btn>
-        <lex-btn type="submit" id="generateDocStudioDocumentBtn" variant="primary">Generate</lex-btn>
-      </div>
     </form>
   </lex-modal>
 
-  <lex-modal id="docStudioDocumentViewerModal" heading="Doc Studio Document" size="full" hide-actions>
+  <lex-modal id="docStudioDocumentViewerModal" heading="Doc Studio Document" size="full" hide-actions
+    footer-content='<lex-btn type="button" id="openDocStudioDocumentTabBtn" variant="secondary">Open in Doc Studio</lex-btn><lex-btn type="button" id="closeDocStudioDocumentViewerBtn" variant="ghost">Close</lex-btn>'>
     <div class="flex flex-col h-full min-h-[76vh]">
-      <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between gap-3">
-        <div>
-          <div id="docStudioViewerTitle" class="text-sm font-semibold text-gray-900">Generated document</div>
-          <div id="docStudioViewerMeta" class="text-xs text-gray-500">Doc Studio</div>
-        </div>
-        <div class="flex items-center gap-2">
-          <lex-btn type="button" id="openDocStudioDocumentTabBtn" variant="secondary" size="sm">Open in Doc Studio</lex-btn>
-          <lex-btn type="button" id="closeDocStudioDocumentViewerBtn" variant="ghost" size="sm">Close</lex-btn>
-        </div>
+      <div class="px-4 py-3 border-b border-gray-200">
+        <div id="docStudioViewerTitle" class="text-sm font-semibold text-gray-900">Generated document</div>
+        <div id="docStudioViewerMeta" class="text-xs text-gray-500">Doc Studio</div>
       </div>
       <iframe id="docStudioDocumentViewerFrame" title="Doc Studio document viewer" class="flex-1 w-full border-0 bg-white"></iframe>
     </div>
   </lex-modal>
 
   <!-- Document Metadata Modal -->
-  <lex-modal id="documentMetadataModal" heading="Document Details" subtitle="Add optional metadata to help organize and find this document" size="md" hide-actions>
+  <lex-modal id="documentMetadataModal" heading="Document Details" size="md" hide-actions
+    footer-content='<lex-btn id="cancelMetadataUpload" variant="secondary">Cancel</lex-btn><lex-btn id="confirmMetadataUpload" variant="primary">Upload Document</lex-btn>'>
       <div class="p-6 space-y-4">
+        <p class="text-sm text-gray-500">Add optional metadata to help organize and find this document</p>
         <div class="bg-gray-50 rounded-lg p-3 border border-gray-200">
           <p class="text-sm text-gray-600">
             <span class="font-medium text-gray-900" id="metadataFileName">filename.pdf</span>
@@ -499,10 +519,6 @@
         </div>
       </div>
 
-      <div class="pt-4 border-t border-gray-200 flex items-center justify-end gap-3">
-        <lex-btn id="cancelMetadataUpload" variant="secondary">Cancel</lex-btn>
-        <lex-btn id="confirmMetadataUpload" variant="primary">Upload Document</lex-btn>
-      </div>
   </lex-modal>
 
   <!-- Unlink Confirmation Modal -->
@@ -551,11 +567,9 @@
   </lex-modal>
 
   <!-- Shared With Drawer -->
-  <lex-modal id="sharedWithDrawer" heading="Shared With" size="sm" hide-actions close-on-overlay>
-    <div class="p-4">
-      <div class="flex items-center justify-between mb-4">
-        <p class="text-sm text-gray-500">People with access to this matter</p>
-        <div class="flex items-center gap-1">
+  <lex-drawer id="sharedWithDrawer" heading="Shared With" subtitle="People with access to this matter" width="sm">
+    <div>
+        <div data-slot="header-actions" class="flex items-center gap-1">
           <button onclick="openManageShareModal(currentMatterData && currentMatterData.matter && currentMatterData.matter.matter_id)" class="p-1.5 rounded transition-colors" style="color: var(--lex-text-secondary)" title="Add people" onmouseover="this.style.color='var(--lex-text-accent)'" onmouseout="this.style.color='var(--lex-text-secondary)'">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
           </button>
@@ -563,53 +577,51 @@
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
           </button>
         </div>
-      </div>
       <div id="sharedWithDrawerList"></div>
     </div>
-  </lex-modal>
+  </lex-drawer>
 
   <!-- Contacts Drawer -->
-  <lex-modal id="contactsDrawer" heading="Contacts" size="sm" hide-actions close-on-overlay>
-    <div class="p-4">
-      <div class="flex items-center justify-between mb-4">
-        <p class="text-sm text-gray-500">People associated with this matter</p>
+  <lex-drawer id="contactsDrawer" heading="Contacts" subtitle="People associated with this matter" width="sm">
+    <div>
+      <div data-slot="header-actions" class="flex items-center gap-1">
         <button onclick="openAddContactModal(currentMatterData && currentMatterData.matter && currentMatterData.matter.matter_id)" class="p-1.5 rounded transition-colors" style="color: var(--lex-text-secondary)" title="Add contact" onmouseover="this.style.color='var(--lex-text-accent)'" onmouseout="this.style.color='var(--lex-text-secondary)'">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
         </button>
       </div>
       <div id="contactsDrawerList"></div>
     </div>
-  </lex-modal>
+  </lex-drawer>
 
   <!-- Linked Matters Drawer -->
-  <lex-modal id="linkedMattersDrawer" heading="Linked Workspaces" size="sm" hide-actions close-on-overlay>
-    <div class="p-4">
-      <div class="flex items-center justify-between mb-4">
-        <p class="text-sm text-gray-500">Matters linked to this one</p>
+  <lex-drawer id="linkedMattersDrawer" heading="Linked Workspaces" subtitle="Matters linked to this one" width="sm">
+    <div>
+      <div data-slot="header-actions" class="flex items-center gap-1">
         <button onclick="openCreateLinkModal(currentMatterData && currentMatterData.matter && currentMatterData.matter.matter_id)" class="p-1.5 rounded transition-colors" style="color: var(--lex-text-secondary)" title="Link matter" onmouseover="this.style.color='var(--lex-text-accent)'" onmouseout="this.style.color='var(--lex-text-secondary)'">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
         </button>
       </div>
       <div id="linkedMattersDrawerList"></div>
     </div>
-  </lex-modal>
+  </lex-drawer>
 
   <!-- Custom Fields Drawer -->
-  <lex-modal id="customFieldsDrawer" heading="Custom Fields" size="sm" hide-actions close-on-overlay>
-    <div class="p-4">
-      <div class="flex items-center justify-between mb-4">
-        <p class="text-sm text-gray-500">All custom fields for this matter</p>
+  <lex-drawer id="customFieldsDrawer" heading="Custom Fields" subtitle="All custom fields for this matter" width="sm">
+    <div>
+      <div data-slot="header-actions" class="flex items-center gap-1">
         <button id="drawerCustomFieldsEditBtn" onclick="if (window.currentMatterData && window.currentMatterData.matter) window.openEditCustomFieldsModal(window.currentMatterData.matter.matter_id)" class="p-1.5 rounded transition-colors" style="color: var(--lex-text-secondary)" title="Edit custom fields" onmouseover="this.style.color='var(--lex-text-accent)'" onmouseout="this.style.color='var(--lex-text-secondary)'">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
         </button>
       </div>
       <div id="customFieldsDrawerList"></div>
     </div>
-  </lex-modal>
+  </lex-drawer>
 
   <!-- Manual Connect Data Modal -->
-  <lex-modal id="manualConnectModal" heading="Link Data to Matter" subtitle="Search and select connector data to link" size="xl" hide-actions>
+  <lex-modal id="manualConnectModal" heading="Link Data to Matter" size="xl" hide-actions
+    footer-content='<lex-btn onclick="closeManualConnectModal()" variant="secondary">Cancel</lex-btn>'>
     <div class="space-y-4">
+      <p class="text-sm text-gray-500">Search and select connector data to link</p>
       <div class="pb-4 border-b border-gray-200">
         <lex-input id="manualConnectSearch" placeholder="Search by ID, name, or content..." leading-icon="search"></lex-input>
         <div class="mt-3 flex gap-2">
@@ -628,9 +640,6 @@
           </svg>
           <p class="mt-2">Start typing to search for data to link</p>
         </div>
-      </div>
-      <div class="flex justify-end pt-4 border-t border-gray-200">
-        <lex-btn onclick="closeManualConnectModal()" variant="secondary">Cancel</lex-btn>
       </div>
     </div>
   </lex-modal>
@@ -652,7 +661,20 @@
       </div>
       <!-- Table area -->
       <div style="flex:1;overflow:auto;">
-        <lex-table id="cdModalTable" selectable empty-text="No connected data"></lex-table>
+        <lex-table
+          id="cdModalTable"
+          class="wd-connected-data-table lex-table--card"
+          selectable
+          column-filters
+          columns="name,type,source,detail,status,created_at"
+          labels="Name,Type,Source,Detail,Status,Created"
+          sort-by="created_at"
+          sort-dir="desc"
+          limit="20"
+          id-key="id"
+          empty-text="No data available. Connect an integration to sync data."
+          aria-label="Connected data"
+        ></lex-table>
       </div>
     </div>
   </lex-modal>
@@ -674,28 +696,12 @@
     </div>
   </lex-drawer>
 
-  <!-- Create Skill Modal - Full Screen Skill Builder -->
-  <div id="createSkillModal" data-hoist class="fixed inset-0 bg-white hidden flex-col" style="z-index: 10001;">
-    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-white shadow-sm">
-      <div class="flex items-center gap-3">
-        <div class="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center" style="background: var(--lex-bg-accent-soft)">
-          <svg class="w-6 h-6" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-          </svg>
-        </div>
-        <div>
-          <h2 class="text-xl font-semibold text-gray-900">Skill Builder</h2>
-          <p class="text-sm text-gray-500">Create a multi-step automated skill</p>
-        </div>
-      </div>
-      <button onclick="closeCreateSkillModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-        </svg>
-      </button>
-    </div>
-
-    <div class="flex-1 overflow-hidden flex">
+  <!-- Create Skill Modal - Full Screen Skill Builder (lex-modal; Escape and backdrop do not discard the draft).
+       The body is sized to the viewport minus header and footer so both panels and the
+       Drawflow canvas keep their own scrolling. -->
+  <lex-modal id="createSkillModal" heading="Skill Builder" size="full" flush close-on-escape="false" close-on-overlay="false" data-hoist
+    footer-content='<div class="mr-auto text-sm text-gray-600"><span id="workflow-step-count">0</span> steps configured</div><lex-btn type="button" onclick="closeCreateSkillModal()" variant="secondary">Cancel</lex-btn><lex-btn type="button" onclick="saveSkill()" variant="primary" leading-icon="check">Save Skill</lex-btn>'>
+    <div class="overflow-hidden flex" style="height: calc(100dvh - 7.5rem);">
       <!-- SIMPLE MODE -->
       <div id="simple-workflow-mode" class="flex-1 flex">
         <div class="flex-1 p-6 bg-gray-50 overflow-y-auto">
@@ -853,45 +859,13 @@
       </div>
     </div>
 
-    <div class="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50">
-      <div class="text-sm text-gray-600">
-        <span id="workflow-step-count">0</span> steps configured
-      </div>
-      <div class="flex gap-3">
-        <button onclick="closeCreateSkillModal()"
-                class="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-          Cancel
-        </button>
-        <button onclick="saveSkill()"
-                class="px-5 py-2.5 text-sm font-medium text-white rounded-lg transition-colors flex items-center gap-2" style="background: var(--lex-bg-accent)">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-          Save Skill
-        </button>
-      </div>
-    </div>
-  </div>
+  </lex-modal>
 
   <!-- Import Skill Modal -->
-  <div id="importSkillModal" data-hoist class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 10001;">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
-      <div class="flex items-center justify-between p-6 border-b border-gray-200">
-        <div class="flex items-center gap-3">
-          <div class="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center" style="background: var(--lex-bg-accent-soft)">
-            <svg class="w-6 h-6" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-            </svg>
-          </div>
-          <div>
-            <h2 class="text-xl font-semibold text-gray-900">Import Skill</h2>
-            <p class="text-sm text-gray-500">Import an existing skill from a JSON file</p>
-          </div>
-        </div>
-        <button onclick="closeImportSkillModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-        </button>
-      </div>
-
-      <div class="flex-1 overflow-y-auto p-6">
+  <lex-modal id="importSkillModal" heading="Import Skill" width="768px" data-hoist
+    footer-content='<lex-btn type="button" onclick="closeImportSkillModal()" variant="secondary">Cancel</lex-btn><lex-btn type="button" id="import-skill-btn" onclick="submitImportSkill()" variant="primary" leading-icon="upload" disabled>Import Skill</lex-btn>'>
+      <div>
+        <p class="text-sm text-gray-500 mb-4">Import an existing skill from a JSON file</p>
         <div id="skill-drop-zone" class="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center cursor-pointer">
           <input type="file" id="skill-file-input" accept=".json" class="hidden">
           <div id="skill-upload-prompt">
@@ -929,22 +903,11 @@
         </div>
       </div>
 
-      <div class="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
-        <button onclick="closeImportSkillModal()"
-                class="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-          Cancel
-        </button>
-        <button id="import-skill-btn" onclick="submitImportSkill()" disabled
-                class="px-5 py-2.5 text-sm font-medium text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2" style="background: var(--lex-bg-accent)">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path></svg>
-          Import Skill
-        </button>
-      </div>
-    </div>
-  </div>
+  </lex-modal>
 
   <!-- Edit Matter Modal (for inline editing from detail page) -->
-  <lex-modal id="detailMatterModal" heading="Edit Matter" size="full" hide-actions>
+  <lex-modal id="detailMatterModal" heading="Edit Matter" size="full" hide-actions
+    footer-content='<lex-btn type="button" id="cancelDetailMatterBtn" variant="secondary">Cancel</lex-btn><lex-btn id="detailMatterSubmitBtn" type="submit" form="detailMatterForm" variant="primary">Save Changes</lex-btn>'>
     <form id="detailMatterForm" class="max-w-2xl mx-auto px-6 py-8 space-y-6">
       <input type="hidden" id="detailMatterId">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -958,15 +921,12 @@
         </lex-select>
         <lex-input id="detailPracticeArea" label="Practice Area" placeholder="e.g., Corporate Law"></lex-input>
       </div>
-      <div class="flex justify-end gap-3 pt-6 border-t border-gray-200">
-        <lex-btn type="button" id="cancelDetailMatterBtn" variant="secondary">Cancel</lex-btn>
-        <lex-btn type="submit" variant="primary">Save Changes</lex-btn>
-      </div>
     </form>
   </lex-modal>
 
   <!-- Status Change Modal -->
-  <lex-modal id="statusChangeModal" heading="Change Status" size="md" hide-actions close-on-overlay>
+  <lex-modal id="statusChangeModal" heading="Change Status" size="md" hide-actions close-on-overlay
+    footer-content='<lex-btn onclick="closeStatusChangeModal()" variant="secondary">Cancel</lex-btn><lex-btn onclick="confirmStatusChange()" variant="primary">Update Status</lex-btn>'>
     <div class="p-4 sm:p-6 space-y-3 sm:space-y-4 flex flex-col max-h-[calc(100vh-4rem)] overflow-y-auto">
       <p class="text-sm text-gray-600">Select a new status for this matter:</p>
       <lex-select id="statusChangeSelect" label="New Status"
@@ -982,15 +942,18 @@
         <lex-textarea id="workspaceCloseoutCouldImprove" label="What could be better?" rows="1" placeholder="Issues, gaps, or lessons learned..."></lex-textarea>
         <lex-textarea id="workspaceCloseoutActionItems" label="Action items" rows="1" placeholder="One follow-up per line..."></lex-textarea>
       </div>
-      <div class="mt-auto flex justify-end gap-3 pt-4 border-t border-gray-200">
-        <lex-btn onclick="closeStatusChangeModal()" variant="secondary">Cancel</lex-btn>
-        <lex-btn onclick="confirmStatusChange()" variant="primary">Update Status</lex-btn>
-      </div>
     </div>
   </lex-modal>
 
   <!-- Document Generation Output Modal -->
-  <lex-modal id="docGenOutputModal" heading="Generated Document" size="full" hide-actions>
+  <lex-modal id="docGenOutputModal" heading="Generated Document" size="full" hide-actions
+    footer-content='<div class="flex items-center justify-between w-full">
+      <div id="docGenArtifactInfo" class="text-sm" style="color: var(--lex-text-secondary)"></div>
+      <div class="flex items-center gap-2">
+        <lex-btn id="docGenCopyBtn" variant="secondary" onclick="copyGeneratedContent()">Copy</lex-btn>
+        <lex-btn id="docGenCloseBtn" variant="ghost" onclick="closeDocGenOutputModal()">Close</lex-btn>
+      </div>
+    </div>'>
     <div id="docGenProgressArea" class="hidden px-6 py-3 border-b border-gray-200">
       <div class="flex items-center gap-3">
         <svg class="w-4 h-4 animate-spin" style="color: var(--lex-text-accent)" fill="none" viewBox="0 0 24 24">
@@ -1004,17 +967,11 @@
       </div>
     </div>
     <div id="docGenOutputContent" class="overflow-y-auto p-6 prose prose-sm max-w-none" style="min-height: 300px; max-height: 60vh;"></div>
-    <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
-      <div id="docGenArtifactInfo" class="text-sm" style="color: var(--lex-text-secondary)"></div>
-      <div class="flex items-center gap-2">
-        <lex-btn id="docGenCopyBtn" variant="secondary" onclick="copyGeneratedContent()">Copy</lex-btn>
-        <lex-btn id="docGenCloseBtn" variant="ghost" onclick="closeDocGenOutputModal()">Close</lex-btn>
-      </div>
-    </div>
   </lex-modal>
 
   <!-- DOCX Template Generation Modal -->
-  <lex-modal id="docxTemplateModal" heading="Generate Document from Template" size="full" hide-actions close-on-overlay>
+  <lex-modal id="docxTemplateModal" heading="Generate Document from Template" size="full" hide-actions close-on-overlay
+    footer-content='<lex-btn type="button" id="docxTemplateCancelBtn" variant="secondary">Cancel</lex-btn><lex-btn type="button" id="docxTemplateGenerateBtn" variant="primary" disabled>Generate Document</lex-btn>'>
     <div class="flex flex-col h-full">
       <!-- Two-column body -->
       <div class="flex-1 flex overflow-hidden">
@@ -1094,27 +1051,18 @@
         </div>
 
       </div>
-
-      <!-- Pinned footer -->
-      <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 flex-shrink-0">
-        <lex-btn type="button" id="docxTemplateCancelBtn" variant="secondary">Cancel</lex-btn>
-        <lex-btn type="button" id="docxTemplateGenerateBtn" variant="primary" disabled>Generate Document</lex-btn>
-      </div>
     </div>
   </lex-modal>
 
   <!-- Template Set Modal -->
-  <lex-modal id="templateSetModal" heading="Create Template Set" size="lg" hide-actions>
+  <lex-modal id="templateSetModal" heading="Create Template Set" size="lg" hide-actions
+    footer-content='<lex-btn type="button" onclick="closeTemplateSetModal()" variant="secondary">Cancel</lex-btn><lex-btn type="submit" form="templateSetForm" variant="primary" id="tsSubmitBtn">Create Set</lex-btn>'>
     <form id="templateSetForm" onsubmit="saveTemplateSet(event)" class="p-6 space-y-5">
       <input type="hidden" id="tsEditId">
       <lex-input id="tsName" label="Name" required placeholder="e.g., Engagement Letters"></lex-input>
       <lex-textarea id="tsDescription" label="Description" rows="2" placeholder="What documents does this set represent?"></lex-textarea>
       <lex-input id="tsDocType" label="Document Type Key" required placeholder="e.g., engagement_letter"></lex-input>
       <lex-input id="tsDocTypeLabel" label="Display Label" placeholder="e.g., Engagement Letter"></lex-input>
-      <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
-        <lex-btn type="button" onclick="closeTemplateSetModal()" variant="secondary">Cancel</lex-btn>
-        <lex-btn type="submit" variant="primary" id="tsSubmitBtn">Create Set</lex-btn>
-      </div>
     </form>
   </lex-modal>
   </template>
@@ -1191,6 +1139,7 @@
   <script src="js/lex/components/foundation/lex-accordion.js"></script>
   <script src="js/lex/components/form/lex-input.js"></script>
   <script src="js/lex/components/form/lex-select.js"></script>
+  <script src="js/lex/components/form/lex-dropdown-btn.js"></script>
   <script src="js/lex/components/form/lex-checkbox.js"></script>
   <script src="js/lex/components/form/lex-textarea.js"></script>
   <script src="js/lex/components/data/lex-table.js"></script>
@@ -1240,6 +1189,10 @@
   <!-- Page controller (MUST be last before auth-guard) -->
   <script src="js/workspace-switcher.js"></script>
   <script src="js/workspace-billable-hours.js"></script>
+  <script src="js/shared/library-column-filters.js"></script>
+  <script src="js/admin/admin-table-kit.js"></script>
+  <script src="js/shared/workspace-details-tables.js"></script>
+  <script src="js/shared/document-types-table.js"></script>
   <script src="js/workspace-details.js"></script>
 
   <!-- PAC bridge consent handler (Lex modal for token requests) -->

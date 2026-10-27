@@ -354,7 +354,10 @@ class NoteEditorComponent {
   async handleDelete() {
     if (!this.currentNote) return;
 
-    const confirmed = window.confirm('Are you sure you want to delete this note?');
+    const confirmed = await Lex.Modal.confirmAsync('Delete note', 'Are you sure you want to delete this note?', {
+      confirmText: 'Delete',
+      variant: 'danger'
+    });
     if (!confirmed) return;
 
     try {

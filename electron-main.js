@@ -91,6 +91,7 @@ const { checkForUpdates, downloadAndInstallUpdate, showOptionalUpdateDialog, sho
 const { logInfo, logError, exportLogs, getLogFilePath } = require('./electron-logger');
 const SessionTracker = require('./js/session/session-tracker');
 const companionBridge = require('./electron-bridge');
+const { redactUrlForLog } = require('./electron-log-redaction');
 const { BrainchildManager, discover, validateLink, mcpBinForRoot, isAllowedVaultRoot } = require('./src/electron-brainchild-manager');
 const { ElectronScreenVoice } = require('./src/screen-voice/electron-screen-voice');
 const {
@@ -723,7 +724,7 @@ if (process.env.NODE_ENV === 'development') {
     if (url.includes('localhost') || url.includes('127.0.0.1')) {
       event.preventDefault();
       callback(true); // Trust the certificate
-      logInfo(`[Development] Certificate error bypassed for: ${url}`);
+      logInfo(`[Development] Certificate error bypassed for: ${redactUrlForLog(url)}`);
     } else {
       callback(false); // Reject certificates from other domains
     }
@@ -838,7 +839,10 @@ function createWindow(serverUrl = null) {
       sandbox: false, // Disable sandbox to allow file:// navigation
       webSecurity: false, // Disable for file:// protocol to work with absolute paths
       allowRunningInsecureContent: false,
-      experimentalFeatures: false
+      experimentalFeatures: false,
+      // Chromium's built-in PDF viewer: the file viewer's fallback PDF iframe
+      // (editor service unavailable, opened at #page=N) renders blank without it.
+      plugins: true
     },
     show: false // Don't show until ready (prevents flash of white screen)
   });
@@ -928,7 +932,10 @@ function createLoginWindow() {
       preload: path.join(__dirname, 'electron-preload.js'),
       additionalArguments: [BRAND_ARG],
       sandbox: false,
-      webSecurity: false
+      webSecurity: false,
+      // The login page navigates this same window into the app, file viewer
+      // included, so it needs the built-in PDF viewer too (see createWindow).
+      plugins: true
     },
     show: false,
     resizable: true,
@@ -1909,7 +1916,7 @@ ipcMain.handle('settings:revoke-bridge-consent', async (_event, payload) => {
  *   lana-ai://automation/<automation-id>    — Open automation detail
  */
 const handleDeepLink = async (deepLinkUrl) => {
-  logInfo(`Deep link received: ${deepLinkUrl}`);
+  logInfo(`Deep link received: ${redactUrlForLog(deepLinkUrl)}`);
 
   try {
     const urlObj = new URL(deepLinkUrl);
@@ -2284,7 +2291,7 @@ app.on('web-contents-created', (event, contents) => {
       // Decode the pathname (handles %3A for : etc.)
       let pathname = decodeURIComponent(parsedUrl.pathname);
 
-      logInfo(`[electron-main] [Navigation] Original URL: ${navigationUrl}`);
+      logInfo(`[electron-main] [Navigation] Original URL: ${redactUrlForLog(navigationUrl)}`);
       logInfo(`[electron-main] [Navigation] Decoded pathname: ${pathname}`);
 
       // Check if this path needs to be fixed to point to public_html
@@ -2353,19 +2360,19 @@ app.on('web-contents-created', (event, contents) => {
         let correctPath = createFileUrl(fullPath);
 
         // Preserve query string and hash from original URL
-        logInfo(`[electron-main] [Navigation] parsedUrl.search: ${parsedUrl.search}`);
-        logInfo(`[electron-main] [Navigation] parsedUrl.hash: ${parsedUrl.hash}`);
+        logInfo(`[electron-main] [Navigation] parsedUrl.search: ${parsedUrl.search ? '[redacted]' : ''}`);
+        logInfo(`[electron-main] [Navigation] parsedUrl.hash: ${parsedUrl.hash ? '[redacted]' : ''}`);
 
         if (parsedUrl.search) {
           correctPath += parsedUrl.search;
-          logInfo(`[electron-main] [Navigation] Added search: ${correctPath}`);
+          logInfo(`[electron-main] [Navigation] Added search: ${redactUrlForLog(correctPath)}`);
         }
         if (parsedUrl.hash) {
           correctPath += parsedUrl.hash;
-          logInfo(`[electron-main] [Navigation] Added hash: ${correctPath}`);
+          logInfo(`[electron-main] [Navigation] Added hash: ${redactUrlForLog(correctPath)}`);
         }
 
-        logInfo(`[electron-main] [Navigation] Final path: ${navigationUrl} -> ${correctPath}`);
+        logInfo(`[electron-main] [Navigation] Final path: ${redactUrlForLog(navigationUrl)} -> ${redactUrlForLog(correctPath)}`);
         navigationEvent.preventDefault();
         contents.loadURL(correctPath);
         return;

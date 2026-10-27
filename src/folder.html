@@ -47,11 +47,8 @@
         lana
         lana-context-type="full_chat"
       >
-        <button id="folderMoreBtn" class="folder-banner-more" type="button" title="More actions" aria-label="More actions" onclick="showFolderActionsMenu(event)">
-          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path>
-          </svg>
-        </button>
+        <lex-dropdown-btn id="folderMoreBtn" class="folder-banner-more" data-folder-actions-menu icon="more-vertical" icon-only variant="ghost" align="end" aria-label="More actions"
+          options="[{&quot;value&quot;:&quot;upload&quot;,&quot;label&quot;:&quot;Upload new file&quot;,&quot;icon&quot;:&quot;upload&quot;},{&quot;value&quot;:&quot;doc-studio&quot;,&quot;label&quot;:&quot;Create with Doc Studio&quot;,&quot;icon&quot;:&quot;plus&quot;},{&quot;divider&quot;:true},{&quot;value&quot;:&quot;new-folder&quot;,&quot;label&quot;:&quot;Create folder&quot;,&quot;icon&quot;:&quot;folder-plus&quot;}]"></lex-dropdown-btn>
       </lex-banner>
       <input type="file" id="fileUploadInput" class="hidden" multiple accept=".pdf,.doc,.docx,.txt,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.pptx,.ppt">
 
@@ -77,7 +74,7 @@
             <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Sort by:</label>
             <lex-select
               id="sortSelect"
-              options='[{"value":"name","label":"Name"},{"value":"created_at","label":"Created Date"},{"value":"updated_at","label":"Modified Date"},{"value":"file_size","label":"Size"}]'
+              options='[{"value":"name","label":"Name"},{"value":"created_at","label":"Created"},{"value":"updated_at","label":"Last edited"},{"value":"file_size","label":"Size"}]'
               value="name"
             ></lex-select>
           </div>
@@ -109,7 +106,8 @@
       </div>
 
       <div id="folderActionsBar" class="folder-actions-bar hidden">
-        <lex-btn id="folderActionsBtn" variant="primary" leading-icon="plus">Actions</lex-btn>
+        <lex-dropdown-btn id="folderActionsBtn" data-folder-actions-menu variant="primary" icon="plus" button-label="Actions" align="end"
+          options="[{&quot;value&quot;:&quot;upload&quot;,&quot;label&quot;:&quot;Upload new file&quot;,&quot;icon&quot;:&quot;upload&quot;},{&quot;value&quot;:&quot;doc-studio&quot;,&quot;label&quot;:&quot;Create with Doc Studio&quot;,&quot;icon&quot;:&quot;plus&quot;},{&quot;divider&quot;:true},{&quot;value&quot;:&quot;new-folder&quot;,&quot;label&quot;:&quot;Create folder&quot;,&quot;icon&quot;:&quot;folder-plus&quot;}]"></lex-dropdown-btn>
       </div>
 
       <!-- Loading State -->
@@ -141,7 +139,8 @@
           id="contentEmptyWidget"
         ></lex-empty>
         <div id="folderEmptyState" class="folder-empty-actions">
-          <lex-btn id="emptyCreateBtn" variant="primary" leading-icon="plus">Create</lex-btn>
+          <lex-dropdown-btn id="emptyCreateBtn" data-folder-actions-menu variant="primary" icon="plus" button-label="Create"
+            options="[{&quot;value&quot;:&quot;upload&quot;,&quot;label&quot;:&quot;Upload new file&quot;,&quot;icon&quot;:&quot;upload&quot;},{&quot;value&quot;:&quot;doc-studio&quot;,&quot;label&quot;:&quot;Create with Doc Studio&quot;,&quot;icon&quot;:&quot;plus&quot;},{&quot;divider&quot;:true},{&quot;value&quot;:&quot;new-folder&quot;,&quot;label&quot;:&quot;Create folder&quot;,&quot;icon&quot;:&quot;folder-plus&quot;}]"></lex-dropdown-btn>
         </div>
       </div>
     </main>
@@ -151,7 +150,8 @@
          ══════════════════════════════════════════════════════════════════ -->
 
     <!-- New Folder Modal -->
-    <lex-modal id="newFolderModal" heading="Create New Folder" size="md" hide-actions="true">
+    <lex-modal id="newFolderModal" heading="Create New Folder" size="md" hide-actions="true"
+      footer-content='<lex-btn type="button" variant="secondary" id="cancelNewFolderBtn">Cancel</lex-btn><lex-btn type="submit" form="newFolderForm" variant="primary" id="createFolderSubmitBtn">Create</lex-btn>'>
       <form id="newFolderForm">
         <lex-input
           id="folderNameInput"
@@ -165,15 +165,12 @@
           </svg>
           Creates a subfolder within the current matter.
         </p>
-        <div class="flex items-center justify-end gap-3 mt-4">
-          <lex-btn type="button" variant="secondary" id="cancelNewFolderBtn">Cancel</lex-btn>
-          <lex-btn type="submit" variant="primary">Create</lex-btn>
-        </div>
       </form>
     </lex-modal>
 
     <!-- Document Metadata Modal -->
-    <lex-modal id="documentMetadataModal" heading="Document Details" size="lg" hide-actions="true">
+    <lex-modal id="documentMetadataModal" heading="Document Details" size="lg" hide-actions="true"
+      footer-content='<lex-btn id="cancelMetadataUpload" variant="secondary">Cancel</lex-btn><lex-btn id="confirmMetadataUpload" variant="primary"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg> Upload Document</lex-btn>'>
       <div class="space-y-4">
         <div class="rounded-lg p-3 border" style="background-color: var(--lex-bg-secondary); border-color: var(--lex-border-default)">
           <p class="text-sm" style="color: var(--lex-text-secondary)">
@@ -220,19 +217,11 @@
           show-count="true"
         ></lex-textarea>
       </div>
-      <div slot="footer">
-        <lex-btn id="cancelMetadataUpload" variant="secondary">Cancel</lex-btn>
-        <lex-btn id="confirmMetadataUpload" variant="primary">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-          </svg>
-          Upload Document
-        </lex-btn>
-      </div>
     </lex-modal>
 
     <!-- Single File Upload Modal -->
-    <lex-modal id="uploadSingleFileModal" heading="Upload Document" size="md" hide-actions="true">
+    <lex-modal id="uploadSingleFileModal" heading="Upload Document" size="md" hide-actions="true"
+      footer-content='<lex-btn id="cancelSingleUploadBtnFooter" variant="secondary">Cancel</lex-btn><lex-btn id="confirmSingleUploadBtn" variant="primary"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg> Upload Document</lex-btn>'>
       <div class="space-y-4">
         <div class="mb-5 p-3 rounded-lg" style="background-color: var(--lex-bg-secondary)">
           <div class="flex items-start gap-3">
@@ -284,19 +273,11 @@
           </div>
         </div>
       </div>
-      <div slot="footer">
-        <lex-btn id="cancelSingleUploadBtnFooter" variant="secondary">Cancel</lex-btn>
-        <lex-btn id="confirmSingleUploadBtn" variant="primary">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-          </svg>
-          Upload Document
-        </lex-btn>
-      </div>
     </lex-modal>
 
     <!-- Bulk Upload Grid Modal -->
-    <lex-modal id="bulkUploadModal" heading="Bulk Upload Documents" size="xl" hide-actions="true">
+    <lex-modal id="bulkUploadModal" heading="Bulk Upload Documents" size="xl" hide-actions="true"
+      footer-content='<lex-btn id="cancelBulkUploadBtn" variant="secondary">Cancel</lex-btn><lex-btn id="confirmBulkUploadBtn" variant="primary"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg> Upload Documents</lex-btn>'>
       <div class="space-y-4">
         <p class="text-sm" style="color: var(--lex-text-secondary)"><span id="bulkFileCount">0</span> files selected - Configure hints for each file</p>
         <!-- Apply to All Controls -->
@@ -338,23 +319,11 @@
           </table>
         </div>
       </div>
-      <div slot="footer">
-        <lex-btn id="cancelBulkUploadBtn" variant="secondary">Cancel</lex-btn>
-        <lex-btn id="confirmBulkUploadBtn" variant="primary">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-          </svg>
-          Upload Documents
-        </lex-btn>
-      </div>
     </lex-modal>
 
     <!-- Per-file Rename and Delete are owned by the MatterDocumentsView
          component, which injects its own Lex rename modal and confirm dialogs.
          No per-file rename/delete modal markup lives here. -->
-
-    <!-- Context Menu Container -->
-    <div id="contextMenu" class="hidden fixed bg-white rounded-lg shadow-xl border py-1 z-50 min-w-[180px]" style="border-color: var(--lex-border-default)"></div>
 
   </template>
 
@@ -415,6 +384,7 @@
   <script src="js/lex/components/foundation/lex-modal.js"></script>
   <script src="js/lex/components/form/lex-input.js"></script>
   <script src="js/lex/components/form/lex-select.js"></script>
+  <script src="js/lex/components/form/lex-dropdown-btn.js"></script>
   <script src="js/lex/components/form/lex-checkbox.js"></script>
   <script src="js/lex/components/form/lex-textarea.js"></script>
   <script src="js/lex/components/data/lex-pagination.js"></script>

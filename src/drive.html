@@ -70,7 +70,7 @@
             <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Sort by:</label>
             <lex-select
               id="sortSelect"
-              options='[{"value":"name","label":"Name"},{"value":"created_at","label":"Created Date"},{"value":"updated_at","label":"Modified Date"},{"value":"document_count","label":"File Count"},{"value":"folder_count","label":"Folder Count"}]'
+              options='[{"value":"name","label":"Name"},{"value":"created_at","label":"Created"},{"value":"updated_at","label":"Last edited"},{"value":"document_count","label":"Size"},{"value":"folder_count","label":"Folder count"}]'
               value="name"
             ></lex-select>
           </div>
@@ -184,21 +184,24 @@
       <!-- Grid View -->
       <div id="gridView" class="hidden grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
 
-      <!-- List View -->
-      <div id="listView" class="hidden bg-white rounded-lg shadow-sm border overflow-x-auto" style="border-color: var(--lex-border-default)">
-        <table class="min-w-full divide-y" style="border-color: var(--lex-border-default)">
-          <thead style="background-color: var(--lex-bg-secondary)">
-            <tr>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider drive-sort-th" style="color: var(--lex-text-secondary)" id="sortHeaderName" data-sort-field="name" role="button" tabindex="0">Name<span class="drive-sort-caret" aria-hidden="true"></span></th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--lex-text-secondary)">Created By</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider drive-sort-th" style="color: var(--lex-text-secondary)" id="sortHeaderCreated" data-sort-field="created_at" role="button" tabindex="0">Created On<span class="drive-sort-caret" aria-hidden="true"></span></th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider drive-sort-th" style="color: var(--lex-text-secondary)" id="sortHeaderSize" data-sort-field="document_count" role="button" tabindex="0">Size<span class="drive-sort-caret" aria-hidden="true"></span></th>
-              <th scope="col" class="w-20 px-6 py-3"></th>
-            </tr>
-          </thead>
-          <tbody id="listViewBody" class="bg-white divide-y" style="border-color: var(--lex-border-default)"></tbody>
-        </table>
-      </div>
+      <!-- List View: one table for every scope (workspaces, Knowledgebase,
+           Shared Knowledge). Its own pager is the only list pager: workspaces
+           page and sort on the server; the notes scopes are sliced in drive.js. -->
+      <lex-table
+        id="listView"
+        column-filters
+        class="hidden drive-list-table lex-table--card"
+        server-paging
+        columns="name,created_by,created_at,size,actions"
+        labels="Name,Created By,Created,Size,Actions"
+        sortable-columns="name,created_at,size"
+        sort-by="name"
+        sort-dir="asc"
+        limit="20"
+        id-key="key"
+        empty-text="Nothing here yet"
+        aria-label="All folders"
+      ></lex-table>
 
       <!-- Empty State — wrapped in a card so it matches the Workspaces empty state -->
       <div id="contentEmpty" class="hidden">
@@ -225,23 +228,26 @@
         <div id="filesGridView" class="hidden grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
 
         <!-- List View -->
-        <div id="filesListView" class="hidden bg-white rounded-lg shadow-sm border overflow-hidden" style="border-color: var(--lex-border-default)">
-          <table class="min-w-full divide-y" style="border-color: var(--lex-border-default)">
-            <thead style="background-color: var(--lex-bg-secondary)">
-              <tr>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--lex-text-secondary)">Name</th>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--lex-text-secondary)">Workspace</th>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--lex-text-secondary)">Created On</th>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--lex-text-secondary)">Size</th>
-              </tr>
-            </thead>
-            <tbody id="filesListViewBody" class="bg-white divide-y" style="border-color: var(--lex-border-default)"></tbody>
-          </table>
-        </div>
+        <lex-table
+          id="filesListView"
+          class="hidden drive-list-table lex-table--card"
+          server-paging
+          column-filters
+          columns="name,workspace,created_at,size"
+          labels="Name,Workspace,Created,Size"
+          sortable-columns="name,created_at,size"
+          sort-by="created_at"
+          sort-dir="desc"
+          limit="20"
+          id-key="id"
+          empty-text="No matching files"
+          aria-label="Matching files"
+        ></lex-table>
       </div>
 
-      <!-- Pagination Controls -->
-      <lex-pagination id="drivePagination" class="mt-6"></lex-pagination>
+      <!-- Grid view pager (workspaces). Hidden in list view, where each
+           table's own pager is the only pager. -->
+      <lex-pagination id="drivePagination" class="hidden mt-6"></lex-pagination>
     </main>
 
     <!-- ══════════════════════════════════════════════════════════════════
@@ -249,7 +255,8 @@
          ══════════════════════════════════════════════════════════════════ -->
 
     <!-- New Folder Modal -->
-    <lex-modal id="newFolderModal" heading="Create New Folder" size="md" hide-actions="true">
+    <lex-modal id="newFolderModal" heading="Create New Folder" size="md" hide-actions="true"
+      footer-content='<lex-btn type="button" variant="secondary" id="cancelNewFolderBtn">Cancel</lex-btn><lex-btn type="submit" form="newFolderForm" variant="primary" id="createFolderSubmitBtn">Create</lex-btn>'>
       <form id="newFolderForm">
         <lex-input
           id="folderNameInput"
@@ -263,55 +270,12 @@
           </svg>
           Creating a folder will also create a new workspace. To edit workspace details, visit the <a href="/workspaces.html" class="underline" style="color: var(--lex-text-accent)">Workspaces page</a>.
         </p>
-        <div class="flex items-center justify-end gap-3 mt-4">
-          <lex-btn type="button" variant="secondary" id="cancelNewFolderBtn">Cancel</lex-btn>
-          <lex-btn type="submit" variant="primary">Create</lex-btn>
-        </div>
       </form>
     </lex-modal>
 
-    <!-- Matter Actions Modal -->
-    <lex-modal id="matterActionsModal" heading="Folder Options" size="md" hide-actions="true">
-      <div class="space-y-4">
-        <div class="mb-4 p-4 rounded-lg" style="background-color: var(--lex-bg-secondary)">
-          <p class="text-sm font-medium mb-1" style="color: var(--lex-text-secondary)">Folder:</p>
-          <p id="modalMatterName" class="text-base font-medium" style="color: var(--lex-text-primary)"></p>
-          <p id="modalMatterId" class="text-sm" style="color: var(--lex-text-secondary)"></p>
-        </div>
-        <div class="space-y-3">
-          <button onclick="openMatterFromModal()" class="w-full flex items-center gap-3 px-4 py-3 bg-white border-2 rounded-lg transition-all group" style="border-color: var(--lex-border-default)">
-            <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background-color: var(--lex-bg-accent-muted)">
-              <svg class="w-5 h-5" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
-            </div>
-            <div class="flex-1 text-left">
-              <p class="font-medium" style="color: var(--lex-text-primary)">Open Folder</p>
-              <p class="text-sm" style="color: var(--lex-text-secondary)">View files and folders</p>
-            </div>
-          </button>
-          <button id="togglePinBtn" onclick="togglePinFromModal()" class="w-full flex items-center gap-3 px-4 py-3 bg-white border-2 rounded-lg transition-all group" style="border-color: var(--lex-border-default)">
-            <div class="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-              <svg class="w-5 h-5 text-yellow-600" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg>
-            </div>
-            <div class="flex-1 text-left">
-              <p id="pinBtnLabel" class="font-medium" style="color: var(--lex-text-primary)">Pin Folder</p>
-              <p id="pinBtnDesc" class="text-sm" style="color: var(--lex-text-secondary)">Add to pinned folders</p>
-            </div>
-          </button>
-          <button onclick="deleteMatterFromModal()" class="w-full flex items-center gap-3 px-4 py-3 bg-white border-2 rounded-lg transition-all group" style="border-color: var(--lex-border-default)">
-            <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-              <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-            </div>
-            <div class="flex-1 text-left">
-              <p class="font-medium" style="color: var(--lex-text-primary)">Delete Folder</p>
-              <p class="text-sm" style="color: var(--lex-text-secondary)">Permanently delete this folder and all its contents</p>
-            </div>
-          </button>
-        </div>
-      </div>
-    </lex-modal>
-
     <!-- Delete Matter Confirmation Modal -->
-    <lex-modal id="deleteMatterConfirmModal" heading="Delete Folder" size="md" variant="danger" hide-actions="true">
+    <lex-modal id="deleteMatterConfirmModal" heading="Delete Folder" size="md" variant="danger" hide-actions="true"
+      footer-content='<lex-btn onclick="closeDeleteMatterConfirmModal()" variant="secondary">Cancel</lex-btn><lex-btn id="confirmDeleteMatterBtn" onclick="confirmDeleteMatter()" variant="danger">Delete Folder</lex-btn>'>
       <div>
         <div class="flex items-start gap-3 mb-4">
           <div class="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -330,10 +294,6 @@
             </ul>
             <p class="text-sm font-medium mt-3" style="color: var(--lex-status-danger-text)">This action cannot be undone.</p>
           </div>
-        </div>
-        <div class="flex gap-3 mt-6">
-          <lex-btn onclick="closeDeleteMatterConfirmModal()" variant="secondary" style="flex: 1">Cancel</lex-btn>
-          <lex-btn id="confirmDeleteMatterBtn" onclick="confirmDeleteMatter()" variant="danger" style="flex: 1">Delete Folder</lex-btn>
         </div>
       </div>
     </lex-modal>
@@ -397,7 +357,11 @@
   <script src="js/lex/components/foundation/lex-modal.js"></script>
   <script src="js/lex/components/form/lex-input.js"></script>
   <script src="js/lex/components/form/lex-select.js"></script>
+  <script src="js/lex/components/form/lex-dropdown-btn.js"></script>
   <script src="js/lex/components/data/lex-pagination.js"></script>
+  <script src="js/lex/components/data/lex-table.js"></script>
+  <script src="js/shared/library-column-filters.js"></script>
+  <script src="js/shared/list-query-params.js"></script>
 
   <!-- Inject page content + hoist modals -->
   <script src="js/lex/lex-page-init.js"></script>

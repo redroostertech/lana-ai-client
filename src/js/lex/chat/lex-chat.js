@@ -12,6 +12,34 @@
   const Chat = global.Lex.Chat || {};
   if (!LexElement) { console.error('[lex-chat] LexElement not loaded'); return; }
 
+  // Server-authored "what I checked" line saved with a message, if any.
+  function persistedCoverageSummary(message) {
+    const m = message || {};
+    const meta = m.metadata && typeof m.metadata === 'object' ? m.metadata : {};
+    const value = m.coverage_summary || m.coverageSummary || meta.coverage_summary || meta.coverageSummary;
+    return typeof value === 'string' && value.trim() ? value : undefined;
+  }
+
+  // The page the user is on, as a file-viewer back referrer
+  // (e.g. 'workspace-details.html?id=...'). The SPA shell keeps the real
+  // route in history.state.path; standalone pages use the location.
+  function currentRouteForReferrer() {
+    const state = global.history && global.history.state;
+    if (state && typeof state.path === 'string' && state.path) {
+      return state.path.charAt(0) === '/' ? state.path.substring(1) : state.path;
+    }
+    const loc = global.location || {};
+    const pathname = String(loc.pathname || '');
+    const markers = ['/public_html/', '/src/'];
+    let route = '';
+    for (let i = 0; i < markers.length && !route; i++) {
+      const idx = pathname.lastIndexOf(markers[i]);
+      if (idx !== -1) route = pathname.substring(idx + markers[i].length);
+    }
+    if (!route) route = pathname.substring(pathname.lastIndexOf('/') + 1);
+    return route ? route + String(loc.search || '') : '';
+  }
+
   // ---------------------------------------------------------------------------
   // Tool-name humanizer
   // ---------------------------------------------------------------------------
@@ -24,6 +52,17 @@
   // To extend: add a new entry below; for tools whose phrasing depends on a
   // param (e.g. get_matter_data + data_type), branch inside the function.
   // ---------------------------------------------------------------------------
+
+  // Matches chef's ChatStateService MAX_ACTIVE_DOCUMENTS.
+  const MAX_CHAT_DOCUMENTS = 3;
+
+  // Conversation candidates and library files share one result shape.
+  function toDocumentResult(row) {
+    const id = row.file_id || row.document_id || row.id;
+    const filename = row.filename || row.original_filename || row.name || 'Document';
+    const workspace = row.workspace_name || row.matter_name || row.client_matter_name || '';
+    return { id, filename, name: filename, meta: workspace };
+  }
 
   function humanizeSnakeCase(name) {
     const cleaned = String(name || '').replace(/_/g, ' ').trim();
@@ -312,10 +351,6 @@
         // include matter contacts in addition to org users + agents.
         if (this.matterId) this._composerEl.matterId = this.matterId;
       }
-      if (this._documentsEl) {
-        this._documentsEl.mode = this.chatMode;
-      }
-
       // Show welcome
       if (this._threadEl && !this.conversationId) {
         this._threadEl.showWelcome();
@@ -371,28 +406,17 @@
         if (!this._bridge) this.send(e.detail.value);
       });
 
-      // Document remove
-      this.addEventListener('lex-document-remove', async (e) => {
-        try {
-          if (this._source) {
-            const state = await this._source.removeDocument(e.detail.documentId);
-            if (state) this._updateDocumentState(state);
-          }
-        } catch (err) {
-          this._showSystemMessage('Failed to remove document: ' + err.message);
-        }
+      // Banner chip remove / Clear / Manage
+      this.addEventListener('lex-document-remove', (e) => {
+        this.removeDocument(e.detail.documentId);
       });
 
-      // Document exit
-      this.addEventListener('lex-document-exit', async () => {
-        try {
-          if (this._source) {
-            const state = await this._source.clearDocuments();
-            if (state) this._updateDocumentState(state);
-          }
-        } catch (err) {
-          this._showSystemMessage('Failed to exit document mode: ' + err.message);
-        }
+      this.addEventListener('lex-document-exit', () => {
+        this.clearDocuments();
+      });
+
+      this.addEventListener('lex-document-manage', () => {
+        this.openDocumentsManager();
       });
 
       // Citation click — emit cancelable event, then open document as default.
@@ -437,13 +461,12 @@
         this._loadMoreHistory();
       });
 
-      // Composer tool selection — set component state, not global localStorage
+      // Composer tool selection — set component state, not global localStorage.
+      // Tools are modes: the composer keeps one active at a time. Documents are
+      // not a mode; attaching one is the signal (see addDocument).
       this.addEventListener('lex-composer-tool-select', (e) => {
         const { toolId } = e.detail;
-        if (toolId === 'document_chat') {
-          this._props.chatMode = 'document';
-          if (this._documentsEl) this._documentsEl.mode = 'document';
-        } else if (toolId === 'agentic') {
+        if (toolId === 'agentic') {
           this._props.chatMode = 'agentic';
         } else if (toolId === 'insights_chat') {
           this._props.chatMode = 'insights';
@@ -454,12 +477,7 @@
       // Composer tool dismiss
       this.addEventListener('lex-composer-tool-dismiss', (e) => {
         const { toolId } = e.detail;
-        if (toolId === 'document_chat') {
-          if (this._documents.length === 0) {
-            this._props.chatMode = 'general';
-            if (this._documentsEl) this._documentsEl.mode = 'general';
-          }
-        } else if (toolId === 'agentic') {
+        if (toolId === 'agentic') {
           this._props.chatMode = 'general';
         } else if (toolId === 'insights_chat') {
           this._props.chatMode = 'general';
@@ -467,9 +485,24 @@
         this.emit('lex-chat-tool-dismiss', { toolId });
       });
 
-      // Composer manage documents request
+      // Composer "Manage chat documents". Hosts may cancel lex-chat-manage-documents
+      // to show their own UI; otherwise the chat opens its documents drawer.
       this.addEventListener('lex-composer-manage-documents', () => {
-        this.emit('lex-chat-manage-documents');
+        const evt = new CustomEvent('lex-chat-manage-documents', {
+          bubbles: true, composed: true, cancelable: true
+        });
+        this.dispatchEvent(evt);
+        if (!evt.defaultPrevented) this.openDocumentsManager();
+      });
+
+      // Composer # picker search
+      this.addEventListener('lex-composer-document-search', (e) => {
+        const composer = this._composerEl;
+        if (!composer || typeof composer.setDocumentResults !== 'function') return;
+        const seq = (this._docSearchSeq = (this._docSearchSeq || 0) + 1);
+        this.searchDocuments((e.detail && e.detail.query) || '', { limit: 10 })
+          .then((docs) => { if (seq === this._docSearchSeq) composer.setDocumentResults(docs); })
+          .catch(() => { if (seq === this._docSearchSeq) composer.setDocumentResults([]); });
       });
 
       // Composer document selection from # picker — add document to chat context
@@ -795,18 +828,26 @@
       // Use component state only — no global localStorage that persists across conversations
       if (this.chatMode === 'agentic') {
         sendOpts.contextType = 'agentic_mode';
-      } else if (this.chatMode === 'document') {
-        sendOpts.contextType = 'document_chat';
-        // Auto-include pinned documents as attachments in document chat mode
-        if (this._documents && this._documents.length > 0 && !sendOpts.attachments) {
-          sendOpts.attachments = {
-            files: this._documents.map(d => ({ file_id: d.id, name: d.filename || d.name }))
-          };
-        }
       } else if (this.chatMode === 'insights') {
         sendOpts.contextType = sendOpts.attachments && sendOpts.attachments.module_context
           ? 'insights_chat'
           : 'data_chat';
+      }
+      // Documents added before the thread existed are not saved on the server
+      // yet, so this turn carries them. Saved ones the server loads itself.
+      const unsaved = this._pendingDocumentAdds || [];
+      if (unsaved.length > 0) {
+        const attachments = sendOpts.attachments && !Array.isArray(sendOpts.attachments)
+          ? { ...sendOpts.attachments }
+          : {};
+        const files = Array.isArray(attachments.files) ? attachments.files.slice() : [];
+        for (const doc of unsaved) {
+          if (!files.some(f => String(f.file_id) === String(doc.id))) {
+            files.push({ file_id: doc.id, name: doc.name });
+          }
+        }
+        attachments.files = files;
+        if (!Array.isArray(sendOpts.attachments)) sendOpts.attachments = attachments;
       }
       // Explicit contextType prop takes precedence
       if (this.contextType && !sendOpts.contextType) sendOpts.contextType = this.contextType;
@@ -1113,7 +1154,12 @@
      * Load a conversation by ID.
      */
     async loadConversation(id) {
-      if (this.conversationId && this.conversationId !== id) this._clearActiveRetryReceipt();
+      if (this.conversationId && this.conversationId !== id) {
+        this._clearActiveRetryReceipt();
+        // Documents waiting on another thread's first message stay with it.
+        this._pendingDocumentAdds = [];
+        this._conversationRegistered = false;
+      }
       const loadSeq = ++this._loadConversationSeq;
       this._props.conversationId = id;
       this._resetContextMeter();
@@ -1125,10 +1171,12 @@
         await this._source.connect(id);
         if (!isCurrentLoad() || this._activeTurnId) return;
 
-        // Load selected documents for document mode without exposing raw chat state.
+        // Load the thread's documents without exposing raw chat state.
         const state = await this._source.loadState();
         if (!isCurrentLoad() || this._activeTurnId) return;
-        if (state) this._updateDocumentState(state);
+        // The server answered for this id, so the thread is saved.
+        this._conversationRegistered = true;
+        this._updateDocumentState(state || { activeDocuments: [] });
 
         // Load history
         const result = await this._source.loadHistory(1, this.maxHistory);
@@ -1145,6 +1193,7 @@
                 timestamp: m.timestamp || m.created_at,
                 citations: m.citations && m.citations.length > 0 ? m.citations : undefined,
                 references: m.references && m.references.length > 0 ? m.references : undefined,
+                coverageSummary: persistedCoverageSummary(m),
                 artifacts: m.artifacts && m.artifacts.length > 0 ? m.artifacts : undefined,
                 attachments: messageAttachments.length > 0 ? messageAttachments : undefined,
                 duration: m.duration || null,
@@ -1261,17 +1310,117 @@
         this._threadEl.clear();
         this._threadEl.showWelcome();
       }
-      if (this._documentsEl) {
-        this._documentsEl.documents = [];
-        this._documentsEl.mode = 'general';
+      this._setDocuments([]);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Chat documents — the documents LANA answers this chat from (max 3)
+    // ---------------------------------------------------------------------------
+
+    get maxDocuments() { return MAX_CHAT_DOCUMENTS; }
+
+    // A new thread can hold an id before its first message, but the server
+    // does not know it until that message is saved.
+    _isThreadSaved() {
+      return !!this.conversationId && this._conversationRegistered === true;
+    }
+
+    getDocuments() {
+      return (this._documents || []).map(doc => ({
+        id: doc.id,
+        filename: doc.filename || doc.name || 'Document'
+      }));
+    }
+
+    openDocumentsManager() {
+      const open = global.Lex.Chat && global.Lex.Chat.openDocumentsManager;
+      return typeof open === 'function' ? open(this) : null;
+    }
+
+    /**
+     * Search documents the user can add, scoped like the chat:
+     * - saved workspace thread: the server's candidates for it (that
+     *   workspace plus what it inherits, access-checked);
+     * - new workspace thread: library files in that workspace (its matter, or
+     *   the one the host will create it in, see _newThreadWorkspace);
+     * - no workspace: the whole library. Chef's candidates for an unscoped
+     *   thread are only files uploaded into it, which the composer cannot do.
+     * Resolves to [{ id, filename, name, meta }].
+     */
+    async searchDocuments(query, opts = {}) {
+      const api = global.api;
+      if (!api) return [];
+      const limit = opts.limit || 10;
+      const text = String(query || '').trim();
+      if (this._isThreadSaved()) {
+        const data = await new Chat.ConversationsApiClient(api)
+          .getDocumentCandidates(this.conversationId, { search: text, limit });
+        if (data && (data.matter_id || data.matterId)) {
+          const rows = data.document_candidates || data.files || data.candidates || [];
+          return rows.map(toDocumentResult);
+        }
+        return this._searchLibrary(text, limit, null);
+      }
+      return this._searchLibrary(text, limit, this._newThreadWorkspace());
+    }
+
+    // The workspace a new thread will be created in: its own matter, else
+    // whatever a host answers on lex-chat-document-scope (the dock fills in
+    // the workspace page the user is on, the same matter it adds on create).
+    _newThreadWorkspace() {
+      if (this.matterId) return this.matterId;
+      const detail = { matterId: null };
+      this.dispatchEvent(new CustomEvent('lex-chat-document-scope', { detail, bubbles: true, composed: true }));
+      return detail.matterId || null;
+    }
+
+    async _searchLibrary(text, limit, workspaceId) {
+      const params = new URLSearchParams({ page: '1', page_size: String(limit), sort_by: 'updated_at', sort_order: 'desc' });
+      if (text) params.set('search', text);
+      // Accepts the workspace's code or UUID.
+      if (workspaceId) params.set('workspaces', workspaceId);
+      const data = await global.api.get('/api/v1/storage/library/files?' + params.toString());
+      const rows = (data && (data.files || data.documents || (data.data && (data.data.files || data.data.documents)))) || [];
+      return rows.map(toDocumentResult);
+    }
+
+    _setDocuments(docs) {
+      this._documents = docs;
+      if (this._documentsEl) this._documentsEl.documents = docs;
+      this.emit('lex-chat-documents-change', { documents: this.getDocuments() });
+    }
+
+    async clearDocuments() {
+      this._pendingDocumentAdds = [];
+      if (!this._isThreadSaved() || !this._source) {
+        this._setDocuments([]);
+        return;
+      }
+      try {
+        const state = await this._source.clearDocuments();
+        if (state) this._updateDocumentState(state);
+      } catch (err) {
+        this._showSystemMessage('Failed to clear documents: ' + err.message);
       }
     }
 
     /**
-     * Add a document to document mode.
+     * Add a document to this chat.
      */
     async addDocument(id, name) {
       if (!this._source) return;
+      if (this._documents.some(doc => String(doc.id) === String(id))) return;
+      // An unsaved thread cannot save documents yet: keep them here, send
+      // them with the first message and save them once it lands.
+      if (!this._isThreadSaved()) {
+        if (this._documents.length >= MAX_CHAT_DOCUMENTS) {
+          const message = `Maximum of ${MAX_CHAT_DOCUMENTS} documents allowed. Remove a document first.`;
+          this._showSystemMessage(message);
+          throw new Error(message);
+        }
+        this._queuePendingDocument(id, name);
+        return;
+      }
       // Capture new-thread state before awaiting. The streaming connection can
       // register the conversation while this request is in flight; checking
       // only inside catch would then turn the expected race into a false error.
@@ -1286,10 +1435,7 @@
         // queue the attach and retry silently after the first response.
         if (shouldDeferUntilFirstResponse ||
             String(err.message || '').toLowerCase().indexOf('persisted before its first message') !== -1) {
-          this._pendingDocumentAdds = this._pendingDocumentAdds || [];
-          if (!this._pendingDocumentAdds.some((document) => document.id === id)) {
-            this._pendingDocumentAdds.push({ id, name });
-          }
+          this._queuePendingDocument(id, name);
           return;
         }
         this._showSystemMessage('Failed to add document: ' + err.message);
@@ -1297,11 +1443,29 @@
       }
     }
 
+    _queuePendingDocument(id, name) {
+      this._pendingDocumentAdds = this._pendingDocumentAdds || [];
+      if (!this._pendingDocumentAdds.some((document) => String(document.id) === String(id))) {
+        this._pendingDocumentAdds.push({ id, name });
+      }
+      if (!this._documents.some(doc => String(doc.id) === String(id))) {
+        this._setDocuments(this._documents.concat([{ id, filename: name || 'Document' }]));
+      }
+    }
+
     /**
-     * Remove a document from document mode.
+     * Remove a document from this chat.
      */
     async removeDocument(id) {
       if (!this._source) return;
+      const pending = this._pendingDocumentAdds || [];
+      if (pending.some(doc => String(doc.id) === String(id))) {
+        this._pendingDocumentAdds = pending.filter(doc => String(doc.id) !== String(id));
+        this._setDocuments(this._documents.filter(doc => String(doc.id) !== String(id)));
+        if (this._composerEl) this._composerEl.removeDocument(id);
+        return;
+      }
+      if (this._composerEl) this._composerEl.removeDocument(id);
       try {
         const state = await this._source.removeDocument(id);
         if (state) this._updateDocumentState(state);
@@ -1489,6 +1653,18 @@
             this._activityEl.update(event.message || 'Processing...', event.phase || 'agentic');
             this._activityEl.addReasoningEntry(event);
           }
+          break;
+
+        // LANA has gone as far as she honestly can and is asking.
+        //
+        // Rendered as a DECISION so answering is one tap. The user still has the
+        // composer, and `allow_custom` is always on, because a question that
+        // cannot be walked away from is the failure mode that makes people stop
+        // using a tool. The backend treats an off-topic reply as `abstained`
+        // and simply runs a normal turn.
+        case 'uncertainty':
+          if (this._activityEl) this._activityEl.hide();
+          this._insertUncertaintyBlock(event);
           break;
 
         case 'plan_ready':
@@ -1755,14 +1931,12 @@
     }
 
     _updateDocumentState(state) {
-      this._props.chatMode = state.mode || 'general';
-      const docs = state.activeDocuments || [];
-      this._documents = docs;
-
-      if (this._documentsEl) {
-        this._documentsEl.documents = docs;
-        this._documentsEl.mode = state.mode || 'general';
-      }
+      // The server's saved list, plus any still waiting to be saved.
+      const saved = state.activeDocuments || [];
+      const waiting = (this._pendingDocumentAdds || [])
+        .filter(doc => !saved.some(s => String(s.id) === String(doc.id)))
+        .map(doc => ({ id: doc.id, filename: doc.name || 'Document' }));
+      this._setDocuments(saved.concat(waiting));
     }
 
     /**
@@ -1825,6 +1999,65 @@
       }
 
       return el;
+    }
+
+    /**
+     * Render an open question as a decision block.
+     *
+     * Reuses the existing `decision` block rather than adding a component: it
+     * already renders selectable cards, already allows a custom reply, and
+     * already routes the answer back through ActionBridge as a follow-up
+     * message, which is exactly the round trip the backend contract expects.
+     *
+     * The LABEL is what gets sent, never the id. The backend classifies the
+     * reply against the candidates it offered and matches on the label; sending
+     * an opaque id would put a string the user never saw into their own
+     * transcript.
+     */
+    _insertUncertaintyBlock(event) {
+      if (!this._threadEl || !this._threadEl._container) return;
+      if (!global.Lex || !global.Lex.BlockRenderer) return;
+
+      var welcome = this._threadEl._container.querySelector('.lex-chat-welcome');
+      if (welcome) welcome.remove();
+
+      var candidates = Array.isArray(event.candidates) ? event.candidates : [];
+      var options = candidates.map(function (candidate) {
+        var label = String((candidate && candidate.label) || '').trim();
+        if (!label) return null;
+        return { label: label, value: label };
+      }).filter(Boolean);
+
+      // A confirmation is still a choice, and it needs its "no". Without an
+      // explicit decline the only way to say no is to ignore the question,
+      // which reads as the product having stalled.
+      if (options.length === 1 && event.resolvesBy === 'confirmation') {
+        options = [
+          { label: 'Yes, ' + options[0].label, value: 'Yes, ' + options[0].label },
+          { label: 'No, not that one', value: 'No, not that one' }
+        ];
+      }
+      if (options.length === 0) return;
+
+      var host = document.createElement('div');
+      host.className = 'lex-chat-uncertainty';
+      this._threadEl._container.appendChild(host);
+
+      global.Lex.BlockRenderer.render(host, [{
+        type: 'decision',
+        prompt: event.prompt || 'Which did you mean?',
+        options: options,
+        // ALWAYS true. The escape hatch is the anti-trap rule, not a nicety.
+        allow_custom: true,
+        custom_placeholder: 'Something else...'
+      }]);
+
+      if (this._threadEl.scrollToBottom) this._threadEl.scrollToBottom();
+      this.emit('lex-chat-uncertainty', {
+        uncertaintyKind: event.uncertaintyKind,
+        resolvesBy: event.resolvesBy,
+        candidates: candidates.length
+      });
     }
 
     _insertPlanCard(event) {
@@ -1940,16 +2173,9 @@
     _processMessageMentions(content) {
       const svc = global.DocumentProcessingService;
       if (!svc) return;
-      const docs = (this._documents || []).concat(this._getAvailableDocuments());
+      const docs = this._documents || [];
       if (docs.length === 0) return;
       svc.processMessageMentions(content, docs, this._jitCallbacks());
-    }
-
-    _getAvailableDocuments() {
-      if (global.ChatFileDrawer && typeof global.ChatFileDrawer.getMentionItems === 'function') {
-        return global.ChatFileDrawer.getMentionItems() || [];
-      }
-      return [];
     }
 
     // ---------------------------------------------------------------------------
@@ -1978,20 +2204,116 @@
         return;
       }
 
-      const requestedPage = Number(detail.page);
-      const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
-
-      try {
-        if (!global.Lex.Nav || typeof global.Lex.Nav.go !== 'function') {
-          throw new Error('File viewer navigation not available');
-        }
-        // The viewer loads canonical metadata and enforces authenticated access.
-        // A raw blob popup does not reliably initialize Electron's PDF viewer.
-        await global.Lex.Nav.go('file-viewer.html', { params: { id: docId, page } });
-      } catch (err) {
-        console.error('[lex-chat] Citation document open failed:', err);
+      // Documents open in a modal over the current page, hosting the file
+      // viewer in its embedded mode at the cited page with the quoted passage
+      // highlighted. The page underneath and the chat dock stay as they are.
+      // Never a new window: a blob child window cannot render PDFs, and the
+      // system browser is never used for workspace documents.
+      const Nav = global.Lex && global.Lex.Nav;
+      const Modal = global.Lex && global.Lex.Modal;
+      const Evidence = Chat.Evidence;
+      if (!Nav || typeof Nav.href !== 'function' || !Modal || typeof Modal.open !== 'function' || !Evidence) {
         this._showSystemMessage('Could not open document. Please try again.');
+        return;
       }
+      const nav = Evidence.buildCitationViewerNavigation({
+        documentId: docId,
+        citation: detail.citation || null,
+        page: detail.page,
+        referrer: currentRouteForReferrer()
+      });
+      const citation = detail.citation || {};
+      const label = (typeof Chat.documentCitationDisplayName === 'function' && Chat.documentCitationDisplayName(citation))
+        || citation.label || citation.filename || detail.filename || 'Document';
+      this._openCitationViewerModal(nav, label);
+    }
+
+    /**
+     * The citation viewer modal: lex-modal (X, Escape, backdrop close, focus
+     * trap, focus returned to the clicked source) around an iframe of
+     * file-viewer.html?chrome=embedded. "Open full view" goes to the page.
+     */
+    _openCitationViewerModal(nav, label) {
+      const Nav = global.Lex.Nav;
+      const doc = global.document;
+      const trigger = doc.activeElement && doc.activeElement !== doc.body ? doc.activeElement : null;
+
+      const frame = doc.createElement('iframe');
+      frame.className = 'lex-chat-source-viewer-frame';
+      frame.title = 'Document viewer: ' + label;
+      // Part of the modal's focus trap cycle.
+      frame.setAttribute('tabindex', '0');
+      frame.src = Nav.href(nav.path, Object.assign({}, nav.params, { chrome: 'embedded' }));
+
+      const escapeAttr = (value) => (ChatFormat && ChatFormat.escapeHtml ? ChatFormat.escapeHtml(String(value)) : String(value));
+      const modal = global.Lex.Modal.open({
+        heading: label,
+        content: frame,
+        size: 'xl',
+        width: 'calc(100vw - 64px)',
+        flush: true,
+        closeOnOverlay: true,
+        headerActions: '<lex-btn variant="secondary" size="sm" data-citation-open-full aria-label="Open ' + escapeAttr(label) + ' in the full file viewer">Open full view</lex-btn>'
+      });
+      if (modal && modal.classList) modal.classList.add('lex-chat-source-modal');
+      // lex-modal copies its content when it upgrades: use the live frame.
+      const liveFrame = (modal && typeof modal.querySelector === 'function'
+        && modal.querySelector('iframe.lex-chat-source-viewer-frame')) || frame;
+
+      let closed = false;
+      const onMessage = (event) => {
+        const data = event && event.data;
+        if (!data || event.source !== liveFrame.contentWindow) return;
+        if (data.type === 'lex-embedded-back' || data.type === 'lex-embedded-close') close();
+      };
+      const cleanup = () => {
+        if (closed) return;
+        closed = true;
+        global.removeEventListener('message', onMessage);
+        liveFrame.src = 'about:blank';
+        if (trigger && trigger.isConnected !== false && typeof trigger.focus === 'function') {
+          setTimeout(() => trigger.focus(), 0);
+        }
+      };
+      const close = () => {
+        cleanup();
+        if (modal && typeof modal.removeAfterClose === 'function') modal.removeAfterClose();
+      };
+      global.addEventListener('message', onMessage);
+      if (modal && typeof modal.addEventListener === 'function') {
+        // X, Escape and backdrop clicks all emit lex-close.
+        modal.addEventListener('lex-close', cleanup);
+        modal.addEventListener('click', (event) => {
+          const target = event.target && event.target.closest ? event.target.closest('[data-citation-open-full]') : null;
+          if (!target) return;
+          event.preventDefault();
+          close();
+          this._handOffConversationToDock();
+          Nav.go(nav.path, { params: nav.params, context: nav.context });
+        });
+      }
+      return modal;
+    }
+
+    /**
+     * "Open full view" is a full page load. Queue this conversation for the
+     * viewer's LANA dock (the same one-shot hand-off NavigationHelpers uses)
+     * so the chat the user clicked from is open beside the document.
+     */
+    _handOffConversationToDock() {
+      const threadId = this.conversationId;
+      if (!threadId) return;
+      const action = { type: 'conversation', threadId, matterId: this.matterId || null };
+      const helpers = global.NavigationHelpers;
+      if (helpers && typeof helpers.queueLanaDockAction === 'function') {
+        helpers.queueLanaDockAction(action);
+        return;
+      }
+      try {
+        if (global.sessionStorage) {
+          global.sessionStorage.setItem('lana_dock_pending_action', JSON.stringify(Object.assign({ createdAt: Date.now() }, action)));
+        }
+      } catch (_) { /* storage unavailable: the dock still restores its active conversation */ }
     }
 
     _openReference(reference) {
@@ -2092,11 +2414,13 @@
     async _showCitationSourceDetails(detail) {
       let citation = detail && detail.citation ? detail.citation : {};
       citation = await this._hydrateDomainPackCitation(citation);
-      const label = citation.label || citation.filename || citation.citation || detail.filename || 'Source';
+      const displayName = typeof Chat.documentCitationDisplayName === 'function'
+        ? Chat.documentCitationDisplayName(citation) : null;
+      const label = displayName || citation.label || citation.filename || citation.citation || detail.filename || 'Source';
       const sourceKind = this._getCitationSourceKind(citation);
       const sourceType = sourceKind.label;
       const authorityId = citation.authority_id || citation.authorityId || citation.sourceRef || citation.id || '';
-      const citationText = citation.citation || citation.label || citation.filename || '';
+      const citationText = citation.citation || displayName || citation.label || citation.filename || '';
       const excerpt = citation.excerpt || citation.snippet || citation.chunk_text || citation.content || citation.text || '';
       const pack = citation.domain_pack || citation.domainPack || null;
       const locator = citation.locator || {};
@@ -2286,6 +2610,7 @@
               timestamp: m.timestamp,
               citations: m.citations,
               references: m.references,
+              coverageSummary: persistedCoverageSummary(m),
               artifacts: m.artifacts,
               duration: m.duration || null,
               tokenCount: m.tokenCount || null

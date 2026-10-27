@@ -21,15 +21,13 @@
   gap: 12px;
 }
 
-.bc-panel {
+/* A scope's toolbar card, section heading and table (docs/TABLE-STANDARD.md).
+   The toolbar and lex-table--card carry their own card chrome. */
+.bc-panel,
+.bc-list {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: var(--lex-bg-primary);
-  border: 1px solid var(--lex-border-subtle);
-  border-radius: 12px;
-  padding: 16px;
-  box-shadow: var(--lex-shadow-sm);
 }
 
 .bc-panel.bc-hidden {
@@ -41,6 +39,135 @@
 .bc-hidden {
   display: none;
 }
+
+.bc-list.bc-hidden {
+  display: none;
+}
+
+.bc-table-toolbar {
+  background: var(--lex-bg-primary);
+  border: 1px solid var(--lex-border-default);
+  border-radius: 8px;
+  box-shadow: var(--lex-shadow-sm);
+  padding: 16px;
+}
+
+.bc-table-toolbar-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.bc-table-toolbar-search {
+  flex: 1;
+  min-width: 200px;
+}
+
+.bc-table-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bc-table-toolbar-label {
+  font-size: 14px;
+  white-space: nowrap;
+  color: var(--lex-text-secondary);
+}
+
+.bc-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.bc-section-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--lex-text-primary);
+}
+
+/* Cells */
+.bc-name-cell {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.bc-name {
+  font-weight: 600;
+  color: var(--lex-text-primary);
+  overflow-wrap: break-word;
+}
+
+.bc-subtitle,
+.bc-cell-muted {
+  color: var(--lex-text-tertiary);
+  font-size: 13px;
+}
+
+.bc-time {
+  white-space: nowrap;
+}
+
+.bc-workspace-link {
+  appearance: none;
+  background: none;
+  border: 0;
+  color: var(--lex-accent, #3b5bdb);
+  cursor: pointer;
+  display: block;
+  font: inherit;
+  font-weight: 600;
+  max-width: 100%;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.bc-workspace-link > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bc-workspace-link:focus-visible {
+  border-radius: 4px;
+  box-shadow: var(--lex-focus-ring);
+  outline: none;
+}
+
+/* Column widths. Narrow windows scroll sideways. */
+#bcOrgTable th,
+#bcOrgStudioTable th,
+#bcMyTable th {
+  white-space: nowrap;
+}
+
+/* Organization documents: File, Type, Matter, Template, Created, Last edited */
+#bcOrgTable table { min-width: 920px; }
+#bcOrgTable th:nth-child(2) { width: 88px; }
+#bcOrgTable th:nth-child(3) { width: 22%; }
+#bcOrgTable th:nth-child(4) { width: 120px; }
+#bcOrgTable th:nth-child(5) { width: 176px; }
+#bcOrgTable th:nth-child(6) { width: 150px; }
+
+/* Doc Studio files: File, Style, Sections, Created */
+#bcOrgStudioTable table { min-width: 720px; }
+#bcOrgStudioTable th:nth-child(2) { width: 140px; }
+#bcOrgStudioTable th:nth-child(3) { width: 120px; }
+#bcOrgStudioTable th:nth-child(4) { width: 176px; }
+
+/* My notes: Name, Folder, Created, Last edited */
+#bcMyTable table { min-width: 760px; }
+#bcMyTable th:nth-child(2) { width: 28%; }
+#bcMyTable th:nth-child(3) { width: 176px; }
+#bcMyTable th:nth-child(4) { width: 150px; }
+#bcMyTable td:nth-child(2) { max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .bc-status {
   margin: 0;

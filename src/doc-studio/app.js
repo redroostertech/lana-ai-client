@@ -8,7 +8,6 @@ const state = {
   view: 'slides',
   presentationId: null,
   presentations: [],
-  libraryDocuments: [],
   selectedSlideIndex: 0,
   templateGalleryOpen: false,
   templates: [],
@@ -126,7 +125,7 @@ function replaceClientUrl(path) {
 }
 
 async function openDocStudioLibrary() {
-  if (state.view !== 'library' && !confirmUnsavedDocumentChanges()) {
+  if (state.view !== 'library' && !(await confirmUnsavedDocumentChanges())) {
     return;
   }
   setDocumentEditorMode(false);
@@ -344,11 +343,15 @@ function formatLastSaved(value) {
   return `Last saved ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
 }
 
-function confirmUnsavedDocumentChanges() {
+async function confirmUnsavedDocumentChanges() {
   if (!state.documentDirty) {
     return true;
   }
-  return window.confirm('Continue with unsaved document changes? Save first if you want them persisted.');
+  return window.Lex.Modal.confirmAsync(
+    'Unsaved changes',
+    'Continue with unsaved document changes? Save first if you want them persisted.',
+    { confirmText: 'Continue' }
+  );
 }
 
 function cloneDocumentModel() {
@@ -432,6 +435,25 @@ function setInputValue(input, value) {
   if (input && document.activeElement !== input) {
     input.value = value;
   }
+}
+
+// lex-select options are { value, label } with string values; the value is
+// set after the options so the selection always has a matching label.
+function setSelectOptions(select, options, value) {
+  if (!select) {
+    return;
+  }
+  select.options = options.map(option => ({ value: String(option.value), label: option.label }));
+  select.value = value === null || value === undefined ? '' : String(value);
+}
+
+function capitalizeLabel(value) {
+  const text = String(value ?? '');
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : text;
+}
+
+function selectOptionsAttr(options) {
+  return escapeHtml(JSON.stringify(options.map(option => ({ value: String(option.value), label: option.label }))));
 }
 
 function sourceFileNames() {
@@ -1653,16 +1675,24 @@ function renderEditorTools() {
   elements.toggleTemplatesBtn.classList.toggle('active', state.templateGalleryOpen);
   elements.toggleTemplatesBtn.textContent = state.templateGalleryOpen ? 'Hide templates' : 'Templates';
   elements.saveMetadataBtn.disabled = !cards.length && !state.presentationId;
-  elements.slidePicker.innerHTML = cards.length
-    ? cards.map((card, index) => `<option value="${index}" ${index === state.selectedSlideIndex ? 'selected' : ''}>${index + 1}. ${escapeHtml(card.title || 'Untitled slide')}</option>`).join('')
-    : '<option>No slides</option>';
+  elements.slidePicker.placeholder = 'No slides';
+  setSelectOptions(
+    elements.slidePicker,
+    cards.map((card, index) => ({ value: index, label: `${index + 1}. ${card.title || 'Untitled slide'}` })),
+    cards.length ? state.selectedSlideIndex : ''
+  );
+  elements.slidePicker.disabled = !cards.length;
   const selectedLayout = selectedCard?.design?.template?.layoutFamily || selectedCard?.design?.layout;
-  elements.slideLayout.innerHTML = layoutOptions.map(layout => `<option value="${escapeHtml(layout)}" ${selectedLayout === layout ? 'selected' : ''}>${escapeHtml(layout.replace(/-/g, ' '))}</option>`).join('');
-  elements.slideStyle.innerHTML = ['deck'].concat(styleOptions).map(style => {
-    const active = style === 'deck' ? !selectedCard?.design?.style : selectedCard?.design?.style === style;
-    const label = style === 'deck' ? `Deck (${activeDeckStyle()})` : style;
-    return `<option value="${escapeHtml(style)}" ${active ? 'selected' : ''}>${escapeHtml(label)}</option>`;
-  }).join('');
+  setSelectOptions(
+    elements.slideLayout,
+    layoutOptions.map(layout => ({ value: layout, label: capitalizeLabel(layout.replace(/-/g, ' ')) })),
+    layoutOptions.includes(selectedLayout) ? selectedLayout : (layoutOptions[0] || '')
+  );
+  setSelectOptions(
+    elements.slideStyle,
+    ['deck'].concat(styleOptions).map(style => ({ value: style, label: style === 'deck' ? `Deck (${activeDeckStyle()})` : capitalizeLabel(style) })),
+    selectedCard?.design?.style && styleOptions.includes(selectedCard.design.style) ? selectedCard.design.style : 'deck'
+  );
   elements.slideLayout.disabled = !selectedCard;
   elements.slideStyle.disabled = !selectedCard;
 
@@ -1692,12 +1722,10 @@ function renderEditorTools() {
       <span>Visual label</span>
       <input id="visualLabelInput" value="${escapeHtml(visualLabel(selectedCard.visual, design.layout || 'statement'))}">
     </label>
-    <label class="mini-field">
+    <div class="mini-field">
       <span>Image style</span>
-      <select id="slideImageStyleInput">
-        ${imageStyleOptions.map(style => `<option value="${escapeHtml(style)}" ${activeSlideImageStyle(selectedCard) === style ? 'selected' : ''}>${escapeHtml(style.replace(/-/g, ' '))}</option>`).join('')}
-      </select>
-    </label>
+      <lex-select id="slideImageStyleInput" options="${selectOptionsAttr(imageStyleOptions.map(style => ({ value: style, label: capitalizeLabel(style.replace(/-/g, ' ')) })))}" value="${escapeHtml(activeSlideImageStyle(selectedCard))}"></lex-select>
+    </div>
     <label class="mini-field image-prompt-field">
       <span>Image prompt</span>
       <textarea id="imagePromptInput" rows="3">${escapeHtml(selectedCard.image_prompt || '')}</textarea>
@@ -1705,13 +1733,11 @@ function renderEditorTools() {
     ${state.libraryCapabilities.imageAvailable ? '' : '<span class="image-unavailable">Image provider unavailable. Configure OPENAI_API_KEY to generate images.</span>'}
     <div class="bullet-icon-editor" aria-label="Bullet icons">
       ${points.map((point, pointIndex) => `
-        <label class="bullet-icon-row">
+        <div class="bullet-icon-row">
           <span>${escapeHtml(String(pointIndex + 1))}</span>
-          <select data-bullet-icon="${pointIndex}">
-            ${iconNames.map(name => `<option value="${escapeHtml(name)}" ${(bulletIcons[pointIndex]?.icon || icons[pointIndex % icons.length]) === name ? 'selected' : ''}>${escapeHtml(name)}</option>`).join('')}
-          </select>
+          <lex-select data-bullet-icon="${pointIndex}" size="sm" searchable="true" options="${selectOptionsAttr(iconNames.map(name => ({ value: name, label: name })))}" value="${escapeHtml(bulletIcons[pointIndex]?.icon || icons[pointIndex % icons.length])}"></lex-select>
           <small>${escapeHtml(point)}</small>
-        </label>
+        </div>
       `).join('')}
     </div>
   `;
@@ -1723,10 +1749,14 @@ function renderBrandKitControls() {
     return;
   }
 
-  const options = ['<option value="">Select saved kit</option>'].concat(
-    state.brandKits.map(kit => `<option value="${escapeHtml(kit.id)}">${escapeHtml(kit.name)} · ${escapeHtml(kit.style || 'editorial')}</option>`)
+  elements.brandKitSelect.placeholder = 'Select saved kit';
+  setSelectOptions(
+    elements.brandKitSelect,
+    [{ value: '', label: 'Select saved kit' }].concat(
+      state.brandKits.map(kit => ({ value: kit.id, label: `${kit.name} · ${kit.style || 'editorial'}` }))
+    ),
+    ''
   );
-  elements.brandKitSelect.innerHTML = options.join('');
 }
 
 function renderCriticPanel() {
@@ -1927,23 +1957,6 @@ function formatDate(value) {
   }
 }
 
-// Library row shaping is owned by the shared, pure window.DocumentLibraryMapper
-// module (src/js/shared/document-library-mapper.js). Doc Studio and the
-// Brainchild surface consume the same normalization contract so identical
-// documents never drift between the two surfaces. Do NOT re-implement
-// fileExtension / humanFileType / filename / row mapping here — extend the
-// shared mapper instead.
-function libraryItems() {
-  const mapper = window.DocumentLibraryMapper;
-  if (!mapper || typeof mapper.normalizeLibraryItems !== 'function') {
-    return [];
-  }
-  return mapper.normalizeLibraryItems({
-    documents: Array.isArray(state.libraryDocuments) ? state.libraryDocuments : [],
-    presentations: Array.isArray(state.presentations) ? state.presentations : []
-  }, 'org');
-}
-
 function presentationPreview(presentation) {
   const title = presentation.title || 'Untitled file';
   const subtitle = presentation.subtitle || '';
@@ -1960,125 +1973,92 @@ function presentationPreview(presentation) {
   `;
 }
 
-function renderLibrary() {
-  if (!elements.libraryList) {
-    return;
-  }
+// The library is two tables behind the toolbar's Source select: Doc Studio
+// files (the whole presentations list, client-side) and the organization's
+// stored documents (server-paged). Rows, renderers, filters and the toolbar
+// live in the shared src/js/shared/doc-studio-library-table.js, which the
+// Brainchild Organization scope uses too. Do NOT re-implement row mapping here.
+let libraryController = null;
 
-  const items = libraryItems();
-  if (!items.length) {
-    elements.libraryList.innerHTML = `
-      <lex-empty
-        icon="document"
-        message="No documents yet"
-        description="Generated Doc Studio files and uploaded matter documents will appear here."
-      ></lex-empty>
-    `;
-    return;
-  }
-
-  elements.libraryList.innerHTML = `
-    <lex-table
-      id="docStudioLibraryTable"
-      columns="filename,file_type,matter,is_template,created_at,updated_at"
-      labels="Filename,File Type,Matter,Template,Created,Edited"
-      searchable
-      filterable
-      column-filters
-      compact
-      limit="25"
-      sort-by="updated_at"
-      sort-dir="desc"
-      empty-text="No saved documents"
-    ></lex-table>
-  `;
-  const table = elements.libraryList.querySelector('#docStudioLibraryTable');
-  if (!table || typeof table.setData !== 'function') {
-    return;
-  }
-  table.setData(items);
-  table.setCellRenderers({
-    filename: (value, row) => {
-      const subtitle = row._source?.subtitle || row._source?.document_type || row.file_type || '';
-      return `
-        <button type="button" class="library-table-title" data-open-library-item="${escapeHtml(row.id)}">
-          <strong>${escapeHtml(value)}</strong>
-          ${subtitle ? `<span>${escapeHtml(subtitle)}</span>` : ''}
-        </button>
-      `;
-    },
-    file_type: value => `<span class="doc-library-badge">${escapeHtml(value || 'Document')}</span>`,
-    is_template: value => `<span class="doc-library-badge ${String(value).toLowerCase() === 'yes' ? 'is-template' : ''}">${escapeHtml(value || 'No')}</span>`
+function fetchLibraryJson(path) {
+  return apiFetch(path).then(response => {
+    if (!response.ok) {
+      const error = new Error(`Request failed with ${response.status}`);
+      error.status = response.status;
+      throw error;
+    }
+    return response.json();
   });
+}
 
-  // Make the entire row clickable, not just the filename button. lex-table
-  // emits row-click for any non-control click in the row; route through the
-  // shared openLibraryItem dispatcher so storage files open the file viewer
-  // and presentations open in-place in Doc Studio.
-  if (!table.__rowClickWired) {
-    table.addEventListener('row-click', (event) => {
-      const rowId = event.detail && event.detail.id;
-      if (rowId) openLibraryItem(rowId);
-    });
-    table.__rowClickWired = true;
+function ensureLibraryController() {
+  if (libraryController || !window.DocStudioLibraryTable || !elements.libraryList) {
+    return libraryController;
+  }
+  libraryController = window.DocStudioLibraryTable.createController({
+    ids: {
+      search: 'docStudioLibrarySearch',
+      sort: 'docStudioLibrarySort',
+      order: 'docStudioLibrarySortOrder',
+      source: 'docStudioLibrarySource',
+      count: 'docStudioLibraryCount',
+      sectionTitle: 'docStudioLibrarySectionTitle',
+      sectionCount: 'docStudioLibrarySectionCount',
+      storedTable: 'docStudioStoredTable',
+      studioTable: 'docStudioLibraryTable'
+    },
+    fetchJson: fetchLibraryJson,
+    defaultSource: 'studio',
+    linkPrefix: '../',
+    onOpen: row => {
+      openLibraryItem(row).catch(error => setStatus(error.message));
+    },
+    onPresentations: presentations => {
+      state.presentations = presentations;
+    },
+    onError: message => {
+      setStatus(`Library loaded with limited sources (${message || 'request failed'}).`);
+    }
+  });
+  return libraryController;
+}
+
+// Called on every render; the tables keep their own state, so this only
+// makes sure the controller is wired.
+function renderLibrary() {
+  const controller = ensureLibraryController();
+  if (controller) {
+    controller.start();
   }
 }
 
-async function openLibraryItem(itemId) {
-  const item = libraryItems().find(entry => entry.id === itemId);
-  if (!item) return;
-  if (item._kind === 'storage') {
-    const params = new URLSearchParams({ id: item._fileId });
-    if (item._matterId) {
-      params.set('matter_id', item._matterId);
+// row: a DocStudioLibraryTable row (storage file or presentation).
+async function openLibraryItem(row) {
+  if (!row) return;
+  if (row._kind === 'storage') {
+    const params = new URLSearchParams({ id: row._fileId });
+    if (row._matterId) {
+      params.set('matter_id', row._matterId);
     }
     window.location.href = `../file-viewer.html?${params.toString()}`;
     return;
   }
-  if (!confirmUnsavedDocumentChanges()) {
+  if (!(await confirmUnsavedDocumentChanges())) {
     return;
   }
-  replaceClientUrl(`/doc-studio/?id=${encodeURIComponent(item._presentationId)}`);
-  state.presentationId = item._presentationId;
+  replaceClientUrl(`/doc-studio/?id=${encodeURIComponent(row._presentationId)}`);
+  state.presentationId = row._presentationId;
   await loadPresentationFromUrl();
   render();
 }
 
 async function loadLibrary() {
-  const errors = [];
-  try {
-    const response = await apiFetch('/api/v1/deck-studio/presentations?limit=100');
-    if (!response.ok) {
-      throw new Error(`Request failed with ${response.status}`);
-    }
-
-    const payload = await response.json();
-    state.presentations = Array.isArray(payload.presentations) ? payload.presentations : [];
-  } catch (error) {
-    errors.push(`Doc Studio files: ${error.message}`);
+  const controller = ensureLibraryController();
+  if (!controller) {
+    return;
   }
-
-  try {
-    const response = await apiFetch('/api/v1/storage/library/files?page_size=200&sort_by=updated_at&sort_order=desc');
-    if (!response.ok) {
-      throw new Error(`Request failed with ${response.status}`);
-    }
-
-    const payload = await response.json();
-    state.libraryDocuments = Array.isArray(payload.documents)
-      ? payload.documents
-      : Array.isArray(payload.files)
-        ? payload.files
-        : [];
-  } catch (error) {
-    state.libraryDocuments = [];
-    errors.push(`stored documents: ${error.message}`);
-  }
-
-  renderLibrary();
-  if (errors.length) {
-    setStatus(`Library loaded with limited sources (${errors.join('; ')}).`);
-  }
+  await customElements.whenDefined('lex-table');
+  await controller.reload();
 }
 
 async function loadCapabilities() {
@@ -2145,7 +2125,11 @@ async function duplicatePresentation(id) {
 
 async function renamePresentation(id) {
   const current = state.presentations.find(presentation => presentation.id === id);
-  const title = window.prompt('Rename file', current?.title || 'Untitled file');
+  const title = await window.Lex.Modal.prompt('Rename file', {
+    label: 'File name',
+    value: current?.title || 'Untitled file',
+    confirmText: 'Rename'
+  });
   if (!title || !title.trim()) {
     return null;
   }
@@ -2173,7 +2157,7 @@ async function renamePresentation(id) {
 async function deletePresentation(id) {
   const current = state.presentations.find(presentation => presentation.id === id);
   const title = current?.title || 'this file';
-  if (!window.confirm(`Delete "${title}"? This removes the saved file and generated exports.`)) {
+  if (!(await window.Lex.Modal.confirmAsync('Delete file', `Delete "${title}"? This removes the saved file and generated exports.`, { confirmText: 'Delete', variant: 'danger' }))) {
     return null;
   }
 
@@ -2456,8 +2440,12 @@ async function shareCurrentPresentation() {
       await navigator.clipboard.writeText(url);
       setStatus(`Viewer link copied: ${url}`);
     } else {
-      window.prompt('Presentation viewer link', url);
       setStatus('Viewer link ready.');
+      await window.Lex.Modal.prompt('Presentation viewer link', {
+        label: 'Copy this link to share the presentation',
+        value: url,
+        confirmText: 'Done'
+      });
     }
     window.open(url, '_blank', 'noopener,noreferrer');
   } catch (error) {
@@ -2786,14 +2774,14 @@ function addDocumentParty() {
   render();
 }
 
-function deleteDocumentParty(index) {
+async function deleteDocumentParty(index) {
   const documentModel = state.deck.document && typeof state.deck.document === 'object' ? state.deck.document : null;
   const parties = documentModel ? ensureDocumentParties(documentModel) : [];
   if (!documentModel || !parties[index]) {
     return;
   }
   const label = parties[index].name || parties[index].role || `party ${index + 1}`;
-  if (!window.confirm(`Delete ${label}? This also removes the matching signature block.`)) {
+  if (!(await window.Lex.Modal.confirmAsync('Delete party', `Delete ${label}? This also removes the matching signature block.`, { confirmText: 'Delete', variant: 'danger' }))) {
     return;
   }
   parties.splice(index, 1);
@@ -2816,13 +2804,13 @@ function addDocumentSection() {
   render();
 }
 
-function deleteDocumentSection(index) {
+async function deleteDocumentSection(index) {
   const documentModel = state.deck.document && typeof state.deck.document === 'object' ? state.deck.document : null;
   const sections = documentModel ? ensureDocumentSections(documentModel) : [];
   if (!documentModel || !sections[index]) {
     return;
   }
-  if (!window.confirm(`Delete section "${sections[index].heading || index + 1}"?`)) {
+  if (!(await window.Lex.Modal.confirmAsync('Delete section', `Delete section "${sections[index].heading || index + 1}"?`, { confirmText: 'Delete', variant: 'danger' }))) {
     return;
   }
   sections.splice(index, 1);
@@ -2830,7 +2818,7 @@ function deleteDocumentSection(index) {
   render();
 }
 
-function deleteDocumentMetaField(field) {
+async function deleteDocumentMetaField(field) {
   const labels = {
     effective_date: 'Effective date',
     jurisdiction: 'Governing law'
@@ -2839,7 +2827,7 @@ function deleteDocumentMetaField(field) {
   if (!documentModel || !labels[field]) {
     return;
   }
-  if (!window.confirm(`Remove ${labels[field]} from this document layout?`)) {
+  if (!(await window.Lex.Modal.confirmAsync('Remove field', `Remove ${labels[field]} from this document layout?`, { confirmText: 'Remove', variant: 'danger' }))) {
     return;
   }
   const hidden = hiddenDocumentFields(documentModel);
@@ -2860,13 +2848,13 @@ function addDocumentReviewNote() {
   render();
 }
 
-function deleteDocumentReviewNote(index) {
+async function deleteDocumentReviewNote(index) {
   const documentModel = state.deck.document && typeof state.deck.document === 'object' ? state.deck.document : null;
   const notes = documentModel ? ensureDocumentReviewNotes(documentModel) : [];
   if (!documentModel || index < 0 || index >= notes.length) {
     return;
   }
-  if (!window.confirm('Delete this review note?')) {
+  if (!(await window.Lex.Modal.confirmAsync('Delete review note', 'Delete this review note?', { confirmText: 'Delete', variant: 'danger' }))) {
     return;
   }
   notes.splice(index, 1);
@@ -2933,7 +2921,7 @@ async function deleteDocumentComment(commentIdOrIndex) {
   if (!documentModel || index < 0 || index >= comments.length) {
     return;
   }
-  if (!window.confirm('Delete this comment?')) {
+  if (!(await window.Lex.Modal.confirmAsync('Delete comment', 'Delete this comment?', { confirmText: 'Delete', variant: 'danger' }))) {
     return;
   }
   comments.splice(index, 1);
@@ -3202,7 +3190,7 @@ async function critiqueCurrentDeck({ polish = false } = {}) {
 }
 
 async function generateDeck() {
-  if (!confirmUnsavedDocumentChanges()) {
+  if (!(await confirmUnsavedDocumentChanges())) {
     return;
   }
   const prompt = elements.prompt.value.trim();
@@ -3534,14 +3522,14 @@ elements.themeForeground.addEventListener('input', () => {
   elements.brandDensity,
   elements.brandComposition
 ].filter(Boolean).forEach(input => {
-  input.addEventListener(input.tagName === 'SELECT' ? 'change' : 'input', () => {
+  input.addEventListener(input.tagName === 'LEX-SELECT' ? 'lex-change' : 'input', () => {
     applyBrandControlsToDeck();
     render();
   });
 });
 elements.saveBrandKitBtn.addEventListener('click', saveBrandKit);
-elements.brandKitSelect.addEventListener('change', () => applyBrandKit(elements.brandKitSelect.value));
-elements.style.addEventListener('change', () => applyDeckStyle(elements.style.value));
+elements.brandKitSelect.addEventListener('lex-change', event => applyBrandKit(event.detail.value));
+elements.style.addEventListener('lex-change', event => applyDeckStyle(event.detail.value));
 elements.slidesView.addEventListener('input', syncEdits);
 elements.slidesView.addEventListener('click', event => {
   const cardNode = event.target.closest('.slide-card');
@@ -3572,8 +3560,8 @@ elements.presentView.addEventListener('click', event => {
     movePresentation(1);
   }
 });
-elements.slidePicker.addEventListener('change', () => {
-  state.selectedSlideIndex = Number(elements.slidePicker.value) || 0;
+elements.slidePicker.addEventListener('lex-change', event => {
+  state.selectedSlideIndex = Number(event.detail.value) || 0;
   render();
   document.querySelector(`[data-index="${state.selectedSlideIndex}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 });
@@ -3585,17 +3573,17 @@ elements.nextSlideBtn.addEventListener('click', () => {
   state.selectedSlideIndex = Math.min(Math.max(0, state.deck.cards.length - 1), state.selectedSlideIndex + 1);
   render();
 });
-elements.slideLayout.addEventListener('change', () => {
+elements.slideLayout.addEventListener('lex-change', event => {
   const card = selectedCard();
   if (!card) {
     return;
   }
-  card.design = { ...(card.design || {}), layout: elements.slideLayout.value };
+  card.design = { ...(card.design || {}), layout: event.detail.value };
   delete card.design.template;
   delete card.design.templateId;
   render();
 });
-elements.slideStyle.addEventListener('change', () => {
+elements.slideStyle.addEventListener('lex-change', () => {
   const card = selectedCard();
   if (!card) {
     return;
@@ -3665,13 +3653,13 @@ elements.visualEditor.addEventListener('input', event => {
     card.image_prompt = event.target.value.trim();
   }
 });
-elements.visualEditor.addEventListener('change', event => {
+elements.visualEditor.addEventListener('lex-change', event => {
   if (event.target.id === 'slideImageStyleInput') {
     const card = state.deck.cards[state.selectedSlideIndex];
     if (!card) {
       return;
     }
-    card.design = { ...(card.design || {}), imageStyle: enumOption(event.target.value, imageStyleOptions, activeBrandKitModel().preferences.imageStyle) };
+    card.design = { ...(card.design || {}), imageStyle: enumOption(event.detail.value, imageStyleOptions, activeBrandKitModel().preferences.imageStyle) };
     return;
   }
 
@@ -3683,7 +3671,7 @@ elements.visualEditor.addEventListener('change', event => {
 
   const bulletIcons = ensureBulletIconModel(card);
   const pointIndex = Number(select.dataset.bulletIcon);
-  bulletIcons[pointIndex].icon = select.value;
+  bulletIcons[pointIndex].icon = event.detail.value;
   render();
 });
 elements.templateGallery.addEventListener('click', event => {
@@ -3695,21 +3683,16 @@ elements.templateGallery.addEventListener('click', event => {
   applyTemplateToSelectedSlide(button.dataset.templateId);
 });
 elements.libraryList.addEventListener('click', async event => {
-  const libraryItemButton = event.target.closest('[data-open-library-item]');
   const openButton = event.target.closest('[data-open-presentation]');
   const duplicateButton = event.target.closest('[data-duplicate-presentation]');
   const renameButton = event.target.closest('[data-rename-presentation]');
   const deleteButton = event.target.closest('[data-delete-presentation]');
-  if (!libraryItemButton && !openButton && !duplicateButton && !renameButton && !deleteButton) {
+  if (!openButton && !duplicateButton && !renameButton && !deleteButton) {
     return;
   }
 
   try {
-    if (libraryItemButton) {
-      await openLibraryItem(libraryItemButton.dataset.openLibraryItem);
-      return;
-    }
-    if (openButton && !confirmUnsavedDocumentChanges()) {
+    if (openButton && !(await confirmUnsavedDocumentChanges())) {
       return;
     }
     if (duplicateButton) {
@@ -3878,7 +3861,7 @@ elements.docView.addEventListener('click', async event => {
     }
 
     if (deletePartyButton) {
-      deleteDocumentParty(Number(deletePartyButton.dataset.docDeleteParty));
+      await deleteDocumentParty(Number(deletePartyButton.dataset.docDeleteParty));
       return;
     }
 
@@ -3888,12 +3871,12 @@ elements.docView.addEventListener('click', async event => {
     }
 
     if (deleteSectionButton) {
-      deleteDocumentSection(Number(deleteSectionButton.dataset.docDeleteSection));
+      await deleteDocumentSection(Number(deleteSectionButton.dataset.docDeleteSection));
       return;
     }
 
     if (deleteMetaButton) {
-      deleteDocumentMetaField(deleteMetaButton.dataset.docDeleteMeta);
+      await deleteDocumentMetaField(deleteMetaButton.dataset.docDeleteMeta);
       return;
     }
 
@@ -3903,7 +3886,7 @@ elements.docView.addEventListener('click', async event => {
     }
 
     if (deleteReviewNoteButton) {
-      deleteDocumentReviewNote(Number(deleteReviewNoteButton.dataset.docDeleteReviewNote));
+      await deleteDocumentReviewNote(Number(deleteReviewNoteButton.dataset.docDeleteReviewNote));
       return;
     }
 
@@ -3997,8 +3980,8 @@ elements.docView.addEventListener('click', async event => {
   }
 });
 elements.tabs.forEach(tab => {
-  tab.addEventListener('click', () => {
-    if (tab.dataset.view !== state.view && !confirmUnsavedDocumentChanges()) {
+  tab.addEventListener('click', async () => {
+    if (tab.dataset.view !== state.view && !(await confirmUnsavedDocumentChanges())) {
       return;
     }
     state.view = tab.dataset.view;

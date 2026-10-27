@@ -95,9 +95,15 @@
   function createModalMarkup() {
     return '' +
       '<lex-modal id="' + CREATE_MODAL_ID + '" heading="Create with Doc Studio" ' +
-        'subtitle="Generate a workspace-specific file from selected or all workspace documents" ' +
-        'size="lg" hide-actions close-on-overlay>' +
+        'size="lg" close-on-overlay ' +
+        // Footer buttons sit outside the <form>; bindEvents() submits the
+        // form from the Generate click with requestSubmit().
+        "footer-content='" +
+          '<lex-btn type="button" id="dscmCancelBtn" variant="secondary">Cancel</lex-btn>' +
+          '<lex-btn type="button" id="dscmGenerateBtn" variant="primary">Generate</lex-btn>' +
+        "'>" +
         '<form id="dscmCreateForm" class="p-6 space-y-5 dscm-form">' +
+          '<p class="dscm-intro">Generate a workspace-specific file from selected or all workspace documents</p>' +
           '<div id="dscmMatterPicker" class="dscm-matter-picker hidden">' +
             '<label class="dscm-matter-label" for="dscmMatterSearch">Workspace</label>' +
             '<div class="dscm-matter-combo">' +
@@ -140,10 +146,6 @@
             '<ol id="dscmProgressSteps" class="dscm-progress-steps"></ol>' +
           '</div>' +
           '<div id="dscmDocumentStatus" class="dscm-status hidden"></div>' +
-          '<div class="dscm-actions">' +
-            '<lex-btn type="button" id="dscmCancelBtn" variant="secondary">Cancel</lex-btn>' +
-            '<lex-btn type="submit" id="dscmGenerateBtn" variant="primary">Generate</lex-btn>' +
-          '</div>' +
         '</form>' +
       '</lex-modal>';
   }
@@ -185,6 +187,15 @@
 
     var cancel = document.getElementById('dscmCancelBtn');
     if (cancel) cancel.addEventListener('click', closeCreateModal);
+
+    var generate = document.getElementById('dscmGenerateBtn');
+    if (generate && form) {
+      generate.addEventListener('click', function () {
+        if (generate.disabled || generate.loading) return;
+        if (typeof form.requestSubmit === 'function') form.requestSubmit();
+        else form.dispatchEvent(new Event('submit', { cancelable: true }));
+      });
+    }
 
     var closeViewer = document.getElementById('dscmCloseViewerBtn');
     if (closeViewer) closeViewer.addEventListener('click', closeViewer_);

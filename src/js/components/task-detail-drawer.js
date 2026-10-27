@@ -504,18 +504,19 @@
     ].join('');
   }
 
+  // Same options and labels as the My Tasks page status control.
+  var STATUS_OPTIONS = [
+    { value: 'pending', label: 'Pending' },
+    { value: 'in_progress', label: 'In Progress' },
+    { value: 'in_review', label: 'In Review' },
+    { value: 'complete', label: 'Complete' },
+    { value: 'cancelled', label: 'Cancelled' }
+  ];
+
   function statusSelectHtml(task) {
     var current = normalizeStatus(task.status);
-    var options = [
-      ['pending', 'Pending'],
-      ['in_progress', 'In Progress'],
-      ['in_review', 'In Review'],
-      ['complete', 'Complete'],
-      ['cancelled', 'Cancelled']
-    ].map(function (opt) {
-      return '<option value="' + opt[0] + '"' + (opt[0] === current ? ' selected' : '') + '>' + opt[1] + '</option>';
-    }).join('');
-    return '<span class="my-task-status-control"><select class="my-task-status-select" data-shared-status-select>' + options + '</select></span>';
+    return '<span class="my-task-status-control"><lex-select class="my-task-status-select" data-shared-status-select aria-label="Update status"' +
+      ' value="' + esc(current) + '" options="' + esc(JSON.stringify(STATUS_OPTIONS)) + '"></lex-select></span>';
   }
 
   function syncTabs(task) {
@@ -832,11 +833,7 @@
   }
 
   function confirmDelete(title, message, onConfirm) {
-    if (window.Lex && Lex.Modal && typeof Lex.Modal.confirm === 'function') {
-      Lex.Modal.confirm(title, message, onConfirm, { variant: 'danger', confirmText: 'Delete' });
-      return;
-    }
-    if (window.confirm(message)) onConfirm();
+    Lex.Modal.confirm(title, message, onConfirm, { variant: 'danger', confirmText: 'Delete' });
   }
 
   function startCommentEdit(comment) {
@@ -912,10 +909,14 @@
       }
     });
 
+    document.addEventListener('lex-change', function (event) {
+      if (!event.target.closest || !event.target.closest('#sharedTaskDetailsModal')) return;
+      var status = event.target.closest('[data-shared-status-select]');
+      if (status) updateStatus((event.detail && event.detail.value) || status.value);
+    });
+
     document.addEventListener('change', function (event) {
       if (!event.target.closest('#sharedTaskDetailsModal')) return;
-      var status = event.target.closest('[data-shared-status-select]');
-      if (status) updateStatus(status.value);
       var check = event.target.closest('[data-shared-checklist-id]');
       if (check && state.task) {
         var store = getStore(state.task);

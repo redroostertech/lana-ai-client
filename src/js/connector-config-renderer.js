@@ -49,6 +49,10 @@ export async function renderConfigurationForm(schema, container, currentConfig =
   const form = document.getElementById('connectorConfigForm');
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    // lex-select is not form-associated, so the browser does not enforce its required flag.
+    const invalidSelect = Array.from(form.querySelectorAll('lex-select[required]'))
+      .find(select => typeof select.validate === 'function' && !select.validate().valid);
+    if (invalidSelect) return;
     const config = collectFormData(schema);
 
     // Validate configuration
@@ -277,26 +281,38 @@ function renderNumberInput(field, value, required) {
  * Render select dropdown field
  */
 function renderSelect(field, value, required) {
-  let html = `
-    <select
-      id="${field.field_name}"
-      name="${field.field_name}"
-      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-      ${required}
-    >
-      <option value="">Select ${field.label}</option>
-  `;
+  const placeholder = `Select ${field.label}`;
+  const options = [{ value: '', label: placeholder }];
 
   for (const option of (field.options || [])) {
     const optionValue = typeof option === 'object' ? option.value : option;
     const optionLabel = typeof option === 'object' ? option.label : option;
-    const selected = value === optionValue ? 'selected' : '';
-
-    html += `<option value="${optionValue}" ${selected}>${optionLabel}</option>`;
+    options.push({ value: String(optionValue ?? ''), label: String(optionLabel ?? optionValue ?? '') });
   }
 
-  html += '</select>';
-  return html;
+  const selectedValue = options.some(option => option.value === String(value ?? '')) ? String(value ?? '') : '';
+
+  return `
+    <lex-select
+      id="${field.field_name}"
+      name="${field.field_name}"
+      placeholder="${escapeAttribute(placeholder)}"
+      options="${escapeAttribute(JSON.stringify(options))}"
+      value="${escapeAttribute(selectedValue)}"
+      ${required}
+    ></lex-select>
+  `;
+}
+
+/**
+ * Escape a value for a double-quoted HTML attribute
+ */
+function escapeAttribute(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 /**
@@ -436,11 +452,11 @@ function attachFieldHandlers(schema, currentConfig) {
  * Open directory browser modal
  */
 async function openDirectoryBrowser(config) {
-  return new Promise((resolve) => {
-    // This will be implemented to use the existing directory browser modal
-    // For now, return a placeholder
-    const path = prompt('Enter directory path:');
-    resolve(path);
+  // This will be implemented to use the existing directory browser modal.
+  // For now, ask for the path; resolves null when cancelled.
+  return window.Lex.Modal.prompt('Choose Directory', {
+    label: 'Directory path',
+    confirmText: 'Use path'
   });
 }
 
@@ -472,7 +488,7 @@ async function initiateOAuthFlow(provider, connectorId = null, matterId = null) 
 
     if (!stateResult.success) {
       console.error('Failed to create OAuth state:', stateResult.error);
-      alert(`Failed to initiate OAuth: ${stateResult.error}`);
+      await window.Lex.Modal.alertAsync('OAuth Failed', `Failed to initiate OAuth: ${stateResult.error}`);
       return null;
     }
 
@@ -511,7 +527,7 @@ async function initiateOAuthFlow(provider, connectorId = null, matterId = null) 
     if (!backendUrl) {
       const msg = 'OAuth flow cannot start: no backend URL is configured. Sign in again to set the saved server.';
       console.error(msg);
-      alert(msg);
+      await window.Lex.Modal.alertAsync('OAuth Unavailable', msg);
       return null;
     }
 
@@ -613,7 +629,7 @@ async function initiateOAuthFlow(provider, connectorId = null, matterId = null) 
 
   } catch (error) {
     console.error('OAuth flow error:', error);
-    alert(`OAuth authentication failed: ${error.message}`);
+    await window.Lex.Modal.alertAsync('OAuth Failed', `OAuth authentication failed: ${error.message}`);
     return null;
   }
 }

@@ -154,6 +154,11 @@
     if (status === 'cancelled' || status === 'deleted') {
       return 'inactive';
     }
+    // Created with no text: nothing to process until it is written and released.
+    if (parseDocumentMetadata(doc).processing_skipped_reason === 'empty_document' &&
+        (status === '' || status === 'pending') && (processingStatus === '' || processingStatus === 'pending')) {
+      return 'draft';
+    }
     if (status === 'queued' || status === 'pending' || status === 'ready') {
       return 'uploaded';
     }
@@ -181,6 +186,11 @@
         label: 'Uploaded',
         badgeClass: 'mdv-badge--uploaded',
         progressLabel: 'Uploaded, awaiting processing'
+      },
+      'draft': {
+        label: 'Draft',
+        badgeClass: 'mdv-badge--draft',
+        progressLabel: 'Draft, no text yet'
       },
       'needs_attention': {
         label: 'Needs Attention',
@@ -248,18 +258,7 @@
   // -- SVG icon snippets (no emoji) ----------------------------------------
 
   var ICON_SEARCH = '<svg class="mdv-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>';
-  var ICON_KEBAB = '<svg class="mdv-kebab-icon" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path></svg>';
-  var ICON_DOWNLOAD = '<svg class="mdv-menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>';
-  var ICON_OPEN = '<svg class="mdv-menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>';
   var ICON_DELETE = '<svg class="mdv-menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>';
-  var ICON_RENAME = '<svg class="mdv-menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>';
-  var ICON_RETRY = '<svg class="mdv-menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>';
-  var ICON_REPLACE = '<svg class="mdv-menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>';
-  var ICON_TEMPLATE = '<svg class="mdv-menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>';
-  var ICON_GENERATE = '<svg class="mdv-menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>';
-  var ICON_REVIEW = '<svg class="mdv-menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7 3h10a2 2 0 012 2v14l-4-2-4 2-4-2-4 2V5a2 2 0 012-2z"></path></svg>';
-  var ICON_SIGN = '<svg class="mdv-menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536M4 20h4l10.5-10.5a2.5 2.5 0 00-3.536-3.536L4 16.929V20z"></path></svg>';
-  var ICON_CHECK = '<svg class="mdv-menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
   var ICON_DOC_STUDIO = '<svg class="mdv-btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>';
   var ICON_ASSIGN = '<svg class="mdv-menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>';
 
@@ -307,7 +306,6 @@
       search: '',
       page: 1,
       filter: 'all',
-      openMenuId: null,
       selected: {},
       artifactLoadError: null,
       viewMode: opts.viewMode === 'grid' ? 'grid' : 'list'
@@ -318,8 +316,7 @@
     var inputHandler = null;
     var changeHandler = null;
     var pageChangeHandler = null;
-    var documentClickHandler = null;
-    var viewportChangeHandler = null;
+    var menuSelectHandler = null;
     var artifactController = null;
     var destroyed = false;
 
@@ -337,14 +334,10 @@
 
     // Invoke the injected confirm dialog. The default (this client library's
     // Lex.Modal.confirm) takes (title, message, onConfirm, options) where
-    // options = { confirmText, variant }. We pass that options object. Falls
-    // back to window.confirm when no confirm function is available.
+    // options = { confirmText, variant }. We pass that options object.
     function doConfirm(title, message, onConfirm, confirmText, variant) {
-      if (confirmFn) {
-        confirmFn(title, message, onConfirm, { confirmText: confirmText, variant: variant });
-      } else if (window.confirm(message)) {
-        onConfirm();
-      }
+      var confirmDialog = confirmFn || window.Lex.Modal.confirm;
+      confirmDialog(title, message, onConfirm, { confirmText: confirmText, variant: variant });
     }
 
     function fileName(file) {
@@ -509,93 +502,110 @@
     }
 
     // -- Per-file action menu -----------------------------------------------
+    //
+    // Each row/card carries a lex-dropdown-btn (icon-only kebab). Its items'
+    // values are the same action names the click delegation used; the
+    // container's lex-select listener dispatches them (handleMenuSelect).
 
-    function fileMenu(file) {
-      var open = String(state.openMenuId) === String(file.id);
+    function menuItem(action, icon, label, danger) {
+      var item = { value: action, label: label, icon: icon };
+      if (danger) item.danger = true;
+      return item;
+    }
+
+    function kebabMenu(items, label, dataAttrs) {
+      return '<lex-dropdown-btn class="mdv-kebab-menu" icon="more-vertical" icon-only variant="ghost" align="end" floating' +
+        ' aria-label="' + esc(label) + '"' + dataAttrs +
+        ' options="' + escAttrJson(items) + '"></lex-dropdown-btn>';
+    }
+
+    // JSON for a double-quoted attribute; quotes are always escaped here
+    // (a page-level window.escapeHtml may not escape them).
+    function escAttrJson(value) {
+      return JSON.stringify(value)
+        .split('&').join('&amp;')
+        .split('"').join('&quot;')
+        .split('<').join('&lt;')
+        .split('>').join('&gt;');
+    }
+
+    function fileMenuItems(file) {
       var lifecycle = getDocumentLifecycle(file);
       var isReady = lifecycle === 'ready' || lifecycle === 'summarized';
       var needsAttention = lifecycle === 'needs_attention';
       var isGenerated = isDocStudioGeneratedDocument(file);
       var metadata = parseDocumentMetadata(file);
       var readOnly = !!file.read_only;
-      var items = '';
-
-      function item(action, icon, label, extraAttrs, danger) {
-        return '<button type="button" class="mdv-menu-item' + (danger ? ' mdv-menu-item--danger' : '') + '" data-action="' + action + '" data-doc-id="' + esc(file.id) + '"' + (extraAttrs || '') + '>' +
-          icon + '<span>' + esc(label) + '</span></button>';
-      }
+      var items = [];
 
       if (onFileOpen && (isReady || isGenerated)) {
-        items += item('open', ICON_OPEN, 'Open');
+        items.push(menuItem('open', 'eye', 'Open'));
       }
-      items += item('download', ICON_DOWNLOAD, 'Download');
+      items.push(menuItem('download', 'download', 'Download'));
 
       // Doc Studio workflow actions.
       if (enableWorkflow && isGenerated) {
         var hasReviewRequest = metadata.legal_review && metadata.legal_review.status && metadata.legal_review.status !== 'not_requested';
         var hasSignatureRequest = metadata.signature_workflow && metadata.signature_workflow.status && metadata.signature_workflow.status !== 'not_requested';
-        items += item('request-review', ICON_REVIEW, hasReviewRequest ? 'Re-request Review' : 'Request Review');
-        items += item('request-signatures', ICON_SIGN, hasSignatureRequest ? 'Re-request Signatures' : 'Request Signatures');
+        items.push(menuItem('request-review', 'clipboard-check', hasReviewRequest ? 'Re-request Review' : 'Request Review'));
+        items.push(menuItem('request-signatures', 'pen', hasSignatureRequest ? 'Re-request Signatures' : 'Request Signatures'));
         if (hasReviewRequest && metadata.legal_review.status !== 'approved') {
-          items += item('mark-approved', ICON_CHECK, 'Mark Approved');
+          items.push(menuItem('mark-approved', 'check', 'Mark Approved'));
         }
         if (hasSignatureRequest && metadata.signature_workflow.status !== 'completed') {
-          items += item('mark-signed', ICON_CHECK, 'Mark Signed');
+          items.push(menuItem('mark-signed', 'check', 'Mark Signed'));
         }
       }
 
       // Retry ingestion (failed documents).
       if (enableRetry && needsAttention) {
-        items += item('retry', ICON_RETRY, 'Retry Ingestion');
+        items.push(menuItem('retry', 'refresh-cw', 'Retry Ingestion'));
       }
 
       // Template generate / mark / unmark.
       if (enableTemplateToggle && isDocxOrPdf(file) && !readOnly && isReady) {
         if (file.is_template) {
-          items += item('template-generate', ICON_GENERATE, 'Generate');
-          items += item('template-unmark', ICON_TEMPLATE, 'Unmark Template');
+          items.push(menuItem('template-generate', 'file-text', 'Generate'));
+          items.push(menuItem('template-unmark', 'file', 'Unmark Template'));
         } else {
-          items += item('template-mark', ICON_TEMPLATE, 'Use as Template');
+          items.push(menuItem('template-mark', 'file', 'Use as Template'));
         }
       }
 
       if (enableRename && !readOnly) {
-        items += item('rename', ICON_RENAME, 'Rename');
+        items.push(menuItem('rename', 'edit', 'Rename'));
       }
       if (enableReplace && !readOnly) {
-        items += item('replace', ICON_REPLACE, 'Replace');
+        items.push(menuItem('replace', 'upload', 'Replace'));
       }
 
       if (!readOnly) {
-        items += '<div class="mdv-menu-divider"></div>';
-        items += item('delete', ICON_DELETE, 'Delete', '', true);
+        items.push({ divider: true });
+        items.push(menuItem('delete', 'trash-2', 'Delete', true));
       }
 
-      return '<div class="mdv-menu' + (open ? ' mdv-menu--open' : '') + '" data-menu-for="' + esc(file.id) + '">' + items + '</div>';
+      return items;
+    }
+
+    function fileMenu(file) {
+      return kebabMenu(fileMenuItems(file), 'File actions', ' data-doc-id="' + esc(file.id) + '"');
     }
 
     function artifactMenu(artifact) {
       var id = artifactId(artifact);
-      var menuId = 'artifact:' + id;
-      var open = String(state.openMenuId) === String(menuId);
       var savedDocument = artifactDocument(artifact);
-      var canPromote = !!artifactPromotionAction(artifact);
-      var items = '';
+      var items = [menuItem('artifact-view', 'eye', 'View')];
+      var attrs = ' data-artifact-id="' + esc(id) + '"';
 
-      function item(action, icon, label, attrs) {
-        return '<button type="button" class="mdv-menu-item" data-action="' + action + '" data-artifact-id="' + esc(id) + '"' + (attrs || '') + '>' +
-          icon + '<span>' + esc(label) + '</span></button>';
-      }
-
-      items += item('artifact-view', ICON_OPEN, 'View');
-      if (canPromote) {
-        items += item('artifact-promote', ICON_DOWNLOAD, 'Save to Documents');
+      if (artifactPromotionAction(artifact)) {
+        items.push(menuItem('artifact-promote', 'download', 'Save to Documents'));
       }
       if (savedDocument && savedDocument.id) {
-        items += item('artifact-open-document', ICON_OPEN, 'Open Document', ' data-document-id="' + esc(savedDocument.id) + '"');
+        items.push(menuItem('artifact-open-document', 'eye', 'Open Document'));
+        attrs += ' data-document-id="' + esc(savedDocument.id) + '"';
       }
 
-      return '<div class="mdv-menu' + (open ? ' mdv-menu--open' : '') + '" data-menu-for="' + esc(menuId) + '">' + items + '</div>';
+      return kebabMenu(items, 'Artifact actions', attrs);
     }
 
     function workflowBadgesHtml(file) {
@@ -666,7 +676,6 @@
         '    </div>',
         '  </div>',
         '  <div class="mdv-file-actions">',
-        '    <button type="button" class="mdv-kebab" data-action="menu" data-doc-id="' + esc(file.id) + '" title="File actions" aria-haspopup="true">' + ICON_KEBAB + '</button>',
         '    ' + fileMenu(file),
         '  </div>',
         '</div>'
@@ -687,7 +696,6 @@
         '<div class="mdv-card" data-doc-id="' + esc(file.id) + '" data-doc-type="' + (file.is_template ? 'template' : 'document') + '">',
         (enableBatch ? '  <div class="mdv-card-select">' + selectCheckbox(file) + '</div>' : ''),
         '  <div class="mdv-card-actions">',
-        '    <button type="button" class="mdv-kebab" data-action="menu" data-doc-id="' + esc(file.id) + '" title="File actions" aria-haspopup="true">' + ICON_KEBAB + '</button>',
         '    ' + fileMenu(file),
         '  </div>',
         '  <div class="mdv-card-body">',
@@ -737,7 +745,6 @@
         '    </div>',
         '  </div>',
         '  <div class="mdv-file-actions">',
-        '    <button type="button" class="mdv-kebab" data-action="artifact-menu" data-artifact-id="' + esc(id) + '" title="Artifact actions" aria-haspopup="true">' + ICON_KEBAB + '</button>',
         '    ' + artifactMenu(artifact),
         '  </div>',
         '</div>'
@@ -937,84 +944,6 @@
       }
     }
 
-    // -- Menu open/close -----------------------------------------------------
-
-    function applyMenuState() {
-      var menus = containerEl.querySelectorAll('.mdv-menu[data-menu-for]');
-      for (var m = 0; m < menus.length; m++) {
-        var id = menus[m].getAttribute('data-menu-for');
-        var open = String(id) === String(state.openMenuId);
-        menus[m].classList.toggle('mdv-menu--open', open);
-        if (open) {
-          positionMenu(id, menus[m]);
-        } else {
-          menus[m].style.left = '';
-          menus[m].style.top = '';
-          menus[m].style.right = '';
-        }
-      }
-    }
-
-    function findKebabByMenuId(menuId) {
-      var artifactPrefix = 'artifact:';
-      if (String(menuId).indexOf(artifactPrefix) === 0) {
-        var artifactIdValue = String(menuId).slice(artifactPrefix.length);
-        var artifactButtons = containerEl.querySelectorAll('.mdv-kebab[data-artifact-id]');
-        for (var a = 0; a < artifactButtons.length; a++) {
-          if (String(artifactButtons[a].getAttribute('data-artifact-id')) === artifactIdValue) {
-            return artifactButtons[a];
-          }
-        }
-        return null;
-      }
-
-      var buttons = containerEl.querySelectorAll('.mdv-kebab[data-doc-id]');
-      for (var i = 0; i < buttons.length; i++) {
-        if (String(buttons[i].getAttribute('data-doc-id')) === String(menuId)) {
-          return buttons[i];
-        }
-      }
-      return null;
-    }
-
-    function positionMenu(menuId, menu) {
-      if (!menu) return;
-      var trigger = findKebabByMenuId(menuId);
-      if (!trigger) return;
-
-      var triggerRect = trigger.getBoundingClientRect();
-      var menuRect = menu.getBoundingClientRect();
-      var gap = 6;
-      var margin = 12;
-      var menuWidth = menuRect.width || 176;
-      var menuHeight = menuRect.height || 220;
-
-      var left = triggerRect.right - menuWidth;
-      left = Math.max(margin, Math.min(left, window.innerWidth - menuWidth - margin));
-
-      var top = triggerRect.bottom + gap;
-      if (top + menuHeight + margin > window.innerHeight) {
-        top = triggerRect.top - menuHeight - gap;
-      }
-      top = Math.max(margin, Math.min(top, window.innerHeight - menuHeight - margin));
-
-      menu.style.left = left + 'px';
-      menu.style.top = top + 'px';
-      menu.style.right = 'auto';
-    }
-
-    function closeMenu() {
-      if (state.openMenuId !== null) {
-        state.openMenuId = null;
-        applyMenuState();
-      }
-    }
-
-    function toggleMenu(fileId) {
-      state.openMenuId = (String(state.openMenuId) === String(fileId)) ? null : fileId;
-      applyMenuState();
-    }
-
     // -- Mutating actions ----------------------------------------------------
 
     async function downloadFile(fileId) {
@@ -1198,7 +1127,9 @@
 
     async function requestLegalReview(fileId) {
       try {
-        var proceed = window.confirm('Request Lana legal review for this generated document?');
+        var proceed = await window.Lex.Modal.confirmAsync('Request Legal Review', 'Request Lana legal review for this generated document?', {
+          confirmText: 'Request review'
+        });
         if (!proceed) return;
         await docStudioRequest('POST', '/api/v1/deck-studio/matter-documents/' + encodeURIComponent(fileId) + '/legal-review', {
           notes: 'Review requested from the matter Documents view.'
@@ -1212,7 +1143,12 @@
 
     async function requestSignatures(fileId) {
       try {
-        var signerText = window.prompt('Enter signer names or emails separated by commas. Leave blank to create a signature request without named signers.', '');
+        var signerText = await window.Lex.Modal.prompt('Request Signatures', {
+          message: 'Leave blank to create a signature request without named signers.',
+          label: 'Signer names or emails, separated by commas',
+          value: '',
+          confirmText: 'Request signatures'
+        });
         if (signerText === null) return;
         var signers = signerText.split(',')
           .map(function (v) { return v.trim(); })
@@ -1458,18 +1394,19 @@
       var existing = document.getElementById(MODAL_ID);
       if (existing) return existing;
 
-      var wrapper = document.createElement('div');
-      wrapper.innerHTML =
-        '<lex-modal id="' + MODAL_ID + '" heading="Rename File" size="md" hide-actions="true">' +
-          '<form id="' + FORM_ID + '">' +
-            '<lex-input id="' + INPUT_ID + '" label="File Name" placeholder="Enter file name" required="true"></lex-input>' +
-            '<div class="mdv-rename-actions">' +
-              '<lex-btn type="button" variant="secondary" id="' + CANCEL_ID + '">Cancel</lex-btn>' +
-              '<lex-btn type="submit" variant="primary" id="' + SAVE_ID + '">Save</lex-btn>' +
-            '</div>' +
-          '</form>' +
-        '</lex-modal>';
-      var modal = wrapper.firstChild;
+      // The Save/Cancel buttons live in the modal's own footer (footer-content);
+      // the form still submits on Enter, and Save is wired to the same handler.
+      var modal = document.createElement('lex-modal');
+      modal.id = MODAL_ID;
+      modal.setAttribute('heading', 'Rename File');
+      modal.setAttribute('size', 'md');
+      modal.setAttribute('footer-content',
+        '<lex-btn type="button" variant="secondary" id="' + CANCEL_ID + '">Cancel</lex-btn>' +
+        '<lex-btn type="button" variant="primary" id="' + SAVE_ID + '">Save</lex-btn>');
+      modal.innerHTML =
+        '<form id="' + FORM_ID + '">' +
+          '<lex-input id="' + INPUT_ID + '" label="File Name" placeholder="Enter file name" required="true"></lex-input>' +
+        '</form>';
       document.body.appendChild(modal);
       return modal;
     }
@@ -1496,7 +1433,14 @@
           if (modal._mdvOnSubmit) modal._mdvOnSubmit();
         });
       }
-      var cancelBtn = document.getElementById(CANCEL_ID);
+      var saveBtn = modal.querySelector('#' + SAVE_ID);
+      if (saveBtn && !saveBtn._mdvBound) {
+        saveBtn._mdvBound = true;
+        saveBtn.addEventListener('click', function () {
+          if (modal._mdvOnSubmit) modal._mdvOnSubmit();
+        });
+      }
+      var cancelBtn = modal.querySelector('#' + CANCEL_ID);
       if (cancelBtn && !cancelBtn._mdvBound) {
         cancelBtn._mdvBound = true;
         cancelBtn.addEventListener('click', function () {
@@ -1553,6 +1497,8 @@
     // -- Event delegation ----------------------------------------------------
 
     function handleClick(event) {
+      // Kebab menus are lex-dropdown-btns; their items arrive as lex-select.
+      if (event.target.closest && event.target.closest('lex-dropdown-btn')) return;
       var actionEl = event.target.closest ? event.target.closest('[data-action]') : null;
       if (!actionEl || !containerEl.contains(actionEl)) return;
 
@@ -1575,16 +1521,6 @@
             render();
           }
           return;
-        case 'menu':
-          event.preventDefault();
-          event.stopPropagation();
-          toggleMenu(fileId);
-          return;
-        case 'artifact-menu':
-          event.preventDefault();
-          event.stopPropagation();
-          toggleMenu('artifact:' + artifactIdValue);
-          return;
         case 'select':
           // Checkbox toggle handled by change listener; just stop bubbling.
           event.stopPropagation();
@@ -1594,101 +1530,53 @@
           return;
         case 'batch-delete':
           event.preventDefault();
-          closeMenu();
           batchDelete();
-          return;
-        case 'open':
-          event.preventDefault();
-          closeMenu();
-          if (onFileOpen) onFileOpen(fileId);
-          return;
-        case 'artifact-view':
-          event.preventDefault();
-          closeMenu();
-          viewArtifact(artifactIdValue);
-          return;
-        case 'artifact-promote':
-          event.preventDefault();
-          closeMenu();
-          promoteArtifact(artifactIdValue);
-          return;
-        case 'artifact-open-document':
-          event.preventDefault();
-          closeMenu();
-          if (onFileOpen) onFileOpen(actionEl.getAttribute('data-document-id') || '');
-          return;
-        case 'download':
-          event.preventDefault();
-          closeMenu();
-          downloadFile(fileId);
-          return;
-        case 'rename':
-          event.preventDefault();
-          closeMenu();
-          openRenameModal(fileId);
-          return;
-        case 'delete':
-          event.preventDefault();
-          closeMenu();
-          confirmDelete(fileId);
-          return;
-        case 'retry':
-          event.preventDefault();
-          closeMenu();
-          retryIngestion(fileId);
-          return;
-        case 'replace':
-          event.preventDefault();
-          closeMenu();
-          replaceFile(fileId);
-          return;
-        case 'template-mark':
-          event.preventDefault();
-          closeMenu();
-          toggleTemplate(fileId, true);
-          return;
-        case 'template-unmark':
-          event.preventDefault();
-          closeMenu();
-          toggleTemplate(fileId, false);
-          return;
-        case 'template-generate':
-          event.preventDefault();
-          closeMenu();
-          openTemplateModal(fileId);
-          return;
-        case 'request-review':
-          event.preventDefault();
-          closeMenu();
-          requestLegalReview(fileId);
-          return;
-        case 'request-signatures':
-          event.preventDefault();
-          closeMenu();
-          requestSignatures(fileId);
-          return;
-        case 'mark-approved':
-          event.preventDefault();
-          closeMenu();
-          updateLegalReviewStatus(fileId, 'approved');
-          return;
-        case 'mark-signed':
-          event.preventDefault();
-          closeMenu();
-          updateSignatureStatus(fileId, 'completed');
           return;
         case 'assign-orphan':
           event.preventDefault();
-          closeMenu();
           assignOrphan(orphanKey);
           return;
         case 'delete-orphan':
           event.preventDefault();
-          closeMenu();
           deleteOrphan(orphanKey);
           return;
         default:
+          if (runItemAction(action, fileId, artifactIdValue, actionEl.getAttribute('data-document-id'))) {
+            event.preventDefault();
+          }
           return;
+      }
+    }
+
+    // A kebab menu item was chosen: the host carries the row's ids.
+    function handleMenuSelect(event) {
+      var host = event.target && event.target.closest ? event.target.closest('lex-dropdown-btn.mdv-kebab-menu') : null;
+      if (!host || !containerEl.contains(host)) return;
+      var action = event.detail && event.detail.value;
+      runItemAction(action, host.getAttribute('data-doc-id'), host.getAttribute('data-artifact-id'), host.getAttribute('data-document-id'));
+    }
+
+    // Per-file and per-artifact actions, from a menu item or an inline button.
+    // Returns true when the action is known.
+    function runItemAction(action, fileId, artifactIdValue, documentId) {
+      switch (action) {
+        case 'open': if (onFileOpen) onFileOpen(fileId); return true;
+        case 'artifact-view': viewArtifact(artifactIdValue); return true;
+        case 'artifact-promote': promoteArtifact(artifactIdValue); return true;
+        case 'artifact-open-document': if (onFileOpen) onFileOpen(documentId || ''); return true;
+        case 'download': downloadFile(fileId); return true;
+        case 'rename': openRenameModal(fileId); return true;
+        case 'delete': confirmDelete(fileId); return true;
+        case 'retry': retryIngestion(fileId); return true;
+        case 'replace': replaceFile(fileId); return true;
+        case 'template-mark': toggleTemplate(fileId, true); return true;
+        case 'template-unmark': toggleTemplate(fileId, false); return true;
+        case 'template-generate': openTemplateModal(fileId); return true;
+        case 'request-review': requestLegalReview(fileId); return true;
+        case 'request-signatures': requestSignatures(fileId); return true;
+        case 'mark-approved': updateLegalReviewStatus(fileId, 'approved'); return true;
+        case 'mark-signed': updateSignatureStatus(fileId, 'completed'); return true;
+        default: return false;
       }
     }
 
@@ -1722,19 +1610,6 @@
         state.page = newPage;
         render();
       }
-    }
-
-    function handleDocumentClick(event) {
-      if (state.openMenuId === null) return;
-      if (containerEl.contains(event.target)) {
-        var menuEl = event.target.closest ? event.target.closest('.mdv-menu, .mdv-kebab') : null;
-        if (menuEl) return;
-      }
-      closeMenu();
-    }
-
-    function handleViewportChange() {
-      closeMenu();
     }
 
     // -- Public methods ------------------------------------------------------
@@ -1776,7 +1651,6 @@
         await loadArtifacts();
       }
 
-      state.openMenuId = null;
       // Prune selections for files that no longer exist.
       var present = {};
       state.files.forEach(function (f) { present[fileSelectKey(f.id)] = true; });
@@ -1810,9 +1684,7 @@
       containerEl.removeEventListener('click', clickHandler);
       containerEl.removeEventListener('input', inputHandler);
       containerEl.removeEventListener('change', changeHandler);
-      document.removeEventListener('click', documentClickHandler);
-      window.removeEventListener('resize', viewportChangeHandler);
-      window.removeEventListener('scroll', viewportChangeHandler, true);
+      containerEl.removeEventListener('lex-select', menuSelectHandler);
 
       var pag = containerEl.querySelector('[data-mdv-pagination]');
       if (pag && pageChangeHandler) {
@@ -1832,15 +1704,12 @@
     inputHandler = handleInput;
     changeHandler = handleChange;
     pageChangeHandler = handlePageChange;
-    documentClickHandler = handleDocumentClick;
-    viewportChangeHandler = handleViewportChange;
+    menuSelectHandler = handleMenuSelect;
 
     containerEl.addEventListener('click', clickHandler);
     containerEl.addEventListener('input', inputHandler);
     containerEl.addEventListener('change', changeHandler);
-    document.addEventListener('click', documentClickHandler);
-    window.addEventListener('resize', viewportChangeHandler);
-    window.addEventListener('scroll', viewportChangeHandler, true);
+    containerEl.addEventListener('lex-select', menuSelectHandler);
 
     render();
     if (enableArtifacts) {

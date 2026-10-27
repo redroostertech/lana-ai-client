@@ -3,7 +3,6 @@
 
   var state = {
     tasks: [],
-    newMenuOpen: false,
     // Create/Edit Task modal selections
     editingTaskId: null,           // null when creating, set when editing
     viewingTask: null,             // currently open in the details modal
@@ -20,13 +19,16 @@
     planSelectedMatterName: null
   };
 
-  // The /api/v1/tasks/my endpoint caps `limit` at 100, so we page through
-  // up to TASK_FETCH_MAX rows to gather the full set for lex-table's
-  // client-side search/sort/filter/pagination. Past TASK_FETCH_MAX we stop
-  // and accept truncation rather than spamming the API; a user with that
-  // many open assignments warrants a different UX anyway.
-  var TASK_PAGE_LIMIT = 100;
-  var TASK_FETCH_MAX = 500;
+  // My Tasks is a server-paged table (docs/TABLE-STANDARD.md): GET
+  // /api/v1/tasks/my pages (limit <= 100 + offset), sorts every sortable
+  // column, searches, and filters status and priority itself, and returns
+  // the total. Each table page is one request, so no task is ever dropped
+  // by a client-side cap. LanaListQueryParams.myTasksParams maps the query.
+  var taskSearchTerm = '';
+  var taskSearchDebounce = null;
+  var taskLoadSequence = 0;
+  var taskLoadPromise = Promise.resolve([]);
+  var taskWorkspaceOptions = [];
 
   var TASK_PLAN_ROLES = ['system_admin', 'org_admin', 'admin', 'upper_leader', 'senior_leader', 'senior_user'];
 
@@ -42,11 +44,12 @@
     return value ? Lex.Utils.formatDate(value) : '';
   }
 
+  // Dates go through Lex.Utils (the user's timezone).
   function formatDateTime(value) {
     if (!value) return '';
-    var d = new Date(value);
-    if (isNaN(d.getTime())) return formatDate(value);
-    return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+    if (typeof Lex.Utils.formatDateTime !== 'function') return formatDate(value);
+    var text = Lex.Utils.formatDateTime(value);
+    return text === 'Never' ? '' : text;
   }
 
   function normalizeTasks(response) {
@@ -81,13 +84,11 @@
 
   function statusSelectHtml(task) {
     var current = normalizeStatus(task.status);
-    var options = STATUS_OPTIONS.map(function (opt) {
-      var selected = opt.value === current ? ' selected' : '';
-      return '<option value="' + opt.value + '"' + selected + '>' + esc(opt.label) + '</option>';
-    }).join('');
+    var options = JSON.stringify(STATUS_OPTIONS);
     return [
       '<span class="my-task-status-control">',
-      '  <select class="my-task-status-select" data-task-status-select aria-label="Update status">' + options + '</select>',
+      '  <lex-select class="my-task-status-select" data-task-status-select aria-label="Update status"' +
+        ' value="' + esc(current) + '" options="' + esc(options) + '"></lex-select>',
       '</span>'
     ].join('');
   }
@@ -1063,60 +1064,22 @@
   // Inject (or refresh) the "Actions" dropdown in the modal header, next to the
   // close button. Edit / Mark Complete (or Reopen) / Delete live here so they're
   // reachable from the header instead of a button row at the bottom of the body.
+  // The wrapper comes from the modal's header-actions attribute (my-tasks.html),
+  // which lex-modal renders between the title and its close button.
   function renderHeaderActions(modal, task) {
-    var header = modal.querySelector('.lex-modal-header');
-    if (!header) return;
+    var wrap = modal.querySelector('[data-task-actions-wrap]');
+    if (!wrap) return;
 
     var isComplete = normalizeStatus(task.status) === 'complete';
-    var completeLabel = isComplete ? 'Reopen' : 'Mark Complete';
-    var completeAction = isComplete ? 'reopen' : 'complete';
-
-    var wrap = header.querySelector('[data-task-actions-wrap]');
-    if (!wrap) {
-      wrap = document.createElement('div');
-      wrap.className = 'my-task-header-actions';
-      wrap.setAttribute('data-task-actions-wrap', '');
-      var closeBtn = header.querySelector('.lex-modal-close');
-      header.insertBefore(wrap, closeBtn);
-    }
-
-    var chevron = '<svg class="my-task-actions-btn__chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
-    wrap.innerHTML = [
-      '<button type="button" class="my-task-actions-btn" data-task-actions-toggle aria-haspopup="true" aria-expanded="false">',
-      '  <span>Actions</span>' + chevron,
-      '</button>',
-      '<div class="my-task-actions-menu hidden" role="menu">',
-      '  <button type="button" role="menuitem" data-task-action="edit">Edit</button>',
-      '  <button type="button" role="menuitem" data-task-action="' + completeAction + '">' + completeLabel + '</button>',
-      '  <button type="button" role="menuitem" class="my-task-actions-menu__danger" data-task-action="delete">Delete</button>',
-      '</div>'
-    ].join('');
-  }
-
-  function taskActionsEls() {
-    var modal = el('myTaskDetailsModal');
-    if (!modal) return {};
-    return {
-      menu: modal.querySelector('.my-task-actions-menu'),
-      toggle: modal.querySelector('[data-task-actions-toggle]')
-    };
-  }
-
-  function toggleTaskActionsMenu() {
-    var refs = taskActionsEls();
-    if (!refs.menu) return;
-    if (refs.menu.classList.contains('hidden')) {
-      refs.menu.classList.remove('hidden');
-      if (refs.toggle) refs.toggle.setAttribute('aria-expanded', 'true');
-    } else {
-      closeTaskActionsMenu();
-    }
-  }
-
-  function closeTaskActionsMenu() {
-    var refs = taskActionsEls();
-    if (refs.menu) refs.menu.classList.add('hidden');
-    if (refs.toggle) refs.toggle.setAttribute('aria-expanded', 'false');
+    var items = [
+      { value: 'edit', label: 'Edit', icon: 'edit' },
+      { value: isComplete ? 'reopen' : 'complete', label: isComplete ? 'Reopen' : 'Mark Complete', icon: isComplete ? 'rotate-ccw' : 'check' },
+      { divider: true },
+      { value: 'delete', label: 'Delete', icon: 'trash-2', danger: true }
+    ];
+    var json = JSON.stringify(items).split('&').join('&amp;').split('"').join('&quot;')
+      .split('<').join('&lt;').split('>').join('&gt;');
+    wrap.innerHTML = '<lex-dropdown-btn data-task-actions-menu button-label="Actions" align="end" floating options="' + json + '"></lex-dropdown-btn>';
   }
 
   function closeoutValue(id) {
@@ -1211,18 +1174,19 @@
     state.viewingTask = null;
   }
 
-  // Map a raw task into the row shape lex-table sees. Keep humanized values
-  // in the visible columns so the column-filter dropdowns show pretty labels
-  // (e.g. "In Progress" rather than "in_progress") while preserving the
-  // original task in `_raw` for row-click / action handlers.
+  // Map a raw task into the row shape lex-table sees. Rows keep raw values
+  // (status and priority codes, the matter id, ISO dates); the renderers
+  // and the supplied filter options carry the readable labels. The original
+  // task stays in `_raw` for row-click / action handlers.
   function mapTaskForTable(task) {
     return {
       id: task.id,
       title: task.title || 'Untitled task',
-      workspace_matter: taskMatterLabel(task),
-      status: statusLabel(task.status),
-      priority: priorityLabel(task.priority || 'normal'),
+      workspace_matter: task.matter_id || '',
+      status: normalizeStatus(task.status),
+      priority: String(task.priority || 'normal').toLowerCase(),
       due_date: task.due_date || '',
+      created_at: task.created_at || '',
       updated_at: task.updated_at || '',
       _raw: task
     };
@@ -1231,7 +1195,7 @@
   function cellRenderers() {
     return {
       title: function (val) {
-        return '<div class="my-task-table__title">' + esc(val || '') + '</div>';
+        return '<div class="my-task-table__title" title="' + esc(val || '') + '">' + esc(val || '') + '</div>';
       },
       workspace_matter: function (val, row) {
         var task = row && row._raw;
@@ -1256,40 +1220,142 @@
         return '<lex-badge label="' + esc(priorityLabel(raw)) + '" color="' + esc(priorityColor(raw)) + '"></lex-badge>';
       },
       due_date: function (val) {
-        return val ? esc(formatDate(val)) : '<span class="my-task-detail__muted">—</span>';
+        return val ? '<span class="my-task-table__created">' + esc(formatDate(val)) + '</span>' : '<span class="my-task-detail__muted">—</span>';
+      },
+      created_at: function (val) {
+        return val ? '<span class="my-task-table__created">' + esc(Lex.Utils.formatDateTime(val)) + '</span>' : '<span class="my-task-detail__muted">—</span>';
       }
     };
   }
 
-  async function loadTasks() {
+  // Every column filters (the table standard): Task by text, Workspace by
+  // workspace, Status and Priority by value, Due and Created by range.
+  function columnFilterOptions() {
+    var params = window.LanaListQueryParams;
+    var ranges = window.LanaLibraryColumnFilters;
+    var map = { title: { text: true, placeholder: 'Task contains...' } };
+    if (taskWorkspaceOptions.length) map.workspace_matter = { options: taskWorkspaceOptions };
+    if (params) {
+      map.status = { options: params.TASK_STATUS_OPTIONS };
+      map.priority = { options: params.TASK_PRIORITY_OPTIONS };
+      map.due_date = { single: true, options: params.TASK_DUE_OPTIONS };
+    }
+    if (ranges) map.created_at = { single: true, options: ranges.EDITED_RANGE_OPTIONS };
+    return map;
+  }
+
+  function loadTaskWorkspaceOptions() {
+    var ranges = window.LanaLibraryColumnFilters;
+    if (!ranges || typeof ranges.loadWorkspaceOptions !== 'function') return;
+    ranges.loadWorkspaceOptions(window.api).then(function (options) {
+      var table = el('myTasksTable');
+      if (!table || !options || !options.length) return;
+      taskWorkspaceOptions = options;
+      if (typeof table.setColumnFilterOptions === 'function') table.setColumnFilterOptions(columnFilterOptions());
+    });
+  }
+
+  // Asks the table for its current query; the answer arrives as
+  // lex-query-change and lands in fetchTaskPage. Resolves with that page.
+  function loadTasks(options) {
     var table = el('myTasksTable');
-    if (!table) return;
+    if (!table || typeof table.requestServerQuery !== 'function') return Promise.resolve([]);
+    table.requestServerQuery({ resetPage: !!(options && options.resetPage) });
+    return taskLoadPromise;
+  }
+
+  function fetchTaskPage(query) {
+    taskLoadPromise = doFetchTaskPage(query || {});
+    return taskLoadPromise;
+  }
+
+  // The tasks API's largest page.
+  var MAX_TASKS_PER_REQUEST = 100;
+
+  function taskPagination(response, requested) {
+    var data = (response && response.data) || response || {};
+    var source = data.pagination || {};
+    var total = Number(source.total !== undefined ? source.total : data.total);
+    return {
+      page: requested.page,
+      limit: requested.limit,
+      total: Number.isFinite(total) ? total : 0,
+      offset: source.offset
+    };
+  }
+
+  // Empty copy follows the search and filters: a filtered-empty table
+  // offers Clear filters instead of the create button.
+  function syncTaskEmptyState(table, filters) {
+    var filtered = Boolean(taskSearchTerm || Object.keys(filters || {}).length);
+    table.emptyText = filtered ? 'No matching tasks. Try a different search or filter.' : 'No tasks assigned to you';
+    table.emptyActionLabel = filtered ? '' : 'Create a task';
+  }
+
+  async function doFetchTaskPage(query) {
+    var table = el('myTasksTable');
+    var builder = window.LanaListQueryParams;
+    if (!table) return [];
+    var sequence = ++taskLoadSequence;
+    var filters = query.filters || {};
+
+    // The toolbar Status select mirrors the Status column's filter.
+    var statusSelect = el('myTasksStatusFilter');
+    var picked = builder ? builder.filterValues(filters.status) : [];
+    var statusValue = picked.length === 1 ? picked[0] : 'all';
+    if (statusSelect && statusSelect.value !== statusValue) statusSelect.value = statusValue;
+    syncTaskToolbarSort(query.sortBy, query.sortDir);
+
     try {
-      var collected = [];
-      var offset = 0;
-      while (collected.length < TASK_FETCH_MAX) {
-        var batch = normalizeTasks(await api.getMyTasks({
-          limit: TASK_PAGE_LIMIT,
-          offset: offset,
-          sort_by: 'updated_at',
-          sort_dir: 'DESC'
-        }));
-        if (!batch.length) break;
-        collected = collected.concat(batch);
-        if (batch.length < TASK_PAGE_LIMIT) break;
-        offset += TASK_PAGE_LIMIT;
+      if (!builder) throw new Error('List query helpers are unavailable.');
+      var params = builder.myTasksParams(query, { search: taskSearchTerm });
+      var requested = {
+        page: Number(query.page) || 1,
+        limit: Number(params.get('limit')) || 20,
+        offset: Number(params.get('offset')) || 0
+      };
+      var response = await api.getMyTasks(Object.fromEntries(params.entries()));
+      if (sequence !== taskLoadSequence) return state.tasks;
+      var pagination = taskPagination(response, requested);
+      var tasks;
+      // A server that ignores offset answers every page with page 1. Within
+      // its 100-row limit, ask for every row up to this page and keep this
+      // page's slice; past that, say so instead of repeating page 1.
+      if (requested.offset > 0 && pagination.offset !== undefined && Number(pagination.offset) !== requested.offset) {
+        var upTo = requested.offset + requested.limit;
+        if (upTo > MAX_TASKS_PER_REQUEST) throw new Error('This server cannot page tasks yet.');
+        params.set('limit', String(upTo));
+        params.delete('offset');
+        response = await api.getMyTasks(Object.fromEntries(params.entries()));
+        if (sequence !== taskLoadSequence) return state.tasks;
+        pagination = taskPagination(response, requested);
+        tasks = normalizeTasks(response).slice(requested.offset, upTo);
+      } else {
+        tasks = normalizeTasks(response);
       }
-      state.tasks = collected;
-      table.setData(collected.map(mapTaskForTable));
+      state.tasks = tasks;
+      syncTaskEmptyState(table, filters);
+      table.setServerData(tasks.map(mapTaskForTable), pagination);
       updateTaskCount();
-      return collected;
+      return tasks;
     } catch (error) {
-      Lex.Toast.error(error.message || 'Unable to load tasks');
+      if (sequence !== taskLoadSequence) return state.tasks;
+      console.error('[MyTasks] Failed to load tasks:', error);
       state.tasks = [];
-      if (typeof table.setData === 'function') table.setData([]);
+      if (typeof table.setServerError === 'function') {
+        table.setServerError('Tasks could not be loaded. ' + (error && error.message === 'This server cannot page tasks yet.'
+          ? 'This server can only show the first 100 tasks until it is updated.' : 'Check your connection and try again.'));
+      }
       updateTaskCount();
       return [];
     }
+  }
+
+  function syncTaskToolbarSort(column, direction) {
+    var select = el('myTasksSort');
+    var button = el('myTasksSortOrder');
+    if (select && column && select.value !== column) select.value = column;
+    if (button) button.dataset.order = direction === 'asc' ? 'asc' : 'desc';
   }
 
   // Reflect the table's current (post-search/filter) row total in the toolbar
@@ -1342,42 +1408,19 @@
     return false;
   }
 
-  function syncNewMenuVisibility() {
-    var menu = el('myTasksNewMenu');
-    var btn = el('myTasksNewBtn');
-    if (!menu) return;
-    if (state.newMenuOpen) {
-      menu.classList.remove('hidden');
-      if (btn) btn.setAttribute('aria-expanded', 'true');
-    } else {
-      menu.classList.add('hidden');
-      if (btn) btn.setAttribute('aria-expanded', 'false');
-    }
-  }
-
-  function toggleNewMenu(force) {
-    state.newMenuOpen = typeof force === 'boolean' ? force : !state.newMenuOpen;
-    syncNewMenuVisibility();
-  }
-
-  function hideNewMenu() {
-    if (!state.newMenuOpen) return;
-    state.newMenuOpen = false;
-    syncNewMenuVisibility();
-  }
-
+  // Items of the "New Task" menu (#myTasksNewBtn, a lex-dropdown-btn). New
+  // Task Plan is listed only for roles that may create plans. Set as an
+  // attribute so a re-render of the lex-banner around it keeps the items.
   function applyTaskPlanRoleGate() {
-    var menu = el('myTasksNewMenu');
+    var menu = el('myTasksNewBtn');
     if (!menu) return;
-    var canPlans = canCreateTaskPlans();
-    var planItem = menu.querySelector('[data-new-action="task-plan"]');
-    if (planItem) {
-      if (canPlans) {
-        planItem.classList.remove('hidden');
-      } else {
-        planItem.classList.add('hidden');
-      }
+    var items = [
+      { value: 'task', label: 'New Task', description: 'Create a single task on a matter' }
+    ];
+    if (canCreateTaskPlans()) {
+      items.push({ value: 'task-plan', label: 'New Task Plan', description: 'Draft a checklist that publishes to tasks' });
     }
+    menu.setAttribute('options', JSON.stringify(items));
   }
 
   // --- Matter picker (Create Task modal) ----------------------------------
@@ -1724,7 +1767,10 @@
     }
 
     if (action === 'delete') {
-      var confirmDelete = window.confirm('Delete this task? This cannot be undone.');
+      var confirmDelete = await Lex.Modal.confirmAsync('Delete Task', 'Delete this task? This cannot be undone.', {
+        variant: 'danger',
+        confirmText: 'Delete'
+      });
       if (!confirmDelete) return;
       try {
         await api.deleteTask(task.id);
@@ -2574,7 +2620,6 @@
   }
 
   function handleNewMenuClick(action) {
-    hideNewMenu();
     if (action === 'task') {
       openNewTaskModal();
       return;
@@ -2607,12 +2652,24 @@
     } catch (_) {
       return;
     }
-    var taskId = params.get('task');
-    if (!taskId || !Array.isArray(tasks)) return;
-    var task = tasks.find(function (item) {
+    var taskId = params.get('task') || params.get('task_id');
+    if (!taskId) return;
+    var task = (Array.isArray(tasks) ? tasks : []).find(function (item) {
       return String(item.id || item.task_id || '') === String(taskId);
     });
-    if (task) requestAnimationFrame(function () { openTaskDetails(task); });
+    if (task) {
+      requestAnimationFrame(function () { openTaskDetails(task); });
+      return;
+    }
+    // Not on the first page: fetch it by id (matter_id scopes a matter task).
+    if (!api || typeof api.get !== 'function') return;
+    var matterId = params.get('matter_id');
+    api.get('/api/v1/tasks/' + encodeURIComponent(taskId) + (matterId ? '?matter_id=' + encodeURIComponent(matterId) : ''))
+      .then(function (response) {
+        var found = response && (response.data || response.task);
+        if (found && found.id) openTaskDetails(found);
+      })
+      .catch(function () { /* the task stays reachable through the table */ });
   }
 
   function bindEvents() {
@@ -2623,6 +2680,9 @@
       if (typeof table.setCellRenderers === 'function') {
         table.setCellRenderers(cellRenderers());
       }
+      if (typeof table.setColumnFilterOptions === 'function') {
+        table.setColumnFilterOptions(columnFilterOptions());
+      }
 
       // lex-table emits `row-click` for any non-button/input/anchor click
       // inside a row. Use it to open the task details modal.
@@ -2632,8 +2692,15 @@
         if (task) openTaskDetails(task);
       });
 
-      // Keep the toolbar count in sync as the client-side pipeline reprocesses.
-      table.addEventListener('lex-filter-change', updateTaskCount);
+      // The table asks for a page (paging, sort, column filters).
+      table.addEventListener('lex-query-change', function (event) {
+        if (event.target && event.target !== table) return;
+        fetchTaskPage(event.detail);
+      });
+      // A header click sorted the table: mirror it in the toolbar.
+      table.addEventListener('sort-change', function (event) {
+        if (event.detail) syncTaskToolbarSort(event.detail.sortBy, event.detail.sortDir);
+      });
       table.addEventListener('lex-data-loaded', updateTaskCount);
 
       // Empty-state CTA: "Create a task" on a genuine no-data state opens the new
@@ -2641,12 +2708,17 @@
       table.addEventListener('empty-action', function () { openNewTaskModal(); });
 
       // --- Library-style toolbar: search / sort / order / status filter ---
+      // Search: 350 ms after typing stops (at once on clear), reload page 1.
       var searchInput = el('myTasksSearch');
       if (searchInput) {
         var runSearch = function (event) {
-          if (table.dataSource) {
-            table.dataSource.setSearch(event && event.detail ? event.detail.value : '');
-          }
+          var value = String((event && event.detail ? event.detail.value : '') || '').trim();
+          clearTimeout(taskSearchDebounce);
+          taskSearchDebounce = setTimeout(function () {
+            if (value === taskSearchTerm) return;
+            taskSearchTerm = value;
+            loadTasks({ resetPage: true });
+          }, value ? 350 : 0);
         };
         searchInput.addEventListener('lex-input', runSearch);
         searchInput.addEventListener('lex-change', runSearch);
@@ -2788,11 +2860,11 @@
         });
       });
 
-      // Inline status change from the details list.
-      modalContent.addEventListener('change', function (event) {
-        var select = event.target.closest('[data-task-status-select]');
+      // Inline status change from the details list (lex-select).
+      modalContent.addEventListener('lex-change', function (event) {
+        var select = event.target && event.target.closest ? event.target.closest('[data-task-status-select]') : null;
         if (!select) return;
-        setTaskStatus(select.value);
+        setTaskStatus(event.detail && event.detail.value !== undefined ? event.detail.value : select.value);
       });
 
       modalContent.addEventListener('lex-change', function (event) {
@@ -2854,52 +2926,25 @@
       });
     }
 
-    // Header "Actions" dropdown (Edit / Mark Complete / Delete). The toggle
-    // and menu live in the modal header, outside #myTaskDetailsContent.
+    // Header "Actions" menu (lex-dropdown-btn: Edit / Mark Complete or
+    // Reopen / Delete). It lives in the modal header, outside
+    // #myTaskDetailsContent.
     var detailsModal = el('myTaskDetailsModal');
     if (detailsModal) {
-      detailsModal.addEventListener('click', function (event) {
-        if (event.target.closest('[data-task-actions-toggle]')) {
-          event.stopPropagation();
-          toggleTaskActionsMenu();
-          return;
-        }
-        var menuItem = event.target.closest('.my-task-actions-menu [data-task-action]');
-        if (menuItem) {
-          event.stopPropagation();
-          closeTaskActionsMenu();
-          handleTaskAction(menuItem.getAttribute('data-task-action'));
-        }
+      detailsModal.addEventListener('lex-select', function (event) {
+        if (!event.target.closest || !event.target.closest('[data-task-actions-menu]')) return;
+        handleTaskAction(event.detail && event.detail.value);
       });
     }
-    // Dismiss the actions menu on any outside click.
-    document.addEventListener('click', function (event) {
-      if (!event.target.closest('.my-task-header-actions')) closeTaskActionsMenu();
-    });
 
+    // "New Task" menu (lex-dropdown-btn): New Task / New Task Plan.
     var newBtn = el('myTasksNewBtn');
-    var newMenu = el('myTasksNewMenu');
     if (newBtn) {
-      newBtn.addEventListener('click', function (event) {
-        event.stopPropagation();
-        toggleNewMenu();
+      newBtn.addEventListener('lex-select', function (event) {
+        handleNewMenuClick(event.detail && event.detail.value);
       });
     }
-    if (newMenu) {
-      newMenu.addEventListener('click', function (event) {
-        var item = event.target.closest('[data-new-action]');
-        if (!item) return;
-        event.stopPropagation();
-        handleNewMenuClick(item.getAttribute('data-new-action'));
-      });
-    }
-    document.addEventListener('click', function (event) {
-      if (!state.newMenuOpen) return;
-      var wrapper = event.target.closest('.my-tasks-new-wrapper');
-      if (!wrapper) hideNewMenu();
-    });
     document.addEventListener('keydown', function (event) {
-      if (event.key === 'Escape') hideNewMenu();
       if (event.key && event.key.toLowerCase() === 'm' && state.viewingTask) {
         var tag = event.target && event.target.tagName ? event.target.tagName.toLowerCase() : '';
         var editable = event.target && event.target.isContentEditable;
@@ -2922,6 +2967,7 @@
       createForm.addEventListener('submit', submitNewTask);
       createForm.addEventListener('lex-submit', submitNewTask);
     }
+    bindFooterSubmit(el('myTaskSaveBtn'), createForm, submitNewTask);
     if (cancelBtn) cancelBtn.addEventListener('click', closeNewTaskModal);
     if (matterPickBtn) matterPickBtn.addEventListener('click', openMatterPicker);
     if (userPickBtn) userPickBtn.addEventListener('click', openUserPicker);
@@ -2959,8 +3005,26 @@
       planForm.addEventListener('submit', submitNewTaskPlan);
       planForm.addEventListener('lex-submit', submitNewTaskPlan);
     }
+    bindFooterSubmit(el('myTaskPlanSaveBtn'), planForm, submitNewTaskPlan);
     if (planCancelBtn) planCancelBtn.addEventListener('click', closeNewTaskPlanModal);
     if (planMatterPickBtn) planMatterPickBtn.addEventListener('click', openPlanMatterPicker);
+  }
+
+  // The create modals keep their Save button in the lex-modal footer
+  // (footer-content), outside the lex-form, so a click no longer reaches the
+  // form's submit delegation. Validate the form and hand the same
+  // { detail: { valid, values } } shape the lex-submit event carries.
+  function bindFooterSubmit(button, form, handler) {
+    if (!button || !form) return;
+    button.addEventListener('click', function (event) {
+      if (event) event.preventDefault();
+      var result = typeof form.validate === 'function' ? form.validate() : { valid: true, errors: [] };
+      var values = typeof form.getValues === 'function' ? form.getValues() : {};
+      handler({
+        preventDefault: function () {},
+        detail: { valid: result.valid, values: values, errors: result.errors }
+      });
+    });
   }
 
   function init() {
@@ -2968,6 +3032,7 @@
     bindEvents();
     applyTaskPlanRoleGate();
     handleInitialAction();
+    loadTaskWorkspaceOptions();
     loadTasks().then(handleInitialTask);
   }
 

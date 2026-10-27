@@ -8,22 +8,17 @@
  * @requires api.js          - window.api — getUsers, getUser, createUser, updateUser,
  *                              checkEmail, checkUsername, getRoles
  * @requires admin-users.pagination.js - API pagination response normalization
- * @requires lex.utils.js    - Lex.Utils.escapeHtml, Lex.Utils.formatDate
+ * @requires lex.utils.js    - Lex.Utils.escapeHtml, Lex.Utils.formatDateTime, Lex.Utils.humanizeLabel
  * @requires lex-toast.js    - Lex.Toast.success, Lex.Toast.error
- * @requires lex-table.js    - table.setData()
+ * @requires lex-table.js    - server-paged table (setServerData)
+ * @requires admin-table-kit.js - AdminTableKit toolbar + cell helpers
+ * @requires library-column-filters.js - date-range filter bounds
  * @requires lex-form.js     - form.getValues(), form.reset(), form.validate()
  * @requires lex-nav.js      - Lex.Nav.go
  */
 
 (function () {
   'use strict';
-
-  // =========================================================================
-  // Lex aliases (shell singletons — set once, never re-declared)
-  // =========================================================================
-
-  var escHtml    = Lex.Utils.escapeHtml;
-  var fmtDate    = Lex.Utils.formatDate;
 
   // =========================================================================
   // Module-level state
@@ -39,9 +34,21 @@
   /** null = create mode, string ID = edit mode. */
   var _editingUserId = null;
 
-  /** Pagination state */
-  var _currentPage = 1;
-  var _pageSize    = 20;
+  /** Toolbar search term (the table owns paging, sort and filters). */
+  var _searchTerm = '';
+
+  /** Toolbar handle from AdminTableKit.bindToolbar. */
+  var _toolbar = null;
+
+  var TABLE_ID = 'usersTable';
+
+  // Table column -> admin users API sort_by.
+  var SORT_BY_COLUMN = { email: 'email', username: 'username', status: 'status', created_at: 'created_at' };
+
+  // Status values the user write paths accept.
+  var USER_STATUSES = ['active', 'inactive', 'suspended', 'deactivated'];
+
+  var STATUS_COLORS = { active: 'green', inactive: 'gray', deactivated: 'gray', suspended: 'red', pending: 'yellow', invited: 'yellow' };
 
 
   // =========================================================================
@@ -54,17 +61,15 @@
   function init() {
     _wireHeaderButtons();
     _wireUserModal();
-    _wirePagination();
 
     // Topbar refresh button
     document.addEventListener('lex-refresh', function (e) {
       e.preventDefault();
-      _currentPage = 1;
       loadUsers();
     });
 
     loadRoles();
-    loadUsers();
+    _initTable();
   }
 
 
@@ -109,54 +114,6 @@
   function setInputValue(elId, value) {
     var elem = el(elId);
     if (elem) elem.value = (value !== null && value !== undefined) ? String(value) : '';
-  }
-
-  /**
-   * Get initials from a name string.
-   * Takes the first char of the first word and the first char of the last word.
-   * Uses charAt() and indexOf() — no regex.
-   * @param {string} name
-   * @returns {string} Up to two uppercase initials.
-   */
-  function getInitials(name) {
-    if (!name) return '?';
-    var parts = name.split(' ');
-    var first = parts[0] ? parts[0].charAt(0) : '';
-    var last  = parts.length > 1 ? parts[parts.length - 1].charAt(0) : '';
-    return (first + last).toUpperCase() || '?';
-  }
-
-  /**
-   * Build an HTML pill for a user's status (active, inactive, pending, etc.).
-   * Uses inline style rather than Lex.Utils.statusBadge so we control colors.
-   * @param {string} status
-   * @returns {string} Safe HTML string.
-   */
-  function statusPill(status) {
-    var s = status ? String(status).toLowerCase() : '';
-    var color;
-    var label;
-    if (s === 'active') {
-      color = 'var(--lex-status-success-bg,#ECFDF3)';
-      label = 'Active';
-    } else if (s === 'inactive' || s === 'deactivated') {
-      color = 'var(--lex-status-neutral-bg,#F2F4F7)';
-      label = 'Inactive';
-    } else if (s === 'pending' || s === 'invited') {
-      color = 'var(--lex-status-warning-bg,#FFFAEB)';
-      label = s.charAt(0).toUpperCase() + s.substring(1);
-    } else {
-      color = 'var(--lex-status-neutral-bg,#F2F4F7)';
-      label = s ? s.charAt(0).toUpperCase() + s.substring(1) : 'Unknown';
-    }
-    return (
-      '<span style="' +
-        'display:inline-flex;align-items:center;' +
-        'padding:2px 8px;border-radius:9999px;' +
-        'font-size:var(--lex-body-xs-size,0.75rem);' +
-        'font-weight:500;background:' + color + ';' +
-      '">' + escHtml(label) + '</span>'
-    );
   }
 
   /**
@@ -224,146 +181,178 @@
   }
 
   // =========================================================================
-  // A. loadUsers — Fetch and render table
+  // A. Users table — server-paged (docs/TABLE-STANDARD.md)
   // =========================================================================
 
   /**
-   * Fetch the user list from the API and populate the lex-table.
-   * Uses a generation counter to discard stale responses.
+   * The admin users API query for a lex-table server query.
+   * Filters the API does not take yet (name/email/username contains, Created
+   * range, several statuses or roles) are sent under the standard names so
+   * they apply once the API reads them.
+   * @param {Object} query - { page, limit, sortBy, sortDir, filters }
+   * @param {string} search - toolbar search
+   * @param {Date} [now]
+   * @returns {URLSearchParams}
+   */
+  function toApiParams(query, search, now) {
+    var kit = window.AdminTableKit;
+    var q = query || {};
+    var filters = q.filters || {};
+    var params = new URLSearchParams();
+    params.set('page', String(q.page || 1));
+    params.set('page_size', String(q.limit || 20));
+    params.set('sort_by', SORT_BY_COLUMN[q.sortBy] || 'created_at');
+    params.set('sort_order', q.sortDir === 'asc' ? 'asc' : 'desc');
+    if (search) params.set('search', search);
+    ['name', 'email', 'username'].forEach(function (col) {
+      var text = kit.firstFilterValue(filters, col);
+      if (text) params.set(col, text);
+    });
+    var statuses = kit.filterValues(filters.status);
+    if (statuses.length) params.set('status_filter', statuses.join(','));
+    var roles = kit.filterValues(filters.role);
+    if (roles.length) params.set('role_id_filter', roles.join(','));
+    kit.setRange(params, filters, 'created_at', 'created_after', 'created_before', now);
+    return params;
+  }
+
+  /**
+   * One table row per user: raw values, the record as _raw.
+   * @param {Object} u
+   * @returns {Object}
+   */
+  function mapUser(u) {
+    return {
+      id:         String(u.id || u.user_id || ''),
+      name:       userDisplayName(u),
+      email:      String(u.email || ''),
+      username:   String(u.username || ''),
+      role:       String(u.role_id || ''),
+      status:     String(u.status || (u.is_active ? 'active' : 'inactive')),
+      created_at: u.created_at || '',
+      _raw:       u
+    };
+  }
+
+  function cellRenderers() {
+    var kit = window.AdminTableKit;
+    return {
+      name: function (val, row) { return kit.nameCell(val || row.username || row.email); },
+      email: function (val) { return val ? '<span class="admin-table-text" title="' + kit.esc(val) + '">' + kit.esc(val) + '</span>' : kit.muted(''); },
+      username: function (val) { return val ? '<span class="admin-table-text">' + kit.esc(val) + '</span>' : kit.muted(''); },
+      role: function (val, row) {
+        var label = userRoleName(row._raw);
+        return label ? '<span class="admin-table-text">' + kit.esc(Lex.Utils.humanizeLabel(label)) + '</span>' : kit.muted('No role');
+      },
+      status: function (val) {
+        var key = String(val || '').toLowerCase();
+        return kit.badge(Lex.Utils.humanizeLabel(key), STATUS_COLORS[key] || 'gray');
+      },
+      created_at: function (val) { return kit.timeCell(val); }
+    };
+  }
+
+  /**
+   * Header filters for every column. Roles come from the role list.
+   * @param {Array} roles
+   */
+  function filterOptions(roles) {
+    var kit = window.AdminTableKit;
+    var map = {
+      name:     { text: true, placeholder: 'Name contains...' },
+      email:    { text: true, placeholder: 'Email contains...' },
+      username: { text: true, placeholder: 'Username contains...' },
+      status:   { options: kit.labelOptions(USER_STATUSES) },
+      created_at: kit.dateRangeFilter()
+    };
+    var roleOptions = (roles || []).map(function (r) {
+      return { value: String(r.id), label: Lex.Utils.humanizeLabel(r.display_name || r.name || r.role_name || r.id) };
+    }).filter(function (o) { return o.value; });
+    if (roleOptions.length) map.role = { options: roleOptions };
+    return map;
+  }
+
+  function _table() {
+    return el(TABLE_ID);
+  }
+
+  function _initTable() {
+    var table = _table();
+    if (!table) return;
+    window.AdminTableKit.whenTableReady().then(function () {
+      if (_table() !== table) return;
+      // Renderers before the first page lands.
+      table.setCellRenderers(cellRenderers());
+      table.setColumnFilterOptions(filterOptions(_roles));
+      _toolbar = window.AdminTableKit.bindToolbar({
+        table: table,
+        searchId: 'usersSearch',
+        sortId: 'usersSort',
+        orderId: 'usersSortOrder',
+        filterId: 'usersStatusFilter',
+        filterKey: 'status',
+        countIds: ['usersCount', 'usersSectionCount'],
+        noun: ['user', 'users'],
+        onSearch: function (term) {
+          _searchTerm = term;
+          table.requestServerQuery({ resetPage: true });
+        }
+      });
+      table.addEventListener('lex-query-change', function (e) {
+        if (e.target !== table) return;
+        _fetchUsers(e.detail);
+      });
+      table.addEventListener('row-click', function (e) {
+        var row = e.detail && e.detail.row;
+        if (row && row.id) {
+          Lex.Nav.go('admin/user-details.html', { params: { userId: row.id } });
+        }
+      });
+      table.requestServerQuery({ resetPage: true });
+    });
+  }
+
+  /**
+   * Reload the current page (after a create/edit or a topbar refresh).
    */
   function loadUsers() {
+    var table = _table();
+    if (table && typeof table.requestServerQuery === 'function') table.requestServerQuery();
+  }
+
+  /**
+   * Answer the table's lex-query-change with one page of users.
+   * A generation counter drops stale answers.
+   * @param {Object} query
+   */
+  function _fetchUsers(query) {
     var gen = ++_gen;
-    var table = el('usersTable');
+    var table = _table();
     if (!table) return;
+    query = query || table.serverQuery;
+    var filters = query.filters || {};
+    var filtered = Boolean(_searchTerm || Object.keys(filters).length);
+    if (_toolbar) _toolbar.syncFilter(filters);
 
-    // Apply redacted shimmer while loading
-    Lex.Redact.on(table);
-
-    api.getUsers(_currentPage, _pageSize, {})
+    api.get('/api/v1/admin/users?' + toApiParams(query, _searchTerm).toString())
       .then(function (result) {
         if (gen !== _gen) return; // stale response — discard
-
         var normalized = AdminUsersPagination.normalizeAdminUsersResponse(result);
-        var users = normalized.users;
-        var total = normalized.total;
-
-        var rows = users.map(function (u) {
-          return {
-            _id:         String(u.id || u.user_id || ''),
-            user_display: userDisplayName(u),
-            _email:      String(u.email || ''),
-            username:    String(u.username || ''),
-            role_name:   userRoleName(u) || 'No role',
-            status:      String(u.status || (u.is_active ? 'active' : 'inactive')),
-            created_at:  u.created_at ? fmtDate(u.created_at) : '—',
-            _raw:        u
-          };
+        var pagination = (result && result.pagination) || {};
+        table.emptyText = window.AdminTableKit.emptyText(filtered, 'users');
+        table.setServerData(normalized.users.map(mapUser), {
+          page: pagination.page || query.page,
+          page_size: pagination.page_size || query.limit,
+          total: normalized.total,
+          total_pages: pagination.total_pages
         });
-
-        Lex.Redact.off(table);
-        _ensureTableObserver(table);
-        table.setData(rows);
-        _updatePagination(total);
       })
       .catch(function (err) {
         if (gen !== _gen) return;
-        Lex.Redact.off(table);
         console.error('[admin-users] loadUsers error:', err);
-        Lex.Toast.error('Failed to load users');
+        if (_toolbar) _toolbar.setCount(null);
+        table.setServerError('Users could not be loaded. Check your connection and try again.');
       });
-  }
-
-  /**
-   * One-time setup: attach row-click listener and a MutationObserver that
-   * re-applies custom cell renderers whenever lex-table re-renders
-   * (search, sort, paginate).  Must be called BEFORE the first setData().
-   *
-   * The observer watches direct childList only (not subtree), so the
-   * td.innerHTML changes inside _applyTableRenderers do NOT re-trigger it.
-   *
-   * @param {Element} table
-   */
-  function _ensureTableObserver(table) {
-    if (table._usersRendererAttached) return;
-    table._usersRendererAttached = true;
-
-    table.addEventListener('row-click', function (e) {
-      var row = e.detail && e.detail.row;
-      if (row) {
-        Lex.Nav.go('admin/user-details.html', { params: { userId: row._id } });
-      }
-    });
-
-    new MutationObserver(function () {
-      requestAnimationFrame(function () { _applyTableRenderers(table); });
-    }).observe(table, { childList: true });
-  }
-
-  /**
-   * Apply custom cell renderers to the lex-table.
-   * Overrides the user_display column to show avatar+name+email,
-   * the status column to show a coloured pill, and appends an
-   * Actions dropdown to each row.
-   *
-   * Reads the currently displayed rows from table.dataSource.data
-   * so it works correctly after search/sort/paginate re-renders.
-   *
-   * @param {Element} table
-   */
-  function _applyTableRenderers(table) {
-    var rows = (table.dataSource && table.dataSource.data) || [];
-
-    var tbody = table.querySelector('tbody');
-    if (!tbody) return;
-
-    var trs = tbody.querySelectorAll('tr');
-    for (var i = 0; i < trs.length; i++) {
-      var tr   = trs[i];
-      var row  = rows[i];
-      if (!row) continue;
-
-      var tds = tr.querySelectorAll('td');
-      if (tds.length === 0) continue;
-
-      // Column order: user_display, username, role_name, status, created_at
-      // User display cell (index 0): avatar circle + name + email
-      var nameVal  = row.user_display || '';
-      var emailVal = row._email || '';
-      var initials = getInitials(nameVal);
-      if (tds[0]) {
-        tds[0].innerHTML =
-          '<div style="display:flex;align-items:center;gap:0.625rem;">' +
-            '<div style="' +
-              'flex-shrink:0;width:2rem;height:2rem;border-radius:9999px;' +
-              'background:var(--lex-bg-accent,#8B7355);' +
-              'color:var(--lex-text-on-accent,#fff);' +
-              'display:flex;align-items:center;justify-content:center;' +
-              'font-size:0.6875rem;font-weight:600;' +
-            '">' +
-              escHtml(initials) +
-            '</div>' +
-            '<div style="min-width:0;">' +
-              '<div style="font-weight:500;color:var(--lex-text-primary);' +
-                'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
-                escHtml(nameVal) +
-              '</div>' +
-              '<div style="font-size:var(--lex-body-xs-size,0.75rem);' +
-                'color:var(--lex-text-tertiary);' +
-                'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
-                escHtml(emailVal) +
-              '</div>' +
-            '</div>' +
-          '</div>';
-      }
-
-      // Status cell — coloured pill
-      var statusVal = row.status || '';
-      var statusIndex = 3; // 0:user_display, 1:username, 2:role_name, 3:status, 4:created_at
-      if (tds[statusIndex]) {
-        tds[statusIndex].innerHTML = statusPill(statusVal);
-      }
-
-    }
   }
 
   // =========================================================================
@@ -393,6 +382,10 @@
         }
         _roles = list;
         _populateRoleSelect();
+        var table = _table();
+        if (table && typeof table.setColumnFilterOptions === 'function') {
+          table.setColumnFilterOptions(filterOptions(_roles));
+        }
       })
       .catch(function (err) {
         console.error('[admin-users] loadRoles error:', err);
@@ -547,6 +540,9 @@
       _handleUserFormSubmit(e.detail.values);
     });
 
+    // Save sits in the modal footer as <lex-btn type="submit" form="userForm">;
+    // lex-form emits lex-submit for it.
+
     // Email availability check on blur (create mode only)
     var emailInput = el('userEmail');
     if (emailInput) {
@@ -590,7 +586,7 @@
       });
     }
 
-    // Cancel button inside the form (since modal uses hide-actions)
+    // Cancel button in the modal footer (footer-content)
     var cancelBtn = el('userModalCancelBtn');
     if (cancelBtn) {
       cancelBtn.addEventListener('click', function () {
@@ -713,41 +709,14 @@
     if (elem) elem.error = '';
   }
 
-  // =========================================================================
-  // Pagination
-  // =========================================================================
-
-  /**
-   * Update the lex-pagination component with current state.
-   * @param {number} total - Total number of users from the API.
-   */
-  function _updatePagination(total) {
-    var pager = el('pagination');
-    if (!pager) return;
-
-    var totalPages = Math.ceil(total / _pageSize) || 1;
-    pager.page       = _currentPage;
-    pager.totalPages = totalPages;
-    pager.total      = total;
-    pager.limit      = _pageSize;
-  }
-
-  /**
-   * Wire the page-change event from lex-pagination.
-   */
-  function _wirePagination() {
-    var pager = el('pagination');
-    if (!pager || pager._usersWired) return;
-    pager._usersWired = true;
-
-    pager.addEventListener('page-change', function (e) {
-      var page = e.detail && e.detail.page;
-      if (page && page !== _currentPage) {
-        _currentPage = page;
-        loadUsers();
-      }
-    });
-  }
+  // Pure table logic, exposed for unit tests.
+  window.AdminUsersTable = {
+    toApiParams: toApiParams,
+    mapUser: mapUser,
+    cellRenderers: cellRenderers,
+    filterOptions: filterOptions,
+    SORT_BY_COLUMN: SORT_BY_COLUMN
+  };
 
   // =========================================================================
   // Bootstrap

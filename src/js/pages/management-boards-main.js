@@ -125,94 +125,224 @@ async function loadTabData(tabName) {
   }
 }
 
+// =========================================================================
+// Custom boards table — server-paged lex-table (docs/TABLE-STANDARD.md)
+// =========================================================================
+
+const BOARDS_TABLE_ID = 'boardsTable';
+
+// Table column -> GET /api/v1/admin/management-boards sort_by (its allow-list).
+const BOARD_SORT_BY_COLUMN = {
+  name: 'name',
+  board_type: 'board_type',
+  last_review_at: 'last_review_at',
+  created_at: 'created_at'
+};
+
+// Values the board write paths accept (POST /admin/management-boards zod enums).
+const BOARD_TYPES = ['intake', 'caseload', 'revenue', 'custom'];
+const BOARD_REVIEW_FREQUENCIES = ['daily', 'weekly', 'monthly', 'quarterly', 'annual'];
+const BOARD_ACCESS_LEVELS = ['admin', 'editor', 'viewer'];
+
+const BOARD_TYPE_COLORS = { intake: 'blue', caseload: 'purple', revenue: 'green', custom: 'gray' };
+const BOARD_ACCESS_COLORS = { admin: 'red', editor: 'blue', viewer: 'gray' };
+const BOARD_STATUS_COLORS = { active: 'green', inactive: 'gray' };
+
+// Metrics column ranges: min inclusive, max exclusive.
+const BOARD_METRIC_RANGES = [
+  { value: '0', label: 'None', min: 0, max: 1 },
+  { value: '1-5', label: '1 to 5', min: 1, max: 6 },
+  { value: '6-10', label: '6 to 10', min: 6, max: 11 },
+  { value: '11+', label: 'More than 10', min: 11, max: null }
+];
+
+let boardsSearchTerm = '';
+let boardsToolbar = null;
+let boardsLoadSeq = 0;
+
 /**
- * Load boards (unified view with filters)
+ * The management boards API query for a lex-table server query.
+ * The API reads page/page_size, sort_by/sort_order, one board_type and
+ * is_active today; the other filters go under the standard names so they
+ * apply once the API reads them.
+ * @param {Object} query - { page, limit, sortBy, sortDir, filters }
+ * @param {string} search - toolbar search
+ * @param {Date} [now]
+ * @returns {URLSearchParams}
  */
-async function loadBoards() {
+function boardsApiParams(query, search, now) {
+  const kit = window.AdminTableKit;
+  const q = query || {};
+  const filters = q.filters || {};
+  const params = new URLSearchParams();
+  params.set('page', String(q.page || 1));
+  params.set('page_size', String(q.limit || 20));
+  params.set('sort_by', BOARD_SORT_BY_COLUMN[q.sortBy] || 'created_at');
+  params.set('sort_order', q.sortDir === 'asc' ? 'asc' : 'desc');
+  if (search) params.set('search', search);
+  const name = kit.firstFilterValue(filters, 'name');
+  if (name) params.set('name', name);
+  const type = kit.firstFilterValue(filters, 'board_type');
+  if (type) params.set('board_type', type);
+  const frequencies = kit.filterValues(filters.review_frequency);
+  if (frequencies.length) params.set('review_frequency', frequencies.join(','));
+  const access = kit.filterValues(filters.access);
+  if (access.length) params.set('access_level', access.join(','));
+  const visibility = kit.firstFilterValue(filters, 'visibility');
+  if (visibility) params.set('is_public', visibility === 'public' ? 'true' : 'false');
+  const status = kit.firstFilterValue(filters, 'status');
+  if (status) params.set('is_active', status === 'inactive' ? 'false' : 'true');
+  const metrics = BOARD_METRIC_RANGES.find(r => r.value === kit.firstFilterValue(filters, 'metrics_count'));
+  if (metrics) {
+    params.set('min_metrics', String(metrics.min));
+    if (metrics.max !== null) params.set('max_metrics', String(metrics.max));
+  }
+  kit.setRange(params, filters, 'last_review_at', 'last_review_after', 'last_review_before', now);
+  kit.setRange(params, filters, 'created_at', 'created_after', 'created_before', now);
+  return params;
+}
+
+/**
+ * One table row per board: raw values, the record as _raw.
+ * @param {Object} board
+ * @returns {Object}
+ */
+function mapBoardRow(board) {
+  const b = board || {};
+  return {
+    id: String(b.id || ''),
+    name: String(b.name || ''),
+    board_type: String(b.board_type || ''),
+    review_frequency: String(b.review_frequency || ''),
+    metrics_count: Number(b.metrics_count != null ? b.metrics_count : (b.metric_count || 0)) || 0,
+    access: String(b.user_access_level || ''),
+    visibility: b.is_public ? 'public' : 'private',
+    status: b.is_active === false ? 'inactive' : 'active',
+    last_review_at: b.last_review_at || '',
+    created_at: b.created_at || '',
+    _raw: b
+  };
+}
+
+function boardsCellRenderers() {
+  const kit = window.AdminTableKit;
+  const label = (v) => Lex.Utils.humanizeLabel(v);
+  return {
+    name: (val, row) => kit.nameCell(val, row._raw && row._raw.description),
+    board_type: (val) => kit.badge(val ? label(val) : '', BOARD_TYPE_COLORS[val] || 'gray'),
+    review_frequency: (val) => val ? '<span class="admin-table-text">' + kit.esc(label(val)) + '</span>' : kit.muted(''),
+    metrics_count: (val) => '<span class="admin-table-text">' + kit.esc(String(Number(val) || 0)) + '</span>',
+    access: (val) => kit.badge(val ? label(val) : '', BOARD_ACCESS_COLORS[val] || 'gray'),
+    visibility: (val) => '<span class="admin-table-text">' + kit.esc(label(val || 'private')) + '</span>',
+    status: (val) => kit.badge(label(val || 'active'), BOARD_STATUS_COLORS[val] || 'gray'),
+    last_review_at: (val) => kit.timeCell(val),
+    created_at: (val) => kit.timeCell(val)
+  };
+}
+
+/**
+ * Header filters for every column. Type, Visibility and Status are single
+ * choice because the API takes one board_type / is_active value.
+ */
+function boardsFilterOptions() {
+  const kit = window.AdminTableKit;
+  return {
+    name: { text: true, placeholder: 'Board name contains...' },
+    board_type: { single: true, options: kit.labelOptions(BOARD_TYPES) },
+    review_frequency: { options: kit.labelOptions(BOARD_REVIEW_FREQUENCIES) },
+    metrics_count: { single: true, options: BOARD_METRIC_RANGES.map(r => ({ value: r.value, label: r.label })) },
+    access: { options: kit.labelOptions(BOARD_ACCESS_LEVELS) },
+    visibility: { single: true, options: kit.labelOptions(['public', 'private']) },
+    status: { single: true, options: kit.labelOptions(['active', 'inactive']) },
+    last_review_at: kit.dateRangeFilter(),
+    created_at: kit.dateRangeFilter()
+  };
+}
+
+function boardsTable() {
+  return document.getElementById(BOARDS_TABLE_ID);
+}
+
+/**
+ * Wire the boards table once: renderers, header filters, toolbar, paging.
+ */
+function initBoardsTable() {
+  const table = boardsTable();
+  if (!table || table.dataset.boardsBound === '1') return Promise.resolve();
+  table.dataset.boardsBound = '1';
+  return window.AdminTableKit.whenTableReady().then(() => {
+    if (boardsTable() !== table) return;
+    table.setCellRenderers(boardsCellRenderers());
+    table.setColumnFilterOptions(boardsFilterOptions());
+    boardsToolbar = window.AdminTableKit.bindToolbar({
+      table,
+      searchId: 'boardsSearch',
+      sortId: 'boardsSort',
+      orderId: 'boardsSortOrder',
+      filterId: 'boardsTypeFilter',
+      filterKey: 'board_type',
+      countIds: ['boardsCount', 'boardsSectionCount'],
+      noun: ['board', 'boards'],
+      onSearch: (term) => {
+        boardsSearchTerm = term;
+        table.requestServerQuery({ resetPage: true });
+      }
+    });
+    table.addEventListener('lex-query-change', (e) => {
+      if (e.target !== table) return;
+      fetchBoardsPage(e.detail);
+    });
+    table.addEventListener('row-click', (e) => {
+      const row = e.detail && e.detail.row;
+      if (row && row.id) viewBoardDetail(row.id);
+    });
+    table.requestServerQuery({ resetPage: true });
+  });
+}
+
+/**
+ * Answer the table's lex-query-change with one page of boards.
+ * @param {Object} query
+ */
+async function fetchBoardsPage(query) {
+  const seq = ++boardsLoadSeq;
+  const table = boardsTable();
+  if (!table) return;
+  const q = query || table.serverQuery || {};
+  const filters = q.filters || {};
+  const filtered = Boolean(boardsSearchTerm || Object.keys(filters).length);
+  if (boardsToolbar) boardsToolbar.syncFilter(filters);
   try {
-    const response = await ManagementBoardService.getAllBoards();
-    allBoards = response.boards || [];
-
-    const grid = document.getElementById('boardsGrid');
-    if (!grid) return;
-
-    if (allBoards.length === 0) {
-      grid.innerHTML = ManagementBoardComponents.renderEmptyState('No boards yet');
-      return;
-    }
-
-    // Apply filters
-    const filtered = filterBoards(allBoards);
-
-    if (filtered.length === 0) {
-      grid.innerHTML = `
-        <div class="col-span-full text-center py-12">
-          <i class="fas fa-search text-6xl text-gray-300 mb-4"></i>
-          <h3 class="text-lg font-medium text-gray-900 mb-2">No boards match your filters</h3>
-          <p class="text-gray-500">Try adjusting your search or filters</p>
-        </div>
-      `;
-      return;
-    }
-
-    grid.innerHTML = filtered.map(board =>
-      ManagementBoardComponents.renderBoardCard(board)
-    ).join('');
-
+    const response = await api.get(ManagementBoardService.baseUrl + '?' + boardsApiParams(q, boardsSearchTerm).toString());
+    if (seq !== boardsLoadSeq) return;
+    allBoards = (response && response.boards) || [];
+    const pagination = (response && response.pagination) || {};
+    table.emptyText = window.AdminTableKit.emptyText(filtered, 'boards');
+    table.setServerData(allBoards.map(mapBoardRow), {
+      page: pagination.page || q.page || 1,
+      page_size: pagination.page_size || q.limit || 20,
+      total: pagination.total_count != null ? pagination.total_count : (pagination.total != null ? pagination.total : allBoards.length),
+      total_pages: pagination.total_pages
+    });
   } catch (error) {
+    if (seq !== boardsLoadSeq) return;
     console.error('[ManagementBoards] Failed to load boards:', error);
-    const grid = document.getElementById('boardsGrid');
-    if (grid) {
-      grid.innerHTML = `
-        <div class="col-span-full text-center py-12">
-          <i class="fas fa-exclamation-triangle text-6xl text-red-300 mb-4"></i>
-          <h3 class="text-lg font-medium text-gray-900 mb-2">Failed to load boards</h3>
-          <p class="text-gray-500 mb-4">${error.message}</p>
-          <button onclick="loadBoards()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition">
-            Try Again
-          </button>
-        </div>
-      `;
-    }
-    throw error;
+    if (boardsToolbar) boardsToolbar.setCount(null);
+    table.setServerError('Boards could not be loaded. Check your connection and try again.');
   }
 }
 
 /**
- * Filter boards based on current filter selections
+ * Load boards: first call wires the table, later calls reload the current page.
  */
-function filterBoards(boards) {
-  const searchInput = document.getElementById('boardSearch');
-  const typeFilter = document.getElementById('boardTypeFilter');
-  const accessFilter = document.getElementById('boardAccessFilter');
-
-  let filtered = boards;
-
-  // Search filter
-  if (searchInput && searchInput.value) {
-    const search = searchInput.value.toLowerCase();
-    filtered = filtered.filter(board =>
-      board.name.toLowerCase().includes(search) ||
-      (board.description && board.description.toLowerCase().includes(search))
-    );
+async function loadBoards() {
+  const table = boardsTable();
+  if (!table) return;
+  if (table.dataset.boardsBound !== '1') {
+    await initBoardsTable();
+    return;
   }
-
-  // Type filter
-  if (typeFilter && typeFilter.value) {
-    filtered = filtered.filter(board => board.board_type === typeFilter.value);
-  }
-
-  // Access filter
-  if (accessFilter && accessFilter.value) {
-    const filterValue = accessFilter.value;
-    if (filterValue === 'my') {
-      filtered = filtered.filter(board => board.user_access_level !== null);
-    } else if (filterValue === 'public') {
-      filtered = filtered.filter(board => board.is_public);
-    }
-  }
-
-  return filtered;
+  if (typeof table.requestServerQuery === 'function') table.requestServerQuery();
 }
 
 /**
@@ -295,27 +425,7 @@ function setupUIEventListeners() {
     if (userInitialsEl) userInitialsEl.textContent = initials;
   }
 
-  // User menu toggle
-  const userMenu = document.getElementById('userMenu');
-  const userDropdown = document.getElementById('userDropdown');
-  if (userMenu && userDropdown) {
-    userMenu.addEventListener('click', (e) => {
-      e.stopPropagation();
-      userDropdown.classList.toggle('hidden');
-    });
-    document.addEventListener('click', (e) => {
-      if (!userMenu.contains(e.target)) userDropdown.classList.add('hidden');
-    });
-  }
-
-  // Logout handler
-  const logoutBtn = document.getElementById('logoutBtn');
-  if (logoutBtn) {
-    logoutBtn.addEventListener('click', async () => {
-      await api.logout();
-      window.location.href = '../login.html';
-    });
-  }
+  // Account menu: js/shared/header-user-menu.js renders and wires #userMenu.
 
   // Sidebar toggle for mobile
   const sidebar = document.getElementById('sidebar');
@@ -357,48 +467,6 @@ function setupEventListeners() {
     submitMetricForm.addEventListener('submit', handleSubmitMetric);
   }
 
-  // Board search filter
-  const searchInput = document.getElementById('boardSearch');
-  if (searchInput) {
-    searchInput.addEventListener('input', debounce(() => {
-      const grid = document.getElementById('boardsGrid');
-      if (grid && allBoards.length > 0) {
-        const filtered = filterBoards(allBoards);
-        grid.innerHTML = filtered.map(board =>
-          ManagementBoardComponents.renderBoardCard(board)
-        ).join('');
-      }
-    }, 300));
-  }
-
-  // Board type filter
-  const typeFilter = document.getElementById('boardTypeFilter');
-  if (typeFilter) {
-    typeFilter.addEventListener('change', () => {
-      const grid = document.getElementById('boardsGrid');
-      if (grid && allBoards.length > 0) {
-        const filtered = filterBoards(allBoards);
-        grid.innerHTML = filtered.map(board =>
-          ManagementBoardComponents.renderBoardCard(board)
-        ).join('');
-      }
-    });
-  }
-
-  // Board access filter
-  const accessFilter = document.getElementById('boardAccessFilter');
-  if (accessFilter) {
-    accessFilter.addEventListener('change', () => {
-      const grid = document.getElementById('boardsGrid');
-      if (grid && allBoards.length > 0) {
-        const filtered = filterBoards(allBoards);
-        grid.innerHTML = filtered.map(board =>
-          ManagementBoardComponents.renderBoardCard(board)
-        ).join('');
-      }
-    });
-  }
-
   // Board detail modal tab switching
   setupBoardDetailTabs();
 
@@ -436,7 +504,7 @@ function setupEventListeners() {
   if (cancelTeamMemberBtn) {
     cancelTeamMemberBtn.addEventListener('click', () => {
       document.getElementById('addTeamMemberForm').classList.add('hidden');
-      document.getElementById('teamAssignmentForm').reset();
+      resetTeamAssignmentForm();
       clearUserSearch();
     });
   }
@@ -786,6 +854,24 @@ function closeModal(modalId) {
 }
 
 /**
+ * Set a lex-select back to a value; form.reset() leaves lex-select alone.
+ * @param {string} id - Element id
+ * @param {string} value - Value to restore
+ */
+function resetLexSelect(id, value) {
+  const select = document.getElementById(id);
+  if (select) select.value = value;
+}
+
+/**
+ * Reset the team assignment form, including its access level lex-select
+ */
+function resetTeamAssignmentForm() {
+  document.getElementById('teamAssignmentForm').reset();
+  resetLexSelect('teamAccessLevel', 'admin');
+}
+
+/**
  * Handle create board form submission
  * @param {Event} e - Form submit event
  */
@@ -817,8 +903,10 @@ async function handleCreateBoard(e) {
     // Close modal
     closeModal('newBoardModal');
 
-    // Reset form
+    // Reset form. form.reset() does not reach lex-select, so clear those too.
     e.target.reset();
+    resetLexSelect('boardType', '');
+    resetLexSelect('reviewFrequency', '');
 
     // Reload boards
     await loadBoards();
@@ -881,42 +969,6 @@ async function handleSubmitMetric(e) {
   } catch (error) {
     console.error('[ManagementBoards] Failed to submit metric:', error);
     showToast('Failed to submit metric', 'error');
-  }
-}
-
-/**
- * Handle board search
- * @param {Event} e - Input event
- */
-function handleBoardSearch(e) {
-  const searchTerm = e.target.value.toLowerCase();
-  const typeFilter = document.getElementById('boardTypeFilter')?.value;
-
-  let filtered = allBoards;
-
-  // Apply search filter
-  if (searchTerm) {
-    filtered = filtered.filter(board =>
-      board.name.toLowerCase().includes(searchTerm) ||
-      (board.description && board.description.toLowerCase().includes(searchTerm))
-    );
-  }
-
-  // Apply type filter
-  if (typeFilter) {
-    filtered = filtered.filter(board => board.board_type === typeFilter);
-  }
-
-  renderAllBoardsTable(filtered);
-}
-
-/**
- * Handle board type filter
- */
-function handleBoardFilter() {
-  const searchInput = document.getElementById('boardSearch');
-  if (searchInput) {
-    handleBoardSearch({ target: searchInput });
   }
 }
 
@@ -1316,7 +1368,7 @@ async function handleTeamAssignmentSubmit(e) {
     showToast('User assigned successfully', 'success');
 
     // Reset form and hide it
-    document.getElementById('teamAssignmentForm').reset();
+    resetTeamAssignmentForm();
     document.getElementById('addTeamMemberForm').classList.add('hidden');
 
     // Reload assignments (users already cached by autocomplete)
@@ -1331,11 +1383,18 @@ async function handleTeamAssignmentSubmit(e) {
 /**
  * Remove team member
  */
-async function removeTeamMember(boardId, userId) {
-  if (!confirm('Are you sure you want to remove this user from the board?')) {
-    return;
-  }
+function removeTeamMember(boardId, userId) {
+  const modal = Lex.Modal.confirm(
+    'Remove team member',
+    'Remove this user from the board?',
+    () => { performRemoveTeamMember(boardId, userId); },
+    { variant: 'danger', confirmText: 'Remove' }
+  );
+  // Above the full-screen board detail overlay (z-50).
+  if (modal && modal.style) modal.style.setProperty('--lex-z-modal', '60');
+}
 
+async function performRemoveTeamMember(boardId, userId) {
   try {
     await ManagementBoardService.removeAssignment(boardId, userId);
     showToast('User removed successfully', 'success');
@@ -1373,3 +1432,14 @@ window.viewBoardDetail = viewBoardDetail;
 window.closeModal = closeModal;
 window.openNewBoardModal = openNewBoardModal;
 window.removeTeamMember = removeTeamMember;
+window.loadBoards = loadBoards;
+
+// Pure table logic, exposed for unit tests.
+window.ManagementBoardsTable = {
+  toApiParams: boardsApiParams,
+  mapBoard: mapBoardRow,
+  cellRenderers: boardsCellRenderers,
+  filterOptions: boardsFilterOptions,
+  SORT_BY_COLUMN: BOARD_SORT_BY_COLUMN,
+  METRIC_RANGES: BOARD_METRIC_RANGES
+};

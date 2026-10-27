@@ -33,7 +33,6 @@ const UserPickerModal = {
 
   _onSelect: null,
   _renderOverrides: null,
-  _stylesInjected: false,
 
   // ── Lifecycle ───────────────────────────────────────────────────────────
 
@@ -55,10 +54,15 @@ const UserPickerModal = {
     contentHtml += '</p>';
     contentHtml += '</div>';
 
+    // The user-picker is always opened from another modal, so it always uses
+    // lex-modal's back chevron as its dismissal affordance.
     var modal = document.createElement('lex-modal');
     modal.heading = 'Pick a user';
     modal.size = 'lg';
     modal.hideActions = true;
+    modal.backButton = true;
+    modal.backLabel = 'Go back';
+    modal.hideClose = true;
     modal.innerHTML = contentHtml;
 
     document.body.appendChild(modal);
@@ -80,6 +84,10 @@ const UserPickerModal = {
         }, 180);
       });
     }
+
+    modal.addEventListener('lex-back', () => {
+      UserPickerModal.close();
+    });
 
     modal.addEventListener('lex-close', () => {
       this.isOpen = false;
@@ -120,12 +128,6 @@ const UserPickerModal = {
             ? 'Pick someone who has access to this matter.'
             : 'Pick a user in your organization.');
     }
-
-    // Picker-mode chrome: left chevron, no X close. The user-picker is
-    // always opened from another modal, so it's always in picker mode —
-    // no need for a "default" non-picker mode.
-    this.modal.classList.add('upm-picker-mode');
-    setTimeout(this._ensurePickerChrome.bind(this), 0);
 
     this.modal.open = true;
     this.isOpen = true;
@@ -236,59 +238,6 @@ const UserPickerModal = {
     this.close();
   },
 
-  // ── Picker chrome ───────────────────────────────────────────────────────
-
-  _ensurePickerChrome() {
-    if (!this.modal) return;
-    var header = this.modal.querySelector('.lex-modal-header');
-    if (!header) return;
-
-    this._injectPickerStyles();
-
-    if (header.querySelector('.upm-back-btn')) return;
-    var btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'upm-back-btn';
-    btn.setAttribute('aria-label', 'Go back');
-    btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>';
-    btn.addEventListener('click', function () { UserPickerModal.close(); });
-    header.insertBefore(btn, header.firstChild);
-  },
-
-  _injectPickerStyles() {
-    if (this._stylesInjected) return;
-    this._stylesInjected = true;
-    var style = document.createElement('style');
-    style.setAttribute('data-source', 'user-picker-modal');
-    style.textContent = [
-      'lex-modal.upm-picker-mode .lex-modal-close { display: none !important; }',
-      'lex-modal.upm-picker-mode .lex-modal-header {',
-      '  justify-content: flex-start !important;',
-      '  gap: 8px;',
-      '}',
-      'lex-modal.upm-picker-mode .lex-modal-title {',
-      '  flex: 0 1 auto;',
-      '  margin-right: auto;',
-      '}',
-      '.upm-back-btn {',
-      '  display: inline-flex; align-items: center; justify-content: center;',
-      '  width: 32px; height: 32px;',
-      '  background: transparent; border: none; padding: 0;',
-      '  margin: 0 4px 0 -6px;',
-      '  color: var(--lex-text-secondary, #555);',
-      '  border-radius: var(--lex-radius-md, 8px);',
-      '  cursor: pointer;',
-      '  transition: background 0.15s, color 0.15s;',
-      '  flex-shrink: 0;',
-      '}',
-      '.upm-back-btn:hover, .upm-back-btn:focus-visible {',
-      '  background: var(--lex-bg-secondary, rgba(0,0,0,0.05));',
-      '  color: var(--lex-text-primary);',
-      '  outline: none;',
-      '}',
-    ].join('\n');
-    document.head.appendChild(style);
-  },
 
   // ── Component lazy-loading ───────────────────────────────────────────────
 

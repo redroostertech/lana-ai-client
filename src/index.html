@@ -72,6 +72,7 @@
   <script src="js/components.js"></script>
   <script src="js/version.js"></script>
   <script src="js/menu.js"></script>
+  <script src="js/shared/header-user-menu.js"></script>
   <script src="js/navigation-helpers.js"></script>
   <script src="js/conversation-search-modal.js"></script>
   <script src="js/notifications.js"></script>
@@ -164,103 +165,12 @@
           </button>
 
           <!-- User Menu -->
-          <div class="relative" id="userMenu">
-            <button class="flex items-center gap-2 text-gray-700 hover:text-gray-900 p-1" title="Settings">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-              </svg>
-            </button>
-            <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1">
-              <a href="settings-v2.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
-              <hr class="my-1">
-              <button id="logoutBtn" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sign out</button>
-            </div>
-          </div>
+          <div class="relative" id="userMenu" data-header-user-menu data-settings-href="settings-v2.html" data-login-href="login.html"></div>
         </div>
       </div>
     </header>
 
-    <!-- Notification Panel Overlay -->
-    <div id="notificationOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
-
-    <!-- Notification Slide-out Panel -->
-    <div id="notificationPanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
-      <!-- Panel Header -->
-      <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
-        <h2 class="text-lg font-semibold text-gray-900">Notifications</h2>
-        <div class="flex items-center gap-3">
-          <button id="markAllReadBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium hidden">Mark all read</button>
-          <button id="refreshNotificationsBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-            </svg>
-          </button>
-          <button id="closeNotificationPanel" class="text-gray-400 hover:text-gray-600">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <!-- Filter Tabs -->
-      <div class="flex border-b border-gray-200 px-6 flex-shrink-0">
-        <button id="filterAll" class="px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">All</button>
-        <button id="filterUnread" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700">Unread</button>
-      </div>
-
-      <!-- Notifications List -->
-      <div id="notificationList" class="flex-1 overflow-y-auto">
-        <!-- Loading State -->
-        <div id="notificationLoading" class="p-8 text-center">
-          <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
-          <p class="text-gray-500 mt-3 text-sm">Loading notifications...</p>
-        </div>
-      </div>
-
-      <!-- Loading More Indicator -->
-      <div id="notificationLoadingMore" class="hidden p-4 border-t border-gray-100 text-center flex-shrink-0">
-        <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
-      </div>
-    </div>
-
-    <!-- Activity Panel Overlay -->
-    <div id="activityOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
-
-    <!-- Activity Slide-out Panel -->
-    <div id="activityPanel" class="fixed inset-y-0 right-0 w-full sm:w-[28rem] bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
-      <!-- Panel Header -->
-      <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
-        <h2 class="text-lg font-semibold text-gray-900">Activity</h2>
-        <div class="flex items-center gap-3">
-          <button id="refreshActivityBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-            </svg>
-          </button>
-          <button id="closeActivityPanel" class="text-gray-400 hover:text-gray-600">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <!-- Activity List -->
-      <div id="activityList" class="flex-1 overflow-y-auto">
-        <!-- Loading State -->
-        <div id="activityLoading" class="p-8 text-center">
-          <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
-          <p class="text-gray-500 mt-3 text-sm">Loading activity...</p>
-        </div>
-      </div>
-
-      <!-- Loading More Indicator -->
-      <div id="activityLoadingMore" class="hidden p-4 border-t border-gray-100 text-center">
-        <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
-      </div>
-    </div>
+    <!-- Notification and activity panels: lex-drawers mounted by js/notifications.js and js/activity.js -->
 
     <!-- Page Content -->
     <main class="p-4 lg:p-8">
@@ -437,10 +347,7 @@
             </div>
             <!-- User Filter Dropdown (Admins Only) -->
             <div id="activityUserFilterContainer" class="hidden">
-              <select id="activityUserFilter" class="block w-64 rounded-lg border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500">
-                <option value="me">My Activity</option>
-                <option value="all">All Users</option>
-              </select>
+              <lex-select id="activityUserFilter" size="sm" searchable style="width:16rem" options='[{"value":"me","label":"My activity"},{"value":"all","label":"All users"}]' value="me"></lex-select>
             </div>
           </div>
         </div>
@@ -556,17 +463,8 @@
   <div id="sidebarOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden lg:hidden"></div>
 
   <!-- Activity Heatmap Info Modal -->
-  <div id="activityHeatmapInfoModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 9999;" onclick="if(event.target === this) closeActivityHeatmapInfoModal()">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
-      <div class="flex items-center justify-between p-6 border-b border-gray-200">
-        <h2 class="text-xl font-semibold text-gray-900">Understanding the Activity Overview</h2>
-        <button type="button" onclick="closeActivityHeatmapInfoModal()" class="text-gray-400 hover:text-gray-600 transition-colors" aria-label="Close">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-      <div class="p-6 space-y-6">
+  <lex-modal id="activityHeatmapInfoModal" heading="Understanding the Activity Overview" size="lg">
+      <div class="space-y-6">
         <div>
           <h3 class="text-sm font-semibold text-gray-900 mb-2">What is this?</h3>
           <p class="text-sm text-gray-600 leading-relaxed">The Activity Overview is a calendar-style chart that shows <strong>when your organization was active</strong> over the last 90 days. Each small square represents one day; the color shows how much activity happened that day.</p>
@@ -613,13 +511,8 @@
           <p class="text-sm text-gray-600 leading-relaxed">The chart doesn’t tell you why activity went up or down, but it shows you when it did so you can dig in elsewhere (e.g. reports or conversations) to understand the cause.</p>
         </div>
       </div>
-      <div class="p-6 pt-0">
-        <button type="button" onclick="closeActivityHeatmapInfoModal()" class="w-full px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
-          Got it
-        </button>
-      </div>
-    </div>
-  </div>
+      <lex-btn data-slot="footer" variant="primary" onclick="closeActivityHeatmapInfoModal()">Got it</lex-btn>
+  </lex-modal>
 
   <script>
     // Feature flags
@@ -707,9 +600,6 @@
     const sidebarOverlay = document.getElementById('sidebarOverlay');
     const openSidebar = document.getElementById('openSidebar');
     const closeSidebar = document.getElementById('closeSidebar');
-    const userMenu = document.getElementById('userMenu');
-    const userDropdown = document.getElementById('userDropdown');
-    const logoutBtn = document.getElementById('logoutBtn');
 
     // Sidebar toggle
     openSidebar.addEventListener('click', () => {
@@ -727,22 +617,6 @@
       sidebarOverlay.classList.add('hidden');
     });
 
-    // User menu toggle
-    userMenu.addEventListener('click', () => {
-      userDropdown.classList.toggle('hidden');
-    });
-
-    document.addEventListener('click', (e) => {
-      if (!userMenu.contains(e.target)) {
-        userDropdown.classList.add('hidden');
-      }
-    });
-
-    // Logout
-    logoutBtn.addEventListener('click', async () => {
-      await api.logout();
-      window.location.href = 'login.html';
-    });
 
     // Initialize notification panel
     NotificationPanel.init();
@@ -788,8 +662,7 @@
     const activityHeatmapInfoModal = document.getElementById('activityHeatmapInfoModal');
     if (activityHeatmapInfoBtn && activityHeatmapInfoModal) {
       activityHeatmapInfoBtn.addEventListener('click', () => {
-        activityHeatmapInfoModal.classList.remove('hidden');
-        activityHeatmapInfoModal.classList.add('flex');
+        activityHeatmapInfoModal.open = true;
       });
     }
 
@@ -1152,28 +1025,21 @@
         const result = await api.getOrganizationUsers();
         const users = result.users || [];
 
-        // Clear existing options except "My Activity" and "All Users"
-        while (filterSelect.options.length > 2) {
-          filterSelect.remove(2);
-        }
-
-        // Add divider
-        const divider = document.createElement('option');
-        divider.disabled = true;
-        divider.textContent = '────────────────';
-        filterSelect.add(divider);
-
-        // Add each user
-        users.forEach(user => {
-          const option = document.createElement('option');
-          option.value = user.id;
-          option.textContent = `${user.full_name} (${user.email})`;
-          filterSelect.add(option);
-        });
+        // "My activity" and "All users", then each user under a group header
+        // (the group header replaces the old disabled divider option)
+        const options = [
+          { value: 'me', label: 'My activity' },
+          { value: 'all', label: 'All users' }
+        ].concat(users.map(user => ({
+          value: String(user.id),
+          label: `${user.full_name} (${user.email})`,
+          group: 'Users'
+        })));
+        filterSelect.setAttribute('options', JSON.stringify(options));
 
         // Handle filter change
-        filterSelect.addEventListener('change', async (e) => {
-          const selectedValue = e.target.value;
+        filterSelect.addEventListener('lex-change', async (e) => {
+          const selectedValue = e.detail.value;
 
           if (selectedValue === 'me') {
             // Load current user's productivity and activity
@@ -1457,10 +1323,7 @@
     // Close activity heatmap info modal (called from onclick)
     window.closeActivityHeatmapInfoModal = function() {
       const modal = document.getElementById('activityHeatmapInfoModal');
-      if (modal) {
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-      }
+      if (modal) modal.open = false;
     };
   </script>
 
@@ -1491,6 +1354,7 @@
   <!-- Lex UI core -->
   <script src="js/lex/lex.core.js"></script>
   <script src="js/lex/lex.icons.js"></script>
+  <script src="js/lex/components/form/lex-dropdown-btn.js"></script>
   <script src="js/lex/lex.data.js"></script>
   <script src="js/lex/lex.forms.js"></script>
   <script src="js/lex/lex.state.js"></script>
@@ -1501,9 +1365,11 @@
   <!-- Lex UI prerequisites for the LANA dock -->
   <script src="js/lex/components/foundation/lex-toast.js"></script>
   <script src="js/lex/components/foundation/lex-spinner.js"></script>
-  <script src="js/lex/components/foundation/lex-btn.js"></script>
   <script src="js/lex/components/foundation/lex-modal.js"></script>
   <script src="js/lex/components/foundation/lex-drawer.js"></script>
+  <script src="js/lex/components/form/lex-select.js"></script>
+  <!-- After lex-modal/lex-drawer: they must capture footer lex-btns before those upgrade -->
+  <script src="js/lex/components/foundation/lex-btn.js"></script>
 
   <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>
 

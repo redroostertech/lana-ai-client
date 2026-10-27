@@ -56,7 +56,6 @@
 
   // Temporary state for pending file upload
   var pendingUploadFiles = null;
-  var contextMenuAnchor = null;
 
   // Mounted MatterDocumentsView instance (renders the current folder's FILES).
   // folder.js keeps subfolder rendering/navigation; the component owns files.
@@ -555,9 +554,7 @@
   function folderCardHtml(folder) {
     return [
       '<div class="lf-card" data-folder-id="' + escapeHtml(folder.id) + '" data-name="' + escapeHtml(folder.name) + '" onclick="handleFolderClick(this)">',
-      '  <button class="lf-card-menu" onclick="event.stopPropagation(); showFolderMenu(' + JSON.stringify(folder.id) + ', event)" title="Folder actions">',
-      '    <svg class="lf-icon-sm" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path></svg>',
-      '  </button>',
+      '  ' + folderMenuHtml(folder, 'lf-card-menu'),
       '  <div class="lf-card-body">',
       '    <svg class="lf-card-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
       '      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>',
@@ -586,9 +583,7 @@
       '  <div class="lf-row-cell">' + formatRelativeDate(folder.created_at) + '</div>',
       '  <div class="lf-row-cell">' + (folder.document_count || 0) + ' items</div>',
       '  <div class="lf-row-cell lf-row-actions">',
-      '    <button class="lf-row-menu" onclick="event.stopPropagation(); showFolderMenu(' + JSON.stringify(folder.id) + ', event)" title="Folder actions">',
-      '      <svg class="lf-icon-sm" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path></svg>',
-      '    </button>',
+      '    ' + folderMenuHtml(folder, 'lf-row-menu'),
       '  </div>',
       '</div>'
     ].join('');
@@ -995,236 +990,87 @@
   // rename modal + injected confirm dialogs). folder.js no longer renders any
   // per-file download/rename/delete wiring or modals.
 
-  // -- Context menu -----------------------------------------------------
+  // -- Menus ------------------------------------------------------------
   //
   // Per-file actions (Open/Download/Rename/Delete) are owned by the
-  // MatterDocumentsView component's own kebab menu. folder.js keeps only the
-  // subfolder context menu below.
+  // MatterDocumentsView component's own kebab menu. folder.js keeps the
+  // subfolder kebab and the folder-level create/actions menu, both
+  // lex-dropdown-btn; their lex-select events land in handleFolderMenuSelect.
+
+  var FOLDER_ITEM_MENU = [
+    { value: 'open', label: 'Open', icon: 'folder-open' },
+    { value: 'rename', label: 'Rename', icon: 'edit' },
+    { divider: true },
+    { value: 'delete', label: 'Delete', icon: 'trash-2', danger: true }
+  ];
+
+  // The folder-level create menu (banner kebab, Actions button, empty-state
+  // Create) has its items in each trigger's options attribute in folder.html,
+  // so the lex-banner's cloned content keeps them.
+
+  function jsonAttr(value) {
+    return JSON.stringify(value).split('&').join('&amp;').split('"').join('&quot;')
+      .split('<').join('&lt;').split('>').join('&gt;');
+  }
 
   /**
-   * Show the context menu for a subfolder item.
-   * No isMatter pin option - subfolders only.
+   * Kebab menu for one subfolder card or row. The click is stopped at the
+   * host so it does not open the folder underneath.
+   * @param {Object} folder
+   * @param {string} className - lf-card-menu | lf-row-menu
+   */
+  function folderMenuHtml(folder, className) {
+    return '<lex-dropdown-btn class="' + className + '" data-folder-menu data-folder-id="' + escapeHtml(folder.id) + '"' +
+      ' icon="more-vertical" icon-only variant="ghost" align="end" floating aria-label="Folder actions"' +
+      ' options="' + jsonAttr(FOLDER_ITEM_MENU) + '" onclick="event.stopPropagation()"></lex-dropdown-btn>';
+  }
+
+  function findFolder(folderId) {
+    for (var i = 0; i < folderState.folders.length; i++) {
+      if (String(folderState.folders[i].id) === String(folderId)) return folderState.folders[i];
+    }
+    return null;
+  }
+
+  /**
+   * Run a subfolder menu action.
+   * @param {string} action - open | rename | delete
    * @param {string|Object} folderOrId - Folder object or folder ID string
-   * @param {Event} event
    */
-  function showFolderMenu(folderOrId, event) {
-    console.log('[Folder] Show folder menu:', folderOrId);
-    if (event && event.stopPropagation) {
-      event.stopPropagation();
-    }
-
-    var folder;
-    if (typeof folderOrId === 'object') {
-      folder = folderOrId;
-    } else {
-      folder = null;
-      for (var i = 0; i < folderState.folders.length; i++) {
-        if (folderState.folders[i].id === folderOrId) {
-          folder = folderState.folders[i];
-          break;
-        }
-      }
-    }
-
+  function runFolderItemAction(action, folderOrId) {
+    var folder = typeof folderOrId === 'object' ? folderOrId : findFolder(folderOrId);
     if (!folder) return;
-
-    var menuItems = [
-      {
-        icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>',
-        label: 'Open',
-        action: function () {
-          hideContextMenu();
-          navigateToFolder(folder.id, folder.name);
-        }
-      },
-      {
-        icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>',
-        label: 'Rename',
-        action: function () {
-          hideContextMenu();
-          Lex.Toast.info('Rename feature coming soon!');
-        }
-      },
-      { divider: true },
-      {
-        icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>',
-        label: 'Delete',
-        className: 'text-red-600 hover:bg-red-50',
-        action: function () {
-          hideContextMenu();
-          Lex.Toast.info('Delete feature coming soon!');
-        }
-      }
-    ];
-
-    showContextMenu(menuItems, event);
-  }
-
-  function uploadIconPath() {
-    return '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>';
-  }
-
-  function folderIconPath() {
-    return '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>';
-  }
-
-  function docStudioIconPath() {
-    return '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>';
+    if (action === 'open') {
+      navigateToFolder(folder.id, folder.name);
+    } else if (action === 'rename') {
+      Lex.Toast.info('Rename feature coming soon!');
+    } else if (action === 'delete') {
+      Lex.Toast.info('Delete feature coming soon!');
+    }
   }
 
   /**
-   * Show the folder-level create/action menu.
-   * @param {Event} event
+   * Run a folder-level create/actions menu action.
+   * @param {string} action - upload | doc-studio | new-folder
    */
-  function showFolderActionsMenu(event) {
-    if (event && event.preventDefault) event.preventDefault();
-    if (event && event.stopPropagation) event.stopPropagation();
-
-    showContextMenu([
-      { heading: 'Documents' },
-      {
-        icon: uploadIconPath(),
-        label: 'Upload new file',
-        action: function () {
-          hideContextMenu();
-          triggerFolderFilePicker();
-        }
-      },
-      {
-        icon: docStudioIconPath(),
-        label: 'Create with Doc Studio',
-        action: function () {
-          hideContextMenu();
-          openDocStudioCreate();
-        }
-      },
-      { divider: true },
-      { heading: 'Folders' },
-      {
-        icon: folderIconPath(),
-        label: 'Create folder',
-        action: function () {
-          hideContextMenu();
-          showNewFolderModal();
-        }
-      }
-    ], event);
+  function runFolderAction(action) {
+    if (action === 'upload') {
+      triggerFolderFilePicker();
+    } else if (action === 'doc-studio') {
+      openDocStudioCreate();
+    } else if (action === 'new-folder') {
+      showNewFolderModal();
+    }
   }
 
-  /**
-   * Build and position a generic context menu from an array of menu item descriptors.
-   * Actions are stored as temporary window globals (contextMenuAction_N) to support
-   * inline onclick handlers.
-   * @param {Array} menuItems
-   * @param {Event} event
-   */
-  function showContextMenu(menuItems, event) {
-    var menu = document.getElementById('contextMenu');
-    if (!menu) return;
-
-    var target = (event && event.currentTarget) || (event && event.target);
-    if (!menu.classList.contains('hidden') && contextMenuAnchor === target) {
-      hideContextMenu();
-      return;
+  function handleFolderMenuSelect(event) {
+    var host = event.target && event.target.closest ? event.target.closest('lex-dropdown-btn') : null;
+    if (!host || !event.detail) return;
+    if (host.hasAttribute('data-folder-menu')) {
+      runFolderItemAction(event.detail.value, host.getAttribute('data-folder-id'));
+    } else if (host.hasAttribute('data-folder-actions-menu')) {
+      runFolderAction(event.detail.value);
     }
-    if (contextMenuAnchor && contextMenuAnchor.setAttribute) {
-      contextMenuAnchor.setAttribute('aria-expanded', 'false');
-    }
-    contextMenuAnchor = target || null;
-
-    var menuHTML = menuItems.map(function (item, index) {
-      if (item.divider) {
-        return '<div class="my-1" style="border-top: 1px solid var(--lex-border-default)"></div>';
-      }
-      if (item.heading) {
-        return '<div class="folder-context-heading">' + escapeHtml(item.heading) + '</div>';
-      }
-
-      // Danger items keep their semantic color; default items use Lex tokens
-      var isDanger = item.className && item.className.indexOf('red') !== -1;
-      var itemStyle = isDanger
-        ? 'color: var(--lex-status-danger-text)'
-        : 'color: var(--lex-text-primary)';
-      var hoverClass = isDanger ? 'context-menu-item--danger' : 'context-menu-item';
-      return [
-        '<button class="w-full text-left px-4 py-2 text-sm flex items-center gap-3 transition-colors ' + hoverClass + '" style="' + itemStyle + '" onclick="window.contextMenuAction_' + index + '()">',
-        '  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' + item.icon + '</svg>',
-        '  ' + item.label,
-        '</button>'
-      ].join('');
-    }).join('');
-
-    menu.innerHTML = menuHTML;
-
-    menuItems.forEach(function (item, index) {
-      if (!item.divider && !item.heading) {
-        window['contextMenuAction_' + index] = item.action;
-      }
-    });
-
-    menu.style.visibility = 'hidden';
-    menu.classList.remove('hidden');
-    if (contextMenuAnchor && contextMenuAnchor.setAttribute) {
-      contextMenuAnchor.setAttribute('aria-expanded', 'true');
-    }
-
-    console.log('[Folder] Context menu - event:', event);
-    console.log('[Folder] Context menu - target:', target);
-
-    var rect = target ? target.getBoundingClientRect() : null;
-    console.log('[Folder] Context menu - rect:', rect);
-
-    if (rect) {
-      requestAnimationFrame(function () {
-        var menuWidth = menu.offsetWidth || 200;
-        var menuHeight = menu.offsetHeight || 100;
-
-        var left = rect.right - menuWidth;
-        var top = rect.bottom + 8;
-
-        if (left < 10) {
-          left = 10;
-        }
-        if (left + menuWidth > window.innerWidth - 10) {
-          left = window.innerWidth - menuWidth - 10;
-        }
-        if (top + menuHeight > window.innerHeight - 10) {
-          top = rect.top - menuHeight - 8;
-        }
-        if (top < 10) {
-          top = 10;
-        }
-
-        menu.style.left = left + 'px';
-        menu.style.top = top + 'px';
-        menu.style.transform = 'none';
-        menu.style.visibility = 'visible';
-      });
-    } else {
-      menu.style.left = '50%';
-      menu.style.top = '50%';
-      menu.style.transform = 'translate(-50%, -50%)';
-      menu.style.visibility = 'visible';
-    }
-
-    setTimeout(function () {
-      document.addEventListener('click', hideContextMenu);
-    }, 0);
-  }
-
-  /**
-   * Hide the context menu and remove its document click listener.
-   */
-  function hideContextMenu() {
-    var menu = document.getElementById('contextMenu');
-    if (menu) {
-      menu.classList.add('hidden');
-    }
-    if (contextMenuAnchor && contextMenuAnchor.setAttribute) {
-      contextMenuAnchor.setAttribute('aria-expanded', 'false');
-    }
-    contextMenuAnchor = null;
-    document.removeEventListener('click', hideContextMenu);
   }
 
   // File icons are owned by the MatterDocumentsView component (files) and the
@@ -1269,11 +1115,9 @@
    * No source filter - folder.html only shows matter-scoped content.
    */
   function setupEventListeners() {
-    var folderActionsBtn = document.getElementById('folderActionsBtn');
-    folderActionsBtn && folderActionsBtn.addEventListener('click', showFolderActionsMenu);
-
-    var emptyCreateBtn = document.getElementById('emptyCreateBtn');
-    emptyCreateBtn && emptyCreateBtn.addEventListener('click', showFolderActionsMenu);
+    // Subfolder kebabs and the folder-level create menus (#folderMoreBtn,
+    // #folderActionsBtn, #emptyCreateBtn) are lex-dropdown-btns.
+    trackDocListener('lex-select', handleFolderMenuSelect);
 
     var cancelNewFolderBtn = document.getElementById('cancelNewFolderBtn');
     cancelNewFolderBtn && cancelNewFolderBtn.addEventListener('click', hideNewFolderModal);
@@ -1439,8 +1283,6 @@
     exposeGlobal('navigateToFolder', navigateToFolder);
     exposeGlobal('navigateToRoot', navigateToRoot);
     exposeGlobal('navigateToMatterBreadcrumb', navigateToMatterBreadcrumb);
-    exposeGlobal('showFolderMenu', showFolderMenu);
-    exposeGlobal('showFolderActionsMenu', showFolderActionsMenu);
     exposeGlobal('_navToFileViewer', _navToFileViewer);
     exposeGlobal('triggerFolderFilePicker', triggerFolderFilePicker);
 
@@ -1456,8 +1298,7 @@
 
   /**
    * Called by LexRouter when navigating away from the folder page.
-   * Clears all intervals, timeouts, window globals, document listeners,
-   * and dynamic contextMenuAction_* globals.
+   * Clears all intervals, timeouts, window globals and document listeners.
    */
   function onLeave() {
     // Tear down the reusable file-list component (removes its listeners/timers).
@@ -1489,20 +1330,6 @@
 
     // Reset module-level state
     pendingUploadFiles = null;
-
-    // Ensure context menu listener is removed (not tracked via trackDocListener)
-    hideContextMenu();
-
-    // Clean up dynamic contextMenuAction_* globals
-    var keysToDelete = [];
-    for (var key in window) {
-      if (key.indexOf('contextMenuAction_') === 0) {
-        keysToDelete.push(key);
-      }
-    }
-    keysToDelete.forEach(function (key) {
-      delete window[key];
-    });
 
     // Clear search input so it doesn't persist on re-navigation
     var searchEl = document.getElementById('searchInput');

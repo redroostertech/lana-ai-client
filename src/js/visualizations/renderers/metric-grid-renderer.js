@@ -487,14 +487,17 @@ export class MetricGridRenderer {
    * calculation details. The first two sections render from `metric` directly;
    * the last two are fetched on demand from /api/v1/modules/metric-catalog/<key>
    * and cached on the renderer instance to avoid re-fetching on subsequent opens.
-   * Falls back to a native alert if Lex.Modal is not loaded on this page.
+   * Falls back to Lex.Modal.alertAsync (description only) when Lex.Modal.open
+   * is unavailable.
    * @private
    */
   openMetricInfoModal(metric) {
     const heading = metric.name || metric.key || 'About this metric';
 
     if (!(window.Lex && window.Lex.Modal && typeof window.Lex.Modal.open === 'function')) {
-      window.alert(`${heading}\n\n${metric.description || ''}`);
+      if (window.Lex && window.Lex.Modal && typeof window.Lex.Modal.alertAsync === 'function') {
+        window.Lex.Modal.alertAsync(heading, metric.description || '');
+      }
       return;
     }
 

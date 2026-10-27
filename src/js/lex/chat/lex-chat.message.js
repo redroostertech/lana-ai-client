@@ -19,6 +19,161 @@
     return global.Lex && global.Lex.Chat && global.Lex.Chat.ContextPromotion;
   }
 
+  // Presentation only: original upload labels never replace document routing identity.
+  function documentCitationDisplayName(citation) {
+    const source = String(citation.source || '').toLowerCase();
+    const type = String(citation.sourceType || citation.source_type || '').toLowerCase();
+    if (source === 'domain_pack' || type === 'domain_pack' || type === 'legal_authority'
+      || citation.authority_id || citation.authorityId) return null;
+    const isDocument = type === 'document' || type === 'chunk' || citation.document_id || citation.documentId || citation.doc_id;
+    return isDocument && typeof citation.display_filename === 'string' && citation.display_filename.trim()
+      ? citation.display_filename : null;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Evidence panel helpers (pure; exported as Lex.Chat.Evidence for tests and
+  // for lex-chat.js, which opens cited documents in the in-app file viewer)
+  // ---------------------------------------------------------------------------
+
+  const EVIDENCE_SNIPPET_MAX = 200;
+  const VIEWER_QUOTE_MAX = 500;
+  let evidenceSectionSeq = 0;
+
+  function firstNonEmptyString(values) {
+    for (let i = 0; i < values.length; i++) {
+      const value = values[i];
+      if (typeof value === 'string' && value.trim()) return value;
+    }
+    return '';
+  }
+
+  /** 'authority' | 'document' | 'other' for one citation. */
+  function citationKind(citation) {
+    const c = citation || {};
+    const source = String(c.source || '').toLowerCase();
+    const type = String(c.sourceType || c.source_type || '').toLowerCase();
+    if (source === 'domain_pack' || type === 'domain_pack' || type === 'legal_authority'
+      || c.authority_id || c.authorityId) return 'authority';
+    if (type === 'document' || type === 'chunk' || c.document_id || c.documentId || c.doc_id) return 'document';
+    return 'other';
+  }
+
+  /**
+   * The passage the answer relied on. An explicit quote from the server
+   * (`quote`, or `quoted_text`) wins; without one this keeps the long-standing
+   * order (chunk text, excerpt, snippet, content, text), which is the start
+   * of the retrieved chunk.
+   * @returns {{ text: string, isQuote: boolean }}
+   */
+  function citationPassage(citation) {
+    const c = citation || {};
+    const quote = firstNonEmptyString([c.quote, c.quoted_text]);
+    if (quote) return { text: quote.replace(/\s+/g, ' ').trim(), isQuote: true };
+    const excerpt = firstNonEmptyString([c.chunk_text, c.excerpt, c.snippet, c.content, c.text]);
+    return { text: excerpt.replace(/\s+/g, ' ').trim(), isQuote: false };
+  }
+
+  /** Shorten at a word boundary; never cuts a word in half. */
+  function truncatePassage(text, max) {
+    const value = String(text || '');
+    const limit = max || EVIDENCE_SNIPPET_MAX;
+    if (value.length <= limit) return value;
+    const cut = value.slice(0, limit);
+    const lastSpace = cut.lastIndexOf(' ');
+    const head = lastSpace > limit * 0.6 ? cut.slice(0, lastSpace) : cut;
+    return head.replace(/[\s.,;:]+$/, '') + '...';
+  }
+
+  // A page is a whole number of one or more, written as nothing else: "3" is
+  // page three, "3#anything" and 1.5 are not pages and are dropped, so the
+  // viewer opens at page one instead of trusting a malformed value (c851ce7).
+  function positiveInt(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const n = typeof value === 'number' ? value : Number(String(value).trim());
+    return Number.isSafeInteger(n) && n >= 1 ? n : null;
+  }
+
+  function nonNegativeInt(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const n = typeof value === 'number' ? value : parseInt(String(value), 10);
+    return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
+  }
+
+  function citationPage(citation) {
+    const c = citation || {};
+    return positiveInt(c.page_number) || positiveInt(c.pageNumber) || positiveInt(c.page)
+      || positiveInt(c.locator && c.locator.page) || null;
+  }
+
+  function citationChunkIndex(citation) {
+    const c = citation || {};
+    const values = [c.chunk_index, c.chunkIndex, c.locator && c.locator.chunkIndex];
+    for (let i = 0; i < values.length; i++) {
+      const n = nonNegativeInt(values[i]);
+      if (n !== null) return n;
+    }
+    return null;
+  }
+
+  /**
+   * Group a response's evidence for the single Sources panel.
+   * Citation items keep their index in `citations` (inline [n] markers and
+   * click handling use it); record items keep their index in `references`.
+   */
+  function groupEvidence(citations, references) {
+    const docs = [];
+    const authorities = [];
+    const others = [];
+    (Array.isArray(citations) ? citations : []).forEach((item, index) => {
+      if (!item || typeof item !== 'object') return;
+      const kind = citationKind(item);
+      const entry = { type: 'citation', index, item };
+      if (kind === 'authority') authorities.push(entry);
+      else if (kind === 'document') docs.push(entry);
+      else others.push(entry);
+    });
+    const records = [];
+    (Array.isArray(references) ? references : []).forEach((item, index) => {
+      if (item && typeof item === 'object') records.push({ type: 'reference', index, item });
+    });
+    const groups = [
+      { key: 'documents', label: 'Documents', items: docs },
+      { key: 'authority', label: 'Legal authority', items: authorities },
+      { key: 'records', label: 'Records', items: records },
+      { key: 'other', label: 'Other sources', items: others }
+    ].filter((group) => group.items.length > 0);
+    const total = groups.reduce((sum, group) => sum + group.items.length, 0);
+    return { groups, total };
+  }
+
+  /**
+   * Server-authored "what I checked" line (for example "Read 300 of 300
+   * pages"). Rendered only when the server sends it; never derived here.
+   */
+  function evidenceCoverageSummary(grounding, explicit) {
+    const g = grounding && typeof grounding === 'object' ? grounding : {};
+    return firstNonEmptyString([explicit, g.coverageSummary, g.coverage_summary]).trim();
+  }
+
+  /**
+   * Where a document citation opens: the in-app file viewer at the cited
+   * page, carrying the quoted passage so the viewer can highlight it.
+   */
+  function buildCitationViewerNavigation(input) {
+    const opts = input || {};
+    const citation = opts.citation || {};
+    const params = { id: String(opts.documentId) };
+    const page = citationPage(citation) || (opts.citation ? null : positiveInt(opts.page));
+    if (page) params.page = page;
+    const passage = citationPassage(citation).text;
+    if (passage) params.quote = passage.length > VIEWER_QUOTE_MAX ? passage.slice(0, VIEWER_QUOTE_MAX) : passage;
+    const chunk = citationChunkIndex(citation);
+    if (chunk !== null) params.chunk = chunk;
+    const context = {};
+    if (opts.referrer) context.referrer = opts.referrer;
+    return { path: 'file-viewer.html', params, context };
+  }
+
   // ---------------------------------------------------------------------------
   // Timestamp formatting — smart relative dates
   // ---------------------------------------------------------------------------
@@ -101,29 +256,50 @@
         border-top: 1px solid var(--lex-chat-border-soft);
         padding-top: 8px;
       }
-      .lex-chat-evidence-tabs {
-        display: inline-flex;
-        align-items: center;
-        gap: 2px;
-        margin-bottom: 6px;
-        border: 1px solid var(--lex-chat-border-soft);
-        border-radius: 6px;
-        padding: 2px;
-        background: var(--lex-chat-bg-surface);
-      }
-      .lex-chat-evidence-tab {
-        border: none;
-        background: transparent;
-        color: var(--lex-chat-text-dim);
-        border-radius: 4px;
-        padding: 3px 7px;
+      .lex-chat-evidence-heading {
         font-size: 10.5px;
         font-weight: 600;
-        cursor: pointer;
-      }
-      .lex-chat-evidence-tab[aria-selected="true"] {
         color: var(--lex-chat-text);
-        background: var(--lex-chat-bg-elevated);
+        margin-bottom: 4px;
+      }
+      .lex-chat-evidence-coverage {
+        font-size: 10.5px;
+        color: var(--lex-chat-text-dim);
+        margin-bottom: 6px;
+      }
+      .lex-chat-evidence-coverage-label {
+        font-weight: 600;
+      }
+      .lex-chat-evidence-group + .lex-chat-evidence-group {
+        margin-top: 6px;
+      }
+      .lex-chat-evidence-group-label {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        color: var(--lex-chat-text-dim);
+        margin-bottom: 2px;
+      }
+      .lex-chat-citation-num {
+        min-width: 1.5em;
+      }
+      .lex-chat-citation-body {
+        min-width: 0;
+      }
+      .lex-chat-citation-relation {
+        opacity: 0.8;
+      }
+      .lex-chat-citation-snippet {
+        margin: 2px 0 0;
+        padding: 0;
+        border: none;
+        font-style: italic;
+        opacity: 0.75;
+        overflow-wrap: anywhere;
+      }
+      .lex-chat-citation-snippet--quote {
+        opacity: 0.9;
       }
       .lex-chat-citations-section .lex-chat-citation-item {
         display: flex;
@@ -137,11 +313,6 @@
       }
       .lex-chat-citations-section .lex-chat-citation-item:hover {
         border-left-color: var(--lex-chat-accent);
-      }
-      .lex-chat-reference-empty {
-        padding: 6px 8px;
-        font-size: 10.5px;
-        color: var(--lex-chat-text-dim);
       }
       .lex-chat-validation-section {
         margin-top: 10px;
@@ -192,6 +363,32 @@
       .lex-chat-citations-more:hover {
         color: var(--lex-chat-accent);
         text-decoration: underline;
+      }
+
+      /* Citation viewer modal: the file viewer (embedded mode) in an iframe,
+         near full viewport with margins. */
+      lex-modal.lex-chat-source-modal .lex-modal-panel {
+        height: calc(100vh - 48px);
+        height: calc(100dvh - 48px);
+      }
+      lex-modal.lex-chat-source-modal .lex-modal-panel > .lex-modal-body {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        padding: 0;
+      }
+      lex-modal.lex-chat-source-modal slot-content[data-lex-modal-content] {
+        display: flex !important;
+        flex: 1 1 auto;
+        flex-direction: column;
+        min-height: 0;
+      }
+      .lex-chat-source-viewer-frame {
+        flex: 1 1 auto;
+        width: 100%;
+        min-height: 0;
+        border: 0;
+        background: var(--lex-bg-secondary);
       }
 
       /* Artifacts section */
@@ -408,6 +605,7 @@
         streaming:  { type: Boolean, default: false, reflect: true },
         citations:  { type: Array, default: [] },
         references: { type: Array, default: [] },
+        coverageSummary: { type: String, default: null, attribute: 'coverage-summary' },
         artifacts:  { type: Array, default: [] },
         attachments: { type: Array, default: [] },
         grounding:   { type: Object, default: null },
@@ -420,7 +618,6 @@
       this._rawContent = ''; // Accumulated raw content for streaming
       this._contentEl = null;
       this._expandedCitations = false;
-      this._activeEvidenceTab = 'sources';
     }
 
     connected() {
@@ -554,14 +751,8 @@
         const existing = this.querySelector('.lex-chat-citations-section');
         if (existing) existing.remove();
         this._renderCitationsSection(this.citations || []);
-      });
-
-      this.delegate('click', '.lex-chat-evidence-tab', (e, target) => {
-        e.preventDefault();
-        this._activeEvidenceTab = target.dataset.evidenceTab || 'sources';
-        const existing = this.querySelector('.lex-chat-citations-section');
-        if (existing) existing.remove();
-        this._renderCitationsSection(this.citations || []);
+        const toggle = this.querySelector('.lex-chat-citations-more');
+        if (toggle && typeof toggle.focus === 'function') toggle.focus();
       });
 
       this.delegate('click', '.lex-chat-reference-link', (e, target) => {
@@ -738,6 +929,10 @@
       if (metadata.timestamp) this._props.timestamp = metadata.timestamp;
       if (metadata.citations) this._props.citations = metadata.citations;
       if (metadata.references) this._props.references = metadata.references;
+      if (metadata.coverageSummary) this._props.coverageSummary = metadata.coverageSummary;
+      // Captured before the Sources panel renders so its "What I checked"
+      // line can read a server-authored coverage summary.
+      if (metadata.grounding) this._props.grounding = metadata.grounding;
       if (metadata.artifacts) this._props.artifacts = metadata.artifacts;
       if (metadata.duration != null) this._props.duration = metadata.duration;
       if (metadata.tokenCount != null) this._props.tokenCount = metadata.tokenCount;
@@ -761,9 +956,9 @@
           this._contentEl.innerHTML = ChatFormat.format(this._rawContent, metadata.citations);
         }
 
-        // Append citations section
-        if (metadata.citations?.length > 0) {
-          this._renderCitationsSection(metadata.citations);
+        // Append the Sources panel (documents, legal authority, records)
+        if (metadata.citations?.length > 0 || this.references?.length > 0) {
+          this._renderCitationsSection(this.citations || []);
         }
 
         // Append artifacts section
@@ -923,64 +1118,74 @@
 
       citations = Array.isArray(citations) ? citations : [];
       const references = Array.isArray(this.references) ? this.references : [];
-      const sourceCount = citations.length;
-      const referenceCount = references.length;
-      if (sourceCount === 0 && referenceCount === 0) return;
-      const activeTab = this._activeEvidenceTab === 'references' ? 'references' : 'sources';
+      const evidence = groupEvidence(citations, references);
+      if (evidence.total === 0) return;
 
+      const h = (value) => ChatFormat.escapeHtml(String(value == null ? '' : value));
       const max = 5;
-      const visibleCitations = this._expandedCitations ? citations : citations.slice(0, max);
-      const items = visibleCitations.map((c, i) => {
-        const absoluteIndex = this._expandedCitations ? i : i;
-        const label = c.label || c.filename || c.citation || c.title || c.name || 'Unknown';
-        const fn = ChatFormat.escapeHtml(label);
-        const pg = c.page_number || c.page || (c.locator && c.locator.page) || '?';
-        const docId = ChatFormat.escapeHtml(c.document_id || c.documentId || c.doc_id || c.sourceRef || '');
-        const excerpt = c.chunk_text || c.excerpt || c.snippet || c.content || c.text || '';
-        const rel = c.relevance_score || c.relevance || 0;
-        const pct = Math.round(rel * 100);
-        const sourceType = ChatFormat.escapeHtml(c.sourceType || c.source_type || '');
-        const source = ChatFormat.escapeHtml(c.source || '');
-        const sourceKind = this._getCitationSourceKind(c);
-        const relation = c.used_for || c.relevance_note || c.claim || '';
+      let remaining = this._expandedCitations ? Infinity : max;
+      let hidden = 0;
+      const uid = 'lex-evidence-' + (this.messageId ? String(this.messageId).replace(/[^A-Za-z0-9_-]/g, '') : '') + '-' + (++evidenceSectionSeq);
 
+      const groupsHtml = evidence.groups.map((group) => {
+        const visible = group.items.slice(0, Math.max(0, Math.min(group.items.length, remaining)));
+        remaining -= visible.length;
+        hidden += group.items.length - visible.length;
+        if (visible.length === 0) return '';
+        const headingId = uid + '-' + group.key;
+        const itemsHtml = visible.map((entry) => (entry.type === 'reference'
+          ? this._renderReferenceItem(entry.item, entry.index)
+          : this._renderCitationItem(entry.item, entry.index))).join('');
         return `
-          <div class="lex-chat-citation-item">
-            <span>${absoluteIndex + 1}.</span>
-            <div>
-              <button class="lex-chat-citation-link" data-citation-index="${absoluteIndex}" data-document-id="${docId}" data-filename="${fn}" data-page="${ChatFormat.escapeHtml(String(pg))}" data-source-type="${sourceType}" data-source="${source}">${fn}</button>
-              <div>${sourceKind}</div>
-              ${relation ? `<div style="opacity:0.8">${ChatFormat.escapeHtml(String(relation))}</div>` : ''}
-              ${pg !== '?' ? `<div>page ${pg}</div>` : ''}
-              ${pct > 0 ? `<div>Relevance: ${pct}%</div>` : ''}
-              ${excerpt ? `<div style="opacity:0.7;font-style:italic">${ChatFormat.escapeHtml(excerpt.substring(0, 100))}${excerpt.length > 100 ? '...' : ''}</div>` : ''}
-            </div>
+          <div class="lex-chat-evidence-group" role="group" aria-labelledby="${headingId}" data-evidence-group="${group.key}">
+            <div class="lex-chat-evidence-group-label" id="${headingId}">${h(group.label)} (${group.items.length})</div>
+            ${itemsHtml}
           </div>`;
       }).join('');
 
-      const more = !this._expandedCitations && citations.length > max
-        ? `<button class="lex-chat-citations-more" type="button">+ ${citations.length - max} more</button>`
-        : this._expandedCitations && citations.length > max
-          ? '<button class="lex-chat-citations-more" type="button">Show less</button>'
+      const more = hidden > 0
+        ? `<button class="lex-chat-citations-more" type="button" aria-expanded="false">+ ${hidden} more</button>`
+        : this._expandedCitations && evidence.total > max
+          ? '<button class="lex-chat-citations-more" type="button" aria-expanded="true">Show less</button>'
+          : '';
+      const coverage = evidenceCoverageSummary(this.grounding, this.coverageSummary);
+      const coverageHtml = coverage
+        ? `<div class="lex-chat-evidence-coverage"><span class="lex-chat-evidence-coverage-label">What I checked:</span> ${h(coverage)}</div>`
         : '';
-      const referencesHtml = referenceCount > 0
-        ? references.map((ref, i) => this._renderReferenceItem(ref, i)).join('')
-        : '<div class="lex-chat-reference-empty">No structured references for this response.</div>';
-      const sourcesHtml = sourceCount > 0
-        ? items + more
-        : '<div class="lex-chat-reference-empty">No sources for this response.</div>';
-      const panelHtml = activeTab === 'references'
-        ? referencesHtml
-        : sourcesHtml;
 
       body.insertAdjacentHTML('beforeend', `
-        <div class="lex-chat-citations-section">
-          <div class="lex-chat-evidence-tabs" role="tablist" aria-label="Response evidence">
-            <button class="lex-chat-evidence-tab" type="button" role="tab" aria-selected="${activeTab === 'sources'}" data-evidence-tab="sources">Sources (${sourceCount})</button>
-            <button class="lex-chat-evidence-tab" type="button" role="tab" aria-selected="${activeTab === 'references'}" data-evidence-tab="references">References (${referenceCount})</button>
-          </div>
-          ${panelHtml}
-        </div>`);
+        <section class="lex-chat-citations-section" aria-labelledby="${uid}-heading">
+          <div class="lex-chat-evidence-heading" id="${uid}-heading" role="heading" aria-level="4">Sources (${evidence.total})</div>
+          ${coverageHtml}
+          ${groupsHtml}
+          ${more}
+        </section>`);
+    }
+
+    _renderCitationItem(c, index) {
+      const h = (value) => ChatFormat.escapeHtml(String(value == null ? '' : value));
+      const label = c.label || c.filename || c.citation || c.title || c.name || 'Unknown';
+      const page = citationPage(c);
+      const docId = c.document_id || c.documentId || c.doc_id || c.sourceRef || '';
+      const passage = citationPassage(c);
+      const snippet = truncatePassage(passage.text, EVIDENCE_SNIPPET_MAX);
+      const rel = Number(c.relevance_score || c.relevance || 0);
+      const pct = Number.isFinite(rel) ? Math.round(rel * 100) : 0;
+      const relation = c.used_for || c.relevance_note || c.claim || '';
+      // The group heading already names the kind (Documents, Legal authority).
+      const meta = [page ? `Page ${page}` : '', pct > 0 ? `Relevance: ${pct}%` : '']
+        .filter(Boolean).join(' · ');
+
+      return `
+          <div class="lex-chat-citation-item">
+            <span class="lex-chat-citation-num">${index + 1}.</span>
+            <div class="lex-chat-citation-body">
+              <button class="lex-chat-citation-link" type="button" data-citation-index="${index}" data-document-id="${h(docId)}" data-filename="${h(label)}" data-page="${h(page || '?')}" data-source-type="${h(c.sourceType || c.source_type || '')}" data-source="${h(c.source || '')}">${h(documentCitationDisplayName(c) || label)}</button>
+              ${meta ? `<div class="lex-chat-citation-meta">${h(meta)}</div>` : ''}
+              ${relation ? `<div class="lex-chat-citation-relation">${h(relation)}</div>` : ''}
+              ${snippet ? `<blockquote class="lex-chat-citation-snippet${passage.isQuote ? ' lex-chat-citation-snippet--quote' : ''}">${h(snippet)}</blockquote>` : ''}
+            </div>
+          </div>`;
     }
 
     _renderReferenceItem(ref, i) {
@@ -991,21 +1196,13 @@
         : (ref.description || ref.subtitle || '');
       return `
         <div class="lex-chat-citation-item">
-          <span>${i + 1}.</span>
-          <div>
-            <button class="lex-chat-reference-link" data-reference-index="${i}">${label}</button>
-            <div>${type}</div>
-            ${description ? `<div style="opacity:0.7">${ChatFormat.escapeHtml(String(description))}</div>` : ''}
+          <span class="lex-chat-citation-num" aria-hidden="true"></span>
+          <div class="lex-chat-citation-body">
+            <button class="lex-chat-reference-link" type="button" data-reference-index="${i}">${label}</button>
+            <div class="lex-chat-citation-meta">${type}</div>
+            ${description ? `<div class="lex-chat-citation-relation">${ChatFormat.escapeHtml(String(description))}</div>` : ''}
           </div>
         </div>`;
-    }
-
-    _getCitationSourceKind(citation) {
-      const source = String(citation && citation.source || '').toLowerCase();
-      const sourceType = String(citation && (citation.sourceType || citation.source_type) || '').toLowerCase();
-      if (source === 'domain_pack' || sourceType === 'domain_pack') return 'Legal authority';
-      if (sourceType === 'document' || sourceType === 'chunk' || citation.document_id || citation.documentId || citation.doc_id) return 'Workspace document';
-      return 'Source';
     }
 
     _renderArtifactsSection(artifacts) {
@@ -1280,5 +1477,16 @@
   global.Lex.Chat = global.Lex.Chat || {};
   global.Lex.Chat.LexChatMessage = LexChatMessage;
   global.Lex.Chat.formatTimestamp = formatTimestamp;
+  global.Lex.Chat.documentCitationDisplayName = documentCitationDisplayName;
+  global.Lex.Chat.Evidence = {
+    citationKind,
+    citationPassage,
+    truncatePassage,
+    citationPage,
+    citationChunkIndex,
+    groupEvidence,
+    evidenceCoverageSummary,
+    buildCitationViewerNavigation
+  };
 
 })(typeof window !== 'undefined' ? window : globalThis);

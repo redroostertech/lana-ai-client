@@ -27,6 +27,7 @@
     'button',
     'input',
     'select',
+    'lex-select',
     'textarea'
   ].join(',');
   var DOC_UI_TEXT_ARTIFACT_PATTERN = /\s*\d?ReplaceDeleteInsert afterBIULinkFieldsApplyCancelAsk LANAAcceptReject\s*/g;
@@ -86,6 +87,20 @@
       .replaceAll('>', '&gt;')
       .replaceAll('"', '&quot;')
       .replaceAll("'", '&#39;');
+  }
+
+  // lex-select markup: options are { value, label } with string values. The
+  // value falls back to the first option, as a native select did.
+  function lexSelectHtml(attrs, options, value) {
+    var values = options.map(function (option) { return option.value; });
+    var selected = values.indexOf(value) !== -1 ? value : (values.length ? values[0] : '');
+    return '<lex-select ' + attrs + ' options="' + esc(JSON.stringify(options)) + '" value="' + esc(selected) + '"></lex-select>';
+  }
+
+  function lexSelectHasOption(select, value) {
+    return Boolean(select && Array.isArray(select.options) && select.options.some(function (option) {
+      return option.value === value;
+    }));
   }
 
   function documentDisplayFilename(file) {
@@ -2438,11 +2453,10 @@
       }
     };
     var message = 'Release the saved draft for "' + (file.filename || file.title || 'this document') + '" as a new version?';
-    if (window.Lex && Lex.Modal && typeof Lex.Modal.confirm === 'function') {
-      Lex.Modal.confirm('Release Version', message, run, { confirmText: 'Release Version' });
-    } else if (window.confirm(message)) {
-      run();
-    }
+    // confirmAsync escapes the text; the filename is user data.
+    Lex.Modal.confirmAsync('Release Version', message, { confirmText: 'Release Version' }).then(function (confirmed) {
+      if (confirmed) run();
+    });
   }
 
   async function retryReleaseApproval(file) {
@@ -3959,14 +3973,14 @@
       '</section>';
     var editHtml =
       '<section class="office-file-info-fields office-file-info-edit">' +
-      '<label><span>Document Type</span><select id="officeMetaDocType">' +
-      '<option value="contract"' + (docType === 'contract' ? ' selected' : '') + '>Contract</option>' +
-      '<option value="affidavit"' + (docType === 'affidavit' ? ' selected' : '') + '>Affidavit</option>' +
-      '<option value="pleading"' + (docType === 'pleading' ? ' selected' : '') + '>Pleading</option>' +
-      '<option value="spreadsheet"' + (docType === 'spreadsheet' ? ' selected' : '') + '>Spreadsheet</option>' +
-      '<option value="presentation"' + (docType === 'presentation' ? ' selected' : '') + '>Presentation</option>' +
-      '<option value="other"' + (docType === 'other' ? ' selected' : '') + '>Other</option>' +
-      '</select></label>' +
+      lexSelectHtml('id="officeMetaDocType" label="Document Type"', [
+        { value: 'contract', label: 'Contract' },
+        { value: 'affidavit', label: 'Affidavit' },
+        { value: 'pleading', label: 'Pleading' },
+        { value: 'spreadsheet', label: 'Spreadsheet' },
+        { value: 'presentation', label: 'Presentation' },
+        { value: 'other', label: 'Other' }
+      ], docType) +
       '<label><span>Tags</span><input id="officeMetaTags" type="text" value="' + esc(metadata.tags || '') + '" placeholder="contract, nda, review"></label>' +
       '<label><span>Notes</span><textarea id="officeMetaNotes" rows="5" placeholder="Add file notes">' + esc(metadata.notes || '') + '</textarea></label>' +
       '<div class="office-file-info-actions"><button type="button" data-action="set-file-info-mode" data-file-info-mode="view">Cancel</button>' +
@@ -4008,7 +4022,7 @@
   function refreshFileInfoDrawer(file) {
     var drawer = activeFileInfoDrawer();
     if (!drawer || !file) return false;
-    var slot = drawer.querySelector('.lex-drawer-body slot-content');
+    var slot = drawer.contentRoot;
     if (!slot) return false;
     slot.innerHTML = renderDocFileInfoRail(file, { drawer: true });
     hydrateIcons(slot);
@@ -4866,12 +4880,20 @@
         '<button type="button" data-command="undo" data-format="undo" title="Undo" disabled aria-disabled="true">' + toolbarIcon('undo-2', 'Undo') + '</button>' +
         '<button type="button" data-command="redo" data-format="redo" title="Redo" disabled aria-disabled="true">' + toolbarIcon('redo-2', 'Redo') + '</button>') +
       toolbarGroup('Style',
-        '<select class="office-format-select" data-command="formatBlock" aria-label="Paragraph style"' + embedBlockedAttrs + '>' +
-        '<option value="p">Normal</option><option value="h1">Heading 1</option><option value="h2">Heading 2</option><option value="h3">Heading 3</option><option value="h4">Heading 4</option><option value="h5">Heading 5</option><option value="h6">Heading 6</option><option value="subheading">Subheading</option><option value="blockquote">Quote</option><option value="pre">Code</option><option value="caption">Caption</option><option value="footnote">Footnote</option></select>' +
-        '<select class="office-format-select" data-command="fontName" aria-label="Font family"' + embedBlockedAttrs + '>' +
-        '<option value="Arial">Arial</option><option value="Georgia">Georgia</option><option value="Times New Roman">Times</option><option value="Courier New">Mono</option></select>' +
-        '<select class="office-format-select office-format-select-narrow" data-command="fontSize" aria-label="Font size"' + embedBlockedAttrs + '>' +
-        '<option value="2">Small</option><option value="3" selected>Body</option><option value="4">Large</option><option value="5">Title</option><option value="6">Hero</option></select>') +
+        lexSelectHtml('class="office-format-select" data-command="formatBlock" size="sm" aria-label="Paragraph style"' + embedBlockedAttrs, [
+          { value: 'p', label: 'Normal' }, { value: 'h1', label: 'Heading 1' }, { value: 'h2', label: 'Heading 2' },
+          { value: 'h3', label: 'Heading 3' }, { value: 'h4', label: 'Heading 4' }, { value: 'h5', label: 'Heading 5' },
+          { value: 'h6', label: 'Heading 6' }, { value: 'subheading', label: 'Subheading' }, { value: 'blockquote', label: 'Quote' },
+          { value: 'pre', label: 'Code' }, { value: 'caption', label: 'Caption' }, { value: 'footnote', label: 'Footnote' }
+        ], 'p') +
+        lexSelectHtml('class="office-format-select" data-command="fontName" size="sm" aria-label="Font family"' + embedBlockedAttrs, [
+          { value: 'Arial', label: 'Arial' }, { value: 'Georgia', label: 'Georgia' },
+          { value: 'Times New Roman', label: 'Times' }, { value: 'Courier New', label: 'Mono' }
+        ], 'Arial') +
+        lexSelectHtml('class="office-format-select office-format-select-narrow" data-command="fontSize" size="sm" aria-label="Font size"' + embedBlockedAttrs, [
+          { value: '2', label: 'Small' }, { value: '3', label: 'Body' }, { value: '4', label: 'Large' },
+          { value: '5', label: 'Title' }, { value: '6', label: 'Hero' }
+        ], '3')) +
       toolbarGroup('Marks',
         '<button type="button" data-command="bold" title="Bold">B</button>' +
         '<button type="button" data-command="italic" title="Italic">I</button>' +
@@ -5633,21 +5655,29 @@
     return null;
   }
 
-  function templateVariableMenu() {
-    var menu = el('officeTemplateVariableMenu');
-    if (menu) return menu;
-    menu = document.createElement('div');
-    menu.id = 'officeTemplateVariableMenu';
-    menu.className = 'office-template-variable-menu';
-    menu.hidden = true;
-    document.body.appendChild(menu);
-    return menu;
-  }
+  // The autocomplete is a Lex.Menu (js/lex/components/form/lex-dropdown-btn.js):
+  // a floating menu at the caret rect whose keyboard is driven from the
+  // document page, so focus and the caret stay in the contenteditable.
+  var templateVariableMenuController = null;
 
   function hideTemplateVariableMenu() {
-    var menu = el('officeTemplateVariableMenu');
-    if (menu) menu.hidden = true;
+    var menu = templateVariableMenuController;
+    templateVariableMenuController = null;
     templateVariableMenuState = null;
+    if (menu && menu.open) menu.close('host');
+  }
+
+  // Where the menu hangs: the live trigger text rect while it still has a box
+  // (so the menu follows the caret when the page scrolls), else the rect
+  // captured when the menu opened (toolbar button or an empty caret).
+  function templateVariableMenuAnchor() {
+    var state = templateVariableMenuState;
+    if (!state) return null;
+    if (state.anchorMode !== 'toolbar' && state.range && typeof state.range.getBoundingClientRect === 'function') {
+      var live = state.range.getBoundingClientRect();
+      if (live && (live.width || live.height)) return live;
+    }
+    return state.anchorRect || { left: 24, top: 100, right: 24, bottom: 124, width: 0, height: 24 };
   }
 
   function templateVariableTrigger() {
@@ -5733,30 +5763,13 @@
     });
   }
 
-  function positionTemplateVariableMenu(anchorRect) {
-    var menu = templateVariableMenu();
-    var rect = anchorRect || { left: 24, top: 100, bottom: 124, width: 0 };
-    menu.hidden = false;
-    var width = menu.offsetWidth || 260;
-    var left = rect.left + ((rect.width || 0) / 2) - (width / 2);
-    var top = rect.bottom + 8;
-    var height = menu.offsetHeight || 280;
-    left = Math.max(12, Math.min(left, window.innerWidth - width - 12));
-    if (top + height > window.innerHeight - 12 && rect.top - height - 8 > 12) {
-      top = rect.top - height - 8;
-    }
-    top = Math.max(12, Math.min(top, window.innerHeight - height - 12));
-    menu.style.left = Math.round(left) + 'px';
-    menu.style.top = Math.round(top) + 'px';
-  }
-
   function renderTemplateVariableMenu() {
     var state = templateVariableMenuState;
-    var menu = templateVariableMenu();
     if (!state) {
-      menu.hidden = true;
+      hideTemplateVariableMenu();
       return;
     }
+    if (!window.Lex || !Lex.Menu || typeof Lex.Menu.openAt !== 'function') return;
     var isMention = state.kind === 'mention';
     var entity = !isMention && state.entityKey ? templateVariableEntity(state.entityKey) : null;
     var user = isMention && state.userId ? mentionUserById(state.userId) : null;
@@ -5792,50 +5805,102 @@
         ? 'Search formats...'
         : (entity ? 'Search properties...' : 'Search entities...');
     var canGoBack = Boolean((isMention && user) || (!isMention && (entity || state.dateSourceKey)));
-    var rows = options.map(function (option, index) {
-      var active = index === state.activeIndex ? ' is-active' : '';
+    var items = options.map(function (option) {
       if (isMention && user) {
         var value = mentionUserPropertyValue(user, option.key);
-        return '<button class="office-template-variable-option' + active + '" type="button" data-mention-property="' + esc(option.key) + '">' +
-          '<span>' + esc(option.label) + '</span><code>' + esc(value || mentionUserLiteral(user.id, option.key)) + '</code></button>';
+        return { value: option.key, label: option.label, meta: value || mentionUserLiteral(user.id, option.key), data: { mentionProperty: option.key } };
       }
       if (isMention) {
-        return '<button class="office-template-variable-option office-template-variable-person' + active + '" type="button" data-mention-user="' + esc(option.id) + '">' +
-          '<span class="office-template-variable-avatar">' + esc(initialsForName(option.label)) + '</span>' +
-          '<span class="office-template-variable-person-copy"><strong>' + esc(option.label) + '</strong><code>' + esc(option.email || option.username || option.id) + '</code></span></button>';
+        return { value: option.id, label: option.label, meta: option.email || option.username || option.id, avatar: initialsForName(option.label), data: { mentionUser: option.id } };
       }
       if (isDateEntity && state.dateSourceKey) {
-        return '<button class="office-template-variable-option' + active + '" type="button" data-template-date-format="' + esc(option.key) + '">' +
-          '<span>' + esc(option.label) + '</span><code>' + esc(option.example || templateVariableLiteral('date', state.dateSourceKey, option.key)) + '</code></button>';
+        return { value: option.key, label: option.label, meta: option.example || templateVariableLiteral('date', state.dateSourceKey, option.key), data: { templateDateFormat: option.key } };
       }
       if (isDateEntity) {
-        return '<button class="office-template-variable-option' + active + '" type="button" data-template-date-source="' + esc(option.key) + '">' +
-          '<span>' + esc(option.label) + '</span><code>' + esc(templateVariableLiteral('date', option.key, 'format')) + '</code></button>';
+        return { value: option.key, label: option.label, meta: templateVariableLiteral('date', option.key, 'format'), data: { templateDateSource: option.key } };
       }
       if (entity) {
-        return '<button class="office-template-variable-option' + active + '" type="button" data-template-variable-property="' + esc(option.key) + '">' +
-          '<span>' + esc(option.label) + '</span><code>' + esc(templateVariableLiteral(entity.key, option.key)) + '</code></button>';
+        return { value: option.key, label: option.label, meta: templateVariableLiteral(entity.key, option.key), data: { templateVariableProperty: option.key } };
       }
-      return '<button class="office-template-variable-option' + active + '" type="button" data-template-variable-entity="' + esc(option.key) + '">' +
-        '<span>' + esc(option.label) + '</span><code>' + esc(option.key) + '</code></button>';
-    }).join('');
-    menu.innerHTML = '<div class="office-template-variable-menu-head">' +
-      '<div class="office-template-variable-menu-title">' +
-      (canGoBack ? '<button class="office-template-variable-back" type="button" data-template-variable-back title="Back">' + toolbarIcon('arrow-left', 'Back') + '</button>' : '') +
-      '<span><strong>' + esc(title) + '</strong><code>' + esc(hint) + '</code></span></div>' +
-      '<input class="office-template-variable-search" type="search" data-template-variable-search placeholder="' + esc(searchPlaceholder) + '" value="' + esc(searchValue || '') + '" autocomplete="off">' +
-      '</div>' +
-      '<div class="office-template-variable-options">' + (rows || '<div class="office-template-variable-empty">No matching fields</div>') + '</div>';
-    positionTemplateVariableMenu(state.anchorRect);
+      return { value: option.key, label: option.label, meta: option.key, data: { templateVariableEntity: option.key } };
+    });
+    var menuOptions = {
+      id: 'officeTemplateVariableMenu',
+      heading: title,
+      hint: hint,
+      onBack: canGoBack ? function () { handleTemplateVariableOption({ templateVariableBack: '' }); } : null,
+      search: { value: searchValue || '', placeholder: searchPlaceholder, onInput: handleTemplateVariableSearch },
+      emptyText: 'No matching fields',
+      activeIndex: state.activeIndex,
+      align: 'center',
+      gap: 8,
+      margin: 12,
+      width: 'min(300px, calc(100vw - 24px))',
+      tabSelects: true,
+      owner: fallbackDocPage(),
+      // The toolbar's insert-variable button reopens the picker itself.
+      ignoreOutside: function (target) {
+        return Boolean(target && target.closest && target.closest('[data-action="insert-template-variable"]'));
+      },
+      onSelect: function (item) { handleTemplateVariableOption(item.data); },
+      onActiveChange: function (index) {
+        if (templateVariableMenuState) templateVariableMenuState.activeIndex = index;
+      },
+      // Escape or a click outside closed it.
+      onClose: function () {
+        if (templateVariableMenuController && !templateVariableMenuController.open) {
+          templateVariableMenuController = null;
+          templateVariableMenuState = null;
+        }
+      }
+    };
+    if (templateVariableMenuController && templateVariableMenuController.open) {
+      templateVariableMenuController.update(items, menuOptions);
+    } else {
+      templateVariableMenuController = Lex.Menu.openAt(templateVariableMenuAnchor, items, menuOptions);
+    }
+  }
+
+  // Typing in the menu's search box filters the current level.
+  function handleTemplateVariableSearch(value) {
+    var state = templateVariableMenuState;
+    if (!state) return;
+    value = value || '';
+    if (state.kind === 'mention') {
+      if (state.userId) {
+        state.propertyQuery = value;
+      } else {
+        state.userQuery = value;
+      }
+    } else if (state.entityKey === 'date' && state.dateSourceKey) {
+      state.formatQuery = value;
+    } else if (state.entityKey) {
+      state.propertyQuery = value;
+    } else {
+      state.entityQuery = value;
+    }
+    state.activeIndex = 0;
+    renderTemplateVariableMenu();
+  }
+
+  // The open menu already reflects this trigger text: keep its level and
+  // highlight. keyup runs this after every key, so without the check an
+  // ArrowDown or an Enter that drilled into a level was undone on release.
+  function templateVariableMenuShowing(kind, raw) {
+    var state = templateVariableMenuState;
+    return Boolean(state && state.kind === kind && state.raw === raw &&
+      templateVariableMenuController && templateVariableMenuController.open);
   }
 
   function updateTemplateVariableAutocomplete() {
     var mentionTrigger = mentionUserTrigger();
     if (mentionTrigger) {
+      if (templateVariableMenuShowing('mention', mentionTrigger.raw)) return;
       var mentionRect = mentionTrigger.range.getBoundingClientRect();
       var mentionUser = mentionTrigger.propertyMode ? mentionUserById(mentionTrigger.userQuery) : null;
       templateVariableMenuState = {
         kind: 'mention',
+        raw: mentionTrigger.raw,
         range: mentionTrigger.range,
         userQuery: mentionTrigger.userQuery,
         userId: mentionUser ? mentionUser.id : '',
@@ -5851,10 +5916,12 @@
       hideTemplateVariableMenu();
       return;
     }
+    if (templateVariableMenuShowing('template', trigger.raw)) return;
     var rangeRect = trigger.range.getBoundingClientRect();
     var entity = trigger.propertyMode ? templateVariableEntity(trigger.entityQuery) : null;
     templateVariableMenuState = {
       kind: 'template',
+      raw: trigger.raw,
       range: trigger.range,
       entityQuery: trigger.entityQuery,
       entityKey: entity ? entity.key : '',
@@ -5971,9 +6038,12 @@
     syncDocumentToolbarState();
   }
 
+  // option: a menu item's data ({ templateVariableEntity: key }, ...) or an
+  // element whose dataset has the same keys.
   function handleTemplateVariableOption(option) {
     if (!option || !templateVariableMenuState) return;
-    if (option.dataset.templateVariableBack !== undefined) {
+    var data = option.dataset || option;
+    if (data.templateVariableBack !== undefined) {
       if (templateVariableMenuState.kind === 'mention') {
         templateVariableMenuState.userId = '';
         templateVariableMenuState.propertyQuery = '';
@@ -5988,8 +6058,8 @@
       renderTemplateVariableMenu();
       return;
     }
-    var mentionUserId = option.dataset.mentionUser;
-    var mentionPropertyKey = option.dataset.mentionProperty;
+    var mentionUserId = data.mentionUser;
+    var mentionPropertyKey = data.mentionProperty;
     if (mentionUserId) {
       templateVariableMenuState.kind = 'mention';
       templateVariableMenuState.userId = mentionUserId;
@@ -6002,10 +6072,10 @@
       insertMentionUserToken(templateVariableMenuState.userId, mentionPropertyKey);
       return;
     }
-    var entityKey = option.dataset.templateVariableEntity;
-    var propertyKey = option.dataset.templateVariableProperty;
-    var dateSourceKey = option.dataset.templateDateSource;
-    var dateFormatKey = option.dataset.templateDateFormat;
+    var entityKey = data.templateVariableEntity;
+    var propertyKey = data.templateVariableProperty;
+    var dateSourceKey = data.templateDateSource;
+    var dateFormatKey = data.templateDateFormat;
     if (entityKey) {
       templateVariableMenuState.entityKey = entityKey;
       templateVariableMenuState.propertyQuery = '';
@@ -6032,26 +6102,12 @@
     }
   }
 
+  // Keys from the document page: ArrowUp/ArrowDown move, Enter/Tab pick,
+  // Escape closes. Returns true when the menu used the key.
   function handleTemplateVariableKeydown(event) {
-    var menu = el('officeTemplateVariableMenu');
-    if (!templateVariableMenuState || !menu || menu.hidden) return false;
-    var options = menu.querySelectorAll('.office-template-variable-option');
-    if (event.key === 'Escape') {
-      hideTemplateVariableMenu();
-      return true;
-    }
-    if (!options.length) return false;
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      var delta = event.key === 'ArrowDown' ? 1 : -1;
-      templateVariableMenuState.activeIndex = (templateVariableMenuState.activeIndex + delta + options.length) % options.length;
-      renderTemplateVariableMenu();
-      return true;
-    }
-    if (event.key === 'Enter' || event.key === 'Tab') {
-      handleTemplateVariableOption(options[templateVariableMenuState.activeIndex || 0]);
-      return true;
-    }
-    return false;
+    var menu = templateVariableMenuController;
+    if (!templateVariableMenuState || !menu || !menu.open) return false;
+    return menu.handleKey(event);
   }
 
   function syncActiveDocContent(options) {
@@ -6311,7 +6367,7 @@
             node.setAttribute('aria-pressed', active ? 'true' : 'false');
           });
         });
-        var styleSelect = document.querySelector('.office-doc-toolbar select[data-command="formatBlock"]');
+        var styleSelect = document.querySelector('.office-doc-toolbar lex-select[data-command="formatBlock"]');
         if (styleSelect && embedState.style !== 'mixed') {
           var styleValues = {
             Heading1: 'h1', Heading2: 'h2', Heading3: 'h3', Heading4: 'h4', Heading5: 'h5', Heading6: 'h6',
@@ -6343,27 +6399,27 @@
       }
     });
 
-    var blockSelect = document.querySelector('.office-doc-toolbar select[data-command="formatBlock"]');
+    var blockSelect = document.querySelector('.office-doc-toolbar lex-select[data-command="formatBlock"]');
     if (blockSelect) {
       var blocks = selectedDocBlocks();
       var normalized = blocks.length ? officeParagraphStyleForBlock(blocks[0]) : queryCommandValue('formatBlock');
       if (normalized.indexOf('heading') === 0) normalized = 'h' + normalized.replace(/[^0-9]/g, '');
       if (normalized === 'div' || normalized === '') normalized = 'p';
-      if (blockSelect.querySelector('option[value="' + normalized + '"]')) blockSelect.value = normalized;
+      if (lexSelectHasOption(blockSelect, normalized)) blockSelect.value = normalized;
     }
-    var fontSelect = document.querySelector('.office-doc-toolbar select[data-command="fontName"]');
-    if (fontSelect) {
+    var fontSelect = document.querySelector('.office-doc-toolbar lex-select[data-command="fontName"]');
+    if (fontSelect && Array.isArray(fontSelect.options)) {
       var font = queryCommandValue('fontName');
       for (var f = 0; f < fontSelect.options.length; f += 1) {
-        if (fontSelect.options[f].value.toLowerCase() === font) {
+        if (String(fontSelect.options[f].value).toLowerCase() === font) {
           fontSelect.value = fontSelect.options[f].value;
           break;
         }
       }
     }
-    var sizeSelect = document.querySelector('.office-doc-toolbar select[data-command="fontSize"]');
+    var sizeSelect = document.querySelector('.office-doc-toolbar lex-select[data-command="fontSize"]');
     var size = queryCommandValue('fontSize');
-    if (sizeSelect && sizeSelect.querySelector('option[value="' + size + '"]')) sizeSelect.value = size;
+    if (lexSelectHasOption(sizeSelect, size)) sizeSelect.value = size;
   }
 
   function updateSelectionToolbar() {
@@ -6827,6 +6883,14 @@
       typeof officeEditorInstance.applyEdits === 'function');
   }
 
+  function promptForLinkUrl() {
+    return Lex.Modal.prompt('Insert Link', {
+      label: 'Paste a URL',
+      placeholder: 'https://',
+      confirmText: 'Insert link'
+    });
+  }
+
   function handleEmbedToolbarCommand(file, command, value) {
     var ranges = embedToolbarSelectionRanges;
     embedToolbarSelectionRanges = null;
@@ -6886,8 +6950,9 @@
       return;
     }
     if (command === 'createLink') {
-      var href = window.prompt ? window.prompt('Paste a URL') : '';
-      if (href) applyEmbedLinkCommand(file, href, ranges);
+      promptForLinkUrl().then(function (href) {
+        if (href) applyEmbedLinkCommand(file, href, ranges);
+      });
       return;
     }
     if (command === 'unlink') {
@@ -7155,13 +7220,16 @@
       }).filter(function (row) {
         return row.id && row.id !== currentMatter;
       });
-      select.innerHTML = '<option value="">Choose a workspace</option>' + rows.map(function (row) {
-        return '<option value="' + esc(row.id) + '">' + esc(row.name) + '</option>';
-      }).join('');
+      select.options = [{ value: '', label: 'Choose a workspace' }].concat(rows.map(function (row) {
+        return { value: row.id, label: row.name };
+      }));
+      select.placeholder = rows.length ? 'Choose a workspace' : 'No other active workspaces';
+      select.value = '';
       select.disabled = rows.length === 0;
-      if (!rows.length) select.innerHTML = '<option value="">No other active workspaces</option>';
     } catch (error) {
-      select.innerHTML = '<option value="">Workspaces unavailable</option>';
+      select.options = [];
+      select.placeholder = 'Workspaces unavailable';
+      select.value = '';
       select.disabled = true;
     }
   }
@@ -7196,11 +7264,15 @@
       Lex.Modal.open({
         heading: 'Share Document',
         size: 'sm',
-        content: '<div class="office-signer-form"><label for="officeShareTargetType">Share with</label>' +
-          '<select id="officeShareTargetType" class="office-format-select"><option value="user">Person</option><option value="workspace">Workspace</option></select>' +
+        content: '<div class="office-signer-form">' +
+          lexSelectHtml('id="officeShareTargetType" label="Share with"', [
+            { value: 'user', label: 'Person' }, { value: 'workspace', label: 'Workspace' }
+          ], 'user') +
           '<div id="officeShareUserFields"><label for="officeShareUserQuery">User name or email</label><input id="officeShareUserQuery" type="search" autocomplete="off" placeholder="person@example.com"></div>' +
-          '<div id="officeShareWorkspaceFields" hidden><label for="officeShareWorkspace">Workspace</label><select id="officeShareWorkspace" class="office-format-select" disabled><option value="">Loading workspaces...</option></select></div>' +
-          '<label for="officeSharePermission">Permission</label><select id="officeSharePermission" class="office-format-select"><option value="read">Can view</option><option value="write">Can edit</option></select></div>',
+          '<div id="officeShareWorkspaceFields" hidden><lex-select id="officeShareWorkspace" label="Workspace" searchable disabled placeholder="Loading workspaces..." options="[]" value=""></lex-select></div>' +
+          lexSelectHtml('id="officeSharePermission" label="Permission"', [
+            { value: 'read', label: 'Can view' }, { value: 'write', label: 'Can edit' }
+          ], 'read') + '</div>',
         confirmText: 'Grant access',
         cancelText: 'Cancel',
         onConfirm: submit
@@ -7209,13 +7281,17 @@
         var input = el('officeShareUserQuery');
         if (input) input.focus();
         var type = el('officeShareTargetType');
-        if (type) type.addEventListener('change', syncShareTargetFields);
+        if (type) type.addEventListener('lex-change', syncShareTargetFields);
         loadShareWorkspaceOptions(file);
       }, 0);
       return;
     }
-    var query = window.prompt ? window.prompt('Collaborator name or email') : '';
-    if (query) addCollaboratorFromQuery(file, query, ['read']).catch(function (error) { toast(error.message); });
+    Lex.Modal.prompt('Share Document', {
+      label: 'Collaborator name or email',
+      confirmText: 'Share'
+    }).then(function (query) {
+      if (query) addCollaboratorFromQuery(file, query, ['read']).catch(function (error) { toast(error.message); });
+    });
   }
 
   async function removeCollaborator(file, collaboratorId) {
@@ -7241,20 +7317,16 @@
         toast((error && error.message) || 'Collaborator access could not be removed.');
       });
     };
-    if (window.Lex && Lex.Modal && typeof Lex.Modal.open === 'function') {
-      Lex.Modal.open({
-        heading: 'Remove Document Access',
-        size: 'sm',
-        content: '<div class="office-edit-change-modal"><p>Remove <strong>' + esc(collaborator.name) +
-          '</strong> from this document? The document and its review history will not be deleted.</p></div>',
-        confirmText: 'Remove access',
-        cancelText: 'Keep access',
-        destructive: true,
-        onConfirm: remove
-      });
-      return;
-    }
-    if (window.confirm && window.confirm('Remove ' + collaborator.name + ' from this document?')) remove();
+    Lex.Modal.open({
+      heading: 'Remove Document Access',
+      size: 'sm',
+      content: '<div class="office-edit-change-modal"><p>Remove <strong>' + esc(collaborator.name) +
+        '</strong> from this document? The document and its review history will not be deleted.</p></div>',
+      confirmText: 'Remove access',
+      cancelText: 'Keep access',
+      destructive: true,
+      onConfirm: remove
+    });
   }
 
   async function sendSignaturePacket(file) {
@@ -7303,9 +7375,18 @@
       var current = currentUserRecord() || {};
       var defaultSignature = current.full_name || current.fullName || current.display_name ||
         [current.first_name || '', current.last_name || ''].join(' ').trim();
-      var signatureText = window.prompt ? window.prompt('Type your legal signature to confirm consent', defaultSignature || '') : '';
+      var signatureText = await Lex.Modal.prompt('Sign Document', {
+        label: 'Type your legal signature to confirm consent',
+        value: defaultSignature || '',
+        confirmText: 'Continue',
+        required: true
+      });
       if (!signatureText) return;
-      if (!window.confirm || !window.confirm(consentDisclosure + '\n\nApply the typed signature "' + signatureText + '"?')) return;
+      var consented = await Lex.Modal.confirmAsync('Apply the typed signature "' + signatureText + '"?', consentDisclosure, {
+        confirmText: 'Apply signature',
+        size: 'lg'
+      });
+      if (!consented) return;
       details = {
         consent: true,
         consent_disclosure: consentDisclosure,
@@ -7313,7 +7394,11 @@
         signature_method: 'typed'
       };
     } else {
-      var reason = window.prompt ? window.prompt('Reason for declining (optional)', '') : '';
+      var reason = await Lex.Modal.prompt('Decline Signature', {
+        label: 'Reason for declining (optional)',
+        value: '',
+        confirmText: 'Decline'
+      });
       if (reason === null) return;
       details = { decline_reason: reason || undefined };
     }
@@ -7352,9 +7437,20 @@
         return;
       }
       if (command === 'createLink') {
-        value = window.prompt ? window.prompt('Paste a URL') : '';
-        if (!value) return;
+        // The link dialog takes focus, so remember the selection and put it
+        // back before execCommand applies the link.
+        selectionInsideDoc();
+        promptForLinkUrl().then(function (href) {
+          if (!href) return;
+          restoreDocSelection();
+          execFallbackDocCommand(command, href);
+        });
+        return;
       }
+      execFallbackDocCommand(command, value);
+    }
+
+    function execFallbackDocCommand(command, value) {
       var page = fallbackDocPage();
       if (page && typeof page.focus === 'function') page.focus();
       try {
@@ -7384,7 +7480,6 @@
     });
 
     document.addEventListener('click', function (event) {
-      var variableTarget = event.target.closest('[data-template-variable-entity], [data-template-variable-property], [data-template-date-source], [data-template-date-format], [data-mention-user], [data-mention-property], [data-template-variable-back]');
       var actionTarget = event.target.closest('[data-action]');
       var filterTarget = event.target.closest('[data-filter]');
       var fileTarget = event.target.closest('[data-file-id]');
@@ -7392,13 +7487,12 @@
       var slideTarget = event.target.closest('[data-slide-index]');
       var file = activeFile();
 
-      if (variableTarget) {
-        handleTemplateVariableOption(variableTarget);
-        return;
-      }
-
-      if (templateVariableMenuState &&
-          !(event.target.closest && event.target.closest('#officeTemplateVariableMenu')) &&
+      // composedPath: picking a level re-renders the menu, so the clicked row
+      // is already detached from it here.
+      var menuEl = templateVariableMenuController && templateVariableMenuController.element;
+      var inVariableMenu = Boolean(menuEl && (menuEl.contains(event.target) ||
+        (typeof event.composedPath === 'function' && event.composedPath().indexOf(menuEl) !== -1)));
+      if (templateVariableMenuState && !inVariableMenu &&
           !(actionTarget && actionTarget.dataset.action === 'insert-template-variable')) {
         hideTemplateVariableMenu();
       }
@@ -7891,34 +7985,6 @@
     });
 
     document.addEventListener('input', function (event) {
-      var searchTarget = event.target.closest && event.target.closest('[data-template-variable-search]');
-      if (!searchTarget || !templateVariableMenuState) return;
-      var value = searchTarget.value || '';
-      if (templateVariableMenuState.kind === 'mention') {
-        if (templateVariableMenuState.userId) {
-          templateVariableMenuState.propertyQuery = value;
-        } else {
-          templateVariableMenuState.userQuery = value;
-        }
-      } else if (templateVariableMenuState.entityKey === 'date' && templateVariableMenuState.dateSourceKey) {
-        templateVariableMenuState.formatQuery = value;
-      } else if (templateVariableMenuState.entityKey) {
-        templateVariableMenuState.propertyQuery = value;
-      } else {
-        templateVariableMenuState.entityQuery = value;
-      }
-      templateVariableMenuState.activeIndex = 0;
-      renderTemplateVariableMenu();
-      var nextSearch = el('officeTemplateVariableMenu') && el('officeTemplateVariableMenu').querySelector('[data-template-variable-search]');
-      if (nextSearch && typeof nextSearch.focus === 'function') {
-        nextSearch.focus();
-        try {
-          nextSearch.setSelectionRange(nextSearch.value.length, nextSearch.value.length);
-        } catch (_) {}
-      }
-    });
-
-    document.addEventListener('input', function (event) {
       var file = activeFile();
       if (!file) return;
 
@@ -7995,10 +8061,6 @@
         event.preventDefault();
         event.stopPropagation();
       }
-      if (event.target && event.target.closest && event.target.closest('[data-template-variable-search]') && handleTemplateVariableKeydown(event)) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
     });
 
     document.addEventListener('change', function (event) {
@@ -8023,10 +8085,18 @@
         return;
       }
       var commandTarget = event.target.closest('[data-command]');
-      if (commandTarget && commandTarget.matches('select, input[type="color"]')) {
+      if (commandTarget && commandTarget.matches('input[type="color"]')) {
         applyDocumentCommand(commandTarget);
         syncDocumentToolbarState();
       }
+    });
+
+    // Paragraph style, font and size are lex-selects: they report lex-change.
+    document.addEventListener('lex-change', function (event) {
+      var commandTarget = event.target && event.target.closest ? event.target.closest('lex-select[data-command]') : null;
+      if (!commandTarget) return;
+      applyDocumentCommand(commandTarget);
+      syncDocumentToolbarState();
     });
 
     document.addEventListener('focusin', function (event) {
@@ -8042,7 +8112,7 @@
 
     document.addEventListener('click', function (event) {
       var commandTarget = event.target.closest('[data-command]');
-      if (!commandTarget || commandTarget.matches('select, input[type="color"]')) return;
+      if (!commandTarget || commandTarget.matches('lex-select, input[type="color"]')) return;
       applyDocumentCommand(commandTarget);
       syncDocumentToolbarState();
       updateSelectionToolbar();
@@ -8077,18 +8147,17 @@
             try { embedToolbarSelectionRanges = embed.selectionRanges(); } catch (_) { embedToolbarSelectionRanges = null; }
             if (embedCommandTarget.matches('button')) event.preventDefault();
           }
+          // Opening a toolbar lex-select or clicking one of its options must
+          // not move the caret: its trigger and option rows are ordinary
+          // elements, so a mousedown there would collapse the selection the
+          // command is about to format.
+          if (embedCommandTarget.matches('lex-select')) event.preventDefault();
         }
       }
       if (event.target && event.target.closest && event.target.closest('[data-action="insert-template-variable"]')) {
         // Keep the document caret/selection (shell or embed) and any pending
         // embed typing session alive so the picker can capture the insertion
         // point when the click handler opens it.
-        event.preventDefault();
-      }
-      if (event.target &&
-          event.target.closest &&
-          event.target.closest('#officeTemplateVariableMenu') &&
-          !event.target.closest('[data-template-variable-search]')) {
         event.preventDefault();
       }
     });

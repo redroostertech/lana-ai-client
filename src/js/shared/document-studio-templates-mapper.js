@@ -24,6 +24,9 @@
   'use strict';
 
   var VALID_KINDS = ['fill', 'compose', 'render'];
+  // Mirrors the backend validator's sort_by / sort_order enums.
+  var VALID_SORT_FIELDS = ['name', 'updated_at', 'created_at', 'workspace', 'kind', 'document_type', 'variables'];
+  var VALID_SORT_ORDERS = ['asc', 'desc'];
 
   var KIND_LABELS = {
     fill: 'Document',
@@ -57,10 +60,11 @@
    *
    * Only known query params are emitted, mirroring the backend validator
    * (document-studio.validators.js): kind, matter_id, document_type, category,
-   * q, include_org_wide, limit, offset.
+   * q, include_org_wide, limit, offset, sort_by, sort_order, workspaces,
+   * updated_after, updated_before, created_after, created_before.
    *
    * @param {Object} [filters]
-   * @param {string} [filters.kind]            - 'fill' | 'compose' | 'render'
+   * @param {string|Array} [filters.kind]      - 'fill' | 'compose' | 'render', or a list
    * @param {string} [filters.matterId]        - string matter key
    * @param {string} [filters.documentType]
    * @param {string} [filters.category]
@@ -68,19 +72,35 @@
    * @param {boolean} [filters.includeOrgWide] - default omitted (backend defaults true)
    * @param {number} [filters.limit]
    * @param {number} [filters.offset]
+   * @param {string} [filters.sortBy]          - name | updated_at | created_at | workspace | kind | document_type | variables
+   * @param {string} [filters.sortOrder]       - 'asc' | 'desc'
+   * @param {Array}  [filters.workspaces]      - matter ids; 'organization' = org-wide
+   * @param {string} [filters.updatedAfter]    - ISO datetime (inclusive)
+   * @param {string} [filters.updatedBefore]   - ISO datetime (exclusive)
+   * @param {string} [filters.createdAfter]    - ISO datetime (inclusive)
+   * @param {string} [filters.createdBefore]   - ISO datetime (exclusive)
    * @returns {string}
    */
   function buildListQuery(filters) {
     var f = filters || {};
     var parts = [];
 
-    var kind = f.kind ? String(f.kind).toLowerCase() : '';
-    if (kind && VALID_KINDS.indexOf(kind) !== -1) {
-      _appendParam(parts, 'kind', kind);
+    var kinds = (Array.isArray(f.kind) ? f.kind : String(f.kind || '').split(','))
+      .map(function (k) { return String(k).trim().toLowerCase(); })
+      .filter(function (k, i, all) { return VALID_KINDS.indexOf(k) !== -1 && all.indexOf(k) === i; });
+    if (kinds.length) {
+      _appendParam(parts, 'kind', kinds.join(','));
     }
 
     _appendParam(parts, 'matter_id', f.matterId);
-    _appendParam(parts, 'document_type', f.documentType);
+    // One document type or a list (the Template Type column filter).
+    var documentTypes = (Array.isArray(f.documentType) ? f.documentType : [f.documentType])
+      .map(function (t) { return t === undefined || t === null ? '' : String(t).trim(); })
+      .filter(Boolean);
+    if (documentTypes.length) _appendParam(parts, 'document_type', documentTypes.join(','));
+    _appendParam(parts, 'name', f.name);
+    if (typeof f.minVariables === 'number' && f.minVariables >= 0) _appendParam(parts, 'min_variables', f.minVariables);
+    if (typeof f.maxVariables === 'number' && f.maxVariables > 0) _appendParam(parts, 'max_variables', f.maxVariables);
     _appendParam(parts, 'category', f.category);
     _appendParam(parts, 'q', f.q);
 
@@ -95,6 +115,22 @@
     }
     if (typeof f.offset === 'number' && f.offset >= 0) {
       _appendParam(parts, 'offset', f.offset);
+    }
+
+    var workspaces = (Array.isArray(f.workspaces) ? f.workspaces : [])
+      .map(function (w) { return String(w).trim(); })
+      .filter(Boolean);
+    if (workspaces.length) _appendParam(parts, 'workspaces', workspaces.join(','));
+    _appendParam(parts, 'updated_after', f.updatedAfter);
+    _appendParam(parts, 'updated_before', f.updatedBefore);
+    _appendParam(parts, 'created_after', f.createdAfter);
+    _appendParam(parts, 'created_before', f.createdBefore);
+
+    var sortBy = f.sortBy ? String(f.sortBy).toLowerCase() : '';
+    if (VALID_SORT_FIELDS.indexOf(sortBy) !== -1) {
+      _appendParam(parts, 'sort_by', sortBy);
+      var sortOrder = f.sortOrder ? String(f.sortOrder).toLowerCase() : '';
+      if (VALID_SORT_ORDERS.indexOf(sortOrder) !== -1) _appendParam(parts, 'sort_order', sortOrder);
     }
 
     return parts.join('&');

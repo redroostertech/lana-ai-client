@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Search Analytics - LanaAI</title>
+  <link rel="stylesheet" href="../css/lex-tokens.css">
+  <link rel="stylesheet" href="../css/admin/admin-tables.css">
   <link rel="stylesheet" href="../css/tailwind-output.css">
   <script src="../js/tailwind-loader.js"></script>
   <script src="../js/error-reporter.js"></script>
@@ -14,6 +16,7 @@
   <script src="../js/api.js"></script>
   <script src="../js/components.js"></script>
   <script src="../js/menu.js"></script>
+  <script src="../js/shared/header-user-menu.js"></script>
   <script src="../js/notifications.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -44,12 +47,7 @@
         <div class="flex items-center gap-4">
           <!-- Date Range Selector -->
           <div class="relative">
-            <select id="dateRange" class="bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-              <option value="1">Last 24 hours</option>
-              <option value="7" selected>Last 7 days</option>
-              <option value="30">Last 30 days</option>
-              <option value="custom">Custom range</option>
-            </select>
+            <lex-select id="dateRange" aria-label="Date range" options='[{"value":"1","label":"Last 24 hours"},{"value":"7","label":"Last 7 days"},{"value":"30","label":"Last 30 days"},{"value":"custom","label":"Custom range"}]' value="7"></lex-select>
           </div>
 
           <!-- Export Button -->
@@ -69,75 +67,26 @@
           </button>
 
           <!-- User Menu -->
-          <div class="relative" id="userMenu">
-            <button class="flex items-center gap-2 text-gray-700 hover:text-gray-900 p-1" title="Settings">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-              </svg>
-            </button>
-            <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-              <a href="../settings-v2.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
-              <hr class="my-1">
-              <button id="logoutBtn" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sign out</button>
-            </div>
-          </div>
+          <div class="relative" id="userMenu" data-header-user-menu data-settings-href="../settings-v2.html" data-login-href="../login.html"></div>
         </div>
       </div>
     </header>
 
-    <!-- Notification Panel Overlay -->
-    <div id="notificationOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
-
-    <!-- Notification Slide-out Panel -->
-    <div id="notificationPanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
-      <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
-        <h2 class="text-lg font-semibold text-gray-900">Notifications</h2>
-        <div class="flex items-center gap-3">
-          <button id="markAllReadBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium hidden">Mark all read</button>
-          <button id="refreshNotificationsBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-          </button>
-          <button id="closeNotificationPanel" class="text-gray-400 hover:text-gray-600">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-          </button>
-        </div>
-      </div>
-      <div class="flex border-b border-gray-200 px-6 flex-shrink-0">
-        <button id="filterAll" class="px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">All</button>
-        <button id="filterUnread" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700">Unread</button>
-      </div>
-      <div id="notificationList" class="flex-1 overflow-y-auto">
-        <div id="notificationLoading" class="p-8 text-center">
-          <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
-          <p class="text-gray-500 mt-3 text-sm">Loading notifications...</p>
-        </div>
-      </div>
-      <div id="notificationLoadingMore" class="hidden p-4 border-t border-gray-100 text-center flex-shrink-0">
-        <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
-      </div>
-    </div>
+    <!-- Notification panel: lex-drawer mounted by js/notifications.js -->
 
     <!-- Custom Date Range Modal -->
-    <div id="customDateModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-      <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">Custom Date Range</h3>
-        <div class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-            <input type="date" id="customStartDate" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">End Date</label>
-            <input type="date" id="customEndDate" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-          </div>
+    <lex-modal id="customDateModal" heading="Custom Date Range" size="sm" confirm-text="Apply" cancel-text="Cancel">
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="customStartDate">Start date</label>
+          <input type="date" id="customStartDate" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
         </div>
-        <div class="flex gap-3 mt-6">
-          <button id="cancelCustomDate" class="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-200">Cancel</button>
-          <button id="applyCustomDate" class="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700">Apply</button>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="customEndDate">End date</label>
+          <input type="date" id="customEndDate" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
         </div>
       </div>
-    </div>
+    </lex-modal>
 
     <!-- Main Content Area -->
     <main class="p-4 lg:p-8">
@@ -230,91 +179,152 @@
           </div>
         </div>
 
-        <!-- Top Queries Table -->
-        <div class="bg-white rounded-lg shadow">
-          <div class="px-6 py-4 border-b border-gray-200">
-            <h3 class="text-lg font-semibold text-gray-900">Top Queries</h3>
+        <!-- Top Queries (docs/TABLE-STANDARD.md) -->
+        <section aria-labelledby="topQueriesHeading">
+          <div class="bg-white rounded-lg shadow-sm border mb-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and sort top queries">
+            <div class="flex items-center gap-4 flex-wrap">
+              <div class="flex-1 min-w-[200px]">
+                <lex-input id="topQueriesSearch" placeholder="Search queries..." clearable="true" leading-icon="search"></lex-input>
+              </div>
+              <div class="flex items-center gap-2">
+                <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Sort by:</label>
+                <lex-select id="topQueriesSort" options='[{"value":"frequency","label":"Searches"},{"value":"query_text","label":"Query"},{"value":"avg_latency_ms","label":"Avg latency"},{"value":"zero_result_rate_percent","label":"Zero-result rate"},{"value":"ctr_percent","label":"CTR"}]' value="frequency"></lex-select>
+              </div>
+              <lex-btn id="topQueriesSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path></svg>
+              </lex-btn>
+              <div id="topQueriesCount" class="admin-table-toolbar-label text-sm whitespace-nowrap"></div>
+            </div>
           </div>
-          <div class="overflow-x-auto">
-            <table class="w-full">
-              <thead class="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" data-sort="query">
-                    Query Text
-                    <svg class="w-4 h-4 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
-                    </svg>
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" data-sort="frequency">
-                    Frequency
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" data-sort="latency">
-                    Avg Latency
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" data-sort="zero">
-                    Zero-Result Rate
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" data-sort="ctr">
-                    CTR
-                  </th>
-                </tr>
-              </thead>
-              <tbody id="topQueriesTable" class="divide-y divide-gray-200">
-                <!-- Dynamically populated -->
-              </tbody>
-            </table>
+          <div class="flex items-center justify-between mb-3 gap-4">
+            <div>
+              <h2 id="topQueriesHeading" class="admin-table-section-title text-lg font-semibold">Top Queries</h2>
+              <p class="admin-table-toolbar-label text-sm">The most frequent queries in the selected period. <span id="topQueriesCapNote"></span></p>
+            </div>
+            <span id="topQueriesSectionCount" class="admin-table-toolbar-label text-sm whitespace-nowrap" aria-live="polite"></span>
           </div>
-        </div>
+          <lex-table
+            id="topQueriesTable"
+            class="admin-table lex-table--card"
+            column-filters
+            columns="query_text,query_type,frequency,avg_latency_ms,zero_result_rate_percent,ctr_percent"
+            labels="Query,Type,Searches,Avg latency,Zero-result rate,CTR"
+            sortable-columns="query_text,query_type,frequency,avg_latency_ms,zero_result_rate_percent,ctr_percent"
+            sort-by="frequency"
+            sort-dir="desc"
+            limit="20"
+            id-key="_key"
+            empty-text="No queries in this period"
+            aria-label="Top queries"
+          ></lex-table>
+        </section>
 
-        <!-- Zero-Result Queries Table -->
-        <div class="bg-white rounded-lg shadow">
-          <div class="px-6 py-4 border-b border-gray-200">
-            <h3 class="text-lg font-semibold text-gray-900">Zero-Result Queries</h3>
-            <p class="text-sm text-gray-500 mt-1">Queries that returned no results (potential search quality issues)</p>
+        <!-- Zero-Result Queries (docs/TABLE-STANDARD.md) -->
+        <section aria-labelledby="zeroResultsHeading">
+          <div class="bg-white rounded-lg shadow-sm border mb-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and sort zero-result queries">
+            <div class="flex items-center gap-4 flex-wrap">
+              <div class="flex-1 min-w-[200px]">
+                <lex-input id="zeroResultsSearch" placeholder="Search zero-result queries..." clearable="true" leading-icon="search"></lex-input>
+              </div>
+              <div class="flex items-center gap-2">
+                <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Sort by:</label>
+                <lex-select id="zeroResultsSort" options='[{"value":"created_at","label":"Created"},{"value":"query_text","label":"Query"}]' value="created_at"></lex-select>
+              </div>
+              <lex-btn id="zeroResultsSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path></svg>
+              </lex-btn>
+              <div id="zeroResultsCount" class="admin-table-toolbar-label text-sm whitespace-nowrap"></div>
+            </div>
           </div>
-          <div class="overflow-x-auto">
-            <table class="w-full">
-              <thead class="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Query Text</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Matter</th>
-                </tr>
-              </thead>
-              <tbody id="zeroResultsTable" class="divide-y divide-gray-200">
-                <!-- Dynamically populated -->
-              </tbody>
-            </table>
+          <div class="flex items-center justify-between mb-3 gap-4">
+            <div>
+              <h2 id="zeroResultsHeading" class="admin-table-section-title text-lg font-semibold">Zero-Result Queries</h2>
+              <p class="admin-table-toolbar-label text-sm">Queries that returned no results (potential search quality issues). <span id="zeroResultsCapNote"></span></p>
+            </div>
+            <span id="zeroResultsSectionCount" class="admin-table-toolbar-label text-sm whitespace-nowrap" aria-live="polite"></span>
           </div>
-        </div>
+          <lex-table
+            id="zeroResultsTable"
+            class="admin-table lex-table--card"
+            column-filters
+            columns="query_text,query_type,user,matter_id,created_at"
+            labels="Query,Type,User,Workspace,Created"
+            sortable-columns="query_text,query_type,user,matter_id,created_at"
+            sort-by="created_at"
+            sort-dir="desc"
+            limit="20"
+            id-key="_key"
+            empty-text="No zero-result queries in this period"
+            aria-label="Zero-result queries"
+          ></lex-table>
+        </section>
 
-        <!-- Slow Queries Table -->
-        <div class="bg-white rounded-lg shadow">
-          <div class="px-6 py-4 border-b border-gray-200">
-            <h3 class="text-lg font-semibold text-gray-900">Slow Queries</h3>
-            <p class="text-sm text-gray-500 mt-1">Queries taking longer than 100ms</p>
+        <!-- Slow Queries (docs/TABLE-STANDARD.md) -->
+        <section aria-labelledby="slowQueriesHeading">
+          <div class="bg-white rounded-lg shadow-sm border mb-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and sort slow queries">
+            <div class="flex items-center gap-4 flex-wrap">
+              <div class="flex-1 min-w-[200px]">
+                <lex-input id="slowQueriesSearch" placeholder="Search slow queries..." clearable="true" leading-icon="search"></lex-input>
+              </div>
+              <div class="flex items-center gap-2">
+                <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Sort by:</label>
+                <lex-select id="slowQueriesSort" options='[{"value":"created_at","label":"Created"},{"value":"latency_ms","label":"Latency"},{"value":"result_count","label":"Results"},{"value":"query_text","label":"Query"}]' value="created_at"></lex-select>
+              </div>
+              <lex-btn id="slowQueriesSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path></svg>
+              </lex-btn>
+              <div id="slowQueriesCount" class="admin-table-toolbar-label text-sm whitespace-nowrap"></div>
+            </div>
           </div>
-          <div class="overflow-x-auto">
-            <table class="w-full">
-              <thead class="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Query Text</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Latency</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                </tr>
-              </thead>
-              <tbody id="slowQueriesTable" class="divide-y divide-gray-200">
-                <!-- Dynamically populated -->
-              </tbody>
-            </table>
+          <div class="flex items-center justify-between mb-3 gap-4">
+            <div>
+              <h2 id="slowQueriesHeading" class="admin-table-section-title text-lg font-semibold">Slow Queries</h2>
+              <p class="admin-table-toolbar-label text-sm">Queries taking 100 ms or longer. <span id="slowQueriesCapNote"></span></p>
+            </div>
+            <span id="slowQueriesSectionCount" class="admin-table-toolbar-label text-sm whitespace-nowrap" aria-live="polite"></span>
           </div>
-        </div>
+          <lex-table
+            id="slowQueriesTable"
+            class="admin-table lex-table--card"
+            column-filters
+            columns="query_text,query_type,latency_ms,result_count,matter_id,created_at"
+            labels="Query,Type,Latency,Results,Workspace,Created"
+            sortable-columns="query_text,query_type,latency_ms,result_count,matter_id,created_at"
+            sort-by="created_at"
+            sort-dir="desc"
+            limit="20"
+            id-key="_key"
+            empty-text="No slow queries in this period"
+            aria-label="Slow queries"
+          ></lex-table>
+        </section>
+
       </div>
     </main>
   </div>
 
+  <!-- Lex UI core + the components these tables use -->
+  <script src="../js/lex/lex.core.js"></script>
+  <script src="../js/lex/lex.icons.js"></script>
+  <script src="../js/lex/components/form/lex-dropdown-btn.js"></script>
+  <script src="../js/lex/lex.data.js"></script>
+  <script src="../js/lex/lex.forms.js"></script>
+  <script src="../js/lex/lex.state.js"></script>
+  <script src="../js/lex/lex.utils.js"></script>
+  <script src="../js/lex/lex-nav.js"></script>
+  <script src="../js/lex/components/foundation/lex-toast.js"></script>
+  <script src="../js/lex/components/foundation/lex-btn.js"></script>
+  <script src="../js/lex/components/foundation/lex-empty.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/foundation/lex-modal.js"></script>
+  <script src="../js/lex/components/foundation/lex-drawer.js"></script>
+  <script src="../js/lex/components/form/lex-input.js"></script>
+  <script src="../js/lex/components/form/lex-select.js"></script>
+  <script src="../js/lex/components/data/lex-table.js"></script>
+  <script src="../js/shared/library-column-filters.js"></script>
+  <script src="../js/admin/admin-table-kit.js"></script>
+  <script src="../js/admin/admin-client-tables.js"></script>
+  <script src="../js/admin/search-analytics-tables.js"></script>
   <script src="js/search-analytics.js"></script>
   <script src="../js/auth-guard.js"></script>
 </body>

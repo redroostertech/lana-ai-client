@@ -264,6 +264,7 @@
       lex-select input.lex-field-input,
       lex-search input,
       lex-dropdown-btn input,
+      .lex-ddbtn-layer input,
       .lex-field-input {
         border: 0 none !important;
         border-width: 0 !important;

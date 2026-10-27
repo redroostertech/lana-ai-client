@@ -10,6 +10,23 @@
        options='[{"value":"a","label":"Alpha"},{"value":"b","label":"Beta"},{"value":"c","label":"Gamma"}]'>
      </lex-select>
 
+   Options: [{ value, label, description?, group?, disabled? }], plain strings,
+   or { divider: true } separators. Values are compared as strings, so numeric
+   values work (the value you read back is the string form). Disabled options
+   and dividers cannot be chosen and keyboard navigation skips them.
+
+   Value:
+     single   — select.value is a string. A value that matches no option shows
+                the placeholder (the value itself is kept, so options loaded
+                later still pick it up).
+     multiple — select.value is an array of strings. The setter takes an
+                array, a JSON array string, or a comma-separated string.
+
+   .options and .value assigned before the element upgrades are kept.
+   select.focus() focuses the trigger. Inside a <form>, the form's reset event
+   restores the value the select had when it first connected. Clicks on
+   options, the clear button and pill removers call preventDefault, so a
+   lex-select inside a <label> does not reopen.
    variant="outlined": white bordered trigger, for a dropdown that replaces
    tabs or a segmented control on narrow layouts.
 
@@ -189,8 +206,11 @@
         position: absolute;
         top: calc(100% + 4px);
         left: 0;
+        /* Fit the options, never narrower than the trigger. The cap keeps
+           long descriptions wrapping instead of widening the page. */
         min-width: 100%;
-        width: 100%;
+        width: max-content;
+        max-width: max(100%, 20rem);
         box-sizing: border-box;
         max-height: 240px;
         overflow-y: auto;
@@ -256,6 +276,21 @@
         font-weight: var(--lex-weight-medium, 500);
       }
 
+      .lex-select-option--disabled {
+        opacity: var(--lex-input-disabled-opacity, 0.5);
+        cursor: not-allowed;
+      }
+
+      .lex-select-option--disabled:hover {
+        background: transparent;
+      }
+
+      .lex-select-divider {
+        height: 1px;
+        margin: 4px 0;
+        background: var(--lex-border-subtle, rgba(0,0,0,0.06));
+      }
+
       .lex-select-option-check {
         width: 14px;
         height: 14px;
@@ -271,7 +306,7 @@
       .lex-select-option-label {
         flex: 1;
         min-width: 0;
-        overflow-wrap: anywhere;
+        overflow-wrap: break-word;
       }
 
       .lex-select-option-desc {
@@ -325,6 +360,141 @@
       this._selectedValues = new Set();
       // Unique per-instance prefix for option element IDs (used by aria-activedescendant).
       this._instanceId = Math.random().toString(36).slice(2, 8);
+      this._initialValue = undefined;
+      this._formResetCleanup = null;
+      this._refocusTrigger = false;
+      // Normally set up by LexElement; guarded so lightweight test stubs work.
+      if (!this._props) this._props = {};
+      if (!this._changedProps) this._changedProps = new Map();
+
+      // value: an array under `multiple`, a string otherwise. Stored raw in
+      // _props.value (array or string) and normalized on read, so the order
+      // in which `multiple` and `value` arrive does not matter.
+      Object.defineProperty(this, 'value', {
+        get: () => this._readValue(),
+        set: (val) => {
+          const old = this._props.value;
+          let next = val;
+          if (Array.isArray(val)) next = val.map((v) => String(v));
+          else if (val !== null && val !== undefined) next = String(val);
+          if (old === next && typeof next !== 'object') return;
+          this._props.value = next;
+          this._changedProps.set('value', old);
+          if (typeof this._scheduleUpdate === 'function') this._scheduleUpdate();
+        },
+        configurable: true
+      });
+      if (this._upgradedProps && Object.prototype.hasOwnProperty.call(this._upgradedProps, 'value')) {
+        this.value = this._upgradedProps.value;
+      }
+    }
+
+    // Normalized read of the stored value (see the accessor above).
+    _readValue() {
+      const raw = this._props.value;
+      if (this.multiple) return LexSelect._toList(raw);
+      if (Array.isArray(raw)) return raw.length ? String(raw[0]) : '';
+      return raw;
+    }
+
+    // Array, JSON array string or comma string → array of strings.
+    static _toList(raw) {
+      if (Array.isArray(raw)) return raw.map((v) => String(v));
+      if (raw === null || raw === undefined) return [];
+      const text = String(raw).trim();
+      if (!text) return [];
+      if (text.charAt(0) === '[') {
+        try {
+          const parsed = JSON.parse(text);
+          if (Array.isArray(parsed)) return parsed.map((v) => String(v));
+        } catch (e) { /* fall through to the comma form */ }
+      }
+      return text.split(',').map((v) => v.trim()).filter((v) => v !== '');
+    }
+
+    // Options normalized to { value: string, label: string, ... }; plain
+    // strings and numbers become value=label; { divider: true } stays a divider.
+    _getOptions() {
+      const raw = Array.isArray(this.options) ? this.options : [];
+      const out = [];
+      for (const opt of raw) {
+        if (opt === null || opt === undefined) continue;
+        if (typeof opt !== 'object') {
+          out.push({ value: String(opt), label: String(opt) });
+          continue;
+        }
+        if (opt.divider || opt.separator) {
+          out.push({ divider: true });
+          continue;
+        }
+        const value = opt.value === null || opt.value === undefined ? '' : String(opt.value);
+        const label = opt.label === null || opt.label === undefined ? value : String(opt.label);
+        out.push(Object.assign({}, opt, { value, label }));
+      }
+      return out;
+    }
+
+    static _isSelectable(opt) {
+      return !!opt && !opt.divider && !opt.disabled;
+    }
+
+    // Next selectable index from `from` in direction dir (+1/-1); stays put
+    // when there is none.
+    _stepIndex(opts, from, dir) {
+      let idx = from;
+      for (let i = 0; i < opts.length; i++) {
+        idx += dir;
+        if (idx < 0 || idx >= opts.length) return from;
+        if (LexSelect._isSelectable(opts[idx])) return idx;
+      }
+      return from;
+    }
+
+    connected() {
+      super.connected();
+      if (this._initialValue === undefined) {
+        const v = this._props.value;
+        this._initialValue = Array.isArray(v) ? v.slice() : v;
+      }
+      this._bindFormReset();
+    }
+
+    disconnected() {
+      super.disconnected();
+      if (this._formResetCleanup) {
+        this._formResetCleanup();
+        this._formResetCleanup = null;
+      }
+    }
+
+    // Restore the first-connected value when the enclosing <form> resets.
+    _bindFormReset() {
+      if (this._formResetCleanup) {
+        this._formResetCleanup();
+        this._formResetCleanup = null;
+      }
+      const form = typeof this.closest === 'function' ? this.closest('form') : null;
+      if (!form) return;
+      const onReset = (e) => {
+        queueMicrotask(() => {
+          if (e.defaultPrevented) return;
+          const init = this._initialValue;
+          this._open = false;
+          this._searchTerm = '';
+          this.value = Array.isArray(init) ? init.slice() : (init === undefined ? '' : init);
+          if (typeof this.clearValidation === 'function') this.clearValidation();
+          this._scheduleUpdate();
+        });
+      };
+      form.addEventListener('reset', onReset);
+      this._formResetCleanup = () => form.removeEventListener('reset', onReset);
+    }
+
+    /** Focus the trigger button (the element itself is not focusable). */
+    focus(options) {
+      const trigger = this.querySelector('.lex-select-trigger');
+      if (trigger) trigger.focus(options);
+      else super.focus(options);
     }
 
     render() {
@@ -347,8 +517,10 @@
       // Display text
       const displayHtml = this._renderDisplay();
 
-      // Clear button
-      const showClear = this.clearable && this._selectedValues.size > 0;
+      // Clear button (not for a single value that matches no option — the
+      // trigger shows the placeholder then)
+      const showClear = this.clearable && this._selectedValues.size > 0 &&
+        (this.multiple || !!this._findOption(this._singleValue()));
       const clearHtml = showClear
         ? `<button type="button" class="lex-select-clear" data-action="clear" tabindex="-1" aria-label="Clear selection">${CLEAR_SVG}</button>`
         : '';
@@ -372,6 +544,10 @@
       } else {
         let currentGroup = null;
         options.forEach((opt, idx) => {
+          if (opt.divider) {
+            html += `<div class="lex-select-divider" role="separator"></div>`;
+            return;
+          }
           // Group header
           if (opt.group && opt.group !== currentGroup) {
             currentGroup = opt.group;
@@ -383,9 +559,11 @@
           let optCls = 'lex-select-option';
           if (isSelected) optCls += ' lex-select-option--selected';
           if (isFocused) optCls += ' lex-select-option--focused';
+          if (opt.disabled) optCls += ' lex-select-option--disabled';
           const optId = `lex-select-opt-${this._instanceId}-${idx}`;
+          const disabledOpt = opt.disabled ? ' aria-disabled="true" data-disabled="true"' : '';
 
-          html += `<div class="${optCls}" data-value="${this._escHtml(opt.value)}" data-idx="${idx}" id="${optId}" role="option" aria-selected="${isSelected ? 'true' : 'false'}">`;
+          html += `<div class="${optCls}" data-value="${this._escHtml(opt.value)}" data-idx="${idx}" id="${optId}" role="option" aria-selected="${isSelected ? 'true' : 'false'}"${disabledOpt}>`;
           if (this.multiple) html += CHECK_SVG;
           html += `<div class="lex-select-option-label">${this._escHtml(opt.label)}`;
           if (opt.description) html += `<div class="lex-select-option-desc">${this._escHtml(opt.description)}</div>`;
@@ -400,16 +578,28 @@
       return this._renderFieldWrapper(html);
     }
 
+    _findOption(value) {
+      if (value === null || value === undefined) return null;
+      const key = String(value);
+      return this._getOptions().find((o) => !o.divider && o.value === key) || null;
+    }
+
+    _singleValue() {
+      const v = this._readValue();
+      return v === null || v === undefined ? '' : String(v);
+    }
+
     _renderDisplay() {
+      const placeholderHtml = `<span class="lex-select-display lex-select-placeholder">${this._escHtml(this.placeholder)}</span>`;
       if (this._selectedValues.size === 0) {
-        return `<span class="lex-select-display lex-select-placeholder">${this._escHtml(this.placeholder)}</span>`;
+        return placeholderHtml;
       }
 
       if (this.multiple) {
-        const allOpts = this.options || [];
+        const allOpts = this._getOptions();
         let pillsHtml = '<span class="lex-select-pills">';
         for (const val of this._selectedValues) {
-          const opt = allOpts.find(o => o.value === val);
+          const opt = allOpts.find(o => !o.divider && o.value === val);
           const label = opt ? opt.label : val;
           pillsHtml += `<span class="lex-select-pill">${this._escHtml(label)}<span class="lex-select-pill-x" data-remove="${this._escHtml(val)}">&times;</span></span>`;
         }
@@ -417,37 +607,34 @@
         return pillsHtml;
       }
 
-      // Single: show label
-      const allOpts = this.options || [];
-      const selected = allOpts.find(o => o.value === this.value);
-      return `<span class="lex-select-display">${this._escHtml(selected ? selected.label : this.value)}</span>`;
+      // Single: show the option label; a value with no matching option shows
+      // the placeholder rather than the raw value.
+      const selected = this._findOption(this._singleValue());
+      if (!selected) return placeholderHtml;
+      return `<span class="lex-select-display">${this._escHtml(selected.label)}</span>`;
     }
 
     _syncSelectedFromValue() {
       if (this.multiple) {
-        const val = this.value;
-        if (Array.isArray(val)) {
-          this._selectedValues = new Set(val);
-        } else if (typeof val === 'string' && val) {
-          try { this._selectedValues = new Set(JSON.parse(val)); } catch (e) { this._selectedValues = new Set(); }
-        } else {
-          this._selectedValues = new Set();
-        }
+        this._selectedValues = new Set(LexSelect._toList(this._props.value));
       } else {
-        this._selectedValues = this.value ? new Set([this.value]) : new Set();
+        const v = this._singleValue();
+        this._selectedValues = v ? new Set([v]) : new Set();
       }
     }
 
     _getFilteredOptions() {
-      const opts = this.options || [];
+      const opts = this._getOptions();
       if (!this._searchTerm) {
         const limit = Number(this.visibleLimit || 0);
         return Number.isFinite(limit) && limit > 0 ? opts.slice(0, limit) : opts;
       }
       const term = this._searchTerm.toLowerCase();
       return opts.filter(o =>
-        o.label.toLowerCase().includes(term) ||
-        (o.description && o.description.toLowerCase().includes(term))
+        !o.divider && (
+          o.label.toLowerCase().includes(term) ||
+          (o.description && String(o.description).toLowerCase().includes(term))
+        )
       );
     }
 
@@ -456,6 +643,13 @@
     }
 
     updated() {
+      // Keyboard on a non-searchable trigger re-renders it; keep focus there.
+      if (this._refocusTrigger) {
+        this._refocusTrigger = false;
+        const t = this.querySelector('.lex-select-trigger');
+        if (t) t.focus();
+      }
+
       // Toggle dropdown
       this.delegate('click', '[data-action="toggle"]', (e) => {
         if (this.disabled) return;
@@ -475,6 +669,9 @@
 
       // Clear
       this.delegate('click', '[data-action="clear"]', (e) => {
+        // preventDefault: inside a <label>, the click would otherwise be
+        // forwarded to the trigger and reopen the dropdown.
+        e.preventDefault();
         e.stopPropagation();
         this._selectedValues.clear();
         this._emitChange(this.multiple ? [] : '');
@@ -483,6 +680,7 @@
 
       // Remove pill
       this.delegate('click', '[data-remove]', (e) => {
+        e.preventDefault();
         e.stopPropagation();
         const val = e.target.dataset.remove || e.target.closest('[data-remove]').dataset.remove;
         this._selectedValues.delete(val);
@@ -492,6 +690,8 @@
 
       // Option click
       this.delegate('click', '.lex-select-option', (e, target) => {
+        e.preventDefault();
+        if (target.dataset.disabled === 'true') return;
         const val = target.dataset.value;
         if (this.multiple) {
           if (this._selectedValues.has(val)) {
@@ -538,12 +738,14 @@
           const opts = this._getFilteredOptions();
           if (e.key === 'ArrowDown') {
             e.preventDefault();
-            this._focusedIdx = Math.min(this._focusedIdx + 1, opts.length - 1);
+            this._focusedIdx = this._stepIndex(opts, this._focusedIdx, 1);
             this._scheduleUpdate();
             queueMicrotask(() => { const si = this.querySelector('.lex-select-search input'); if (si) si.focus(); });
           } else if (e.key === 'ArrowUp') {
             e.preventDefault();
-            this._focusedIdx = Math.max(this._focusedIdx - 1, 0);
+            this._focusedIdx = this._focusedIdx < 0
+              ? this._stepIndex(opts, -1, 1)
+              : this._stepIndex(opts, this._focusedIdx, -1);
             this._scheduleUpdate();
             queueMicrotask(() => { const si = this.querySelector('.lex-select-search input'); if (si) si.focus(); });
           } else if (e.key === 'Enter' && this._focusedIdx >= 0) {
@@ -564,15 +766,33 @@
       const trigger = this.querySelector('[data-action="toggle"]');
       if (trigger && !this.searchable) {
         this.listen(trigger, 'keydown', (e) => {
-          if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            if (!this._open) {
+          const opts = this._getFilteredOptions();
+          if (!this._open) {
+            if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
               this._open = true;
-              this._focusedIdx = 0;
+              this._focusedIdx = this._stepIndex(opts, -1, 1);
+              this._refocusTrigger = true;
               this._scheduleUpdate();
             }
+            return;
+          }
+          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            this._focusedIdx = e.key === 'ArrowDown'
+              ? this._stepIndex(opts, this._focusedIdx, 1)
+              : (this._focusedIdx < 0 ? this._stepIndex(opts, -1, 1) : this._stepIndex(opts, this._focusedIdx, -1));
+            this._refocusTrigger = true;
+            this._scheduleUpdate();
+          } else if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            const optEl = this._focusedIdx >= 0 ? this.querySelector(`[data-idx="${this._focusedIdx}"]`) : null;
+            this._refocusTrigger = true;
+            if (optEl) optEl.click();
+            else { this._open = false; this._scheduleUpdate(); }
           } else if (e.key === 'Escape') {
             this._open = false;
+            this._refocusTrigger = true;
             this._scheduleUpdate();
           }
         });

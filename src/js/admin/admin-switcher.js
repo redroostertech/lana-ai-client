@@ -30,6 +30,12 @@
       description: 'Create, review, and publish task/checklist plans'
     },
     {
+      value: 'admin/run-books.html',
+      label: 'Run Books',
+      description: 'Package your organization\'s own processes as retrievable evidence',
+      allowedRoles: ['system_admin', 'org_admin', 'organization_admin']
+    },
+    {
       value: 'admin/communications.html',
       label: 'Communications',
       description: 'Coming soon',

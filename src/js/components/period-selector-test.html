@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PeriodSelector Component Test</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="../../css/lex-tokens.css">
+  <script src="../lex/lex.core.js"></script>
+  <script src="../lex/lex.forms.js"></script>
+  <script src="../lex/components/form/lex-select.js"></script>
+  <script src="../lex/components/foundation/lex-modal.js"></script>
 </head>
 <body class="bg-gray-50 p-8">
   <div class="max-w-4xl mx-auto">
@@ -95,14 +100,14 @@
     // Get period button
     document.getElementById('getBtn').addEventListener('click', () => {
       const period = selector.getPeriod();
-      alert(`Current Period:\nStart: ${period.start}\nEnd: ${period.end}\nType: ${period.type}`);
+      Lex.Modal.alertAsync('Current period', `Start: ${period.start}, end: ${period.end}, type: ${period.type}`);
     });
 
     // Set custom period button
     document.getElementById('setBtn').addEventListener('click', () => {
       // Set to Q4 2025
       selector.setPeriod('2025-10-01', '2025-12-31', 'quarterly');
-      alert('Period set to Q4 2025 (quarterly)');
+      Lex.Modal.alertAsync('Period set', 'Period set to Q4 2025 (quarterly)');
     });
   </script>
 </body>

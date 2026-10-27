@@ -86,7 +86,7 @@ export function renderLeadSourcePerformance() {
     onBarClick: (dataIndex, seriesIndex, value, label, series) => {
       console.log(`Clicked: ${series.label} for ${label} = ${value}%`);
       // In real implementation, open drill-down view
-      alert(`Viewing ${series.label} details for ${label}: ${value}%`);
+      Lex.Modal.alertAsync(series.label, `Viewing ${series.label} details for ${label}: ${value}%`);
     }
   });
 

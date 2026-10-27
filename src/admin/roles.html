@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="../css/lex-tokens.css">
   <link rel="stylesheet" href="../css/components.css">
   <link rel="stylesheet" href="../css/admin/admin-switcher.css">
+  <link rel="stylesheet" href="../css/admin/admin-tables.css">
   <link rel="stylesheet" href="../css/tailwind-output.css">
   <script src="../js/tailwind-loader.js"></script>
 
@@ -48,52 +49,92 @@
 
       <lex-breadcrumb items='[{"label":"Administration","href":"admin/index.html"},{"label":"Roles &amp; Permissions"}]'></lex-breadcrumb>
 
-      <lex-card padding="none">
+      <style>
+        /* Roles: Name, Level, Permissions, Users, Status, Created, actions */
+        #rolesTable table { min-width: 960px; }
+        #rolesTable th { white-space: nowrap; }
+        #rolesTable th:nth-child(2) { width: 110px; }
+        #rolesTable th:nth-child(3) { width: 130px; }
+        #rolesTable th:nth-child(4) { width: 100px; }
+        #rolesTable th:nth-child(5) { width: 110px; }
+        #rolesTable th:nth-child(6) { width: 176px; }
+        #rolesTable th:nth-child(7) { width: 150px; }
+        .roles-row-actions { display: flex; gap: 6px; justify-content: flex-end; }
+      </style>
 
-        <!-- Tab navigation -->
-        <lex-tabs
-          id="rolesTabs"
-          variant="underline"
-          active="roles"
-          tabs='[{"id":"roles","label":"Roles"},{"id":"permissions","label":"Permissions"}]'
-          style="padding:0 1.5rem;"
-        ></lex-tabs>
+      <!-- Tab navigation -->
+      <lex-tabs
+        id="rolesTabs"
+        variant="underline"
+        active="roles"
+        tabs='[{"id":"roles","label":"Roles"},{"id":"permissions","label":"Permissions"}]'
+      ></lex-tabs>
 
-        <!-- ===================== ROLES TAB ===================== -->
-        <div id="tabPanelRoles" style="padding:1.5rem;">
-          <!-- Roles grid — redact target -->
-          <div id="rolesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <!-- Populated by roles.js -->
+      <!-- ===================== ROLES TAB ===================== -->
+      <div id="tabPanelRoles">
+        <!-- Search / Sort / Filter toolbar (docs/TABLE-STANDARD.md) -->
+        <div class="bg-white rounded-lg shadow-sm border mb-4 mt-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and filter roles">
+          <div class="flex items-center gap-4 flex-wrap">
+            <div class="flex-1 min-w-[200px]">
+              <lex-input id="rolesSearch" placeholder="Search roles..." clearable="true" leading-icon="search"></lex-input>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Sort by:</label>
+              <lex-select id="rolesSort" options='[{"value":"level","label":"Level"},{"value":"name","label":"Name"},{"value":"permissions","label":"Permissions"},{"value":"users","label":"Users"},{"value":"status","label":"Status"},{"value":"created_at","label":"Created"}]' value="level"></lex-select>
+            </div>
+            <lex-btn id="rolesSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+              </svg>
+            </lex-btn>
+            <div class="flex items-center gap-2">
+              <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Status:</label>
+              <lex-select id="rolesStatusFilter" options='[{"value":"all","label":"All"},{"value":"active","label":"Active"},{"value":"inactive","label":"Inactive"}]' value="all"></lex-select>
+            </div>
+            <div id="rolesCount" class="admin-table-toolbar-label text-sm whitespace-nowrap"></div>
           </div>
-
-          <!-- Empty state (hidden until loaded with no data) -->
-          <lex-empty
-            id="rolesEmpty"
-            class="hidden"
-            icon="shield"
-            message="No roles found"
-            description="Create a role to get started."
-          ></lex-empty>
         </div>
 
-        <!-- ===================== PERMISSIONS TAB ===================== -->
-        <div id="tabPanelPermissions" class="hidden" style="padding:1.5rem;">
-          <!-- Permissions grid — redact target -->
-          <div id="permissionsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <!-- Populated by roles.js -->
+        <section aria-labelledby="rolesHeading">
+          <div class="flex items-center justify-between mb-3">
+            <h2 id="rolesHeading" class="admin-table-section-title text-lg font-semibold">All Roles</h2>
+            <span id="rolesSectionCount" class="admin-table-toolbar-label text-sm" aria-live="polite"></span>
           </div>
 
-          <!-- Empty state -->
-          <lex-empty
-            id="permissionsEmpty"
-            class="hidden"
-            icon="key"
-            message="No permissions found"
-            description="System permissions will appear here once loaded."
-          ></lex-empty>
+          <lex-table
+            id="rolesTable"
+            class="admin-table lex-table--card"
+            column-filters
+            columns="name,level,permissions,users,status,created_at,actions"
+            labels="Name,Level,Permissions,Users,Status,Created, "
+            sortable-columns="name,level,permissions,users,status,created_at"
+            search-keys="name,description"
+            sort-by="level"
+            sort-dir="desc"
+            limit="20"
+            id-key="id"
+            empty-text="No roles yet"
+            aria-label="Roles"
+          ></lex-table>
+        </section>
+      </div>
+
+      <!-- ===================== PERMISSIONS TAB ===================== -->
+      <div id="tabPanelPermissions" class="hidden" style="padding:1.5rem 0;">
+        <!-- Permissions grid — redact target -->
+        <div id="permissionsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- Populated by roles.js -->
         </div>
 
-      </lex-card>
+        <!-- Empty state -->
+        <lex-empty
+          id="permissionsEmpty"
+          class="hidden"
+          icon="key"
+          message="No permissions found"
+          description="System permissions will appear here once loaded."
+        ></lex-empty>
+      </div>
 
     </main>
 
@@ -102,7 +143,7 @@
       id="roleModal"
       heading="Create Role"
       size="lg"
-      hide-actions
+      footer-content='<lex-btn id="cancelRoleBtn" type="button" variant="secondary">Cancel</lex-btn><lex-btn id="saveRoleBtn" type="submit" form="roleForm" variant="primary">Save Role</lex-btn>'
       data-hoist
     >
       <lex-form id="roleForm" class="p-2">
@@ -148,11 +189,6 @@
             </div>
           </div>
 
-          <!-- Form action buttons -->
-          <div class="flex justify-end gap-3 pt-2 border-t" style="border-color: var(--lex-border-default)">
-            <lex-btn id="cancelRoleBtn" type="button" variant="secondary">Cancel</lex-btn>
-            <lex-btn id="saveRoleBtn" type="submit" variant="primary">Save Role</lex-btn>
-          </div>
 
         </div>
 
@@ -235,12 +271,15 @@
   <script src="../js/lex/components/form/lex-select.js"></script>
   <script src="../js/lex/components/form/lex-textarea.js"></script>
   <script src="../js/lex/components/form/lex-checkbox.js"></script>
+  <script src="../js/lex/components/data/lex-table.js"></script>
 
   <!-- Inject page content + hoist modals -->
   <script src="../js/lex/lex-page-init.js"></script>
   <script src="../js/admin/admin-switcher.js"></script>
 
   <!-- Page controller -->
+  <script src="../js/shared/library-column-filters.js"></script>
+  <script src="../js/admin/admin-table-kit.js"></script>
   <script src="../js/admin/roles.js"></script>
 
   <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>

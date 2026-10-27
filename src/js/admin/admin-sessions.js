@@ -1,311 +1,228 @@
 /**
  * Admin Active Sessions — standalone page controller.
  *
- * Handles session listing with pagination. Row-click navigates to
+ * One server-paged lex-table (docs/TABLE-STANDARD.md): toolbar search, Sort
+ * by, a Device filter and header filters on every column. Row-click opens
  * the session-details page.
  *
- * @requires api.js          - window.api — getSessions
- * @requires lex.utils.js    - Lex.Utils.escapeHtml, Lex.Utils.formatDateTime
- * @requires lex-toast.js    - Lex.Toast.error
- * @requires lex-table.js    - table.setData()
- * @requires lex-nav.js      - Lex.Nav.go
+ * @requires api.js                  - window.api.get
+ * @requires lex.utils.js            - Lex.Utils.formatDateTime, timeAgo, humanizeLabel
+ * @requires lex-table.js            - server paging (setServerData)
+ * @requires admin-table-kit.js      - AdminTableKit toolbar + cell helpers
+ * @requires library-column-filters.js - date-range filter bounds
+ * @requires lex-nav.js              - Lex.Nav.go
  */
 
 (function () {
   'use strict';
 
-  // =========================================================================
-  // Lex aliases
-  // =========================================================================
+  var TABLE_ID = 'sessionsTable';
 
-  var escHtml     = Lex.Utils.escapeHtml;
-  var fmtDateTime = Lex.Utils.formatDateTime;
+  /** A session is Active when it was used in the last five minutes. */
+  var ACTIVE_WINDOW_MS = 5 * 60 * 1000;
 
-  // =========================================================================
-  // Module-level state
-  // =========================================================================
+  // Table column -> admin sessions API sort_by. last_activity and user_email
+  // are on the API's allow-list but break its SQL, so they are not sortable here.
+  var SORT_BY_COLUMN = { created_at: 'created_at', expires_at: 'expires_at' };
 
-  /** Generation counter — incremented on every loadSessions() call. */
+  var DEVICES = ['Desktop', 'Mobile', 'Tablet'];
+
+  /** Generation counter: drops stale answers. */
   var _gen = 0;
-
-  /** Pagination state. */
-  var _currentPage = 1;
-  var _pageSize    = 20;
-
-  // =========================================================================
-  // Entry point
-  // =========================================================================
-
-  function init() {
-    _wireRefreshButton();
-    _wirePagination();
-    loadSessions();
-  }
-
-  // =========================================================================
-  // Helpers
-  // =========================================================================
+  var _searchTerm = '';
+  var _toolbar = null;
 
   function el(id) {
     return document.getElementById(id);
   }
 
-  /**
-   * Get first character initial from a name or email.
-   * @param {string} name
-   * @returns {string}
-   */
-  function getInitial(name) {
-    if (!name) return '?';
-    return name.charAt(0).toUpperCase();
+  function kit() {
+    return window.AdminTableKit;
   }
 
   /**
-   * Format a date string as relative time (e.g., "2m ago", "1h ago").
-   * @param {string} dateStr
-   * @returns {string}
+   * Whether a session was active in the last five minutes.
+   * @param {string} lastActivity
+   * @param {number} [nowMs]
    */
-  function timeAgo(dateStr) {
-    if (!dateStr) return '-';
-    return LanaTime.timeAgo(dateStr) || '-';
+  function isSessionActive(lastActivity, nowMs) {
+    if (!lastActivity) return false;
+    var date = Lex.Utils.parseApiUtcDate ? Lex.Utils.parseApiUtcDate(lastActivity) : new Date(lastActivity);
+    var time = date ? date.getTime() : NaN;
+    if (!Number.isFinite(time)) return false;
+    var now = typeof nowMs === 'number' ? nowMs : Date.now();
+    return now - time < ACTIVE_WINDOW_MS;
   }
 
   /**
-   * Determine if a session is currently active (activity within last 5 min).
-   * @param {Object} session
-   * @returns {boolean}
+   * The admin sessions API query for a lex-table server query. Filters the
+   * API does not read yet go under the standard names (see the report).
    */
-  function isSessionActive(session) {
-    if (!session.last_activity) return false;
-    return Lex.Utils.millisecondsSince(new Date(session.last_activity).getTime()) < 5 * Lex.Utils.MS_PER_MINUTE;
+  function toApiParams(query, search, now) {
+    var k = kit();
+    var q = query || {};
+    var filters = q.filters || {};
+    var params = new URLSearchParams();
+    params.set('page', String(q.page || 1));
+    params.set('page_size', String(q.limit || 20));
+    params.set('sort_by', SORT_BY_COLUMN[q.sortBy] || 'created_at');
+    params.set('sort_order', q.sortDir === 'asc' ? 'asc' : 'desc');
+    if (search) params.set('search', search);
+    var user = k.firstFilterValue(filters, 'user');
+    if (user) params.set('user', user);
+    var devices = k.filterValues(filters.device);
+    if (devices.length) params.set('device_filter', devices.join(','));
+    var ip = k.firstFilterValue(filters, 'ip_address');
+    if (ip) params.set('ip_address_filter', ip);
+    var status = k.filterValues(filters.status);
+    if (status.length === 1) params.set('activity_status', status[0]);
+    k.setRange(params, filters, 'created_at', 'created_after', 'created_before', now);
+    k.setRange(params, filters, 'last_activity', 'last_activity_after', 'last_activity_before', now);
+    k.setRange(params, filters, 'expires_at', 'expires_after', 'expires_before', now);
+    return params;
   }
 
-  /**
-   * Build an HTML pill for session status.
-   * @param {boolean} active
-   * @returns {string}
-   */
-  function statusPill(active) {
-    var color = active
-      ? 'var(--lex-status-success-bg,#ECFDF3)'
-      : 'var(--lex-status-neutral-bg,#F2F4F7)';
-    var label = active ? 'Active' : 'Idle';
-    return (
-      '<span style="' +
-        'display:inline-flex;align-items:center;' +
-        'padding:2px 8px;border-radius:9999px;' +
-        'font-size:var(--lex-body-xs-size,0.75rem);' +
-        'font-weight:500;background:' + color + ';' +
-      '">' + escHtml(label) + '</span>'
-    );
+  function mapSession(s, nowMs) {
+    return {
+      id:            String(s.session_id || s.id || ''),
+      user:          String(s.user_name || s.user_email || s.username || ''),
+      device:        String(s.device || ''),
+      ip_address:    String(s.ip_address || ''),
+      created_at:    s.created_at || '',
+      last_activity: s.last_activity || '',
+      expires_at:    s.expires_at || '',
+      status:        isSessionActive(s.last_activity, nowMs) ? 'active' : 'idle',
+      _raw:          s
+    };
   }
 
-  // =========================================================================
-  // Wire UI
-  // =========================================================================
+  function cellRenderers() {
+    var k = kit();
+    return {
+      user: function (val, row) {
+        var email = String(row._raw.user_email || '');
+        return k.nameCell(val || email, email && email !== val ? email : '');
+      },
+      device: function (val, row) {
+        var browser = row._raw.browser && row._raw.browser !== 'Unknown' ? row._raw.browser : '';
+        var os = row._raw.os && row._raw.os !== 'Unknown' ? row._raw.os : '';
+        var detail = [browser, os].filter(Boolean).join(' / ');
+        if (!val && !detail) return k.muted('');
+        return '<span class="admin-table-text">' + k.esc(Lex.Utils.capitalizeFirst(val || detail)) + '</span>' +
+          (val && detail ? '<span class="admin-table-sub">' + k.esc(detail) + '</span>' : '');
+      },
+      ip_address: function (val, row) {
+        var location = row._raw.location;
+        return val ? '<span class="admin-table-text" title="' + k.esc(location || val) + '">' + k.esc(val) + '</span>' : k.muted('');
+      },
+      created_at: function (val) { return k.timeCell(val); },
+      last_activity: function (val) { return k.relativeCell(val); },
+      expires_at: function (val) { return k.timeCell(val); },
+      status: function (val) {
+        return k.badge(val === 'active' ? 'Active' : 'Idle', val === 'active' ? 'green' : 'gray');
+      }
+    };
+  }
 
-  function _wireRefreshButton() {
-    var btn = el('refreshSessionsBtn');
-    if (!btn || btn._sessionsWired) return;
-    btn._sessionsWired = true;
-    btn.addEventListener('click', function () {
-      _currentPage = 1;
-      loadSessions();
-    });
+  function filterOptions() {
+    var k = kit();
+    return {
+      user:          { text: true, placeholder: 'User contains...' },
+      device:        { options: k.labelOptions(DEVICES) },
+      ip_address:    { text: true, placeholder: 'IP address is...' },
+      created_at:    k.dateRangeFilter(),
+      last_activity: k.dateRangeFilter(),
+      expires_at:    k.dateRangeFilter(),
+      status:        { single: true, options: [{ value: 'active', label: 'Active' }, { value: 'idle', label: 'Idle' }] }
+    };
+  }
+
+  function fetchSessions(query) {
+    var gen = ++_gen;
+    var table = el(TABLE_ID);
+    if (!table) return;
+    query = query || table.serverQuery;
+    var filters = query.filters || {};
+    var filtered = Boolean(_searchTerm || Object.keys(filters).length);
+    if (_toolbar) _toolbar.syncFilter(filters);
+
+    api.get('/api/v1/admin/sessions?' + toApiParams(query, _searchTerm).toString())
+      .then(function (result) {
+        if (gen !== _gen) return;
+        var sessions = (result && (result.sessions || result.data)) || [];
+        var pagination = (result && result.pagination) || {};
+        var total = pagination.total_count !== undefined ? pagination.total_count
+          : (pagination.total !== undefined ? pagination.total : (result && result.total));
+        var now = Date.now();
+        table.emptyText = kit().emptyText(filtered, 'sessions');
+        table.setServerData(sessions.map(function (s) { return mapSession(s, now); }), {
+          page: pagination.page || query.page,
+          page_size: pagination.page_size || query.limit,
+          total: Number.isFinite(Number(total)) ? Number(total) : sessions.length,
+          total_pages: pagination.total_pages
+        });
+      })
+      .catch(function (err) {
+        if (gen !== _gen) return;
+        console.error('[admin-sessions] loadSessions error:', err);
+        if (_toolbar) _toolbar.setCount(null);
+        table.setServerError('Sessions could not be loaded. Check your connection and try again.');
+      });
+  }
+
+  function init() {
+    var table = el(TABLE_ID);
+    if (!table) return;
 
     // Topbar refresh button
     document.addEventListener('lex-refresh', function (e) {
       e.preventDefault();
-      _currentPage = 1;
-      loadSessions();
+      table.requestServerQuery();
     });
-  }
 
-  // =========================================================================
-  // Pagination
-  // =========================================================================
-
-  function _wirePagination() {
-    var pager = el('sessionsPagination');
-    if (!pager || pager._sessionsWired) return;
-    pager._sessionsWired = true;
-    pager.addEventListener('page-change', function (e) {
-      var page = e.detail && e.detail.page;
-      if (page && page !== _currentPage) {
-        _currentPage = page;
-        loadSessions();
-      }
-    });
-  }
-
-  function _updatePagination(total) {
-    var pager = el('sessionsPagination');
-    if (!pager) return;
-    var totalPages = Math.max(1, Math.ceil(total / _pageSize));
-    pager.page       = _currentPage;
-    pager.totalPages = totalPages;
-    pager.total      = total;
-    pager.limit      = _pageSize;
-  }
-
-  // =========================================================================
-  // Load Sessions
-  // =========================================================================
-
-  function loadSessions() {
-    var gen = ++_gen;
-    var table = el('sessionsTable');
-    if (!table) return;
-
-    Lex.Redact.on(table);
-
-    api.getSessions(_currentPage, _pageSize)
-      .then(function (result) {
-        if (gen !== _gen) return;
-
-        var sessions = [];
-        var total = 0;
-        if (Array.isArray(result)) {
-          sessions = result;
-          total = result.length;
-        } else if (result && Array.isArray(result.sessions)) {
-          sessions = result.sessions;
-          total = result.total || result.count || sessions.length;
-        } else if (result && Array.isArray(result.data)) {
-          sessions = result.data;
-          total = result.total || result.count || sessions.length;
+    kit().whenTableReady().then(function () {
+      if (el(TABLE_ID) !== table) return;
+      table.setCellRenderers(cellRenderers());
+      table.setColumnFilterOptions(filterOptions());
+      _toolbar = kit().bindToolbar({
+        table: table,
+        searchId: 'sessionsSearch',
+        sortId: 'sessionsSort',
+        orderId: 'sessionsSortOrder',
+        filterId: 'sessionsDeviceFilter',
+        filterKey: 'device',
+        countIds: ['sessionsCount', 'sessionsSectionCount'],
+        noun: ['session', 'sessions'],
+        onSearch: function (term) {
+          _searchTerm = term;
+          table.requestServerQuery({ resetPage: true });
         }
-
-        var rows = sessions.map(function (s) {
-          var active = isSessionActive(s);
-          var userName = String(s.user_name || s.user_email || '');
-          var userEmail = String(s.user_email || '');
-
-          return {
-            _id:           String(s.session_id || s.id || ''),
-            user_display:  userName || userEmail,
-            _userName:     userName,
-            _userEmail:    userEmail,
-            device:        String(s.browser || 'Unknown') + ' / ' + String(s.os || s.device || 'Unknown'),
-            ip_location:   String(s.ip_address || '-') + (s.location ? ' (' + s.location + ')' : ''),
-            started:       s.created_at || '',
-            last_activity: s.last_activity || '',
-            status:        active ? 'Active' : 'Idle',
-            _active:       active,
-            _raw:          s
-          };
-        });
-
-        Lex.Redact.off(table);
-        _ensureTableObserver(table);
-        table.setData(rows);
-        _updatePagination(total);
-      })
-      .catch(function (err) {
-        if (gen !== _gen) return;
-        Lex.Redact.off(table);
-        console.error('[admin-sessions] loadSessions error:', err);
-        Lex.Toast.error('Failed to load sessions');
       });
-  }
-
-  // =========================================================================
-  // Table Renderers (MutationObserver pattern)
-  // =========================================================================
-
-  function _ensureTableObserver(table) {
-    if (table._sessionsRendererAttached) return;
-    table._sessionsRendererAttached = true;
-
-    table.addEventListener('row-click', function (e) {
-      var row = e.detail && e.detail.row;
-      if (row) {
-        Lex.Nav.go('admin/session-details.html', {
-          params: { sessionId: row._id },
-          context: { session: row._raw }
-        });
-      }
+      table.addEventListener('lex-query-change', function (e) {
+        if (e.target === table) fetchSessions(e.detail);
+      });
+      table.addEventListener('row-click', function (e) {
+        var row = e.detail && e.detail.row;
+        if (row && row.id) {
+          Lex.Nav.go('admin/session-details.html', {
+            params: { sessionId: row.id },
+            context: { session: row._raw }
+          });
+        }
+      });
+      table.requestServerQuery({ resetPage: true });
     });
-
-    new MutationObserver(function () {
-      requestAnimationFrame(function () { _applyTableRenderers(table); });
-    }).observe(table, { childList: true });
   }
 
-  function _applyTableRenderers(table) {
-    var rows = (table.dataSource && table.dataSource.data) || [];
-
-    var tbody = table.querySelector('tbody');
-    if (!tbody) return;
-
-    var trs = tbody.querySelectorAll('tr');
-    for (var i = 0; i < trs.length; i++) {
-      var tr  = trs[i];
-      var row = rows[i];
-      if (!row) continue;
-
-      var tds = tr.querySelectorAll('td');
-      if (tds.length === 0) continue;
-
-      // Column order: user_display(0), device(1), ip_location(2), started(3), last_activity(4), status(5)
-
-      // User display cell (index 0): avatar + name + email
-      var nameVal  = row._userName || row.user_display || '';
-      var emailVal = row._userEmail || '';
-      var initial  = getInitial(nameVal || emailVal);
-      if (tds[0]) {
-        tds[0].innerHTML =
-          '<div style="display:flex;align-items:center;gap:0.625rem;">' +
-            '<div style="' +
-              'flex-shrink:0;width:2rem;height:2rem;border-radius:9999px;' +
-              'background:var(--lex-bg-accent,#8B7355);' +
-              'color:var(--lex-text-on-accent,#fff);' +
-              'display:flex;align-items:center;justify-content:center;' +
-              'font-size:0.6875rem;font-weight:600;' +
-            '">' +
-              escHtml(initial) +
-            '</div>' +
-            '<div style="min-width:0;">' +
-              '<div style="font-weight:500;color:var(--lex-text-primary);' +
-                'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
-                escHtml(nameVal || emailVal) +
-              '</div>' +
-              (emailVal && emailVal !== nameVal ?
-                '<div style="font-size:var(--lex-body-xs-size,0.75rem);' +
-                  'color:var(--lex-text-tertiary);' +
-                  'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
-                  escHtml(emailVal) +
-                '</div>' : '') +
-            '</div>' +
-          '</div>';
-      }
-
-      // Started cell (index 3): formatted datetime
-      if (tds[3] && row.started) {
-        tds[3].innerHTML =
-          '<span style="font-size:var(--lex-body-sm-size,0.875rem);color:var(--lex-text-secondary);">' +
-            escHtml(fmtDateTime(row.started)) +
-          '</span>';
-      }
-
-      // Last activity cell (index 4): relative time
-      if (tds[4]) {
-        tds[4].innerHTML =
-          '<span style="font-size:var(--lex-body-sm-size,0.875rem);color:var(--lex-text-secondary);">' +
-            escHtml(row.last_activity ? timeAgo(row.last_activity) : '-') +
-          '</span>';
-      }
-
-      // Status cell (index 5): coloured pill
-      if (tds[5]) {
-        tds[5].innerHTML = statusPill(row._active);
-      }
-    }
-  }
-
-  // =========================================================================
-  // Bootstrap
-  // =========================================================================
+  // Pure table logic, exposed for unit tests.
+  window.AdminSessionsTable = {
+    toApiParams: toApiParams,
+    mapSession: mapSession,
+    cellRenderers: cellRenderers,
+    filterOptions: filterOptions,
+    isSessionActive: isSessionActive,
+    SORT_BY_COLUMN: SORT_BY_COLUMN
+  };
 
   init();
 

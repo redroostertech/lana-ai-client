@@ -9,7 +9,9 @@
   // State
   var allSkills = [];
   var filteredSkills = [];
-  var searchTerm = '';
+  var searchTerm = '';         // lower-cased, for the grid
+  var searchText = '';         // as typed, for the list table
+  var searchDebounce = null;
   var selectedCategory = 'all';
   var viewMode = 'list'; // 'list' or 'grid' — default to list
   var selectedSkill = null;
@@ -54,8 +56,8 @@
 
   // DOM Elements
   var searchInput, categoryFilter, gridViewBtn, listViewBtn;
-  var loadingState, skillsGridContainer, gridEmptyState, filterChips;
-  var gridViewContainer, skillsListView, gridPagination, listPagination;
+  var loadingState, skillsGridContainer, gridEmptyState;
+  var gridViewContainer, skillsListView, gridPagination;
   var skillDetailsModal, matterSelectorModal;
 
   /**
@@ -112,17 +114,21 @@
     }
 
     // Get DOM elements
-    searchInput = document.getElementById('search-input');
+    searchInput = document.getElementById('skillsSearch');
     categoryFilter = document.getElementById('category-filter');
     gridViewBtn = document.getElementById('grid-view-btn');
     listViewBtn = document.getElementById('list-view-btn');
     loadingState = document.getElementById('loading-state');
     skillsGridContainer = document.getElementById('skills-grid-container');
     gridEmptyState = document.getElementById('grid-empty-state');
-    filterChips = document.getElementById('filter-chips');
     gridViewContainer = document.getElementById('grid-view-container');
     skillsListView = document.getElementById('skillsListView');
     if (skillsListView) {
+      // Renderers and filter options must be registered before the first setData.
+      if (typeof skillsListView.setCellRenderers === 'function' && window.LanaSkillsTable) {
+        skillsListView.setCellRenderers(window.LanaSkillsTable.cellRenderers());
+        skillsListView.setColumnFilterOptions(window.LanaSkillsTable.columnFilterOptions([], window.LanaLibraryColumnFilters));
+      }
       // Empty-state CTA: "Create a skill" reuses the header create action.
       skillsListView.addEventListener('empty-action', function () {
         var b = document.getElementById('create-skill-btn');
@@ -130,7 +136,6 @@
       });
     }
     gridPagination = document.getElementById('grid-pagination');
-    listPagination = document.getElementById('list-pagination');
     skillDetailsModal = document.getElementById('skill-details-modal');
     matterSelectorModal = document.getElementById('matter-selector-modal');
 
@@ -154,14 +159,30 @@
    * Attach event listeners
    */
   function attachEventListeners() {
-    // Search (grid view)
+    // Toolbar search (lex-input: lex-input while typing, lex-change on clear)
     if (searchInput) {
-      searchInput.addEventListener('input', debounce(handleSearch, 300));
+      searchInput.addEventListener('lex-input', handleSearch);
+      searchInput.addEventListener('lex-change', handleSearch);
     }
 
-    // Category filter (lex-select — fires lex-change)
+    // Toolbar category filter (lex-select — fires lex-change)
     if (categoryFilter) {
       categoryFilter.addEventListener('lex-change', handleCategoryChange);
+    }
+
+    // Toolbar sort: Sort by select + order toggle drive the table
+    var sortSelect = document.getElementById('skillsSort');
+    var sortOrderBtn = document.getElementById('skillsSortOrder');
+    if (sortSelect) {
+      sortSelect.addEventListener('lex-change', function(e) {
+        applyListSort((e.detail && e.detail.value) || 'created_at', currentSortOrder());
+      });
+    }
+    if (sortOrderBtn) {
+      sortOrderBtn.addEventListener('click', function() {
+        sortOrderBtn.dataset.order = currentSortOrder() === 'asc' ? 'desc' : 'asc';
+        applyListSort(sortSelect ? sortSelect.value : 'created_at', currentSortOrder());
+      });
     }
 
     // View toggle (lex-btn components)
@@ -191,7 +212,7 @@
     if (learnMoreCloseBtn) {
       learnMoreCloseBtn.addEventListener('click', function() {
         var modal = document.getElementById('learn-more-modal');
-        if (modal) modal.classList.add('hidden');
+        if (modal) modal.open = false;
       });
     }
 
@@ -201,16 +222,14 @@
       importSkillBtn.addEventListener('click', openSkillImportModal);
     }
 
-    // Modal close buttons — covers all modals including import modal
-    var modalCloseButtons = document.querySelectorAll('.modal-close');
-    modalCloseButtons.forEach(function(btn) {
-      btn.addEventListener('click', closeAllModals);
-    });
-
-    // Modal overlay clicks
-    var modalOverlays = document.querySelectorAll('.modal-overlay');
-    modalOverlays.forEach(function(overlay) {
-      overlay.addEventListener('click', closeAllModals);
+    // lex-modal header close, backdrop and Escape all emit lex-close.
+    ['learn-more-modal', 'skill-details-modal', 'matter-selector-modal', 'skill-import-modal'].forEach(function(id) {
+      var modalEl = document.getElementById(id);
+      if (modalEl) {
+        modalEl.addEventListener('lex-close', function(e) {
+          if (e.target === modalEl) closeAllModals();
+        });
+      }
     });
 
     // Modal action buttons
@@ -271,6 +290,16 @@
       });
     }
 
+    // List view: header sort mirrors into the toolbar; count, empty copy and
+    // the Category select follow the table's own filter state (Clear filters).
+    if (skillsListView) {
+      skillsListView.addEventListener('sort-change', function(e) {
+        if (e.detail) syncToolbarSort(e.detail.sortBy, e.detail.sortDir);
+      });
+      skillsListView.addEventListener('lex-filter-change', syncListState);
+      skillsListView.addEventListener('lex-data-loaded', syncListState);
+    }
+
     // List view row-click — open skill in builder modal
     if (skillsListView) {
       skillsListView.addEventListener('row-click', function(e) {
@@ -281,10 +310,13 @@
       });
     }
 
-    // Skill Builder modal buttons
-    var closeSkillBuilderBtn = document.getElementById('closeSkillBuilderBtn');
-    if (closeSkillBuilderBtn) {
-      closeSkillBuilderBtn.addEventListener('click', closeSkillBuilder);
+    // Skill Builder: the lex-modal header close emits lex-close (Escape and
+    // backdrop are off for the builder so a stray key cannot drop the draft).
+    var skillBuilderModal = document.getElementById('createSkillModal');
+    if (skillBuilderModal) {
+      skillBuilderModal.addEventListener('lex-close', function(e) {
+        if (e.target === skillBuilderModal) closeSkillBuilder();
+      });
     }
     var cancelSkillBuilderBtn = document.getElementById('cancelSkillBuilderBtn');
     if (cancelSkillBuilderBtn) {
@@ -324,7 +356,7 @@
 
   function openLearnMoreModal() {
     var modal = document.getElementById('learn-more-modal');
-    if (modal) modal.classList.remove('hidden');
+    if (modal) modal.open = true;
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -477,11 +509,20 @@
   };
 
   /**
-   * Build event type <option> groups for the trigger select
+   * Build grouped event type options ({ value, label, group }) for the
+   * trigger lex-select
    */
   function buildEventOptions() {
-    if (window.LanaEventCatalog && typeof window.LanaEventCatalog.buildSelectOptions === 'function') {
-      return window.LanaEventCatalog.buildSelectOptions();
+    var catalog = window.LanaEventCatalog;
+    if (catalog && Array.isArray(catalog.categories) && typeof catalog.getEventMeta === 'function') {
+      var catalogOptions = [];
+      catalog.categories.forEach(function(group) {
+        (group.events || []).forEach(function(eventType) {
+          var meta = catalog.getEventMeta(eventType) || {};
+          catalogOptions.push({ value: eventType, label: meta.friendly_name || eventType, group: group.label });
+        });
+      });
+      return catalogOptions;
     }
 
     var groups = {
@@ -524,18 +565,37 @@
       'Schedule Events': ['schedule.minutes','schedule.hourly','schedule.daily','schedule.weekly','schedule.monthly']
     };
 
-    var html = '';
+    var options = [];
     var groupNames = Object.keys(groups);
     for (var g = 0; g < groupNames.length; g++) {
-      var groupName = groupNames[g];
-      var events = groups[groupName];
-      html += '<optgroup label="' + groupName + '">';
+      var events = groups[groupNames[g]];
       for (var i = 0; i < events.length; i++) {
-        html += '<option value="' + events[i] + '">' + events[i] + '</option>';
+        options.push({ value: events[i], label: events[i], group: groupNames[g] });
       }
-      html += '</optgroup>';
     }
-    return html;
+    return options;
+  }
+
+  function escapeAttr(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  /**
+   * lex-select markup for the step builder. Option values stay strings; the
+   * value defaults to the first option, as a native select did.
+   */
+  function stepSelectHtml(attrs, options, value) {
+    var selected = value !== undefined ? value : (options.length ? options[0].value : '');
+    return '<lex-select ' + attrs + ' size="sm" options="' + escapeAttr(JSON.stringify(options)) + '" value="' + escapeAttr(selected) + '"></lex-select>';
+  }
+
+  function stepSelects(container) {
+    return container ? container.querySelectorAll('lex-select') : [];
   }
 
   function renderEventSummaryHtml(selectedEvent) {
@@ -596,8 +656,7 @@
     }
 
     // Show modal
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
+    modal.open = true;
   }
 
   /**
@@ -772,10 +831,7 @@
    */
   function closeSkillBuilder() {
     var modal = document.getElementById('createSkillModal');
-    if (modal) {
-      modal.classList.add('hidden');
-      modal.classList.remove('flex');
-    }
+    if (modal) modal.open = false;
     // Reset state
     skillSteps = [];
     editingSkillId = null;
@@ -810,15 +866,15 @@
       + '<svg class="w-5 h-5 text-white step-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>'
       + '</div>'
       + '<div class="flex-1">'
-      + '<select class="step-type-selector bg-white border border-gray-300 rounded-lg px-3 py-1.5 text-gray-900 text-sm font-medium focus:ring-2 focus:ring-purple-500 focus:border-purple-500" data-step-id="' + stepId + '">'
-      + '<option value="trigger">Trigger</option>'
-      + '<option value="condition">Condition</option>'
-      + '<option value="ai-action">AI Action</option>'
-      + '<option value="database">Database</option>'
-      + '<option value="notification">Notification</option>'
-      + '<option value="integration">Integration</option>'
-      + '<option value="transform">Transform</option>'
-      + '</select>'
+      + stepSelectHtml('class="step-type-selector" data-step-id="' + stepId + '" aria-label="Step type"', [
+        { value: 'trigger', label: 'Trigger' },
+        { value: 'condition', label: 'Condition' },
+        { value: 'ai-action', label: 'AI Action' },
+        { value: 'database', label: 'Database' },
+        { value: 'notification', label: 'Notification' },
+        { value: 'integration', label: 'Integration' },
+        { value: 'transform', label: 'Transform' }
+      ])
       + '<code class="block mt-1 text-xs font-mono text-gray-500">step_' + (stepIndex + 1) + '.*</code>'
       + '</div></div>'
       + '<button class="remove-step-btn text-gray-400 hover:text-red-600 transition-colors" data-step-id="' + stepId + '">'
@@ -851,8 +907,8 @@
     if (stepEl) {
       var typeSelect = stepEl.querySelector('.step-type-selector');
       if (typeSelect) {
-        typeSelect.addEventListener('change', function() {
-          updateStepType(stepId, this.value);
+        typeSelect.addEventListener('lex-change', function(e) {
+          updateStepType(stepId, e.detail.value);
         });
       }
       var removeBtn = stepEl.querySelector('.remove-step-btn');
@@ -952,9 +1008,7 @@
       configHtml = '<div class="space-y-3"><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Event Type</label>'
         + '<div class="flex flex-wrap items-center gap-2">'
-        + '<select id="event-type-select-' + stepId + '" class="event-type-select flex-1 min-w-[220px] px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500" data-step-id="' + stepId + '">'
-        + buildEventOptions()
-        + '</select>'
+        + stepSelectHtml('id="event-type-select-' + stepId + '" class="event-type-select flex-1 min-w-[220px]" data-step-id="' + stepId + '" searchable aria-label="Event type"', buildEventOptions())
         + '<button type="button" class="px-3 py-2 text-xs font-semibold rounded-lg border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100" data-event-browser-open-step="' + stepId + '">Browse Events</button>'
         + '</div>'
         + '<div id="event-description-' + stepId + '" class="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">'
@@ -966,29 +1020,32 @@
         + '<input type="text" placeholder="e.g., trigger.data.fileType" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">'
         + '</div><div class="grid grid-cols-2 gap-3"><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Operator</label>'
-        + '<select class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">'
-        + '<option value="equals">equals</option>'
-        + '<option value="contains">contains</option>'
-        + '<option value="greater_than">greater than</option>'
-        + '<option value="less_than">less than</option>'
-        + '</select></div><div>'
+        + stepSelectHtml('class="condition-operator-select w-full" aria-label="Operator"', [
+          { value: 'equals', label: 'Equals' },
+          { value: 'contains', label: 'Contains' },
+          { value: 'greater_than', label: 'Greater than' },
+          { value: 'less_than', label: 'Less than' }
+        ])
+        + '</div><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Value</label>'
         + '<input type="text" placeholder="e.g., .pdf" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">'
         + '</div></div></div>';
     } else if (type === 'ai-action') {
       configHtml = '<div class="space-y-3"><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">AI Task</label>'
-        + '<select class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">'
-        + '<option value="summarize">Summarize Document</option>'
-        + '<option value="extract">Extract Key Information</option>'
-        + '<option value="classify">Classify Content</option>'
-        + '<option value="generate">Generate Text</option>'
-        + '</select></div><div>'
+        + stepSelectHtml('class="ai-task-select w-full" aria-label="AI task"', [
+          { value: 'summarize', label: 'Summarize Document' },
+          { value: 'extract', label: 'Extract Key Information' },
+          { value: 'classify', label: 'Classify Content' },
+          { value: 'generate', label: 'Generate Text' }
+        ])
+        + '</div><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">AI Instructions Mode</label>'
-        + '<select class="ai-prompt-mode-select w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">'
-        + '<option value="default">Use Default AI Instructions</option>'
-        + '<option value="custom">Use Custom System Prompt</option>'
-        + '</select></div><div class="ai-system-prompt-field hidden">'
+        + stepSelectHtml('class="ai-prompt-mode-select w-full" aria-label="AI instructions mode"', [
+          { value: 'default', label: 'Use Default AI Instructions' },
+          { value: 'custom', label: 'Use Custom System Prompt' }
+        ])
+        + '</div><div class="ai-system-prompt-field hidden">'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">System Prompt</label>'
         + '<textarea rows="3" placeholder="You are a concise estate deadline specialist..." class="ai-system-prompt-input w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 text-sm resize-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"></textarea>'
         + '</div><div>'
@@ -998,39 +1055,31 @@
     } else if (type === 'database') {
       configHtml = '<div class="space-y-3"><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Operation</label>'
-        + '<select class="db-operation-select w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">'
-        + '<option value="insert">Insert Record</option>'
-        + '<option value="query">Query Records</option>'
-        + '<option value="update">Update Record</option>'
-        + '</select></div><div>'
+        + stepSelectHtml('class="db-operation-select w-full" aria-label="Operation"', [
+          { value: 'insert', label: 'Insert Record' },
+          { value: 'query', label: 'Query Records' },
+          { value: 'update', label: 'Update Record' }
+        ])
+        + '</div><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Table</label>'
-        + '<select class="db-table-select w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">'
-        + '<optgroup label="Document Tables">'
-        + '<option value="documents">Documents</option>'
-        + '<option value="document_chunks">Document Chunks</option>'
-        + '<option value="document_metadata">Document Metadata</option>'
-        + '</optgroup>'
-        + '<optgroup label="Matter Tables">'
-        + '<option value="client_matters">Client Matters</option>'
-        + '<option value="matter_contacts">Matter Contacts</option>'
-        + '<option value="matter_documents">Matter Documents</option>'
-        + '<option value="matter_notes">Matter Notes</option>'
-        + '</optgroup>'
-        + '<optgroup label="Workflow Tables">'
-        + '<option value="workflows">Workflows</option>'
-        + '<option value="workflow_executions">Workflow Executions</option>'
-        + '<option value="workflow_steps">Workflow Steps</option>'
-        + '</optgroup>'
-        + '<optgroup label="Integration Tables">'
-        + '<option value="connector_data">Connector Data</option>'
-        + '<option value="integration_sources">Integration Sources</option>'
-        + '</optgroup>'
-        + '<optgroup label="Skill Tables">'
-        + '<option value="custom_skills">Custom Skills</option>'
-        + '<option value="skill_executions">Skill Executions</option>'
-        + '<option value="skill_artifacts">Skill Artifacts</option>'
-        + '</optgroup>'
-        + '</select></div><div>'
+        + stepSelectHtml('class="db-table-select w-full" searchable aria-label="Table"', [
+          { value: 'documents', label: 'Documents', group: 'Document Tables' },
+          { value: 'document_chunks', label: 'Document Chunks', group: 'Document Tables' },
+          { value: 'document_metadata', label: 'Document Metadata', group: 'Document Tables' },
+          { value: 'client_matters', label: 'Client Matters', group: 'Matter Tables' },
+          { value: 'matter_contacts', label: 'Matter Contacts', group: 'Matter Tables' },
+          { value: 'matter_documents', label: 'Matter Documents', group: 'Matter Tables' },
+          { value: 'matter_notes', label: 'Matter Notes', group: 'Matter Tables' },
+          { value: 'workflows', label: 'Workflows', group: 'Workflow Tables' },
+          { value: 'workflow_executions', label: 'Workflow Executions', group: 'Workflow Tables' },
+          { value: 'workflow_steps', label: 'Workflow Steps', group: 'Workflow Tables' },
+          { value: 'connector_data', label: 'Connector Data', group: 'Integration Tables' },
+          { value: 'integration_sources', label: 'Integration Sources', group: 'Integration Tables' },
+          { value: 'custom_skills', label: 'Custom Skills', group: 'Skill Tables' },
+          { value: 'skill_executions', label: 'Skill Executions', group: 'Skill Tables' },
+          { value: 'skill_artifacts', label: 'Skill Artifacts', group: 'Skill Tables' }
+        ])
+        + '</div><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Data (JSON)</label>'
         + '<textarea rows="4" class="db-data-input w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 text-sm font-mono resize-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500" placeholder=\'{"title": "Example", "content": "{{trigger.data.value}}"}\'></textarea>'
         + '<p class="mt-1 text-xs text-gray-500">Use <code>{{trigger.*}}</code> template variables for dynamic values. Fields like organization_id, matter_id, and created_by are auto-injected.</p>'
@@ -1038,11 +1087,12 @@
     } else if (type === 'notification') {
       configHtml = '<div class="space-y-3"><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Notification Type</label>'
-        + '<select class="notification-type-select w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">'
-        + '<option value="create_task">Create Task</option>'
-        + '<option value="send_notification">Send In-App Notification</option>'
-        + '<option value="log_activity">Log Activity</option>'
-        + '</select></div><div>'
+        + stepSelectHtml('class="notification-type-select w-full" aria-label="Notification type"', [
+          { value: 'create_task', label: 'Create Task' },
+          { value: 'send_notification', label: 'Send In-App Notification' },
+          { value: 'log_activity', label: 'Log Activity' }
+        ])
+        + '</div><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Title / Subject</label>'
         + '<input type="text" class="notification-title-input w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500" placeholder="e.g., Review overdue invoices">'
         + '</div><div>'
@@ -1053,11 +1103,12 @@
     } else if (type === 'integration') {
       configHtml = '<div class="space-y-3"><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Action Type</label>'
-        + '<select class="integration-action-select w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">'
-        + '<option value="update_crm">Update CRM</option>'
-        + '<option value="webhook">Webhook</option>'
-        + '<option value="connector_execute">Connector Action</option>'
-        + '</select></div><div>'
+        + stepSelectHtml('class="integration-action-select w-full" aria-label="Action type"', [
+          { value: 'update_crm', label: 'Update CRM' },
+          { value: 'webhook', label: 'Webhook' },
+          { value: 'connector_execute', label: 'Connector Action' }
+        ])
+        + '</div><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Configuration</label>'
         + '<textarea rows="3" class="integration-data-input w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 text-sm font-mono resize-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500" placeholder=\'{"endpoint": "/api/v1/...", "data": {}}\'></textarea>'
         + '<p class="mt-1 text-xs text-gray-500">JSON config for connector parameters. Supports <code>{{variable}}</code> syntax.</p>'
@@ -1065,12 +1116,13 @@
     } else if (type === 'transform') {
       configHtml = '<div class="space-y-3"><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Operation</label>'
-        + '<select class="transform-operation-select w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">'
-        + '<option value="map">Map Fields</option>'
-        + '<option value="filter">Filter Data</option>'
-        + '<option value="merge">Merge Objects</option>'
-        + '<option value="split">Split String</option>'
-        + '</select></div><div>'
+        + stepSelectHtml('class="transform-operation-select w-full" aria-label="Operation"', [
+          { value: 'map', label: 'Map Fields' },
+          { value: 'filter', label: 'Filter Data' },
+          { value: 'merge', label: 'Merge Objects' },
+          { value: 'split', label: 'Split String' }
+        ])
+        + '</div><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Configuration</label>'
         + '<textarea rows="3" class="transform-data-input w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 text-sm font-mono resize-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500" placeholder=\'{"field": "{{trigger.data.value}}"}\'></textarea>'
         + '<p class="mt-1 text-xs text-gray-500">JSON config for this operation. Supports <code>{{variable}}</code> syntax.</p>'
@@ -1083,7 +1135,7 @@
     if (type === 'trigger') {
       var eventSelect = document.getElementById('event-type-select-' + stepId);
       if (eventSelect) {
-        eventSelect.addEventListener('change', function() {
+        eventSelect.addEventListener('lex-change', function() {
           updateEventDescription(stepId);
         });
       }
@@ -1097,8 +1149,11 @@
     }
 
     // Attach live-sync listeners for all form elements in this step
-    var allSelects = configContainer.querySelectorAll('select');
-    var allInputs = configContainer.querySelectorAll('input');
+    var allSelects = stepSelects(configContainer);
+    // The lex-select search box is an <input> too; leave it out.
+    var allInputs = Array.prototype.filter.call(configContainer.querySelectorAll('input'), function(input) {
+      return !input.closest('lex-select');
+    });
     var allTextareas = configContainer.querySelectorAll('textarea');
 
     var syncHandler = function() {
@@ -1120,11 +1175,11 @@
     };
     if (type === 'ai-action' && promptModeSelect) {
       updateAiPromptModeVisibility();
-      promptModeSelect.addEventListener('change', updateAiPromptModeVisibility);
+      promptModeSelect.addEventListener('lex-change', updateAiPromptModeVisibility);
     }
 
     for (var si = 0; si < allSelects.length; si++) {
-      allSelects[si].addEventListener('change', syncHandler);
+      allSelects[si].addEventListener('lex-change', syncHandler);
     }
     for (var ii = 0; ii < allInputs.length; ii++) {
       allInputs[ii].addEventListener('input', syncHandler);
@@ -1171,7 +1226,7 @@
         if (descEl) {
           descEl.innerHTML = renderEventSummaryHtml(eventType);
         }
-        selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+        selectEl.dispatchEvent(new CustomEvent('lex-change', { bubbles: true, detail: { name: selectEl.name || '', value: eventType } }));
       }
     });
   }
@@ -1279,12 +1334,12 @@
       }
     } else if (stepType === 'condition') {
       var inputs = container.querySelectorAll('input[type="text"]');
-      var selects = container.querySelectorAll('select');
+      var selects = stepSelects(container);
       if (inputs.length >= 1) config.field = inputs[0].value;
       if (selects.length >= 1) config.operator = selects[0].value;
       if (inputs.length >= 2) config.value = inputs[1].value;
     } else if (stepType === 'ai-action') {
-      var aiSelects = container.querySelectorAll('select');
+      var aiSelects = stepSelects(container);
       var textareas = container.querySelectorAll('textarea');
       if (aiSelects.length >= 1) config.task = aiSelects[0].value;
       if (aiSelects.length >= 2) config.prompt_mode = aiSelects[1].value;
@@ -1458,12 +1513,12 @@
       }
     } else if (stepType === 'condition') {
       var inputs = container.querySelectorAll('input[type="text"]');
-      var selects = container.querySelectorAll('select');
+      var selects = stepSelects(container);
       if (inputs.length >= 1 && configData.field !== undefined) inputs[0].value = configData.field;
       if (selects.length >= 1 && configData.operator) selects[0].value = configData.operator;
       if (inputs.length >= 2 && configData.value !== undefined) inputs[1].value = configData.value;
     } else if (stepType === 'ai-action') {
-      var aiSelects = container.querySelectorAll('select');
+      var aiSelects = stepSelects(container);
       var textareas = container.querySelectorAll('textarea');
       var taskVal = configData.task || '';
       var promptModeVal = configData.prompt_mode || (configData.system_prompt ? 'custom' : 'default');
@@ -1730,74 +1785,24 @@
       }
       return response.json();
     }).then(function(data) {
-      allSkills = data.skills || data.data || [];
+      var skills = data.skills || data.data || [];
+      var tableApi = window.LanaSkillsTable;
 
-      // Flatten and normalize fields for lex-table compatibility
-      allSkills = allSkills.map(function(skill) {
-        var meta = skill.metadata || {};
-        var config = skill.skill_config || {};
-        return Object.assign({}, skill, {
-          description: skill.skill_description || skill.description || config.description || meta.description || '',
-          category: skill.category || config.category || meta.category || 'automation',
-          skill_type: skill.skill_type || config.skill_type || meta.skill_type || '',
-          version: skill.skill_version || skill.version || config.version || meta.version || '1.0.0',
-          installation_count: skill.installation_count || skill.total_executions || 0,
-          tags: meta.tags || []
-        });
+      // One object per skill: the original fields plus the table's raw row
+      // values (slugs, counts, ISO timestamps). Formatting is the renderers' job.
+      allSkills = skills.map(function(skill) {
+        return Object.assign({}, skill, tableApi.mapSkillRow(skill));
       });
 
       filteredSkills = allSkills.slice();
-
-      // Format rows for lex-table display
-      var formattedSkills = allSkills.map(function(skill) {
-        var out = Object.assign({}, skill);
-
-        // Truncate long descriptions
-        if (out.description && out.description.length > 100) {
-          out.description = out.description.substring(0, 97) + '...';
-        }
-
-        // Format category: replace hyphens/underscores with spaces, title-case
-        if (out.category) {
-          out.category = out.category.split(/[-_]/).map(function(w) {
-            return w.charAt(0).toUpperCase() + w.substring(1);
-          }).join(' ');
-        }
-
-        // Format skill_type similarly
-        if (out.skill_type) {
-          out.skill_type = out.skill_type.split(/[-_]/).map(function(w) {
-            return w.charAt(0).toUpperCase() + w.substring(1);
-          }).join(' ');
-        }
-
-        // Format created_at to readable date
-        if (out.created_at) {
-          try {
-            var d = new Date(out.created_at);
-            if (!isNaN(d.getTime())) {
-              out.created_at = formatDateLong(out.created_at, { month: 'short' });
-            }
-          } catch (e) { /* keep raw value */ }
-        }
-
-        return out;
-      });
-
-      // Populate lex-table for list view
-      if (skillsListView && typeof skillsListView.setData === 'function') {
-        skillsListView.setData(formattedSkills);
-      }
-
-      // Update grid if in grid view
-      if (viewMode === 'grid') {
-        renderGridView();
-      }
+      populateListView(allSkills);
+      filterSkills();
 
       hideLoading();
     }).catch(function(error) {
       console.error('Error loading skills:', error);
       showToast('Failed to load skills. Please try again.', 'error');
+      showListLoadError();
       hideLoading();
       showGridEmpty();
     });
@@ -2013,7 +2018,7 @@
     if (installBtn) installBtn.classList.add('hidden');
 
     body.innerHTML = tabBar + overviewHtml + settingsHtml + runsHtml;
-    modal.classList.remove('hidden');
+    modal.open = true;
 
     // ── Wire tab switching ─────────────────────────────────────────
     var tabBtns = body.querySelectorAll('.ld-tab');
@@ -2211,11 +2216,15 @@
 
         // Wire detach buttons
         container.querySelectorAll('.ld-detach-btn').forEach(function(btn) {
-          btn.addEventListener('click', function(e) {
+          btn.addEventListener('click', async function(e) {
             e.stopPropagation();
             var matterId = btn.dataset.matterId;
             if (!matterId) return;
-            if (!confirm('Detach this skill from the matter?')) return;
+            var confirmed = await Lex.Modal.confirmAsync('Detach Skill', 'Detach this skill from the matter?', {
+              confirmText: 'Detach',
+              variant: 'danger'
+            });
+            if (!confirmed) return;
             detachSkillFromMatter(matterId, skillId, function() {
               loadSkillMatterAttachments(skillId);
               showToast('Skill detached from matter', 'success');
@@ -2276,35 +2285,42 @@
   }
 
   /**
+   * These modals open on top of the Skill Details lex-modal. Every open
+   * lex-modal listens for Escape on document, so one Escape would close both;
+   * stop it at the nested modal (focus is trapped inside it) and close only it.
+   */
+  function escapeClosesOnlyNested(modal) {
+    modal.addEventListener('keydown', function(e) {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      modal.removeAfterClose();
+    });
+  }
+
+  /**
    * Open a simple JSON-editor modal for config overrides (GAP-1).
    */
   function openEditOverridesModal(matterId, skillId, currentOverridesJson, callback) {
-    // Reuse the learn-more modal slot as a temporary container; or inject inline modal
     var existing = document.getElementById('ld-overrides-modal');
     if (existing) existing.remove();
 
     var parsed = '{}';
     try { parsed = JSON.stringify(JSON.parse(currentOverridesJson), null, 2); } catch (e) { parsed = '{}'; }
 
-    var modal = document.createElement('div');
+    // lex-modal (Lex.Modal.open removes it on close, backdrop click and Escape).
+    var modal = window.Lex.Modal.open({
+      heading: 'Edit Config Overrides',
+      size: 'md',
+      content: '<p class="text-xs text-gray-500 mb-3">JSON overrides applied when this skill runs in this matter context.</p>'
+        + '<textarea id="ld-overrides-input" rows="8" style="width:100%;font-family:monospace;font-size:12px;border:1px solid var(--lex-border-default);border-radius:8px;padding:10px;resize:vertical;" spellcheck="false">' + escapeHtml(parsed) + '</textarea>'
+        + '<div id="ld-overrides-error" class="text-xs text-red-500 mt-1 hidden"></div>'
+        + '<lex-btn data-slot="footer" id="ld-overrides-cancel" variant="secondary">Cancel</lex-btn>'
+        + '<lex-btn data-slot="footer" id="ld-overrides-save" variant="primary">Save</lex-btn>'
+    });
     modal.id = 'ld-overrides-modal';
-    modal.className = 'modal';
-    modal.style.cssText = 'position:fixed;inset:0;z-index:10010;display:flex;align-items:center;justify-content:center;';
-    modal.innerHTML = '<div class="modal-overlay" style="position:absolute;inset:0;background:rgba(0,0,0,0.5);"></div>'
-      + '<div style="position:relative;background:#fff;border-radius:12px;padding:24px;width:480px;max-height:80vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">'
-      + '<h3 class="text-lg font-semibold mb-3" style="color:var(--lex-text-primary);">Edit Config Overrides</h3>'
-      + '<p class="text-xs text-gray-500 mb-3">JSON overrides applied when this skill runs in this matter context.</p>'
-      + '<textarea id="ld-overrides-input" rows="8" style="width:100%;font-family:monospace;font-size:12px;border:1px solid var(--lex-border-default);border-radius:8px;padding:10px;resize:vertical;" spellcheck="false">' + escapeHtml(parsed) + '</textarea>'
-      + '<div id="ld-overrides-error" class="text-xs text-red-500 mt-1 hidden"></div>'
-      + '<div class="flex gap-2 justify-end mt-4">'
-      + '<button id="ld-overrides-cancel" class="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50" style="border-color:var(--lex-border-default);">Cancel</button>'
-      + '<button id="ld-overrides-save" class="px-4 py-2 text-sm text-white rounded-lg" style="background:var(--lex-text-accent);">Save</button>'
-      + '</div></div>';
+    escapeClosesOnlyNested(modal);
 
-    document.body.appendChild(modal);
-
-    modal.querySelector('.modal-overlay').addEventListener('click', function() { modal.remove(); });
-    modal.querySelector('#ld-overrides-cancel').addEventListener('click', function() { modal.remove(); });
+    modal.querySelector('#ld-overrides-cancel').addEventListener('click', function() { modal.removeAfterClose(); });
     modal.querySelector('#ld-overrides-save').addEventListener('click', function() {
       var txt = modal.querySelector('#ld-overrides-input').value;
       var errEl = modal.querySelector('#ld-overrides-error');
@@ -2318,18 +2334,16 @@
 
       var url = '/api/v1/matters/' + encodeURIComponent(matterId) + '/skills/' + encodeURIComponent(skillId) + '/config';
       var saveBtn = modal.querySelector('#ld-overrides-save');
-      saveBtn.disabled = true;
-      saveBtn.textContent = 'Saving...';
+      saveBtn.loading = true;
 
       (window.api ? window.api.patch(url, { config_overrides: parsed2 }) : fetch(url, { method: 'PATCH', headers: { 'Authorization': 'Bearer ' + getAuthToken(), 'Content-Type': 'application/json' }, body: JSON.stringify({ config_overrides: parsed2 }) }).then(function(r) { return r.json(); }))
         .then(function() {
-          modal.remove();
+          modal.removeAfterClose();
           showToast('Config overrides saved', 'success');
           if (callback) callback();
         })
         .catch(function(err) {
-          saveBtn.disabled = false;
-          saveBtn.textContent = 'Save';
+          saveBtn.loading = false;
           errEl.textContent = 'Save failed: ' + ((err && err.message) || 'Unknown error');
           errEl.classList.remove('hidden');
         });
@@ -2344,25 +2358,21 @@
     var existing = document.getElementById('ld-attach-modal');
     if (existing) existing.remove();
 
-    var modal = document.createElement('div');
+    // lex-modal (Lex.Modal.open removes it on close, backdrop click and Escape).
+    var modal = window.Lex.Modal.open({
+      heading: 'Attach Skill to Matter',
+      width: '520px',
+      content: '<input id="ld-attach-search" type="text" placeholder="Search matters..." class="mb-3 px-3 py-2 text-sm border rounded-lg w-full" style="border-color:var(--lex-border-default);">'
+        + '<div id="ld-attach-matters" class="overflow-y-auto space-y-1" style="max-height:320px;border:1px solid var(--lex-border-default);border-radius:8px;padding:8px;">'
+        + '<div class="flex justify-center py-4"><div class="animate-spin w-4 h-4 border-2 border-gray-300 border-t-blue-600 rounded-full"></div></div>'
+        + '</div>'
+        + '<lex-btn data-slot="footer" id="ld-attach-cancel" variant="secondary">Cancel</lex-btn>'
+        + '<lex-btn data-slot="footer" id="ld-attach-confirm" variant="primary" disabled>Attach</lex-btn>'
+    });
     modal.id = 'ld-attach-modal';
-    modal.style.cssText = 'position:fixed;inset:0;z-index:10010;display:flex;align-items:center;justify-content:center;';
-    modal.innerHTML = '<div class="modal-overlay" style="position:absolute;inset:0;background:rgba(0,0,0,0.5);"></div>'
-      + '<div style="position:relative;background:#fff;border-radius:12px;padding:24px;width:520px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">'
-      + '<h3 class="text-lg font-semibold mb-3" style="color:var(--lex-text-primary);">Attach Skill to Matter</h3>'
-      + '<input id="ld-attach-search" type="text" placeholder="Search matters..." class="mb-3 px-3 py-2 text-sm border rounded-lg w-full" style="border-color:var(--lex-border-default);">'
-      + '<div id="ld-attach-matters" class="flex-1 overflow-y-auto space-y-1 mb-4" style="max-height:320px;border:1px solid var(--lex-border-default);border-radius:8px;padding:8px;">'
-      + '<div class="flex justify-center py-4"><div class="animate-spin w-4 h-4 border-2 border-gray-300 border-t-blue-600 rounded-full"></div></div>'
-      + '</div>'
-      + '<div class="flex gap-2 justify-end">'
-      + '<button id="ld-attach-cancel" class="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50" style="border-color:var(--lex-border-default);">Cancel</button>'
-      + '<button id="ld-attach-confirm" class="px-4 py-2 text-sm text-white rounded-lg disabled:opacity-50" style="background:var(--lex-text-accent);" disabled>Attach</button>'
-      + '</div></div>';
+    escapeClosesOnlyNested(modal);
 
-    document.body.appendChild(modal);
-
-    modal.querySelector('.modal-overlay').addEventListener('click', function() { modal.remove(); });
-    modal.querySelector('#ld-attach-cancel').addEventListener('click', function() { modal.remove(); });
+    modal.querySelector('#ld-attach-cancel').addEventListener('click', function() { modal.removeAfterClose(); });
 
     var selectedMatterId = null;
 
@@ -2417,21 +2427,19 @@
     modal.querySelector('#ld-attach-confirm').addEventListener('click', function() {
       if (!selectedMatterId) return;
       var confirmBtn = modal.querySelector('#ld-attach-confirm');
-      confirmBtn.disabled = true;
-      confirmBtn.textContent = 'Attaching...';
+      confirmBtn.loading = true;
 
       var url = '/api/v1/matters/' + encodeURIComponent(selectedMatterId) + '/skills';
       (window.api ? window.api.post(url, { skill_id: skillId, enabled: true, config_overrides: {} }) : fetch(url, { method: 'POST', headers: { 'Authorization': 'Bearer ' + getAuthToken(), 'Content-Type': 'application/json' }, body: JSON.stringify({ skill_id: skillId, enabled: true, config_overrides: {} }) }).then(function(r) { return r.json(); }))
         .then(function() {
-          modal.remove();
+          modal.removeAfterClose();
           showToast('Skill attached to matter', 'success');
           // Refresh attachments if the settings tab is open
           ldAttachmentsLoaded = false;
           loadSkillMatterAttachments(skillId);
         })
         .catch(function(err) {
-          confirmBtn.disabled = false;
-          confirmBtn.textContent = 'Attach';
+          confirmBtn.loading = false;
           showToast('Failed to attach: ' + ((err && err.message) || 'Unknown error'), 'error');
         });
     });
@@ -2449,7 +2457,7 @@
     if (!modal || !mattersList) return;
 
     // Close skill details modal
-    if (skillDetailsModal) skillDetailsModal.classList.add('hidden');
+    if (skillDetailsModal) skillDetailsModal.open = false;
 
     var baseUrl = window.api && window.api.baseUrl ? window.api.baseUrl : (window.LanaConfig && window.LanaConfig.API_BASE_URL ? window.LanaConfig.API_BASE_URL : '');
     fetch(baseUrl + '/api/v1/matters', {
@@ -2490,7 +2498,7 @@
         });
       });
 
-      modal.classList.remove('hidden');
+      modal.open = true;
     }).catch(function(error) {
       console.error('Error loading matters:', error);
       showToast('Failed to load matters. Please try again.', 'error');
@@ -2561,14 +2569,110 @@
   // ═══════════════════════════════════════════════════════════════
 
   function handleSearch(e) {
-    searchTerm = e.target.value.toLowerCase();
-    filterSkills();
+    var value = String((e && e.detail && e.detail.value) || '').trim();
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(function() {
+      if (value === searchText) return;
+      searchText = value;
+      searchTerm = value.toLowerCase();
+      if (skillsListView && skillsListView.dataSource) skillsListView.dataSource.setSearch(searchText);
+      filterSkills();
+    }, 300);
   }
 
+  // The Category select writes into the table's filter state, so the table's
+  // Clear filters resets it too; syncListState mirrors it back for the grid.
   function handleCategoryChange(e) {
     var detail = e.detail || {};
     selectedCategory = detail.value || 'all';
+    if (skillsListView) {
+      if (selectedCategory === 'all') skillsListView.removeFilter('category');
+      else skillsListView.addFilter('category', 'in', [selectedCategory]);
+    }
     filterSkills();
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // List table (docs/TABLE-STANDARD.md)
+  // ═══════════════════════════════════════════════════════════════
+
+  function populateListView(rows) {
+    if (!skillsListView || typeof skillsListView.setData !== 'function') return;
+    var tableApi = window.LanaSkillsTable;
+    skillsListView.setColumnFilterOptions(tableApi.columnFilterOptions(rows, window.LanaLibraryColumnFilters));
+    if (categoryFilter) {
+      categoryFilter.setAttribute('options', JSON.stringify(tableApi.categoryFilterOptions(rows)));
+    }
+    skillsListView.setData(rows);
+    // Re-apply toolbar state the table may not have had a data source for yet.
+    if (skillsListView.dataSource) {
+      if (searchText) skillsListView.dataSource.setSearch(searchText);
+      if (selectedCategory !== 'all') skillsListView.addFilter('category', 'in', [selectedCategory]);
+    }
+    syncListState();
+  }
+
+  function showListLoadError() {
+    if (!skillsListView || typeof skillsListView.setData !== 'function') return;
+    skillsListView.emptyText = 'Skills could not be loaded. Check your connection and try again.';
+    skillsListView.emptyActionLabel = '';
+    skillsListView.setData([]);
+    setSkillsCount('');
+  }
+
+  function setSkillsCount(text) {
+    ['skillsCount', 'skillsSectionCount'].forEach(function(id) {
+      var node = document.getElementById(id);
+      if (node) node.textContent = text;
+    });
+  }
+
+  function currentListFilters() {
+    var source = skillsListView && skillsListView.dataSource;
+    return source && source.query ? (source.query.filters || {}) : {};
+  }
+
+  function syncListState() {
+    if (!skillsListView) return;
+    var tableApi = window.LanaSkillsTable;
+    var filters = currentListFilters();
+    var filtered = tableApi.isFiltered(searchText, filters);
+    skillsListView.emptyText = tableApi.emptyText(filtered);
+    skillsListView.emptyActionLabel = filtered ? '' : 'Create a skill';
+
+    // Clear filters (or a header filter) may have changed the category.
+    var category = filters.category && Array.isArray(filters.category.value) && filters.category.value.length === 1
+      ? String(filters.category.value[0]) : 'all';
+    if (category !== selectedCategory) {
+      selectedCategory = category;
+      if (viewMode === 'grid') filterSkills();
+    }
+    if (categoryFilter && categoryFilter.value !== category) categoryFilter.value = category;
+
+    if (viewMode === 'list') {
+      var pagination = skillsListView.dataSource ? skillsListView.dataSource.pagination : null;
+      setSkillsCount(tableApi.countLabel(pagination ? pagination.total : allSkills.length));
+    }
+  }
+
+  function currentSortOrder() {
+    var button = document.getElementById('skillsSortOrder');
+    return button && button.dataset.order === 'asc' ? 'asc' : 'desc';
+  }
+
+  function applyListSort(column, direction) {
+    if (!skillsListView) return;
+    skillsListView.sortBy = column;
+    skillsListView.sortDir = direction;
+    if (skillsListView.dataSource) skillsListView.dataSource.setSort(column, direction);
+  }
+
+  // A header click sorted the table: mirror it in the toolbar.
+  function syncToolbarSort(column, direction) {
+    var select = document.getElementById('skillsSort');
+    var button = document.getElementById('skillsSortOrder');
+    if (select && column && select.value !== column) select.value = column;
+    if (button) button.dataset.order = direction === 'asc' ? 'asc' : 'desc';
   }
 
   function handleMatterSearch(e) {
@@ -2620,44 +2724,10 @@
     });
 
     gridPage = 1; // Reset to first page
-    renderGridView();
-    updateFilterChips();
-  }
-
-  function updateFilterChips() {
-    if (!filterChips) return;
-
-    var chips = [];
-
-    if (searchTerm) {
-      chips.push('<span class="filter-chip">Search: "' + escapeHtml(searchTerm) + '"'
-        + '<button class="filter-chip-remove" data-filter="search">&times;</button></span>');
+    if (viewMode === 'grid') {
+      renderGridView();
+      setSkillsCount(window.LanaSkillsTable.countLabel(filteredSkills.length));
     }
-
-    if (selectedCategory !== 'all') {
-      chips.push('<span class="filter-chip">Category: ' + formatCategory(selectedCategory)
-        + '<button class="filter-chip-remove" data-filter="category">&times;</button></span>');
-    }
-
-    filterChips.innerHTML = chips.join('');
-
-    // Attach remove listeners
-    var removeButtons = filterChips.querySelectorAll('.filter-chip-remove');
-    removeButtons.forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        var filterType = btn.dataset.filter;
-        if (filterType === 'search') {
-          searchInput.value = '';
-          searchTerm = '';
-        } else if (filterType === 'category') {
-          if (categoryFilter && typeof categoryFilter.setValue === 'function') {
-            categoryFilter.setValue('all');
-          }
-          selectedCategory = 'all';
-        }
-        filterSkills();
-      });
-    });
   }
 
   function setViewMode(mode) {
@@ -2670,12 +2740,11 @@
       // Show grid, hide list
       if (gridViewContainer) gridViewContainer.classList.remove('hidden');
       if (skillsListView) skillsListView.style.display = 'none';
-      if (listPagination) listPagination.style.display = 'none';
       // Load data for grid if needed
       if (allSkills.length === 0) {
         loadSkills();
       } else {
-        renderGridView();
+        filterSkills();
       }
     } else {
       if (listViewBtn) listViewBtn.setAttribute('variant', 'primary');
@@ -2683,10 +2752,11 @@
       // Show list, hide grid
       if (gridViewContainer) gridViewContainer.classList.add('hidden');
       if (skillsListView) skillsListView.style.display = '';
-      if (listPagination) listPagination.style.display = '';
       // Load data for list if needed
       if (allSkills.length === 0) {
         loadSkills();
+      } else {
+        syncListState();
       }
     }
   }
@@ -2696,15 +2766,15 @@
   // ═══════════════════════════════════════════════════════════════
 
   function closeAllModals() {
-    if (skillDetailsModal) skillDetailsModal.classList.add('hidden');
-    if (matterSelectorModal) matterSelectorModal.classList.add('hidden');
+    if (skillDetailsModal) skillDetailsModal.open = false;
+    if (matterSelectorModal) matterSelectorModal.open = false;
     var learnMoreModal = document.getElementById('learn-more-modal');
-    if (learnMoreModal) learnMoreModal.classList.add('hidden');
+    if (learnMoreModal) learnMoreModal.open = false;
     selectedSkill = null;
     selectedMatters = [];
     closeSkillImportModal();
     // BUG-009 FIX: Do NOT call closeSkillBuilder() here.
-    // closeAllModals() is triggered by generic .modal-close buttons and overlay clicks.
+    // closeAllModals() is triggered by the other modals' lex-close (close, backdrop, Escape).
     // If the builder modal is open, those generic handlers would destroy unsaved builder state
     // (skillSteps, editingSkillId, mxDiagnostics) even when the user is still working.
     // The builder has its own dedicated close/cancel buttons wired to closeSkillBuilder().
@@ -2723,14 +2793,14 @@
     }
     var modal = document.getElementById('skill-import-modal');
     if (modal) {
-      modal.classList.remove('hidden');
+      modal.open = true;
     }
   }
 
   function closeSkillImportModal() {
     var modal = document.getElementById('skill-import-modal');
     if (modal) {
-      modal.classList.add('hidden');
+      modal.open = false;
     }
     clearSkillImportFile();
     skillImportState.isImporting = false;

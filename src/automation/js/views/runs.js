@@ -1,14 +1,24 @@
 import {
   badge,
+  createServerTableStore,
+  dateTimeCell,
   drawerSection,
   drawerStatGrid,
-  hydrateLexDataTable,
-  lexDataTable,
+  invalidateServerTable,
   lexEmpty,
+  matterLinkCell,
+  mountServerTable,
+  mutedCell,
+  nameCell,
   sectionIntro,
-  surface
+  serverTableSection,
+  textCell
 } from '../shared/ui.js';
-import { escapeAttribute, escapeHtml, formatDate, formatDateTime, getOrganizationTimezone, normalizeText } from '../shared/utils.js';
+import { escapeAttribute, escapeHtml, formatDate, getOrganizationTimezone, normalizeText } from '../shared/utils.js';
+
+const TABLE_ID = 'automationRunsTable';
+const TOOLBAR_PREFIX = 'automationRuns';
+const Queries = () => window.AutomationTableQueries;
 
 function statusClass(status) {
   const normalized = normalizeText(status);
@@ -373,86 +383,260 @@ function renderRunDetailsPanel(context) {
   `;
 }
 
-export function renderRuns(context) {
-  const filters = context.state.filters.runs || {};
-  const visibleRuns = context.state.runs || [];
-  const totalRuns = context.state.runsPagination?.total || visibleRuns.length;
-  const perPage = Math.max(parseInt(filters.perPage, 10) || 25, 1);
-  const page = Math.max(parseInt(filters.page, 10) || 1, 1);
-  const totalPages = Math.max(1, Math.ceil(totalRuns / perPage));
-  const safePage = Math.min(page, totalPages);
-  const offset = Number(context.state.runsPagination?.offset || ((safePage - 1) * perPage));
-  const visibleCount = visibleRuns.length;
-  const start = visibleCount ? offset + 1 : 0;
-  const end = visibleCount ? offset + visibleCount : 0;
-  const timeZone = getOrganizationTimezone(context);
+// Status badge colours for the table.
+const RUN_STATUS_COLORS = {
+  completed: 'success',
+  failed: 'error',
+  rejected: 'error',
+  cancelled: '',
+  pending: 'warning',
+  paused: 'warning',
+  awaiting_approval: 'warning',
+  running: 'info',
+  in_progress: 'info'
+};
 
-  const runRows = visibleRuns.map((run) => {
-    const scope = runScope(run);
-    return {
-      execution_id: run.execution_id || '',
-      automation_name: run.automation_name || run.automation_id || 'Automation',
-      scope: scope.label,
-      matter_name: run.matter_name || run.client_matter_id || 'Org-wide',
-      trigger_event_type: run.trigger_event_type || 'manual',
-      started_at: formatDateTime(run.started_at || run.created_at, { timeZone }),
-      status: normalizeText(run.status) || 'pending',
-      duration: formatDuration(run.execution_duration_ms)
+// Rows keep raw values; the renderers format them.
+export function mapRunRow(run) {
+  const scope = runScope(run);
+  const matterId = scope.type === 'matter'
+    ? (run.client_matter_id || run.matter_id || run.automation_config?.scope?.matter_id || '')
+    : '';
+  const duration = Number(run.execution_duration_ms ?? run.duration_ms);
+  return {
+    execution_id: run.execution_id || run.id || '',
+    automation_name: run.automation_name || run.automation_id || 'Automation',
+    scope: scope.type,
+    matter: matterId,
+    matter_name: scope.type === 'matter' ? (run.matter_name || '') : '',
+    trigger_event_type: run.trigger_event_type || 'manual',
+    started_at: run.started_at || '',
+    created_at: run.created_at || '',
+    status: normalizeText(run.status) || 'pending',
+    duration: run.execution_duration_ms === null || run.execution_duration_ms === undefined || !Number.isFinite(duration) ? null : duration,
+    _raw: run
+  };
+}
+
+function runsStore(context) {
+  context.state.tables = context.state.tables || {};
+  if (!context.state.tables.runs) {
+    context.state.tables.runs = {
+      ...createServerTableStore(),
+      facets: null,
+      workspaces: [],
+      seen: { trigger_event_type: [], status: [], matter: [] },
+      total: null,
+      failedOnPage: 0
     };
+  }
+  return context.state.tables.runs;
+}
+
+export function invalidateRunsTable(context) {
+  invalidateServerTable(context.state.tables?.runs);
+}
+
+function cellRenderers() {
+  const Q = Queries();
+  return {
+    automation_name: (value) => nameCell(value),
+    scope: (value) => (value ? textCell(Q.humanizeLabel(value)) : mutedCell()),
+    matter: (value, row) => matterLinkCell(value, row.matter_name, 'Matter'),
+    trigger_event_type: (value) => (value ? textCell(Q.humanizeEvent(value)) : mutedCell()),
+    started_at: dateTimeCell,
+    created_at: dateTimeCell,
+    status: (value) => badge(Q.humanizeLabel(value || 'pending'), RUN_STATUS_COLORS[value] || ''),
+    duration: (value) => {
+      const text = Q.humanizeDuration(value);
+      return text ? textCell(Q.capitalizeFirst(text)) : mutedCell();
+    }
+  };
+}
+
+function statusOptions(store) {
+  const Q = Queries();
+  const statuses = store.facets?.statuses?.length ? store.facets.statuses : [...Q.RUN_STATUSES, ...store.seen.status];
+  return Q.optionsFromValues(statuses);
+}
+
+function filterOptions(store) {
+  const Q = Queries();
+  const shared = window.LanaLibraryColumnFilters;
+  const triggers = store.facets?.trigger_event_types?.length
+    ? store.facets.trigger_event_types
+    : ['manual', ...store.seen.trigger_event_type];
+  const map = {
+    automation_name: { text: true, placeholder: 'Automation name contains...' },
+    scope: { options: Q.SCOPE_OPTIONS },
+    trigger_event_type: { options: Q.optionsFromValues(triggers, Q.humanizeEvent) },
+    status: { options: statusOptions(store) },
+    duration: { single: true, options: Q.durationOptions() }
+  };
+  // Every workspace when the list loads; until then the matters seen on loaded pages.
+  const matters = store.workspaces.length ? store.workspaces : store.seen.matter;
+  if (matters.length) map.matter = { options: matters };
+  if (shared) {
+    map.started_at = { single: true, options: shared.EDITED_RANGE_OPTIONS };
+    map.created_at = { single: true, options: shared.EDITED_RANGE_OPTIONS };
+  }
+  return map;
+}
+
+function applyFilterOptions(store) {
+  const table = document.getElementById(TABLE_ID);
+  if (table && typeof table.setColumnFilterOptions === 'function') {
+    table.setColumnFilterOptions(filterOptions(store));
+  }
+}
+
+// Trigger and status values in use, and the workspace list for the Matter
+// column. A missing facet route (older servers) falls back to built-in
+// statuses and the triggers seen on loaded pages.
+function loadFilterSources(context, store) {
+  if (store.sourcesRequested) return;
+  store.sourcesRequested = true;
+  context.fetchJson('/api/executions/facets', { headers: context.authHeaders() })
+    .then((response) => {
+      const Q = Queries();
+      store.facets = {
+        trigger_event_types: Q.facetValues(response, 'trigger_event_types'),
+        statuses: Q.facetValues(response, 'statuses')
+      };
+      applyFilterOptions(store);
+    })
+    .catch(() => {
+      store.facets = null;
+    });
+  const shared = window.LanaLibraryColumnFilters;
+  if (shared && window.api) {
+    // Runs carry the workspace uuid (client_matter_id), so filter by id.
+    shared.loadWorkspaces(window.api).then((matters) => {
+      store.workspaces = shared.workspaceOptions(matters, 'id');
+      applyFilterOptions(store);
+    }).catch(() => {});
+  }
+}
+
+function rememberSeen(store, rows) {
+  let changed = false;
+  ['trigger_event_type', 'status'].forEach((field) => {
+    rows.forEach((row) => {
+      const value = row[field];
+      if (value && !store.seen[field].includes(value)) {
+        store.seen[field].push(value);
+        changed = true;
+      }
+    });
   });
+  rows.forEach((row) => {
+    if (row.matter && !store.seen.matter.some((option) => option.value === row.matter)) {
+      store.seen.matter.push({ value: row.matter, label: row.matter_name || row.matter });
+      if (!store.workspaces.length) changed = true;
+    }
+  });
+  if (changed) applyFilterOptions(store);
+}
+
+async function fetchRunsPage(context, query, search) {
+  const Q = Queries();
+  const params = Q.runsParams(query, search);
+  const response = await context.fetchJson(`/api/executions?${params.toString()}`, { headers: context.authHeaders() });
+  const runs = response?.data || response?.executions || [];
+  context.state.runs = runs;
+  return {
+    rows: runs.map(mapRunRow),
+    pagination: Q.tablePagination(response, query, runs.length)
+  };
+}
+
+function bannerBadges(store) {
+  return `
+    <span id="automationRunsTotalBadge">${badge(store.total === null ? 'Loading runs' : `${store.total} total ${store.total === 1 ? 'run' : 'runs'}`)}</span>
+    <span id="automationRunsFailedBadge">${badge(`${store.failedOnPage} failed on this page`, store.failedOnPage ? 'warning' : '')}</span>
+  `;
+}
+
+function updateBannerBadges(store, result) {
+  store.total = Number(result.pagination?.total) || 0;
+  store.failedOnPage = result.rows.filter((row) => row.status === 'failed').length;
+  const total = document.getElementById('automationRunsTotalBadge');
+  const failed = document.getElementById('automationRunsFailedBadge');
+  if (!total || !failed) return;
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = bannerBadges(store);
+  total.replaceWith(wrapper.querySelector('#automationRunsTotalBadge'));
+  failed.replaceWith(wrapper.querySelector('#automationRunsFailedBadge'));
+}
+
+export function renderRuns(context) {
+  const store = runsStore(context);
+  const Q = Queries();
 
   context.els.viewContent.innerHTML = `
     ${sectionIntro({
       eyebrow: 'Operations',
       title: 'Run History',
       copy: 'Track every triggered run, inspect step outcomes, review artifacts, and control active executions.',
-      badges: [
-        badge(`${totalRuns} total runs`),
-        badge(
-          `${context.state.runs.filter((run) => normalizeText(run.status) === 'failed').length} failed in this page`,
-          context.state.runs.some((run) => normalizeText(run.status) === 'failed') ? 'warning' : ''
-        )
-      ]
+      badges: [bannerBadges(store)]
     })}
 
-    <div class="runs-history-layout no-detail">
-      ${surface({
-        title: 'Triggered Runs',
-        subtitle: 'All automation executions across the organization.',
-        body: `
-          ${lexDataTable({
-            id: 'automationRunsTable',
-            columns: ['automation_name', 'scope', 'matter_name', 'trigger_event_type', 'started_at', 'status', 'duration'],
-            labels: ['Automation', 'Scope', 'Matter', 'Trigger', 'Started', 'Status', 'Duration'],
-            emptyText: 'No runs found',
-            sortBy: 'started_at',
-            sortDir: 'desc',
-            idKey: 'execution_id',
-            limit: perPage,
-            ariaLabel: 'Triggered runs'
-          })}
-
-          <div class="connectors-pagination">
-            <div class="connectors-page-meta">
-              Showing ${start}-${end} of ${totalRuns}
-            </div>
-            <div class="row-actions">
-              <lex-btn variant="secondary" size="sm" data-runs-page="${safePage - 1}" ${safePage <= 1 ? 'disabled' : ''}>Previous</lex-btn>
-              <span class="connectors-page-indicator">Page ${safePage} of ${totalPages}</span>
-              <lex-btn variant="secondary" size="sm" data-runs-page="${safePage + 1}" ${safePage >= totalPages ? 'disabled' : ''}>Next</lex-btn>
-            </div>
-          </div>
-        `
-      })}
-
-    </div>
+    ${serverTableSection({
+      prefix: TOOLBAR_PREFIX,
+      store,
+      title: 'Triggered Runs',
+      searchLabel: 'Search and filter runs',
+      searchPlaceholder: 'Search runs...',
+      sortOptions: [
+        { value: 'started_at', label: 'Started' },
+        { value: 'created_at', label: 'Created' },
+        { value: 'automation_name', label: 'Automation' },
+        { value: 'scope', label: 'Scope' },
+        { value: 'matter', label: 'Matter' },
+        { value: 'trigger_event_type', label: 'Trigger' },
+        { value: 'status', label: 'Status' },
+        { value: 'duration', label: 'Duration' }
+      ],
+      filter: { label: 'Status', key: 'status', options: statusOptions(store) },
+      table: {
+        id: TABLE_ID,
+        columns: ['automation_name', 'scope', 'matter', 'trigger_event_type', 'started_at', 'created_at', 'status', 'duration'],
+        labels: ['Automation', 'Scope', 'Matter', 'Trigger', 'Started', 'Created', 'Status', 'Duration'],
+        sortableColumns: Object.keys(Q.RUNS_SORT_BY),
+        sortBy: 'started_at',
+        sortDir: 'desc',
+        idKey: 'execution_id',
+        emptyText: 'No runs yet',
+        ariaLabel: 'Triggered runs'
+      }
+    })}
     ${renderRunDetailsPanel(context)}
   `;
 
-  hydrateLexDataTable('automationRunsTable', runRows, async (row) => {
-    if (row?.execution_id && typeof context.loadRunDetail === 'function') {
-      await context.loadRunDetail(row.execution_id);
-      context.renderCurrentView();
+  mountServerTable({
+    id: TABLE_ID,
+    prefix: TOOLBAR_PREFIX,
+    store,
+    fetchPage: (query, search) => fetchRunsPage(context, query, search),
+    renderers: cellRenderers(),
+    filterOptions: () => filterOptions(store),
+    filterKey: 'status',
+    noun: ['run', 'runs'],
+    emptyText: {
+      base: 'No runs yet',
+      filtered: 'No matching runs. Try a different search or filter.'
+    },
+    errorText: 'Runs could not be loaded. Check your connection and try again.',
+    onLoaded: (result) => {
+      rememberSeen(store, result.rows);
+      updateBannerBadges(store, result);
+    },
+    onRowClick: async (row) => {
+      if (row?.execution_id && typeof context.loadRunDetail === 'function') {
+        await context.loadRunDetail(row.execution_id);
+        context.renderCurrentView();
+      }
     }
   });
+  loadFilterSources(context, store);
 }

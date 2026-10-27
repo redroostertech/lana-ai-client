@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - Lana AI</title>
-    <link rel="stylesheet" href="../css/tailwind-output.css">
+    <link rel="stylesheet" href="../css/lex-tokens.css">
+  <link rel="stylesheet" href="../css/admin/admin-tables.css">
+  <link rel="stylesheet" href="../css/tailwind-output.css">
   <script src="../js/tailwind-loader.js"></script>
     <script src="../js/error-reporter.js"></script>
     <script src="../js/config.js"></script>
@@ -14,6 +16,7 @@
     <script src="../js/api.js"></script>
     <script src="../js/components.js"></script>
     <script src="../js/menu.js"></script>
+    <script src="../js/shared/header-user-menu.js"></script>
     <script src="../js/notifications.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
@@ -119,54 +122,12 @@
                             <span id="notificationBadge" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">0</span>
                         </button>
                         <!-- User Menu -->
-                        <div class="relative" id="userMenu">
-                            <button class="flex items-center gap-2 text-gray-700 hover:text-gray-900 p-1" title="Settings">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                </svg>
-                            </button>
-                            <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-                                <a href="../settings-v2.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
-                                <hr class="my-1">
-                                <button id="logoutBtn" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sign out</button>
-                            </div>
-                        </div>
+                        <div class="relative" id="userMenu" data-header-user-menu data-settings-href="../settings-v2.html" data-login-href="../login.html"></div>
                     </div>
                 </div>
             </header>
 
-            <!-- Notification Panel Overlay -->
-            <div id="notificationOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
-
-            <!-- Notification Slide-out Panel -->
-            <div id="notificationPanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
-                <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
-                    <h2 class="text-lg font-semibold text-gray-900">Notifications</h2>
-                    <div class="flex items-center gap-3">
-                        <button id="markAllReadBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium hidden">Mark all read</button>
-                        <button id="refreshNotificationsBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                        </button>
-                        <button id="closeNotificationPanel" class="text-gray-400 hover:text-gray-600">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                        </button>
-                    </div>
-                </div>
-                <div class="flex border-b border-gray-200 px-6 flex-shrink-0">
-                    <button id="filterAll" class="px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">All</button>
-                    <button id="filterUnread" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700">Unread</button>
-                </div>
-                <div id="notificationList" class="flex-1 overflow-y-auto">
-                    <div id="notificationLoading" class="p-8 text-center">
-                        <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
-                        <p class="text-gray-500 mt-3 text-sm">Loading notifications...</p>
-                    </div>
-                </div>
-                <div id="notificationLoadingMore" class="hidden p-4 border-t border-gray-100 text-center flex-shrink-0">
-                    <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
-                </div>
-            </div>
+            <!-- Notification panel: lex-drawer mounted by js/notifications.js -->
 
             <!-- Content -->
             <main class="flex-1 overflow-y-auto p-6">
@@ -281,45 +242,45 @@
                     <!-- Recent Users (Admin Only) -->
                     <div id="recentUsersSection" class="bg-white rounded-lg shadow-sm p-6 hidden">
                         <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-lg font-semibold text-gray-900">Recent Users</h3>
+                            <div class="flex items-center gap-3"><h3 class="text-lg font-semibold text-gray-900">Recent Users</h3><span id="recentUsersCount" class="admin-table-toolbar-label text-sm" aria-live="polite"></span></div>
                             <a href="/admin/users.html" class="text-blue-600 hover:underline text-sm">View All</a>
                         </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full">
-                                <thead class="text-left text-sm text-gray-500 border-b">
-                                    <tr>
-                                        <th class="pb-2">User</th>
-                                        <th class="pb-2">Status</th>
-                                        <th class="pb-2">Joined</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="recentUsers" class="text-sm">
-                                    <tr><td colspan="3" class="py-4 text-gray-500">Loading...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
+                        <lex-table
+                            id="recentUsersTable"
+                            class="admin-table lex-table--card"
+                            column-filters
+                            columns="name,email,status,created_at"
+                            labels="Name,Email,Status,Created"
+                            sortable-columns="name,email,status,created_at"
+                            sort-by="created_at"
+                            sort-dir="desc"
+                            limit="20"
+                            id-key="id"
+                            empty-text="No users yet"
+                            aria-label="Recent users"
+                        ></lex-table>
                     </div>
 
                     <!-- Recent Matters -->
                     <div class="bg-white rounded-lg shadow-sm p-6">
                         <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-lg font-semibold text-gray-900">Recent Matters</h3>
+                            <div class="flex items-center gap-3"><h3 class="text-lg font-semibold text-gray-900">Recent Matters</h3><span id="recentMattersCount" class="admin-table-toolbar-label text-sm" aria-live="polite"></span></div>
                             <a href="/matters.html" class="text-blue-600 hover:underline text-sm">View All</a>
                         </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full">
-                                <thead class="text-left text-sm text-gray-500 border-b">
-                                    <tr>
-                                        <th class="pb-2">Matter</th>
-                                        <th class="pb-2">Status</th>
-                                        <th class="pb-2">Created</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="recentMatters" class="text-sm">
-                                    <tr><td colspan="3" class="py-4 text-gray-500">Loading...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
+                        <lex-table
+                            id="recentMattersTable"
+                            class="admin-table lex-table--card"
+                            column-filters
+                            columns="name,organization_name,status,created_at"
+                            labels="Matter,Organization,Status,Created"
+                            sortable-columns="name,organization_name,status,created_at"
+                            sort-by="created_at"
+                            sort-dir="desc"
+                            limit="20"
+                            id-key="id"
+                            empty-text="No matters yet"
+                            aria-label="Recent matters"
+                        ></lex-table>
                     </div>
                 </div>
 
@@ -345,12 +306,8 @@
     </div>
 
     <!-- Create User Modal -->
-    <div id="createUserModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-            <div class="p-6 border-b border-gray-200">
-                <h3 class="text-lg font-semibold">Create New User</h3>
-            </div>
-            <form id="createUserForm" class="p-6 space-y-4">
+    <lex-modal id="createUserModal" heading="Create New User" size="md">
+            <form id="createUserForm" class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
                     <input type="email" name="email" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
@@ -369,21 +326,14 @@
                         <input type="text" name="last_name" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                     </div>
                 </div>
-                <div class="flex justify-end space-x-3 pt-4">
-                    <button type="button" onclick="closeModal('createUserModal')" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
-                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Create User</button>
-                </div>
             </form>
-        </div>
-    </div>
+            <lex-btn data-slot="footer" variant="secondary" onclick="closeModal('createUserModal')">Cancel</lex-btn>
+            <lex-btn data-slot="footer" variant="primary" type="submit" form="createUserForm">Create User</lex-btn>
+    </lex-modal>
 
     <!-- Create Organization Modal -->
-    <div id="createOrgModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-            <div class="p-6 border-b border-gray-200">
-                <h3 class="text-lg font-semibold">Create New Organization</h3>
-            </div>
-            <form id="createOrgForm" class="p-6 space-y-4">
+    <lex-modal id="createOrgModal" heading="Create New Organization" size="md">
+            <form id="createOrgForm" class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Organization Name</label>
                     <input type="text" name="name" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
@@ -396,43 +346,52 @@
                     <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
                     <textarea name="description" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
                 </div>
-                <div class="flex justify-end space-x-3 pt-4">
-                    <button type="button" onclick="closeModal('createOrgModal')" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
-                    <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Create Organization</button>
-                </div>
             </form>
-        </div>
-    </div>
+            <lex-btn data-slot="footer" variant="secondary" onclick="closeModal('createOrgModal')">Cancel</lex-btn>
+            <lex-btn data-slot="footer" variant="primary" type="submit" form="createOrgForm">Create Organization</lex-btn>
+    </lex-modal>
 
     <!-- Create Matter Modal -->
-    <div id="createMatterModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-            <div class="p-6 border-b border-gray-200">
-                <h3 class="text-lg font-semibold">Create New Matter</h3>
-            </div>
-            <form id="createMatterForm" class="p-6 space-y-4">
+    <lex-modal id="createMatterModal" heading="Create New Matter" size="md">
+            <form id="createMatterForm" class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Matter Name</label>
                     <input type="text" name="name" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Organization</label>
-                    <select name="organization_id" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" id="matterOrgSelect">
-                        <option value="">Select organization...</option>
-                    </select>
+                    <lex-select name="organization_id" id="matterOrgSelect" placeholder="Select organization..." searchable="true" options='[]' aria-label="Organization"></lex-select>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
                     <textarea name="description" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
                 </div>
-                <div class="flex justify-end space-x-3 pt-4">
-                    <button type="button" onclick="closeModal('createMatterModal')" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
-                    <button type="submit" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">Create Matter</button>
-                </div>
             </form>
-        </div>
-    </div>
+            <lex-btn data-slot="footer" variant="secondary" onclick="closeModal('createMatterModal')">Cancel</lex-btn>
+            <lex-btn data-slot="footer" variant="primary" type="submit" form="createMatterForm">Create Matter</lex-btn>
+    </lex-modal>
 
+    <!-- Lex UI core + the components this page uses -->
+    <script src="../js/lex/lex.core.js"></script>
+    <script src="../js/lex/lex.icons.js"></script>
+    <script src="../js/lex/components/form/lex-dropdown-btn.js"></script>
+    <script src="../js/lex/lex.data.js"></script>
+    <script src="../js/lex/lex.forms.js"></script>
+    <script src="../js/lex/lex.state.js"></script>
+    <script src="../js/lex/lex.utils.js"></script>
+    <script src="../js/lex/lex-nav.js"></script>
+    <script src="../js/lex/components/foundation/lex-empty.js"></script>
+    <script src="../js/lex/components/foundation/lex-badge.js"></script>
+    <script src="../js/lex/components/foundation/lex-modal.js"></script>
+    <script src="../js/lex/components/foundation/lex-drawer.js"></script>
+    <!-- After lex-modal/lex-drawer: they must capture footer lex-btns before those upgrade -->
+    <script src="../js/lex/components/foundation/lex-btn.js"></script>
+    <script src="../js/lex/components/form/lex-select.js"></script>
+    <script src="../js/lex/components/data/lex-table.js"></script>
+    <script src="../js/shared/library-column-filters.js"></script>
+    <script src="../js/admin/admin-table-kit.js"></script>
+    <script src="../js/admin/admin-client-tables.js"></script>
+    <script src="../js/admin/admin-dashboard-tables.js"></script>
     <script>
 
         document.addEventListener('DOMContentLoaded', async function() {
@@ -465,22 +424,6 @@
             }
             loadUserInfo();
 
-            // User menu toggle
-            const userMenu = document.getElementById('userMenu');
-            const userDropdown = document.getElementById('userDropdown');
-            userMenu.addEventListener('click', (e) => {
-              e.stopPropagation();
-              userDropdown.classList.toggle('hidden');
-            });
-            document.addEventListener('click', (e) => {
-              if (!userMenu.contains(e.target)) userDropdown.classList.add('hidden');
-            });
-
-            // Logout handler
-            document.getElementById('logoutBtn').addEventListener('click', async () => {
-              await api.logout();
-              window.location.href = '../login.html';
-            });
 
             // Sidebar toggle
             const sidebar = document.getElementById('sidebar');
@@ -726,74 +669,61 @@
             return actionFormatted;
         }
 
+        /**
+         * Recent Users / Recent Matters: client-side lex-tables with the newest
+         * few records (js/admin/admin-dashboard-tables.js). Rows keep raw
+         * values; the renderers format them.
+         */
+        var recentTables = {};
+        function recentTable(key, renderers) {
+            if (recentTables[key]) return recentTables[key];
+            var table = document.getElementById(key + 'Table');
+            table.setCellRenderers(renderers);
+            table.addEventListener('click', function (e) {
+                var link = e.target.closest ? e.target.closest('[data-matter-id]') : null;
+                if (!link) return;
+                e.stopPropagation();
+                AdminTableKit.openWorkspace(link.getAttribute('data-matter-id'));
+            });
+            recentTables[key] = {
+                table: table,
+                count: AdminClientTables.bindCount(table, [key + 'Count'], key === 'recentUsers' ? ['user', 'users'] : ['matter', 'matters'])
+            };
+            return recentTables[key];
+        }
+
+        function fillRecent(key, rows, renderers, filters) {
+            var entry = recentTable(key, renderers);
+            entry.table.setColumnFilterOptions(filters(rows));
+            entry.table.setData(rows);
+            entry.count.update();
+        }
+
         async function loadRecentUsers() {
+            await AdminTableKit.whenTableReady();
+            var T = AdminDashboardTables;
             try {
-                const res = await api.getUsers({ limit: 5, sort: 'created_at', order: 'desc' });
-                const container = document.getElementById('recentUsers');
-
-                if (!res.users || res.users.length === 0) {
-                    container.innerHTML = '<tr><td colspan="3" class="py-4 text-gray-500">No users yet</td></tr>';
-                    return;
-                }
-
-                container.innerHTML = res.users.map(user => `
-                    <tr class="border-b border-gray-100">
-                        <td class="py-3">
-                            <div class="flex items-center">
-                                <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center mr-3">
-                                    <span class="text-gray-600 text-xs font-medium">${(user.first_name?.[0] || user.username?.[0] || 'U').toUpperCase()}</span>
-                                </div>
-                                <div>
-                                    <p class="font-medium text-gray-900">${user.first_name || ''} ${user.last_name || user.username || ''}</p>
-                                    <p class="text-xs text-gray-500">${user.email}</p>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="py-3">
-                            <span class="px-2 py-1 text-xs rounded-full ${user.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
-                                ${user.is_active ? 'Active' : 'Inactive'}
-                            </span>
-                        </td>
-                        <td class="py-3 text-gray-500">${formatDate(user.created_at)}</td>
-                    </tr>
-                `).join('');
+                const res = await api.getUsers({ limit: T.RECENT_LIMIT, sort: 'created_at', order: 'desc' });
+                fillRecent('recentUsers', (res.users || []).map(T.mapUser), T.userRenderers(), T.userFilters);
             } catch (error) {
                 // Hide the section if we don't have permission
                 if (error.status === 403) {
                     document.getElementById('recentUsersSection').classList.add('hidden');
                 } else {
-                    document.getElementById('recentUsers').innerHTML = '<tr><td colspan="3" class="py-4 text-gray-500">Unable to load users</td></tr>';
+                    recentTable('recentUsers', T.userRenderers()).table.setError('Users could not be loaded.');
                 }
             }
         }
 
         async function loadRecentMatters() {
+            await AdminTableKit.whenTableReady();
+            var T = AdminDashboardTables;
             try {
-                const res = await api.getMatters({ limit: 5 });
-                const container = document.getElementById('recentMatters');
-                const matters = res.matters || res;
-
-                if (!matters || matters.length === 0) {
-                    container.innerHTML = '<tr><td colspan="3" class="py-4 text-gray-500">No matters yet</td></tr>';
-                    return;
-                }
-
-                container.innerHTML = matters.map(matter => `
-                    <tr class="border-b border-gray-100">
-                        <td class="py-3">
-                            <p class="font-medium text-gray-900">${matter.name}</p>
-                            <p class="text-xs text-gray-500">${matter.organization_name || ''}</p>
-                        </td>
-                        <td class="py-3">
-                            <span class="px-2 py-1 text-xs rounded-full ${getStatusClass(matter.status)}">
-                                ${matter.status || 'active'}
-                            </span>
-                        </td>
-                        <td class="py-3 text-gray-500">${formatDate(matter.created_at)}</td>
-                    </tr>
-                `).join('');
+                const res = await api.getMatters({ limit: T.RECENT_LIMIT });
+                const matters = res.matters || res || [];
+                fillRecent('recentMatters', (Array.isArray(matters) ? matters : []).map(T.mapMatter), T.matterRenderers(), T.matterFilters);
             } catch (error) {
-                document.getElementById('recentMatters').innerHTML = '<tr><td colspan="3" class="py-4 text-red-500">Failed to load</td></tr>';
+                recentTable('recentMatters', T.matterRenderers()).table.setError('Matters could not be loaded.');
             }
         }
 
@@ -803,25 +733,18 @@
                 const select = document.getElementById('matterOrgSelect');
                 const orgList = orgs.organizations || orgs;
 
-                orgList.forEach(org => {
-                    const option = document.createElement('option');
-                    option.value = org.id;
-                    option.textContent = org.name;
-                    select.appendChild(option);
-                });
+                select.setAttribute('options', JSON.stringify((orgList || []).map(org => ({ value: String(org.id), label: org.name || String(org.id) }))));
             } catch (error) {
                 console.error('Failed to load organizations:', error);
             }
         }
 
         function openModal(id) {
-            document.getElementById(id).classList.remove('hidden');
-            document.getElementById(id).classList.add('flex');
+            document.getElementById(id).open = true;
         }
 
         function closeModal(id) {
-            document.getElementById(id).classList.add('hidden');
-            document.getElementById(id).classList.remove('flex');
+            document.getElementById(id).open = false;
         }
 
         document.getElementById('createUserForm').addEventListener('submit', async function(e) {
@@ -861,10 +784,17 @@
             e.preventDefault();
             try {
                 const data = Object.fromEntries(new FormData(this));
+                // lex-select is not a form control: read the organization from it.
+                data.organization_id = String(document.getElementById('matterOrgSelect').value || '');
+                if (!data.organization_id) {
+                    Toast.error('Select an organization');
+                    return;
+                }
                 await api.createMatter(data);
                 Toast.success('Matter created successfully');
                 closeModal('createMatterModal');
                 this.reset();
+                document.getElementById('matterOrgSelect').value = '';
                 loadRecentMatters();
                 loadStats();
             } catch (error) {

@@ -17,7 +17,10 @@
     // filter. The filter is sent to the search API so narrowing to a type is
     // not limited to whichever records happened to appear on the first page.
     lastResults: [],
-    activeType: null
+    activeType: null,
+    root: null,        // the palette content (.unified-search-modal)
+    host: null,        // the lex-modal palette hosting it
+    pendingOpen: null  // { query } while lex-modal is still loading
   };
 
   const RECENT_SEARCHES_KEY = 'lana-recent-global-searches';
@@ -37,25 +40,12 @@
     const style = document.createElement('style');
     style.id = 'unified-search-styles';
     style.textContent = `
-      .unified-search-backdrop {
-        position: fixed;
-        inset: 0;
-        z-index: 10000;
-        display: none;
-        align-items: stretch;
-        justify-content: stretch;
-        padding: 0;
-        background: #ffffff;
-      }
-
-      .unified-search-backdrop[data-open="true"] {
-        display: flex;
-      }
-
+      /* Hosted in a lex-modal palette (top-aligned, flush, no header). The
+         panel caps its height at calc(88vh - 32px); fill it. */
       .unified-search-modal {
         width: 100%;
-        height: 100vh;
-        max-height: 100vh;
+        height: calc(88vh - 32px);
+        max-height: calc(88vh - 32px);
         display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(24rem, 36rem);
         background: #ffffff;
@@ -98,23 +88,8 @@
 
       .unified-search-entity-filter {
         flex: 0 0 auto;
-        height: 2.125rem;
         min-width: 10rem;
         max-width: 13rem;
-        border: 1px solid #d1d5db;
-        border-radius: 6px;
-        background: #ffffff;
-        color: #374151;
-        font-size: 0.8125rem;
-        line-height: 1;
-        padding: 0 0.625rem;
-        cursor: pointer;
-      }
-
-      .unified-search-entity-filter:focus {
-        outline: 2px solid rgba(79, 70, 229, 0.22);
-        outline-offset: 1px;
-        border-color: #4f46e5;
       }
 
       .unified-search-close {
@@ -463,14 +438,7 @@
       }
 
       @media (max-width: 760px) {
-        .unified-search-backdrop {
-          padding: 0;
-        }
-
         .unified-search-modal {
-          min-height: 100vh;
-          max-height: 100vh;
-          border-radius: 0;
           grid-template-columns: 1fr;
         }
 
@@ -495,19 +463,65 @@
     return '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35m1.1-5.15a6.25 6.25 0 1 1-12.5 0 6.25 6.25 0 0 1 12.5 0Z"></path></svg>';
   }
 
+  // Palette host. The shell's command palette sits above every other overlay
+  // (it used to be a z-index 10000 full-page layer), so the lex-modal carries
+  // a higher --lex-z-modal than page modals.
+  const PALETTE_Z_INDEX = 10000;
+  const PALETTE_WIDTH = 'min(1200px, 96vw)';
+
+  // Element inside the palette content, found whether or not it is attached.
+  function $(id) {
+    return state.root ? state.root.querySelector('#' + id) : document.getElementById(id);
+  }
+
+  function lexModalDefined() {
+    return !!(window.customElements && window.customElements.get('lex-modal'));
+  }
+
+  // Pages that inject this script through lex-app do not all load lex-modal.
+  function ensureLexModal() {
+    if (lexModalDefined()) return Promise.resolve();
+    if (!window.customElements || !window.Lex || !window.Lex.LexElement) {
+      return Promise.reject(new Error('Lex core unavailable'));
+    }
+    return loadScriptOnce(SCRIPT_BASE + 'lex/components/foundation/lex-modal.js');
+  }
+
+  // Create the lex-modal and move the (already wired) content into it. The
+  // modal is attached empty first: lex-modal copies children present when it
+  // upgrades, which would drop the content's listeners.
+  function attachHost() {
+    if (state.host || !lexModalDefined()) return;
+    const modal = document.createElement('lex-modal');
+    modal.id = 'unifiedSearchModal';
+    modal.setAttribute('palette', '');
+    modal.setAttribute('heading', 'Search Lana');
+    modal.setAttribute('width', PALETTE_WIDTH);
+    modal.style.setProperty('--lex-z-modal', String(PALETTE_Z_INDEX));
+    document.body.appendChild(modal);
+    modal.contentRoot.appendChild(state.root);
+    modal.addEventListener('lex-close', (event) => {
+      if (event.target === modal) state.open = false;
+    });
+    state.host = modal;
+    if (state.pendingOpen) {
+      const query = state.pendingOpen.query;
+      state.pendingOpen = null;
+      open(query);
+    }
+  }
+
   function ensureMounted() {
     if (state.mounted) return;
     css();
-    const html = `
-      <div id="unifiedSearchBackdrop" class="unified-search-backdrop" data-open="false">
-        <div class="unified-search-modal" role="dialog" aria-modal="true" aria-label="Search Lana">
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = `
+        <div class="unified-search-modal">
           <section class="unified-search-main">
             <div class="unified-search-input-row">
               ${searchIcon()}
               <input id="unifiedSearchInput" class="unified-search-input" type="search" placeholder="Search Lana — matters, contacts, documents, conversations, messages, tasks…" autocomplete="off">
-              <select id="unifiedSearchEntityFilter" class="unified-search-entity-filter" aria-label="Filter search by entity type">
-                ${entityFilterOptionsHtml()}
-              </select>
+              <lex-select id="unifiedSearchEntityFilter" class="unified-search-entity-filter" size="sm" aria-label="Filter search by entity type" options="${escapeHtml(JSON.stringify(ENTITY_FILTER_OPTIONS))}" value="all"></lex-select>
               <button id="unifiedSearchClose" class="unified-search-close" type="button" aria-label="Close search">
                 <span class="unified-search-close-x" aria-hidden="true">&times;</span>
                 <span class="unified-search-close-key" aria-hidden="true">Esc</span>
@@ -524,19 +538,23 @@
             </div>
             <div id="unifiedSearchDetailBody" class="unified-search-detail-body"></div>
           </aside>
-        </div>
-      </div>`;
-    document.body.insertAdjacentHTML('beforeend', html);
+        </div>`;
+    state.root = wrapper.firstElementChild;
 
-    document.getElementById('unifiedSearchBackdrop').addEventListener('mousedown', (event) => {
-      if (event.target.id === 'unifiedSearchBackdrop') close();
-    });
-    document.getElementById('unifiedSearchClose').addEventListener('click', close);
-    document.getElementById('unifiedSearchInput').addEventListener('input', onInput);
-    document.getElementById('unifiedSearchEntityFilter').addEventListener('change', onEntityFilterChange);
+    $('unifiedSearchClose').addEventListener('click', close);
+    $('unifiedSearchInput').addEventListener('input', onInput);
+    $('unifiedSearchEntityFilter').addEventListener('lex-change', onEntityFilterChange);
+    ensureLexSelect();
     renderStartState();
     bindShortcut();
     state.mounted = true;
+    if (lexModalDefined()) {
+      attachHost();
+    } else {
+      // Attach whenever lex-modal gets defined, by our load or the page's.
+      if (window.customElements) window.customElements.whenDefined('lex-modal').then(attachHost);
+      ensureLexModal().catch((error) => console.warn('[UnifiedSearch] lex-modal unavailable:', error));
+    }
   }
 
   function bindShortcut() {
@@ -553,9 +571,7 @@
       open();
       return;
     }
-    if (event.key === 'Escape' && state.open) {
-      close();
-    }
+    // Escape is handled by the lex-modal (it closes and emits lex-close).
   }
 
   function onInput(event) {
@@ -575,7 +591,8 @@
   }
 
   function onEntityFilterChange(event) {
-    state.activeType = event.target.value === 'all' ? null : event.target.value;
+    const value = (event.detail && event.detail.value) || event.target.value || 'all';
+    state.activeType = value === 'all' ? null : value;
     if (state.query && state.query.length >= 2) {
       search(state.query);
       return;
@@ -584,7 +601,7 @@
   }
 
   function renderEmpty(message) {
-    document.getElementById('unifiedSearchResults').innerHTML = `<div class="unified-search-empty">${escapeHtml(message)}</div>`;
+    $('unifiedSearchResults').innerHTML = `<div class="unified-search-empty">${escapeHtml(message)}</div>`;
   }
 
   function renderLoading() {
@@ -629,7 +646,7 @@
       return;
     }
 
-    document.getElementById('unifiedSearchResults').innerHTML = `
+    $('unifiedSearchResults').innerHTML = `
       <div class="unified-search-recents">
         <h3 class="unified-search-recents-title">Recent Searches</h3>
         ${recents.map((query) => `
@@ -642,7 +659,7 @@
       </div>
     `;
 
-    document.querySelectorAll('[data-recent-query]').forEach((button) => {
+    state.root.querySelectorAll('[data-recent-query]').forEach((button) => {
       button.addEventListener('click', (event) => {
         const remove = event.target.closest('[data-remove-recent]');
         if (remove) {
@@ -652,7 +669,7 @@
           return;
         }
         const query = button.getAttribute('data-recent-query') || '';
-        const input = document.getElementById('unifiedSearchInput');
+        const input = $('unifiedSearchInput');
         input.value = query;
         state.query = query;
         search(query);
@@ -692,15 +709,46 @@
     matter: 'Open workspace'
   };
 
-  function entityFilterOptionsHtml() {
-    return ENTITY_FILTER_OPTIONS.map((option) => (
-      `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`
-    )).join('');
+  // The modal is injected on every page by lex-app, including pages that do
+  // not load lex-select (or the form mixin it needs). Load them next to this
+  // script so the entity filter upgrades.
+  const SCRIPT_BASE = (function () {
+    const current = document.currentScript && document.currentScript.src;
+    return current ? current.replace(/unified-search-modal\.js(\?.*)?$/, '') : 'js/';
+  }());
+
+  function loadScriptOnce(src) {
+    return new Promise((resolve, reject) => {
+      const existing = document.querySelector(`script[src="${src}"]`);
+      if (existing) {
+        if (existing.dataset.loaded === 'true') { resolve(); return; }
+        existing.addEventListener('load', () => resolve());
+        existing.addEventListener('error', () => reject(new Error('Failed to load ' + src)));
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = src;
+      script.addEventListener('load', () => { script.dataset.loaded = 'true'; resolve(); });
+      script.addEventListener('error', () => reject(new Error('Failed to load ' + src)));
+      document.head.appendChild(script);
+    });
+  }
+
+  function ensureLexSelect() {
+    if (!window.customElements || window.customElements.get('lex-select')) return;
+    const formsReady = window.Lex && window.Lex.withFormField
+      ? Promise.resolve()
+      : loadScriptOnce(SCRIPT_BASE + 'lex/lex.forms.js');
+    formsReady
+      .then(() => loadScriptOnce(SCRIPT_BASE + 'lex/components/form/lex-select.js'))
+      .catch((error) => console.warn('[UnifiedSearch] lex-select unavailable:', error));
   }
 
   function syncEntityFilterSelect() {
-    const select = document.getElementById('unifiedSearchEntityFilter');
+    const select = $('unifiedSearchEntityFilter');
     if (!select) return;
+    // Attribute as well as property: the element may not be upgraded yet.
+    select.setAttribute('value', state.activeType || 'all');
     select.value = state.activeType || 'all';
   }
 
@@ -917,7 +965,7 @@
 
   function renderResultList(results, options) {
     options = options || {};
-    const container = document.getElementById('unifiedSearchResults');
+    const container = $('unifiedSearchResults');
     if (!container) return;
     if (!results.length) {
       container.innerHTML = '<div class="unified-search-empty">No results of this type.</div>';
@@ -1047,7 +1095,7 @@
   }
 
   function renderDetails(result, graph) {
-    const detail = document.getElementById('unifiedSearchDetailBody');
+    const detail = $('unifiedSearchDetailBody');
     if (!detail) return;
     if (!result) {
       detail.innerHTML = '<div class="unified-search-empty">Select a result to inspect its fields and related data.</div>';
@@ -1148,10 +1196,15 @@
 
   function open(initialQuery) {
     ensureMounted();
-    document.getElementById('unifiedSearchBackdrop').dataset.open = 'true';
+    if (!state.host) {
+      // lex-modal is still loading; open as soon as the host exists.
+      state.pendingOpen = { query: initialQuery };
+      return;
+    }
+    state.host.open = true;
     state.open = true;
     setTimeout(() => {
-      const input = document.getElementById('unifiedSearchInput');
+      const input = $('unifiedSearchInput');
       input.focus();
       if (initialQuery) {
         input.value = initialQuery;
@@ -1165,7 +1218,8 @@
 
   function close() {
     if (!state.mounted) return;
-    document.getElementById('unifiedSearchBackdrop').dataset.open = 'false';
+    state.pendingOpen = null;
+    if (state.host) state.host.open = false;
     state.open = false;
   }
 

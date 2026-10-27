@@ -15,6 +15,21 @@
   <script src="../js/components.js"></script>
   <script src="../js/menu.js"></script>
   <script src="../js/connectors.js"></script>
+  <script src="../js/lex/lex.core.js"></script>
+  <script src="../js/lex/lex.icons.js"></script>
+  <script src="../js/lex/lex.data.js"></script>
+  <script src="../js/lex/lex.forms.js"></script>
+  <script src="../js/lex/lex.utils.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/foundation/lex-empty.js"></script>
+  <script src="../js/lex/components/foundation/lex-modal.js"></script>
+  <script src="../js/lex/components/foundation/lex-btn.js"></script>
+  <script src="../js/lex/components/form/lex-input.js"></script>
+  <script src="../js/lex/components/form/lex-select.js"></script>
+  <script src="../js/lex/components/data/lex-table.js"></script>
+  <script src="../js/shared/library-column-filters.js"></script>
+  <script src="../insights/js/record-table-kit.js"></script>
+  <script src="js/integration-tables.js"></script>
 </head>
 <body class="bg-gray-50 min-h-screen">
   <!-- Sidebar -->
@@ -164,22 +179,6 @@
     </main>
   </div>
 
-  <!-- Configuration Modal -->
-  <div id="configModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4">
-      <div class="px-6 py-4 border-b border-gray-200">
-        <h3 id="modalTitle" class="text-lg font-semibold text-gray-900">Configure Connector</h3>
-      </div>
-      <div class="p-6" id="modalContent">
-        <!-- Modal content will be rendered here -->
-      </div>
-      <div class="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
-        <button onclick="closeModal()" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">Cancel</button>
-        <button id="modalSaveBtn" class="px-4 py-2 text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors">Save & Connect</button>
-      </div>
-    </div>
-  </div>
-
   <script>
     if (!api.requireAuth()) throw new Error('Not authenticated');
 
@@ -201,6 +200,26 @@
     document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
 
     let currentConnector = null;
+
+    // Configuration dialog: a lex-modal built here (not declared in the
+    // markup) so its children exist when it upgrades; lex-modal supplies the
+    // backdrop, close button, Escape and focus trap.
+    function ensureConfigModal() {
+      let modal = document.getElementById('configModal');
+      if (modal) return modal;
+      modal = document.createElement('lex-modal');
+      modal.id = 'configModal';
+      modal.setAttribute('heading', 'Configure Connector');
+      modal.innerHTML = `
+        <div id="modalContent"></div>
+        <lex-btn data-slot="footer" variant="secondary" data-config-cancel>Cancel</lex-btn>
+        <lex-btn data-slot="footer" id="modalSaveBtn" variant="primary">Save & Connect</lex-btn>`;
+      document.body.appendChild(modal);
+      modal.querySelector('[data-config-cancel]').addEventListener('click', () => closeModal());
+      modal.addEventListener('lex-close', () => { currentConnector = null; });
+      return modal;
+    }
+    ensureConfigModal();
 
     // Render connector config panel
     function renderConnectorPanel(connector) {
@@ -262,11 +281,10 @@
       currentConnector = ConnectorsMockData.connectors.find(c => c.id === connectorId);
       if (!currentConnector) return;
 
-      const modal = document.getElementById('configModal');
-      const title = document.getElementById('modalTitle');
+      const modal = ensureConfigModal();
       const content = document.getElementById('modalContent');
 
-      title.textContent = `Connect ${currentConnector.name}`;
+      modal.heading = `Connect ${currentConnector.name}`;
 
       // Different config forms based on connector type
       if (connectorId.includes('hubspot') || connectorId.includes('salesforce')) {
@@ -291,12 +309,7 @@
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Sync Frequency</label>
-              <select name="sync_frequency" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                <option value="realtime">Real-time</option>
-                <option value="hourly" selected>Hourly</option>
-                <option value="daily">Daily</option>
-                <option value="manual">Manual only</option>
-              </select>
+              <lex-select name="sync_frequency" options='[{"value":"realtime","label":"Real-time"},{"value":"hourly","label":"Hourly"},{"value":"daily","label":"Daily"},{"value":"manual","label":"Manual only"}]' value="hourly"></lex-select>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Data to Sync</label>
@@ -324,12 +337,12 @@
         document.getElementById('modalSaveBtn').classList.remove('hidden');
       }
 
-      modal.classList.remove('hidden');
+      modal.open = true;
     }
 
     // Close modal
     function closeModal() {
-      document.getElementById('configModal').classList.add('hidden');
+      ensureConfigModal().open = false;
       currentConnector = null;
     }
 
@@ -388,6 +401,10 @@
       if (!form || !Form.validate(form)) return;
 
       const config = Form.serialize(form);
+      // lex-select is not form-associated, so FormData skips it.
+      form.querySelectorAll('lex-select[name]').forEach((select) => {
+        config[select.getAttribute('name')] = select.value;
+      });
 
       try {
         // Test connection first
@@ -425,32 +442,21 @@
         const result = await Connectors.getFieldMappings(connectorId);
         const mappings = result.mappings || [];
 
-        if (mappings.length === 0) {
-          table.innerHTML = '<p class="text-gray-500">No field mappings configured</p>';
-        } else {
-          table.innerHTML = `
-            <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source Field</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Target Field</th>
-                  <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Enabled</th>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
-                ${mappings.map(m => `
-                  <tr>
-                    <td class="px-4 py-3 text-sm text-gray-900">${m.source}</td>
-                    <td class="px-4 py-3 text-sm text-gray-900">${m.target}</td>
-                    <td class="px-4 py-3 text-center">
-                      <input type="checkbox" ${m.enabled ? 'checked' : ''} class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                    </td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          `;
-        }
+        // Client-side lex-table (docs/TABLE-STANDARD.md); a mapping has no
+        // creation time, so there is no Created column.
+        await window.LanaRecordTableKit.mount(table, {
+          id: 'fieldMappingsTable',
+          title: 'Mapped fields',
+          noun: ['field', 'fields'],
+          ariaLabel: 'Field mappings',
+          light: true,
+          searchPlaceholder: 'Search fields...',
+          emptyText: 'No field mappings configured',
+          sortBy: 'source',
+          sortDir: 'asc',
+          minWidth: 560,
+          columns: window.LanaIntegrationTables.FIELD_MAPPING_COLUMNS
+        }, { rows: mappings.map(window.LanaIntegrationTables.fieldMappingRow) });
 
         section.classList.remove('hidden');
         section.scrollIntoView({ behavior: 'smooth' });
@@ -475,11 +481,6 @@
     // CRM connectors page uses static cards (Leadly is active, others are "Coming Soon")
     // No API call needed - the cards are already rendered in HTML
     // The Leadly card links directly to leadly.html for the dashboard
-
-    // Close modal on outside click
-    document.getElementById('configModal').addEventListener('click', (e) => {
-      if (e.target.id === 'configModal') closeModal();
-    });
   </script>
 </body>
 </html>

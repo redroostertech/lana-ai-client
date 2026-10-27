@@ -35,19 +35,9 @@
         lana-context-type="full_chat"
       >
         <div class="my-tasks-banner-actions">
-          <div class="my-tasks-new-wrapper">
-            <lex-btn id="myTasksNewBtn" variant="primary" leading-icon="plus" aria-haspopup="menu" aria-expanded="false">New Task</lex-btn>
-            <div id="myTasksNewMenu" class="my-tasks-new-menu hidden" role="menu" aria-labelledby="myTasksNewBtn">
-              <button type="button" class="my-tasks-new-menu__item" role="menuitem" data-new-action="task">
-                <span class="my-tasks-new-menu__title">New Task</span>
-                <span class="my-tasks-new-menu__hint">Create a single task on a matter</span>
-              </button>
-              <button type="button" class="my-tasks-new-menu__item" role="menuitem" data-new-action="task-plan" data-requires-role="admin">
-                <span class="my-tasks-new-menu__title">New Task Plan</span>
-                <span class="my-tasks-new-menu__hint">Draft a checklist that publishes to tasks</span>
-              </button>
-            </div>
-          </div>
+          <!-- Items are set by js/pages/my-tasks.js (New Task Plan is role-gated). -->
+          <lex-dropdown-btn id="myTasksNewBtn" variant="primary" icon="plus" button-label="New Task" align="end"
+            options="[{&quot;value&quot;:&quot;task&quot;,&quot;label&quot;:&quot;New Task&quot;,&quot;description&quot;:&quot;Create a single task on a matter&quot;}]"></lex-dropdown-btn>
         </div>
       </lex-banner>
 
@@ -67,7 +57,7 @@
             <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Sort by:</label>
             <lex-select
               id="myTasksSort"
-              options='[{"value":"updated_at","label":"Last Updated"},{"value":"due_date","label":"Due Date"},{"value":"title","label":"Task"},{"value":"status","label":"Status"},{"value":"priority","label":"Priority"}]'
+              options='[{"value":"updated_at","label":"Last edited"},{"value":"due_date","label":"Due"},{"value":"created_at","label":"Created"},{"value":"title","label":"Task"},{"value":"status","label":"Status"},{"value":"priority","label":"Priority"}]'
               value="updated_at"
             ></lex-select>
           </div>
@@ -82,7 +72,7 @@
             <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Status:</label>
             <lex-select
               id="myTasksStatusFilter"
-              options='[{"value":"all","label":"All"},{"value":"Pending","label":"Pending"},{"value":"In Progress","label":"In Progress"},{"value":"In Review","label":"In Review"},{"value":"Complete","label":"Complete"},{"value":"Cancelled","label":"Cancelled"}]'
+              options='[{"value":"all","label":"All"},{"value":"pending","label":"Pending"},{"value":"in_progress","label":"In progress"},{"value":"in_review","label":"In review"},{"value":"complete","label":"Complete"},{"value":"cancelled","label":"Cancelled"}]'
               value="all"
             ></lex-select>
           </div>
@@ -100,9 +90,11 @@
       <lex-table
         id="myTasksTable"
         class="my-tasks-table lex-table--card"
-        columns="title,workspace_matter,status,priority,due_date"
-        labels="Task,Workspace | Matter,Status,Priority,Due"
+        columns="title,workspace_matter,status,priority,due_date,created_at"
+        labels="Task,Workspace | Matter,Status,Priority,Due,Created"
         column-filters
+        server-paging
+        sortable-columns="title,status,priority,due_date,created_at"
         sort-by="updated_at"
         sort-dir="desc"
         limit="20"
@@ -119,6 +111,7 @@
         size="full"
         hide-actions
         close-on-overlay
+        header-actions="<div class=&quot;my-task-header-actions&quot; data-task-actions-wrap></div>"
       >
         <div id="myTaskDetailsContent"></div>
       </lex-modal>
@@ -130,7 +123,7 @@
       size="md"
       hide-actions
       data-hoist
-    >
+      footer-content="<lex-btn id=&quot;myTaskCloseoutSkipBtn&quot; variant=&quot;secondary&quot; size=&quot;md&quot;>Skip</lex-btn><lex-btn id=&quot;myTaskCloseoutSaveBtn&quot; variant=&quot;primary&quot; size=&quot;md&quot;>Complete Task</lex-btn>">
       <div class="p-5 space-y-4">
         <div>
           <p class="text-sm font-medium" style="color: var(--lex-text-primary)">Completion notes</p>
@@ -140,10 +133,6 @@
         <lex-textarea id="myTaskCloseoutWentWell" label="What went well?" rows="2" placeholder="Wins or useful signals..."></lex-textarea>
         <lex-textarea id="myTaskCloseoutCouldImprove" label="What could be better?" rows="2" placeholder="Risks, misses, or improvements..."></lex-textarea>
         <lex-textarea id="myTaskCloseoutActionItems" label="Action items" rows="2" placeholder="One follow-up per line..."></lex-textarea>
-        <div class="my-task-modal-actions">
-          <lex-btn id="myTaskCloseoutSkipBtn" variant="secondary" size="md">Skip</lex-btn>
-          <lex-btn id="myTaskCloseoutSaveBtn" variant="primary" size="md">Complete Task</lex-btn>
-        </div>
       </div>
     </lex-modal>
 
@@ -153,7 +142,7 @@
       size="lg"
       hide-actions
       data-hoist
-    >
+      footer-content="<lex-btn id=&quot;myTaskCancelBtn&quot; variant=&quot;secondary&quot; size=&quot;md&quot;>Cancel</lex-btn><lex-btn id=&quot;myTaskSaveBtn&quot; variant=&quot;primary&quot; size=&quot;md&quot;>Create Task</lex-btn>">
       <lex-form id="myTaskCreateForm">
         <div class="my-task-form-grid">
           <lex-input
@@ -234,11 +223,6 @@
           rows="4"
           auto-resize
         ></lex-textarea>
-
-        <div class="my-task-modal-actions">
-          <lex-btn id="myTaskCancelBtn" variant="secondary" size="md">Cancel</lex-btn>
-          <lex-btn id="myTaskSaveBtn" variant="primary" size="md" type="submit">Create Task</lex-btn>
-        </div>
       </lex-form>
     </lex-modal>
 
@@ -248,7 +232,7 @@
       size="lg"
       hide-actions
       data-hoist
-    >
+      footer-content="<lex-btn id=&quot;myTaskPlanCancelBtn&quot; variant=&quot;secondary&quot; size=&quot;md&quot;>Cancel</lex-btn><lex-btn id=&quot;myTaskPlanSaveBtn&quot; variant=&quot;primary&quot; size=&quot;md&quot;>Create &amp;amp; Edit Items</lex-btn>">
       <lex-form id="myTaskPlanCreateForm">
         <div class="my-task-form-grid">
           <lex-input
@@ -290,11 +274,6 @@
           After creating the plan, you'll be taken to the editor to add items
           and assignees.
         </p>
-
-        <div class="my-task-modal-actions">
-          <lex-btn id="myTaskPlanCancelBtn" variant="secondary" size="md">Cancel</lex-btn>
-          <lex-btn id="myTaskPlanSaveBtn" variant="primary" size="md" type="submit">Create &amp; Edit Items</lex-btn>
-        </div>
       </lex-form>
     </lex-modal>
   </template>
@@ -343,9 +322,12 @@
   <script src="js/lex/components/form/lex-form.js"></script>
   <script src="js/lex/components/form/lex-input.js"></script>
   <script src="js/lex/components/form/lex-select.js"></script>
+  <script src="js/lex/components/form/lex-dropdown-btn.js"></script>
   <script src="js/lex/components/form/lex-textarea.js"></script>
   <script src="js/lex/components/form/lex-checkbox.js"></script>
   <script src="js/lex/components/data/lex-table.js"></script>
+  <script src="js/shared/library-column-filters.js"></script>
+  <script src="js/shared/list-query-params.js"></script>
   <script src="js/lex/components/layout/lex-sidebar.js"></script>
   <script src="js/lex/components/layout/lex-topbar.js"></script>
   <script src="js/lex/components/layout/lex-conversation-item.js"></script>

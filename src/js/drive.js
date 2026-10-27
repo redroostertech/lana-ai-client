@@ -79,9 +79,13 @@
       sortBy: 'name',
       sortOrder: 'asc',
       sourceFilter: 'all',
+      columnFilters: {},
       totalResults: 0,
       currentPage: 1,
-      totalPages: 0
+      // The list table's page size (its own pager's select; 20 by default).
+      pageSize: 20,
+      totalPages: 0,
+      filesTotal: 0
     };
   }
 
@@ -135,6 +139,9 @@
 
     var newFolderForm = document.getElementById('newFolderForm');
     newFolderForm && newFolderForm.addEventListener('submit', handleCreateFolder);
+
+    // Workspace folder menus (lex-dropdown-btn) on cards and list rows.
+    trackDocListener('lex-select', handleMatterMenuSelect);
 
     // Refresh Recently Opened / Pinned when returning to the Library (e.g. back
     // from the file viewer). Opening a file logs a file_activity row server-side;
@@ -243,6 +250,8 @@
       sourceFilter.addEventListener('lex-change', function (e) {
         storageState.sourceFilter = e.detail.value || 'all';
         storageState.currentPage = 1;
+        // Each scope has its own filterable columns.
+        resetListColumnFilters();
         if (isBrainchildScope()) {
           // Clear any matters query and load the personal notes vault.
           storageState.searchQuery = '';
@@ -269,12 +278,13 @@
       });
     }
 
-    // Pagination - lex-pagination fires 'page-change'
+    // Grid view pager (lex-pagination 'page-change'). The list view uses the
+    // table's own pager; both load the same server page.
     var drivePagination = document.getElementById('drivePagination');
     if (drivePagination) {
       drivePagination.addEventListener('page-change', function (e) {
         storageState.currentPage = e.detail.page;
-        if (isBrainchildScope() || isOrgKnowledgeScope()) return; // notes scope is single-page
+        if (isBrainchildScope() || isOrgKnowledgeScope()) return; // the notes grid shows every note
         loadMatters();
       });
     }
@@ -299,41 +309,53 @@
       });
     }
 
-    // Matters list-view sortable column headers. Each clickable header drives the
-    // same sortBy/sortOrder state the #sortSelect / #sortOrderBtn use, then
-    // reloads matters so the server-side sort applies. Brainchild scope is unaffected.
-    var sortHeaders = document.querySelectorAll('.drive-sort-th[data-sort-field]');
-    Array.prototype.forEach.call(sortHeaders, function (header) {
-      var activate = function () {
-        handleHeaderSort(header.getAttribute('data-sort-field'));
-      };
-      header.addEventListener('click', activate);
-      header.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
-          e.preventDefault();
-          activate();
-        }
+    // List view: one lex-table for every scope. Header sorts come back as
+    // lex-query-change and drive the same sortBy/sortOrder state the
+    // #sortSelect / #sortOrderBtn use; row clicks and row buttons are delegated.
+    var listTable = document.getElementById('listView');
+    if (listTable) {
+      listTable.addEventListener('lex-query-change', function (e) { handleListQuery(e.detail || {}); });
+      listTable.addEventListener('row-click', function (e) { handleListRowClick(e.detail && e.detail.row); });
+      listTable.addEventListener('click', handleListActionClick);
+    }
+
+    // Files (search matches) table: server-paged by the library files API.
+    // A row opens the file viewer; the workspace link opens the workspace.
+    var filesTable = document.getElementById('filesListView');
+    if (filesTable) {
+      if (typeof filesTable.setCellRenderers === 'function') filesTable.setCellRenderers(filesCellRenderers());
+      if (typeof filesTable.setColumnFilterOptions === 'function') filesTable.setColumnFilterOptions(filesFilterOptions());
+      filesTable.addEventListener('lex-query-change', function (e) { fetchFilesPage(e.detail || {}); });
+      filesTable.addEventListener('row-click', function (e) {
+        var row = e.detail && e.detail.row;
+        if (row) openRecentFile(row.id, row.matterKey);
       });
-    });
+      filesTable.addEventListener('click', function (e) {
+        var link = e.target && e.target.closest ? e.target.closest('[data-workspace-id]') : null;
+        if (!link) return;
+        e.stopPropagation();
+        openWorkspaceDetails(link.getAttribute('data-workspace-id'));
+      });
+    }
   }
 
   /**
-   * Sort the matters list by a column header field. Toggles asc/desc when the
-   * same field is clicked again; defaults to asc when switching fields. Keeps
-   * #sortSelect, #sortOrderBtn, and the active-column caret in sync, then reloads
-   * matters so the server-side sort applies.
-   * @param {string} field - storage sort field (name | created_at | document_count)
+   * A list-view header sort. lex-table has already toggled the direction
+   * (asc when switching columns); mirror it into storageState, keep
+   * #sortSelect / #sortOrderBtn in sync, then reload the active scope so the
+   * server-side (matters) or scope comparator (notes) sort applies.
+   * @param {Object} query - lex-query-change detail ({ sortBy, sortDir })
    */
-  function handleHeaderSort(field) {
-    if (!field) return;
-
-    if (storageState.sortBy === field) {
-      storageState.sortOrder = storageState.sortOrder === 'asc' ? 'desc' : 'asc';
-    } else {
+  function handleListQuery(query) {
+    var field = SORT_FIELD_BY_COLUMN[query.sortBy];
+    if (field) {
       storageState.sortBy = field;
-      storageState.sortOrder = 'asc';
+      storageState.sortOrder = query.sortDir === 'desc' ? 'desc' : 'asc';
     }
-    storageState.currentPage = 1;
+    storageState.columnFilters = query.filters || {};
+    // The table's pager: a filter or sort change already reset it to page 1.
+    storageState.currentPage = Number(query.page) || 1;
+    storageState.pageSize = Number(query.limit) || storageState.pageSize || 20;
 
     syncSortControls();
     if (isBrainchildScope()) { renderBrainchildScope(); return; }
@@ -370,22 +392,20 @@
   }
 
   /**
-   * Mark the active matters list-view column header and show its sort-direction
-   * caret. Only one header carries the active state at a time.
+   * Show the active sort on the list table's header. Fields with no column
+   * (Modified Date, Folder Count) leave every header unmarked.
    */
   function updateSortHeaderIndicators() {
-    var headers = document.querySelectorAll('.drive-sort-th[data-sort-field]');
-    Array.prototype.forEach.call(headers, function (header) {
-      var field = header.getAttribute('data-sort-field');
-      var active = field === storageState.sortBy;
-      var asc = storageState.sortOrder === 'asc';
-      header.classList.toggle('drive-sort-th--active', active);
-      header.classList.toggle('drive-sort-th--asc', active && asc);
-      header.classList.toggle('drive-sort-th--desc', active && !asc);
-      header.setAttribute('aria-sort', active
-        ? (asc ? 'ascending' : 'descending')
-        : 'none');
-    });
+    var table = document.getElementById('listView');
+    if (!table) return;
+    var column = COLUMN_BY_SORT_FIELD[storageState.sortBy] || '';
+    var direction = storageState.sortOrder === 'desc' ? 'desc' : 'asc';
+    table.sortBy = column;
+    table.sortDir = direction;
+    if (table.dataSource) {
+      table.dataSource._sortBy = column;
+      table.dataSource._sortDir = direction;
+    }
   }
 
   /**
@@ -501,7 +521,7 @@
     try {
       var params = new URLSearchParams({
         page: storageState.currentPage,
-        limit: 100,
+        limit: storageState.pageSize || 20,
         sort: storageState.sortBy,
         order: storageState.sortOrder
       });
@@ -513,6 +533,8 @@
       if (storageState.sourceFilter !== 'all') {
         params.append('source', storageState.sourceFilter);
       }
+
+      appendMatterColumnFilters(params);
 
       var response = await api.get('/api/v1/storage/matters?' + params.toString());
 
@@ -550,6 +572,9 @@
     } catch (error) {
       console.error('[Drive] Failed to load matters:', error);
       Lex.Toast.error('Failed to load files. Please try again.');
+      if (listViewEl && typeof listViewEl.setServerError === 'function') {
+        listViewEl.setServerError('Workspaces could not be loaded. Try again.');
+      }
 
       loadingEl && loadingEl.classList.add('hidden');
       emptyEl && emptyEl.classList.remove('hidden');
@@ -565,17 +590,9 @@
     var resultsCountEl = document.getElementById('resultsCount');
     if (!resultsCountEl) return;
 
-    var total = storageState.totalResults;
-    var start = total > 0 ? (storageState.currentPage - 1) * 100 + 1 : 0;
-    var end = Math.min(storageState.currentPage * 100, total);
-
-    if (total === 0) {
-      resultsCountEl.textContent = 'No results found';
-    } else if (storageState.searchQuery || storageState.sourceFilter !== 'all') {
-      resultsCountEl.textContent = 'Showing ' + start + '-' + end + ' of ' + total + ' results';
-    } else {
-      resultsCountEl.textContent = total + ' workspace' + (total !== 1 ? 's' : '');
-    }
+    // The server's total; the table's pager shows the page range.
+    var total = Number(storageState.totalResults) || 0;
+    resultsCountEl.textContent = total + ' workspace' + (total !== 1 ? 's' : '');
 
     // Section header count
     var sectionCount = document.getElementById('driveSectionCount');
@@ -622,6 +639,18 @@
     loadingEl && loadingEl.classList.add('hidden');
 
     var matters = storageState.folders.filter(function (f) { return f.isMatter; });
+
+    // Filtered to nothing in list view: keep the table (and its header filters)
+    // up so its empty state can offer Clear filters.
+    if (matters.length === 0 && storageState.viewMode !== 'grid' &&
+        Object.keys(storageState.columnFilters || {}).length) {
+      emptyEl && emptyEl.classList.add('hidden');
+      gridViewEl && gridViewEl.classList.add('hidden');
+      renderListView([]);
+      listViewEl && listViewEl.classList.remove('hidden');
+      updatePaginationUI();
+      return;
+    }
 
     if (matters.length === 0) {
       applyRootEmptyState();
@@ -672,13 +701,9 @@
 
       var dataAttrs = 'data-is-matter="true" data-matter-id="' + escapeHtml(folder.matter_id) + '" data-name="' + escapeHtml(folder.name) + '"';
 
-      var menuButtonAttrs = 'data-matter-id="' + escapeHtml(folder.matter_id) + '" data-matter-name="' + escapeHtml(folder.name) + '" data-is-pinned="' + (folder.is_pinned || false) + '" data-source="' + escapeHtml(folder.source || 'lana') + '" onclick="event.stopPropagation(); showMatterActionsModal(event)"';
-
       return [
         '<div class="grid-item rounded-lg border p-4 cursor-pointer hover:shadow-md transition-shadow relative group" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)" ' + dataAttrs + ' onclick="handleFolderClick(this)">',
-        '  <button class="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity" style="color: var(--lex-text-tertiary); opacity: 1" ' + menuButtonAttrs + '>',
-        '    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path></svg>',
-        '  </button>',
+        '  ' + matterMenuHtml(folder.matter_id, folder.name, folder.is_pinned, folder.source, 'absolute top-2 right-2'),
         '  <div class="flex flex-col items-center">',
         '    <svg class="w-16 h-16 mb-2" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
         '      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>',
@@ -692,97 +717,388 @@
     gridViewEl.innerHTML = cards;
   }
 
+  // ── List table (lex-table) ───────────────────────────────────────────
+  //
+  // #listView is one lex-table for every scope: workspaces, Knowledgebase
+  // folders and notes, and Shared Knowledge notes. The table's own pager is
+  // the list's only pager. Workspaces page on the server (one request per
+  // table page); the notes scopes hold their whole list, so this page sorts,
+  // filters and slices it to the table's page. #drivePagination pages the
+  // grid view only.
+
+  // Table column <-> storage sort field.
+  var SORT_FIELD_BY_COLUMN = { name: 'name', created_at: 'created_at', size: 'document_count' };
+  var COLUMN_BY_SORT_FIELD = { name: 'name', created_at: 'created_at', document_count: 'size' };
+
+  var LIST_FOLDER_ICON = '<svg class="drive-list-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>';
+  var LIST_NOTE_ICON = '<svg class="drive-list-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>';
+
+  // Knowledgebase notes in the list, by row index, for promote / unpromote.
+  var listBrainchildNotes = [];
+
+  // ── List column filters ──────────────────────────────────────────────
+  //
+  // Workspaces filter on the server (matter_ids, created_after/before,
+  // min/max_documents); the notes scopes hold their whole list and filter it
+  // here. Created By has no workspace data, so only Shared Knowledge offers it.
+
+  var SIZE_BUCKETS = [
+    { value: 'empty', label: 'Empty', min: 0, max: 0 },
+    { value: '1-10', label: '1\u201310 files', min: 1, max: 10 },
+    { value: '11+', label: 'More than 10 files', min: 11, max: null }
+  ];
+  var workspaceFilterOptions = [];
+
+  function filterValues(filter) {
+    if (!filter) return [];
+    var value = filter.value !== undefined ? filter.value : filter;
+    return (Array.isArray(value) ? value : [value]).map(String).filter(Boolean);
+  }
+
+  function createdRange() {
+    var shared = window.LanaLibraryColumnFilters;
+    var value = filterValues(storageState.columnFilters.created_at)[0];
+    return shared && value ? shared.editedRangeBounds(value) : { after: '', before: '' };
+  }
+
+  function appendMatterColumnFilters(params) {
+    var filters = storageState.columnFilters || {};
+    var ids = filterValues(filters.name);
+    if (ids.length) params.append('matter_ids', ids.join(','));
+    var creator = filterValues(filters.created_by)[0];
+    if (creator) params.append('created_by', creator);
+    var range = createdRange();
+    if (range.after) params.append('created_after', range.after);
+    if (range.before) params.append('created_before', range.before);
+    // Size is single-choice: the server takes one min/max range.
+    var bucket = SIZE_BUCKETS.filter(function (b) { return b.value === filterValues(filters.size)[0]; })[0];
+    if (bucket) {
+      params.append('min_documents', String(bucket.min));
+      if (bucket.max !== null) params.append('max_documents', String(bucket.max));
+    }
+  }
+
+  // Notes scopes: keep rows matching Created / Created By. Folders always
+  // stay so the vault can still be browsed.
+  function filterNoteRows(rows) {
+    var filters = storageState.columnFilters || {};
+    var range = createdRange();
+    var creators = filterValues(filters.created_by);
+    if (!range.after && !range.before && !creators.length) return rows;
+    return rows.filter(function (row) {
+      if (row.kind === 'bc-folder') return true;
+      if (creators.length && creators.indexOf(row.created_by) === -1) return false;
+      if (range.after || range.before) {
+        var time = row.created_at ? new Date(row.created_at).getTime() : NaN;
+        if (!Number.isFinite(time)) return false;
+        if (range.after && time < new Date(range.after).getTime()) return false;
+        if (range.before && time >= new Date(range.before).getTime()) return false;
+      }
+      return true;
+    });
+  }
+
+  function listFilterOptions(rows) {
+    var shared = window.LanaLibraryColumnFilters;
+    var map = {};
+    if (shared) map.created_at = { single: true, options: shared.EDITED_RANGE_OPTIONS };
+    if (isBrainchildScope()) return map;
+    if (isOrgKnowledgeScope()) {
+      var names = [];
+      rows.forEach(function (row) { if (row.created_by && names.indexOf(row.created_by) === -1) names.push(row.created_by); });
+      if (names.length) map.created_by = { options: names.sort().map(function (n) { return { value: n, label: n }; }) };
+      return map;
+    }
+    if (workspaceFilterOptions.length) map.name = { options: workspaceFilterOptions };
+    map.created_by = { text: true, placeholder: 'Created by contains...' };
+    map.size = { single: true, options: SIZE_BUCKETS.map(function (b) { return { value: b.value, label: b.label }; }) };
+    return map;
+  }
+
+  // Drop every column filter without a reload; callers reload the scope.
+  function resetListColumnFilters() {
+    storageState.columnFilters = {};
+    var table = document.getElementById('listView');
+    if (table && table.dataSource && table.dataSource._filters) table.dataSource._filters.clear();
+  }
+
+  function loadWorkspaceFilterOptions() {
+    if (!window.LanaLibraryColumnFilters) return;
+    window.LanaLibraryColumnFilters.loadWorkspaceOptions(window.api).then(function (options) {
+      workspaceFilterOptions = options;
+      var files = filesTable();
+      if (files && typeof files.setColumnFilterOptions === 'function') files.setColumnFilterOptions(filesFilterOptions());
+      var table = document.getElementById('listView');
+      if (table && typeof table.setColumnFilterOptions === 'function' && !isBrainchildScope() && !isOrgKnowledgeScope()) {
+        table.setColumnFilterOptions(listFilterOptions([]));
+      }
+    });
+  }
+
+  function listNameCell(icon, name, sub) {
+    return '<div class="drive-list-name-cell">' + icon +
+        '<div class="drive-list-name-text">' +
+          '<div class="drive-list-name" title="' + escapeHtml(name) + '">' + escapeHtml(name) + '</div>' +
+          (sub ? '<div class="drive-list-sub" title="' + escapeHtml(sub) + '">' + escapeHtml(sub) + '</div>' : '') +
+        '</div>' +
+      '</div>';
+  }
+
+  function listCellRenderers() {
+    return {
+      name: function (val, row) {
+        var icon = row.kind === 'matter' || row.kind === 'bc-folder' ? LIST_FOLDER_ICON : LIST_NOTE_ICON;
+        return listNameCell(icon, row.name, row.kind === 'matter' ? row.matterId : '');
+      },
+      created_by: function (val) {
+        return '<span class="drive-list-muted">' + escapeHtml(val || '\u2014') + '</span>';
+      },
+      created_at: function (val) {
+        return '<span class="drive-list-muted">' + escapeHtml(val ? Lex.Utils.formatDateTime(val) : '\u2014') + '</span>';
+      },
+      size: function (val, row) {
+        return '<span class="drive-list-muted">' + escapeHtml(listSizeText(row) || '\u2014') + '</span>';
+      },
+      actions: function (val, row) {
+        if (row.kind === 'matter') {
+          var folder = row._matter;
+          return matterMenuHtml(folder.matter_id, folder.name, folder.is_pinned, folder.source, 'drive-list-menu');
+        }
+        if (row.kind === 'bc-note') {
+          return brainchildPromoteControl(row._note, row.index, escapeHtml(row.path), brainchildScope && brainchildScope.canPromote());
+        }
+        return '';
+      }
+    };
+  }
+
+  // Size cells: rows keep the raw count, this builds the label.
+  function listSizeText(row) {
+    if (!row) return '';
+    if (row.kind === 'matter') {
+      var folders = (row._matter && row._matter.child_folder_count) || 0;
+      var files = Number(row.size) || 0;
+      return files + ' file' + (files !== 1 ? 's' : '') + ' \u2022 ' + folders + ' folder' + (folders !== 1 ? 's' : '');
+    }
+    if (row.kind === 'bc-folder') {
+      var notes = Number(row.size) || 0;
+      return notes + ' note' + (notes !== 1 ? 's' : '');
+    }
+    return 'Note';
+  }
+
+  /**
+   * One page of a whole, already sorted list: the notes scopes' rows after
+   * the column filters, sliced to the table's page.
+   * @param {Array} rows
+   * @param {number} page - 1-based
+   * @param {number} limit
+   * @returns {{ rows: Array, pagination: Object }}
+   */
+  function pageOfRows(rows, page, limit) {
+    var size = Math.max(1, Number(limit) || 20);
+    var totalPages = Math.max(1, Math.ceil(rows.length / size));
+    var current = Math.min(Math.max(1, Number(page) || 1), totalPages);
+    return {
+      rows: rows.slice((current - 1) * size, current * size),
+      pagination: { page: current, limit: size, total: rows.length, total_pages: totalPages }
+    };
+  }
+
+  /**
+   * Hand rows to the list table. Workspaces pass the server's pagination for
+   * the one page they hold; the notes scopes pass their whole list, which is
+   * filtered and sliced to the table's page here.
+   * @param {Array} rows - list row view models ({ key, kind, name, ... })
+   * @param {Object} [pagination] - server pagination for a workspaces page
+   */
+  function setListRows(rows, pagination) {
+    var table = document.getElementById('listView');
+    if (!table) return;
+    if (typeof table.setServerData !== 'function') {
+      if (window.customElements) {
+        window.customElements.whenDefined('lex-table').then(function () { setListRows(rows, pagination); });
+      }
+      return;
+    }
+    table.setCellRenderers(listCellRenderers());
+    table.setColumnFilterOptions(listFilterOptions(rows));
+    updateSortHeaderIndicators();
+    var filtered = Object.keys(storageState.columnFilters || {}).length > 0;
+    table.emptyText = filtered ? 'Nothing matches these filters. Try a different filter.' : 'Nothing here yet';
+    if (isBrainchildScope() || isOrgKnowledgeScope()) {
+      var page = pageOfRows(filterNoteRows(rows), storageState.currentPage, storageState.pageSize);
+      storageState.currentPage = page.pagination.page;
+      table.setServerData(page.rows, page.pagination);
+      return;
+    }
+    table.setServerData(rows, pagination || {
+      page: storageState.currentPage,
+      limit: storageState.pageSize || 20,
+      total: storageState.totalResults,
+      total_pages: storageState.totalPages
+    });
+  }
+
   /**
    * Render the list/table view with matter rows only.
    * @param {Array} matters
    */
   function renderListView(matters) {
-    var listViewBodyEl = document.getElementById('listViewBody');
-    if (!listViewBodyEl) return;
+    setListRows(matters.map(function (folder) {
+      return {
+        key: 'matter:' + folder.matter_id,
+        kind: 'matter',
+        name: folder.name,
+        matterId: folder.matter_id,
+        created_by: '',
+        created_at: folder.created_at,
+        size: folder.document_count || 0,
+        _matter: folder
+      };
+    }));
+  }
 
-    var rows = matters.map(function (folder) {
-      var dataAttrs = 'data-is-matter="true" data-matter-id="' + escapeHtml(folder.matter_id) + '" data-name="' + escapeHtml(folder.name) + '"';
+  function handleListRowClick(row) {
+    if (!row) return;
+    if (row.kind === 'matter') navigateToMatter(row.matterId, row.name);
+    else if (row.kind === 'bc-folder') openBrainchildFolder(row.name);
+    else if (row.kind === 'bc-note') openBrainchildNote(row.path);
+  }
 
-      var displayHtml = [
-        '<div class="flex items-center">',
-        '  <svg class="w-5 h-5 mr-3 flex-shrink-0" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
-        '    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>',
-        '  </svg>',
-        '  <div class="min-w-0 flex-1">',
-        '    <div class="text-sm font-medium truncate" style="color: var(--lex-text-primary)">' + escapeHtml(folder.name) + '</div>',
-        '    <div class="text-xs font-mono truncate" style="color: var(--lex-text-secondary)" title="' + escapeHtml(folder.matter_id) + '">' + escapeHtml(folder.matter_id) + '</div>',
-        '  </div>',
-        '</div>'
-      ].join('');
-
-      var sizeDisplay = (folder.document_count || 0) + ' files \u2022 ' + (folder.child_folder_count || 0) + ' folders';
-
-      var menuButtonAttrs = 'data-matter-id="' + escapeHtml(folder.matter_id) + '" data-matter-name="' + escapeHtml(folder.name) + '" data-is-pinned="' + (folder.is_pinned || false) + '" data-source="' + escapeHtml(folder.source || 'lana') + '" onclick="event.stopPropagation(); showMatterActionsModal(event)"';
-
-      return [
-        '<tr class="cursor-pointer" style="background: transparent" onmouseover="this.style.background=\'var(--lex-bg-secondary)\'" onmouseout="this.style.background=\'transparent\'" ' + dataAttrs + ' onclick="handleFolderClick(this)">',
-        '  <td class="px-6 py-4">' + displayHtml + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">\u2014</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + formatRelativeDate(folder.created_at) + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + sizeDisplay + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm">',
-        '    <button style="color: var(--lex-text-tertiary)" ' + menuButtonAttrs + '>',
-        '      <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path></svg>',
-        '    </button>',
-        '  </td>',
-        '</tr>'
-      ].join('');
-    }).join('');
-
-    listViewBodyEl.innerHTML = rows;
+  // lex-table's row-click skips buttons, so row buttons are delegated here.
+  function handleListActionClick(event) {
+    var target = event.target && event.target.closest ? event.target : null;
+    if (!target) return;
+    var unpromote = target.closest('.bc-unpromote-btn');
+    if (unpromote) { unpromoteBrainchildNote(unpromote, listBrainchildNotes, event); return; }
+    var promote = target.closest('.bc-promote-btn');
+    if (promote) promoteBrainchildNote(promote, listBrainchildNotes, event);
   }
 
   // ── Files load (search-only) ─────────────────────────────────────────
 
-  /**
-   * Map the matters sort field to a /storage/library/files sort_by value. The files
-   * endpoint maps 'name' -> filename internally, supports created_at / updated_at
-   * directly, and does not understand the matters-only counts; those fall back to
-   * 'name'.
-   * @param {string} sortBy
-   * @returns {string}
-   */
-  function mapFilesSortBy(sortBy) {
-    if (sortBy === 'created_at' || sortBy === 'updated_at') return sortBy;
-    return 'name';
+  // ── Files search results (lex-table #filesListView) ──────────────────
+  //
+  // Server-paged by /api/v1/storage/library/files, like the Document
+  // Library: the table owns its page, sort and column filters, and the
+  // toolbar search feeds the API's search.
+
+  var filesLoadSequence = 0;
+
+  function filesTable() {
+    return document.getElementById('filesListView');
+  }
+
+  function filesCellRenderers() {
+    return {
+      name: function (val, row) {
+        return '<div class="drive-list-name-cell"><span class="drive-list-file-icon">' + getFileIconSVG(row.contentType) + '</span>' +
+          '<div class="drive-list-name-text"><div class="drive-list-name" title="' + escapeHtml(val) + '">' + escapeHtml(val) + '</div></div></div>';
+      },
+      workspace: function (val, row) {
+        if (!row.matterKey) return '<span class="drive-list-muted">\u2014</span>';
+        var label = val || row.matterKey;
+        return '<button type="button" class="drive-list-workspace-link" data-workspace-id="' + escapeHtml(row.matterKey) + '" title="Open ' + escapeHtml(label) + '">' + escapeHtml(label) + '</button>';
+      },
+      created_at: function (val) { return '<span class="drive-list-muted">' + escapeHtml(val ? Lex.Utils.formatDateTime(val) : '\u2014') + '</span>'; },
+      size: function (val) { return '<span class="drive-list-muted">' + escapeHtml(formatFileSize(val || 0) || '\u2014') + '</span>'; }
+    };
+  }
+
+  function filesFilterOptions() {
+    var shared = window.LanaLibraryColumnFilters;
+    var params = window.LanaListQueryParams;
+    var map = { name: { text: true, placeholder: 'File name contains...' } };
+    if (workspaceFilterOptions.length) map.workspace = { options: workspaceFilterOptions };
+    if (params) {
+      map.size = {
+        single: true,
+        options: Object.keys(params.FILE_SIZE_RANGES).map(function (key) { return { value: key, label: params.FILE_SIZE_RANGES[key].label }; })
+      };
+    }
+    if (shared) map.created_at = { single: true, options: shared.EDITED_RANGE_OPTIONS };
+    return map;
+  }
+
+  function mapFileForTable(file) {
+    return {
+      id: file.id,
+      name: file.filename || file.original_filename || 'Untitled',
+      workspace: file.matter_name || '',
+      created_at: file.created_at || '',
+      size: Number(file.file_size || 0),
+      contentType: file.content_type,
+      matterKey: file.client_matter || '',
+      _raw: file
+    };
+  }
+
+  function openWorkspaceDetails(matterId) {
+    if (!matterId) return;
+    if (window.Lex && Lex.Nav && typeof Lex.Nav.go === 'function') {
+      Lex.Nav.go('workspace-details.html', { params: { id: matterId }, context: { referrer: 'drive.html' } });
+      return;
+    }
+    window.location.href = 'workspace-details.html?id=' + encodeURIComponent(matterId);
   }
 
   /**
-   * Load matching files for the current search query from
-   * /api/v1/storage/library/files and render the Files section. Files are fetched
-   * ONLY while searching: when the query is empty the section is cleared and
-   * hidden so the default root view stays matters-only. The Source filter applies
-   * to matters only and is intentionally not passed to this endpoint.
+   * Matching files for the current search. Files are fetched ONLY while
+   * searching: with no query the section is cleared and hidden so the root
+   * view stays workspaces-only. The Source filter applies to workspaces only.
+   * With a query, the files table asks for page 1 (fetchFilesPage).
    */
   async function loadRootFiles() {
     var query = (storageState.searchQuery || '').trim();
+    var table = filesTable();
 
-    if (!query) {
+    if (!query || !table || typeof table.requestServerQuery !== 'function') {
+      filesLoadSequence++;
       storageState.files = [];
+      storageState.filesTotal = 0;
       renderFilesSection();
       return;
     }
+    table.requestServerQuery({ resetPage: true });
+  }
+
+  /**
+   * Answers the files table's lex-query-change with one page of matches.
+   * @param {Object} query - { page, limit, sortBy, sortDir, filters }
+   */
+  async function fetchFilesPage(query) {
+    var search = (storageState.searchQuery || '').trim();
+    var table = filesTable();
+    var sequence = ++filesLoadSequence;
+    if (!search || !table) return;
+    var builder = window.LanaListQueryParams;
+    var filtered = Object.keys(query.filters || {}).length > 0;
+    table.emptyText = filtered ? 'No matching files. Try a different filter.' : 'No matching files';
 
     try {
-      var params = new URLSearchParams({
-        search: query,
-        page: 1,
-        page_size: 50,
-        sort_by: mapFilesSortBy(storageState.sortBy),
-        sort_order: storageState.sortOrder
-      });
-
+      if (!builder) throw new Error('List query helpers are unavailable.');
+      var params = builder.libraryFilesParams(query, { search: search });
       var response = await api.get('/api/v1/storage/library/files?' + params.toString());
+      if (sequence !== filesLoadSequence) return;
       var files = (response && (response.files || response.documents)) || [];
-      storageState.files = Array.isArray(files) ? files : [];
+      files = Array.isArray(files) ? files : [];
+      var source = (response && response.pagination) || {};
+      var total = Number(source.total !== undefined ? source.total : (response && response.total));
+      storageState.files = files;
+      storageState.filesTotal = Number.isFinite(total) ? total : files.length;
+      table.setServerData(files.map(mapFileForTable), {
+        page: source.page || query.page || 1,
+        page_size: source.page_size || source.limit || Number(params.get('page_size')),
+        total: storageState.filesTotal,
+        total_pages: source.total_pages !== undefined ? source.total_pages : source.totalPages
+      });
     } catch (error) {
+      if (sequence !== filesLoadSequence) return;
       console.error('[Drive] Failed to load files:', error);
       storageState.files = [];
+      storageState.filesTotal = 0;
+      table.setServerError('Files could not be loaded. Check your connection and try again.');
     }
 
     renderFilesSection();
@@ -804,8 +1120,12 @@
 
     var files = Array.isArray(storageState.files) ? storageState.files : [];
     var searching = !!(storageState.searchQuery && storageState.searchQuery.trim());
+    var table = filesTable();
+    var filesFiltered = !!(table && table.dataSource && table.dataSource.getActiveFilters().size);
 
-    if (!searching || files.length === 0) {
+    // A search with no file matches hides the section, unless the files
+    // table's own filters emptied it (it then offers Clear filters).
+    if (!searching || (files.length === 0 && !filesFiltered)) {
       section.classList.add('hidden');
       if (gridEl) gridEl.classList.add('hidden');
       if (listEl) listEl.classList.add('hidden');
@@ -816,7 +1136,8 @@
 
     section.classList.remove('hidden');
     if (countEl) {
-      countEl.textContent = files.length + ' file' + (files.length !== 1 ? 's' : '');
+      var filesTotal = Number(storageState.filesTotal) || 0;
+      countEl.textContent = filesTotal + ' file' + (filesTotal !== 1 ? 's' : '');
     }
 
     if (storageState.viewMode === 'grid') {
@@ -875,40 +1196,10 @@
   }
 
   /**
-   * Render file rows into the Files list view, mirroring the matters list row
-   * structure/classes. Columns: Name, Matter, Created On, Size. Clicking a row
-   * opens the file viewer via openRecentFile.
-   * @param {Array} files
+   * The Files list view holds the table's current page, set by
+   * fetchFilesPage; nothing to render here.
    */
-  function renderFilesListView(files) {
-    var listBodyEl = document.getElementById('filesListViewBody');
-    if (!listBodyEl) return;
-
-    listBodyEl.innerHTML = (files || []).map(function (file) {
-      var fileName = escapeHtml(file.filename || file.original_filename || 'Untitled');
-      var matterName = escapeHtml(file.matter_name || file.client_matter || '');
-      var fileSize = formatFileSize(file.file_size || 0);
-      var created = file.created_at ? formatRelativeDate(file.created_at) : '-';
-      var fileIcon = getFileIconSVG(file.content_type);
-      var openArgs = escapeHtml(JSON.stringify(file.id)) + ', ' + escapeHtml(JSON.stringify(file.client_matter || ''));
-
-      return [
-        '<tr class="cursor-pointer" style="background: transparent" onmouseover="this.style.background=\'var(--lex-bg-secondary)\'" onmouseout="this.style.background=\'transparent\'" onclick="openRecentFile(' + openArgs + ')">',
-        '  <td class="px-6 py-4">',
-        '    <div class="flex items-center">',
-        '      <div class="w-5 h-5 mr-3 flex-shrink-0 flex items-center justify-center">' + fileIcon + '</div>',
-        '      <div class="min-w-0 flex-1">',
-        '        <div class="text-sm font-medium truncate" style="color: var(--lex-text-primary)" title="' + fileName + '">' + fileName + '</div>',
-        '      </div>',
-        '    </div>',
-        '  </td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + (matterName || '-') + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + created + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + fileSize + '</td>',
-        '</tr>'
-      ].join('');
-    }).join('');
-  }
+  function renderFilesListView() {}
 
   // ── Brainchild scope (personal notes) ────────────────────────────────
   //
@@ -1123,14 +1414,9 @@
     if (sectionCount) sectionCount.textContent = countText;
     if (resultsCountEl) resultsCountEl.textContent = countText;
 
-    // Pagination is matters-only; hide its counts in this scope.
+    // The grid pager is for workspaces; the list uses the table's pager.
     var pager = document.getElementById('drivePagination');
-    if (pager) {
-      pager.page = 1;
-      pager.totalPages = 1;
-      pager.total = itemCount;
-      pager.limit = itemCount || 1;
-    }
+    if (pager) pager.classList.add('hidden');
 
     var emptyEl = document.getElementById('contentEmpty');
     var gridViewEl = document.getElementById('gridView');
@@ -1394,73 +1680,38 @@
   }
 
   /**
-   * Render Brainchild folder rows (clickable to drill in) followed by note rows,
-   * reusing the existing #listViewBody table body.
+   * Render Brainchild folder rows (clickable to drill in) followed by note rows
+   * into the shared list table.
    * @param {Array} folders - immediate child folders ({ name, path, count })
    * @param {Array} notes - normalized Brainchild row view models
    */
   function renderBrainchildList(folders, notes) {
-    var listViewBodyEl = document.getElementById('listViewBody');
-    if (!listViewBodyEl) return;
-
-    var canPromote = brainchildScope && brainchildScope.canPromote();
-
+    listBrainchildNotes = notes || [];
     var folderRows = (folders || []).map(function (folder) {
-      var folderName = escapeHtml(folder.name || '');
       var count = folder.count || 0;
-      var countLabel = count + ' note' + (count !== 1 ? 's' : '');
-
-      return [
-        '<tr class="cursor-pointer library-bc-folder-card" style="background: transparent" onmouseover="this.style.background=\'var(--lex-bg-secondary)\'" onmouseout="this.style.background=\'transparent\'" data-bc-folder-name="' + folderName + '">',
-        '  <td class="px-6 py-4">',
-        '    <div class="flex items-center">',
-        '      <svg class="w-5 h-5 mr-3 flex-shrink-0" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
-        '        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>',
-        '      </svg>',
-        '      <div class="min-w-0 flex-1">',
-        '        <div class="text-sm font-medium truncate" style="color: var(--lex-text-primary)" title="' + folderName + '">' + folderName + '</div>',
-        '      </div>',
-        '    </div>',
-        '  </td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">You</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">-</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + countLabel + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm"></td>',
-        '</tr>'
-      ].join('');
-    }).join('');
-
-    var noteRows = (notes || []).map(function (row, index) {
-      var name = escapeHtml(row.filename || 'Untitled note');
-      var vaultPath = escapeHtml(row._vaultPath || '');
-      var updated = row.updated_at ? formatRelativeDate(row.updated_at) : '-';
-      var promoteCell = brainchildPromoteControl(row, index, vaultPath, canPromote);
-
-      return [
-        '<tr class="cursor-pointer library-bc-note-card" style="background: transparent" onmouseover="this.style.background=\'var(--lex-bg-secondary)\'" onmouseout="this.style.background=\'transparent\'" data-bc-note-path="' + vaultPath + '">',
-        '  <td class="px-6 py-4">',
-        '    <div class="flex items-center">',
-        '      <svg class="w-5 h-5 mr-3 flex-shrink-0" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
-        '        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>',
-        '      </svg>',
-        '      <div class="min-w-0 flex-1">',
-        '        <div class="text-sm font-medium truncate" style="color: var(--lex-text-primary)" title="' + name + '">' + name + '</div>',
-        '      </div>',
-        '    </div>',
-        '  </td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">You</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + updated + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">Note</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm">' + promoteCell + '</td>',
-        '</tr>'
-      ].join('');
-    }).join('');
-
-    listViewBodyEl.innerHTML = folderRows + noteRows;
-    wireBrainchildFolderCards(listViewBodyEl);
-    wireBrainchildNoteCards(listViewBodyEl);
-    wireBrainchildPromoteButtons(listViewBodyEl, notes);
-    wireBrainchildUnpromoteButtons(listViewBodyEl, notes);
+      return {
+        key: 'bc-folder:' + (folder.path || folder.name || ''),
+        kind: 'bc-folder',
+        name: folder.name || '',
+        created_by: 'You',
+        created_at: '',
+        size: count
+      };
+    });
+    var noteRows = listBrainchildNotes.map(function (row, index) {
+      return {
+        key: 'bc-note:' + (row._vaultPath || index),
+        kind: 'bc-note',
+        name: row.filename || 'Untitled note',
+        path: row._vaultPath || '',
+        index: index,
+        created_by: 'You',
+        created_at: row.updated_at || '',
+        size: '',
+        _note: row
+      };
+    });
+    setListRows(folderRows.concat(noteRows));
   }
 
   /**
@@ -1473,17 +1724,20 @@
     var cards = container.querySelectorAll('.library-bc-folder-card');
     Array.prototype.forEach.call(cards, function (card) {
       card.addEventListener('click', function () {
-        var name = card.getAttribute('data-bc-folder-name') || '';
-        if (!name) return;
-        brainchildScope.enterFolder(name);
+        openBrainchildFolder(card.getAttribute('data-bc-folder-name') || '');
       });
     });
   }
 
+  /** Drill into a Brainchild folder; the controller's onChange re-renders. */
+  function openBrainchildFolder(name) {
+    if (!name || !brainchildScope) return;
+    brainchildScope.enterFolder(name);
+  }
+
   /**
-   * Wire each rendered Brainchild note card/row to open that note inside the
-   * Brainchild app via the frozen bridge (openNote(vaultPath)). Folder cards are
-   * handled separately by wireBrainchildFolderCards and keep enterFolder behavior.
+   * Wire each rendered Brainchild note card to open that note inside the
+   * Brainchild app. Folder cards keep enterFolder behavior.
    * @param {HTMLElement} container
    */
   function wireBrainchildNoteCards(container) {
@@ -1491,20 +1745,22 @@
     var cards = container.querySelectorAll('.library-bc-note-card');
     Array.prototype.forEach.call(cards, function (card) {
       card.addEventListener('click', function () {
-        var path = card.getAttribute('data-bc-note-path') || '';
-        if (!path) return;
-        if (window.electronAPI && window.electronAPI.brainchild &&
-            typeof window.electronAPI.brainchild.openNote === 'function') {
-          window.electronAPI.brainchild.openNote(path);
-        }
+        openBrainchildNote(card.getAttribute('data-bc-note-path') || '');
       });
     });
   }
 
+  /** Open a note in the Brainchild app via the frozen bridge (openNote(vaultPath)). */
+  function openBrainchildNote(path) {
+    if (!path) return;
+    if (window.electronAPI && window.electronAPI.brainchild &&
+        typeof window.electronAPI.brainchild.openNote === 'function') {
+      window.electronAPI.brainchild.openNote(path);
+    }
+  }
+
   /**
-   * Wire each rendered "Promote to Org" button to the controller's promote().
-   * The controller fetches the note body, builds the payload, and POSTs it.
-   * stopPropagation keeps a promote click from also opening the note in Brainchild.
+   * Wire each rendered "Promote to Org" button (grid cards) to promote().
    * @param {HTMLElement} container
    * @param {Array} rows
    */
@@ -1512,31 +1768,39 @@
     if (!container || !brainchildScope) return;
     var buttons = container.querySelectorAll('.bc-promote-btn');
     Array.prototype.forEach.call(buttons, function (button) {
-      button.addEventListener('click', async function (event) {
-        if (event && typeof event.stopPropagation === 'function') {
-          event.stopPropagation();
-        }
-        var index = parseInt(button.getAttribute('data-bc-index'), 10);
-        var row = rows[index];
-        if (!row) return;
-        var result = await brainchildScope.promote(row, null, button);
-        if (result && result.success) {
-          // Refresh the promoted map so the new promotion's org document id is
-          // known (needed for a later unpromote), then re-render so the action
-          // flips to the "Promoted" pill without a full reload.
-          await loadBrainchildPromotedIds();
-          renderBrainchildScope();
-        }
+      button.addEventListener('click', function (event) {
+        promoteBrainchildNote(button, rows, event);
       });
     });
   }
 
   /**
-   * Wire each rendered "Promoted" pill to unpromote the note: remove the org's
-   * shared copy. This does NOT touch the personal Brainchild note. Confirms
-   * first, then deletes via the Shared Knowledge scope controller, refreshes the
-   * promoted map, and re-renders so the pill flips back to "Promote to Org".
-   * stopPropagation keeps the click from also opening the note in Brainchild.
+   * Promote a note through the controller, which fetches the body, builds the
+   * payload, and POSTs it. stopPropagation keeps the click from also opening
+   * the note in Brainchild.
+   * @param {HTMLElement} button - carries data-bc-index
+   * @param {Array} rows
+   * @param {Event} event
+   */
+  async function promoteBrainchildNote(button, rows, event) {
+    if (event && typeof event.stopPropagation === 'function') {
+      event.stopPropagation();
+    }
+    if (!brainchildScope) return;
+    var row = rows[parseInt(button.getAttribute('data-bc-index'), 10)];
+    if (!row) return;
+    var result = await brainchildScope.promote(row, null, button);
+    if (result && result.success) {
+      // Refresh the promoted map so the new promotion's org document id is
+      // known (needed for a later unpromote), then re-render so the action
+      // flips to the "Promoted" pill without a full reload.
+      await loadBrainchildPromotedIds();
+      renderBrainchildScope();
+    }
+  }
+
+  /**
+   * Wire each rendered "Promoted" pill (grid cards) to unpromote the note.
    * @param {HTMLElement} container
    * @param {Array} rows
    */
@@ -1545,38 +1809,46 @@
     var buttons = container.querySelectorAll('.bc-unpromote-btn');
     Array.prototype.forEach.call(buttons, function (button) {
       button.addEventListener('click', function (event) {
-        if (event && typeof event.stopPropagation === 'function') {
-          event.stopPropagation();
-        }
-        var index = parseInt(button.getAttribute('data-bc-index'), 10);
-        var row = rows[index];
-        if (!row) return;
-
-        var run = async function () {
-          var docId = brainchildPromotedDocId(row);
-          if (!docId) return;
-          var oks = ensureOrgKnowledgeScope();
-          if (!oks) return;
-          var result = await oks.remove(docId);
-          if (result && result.success) {
-            await loadBrainchildPromotedIds();
-            renderBrainchildScope();
-          }
-        };
-
-        var title = 'Remove from Shared Knowledge';
-        var message = 'Remove this note from your organization\'s shared knowledge? Your personal Brainchild copy is not affected.';
-        if (window.Lex && Lex.Modal && typeof Lex.Modal.confirm === 'function') {
-          Lex.Modal.confirm(title, message, run, {
-            confirmText: 'Remove',
-            cancelText: 'Cancel',
-            variant: 'default',
-            size: 'sm'
-          });
-        } else if (window.confirm(message)) {
-          run();
-        }
+        unpromoteBrainchildNote(button, rows, event);
       });
+    });
+  }
+
+  /**
+   * Unpromote a note: remove the org's shared copy. This does NOT touch the
+   * personal Brainchild note. Confirms first, then deletes via the Shared
+   * Knowledge scope controller, refreshes the promoted map, and re-renders so
+   * the pill flips back to "Promote to Org".
+   * @param {HTMLElement} button - carries data-bc-index
+   * @param {Array} rows
+   * @param {Event} event
+   */
+  function unpromoteBrainchildNote(button, rows, event) {
+    if (event && typeof event.stopPropagation === 'function') {
+      event.stopPropagation();
+    }
+    var row = rows[parseInt(button.getAttribute('data-bc-index'), 10)];
+    if (!row) return;
+
+    var run = async function () {
+      var docId = brainchildPromotedDocId(row);
+      if (!docId) return;
+      var oks = ensureOrgKnowledgeScope();
+      if (!oks) return;
+      var result = await oks.remove(docId);
+      if (result && result.success) {
+        await loadBrainchildPromotedIds();
+        renderBrainchildScope();
+      }
+    };
+
+    var title = 'Remove from Shared Knowledge';
+    var message = 'Remove this note from your organization\'s shared knowledge? Your personal Brainchild copy is not affected.';
+    Lex.Modal.confirm(title, message, run, {
+      confirmText: 'Remove',
+      cancelText: 'Cancel',
+      variant: 'default',
+      size: 'sm'
     });
   }
 
@@ -1691,14 +1963,9 @@
     if (sectionCount) sectionCount.textContent = countText;
     if (resultsCountEl) resultsCountEl.textContent = countText;
 
-    // Pagination is matters-only; pin it to a single page in this scope.
+    // The grid pager is for workspaces; the list uses the table's pager.
     var pager = document.getElementById('drivePagination');
-    if (pager) {
-      pager.page = 1;
-      pager.totalPages = 1;
-      pager.total = items.length;
-      pager.limit = items.length || 1;
-    }
+    if (pager) pager.classList.add('hidden');
 
     if (items.length === 0) {
       renderOrgKnowledgeEmpty();
@@ -1784,38 +2051,21 @@
   }
 
   /**
-   * Render promoted-knowledge note rows into the existing #listViewBody table.
-   * Columns mirror the matters list: Name, Created By, Created On, Type, Action.
+   * Render promoted-knowledge note rows into the shared list table.
+   * Columns mirror the matters list: Name, Created By, Created, Type, Action.
    * @param {Array} items
    */
   function renderOrgKnowledgeList(items) {
-    var listViewBodyEl = document.getElementById('listViewBody');
-    if (!listViewBodyEl) return;
-
-    listViewBodyEl.innerHTML = (items || []).map(function (item) {
-      var title = escapeHtml(item.title || 'Untitled note');
-      var byName = escapeHtml(item.created_by_name || 'a teammate');
-      var created = item.created_at ? formatRelativeDate(item.created_at) : '-';
-
-      return [
-        '<tr style="background: transparent" onmouseover="this.style.background=\'var(--lex-bg-secondary)\'" onmouseout="this.style.background=\'transparent\'">',
-        '  <td class="px-6 py-4">',
-        '    <div class="flex items-center">',
-        '      <svg class="w-5 h-5 mr-3 flex-shrink-0" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
-        '        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>',
-        '      </svg>',
-        '      <div class="min-w-0 flex-1">',
-        '        <div class="text-sm font-medium truncate" style="color: var(--lex-text-primary)" title="' + title + '">' + title + '</div>',
-        '      </div>',
-        '    </div>',
-        '  </td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + byName + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + created + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">Note</td>',
-        '  <td class="px-6 py-4"></td>',
-        '</tr>'
-      ].join('');
-    }).join('');
+    setListRows((items || []).map(function (item, index) {
+      return {
+        key: 'org-note:' + (item.id || item.document_id || index),
+        kind: 'org-note',
+        name: item.title || 'Untitled note',
+        created_by: item.created_by_name || 'a teammate',
+        created_at: item.created_at || '',
+        size: ''
+      };
+    }));
   }
 
   // ── View toggle ──────────────────────────────────────────────────────
@@ -1825,19 +2075,19 @@
    * @param {string} mode - 'grid' or 'list'
    */
   function switchView(mode) {
+    // Column filters live in the list header; grid view would hide them.
+    if (mode === 'grid' && Object.keys(storageState.columnFilters || {}).length) {
+      resetListColumnFilters();
+      storageState.viewMode = mode;
+      if (isBrainchildScope()) renderBrainchildScope();
+      else if (isOrgKnowledgeScope()) renderOrgKnowledgeScope();
+      else loadMatters({ silent: true });
+      syncViewButtons(mode);
+      return;
+    }
     storageState.viewMode = mode;
 
-    var gridBtn = document.getElementById('gridViewBtn');
-    var listBtn = document.getElementById('listViewBtn');
-
-    // lex-btn: switch variant to indicate active view (primary = active, ghost = inactive)
-    if (mode === 'grid') {
-      gridBtn && (gridBtn.variant = 'primary');
-      listBtn && (listBtn.variant = 'ghost');
-    } else {
-      listBtn && (listBtn.variant = 'primary');
-      gridBtn && (gridBtn.variant = 'ghost');
-    }
+    syncViewButtons(mode);
 
     if (isBrainchildScope()) {
       renderBrainchildScope();
@@ -1846,6 +2096,19 @@
     } else {
       renderMatters();
       renderFilesSection();
+    }
+  }
+
+  // lex-btn: switch variant to indicate active view (primary = active, ghost = inactive)
+  function syncViewButtons(mode) {
+    var gridBtn = document.getElementById('gridViewBtn');
+    var listBtn = document.getElementById('listViewBtn');
+    if (mode === 'grid') {
+      gridBtn && (gridBtn.variant = 'primary');
+      listBtn && (listBtn.variant = 'ghost');
+    } else {
+      listBtn && (listBtn.variant = 'primary');
+      gridBtn && (gridBtn.variant = 'ghost');
     }
   }
 
@@ -1920,88 +2183,85 @@
   // ── Matter actions modal ─────────────────────────────────────────────
 
   /**
-   * Show the matter actions modal (open, pin, delete) for a matter card.
-   * Reads matter data from the triggering button's dataset attributes.
-   * @param {Event} event
+   * Workspace folder menu (Open / Pin or Unpin / Delete) on grid cards, list
+   * rows and pinned/recent cards: a lex-dropdown-btn whose data attributes
+   * carry the folder. The click is stopped at the host so it does not open
+   * the folder underneath; handleMatterMenuSelect runs the item.
+   * @param {string} matterId
+   * @param {string} matterName
+   * @param {boolean} isPinned
+   * @param {string} source
+   * @param {string} className
+   * @returns {string} HTML
    */
-  function showMatterActionsModal(event) {
-    console.log('[Drive] Show matter actions modal');
+  function matterMenuHtml(matterId, matterName, isPinned, source, className) {
+    var items = [
+      { value: 'open', label: 'Open Folder', icon: 'folder-open' },
+      { value: 'pin', label: isPinned ? 'Unpin Folder' : 'Pin Folder', icon: 'pin' },
+      { divider: true },
+      { value: 'delete', label: 'Delete Folder', icon: 'trash-2', danger: true }
+    ];
+    var json = JSON.stringify(items).split('&').join('&amp;').split('"').join('&quot;')
+      .split('<').join('&lt;').split('>').join('&gt;');
+    return '<lex-dropdown-btn class="' + className + '" data-matter-menu' +
+      ' data-matter-id="' + escapeHtml(matterId) + '" data-matter-name="' + escapeHtml(matterName) + '"' +
+      ' data-is-pinned="' + (isPinned ? 'true' : 'false') + '" data-source="' + escapeHtml(source || 'lana') + '"' +
+      ' icon="more-vertical" icon-only variant="ghost" align="end" floating aria-label="Folder actions"' +
+      ' options="' + json + '" onclick="event.stopPropagation()"></lex-dropdown-btn>';
+  }
 
-    var button = event.currentTarget;
-    var matterId = button.dataset.matterId;
-    var matterName = button.dataset.matterName;
-    var isPinned = button.dataset.isPinned === 'true';
-    var source = button.dataset.source || 'lana';
-
-    console.log('[Drive] Matter data:', { matterId: matterId, matterName: matterName, isPinned: isPinned, source: source });
-
+  /**
+   * A folder menu item was chosen: read the folder from the menu host and
+   * run the action.
+   * @param {CustomEvent} event - lex-select
+   */
+  function handleMatterMenuSelect(event) {
+    var host = event.target && event.target.closest ? event.target.closest('lex-dropdown-btn[data-matter-menu]') : null;
+    if (!host || !event.detail) return;
     selectedMatter = {
-      matterId: matterId,
-      matterName: matterName,
-      isPinned: isPinned,
-      source: source
+      matterId: host.getAttribute('data-matter-id'),
+      matterName: host.getAttribute('data-matter-name'),
+      isPinned: host.getAttribute('data-is-pinned') === 'true',
+      source: host.getAttribute('data-source') || 'lana'
     };
-
-    var nameEl = document.getElementById('modalMatterName');
-    var idEl = document.getElementById('modalMatterId');
-    if (nameEl) nameEl.textContent = matterName;
-    if (idEl) idEl.textContent = matterId;
-
-    var pinLabel = document.getElementById('pinBtnLabel');
-    var pinDesc = document.getElementById('pinBtnDesc');
-    if (isPinned) {
-      if (pinLabel) pinLabel.textContent = 'Unpin Folder';
-      if (pinDesc) pinDesc.textContent = 'Remove from pinned folders';
-    } else {
-      if (pinLabel) pinLabel.textContent = 'Pin Folder';
-      if (pinDesc) pinDesc.textContent = 'Add to pinned folders';
-    }
-
-    var modal = document.getElementById('matterActionsModal');
-    if (modal) modal.open = true;
+    var action = event.detail.value;
+    if (action === 'open') openSelectedMatter();
+    else if (action === 'pin') togglePinSelectedMatter();
+    else if (action === 'delete') deleteSelectedMatter();
   }
 
   /**
-   * Close the matter actions modal and clear selectedMatter.
+   * Open the selected matter (navigate into it).
    */
-  function closeMatterActionsModal() {
-    var modal = document.getElementById('matterActionsModal');
-    if (modal) modal.open = false;
-    selectedMatter = null;
-  }
-
-  /**
-   * Open the selected matter (navigate into it) from the actions modal.
-   */
-  function openMatterFromModal() {
+  function openSelectedMatter() {
     if (!selectedMatter) return;
 
     var matterId = selectedMatter.matterId;
     var matterName = selectedMatter.matterName;
 
-    closeMatterActionsModal();
+    selectedMatter = null;
     navigateToMatter(matterId, matterName);
   }
 
   /**
-   * Toggle the pin state of the selected matter from the actions modal.
+   * Toggle the pin state of the selected matter.
    */
-  async function togglePinFromModal() {
+  async function togglePinSelectedMatter() {
     if (!selectedMatter) return;
 
     var matterId = selectedMatter.matterId;
     var source = selectedMatter.source;
     var isPinned = selectedMatter.isPinned;
 
-    closeMatterActionsModal();
+    selectedMatter = null;
     await togglePin(matterId, source, isPinned);
   }
 
   /**
-   * Initiate matter deletion from the actions modal.
-   * Transitions to a separate delete confirmation modal.
+   * Initiate deletion of the selected matter: opens the delete confirmation
+   * modal.
    */
-  function deleteMatterFromModal() {
+  function deleteSelectedMatter() {
     if (!selectedMatter) return;
 
     var nameEl = document.getElementById('deleteConfirmMatterName');
@@ -2013,9 +2273,6 @@
       btn.textContent = 'Delete Folder';
       btn.classList.remove('opacity-50', 'cursor-not-allowed');
     }
-
-    var optionsModal = document.getElementById('matterActionsModal');
-    if (optionsModal) optionsModal.open = false;
 
     var confirmModal = document.getElementById('deleteMatterConfirmModal');
     if (confirmModal) confirmModal.open = true;
@@ -2080,10 +2337,12 @@
     var pager = document.getElementById('drivePagination');
     if (!pager) return;
 
+    // Grid view only: the list view's pager is the table's own.
+    pager.classList.toggle('hidden', storageState.viewMode !== 'grid' || (storageState.totalPages || 1) <= 1);
     pager.page = storageState.currentPage;
     pager.totalPages = storageState.totalPages || 1;
     pager.total = storageState.totalResults || 0;
-    pager.limit = 100;
+    pager.limit = storageState.pageSize || 20;
   }
 
   /**
@@ -2289,17 +2548,7 @@
       isPinned
         ? '<div class="absolute top-2 right-8 p-1 rounded-full" style="background: var(--lex-status-warning-bg); border: 1px solid var(--lex-status-warning-border)" title="Pinned"><svg class="w-3 h-3" style="color: var(--lex-status-warning-text)" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg></div>'
         : '',
-      '<button class="matter-menu-btn absolute top-2 right-2 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" style="color: var(--lex-text-secondary)"',
-      '        data-matter-id="' + matterNumber + '"',
-      '        data-matter-name="' + matterName + '"',
-      '        data-is-pinned="' + (matter.is_pinned || isPinned) + '"',
-      '        data-source="' + escapeHtml(matter.source || 'lana') + '"',
-      '        onclick="event.stopPropagation(); showMatterActionsModal(event)"',
-      '        title="More options">',
-      '  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
-      '    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>',
-      '  </svg>',
-      '</button>',
+      matterMenuHtml(matter.matter_id || '', matter.name || matter.matter_id, matter.is_pinned || isPinned, matter.source, 'matter-menu-btn absolute top-2 right-2'),
       '<div class="flex flex-col items-center text-center">',
       '  <div class="w-12 h-12 mb-3 flex items-center justify-center">',
       '    <svg class="w-12 h-12" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
@@ -2408,11 +2657,6 @@
     exposeGlobal('handleFolderClick', handleFolderClick);
     exposeGlobal('navigateToMatter', navigateToMatter);
     exposeGlobal('navigateToRoot', navigateToRoot);
-    exposeGlobal('showMatterActionsModal', showMatterActionsModal);
-    exposeGlobal('closeMatterActionsModal', closeMatterActionsModal);
-    exposeGlobal('openMatterFromModal', openMatterFromModal);
-    exposeGlobal('togglePinFromModal', togglePinFromModal);
-    exposeGlobal('deleteMatterFromModal', deleteMatterFromModal);
     exposeGlobal('closeDeleteMatterConfirmModal', closeDeleteMatterConfirmModal);
     exposeGlobal('confirmDeleteMatter', confirmDeleteMatter);
     exposeGlobal('togglePin', togglePin);
@@ -2420,6 +2664,7 @@
     exposeGlobal('refreshPage', refreshPage);
 
     setupEventListeners();
+    loadWorkspaceFilterOptions();
     updateViewButtons();
     updateSortHeaderIndicators();
     loadMatters();

@@ -218,7 +218,7 @@ h1 {
   font-size: 12px;
 }
 
-.field span {
+.field > span {
   color: #46504c;
   font-size: 12px;
   font-weight: 700;
@@ -418,7 +418,7 @@ textarea:focus {
   min-width: 0;
 }
 
-.mini-field span {
+.mini-field > span {
   color: var(--muted);
   font-size: 10px;
   font-weight: 800;
@@ -868,8 +868,8 @@ textarea:focus {
   font-weight: 800;
 }
 
-.bullet-icon-row select {
-  padding: 6px 8px;
+.bullet-icon-row lex-select {
+  min-width: 0;
 }
 
 .bullet-icon-row small {
@@ -1761,7 +1761,7 @@ body[data-deck-style="noir"] .view-tabs {
 body[data-deck-style="noir"] .brand-block p,
 body[data-deck-style="noir"] .status,
 body[data-deck-style="noir"] #deckSubtitle,
-body[data-deck-style="noir"] .field span,
+body[data-deck-style="noir"] .field > span,
 body[data-deck-style="noir"] .check-field {
   color: var(--deck-muted);
 }
@@ -2581,38 +2581,6 @@ body[data-composition="briefing"] .role-badge {
   color: #9a2c27;
 }
 
-.library-table-title {
-  background: transparent;
-  border: 0;
-  color: var(--ink);
-  cursor: pointer;
-  display: grid;
-  gap: 2px;
-  padding: 0;
-  text-align: left;
-}
-
-.library-table-title span {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.doc-library-badge {
-  background: rgba(47, 111, 115, 0.08);
-  border-radius: 999px;
-  color: #2f6f73;
-  display: inline-flex;
-  font-size: 12px;
-  font-weight: 760;
-  padding: 4px 8px;
-}
-
-.doc-library-badge.is-template {
-  background: color-mix(in srgb, #1f8a4c 12%, #fff);
-  color: #1f6f3d;
-}
-
 .party-address:empty::before {
   color: var(--muted);
   content: attr(data-placeholder);
@@ -2868,7 +2836,9 @@ body[data-doc-studio-view="library"] .library-view {
 }
 
 .library-list {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   width: 100%;
   min-width: 0;
 }
@@ -2877,9 +2847,121 @@ body[data-doc-studio-view="library"] .library-view {
   width: 100%;
 }
 
-.library-list .lex-table-search {
-  max-width: 420px;
+/* Library toolbar card, section heading and tables (docs/TABLE-STANDARD.md). */
+.library-table-toolbar {
+  background: var(--lex-bg-primary, #fff);
+  border: 1px solid var(--lex-border-default, var(--line));
+  border-radius: 8px;
+  box-shadow: var(--lex-shadow-sm);
+  padding: 16px;
 }
+
+.library-table-toolbar-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.library-table-toolbar-search {
+  flex: 1;
+  min-width: 200px;
+}
+
+.library-table-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.library-table-toolbar-label {
+  color: var(--lex-text-secondary, var(--muted));
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.library-section-heading {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.library-section-title {
+  color: var(--lex-text-primary, var(--ink));
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.library-list .bc-name-cell {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.library-list .bc-name {
+  color: var(--lex-text-primary, var(--ink));
+  font-weight: 600;
+  overflow-wrap: break-word;
+}
+
+.library-list .bc-subtitle,
+.library-list .bc-cell-muted {
+  color: var(--lex-text-tertiary, var(--muted));
+  font-size: 13px;
+}
+
+.library-list .bc-time {
+  white-space: nowrap;
+}
+
+.library-list .bc-workspace-link {
+  appearance: none;
+  background: none;
+  border: 0;
+  color: var(--lex-accent, #3b5bdb);
+  cursor: pointer;
+  display: block;
+  font: inherit;
+  font-weight: 600;
+  max-width: 100%;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.library-list .bc-workspace-link > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.library-list .bc-workspace-link:focus-visible {
+  border-radius: 4px;
+  box-shadow: var(--lex-focus-ring);
+  outline: none;
+}
+
+#docStudioLibraryTable th,
+#docStudioStoredTable th {
+  white-space: nowrap;
+}
+
+/* Doc Studio files: File, Style, Sections, Created */
+#docStudioLibraryTable table { min-width: 720px; }
+#docStudioLibraryTable th:nth-child(2) { width: 140px; }
+#docStudioLibraryTable th:nth-child(3) { width: 120px; }
+#docStudioLibraryTable th:nth-child(4) { width: 176px; }
+
+/* Documents: File, Type, Matter, Template, Created, Last edited */
+#docStudioStoredTable table { min-width: 920px; }
+#docStudioStoredTable th:nth-child(2) { width: 88px; }
+#docStudioStoredTable th:nth-child(3) { width: 22%; }
+#docStudioStoredTable th:nth-child(4) { width: 120px; }
+#docStudioStoredTable th:nth-child(5) { width: 176px; }
+#docStudioStoredTable th:nth-child(6) { width: 150px; }
 
 .library-item {
   min-width: 0;

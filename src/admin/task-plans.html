@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="../css/components.css">
   <link rel="stylesheet" href="../css/admin/task-plans.css">
   <link rel="stylesheet" href="../css/admin/admin-switcher.css">
+  <link rel="stylesheet" href="../css/admin/admin-tables.css">
   <link rel="stylesheet" href="../css/tailwind-output.css">
   <script src="../js/tailwind-loader.js"></script>
   <link rel="stylesheet" href="../css/lex-chat.css">
@@ -50,27 +51,64 @@
       </section>
 
       <section id="taskPlansWorkspace" class="task-plans-workspace">
-        <lex-card heading="Plans" subtitle="Backend-owned draft and published plans">
-          <div id="taskPlansList" class="task-plans-list" aria-live="polite"></div>
-        </lex-card>
-
-        <lex-card id="taskPlanDetailCard" heading="Plan Details" subtitle="Select a plan to review">
-          <div id="taskPlanDetail" class="task-plan-detail">
-            <lex-empty
-              icon="document"
-              message="No plan selected"
-              description="Choose a task plan from the list."
-            ></lex-empty>
+        <!-- Search / Sort / Filter toolbar (docs/TABLE-STANDARD.md) -->
+        <div class="bg-white rounded-lg shadow-sm border mb-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and filter task plans">
+          <div class="flex items-center gap-4 flex-wrap">
+            <div class="flex-1 min-w-[200px]">
+              <lex-input id="taskPlansSearch" placeholder="Search task plans..." clearable="true" leading-icon="search"></lex-input>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Sort by:</label>
+              <lex-select id="taskPlansSort" options='[{"value":"updated_at","label":"Last edited"},{"value":"created_at","label":"Created"},{"value":"title","label":"Plan"},{"value":"status","label":"Status"},{"value":"source_type","label":"Type"},{"value":"item_count","label":"Items"}]' value="updated_at"></lex-select>
+            </div>
+            <lex-btn id="taskPlansSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+              </svg>
+            </lex-btn>
+            <div class="flex items-center gap-2">
+              <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Status:</label>
+              <lex-select id="taskPlansStatusFilter" options='[{"value":"all","label":"All"},{"value":"draft","label":"Draft"},{"value":"published","label":"Published"},{"value":"archived","label":"Archived"}]' value="all"></lex-select>
+            </div>
+            <div id="taskPlansCount" class="admin-table-toolbar-label text-sm whitespace-nowrap"></div>
           </div>
-        </lex-card>
+        </div>
+
+        <section aria-labelledby="taskPlansHeading">
+          <div class="flex items-center justify-between mb-3">
+            <h2 id="taskPlansHeading" class="admin-table-section-title text-lg font-semibold">All Plans</h2>
+            <span id="taskPlansSectionCount" class="admin-table-toolbar-label text-sm" aria-live="polite"></span>
+          </div>
+
+          <lex-table
+            id="taskPlansTable"
+            class="admin-table lex-table--card"
+            column-filters
+            columns="title,status,source_type,workspace,item_count,assigned,created_at,updated_at"
+            labels="Plan,Status,Type,Workspace,Items,Assigned to,Created,Last edited"
+            sortable-columns="title,status,source_type,workspace,item_count,assigned,created_at,updated_at"
+            search-keys="title,description,status,source_type"
+            sort-by="updated_at"
+            sort-dir="desc"
+            limit="20"
+            id-key="id"
+            empty-text="No task plans yet"
+            empty-action-label="Create Plan"
+            aria-label="Task plans"
+          ></lex-table>
+        </section>
       </section>
     </main>
+
+    <lex-drawer id="taskPlanDrawer" heading="Plan Details" width="lg" data-hoist>
+      <div id="taskPlanDetail" class="task-plan-detail"></div>
+    </lex-drawer>
 
     <lex-modal
       id="taskPlanModal"
       heading="Create Task Plan"
       size="lg"
-      hide-actions
+      footer-content='<lex-btn id="taskPlanCancelBtn" variant="secondary" size="md">Cancel</lex-btn><lex-btn id="taskPlanSaveBtn" variant="primary" size="md" type="submit" form="taskPlanForm">Create Draft</lex-btn>'
       data-hoist
     >
       <lex-form id="taskPlanForm">
@@ -141,10 +179,6 @@
           auto-resize
         ></lex-textarea>
 
-        <div class="task-plan-modal-actions">
-          <lex-btn id="taskPlanCancelBtn" variant="secondary" size="md">Cancel</lex-btn>
-          <lex-btn id="taskPlanSaveBtn" variant="primary" size="md" type="submit">Create Draft</lex-btn>
-        </div>
       </lex-form>
     </lex-modal>
 
@@ -152,7 +186,7 @@
       id="taskPlanItemModal"
       heading="Plan Item"
       size="md"
-      hide-actions
+      footer-content='<lex-btn id="taskPlanItemCancelBtn" variant="secondary" size="md">Cancel</lex-btn><lex-btn id="taskPlanItemSaveBtn" variant="primary" size="md" type="submit" form="taskPlanItemForm">Save Item</lex-btn>'
       data-hoist
     >
       <lex-form id="taskPlanItemForm">
@@ -199,10 +233,6 @@
           label="Due Date"
           type="date"
         ></lex-input>
-        <div class="task-plan-modal-actions">
-          <lex-btn id="taskPlanItemCancelBtn" variant="secondary" size="md">Cancel</lex-btn>
-          <lex-btn id="taskPlanItemSaveBtn" variant="primary" size="md" type="submit">Save Item</lex-btn>
-        </div>
       </lex-form>
     </lex-modal>
   </template>
@@ -253,6 +283,8 @@
   <script src="../js/lex/components/foundation/lex-card.js"></script>
   <script src="../js/lex/components/foundation/lex-badge.js"></script>
   <script src="../js/lex/components/foundation/lex-modal.js"></script>
+  <script src="../js/lex/components/foundation/lex-drawer.js"></script>
+  <script src="../js/lex/components/data/lex-table.js"></script>
   <script src="../js/lex/components/form/lex-form.js"></script>
   <script src="../js/lex/components/form/lex-input.js"></script>
   <script src="../js/lex/components/form/lex-select.js"></script>
@@ -260,6 +292,8 @@
 
   <script src="../js/lex/lex-page-init.js"></script>
   <script src="../js/admin/admin-switcher.js"></script>
+  <script src="../js/shared/library-column-filters.js"></script>
+  <script src="../js/admin/admin-table-kit.js"></script>
   <script src="../js/admin/task-plans.js"></script>
   <script src="../js/auth-guard.js"></script>
   <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>

@@ -46,6 +46,21 @@
 
       // Initialize properties with defaults and define getters/setters
       const props = this.constructor.properties;
+      // Upgrade-property pattern: a property assigned to the element before
+      // its definition loaded (el.options = [...] on a not-yet-upgraded tag)
+      // lives as an own data property. defineProperty below would silently
+      // replace it, so capture it first and re-apply it after the accessor
+      // exists. Raw values stay on _upgradedProps so subclasses with custom
+      // accessors (lex-select `value`) can re-apply them uncoerced.
+      let upgraded = null;
+      for (const name of Object.keys(props)) {
+        if (Object.prototype.hasOwnProperty.call(this, name)) {
+          if (!upgraded) upgraded = {};
+          upgraded[name] = this[name];
+          delete this[name];
+        }
+      }
+      this._upgradedProps = upgraded;
       for (const [name, config] of Object.entries(props)) {
         const def = config.default !== undefined
           ? (typeof config.default === 'object' ? JSON.parse(JSON.stringify(config.default)) : config.default)
@@ -68,6 +83,14 @@
           configurable: true
         });
       }
+
+      if (upgraded) {
+        for (const name of Object.keys(upgraded)) {
+          const old = this._props[name];
+          this._props[name] = LexElement._coerce(upgraded[name], props[name].type);
+          this._changedProps.set(name, old);
+        }
+      }
     }
 
     // -----------------------------------------------------------------------
@@ -84,6 +107,12 @@
       if (oldVal === newVal) return;
       const propName = LexElement._attrToProp(attr);
       const config = this.constructor.properties[propName];
+      // During upgrade, a property assigned before the definition loaded
+      // wins over its attribute (see _upgradedProps in the constructor).
+      if (config && !this._initialized && this._upgradedProps &&
+          Object.prototype.hasOwnProperty.call(this._upgradedProps, propName)) {
+        return;
+      }
       if (config) {
         // Avoid re-reflecting when we set the attribute ourselves
         this._props[propName] = LexElement._coerce(newVal, config.type);
@@ -104,13 +133,24 @@
         for (const [name, config] of Object.entries(props)) {
           if (config.attribute !== false) {
             const attrName = LexElement._propToAttr(name);
-            if (this.hasAttribute(attrName)) {
+            // A property assigned before upgrade wins over the attribute,
+            // the same as it would after upgrade.
+            const assigned = this._upgradedProps && Object.prototype.hasOwnProperty.call(this._upgradedProps, name);
+            if (!assigned && this.hasAttribute(attrName)) {
               this._props[name] = LexElement._coerce(this.getAttribute(attrName), config.type);
             }
           }
         }
+        if (this._upgradedProps) {
+          for (const name of Object.keys(this._upgradedProps)) {
+            const config = props[name];
+            if (config && config.reflect) this._reflectToAttribute(name, this._props[name]);
+          }
+          this._upgradedProps = null;
+        }
         this._initialized = true;
         this._performUpdate();
+        this._adoptChildrenParsedLater();
       } else {
         // Re-run update to re-attach event listeners that were removed in
         // disconnectedCallback (e.g., after a DOM hoist moves this element
@@ -118,6 +158,44 @@
         this._performUpdate();
       }
       this.connected();
+    }
+
+    // A component in the page HTML upgrades as soon as the parser reaches its
+    // opening tag when its script loaded earlier (e.g. in <head>), so it
+    // renders before its children exist and they get parsed after its
+    // rendered markup. Once parsing finishes, move those children into its
+    // <slot-content> and update (so footer/header slots get placed).
+    _adoptChildrenParsedLater() {
+      if (typeof document === 'undefined' || document.readyState !== 'loading') return;
+      const rendered = Array.from(this.childNodes);
+      // Only this component's own slot (inside its rendered markup), never
+      // one belonging to a nested component.
+      const ownSlot = () => {
+        for (const node of rendered) {
+          if (node.nodeType !== 1) continue;
+          if (node.tagName === 'SLOT-CONTENT') return node;
+          const found = node.querySelector('slot-content');
+          if (found) return found;
+        }
+        return null;
+      };
+      if (!ownSlot()) return;
+      const renderedSet = new Set(rendered);
+      document.addEventListener('DOMContentLoaded', () => {
+        const slot = ownSlot();
+        if (!slot || !this.contains(slot)) return;
+        const late = Array.from(this.childNodes).filter((node) => !renderedSet.has(node) && !node.contains(slot));
+        if (!late.length) return;
+        for (const node of late) slot.appendChild(node);
+        // Components that re-render restore their slot from the captured
+        // children on every update, so those become the captured children.
+        // Render-once components (modal, drawer: _rendered) keep live nodes.
+        if (!this._rendered) {
+          this._originalChildren = late.map((node) => LexElement.cloneContent(node));
+          this._pristineChildren = this._originalChildren.slice();
+        }
+        this._scheduleUpdate();
+      }, { once: true });
     }
 
     disconnectedCallback() {
@@ -172,13 +250,22 @@
     // Content preservation (no Shadow DOM slot alternative)
     // -----------------------------------------------------------------------
 
+    // Children are copied with LexElement.cloneContent, which rebuilds any
+    // Lex child that already upgraded and rendered from its own source
+    // children. A plain deep clone would copy that child's rendered markup as
+    // if it were authored content, and the copy would render it again: a
+    // <lex-btn> inside a <lex-modal> footer became <button><button> whenever
+    // lex-btn.js loaded before lex-modal.js. _pristineChildren keeps the
+    // captured source even after a subclass nulls _originalChildren (modal,
+    // drawer) so this element can itself be copied faithfully later.
     _captureContent() {
       if (this.childNodes.length > 0) {
         this._originalChildren = [];
         for (const node of this.childNodes) {
-          this._originalChildren.push(node.cloneNode(true));
+          this._originalChildren.push(LexElement.cloneContent(node));
         }
       }
+      this._pristineChildren = this._originalChildren ? this._originalChildren.slice() : [];
     }
 
     _restoreContent() {
@@ -186,9 +273,30 @@
       if (slot && this._originalChildren) {
         slot.innerHTML = '';
         for (const node of this._originalChildren) {
-          slot.appendChild(node.cloneNode(true));
+          slot.appendChild(LexElement.cloneContent(node));
         }
       }
+    }
+
+    /**
+     * Deep-copy a node as authored: Lex descendants that already rendered are
+     * copied from their source children, not their rendered markup.
+     * @param {Node} node
+     * @returns {Node}
+     */
+    static cloneContent(node) {
+      if (!node || node.nodeType !== 1 || node.localName === 'template') {
+        return node ? node.cloneNode(true) : node;
+      }
+      const copy = node.cloneNode(false);
+      let source = node.childNodes;
+      if (node instanceof LexElement && node._initialized) {
+        source = node._originalChildren || node._pristineChildren || [];
+      }
+      for (const child of Array.from(source)) {
+        copy.appendChild(LexElement.cloneContent(child));
+      }
+      return copy;
     }
 
     // -----------------------------------------------------------------------
@@ -487,6 +595,109 @@
   global.Lex = global.Lex || {};
   global.Lex.LexElement = LexElement;
   global.Lex.defineLex = defineLex;
+  // Open overlays (lex-modal, lex-drawer) in opening order, so Escape closes
+  // only the topmost one.
+  const OverlayStack = {
+    _seq: 0,
+    opened(el) { if (!el._lexOverlaySeq) el._lexOverlaySeq = ++this._seq; },
+    closed(el) { el._lexOverlaySeq = 0; },
+    isTop(el) {
+      if (!el._lexOverlaySeq) return true;   // not tracked: behave as before
+      const open = document.querySelectorAll('lex-modal, lex-drawer');
+      for (const other of open) {
+        if (other !== el && other._lexOverlaySeq > el._lexOverlaySeq && other.open) return false;
+      }
+      return true;
+    },
+    // One Escape press closes one overlay.
+    claimEscape(event) {
+      if (event.__lexOverlayEscapeHandled) return false;
+      event.__lexOverlayEscapeHandled = true;
+      return true;
+    }
+  };
+
+  // Floating layers: menus rendered at body level (position: fixed) so a
+  // container with overflow hidden/auto cannot clip them. compute() is pure
+  // (rects in, coordinates out); place() measures and positions an element;
+  // track() keeps it placed while the page scrolls or resizes.
+  const Floating = {
+    // anchor: a DOMRect-like box ({ left, top, right?, bottom?, width?, height? }).
+    // size: { width, height } of the floating box. viewport: { width, height }.
+    // opts: align start | end | center, placement bottom (default) | top,
+    // gap (4) between anchor and box, margin (8) kept from the viewport edge.
+    // Returns { top, left, placement, maxHeight } where maxHeight is null when
+    // the box fits, else the room on the chosen side.
+    compute(anchor, size, viewport, opts) {
+      const o = opts || {};
+      const gap = typeof o.gap === 'number' ? o.gap : 4;
+      const margin = typeof o.margin === 'number' ? o.margin : 8;
+      const left0 = Number(anchor && anchor.left) || 0;
+      const top0 = Number(anchor && anchor.top) || 0;
+      const right0 = anchor && anchor.right != null ? Number(anchor.right) : left0 + (Number(anchor && anchor.width) || 0);
+      const bottom0 = anchor && anchor.bottom != null ? Number(anchor.bottom) : top0 + (Number(anchor && anchor.height) || 0);
+      const w = Math.max(0, Number(size && size.width) || 0);
+      const h = Math.max(0, Number(size && size.height) || 0);
+      const vw = Number(viewport && viewport.width) || 0;
+      const vh = Number(viewport && viewport.height) || 0;
+
+      const below = vh - margin - (bottom0 + gap);
+      const above = top0 - gap - margin;
+      let placement = o.placement === 'top' ? 'top' : 'bottom';
+      if (placement === 'bottom' && h > below && above > below) placement = 'top';
+      else if (placement === 'top' && h > above && below > above) placement = 'bottom';
+      const room = Math.max(0, Math.floor(placement === 'bottom' ? below : above));
+      const maxHeight = h > room ? room : null;
+      const usedH = maxHeight === null ? h : maxHeight;
+      const top = placement === 'bottom' ? bottom0 + gap : top0 - gap - usedH;
+
+      let left;
+      if (o.align === 'end') left = right0 - w;
+      else if (o.align === 'center') left = left0 + (right0 - left0) / 2 - w / 2;
+      else left = left0;
+      left = Math.min(left, vw - w - margin);
+      left = Math.max(margin, left);
+      return { top: Math.round(top), left: Math.round(left), placement, maxHeight };
+    },
+
+    viewport() {
+      return { width: global.innerWidth || 0, height: global.innerHeight || 0 };
+    },
+
+    // Position el (already position: fixed and in the document) next to the
+    // anchor rect. Sets top/left and, when it does not fit, max-height.
+    place(el, anchorRect, opts) {
+      if (!el || !anchorRect) return null;
+      el.style.maxHeight = '';
+      const box = el.getBoundingClientRect();
+      const size = { width: el.offsetWidth || box.width || 0, height: el.offsetHeight || box.height || 0 };
+      const pos = Floating.compute(anchorRect, size, Floating.viewport(), opts);
+      el.style.top = pos.top + 'px';
+      el.style.left = pos.left + 'px';
+      if (pos.maxHeight !== null) el.style.maxHeight = pos.maxHeight + 'px';
+      el.setAttribute('data-placement', pos.placement);
+      return pos;
+    },
+
+    // Re-place el on scroll (capture phase, so scrolling any ancestor counts)
+    // and resize. getRect returns the current anchor rect, or null to skip.
+    // Returns stop().
+    track(el, getRect, opts) {
+      const update = () => {
+        const rect = getRect();
+        if (rect) Floating.place(el, rect, opts);
+      };
+      global.addEventListener('scroll', update, true);
+      global.addEventListener('resize', update);
+      return function stop() {
+        global.removeEventListener('scroll', update, true);
+        global.removeEventListener('resize', update);
+      };
+    }
+  };
+
+  global.Lex.OverlayStack = OverlayStack;
+  global.Lex.Floating = Floating;
   global.Lex.ScrollLock = ScrollLock;
   global.Lex.FocusTrap = FocusTrap;
   global.Lex.version = LEX_VERSION;

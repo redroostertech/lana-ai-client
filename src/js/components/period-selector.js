@@ -68,6 +68,19 @@ export class PeriodSelector {
   ];
 
   /**
+   * Escape a value for a double-quoted HTML attribute
+   * @private
+   * @static
+   */
+  static _escapeAttr(value) {
+    return String(value == null ? '' : value)
+      .split('&').join('&amp;')
+      .split('"').join('&quot;')
+      .split('<').join('&lt;')
+      .split('>').join('&gt;');
+  }
+
+  /**
    * Create a PeriodSelector instance
    *
    * @param {Object} config - Configuration object
@@ -178,17 +191,12 @@ export class PeriodSelector {
 
           <!-- Period Type -->
           <div>
-            <label for="${this.ids.periodType}" class="block text-sm font-medium text-gray-700 mb-2">
-              Compare By
-            </label>
-            <select
+            <lex-select
               id="${this.ids.periodType}"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            >
-              ${this.periodTypes.map(pt => `
-                <option value="${pt.value}">${pt.label}</option>
-              `).join('')}
-            </select>
+              label="Compare by"
+              options="${PeriodSelector._escapeAttr(JSON.stringify(this.periodTypes))}"
+              value="${PeriodSelector._escapeAttr(this.state.periodType || '')}"
+            ></lex-select>
           </div>
         </div>
       </div>
@@ -227,7 +235,7 @@ export class PeriodSelector {
 
     // Period type selector
     const typeSelect = document.getElementById(this.ids.periodType);
-    typeSelect.addEventListener('change', () => this._handleTypeChange());
+    typeSelect.addEventListener('lex-change', () => this._handleTypeChange());
   }
 
   /**

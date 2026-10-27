@@ -14,6 +14,9 @@
    Sides: left | right (default)
    Widths: sm (320px) | md (420px) | lg (560px) | xl (720px) | full
    Events: lex-close
+   flush: no body padding (tables, lists, editors edge to edge);
+   Lex.Drawer.open({ ..., flush: true }). drawer.contentRoot is the element the
+   body content lives in.
 */
 
 // Pure helper (no DOM dependency), exported for unit tests. Builds the footer
@@ -174,6 +177,10 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
         padding: 20px;
       }
 
+      .lex-drawer-panel.lex-drawer-panel--flush > .lex-drawer-body {
+        padding: 0;
+      }
+
       /* ── Footer ──────────────────────────────────────── */
 
       .lex-drawer-footer {
@@ -311,7 +318,8 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
         confirmText: { type: String, default: 'Save' },
         cancelText:  { type: String, default: 'Cancel' },
         buttons:     { type: Array, default: null },
-        closeOnOverlay: { type: Boolean, default: true }
+        closeOnOverlay: { type: Boolean, default: true },
+        flush:       { type: Boolean, default: false }   // no body padding
       };
     }
 
@@ -342,7 +350,7 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
       this._rendered = true;
 
       const sideCls = this.side === 'left' ? 'lex-drawer-overlay--left' : 'lex-drawer-overlay--right';
-      const widthCls = `lex-drawer-panel--${this.width || 'md'}`;
+      const widthCls = `lex-drawer-panel--${this.width || 'md'}${this.flush ? ' lex-drawer-panel--flush' : ''}`;
 
       // aria-labelledby points to the heading element when a heading is provided.
       const labelledBy = this.heading ? ` aria-labelledby="${this._titleId}"` : '';
@@ -416,6 +424,11 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
         }
       }
 
+      if (changedProps && changedProps.has('flush')) {
+        const panel = this.querySelector('.lex-drawer-panel');
+        if (panel) panel.classList.toggle('lex-drawer-panel--flush', !!this.flush);
+      }
+
       const slotContent = this.querySelector('.lex-drawer-body slot-content');
       const footerContainer = this.querySelector('.lex-drawer-footer');
       if (slotContent && footerContainer) {
@@ -423,6 +436,18 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
         for (const child of footerChildren) {
           footerContainer.appendChild(child);
         }
+      }
+      // Declarative header actions: children marked data-slot="header-actions".
+      const headerActions = this.querySelector('.lex-drawer-header-actions');
+      if (slotContent && headerActions) {
+        for (const child of slotContent.querySelectorAll('[data-slot="header-actions"]')) {
+          headerActions.appendChild(child);
+        }
+      }
+
+      const overlayStack = window.Lex && window.Lex.OverlayStack;
+      if (overlayStack) {
+        if (this.open) overlayStack.opened(this); else overlayStack.closed(this);
       }
 
       if (!this.open) {
@@ -525,6 +550,8 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
       // ESC key
       const escHandler = (e) => {
         if (e.key === 'Escape' && this.open) {
+          const stack = window.Lex && window.Lex.OverlayStack;
+          if (stack && (!stack.isTop(this) || !stack.claimEscape(e))) return;
           this.emit('lex-close');
           this.open = false;
         }
@@ -545,6 +572,17 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
     }
 
     // --- Instance API ---
+
+    // Show or hide the footer without touching its markup.
+    setFooterVisible(visible) {
+      const footer = this.querySelector('.lex-drawer-footer');
+      if (footer) footer.classList.toggle('hidden', !visible);
+    }
+
+    // The element page content lives in (inside the drawer body).
+    get contentRoot() {
+      return this.querySelector('.lex-drawer-body slot-content') || this.querySelector('.lex-drawer-body');
+    }
 
     /**
      * Set action buttons in the drawer header (between title and close button).
@@ -600,6 +638,7 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
       drawer.width = options.width || 'md';
       drawer.showFooter = options.showFooter || false;
       drawer.closeOnOverlay = options.closeOnOverlay !== undefined ? options.closeOnOverlay : true;
+      if (options.flush !== undefined) drawer.flush = !!options.flush;
 
       if (options.showFooter) {
         drawer.confirmText = options.confirmText || 'Save';

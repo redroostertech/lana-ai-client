@@ -638,8 +638,9 @@
   // Default tool definitions
   // ---------------------------------------------------------------------------
 
+  // Tools are modes, so one is active at a time. Documents are not a tool:
+  // attaching one (# picker or Manage chat documents) is what scopes answers.
   const DEFAULT_TOOLS = [
-    { id: 'document_chat',  label: 'Document Context', icon: ICON_FILE, description: 'Focus answers on selected documents' },
     { id: 'agentic',        label: 'Agentic Mode',     icon: ICON_ZAP,  description: 'AI performs multi-step research and analysis' },
     { id: 'insights_chat',  label: 'Insights Chat',    icon: ICON_EYE,  description: 'Ask about forecasts, trends, and insights' }
   ];
@@ -775,7 +776,7 @@
                   ${ICON_FOLDER}
                   <div>
                     <div class="lex-cmp-pop-label">Manage chat documents</div>
-                    <div class="lex-cmp-pop-desc">Add or remove documents for document chat mode</div>
+                    <div class="lex-cmp-pop-desc">Choose the documents LANA answers this chat from</div>
                   </div>
                 </div>
               </div>
@@ -1102,28 +1103,21 @@
 
     _toggleTool(id) {
       if (this._toolsLocked) return;
-      const active = [...(this.activeTools || [])];
-      const idx = active.indexOf(id);
-      if (idx >= 0) {
-        active.splice(idx, 1);
-        this._props.activeTools = active;
-        // Deselecting Document Context clears all attached files
-        if (id === 'document_chat' && this._attachedDocs.length > 0) {
-          const removed = this._attachedDocs.slice();
-          this._attachedDocs = [];
-          this._renderDocBadges();
-          for (const doc of removed) {
-            this.emit('lex-composer-document-remove', { documentId: doc.id });
-          }
-        }
-        this.emit('lex-composer-tool-dismiss', { toolId: id });
+      if ((this.activeTools || []).includes(id)) {
+        this._removeTool(id);
       } else {
-        active.push(id);
-        this._props.activeTools = active;
-        this.emit('lex-composer-tool-select', { toolId: id });
+        this._selectTool(id);
       }
+    }
+
+    // Make `id` the one active tool, dismissing whichever was active before.
+    _selectTool(id) {
+      const previous = (this.activeTools || []).filter(t => t !== id);
+      this._props.activeTools = [id];
       this._refreshToolsPopover();
       this._refreshActiveChips();
+      for (const toolId of previous) this.emit('lex-composer-tool-dismiss', { toolId });
+      this.emit('lex-composer-tool-select', { toolId: id });
     }
 
     _removeTool(id) {
@@ -1135,15 +1129,6 @@
       this._props.activeTools = active;
       this._refreshToolsPopover();
       this._refreshActiveChips();
-      // Dismissing Document Context clears all attached files
-      if (id === 'document_chat' && this._attachedDocs.length > 0) {
-        const removed = this._attachedDocs.slice();
-        this._attachedDocs = [];
-        this._renderDocBadges();
-        for (const doc of removed) {
-          this.emit('lex-composer-document-remove', { documentId: doc.id });
-        }
-      }
       this.emit('lex-composer-tool-dismiss', { toolId: id });
     }
 
@@ -1320,14 +1305,6 @@
       if (!alreadyAttached) {
         this._attachedDocs.push({ id: docId, filename: name });
         this._renderDocBadges();
-        // Auto-activate Document Context tool
-        const active = this.activeTools || [];
-        if (!active.includes('document_chat')) {
-          this._props.activeTools = [...active, 'document_chat'];
-          this._refreshToolsPopover();
-          this._refreshActiveChips();
-          this.emit('lex-composer-tool-select', { toolId: 'document_chat' });
-        }
       }
       this._textarea?.focus();
       this.emit('lex-composer-document-select', { documentId: docId, filename: docName });
@@ -1416,7 +1393,7 @@
 
     async _fetchMentions(prefix) {
       // Token + base URL come from the global api client used elsewhere
-      // in the chat surface (see lex-chat.js _openCitationDocument). If
+      // in the chat surface (the global api client from api.js). If
       // it's not configured, silently bail — the autocomplete simply
       // shows "No matches".
       const apiClient = (typeof window !== 'undefined') ? window.api : null;
@@ -1855,10 +1832,10 @@
         'office_selection',
         'tracked_change'
       ]).has(contextType);
-      if (moduleContext.type !== 'ui_card' && !documentContext) {
-        const active = new Set(this.activeTools || []);
-        active.add('insights_chat');
-        this.setActiveTools(Array.from(active));
+      if (moduleContext.type !== 'ui_card' && !documentContext
+        && this._getTools().some(t => t.id === 'insights_chat')
+        && !(this.activeTools || []).includes('insights_chat')) {
+        this._selectTool('insights_chat');
       }
     }
 

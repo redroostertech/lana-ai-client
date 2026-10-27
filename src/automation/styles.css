@@ -73,7 +73,8 @@ button:focus {
   outline-offset: 2px;
 }
 
-label {
+label,
+.automation-field {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -360,56 +361,16 @@ button:disabled {
   padding: 32px;
 }
 
-.template-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 120;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-}
 
-.template-modal-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(17, 17, 17, 0.44);
-}
 
-.template-modal-panel {
-  position: relative;
-  width: min(760px, 100%);
-  max-height: calc(100vh - 64px);
-  overflow: auto;
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  box-shadow: 0 32px 56px rgba(17, 17, 17, 0.22);
-  padding: 24px;
+
+
+
+/* Body of the automation lex-modals (template, check data, connector import / add instance / confirm). */
+.automation-modal-body {
   display: flex;
   flex-direction: column;
   gap: 16px;
-}
-
-.template-modal-panel h2 {
-  font-size: clamp(1.9rem, 3.2vw, 2.6rem);
-  line-height: 1.15;
-  margin: 0;
-  padding-right: 40px;
-}
-
-.template-modal-close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 32px;
-  height: 32px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--black-500);
-  font-size: 22px;
-  line-height: 1;
-  cursor: pointer;
 }
 
 .template-modal-description {
@@ -507,15 +468,7 @@ button:disabled {
   padding: 1px 6px;
 }
 
-#template-modal-try {
-  width: 100%;
-}
 
-.template-modal-cta {
-  justify-content: center;
-  font-weight: 700;
-  padding: 12px 16px;
-}
 
 .sidebar {
   background: var(--black-700);
@@ -1307,7 +1260,8 @@ button:disabled {
   gap: 10px;
 }
 
-.automations-settings-panel label {
+.automations-settings-panel label,
+.automations-settings-panel .automation-field {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -1315,7 +1269,8 @@ button:disabled {
   color: var(--black-500);
 }
 
-.automations-settings-panel label span {
+.automations-settings-panel label span,
+.automations-settings-panel .automation-field > span {
   font-weight: 600;
   letter-spacing: 0.02em;
 }
@@ -1325,11 +1280,6 @@ button:disabled {
   font-size: 0.75rem;
   color: var(--black-500);
   line-height: 1.4;
-}
-
-.automations-settings-panel label > select[size] {
-  height: auto;
-  padding: 4px;
 }
 
 .automations-builder-matter-search {
@@ -1725,53 +1675,9 @@ button:disabled {
   align-items: center;
 }
 
-.builder-publish-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 140;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-}
-
-.builder-publish-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(17, 17, 17, 0.44);
-}
-
-.builder-publish-panel {
-  position: relative;
-  width: min(760px, 100%);
-  max-height: calc(100vh - 64px);
-  overflow: auto;
-  border: 1px solid var(--lex-border-default);
-  border-radius: var(--lex-radius-xl, 16px);
-  background: var(--lex-bg-elevated, var(--paper));
-  box-shadow: var(--lex-shadow-xl);
-  display: flex;
-  flex-direction: column;
-}
-
-.builder-publish-header,
-.builder-publish-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 12px 14px;
-}
-
-.builder-publish-header {
-  border-bottom: 1px solid var(--lex-border-subtle);
-}
-
-.builder-publish-header h3 {
-  margin: 0;
-}
-
+/* Publish dialog is a lex-modal (#builder-publish-modal); the modal owns
+   the header, close, footer and body padding. */
 .builder-publish-body {
-  padding: 14px;
   display: grid;
   gap: 12px;
 }
@@ -1793,11 +1699,6 @@ button:disabled {
 
 .builder-publish-blockers li + li {
   margin-top: 4px;
-}
-
-.builder-publish-footer {
-  border-top: 1px solid var(--lex-border-subtle);
-  justify-content: flex-end;
 }
 
 .automations-footer-meta {
@@ -2346,89 +2247,6 @@ button:disabled {
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
-}
-
-.automation-table-loading {
-  display: grid;
-  gap: 12px;
-}
-
-.automation-table-loading__toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.automation-table-loading__search,
-.automation-table-loading__count,
-.automation-table-loading__cell {
-  display: block;
-  overflow: hidden;
-  border-radius: 999px;
-  background: var(--lex-bg-tertiary, #eceae7);
-  color: transparent;
-  position: relative;
-}
-
-.automation-table-loading__search {
-  width: min(280px, 42vw);
-  height: 34px;
-}
-
-.automation-table-loading__count {
-  width: 72px;
-  height: 14px;
-}
-
-.automation-table-loading__table {
-  overflow: hidden;
-  border: 1px solid var(--lex-border-subtle, #e5e7eb);
-  border-radius: 8px;
-  background: var(--lex-bg-primary, #fff);
-}
-
-.automation-table-loading__header,
-.automation-table-loading__row {
-  display: grid;
-  grid-template-columns: minmax(180px, 1.6fr) repeat(7, minmax(92px, 1fr));
-  gap: 12px;
-  align-items: center;
-  padding: 12px 14px;
-}
-
-.automation-table-loading__header {
-  border-bottom: 1px solid var(--lex-border-subtle, #e5e7eb);
-  color: var(--lex-text-tertiary, #8a8178);
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.automation-table-loading__row + .automation-table-loading__row {
-  border-top: 1px solid var(--lex-border-subtle, #f0efed);
-}
-
-.automation-table-loading__cell {
-  height: 14px;
-}
-
-.automation-table-loading__search::after,
-.automation-table-loading__count::after,
-.automation-table-loading__cell::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  transform: translateX(-100%);
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.72), transparent);
-  animation: library-loading-shimmer 1.35s ease-in-out infinite;
-}
-
-@keyframes library-loading-shimmer {
-  100% {
-    transform: translateX(100%);
-  }
 }
 
 .choice-card,
@@ -3563,9 +3381,6 @@ pre.code-preview {
 /* ──────────────────────────────────────────────────────────────────
    Connector Import Modal
    ────────────────────────────────────────────────────────────────── */
-.connector-import-panel {
-  max-width: 560px;
-}
 .connector-import-dropzone {
   border: 2px dashed #cbd5f5;
   border-radius: 14px;
@@ -3630,16 +3445,7 @@ pre.code-preview {
   word-break: break-all;
 }
 
-.connector-confirm-panel {
-  max-width: 480px;
-}
 
-.template-modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 20px;
-}
 
 @media (max-width: 900px) {
   .connector-detail-header {
@@ -4016,61 +3822,8 @@ details[open].ld-step-raw > summary::before {
   color: var(--error, #dc2626);
 }
 
-/* Delete confirmation modal */
-.ld-delete-modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-.ld-delete-modal-panel {
-  background: var(--surface, #fff);
-  border-radius: 10px;
-  padding: 24px 28px;
-  max-width: 460px;
-  width: 90%;
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.18);
-}
-.ld-delete-modal-panel h3 {
-  margin: 0 0 10px 0;
-}
-.ld-delete-modal-panel p {
-  color: var(--text-muted, #6b7280);
-  font-size: 0.9rem;
-}
 
 /* Artifact view modal */
-.ld-artifact-modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-.ld-artifact-modal-panel {
-  background: var(--surface, #fff);
-  border-radius: 10px;
-  padding: 20px 24px;
-  max-width: 640px;
-  width: 92%;
-  max-height: 80vh;
-  overflow-y: auto;
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.18);
-}
-.ld-artifact-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-.ld-artifact-modal-header h3 {
-  margin: 0;
-}
 .ld-artifact-modal-meta {
   display: flex;
   align-items: center;
@@ -4089,16 +3842,6 @@ details[open].ld-step-raw > summary::before {
   overflow-y: auto;
 }
 
-.ld-artifact-modal-panel--fullscreen {
-  width: min(96vw, 1760px) !important;
-  max-width: none !important;
-  height: min(94vh, 1320px) !important;
-  max-height: 94vh !important;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden !important;
-  border-radius: 18px;
-}
 
 .ld-redline-modal-shell {
   display: flex;
@@ -4759,3 +4502,131 @@ details[open].ld-step-raw > summary::before {
   font-size: 0.72rem;
   opacity: 0.6;
 }
+
+/* ── Server-paged tables (docs/TABLE-STANDARD.md) ───────────────────────── */
+/* Library "Live Automations", Run History "Triggered Runs", Approvals
+   "Approval Queue". Fixed layout so long text truncates; the name column
+   takes the remaining width and wraps between words. */
+.automation-table-section {
+  margin-bottom: 24px;
+}
+
+.automation-table table {
+  table-layout: fixed;
+}
+
+.automation-table td {
+  overflow: hidden;
+}
+
+.automation-table th {
+  white-space: nowrap;
+}
+
+.automation-cell-name {
+  color: var(--lex-text-primary);
+  display: block;
+  font-size: 13px;
+  font-weight: var(--lex-weight-semibold, 600);
+  line-height: 1.4;
+  overflow-wrap: break-word;
+}
+
+.automation-cell-secondary {
+  color: var(--lex-text-secondary);
+  display: block;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automation-cell-text,
+.automation-cell-time {
+  color: var(--lex-text-primary);
+  display: block;
+  font-size: 13px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automation-cell-time {
+  color: var(--lex-text-secondary);
+  font-size: 12px;
+}
+
+.automation-cell-muted {
+  color: var(--lex-text-tertiary, var(--lex-text-secondary));
+  display: block;
+  font-size: 12px;
+}
+
+/* Matter links: same treatment as My Tasks' and Document Library's workspace links */
+.automation-matter-link {
+  appearance: none;
+  background: none;
+  border: 0;
+  color: var(--lex-accent, #3b5bdb);
+  cursor: pointer;
+  display: block;
+  font: inherit;
+  font-size: 13px;
+  font-weight: var(--lex-weight-semibold, 600);
+  max-width: 100%;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.automation-matter-link > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automation-matter-link:hover {
+  color: var(--lex-accent-strong, var(--lex-accent, #2f47b3));
+}
+
+.automation-matter-link:focus-visible {
+  border-radius: var(--lex-radius-sm, 4px);
+  box-shadow: var(--lex-focus-ring);
+  outline: none;
+}
+
+/* Narrow windows scroll sideways instead of squeezing the name column. */
+#libraryAutomationsTable table { min-width: 1420px; }
+#automationRunsTable table { min-width: 1400px; }
+#automationApprovalsTable table { min-width: 1260px; }
+
+/* Library: Name, Category, Type, Scope, Visibility, State, Last run, Created, Updated */
+#libraryAutomationsTable th:nth-child(2) { width: 140px; }
+#libraryAutomationsTable th:nth-child(3) { width: 120px; }
+#libraryAutomationsTable th:nth-child(4) { width: 15%; }
+#libraryAutomationsTable th:nth-child(5) { width: 112px; }
+#libraryAutomationsTable th:nth-child(6) { width: 100px; }
+#libraryAutomationsTable th:nth-child(7) { width: 128px; }
+#libraryAutomationsTable th:nth-child(8) { width: 176px; }
+#libraryAutomationsTable th:nth-child(9) { width: 128px; }
+
+/* Run History: Automation, Scope, Matter, Trigger, Started, Created, Status, Duration */
+#automationRunsTable th:nth-child(2) { width: 120px; }
+#automationRunsTable th:nth-child(3) { width: 16%; }
+#automationRunsTable th:nth-child(4) { width: 150px; }
+#automationRunsTable th:nth-child(5) { width: 176px; }
+#automationRunsTable th:nth-child(6) { width: 176px; }
+#automationRunsTable th:nth-child(7) { width: 150px; }
+#automationRunsTable th:nth-child(8) { width: 112px; }
+
+/* Approvals: Title, Source, Type, Priority, Matter, Created, Expires */
+#automationApprovalsTable th:nth-child(2) { width: 150px; }
+#automationApprovalsTable th:nth-child(3) { width: 150px; }
+#automationApprovalsTable th:nth-child(4) { width: 104px; }
+#automationApprovalsTable th:nth-child(5) { width: 16%; }
+#automationApprovalsTable th:nth-child(6) { width: 176px; }
+#automationApprovalsTable th:nth-child(7) { width: 176px; }

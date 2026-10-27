@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Module Execution Dashboard - LanaAI</title>
   <link rel="stylesheet" href="../css/tailwind-output.css">
+  <link rel="stylesheet" href="../css/lex-tokens.css">
   <script src="../js/tailwind-loader.js"></script>
   <script src="../js/error-reporter.js"></script>
   <script src="../js/vendor/chart.js"></script>
@@ -16,7 +17,31 @@
   <script src="../js/api.js"></script>
   <script src="../js/components.js"></script>
   <script src="../js/menu.js"></script>
+  <script src="../js/shared/header-user-menu.js"></script>
   <script src="../js/notifications.js"></script>
+  <!-- Lex UI: the standard drill-down tables (docs/TABLE-STANDARD.md) -->
+  <script src="../js/lex/lex.core.js"></script>
+  <script src="../js/lex/lex.icons.js"></script>
+  <script src="../js/lex/lex.data.js"></script>
+  <script src="../js/lex/lex.forms.js"></script>
+  <script src="../js/lex/lex.utils.js"></script>
+  <script src="../js/lex/components/foundation/lex-btn.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/foundation/lex-empty.js"></script>
+  <script src="../js/lex/components/foundation/lex-modal.js"></script>
+  <script src="../js/lex/components/foundation/lex-drawer.js"></script>
+  <script src="../js/lex/components/form/lex-input.js"></script>
+  <script src="../js/lex/components/form/lex-select.js"></script>
+  <script src="../js/lex/components/data/lex-table.js"></script>
+  <script src="../js/shared/library-column-filters.js"></script>
+  <script src="js/record-table-kit.js"></script>
+  <script src="js/insights-tables.js"></script>
+  <script src="js/insights-overlays.js"></script>
+  <!-- Shared data-override lex-drawer (used through InsightsOverlays.overridePanel) -->
+  <script type="module">
+    import { DataOverridePanel } from '../js/components/data-override-panel.js';
+    window.DataOverridePanel = DataOverridePanel;
+  </script>
 </head>
 <body class="bg-gray-50 min-h-screen">
   <!-- Sidebar -->
@@ -54,156 +79,14 @@
           </button>
 
           <!-- User Menu -->
-          <div class="relative" id="userMenu">
-            <button class="flex items-center gap-2 text-gray-700 hover:text-gray-900 p-1" title="Settings">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-              </svg>
-            </button>
-            <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-              <a href="../settings-v2.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
-              <hr class="my-1">
-              <button id="logoutBtn" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sign out</button>
-            </div>
-          </div>
+          <div class="relative" id="userMenu" data-header-user-menu data-settings-href="../settings-v2.html" data-login-href="../login.html"></div>
         </div>
       </div>
     </header>
 
-    <!-- Notification Panel Overlay -->
-    <div id="notificationOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
+    <!-- Notifications: js/notifications.js mounts its own lex-drawer (#notificationPanel). -->
 
-    <!-- Notification Slide-out Panel -->
-    <div id="notificationPanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
-      <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
-        <h2 class="text-lg font-semibold text-gray-900">Notifications</h2>
-        <div class="flex items-center gap-3">
-          <button id="markAllReadBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium hidden">Mark all read</button>
-          <button id="refreshNotificationsBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-            </svg>
-          </button>
-          <button id="closeNotificationPanel" class="text-gray-400 hover:text-gray-600">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-          </button>
-        </div>
-      </div>
-      <div class="flex border-b border-gray-200 px-6 flex-shrink-0">
-        <button id="filterAll" class="px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">All</button>
-        <button id="filterUnread" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700">Unread</button>
-      </div>
-      <div id="notificationList" class="flex-1 overflow-y-auto">
-        <div id="notificationLoading" class="p-8 text-center">
-          <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
-          <p class="text-gray-500 mt-3 text-sm">Loading notifications...</p>
-        </div>
-      </div>
-      <div id="notificationLoadingMore" class="hidden p-4 border-t border-gray-100 text-center flex-shrink-0">
-        <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
-      </div>
-    </div>
-
-    <!-- Data Override Panel Overlay -->
-    <div id="dataOverrideOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
-
-    <!-- Data Override Slide-out Panel -->
-    <div id="dataOverridePanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
-      <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
-        <h2 class="text-lg font-semibold text-gray-900">Override Target Value</h2>
-        <button id="closeDataOverridePanel" class="text-gray-400 hover:text-gray-600">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-
-      <div class="flex-1 overflow-y-auto p-6">
-        <!-- Metric Info -->
-        <div class="mb-6 p-4 bg-indigo-50 rounded-lg border border-indigo-100">
-          <h3 id="overrideMetricName" class="font-semibold text-gray-900 mb-1"></h3>
-          <p id="overrideMetricDescription" class="text-sm text-gray-600"></p>
-          <div class="mt-3 text-xs text-gray-500">
-            <p>Period: <span id="overridePeriodRange" class="font-medium text-gray-700"></span></p>
-          </div>
-        </div>
-
-        <!-- Current Value Display -->
-        <div class="mb-6">
-          <label class="block text-sm font-medium text-gray-700 mb-2">Current Target</label>
-          <div class="p-3 bg-gray-50 rounded-lg border border-gray-200">
-            <p id="overrideCurrentValue" class="text-2xl font-bold text-gray-900">-</p>
-            <p class="text-xs text-gray-500 mt-1">Default target value</p>
-          </div>
-        </div>
-
-        <!-- Override Form -->
-        <form id="overrideForm" class="space-y-4">
-          <div>
-            <label for="overrideValue" class="block text-sm font-medium text-gray-700 mb-2">
-              New Target Value <span class="text-red-500">*</span>
-            </label>
-            <input
-              type="number"
-              id="overrideValue"
-              step="0.01"
-              required
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              placeholder="Enter new target value"
-            >
-            <p class="text-xs text-gray-500 mt-1">This target will replace the default target for this period.</p>
-          </div>
-
-          <div>
-            <label for="overrideNotes" class="block text-sm font-medium text-gray-700 mb-2">
-              Notes (Optional)
-            </label>
-            <textarea
-              id="overrideNotes"
-              rows="3"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              placeholder="Why are you overriding this value?"
-            ></textarea>
-          </div>
-
-          <!-- Override Type (Hidden - always 'manual') -->
-          <input type="hidden" id="overrideType" value="manual">
-
-          <!-- Action Buttons -->
-          <div class="flex gap-3 pt-4">
-            <button
-              type="submit"
-              id="saveOverrideBtn"
-              class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2 rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-            >
-              <span id="saveOverrideBtnText">Save Override</span>
-              <svg id="saveOverrideBtnSpinner" class="hidden animate-spin inline-block w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-            </button>
-            <button
-              type="button"
-              onclick="closeDataOverridePanel()"
-              class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-
-        <!-- Existing Overrides -->
-        <div id="existingOverridesSection" class="hidden mt-8 pt-6 border-t border-gray-200">
-          <h3 class="text-sm font-semibold text-gray-900 mb-3">Existing Override</h3>
-          <div id="existingOverridesList" class="space-y-2">
-            <!-- Populated dynamically -->
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- Data override: InsightsOverlays.overridePanel() mounts the shared lex-drawer (#dataOverridePanel). -->
 
     <main class="p-4 lg:p-8">
       <!-- Module Execution Controls -->
@@ -242,11 +125,7 @@
           <!-- Module Selection -->
           <div>
             <label for="moduleSelect" class="block text-sm font-medium text-gray-700 mb-2">Module</label>
-            <select id="moduleSelect" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-              <option value="growth-intake-performance">Growth: Intake Performance</option>
-              <option value="growth-lead-quality" disabled>Growth: Lead Quality (Coming Soon)</option>
-              <option value="operations-matter-velocity" disabled>Operations: Matter Velocity (Coming Soon)</option>
-            </select>
+            <lex-select id="moduleSelect" class="w-full" options='[{"value":"growth-intake-performance","label":"Growth: Intake Performance"}]' value="growth-intake-performance"></lex-select>
           </div>
 
           <!-- Start Date -->
@@ -264,13 +143,7 @@
           <!-- Period Type (for comparison calculation) -->
           <div>
             <label for="periodType" class="block text-sm font-medium text-gray-700 mb-2">Compare By</label>
-            <select id="periodType" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-              <option value="quarterly">Quarterly</option>
-              <option value="yearly">Yearly</option>
-            </select>
+            <lex-select id="periodType" class="w-full" options='[{"value":"daily","label":"Daily"},{"value":"weekly","label":"Weekly"},{"value":"monthly","label":"Monthly"},{"value":"quarterly","label":"Quarterly"},{"value":"yearly","label":"Yearly"}]' value="daily"></lex-select>
           </div>
 
           <!-- Execute Button -->
@@ -667,10 +540,31 @@
       showInfo(`Period set to: ${formatDate(startDate)} to ${formatDate(endDate)}`);
     }
 
+    // lex-select helpers. Options and value go on the attributes as well as
+    // the properties: this script can run before lex-select.js has upgraded
+    // the element, and an attribute survives the upgrade.
+    function setLexSelectValue(select, value) {
+      const next = value === null || value === undefined ? '' : String(value);
+      select.setAttribute('value', next);
+      select.value = next;
+    }
+
+    function setLexSelectOptions(select, options, value) {
+      const normalized = options.map(option => ({ value: String(option.value), label: option.label }));
+      select.setAttribute('options', JSON.stringify(normalized));
+      select.options = normalized;
+      if (value !== undefined) setLexSelectValue(select, value);
+    }
+
+    function lexSelectValue(select) {
+      const value = select.value;
+      return value === undefined ? (select.getAttribute('value') || '') : String(value || '');
+    }
+
     // Update "Compare By" dropdown based on selected date range
     function updateCompareByOptions(startDate, endDate, preset) {
       const periodTypeSelect = document.getElementById('periodType');
-      const currentValue = periodTypeSelect.value;
+      const currentValue = lexSelectValue(periodTypeSelect);
 
       // Calculate the duration in days
       const durationMs = endDate - startDate;
@@ -678,23 +572,18 @@
 
       // For "Last Year" preset or full year periods (365-366 days), only show monthly
       if (preset === 'lastYear' || (durationDays >= 365 && durationDays <= 366)) {
-        periodTypeSelect.innerHTML = `
-          <option value="monthly">Monthly</option>
-        `;
-        periodTypeSelect.value = 'monthly';
+        setLexSelectOptions(periodTypeSelect, [{ value: 'monthly', label: 'Monthly' }], 'monthly');
       } else {
-        // For other periods, show all options
-        periodTypeSelect.innerHTML = `
-          <option value="daily">Daily</option>
-          <option value="weekly">Weekly</option>
-          <option value="monthly">Monthly</option>
-          <option value="quarterly">Quarterly</option>
-          <option value="yearly">Yearly</option>
-        `;
-        // Restore previous value if it's still valid
-        if (['daily', 'weekly', 'monthly', 'quarterly', 'yearly'].includes(currentValue)) {
-          periodTypeSelect.value = currentValue;
-        }
+        // For other periods, show all options, restoring the previous value
+        // if it's still valid (otherwise the first option, as before)
+        const periodValues = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
+        setLexSelectOptions(periodTypeSelect, [
+          { value: 'daily', label: 'Daily' },
+          { value: 'weekly', label: 'Weekly' },
+          { value: 'monthly', label: 'Monthly' },
+          { value: 'quarterly', label: 'Quarterly' },
+          { value: 'yearly', label: 'Yearly' }
+        ], periodValues.includes(currentValue) ? currentValue : 'daily');
       }
     }
 
@@ -734,19 +623,7 @@
     }
     loadUserInfo();
 
-    // User menu toggle
-    const userMenu = document.getElementById('userMenu');
-    const userDropdown = document.getElementById('userDropdown');
-    userMenu.addEventListener('click', () => userDropdown.classList.toggle('hidden'));
-    document.addEventListener('click', (e) => {
-      if (!userMenu.contains(e.target)) userDropdown.classList.add('hidden');
-    });
-
-    // Logout
-    document.getElementById('logoutBtn').addEventListener('click', async () => {
-      await api.logout();
-      window.location.href = '../login.html';
-    });
+    // The header account menu (#userMenu) is rendered and wired by js/shared/header-user-menu.js.
 
     // Sidebar toggle
     const sidebar = document.getElementById('sidebar');
@@ -964,13 +841,12 @@
 
     // Show drill-down modal for lead source
     async function showLeadSourceDrilldown(metricKey, source) {
-      const modal = document.getElementById('drilldownModal');
-      const title = document.getElementById('drilldownTitle');
-      const content = document.getElementById('drilldownContent');
+      LanaInsightsTables.resetFetchNotes();
+      const content = InsightsOverlays.drilldownContent();
 
-      title.textContent = `Leads from: ${source}`;
+      const drilldownTitle = `Leads from: ${source}`;
       content.innerHTML = '<div class="text-center py-8"><div class="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto"></div><p class="text-gray-600 mt-4">Loading leads...</p></div>';
-      modal.classList.remove('hidden');
+      InsightsOverlays.openDrilldown(drilldownTitle);
 
       try {
         // Fetch leads from this source
@@ -978,54 +854,15 @@
         const periodStart = LanaTime.utcDayStart(document.getElementById('periodStart').value);
         const periodEnd = LanaTime.utcDayEnd(document.getElementById('periodEnd').value);
 
-        const response = await api.get(`/api/v1/integrations/connector-data?entity_type=contact&source=${encodeURIComponent(source)}&start_date=${periodStart}&end_date=${periodEnd}&limit=100`);
+        const response = await LanaInsightsTables.fetchConnectorData(api, { entity_type: 'contact', source: source, start_date: periodStart, end_date: periodEnd });
 
         if (!response || !response.data || response.data.length === 0) {
           content.innerHTML = '<div class="text-center py-8 text-gray-500">No leads found for this source.</div>';
           return;
         }
 
-        // Render leads table
-        content.innerHTML = `
-          <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
-                ${response.data.map(lead => `
-                  <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      ${lead.data?.name || lead.data?.firstName + ' ' + lead.data?.lastName || 'N/A'}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      ${lead.data?.email || 'N/A'}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      ${lead.data?.phone || 'N/A'}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      ${lead.data?.company || 'N/A'}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      ${new Date(lead.source_created_at).toLocaleDateString()}
-                    </td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          </div>
-          <div class="mt-4 text-sm text-gray-600 text-center">
-            Showing ${response.data.length} lead${response.data.length !== 1 ? 's' : ''}
-            ${response.data.length >= 100 ? ' (limited to 100)' : ''}
-          </div>
-        `;
+        content.innerHTML = '<div id="leadSourceTableContainer"></div>';
+        LanaInsightsTables.render(document.getElementById('leadSourceTableContainer'), 'leadSource', { records: response.data });
       } catch (error) {
         console.error('Failed to load lead source drilldown:', error);
         content.innerHTML = `<div class="text-center py-8 text-red-600">Failed to load leads: ${error.message || 'Unknown error'}</div>`;
@@ -1034,18 +871,17 @@
 
     // Close drilldown modal
     function closeDrilldownModal() {
-      document.getElementById('drilldownModal').classList.add('hidden');
+      InsightsOverlays.closeDrilldown();
     }
 
     // Show drill-down for any metric
     async function showMetricDrilldown(metricKey, metricName) {
-      const modal = document.getElementById('drilldownModal');
-      const title = document.getElementById('drilldownTitle');
-      const content = document.getElementById('drilldownContent');
+      LanaInsightsTables.resetFetchNotes();
+      const content = InsightsOverlays.drilldownContent();
 
-      title.textContent = `${metricName} - Details`;
+      const drilldownTitle = `${metricName} - Details`;
       content.innerHTML = '<div class="text-center py-8"><div class="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto"></div><p class="text-gray-600 mt-4">Loading data...</p></div>';
-      modal.classList.remove('hidden');
+      InsightsOverlays.openDrilldown(drilldownTitle);
 
       try {
         const periodStart = LanaTime.utcDayStart(document.getElementById('periodStart').value);
@@ -1090,8 +926,8 @@
     async function showQualifiedLeadsDrilldown(content, periodStart, periodEnd) {
       // Fetch both contacts and opportunities to calculate relationship
       const [contactsResponse, opportunitiesResponse] = await Promise.all([
-        api.get(`/api/v1/integrations/connector-data?entity_type=contact&start_date=${periodStart}&end_date=${periodEnd}&limit=1000`),
-        api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}&limit=1000`)
+        LanaInsightsTables.fetchConnectorData(api, { entity_type: 'contact', start_date: periodStart, end_date: periodEnd }),
+        LanaInsightsTables.fetchConnectorData(api, { entity_type: 'opportunity', start_date: periodStart, end_date: periodEnd })
       ]);
 
       const contacts = contactsResponse?.data || [];
@@ -1138,826 +974,39 @@
         viewType: 'contacts' // 'contacts', 'opportunities', or 'contact_opportunities'
       };
 
-      // Function to render filtered table with sorting, filtering, and pagination
+      // The contacts, opportunities and contact views share one standard
+      // table area (LanaInsightsTables); summary cards pick the view and filter.
+      const QUALIFIED_LEAD_VIEWS = {
+        contacts: { key: 'qlContacts', title: 'Contacts' },
+        opportunities: { key: 'qlOpportunities', title: 'Opportunities' },
+        contact_opportunities: { key: 'qlContactOpportunities', title: 'Contacts with opportunities' },
+        unique_contact_ids: { key: 'qlUniqueContactIds', title: 'Unique contact IDs' }
+      };
       window.renderContactTable = function(filter, viewType) {
-        console.log('[renderContactTable] Called with:', { filter, viewType });
-
         const state = window.qualifiedLeadsData;
-        const { contacts, contactIdsFromOpportunities, opportunities } = state;
-
-        // Update filter and view type if provided
-        if (filter !== undefined) {
-          state.currentFilter = filter;
-          state.currentPage = 1; // Reset to page 1 when changing filter
-        }
-        if (viewType !== undefined) {
-          state.viewType = viewType;
-          state.currentPage = 1;
-        }
-
-        console.log('[renderContactTable] State after update:', {
-          currentFilter: state.currentFilter,
-          viewType: state.viewType,
-          currentPage: state.currentPage
-        });
-
-        // Render based on view type
-        if (state.viewType === 'opportunities') {
-          console.log('[renderContactTable] Rendering opportunities view');
-          return window.renderOpportunitiesTable(state.currentFilter);
-        } else if (state.viewType === 'contact_opportunities') {
-          console.log('[renderContactTable] Rendering contact-opportunities view');
-          return window.renderContactOpportunitiesTable();
-        } else if (state.viewType === 'unique_contact_ids') {
-          console.log('[renderContactTable] Rendering unique contact IDs view');
-          return window.renderUniqueContactIdsTable();
-        }
-
-        console.log('[renderContactTable] Rendering contacts view');
-
-        // Default: Contacts view
-        let filteredContacts = contacts;
-        let filterTitle = 'All Contacts';
-
-        // Apply category filter
-        if (state.currentFilter === 'qualified') {
-          filteredContacts = contacts.filter(c => contactIdsFromOpportunities.has(c.data?.id));
-          filterTitle = 'Qualified Contacts (Have Opportunities)';
-        } else if (state.currentFilter === 'not_qualified') {
-          filteredContacts = contacts.filter(c => !contactIdsFromOpportunities.has(c.data?.id));
-          filterTitle = 'Not Yet Qualified Contacts (No Opportunities)';
-        }
-
-        // Apply search filter
-        if (state.searchQuery) {
-          const query = state.searchQuery.toLowerCase();
-          filteredContacts = filteredContacts.filter(lead => {
-            const name = lead.data?.contactName || lead.data?.name || (lead.data?.firstName && lead.data?.lastName ? lead.data.firstName + ' ' + lead.data.lastName : '');
-            const email = lead.data?.email || '';
-            const phone = lead.data?.phone || '';
-            return name.toLowerCase().includes(query) || email.toLowerCase().includes(query) || phone.toLowerCase().includes(query);
-          });
-        }
-
-        // Apply sorting
-        if (state.sortColumn) {
-          filteredContacts.sort((a, b) => {
-            let aVal, bVal;
-
-            switch(state.sortColumn) {
-              case 'name':
-                aVal = a.data?.contactName || a.data?.name || (a.data?.firstName && a.data?.lastName ? a.data.firstName + ' ' + a.data.lastName : '');
-                bVal = b.data?.contactName || b.data?.name || (b.data?.firstName && b.data?.lastName ? b.data.firstName + ' ' + b.data.lastName : '');
-                break;
-              case 'email':
-                aVal = a.data?.email || '';
-                bVal = b.data?.email || '';
-                break;
-              case 'phone':
-                aVal = a.data?.phone || '';
-                bVal = b.data?.phone || '';
-                break;
-              case 'status':
-                aVal = contactIdsFromOpportunities.has(a.data?.id) ? 1 : 0;
-                bVal = contactIdsFromOpportunities.has(b.data?.id) ? 1 : 0;
-                break;
-              case 'created':
-                aVal = new Date(a.source_created_at).getTime();
-                bVal = new Date(b.source_created_at).getTime();
-                break;
-              default:
-                return 0;
-            }
-
-            if (aVal < bVal) return state.sortDirection === 'asc' ? -1 : 1;
-            if (aVal > bVal) return state.sortDirection === 'asc' ? 1 : -1;
-            return 0;
-          });
-        }
-
-        // Calculate pagination
-        const totalRecords = filteredContacts.length;
-        const totalPages = Math.ceil(totalRecords / state.rowsPerPage);
-        const startIdx = (state.currentPage - 1) * state.rowsPerPage;
-        const endIdx = Math.min(startIdx + state.rowsPerPage, totalRecords);
-        const paginatedContacts = filteredContacts.slice(startIdx, endIdx);
-
-        // Helper function to sort by column
-        window.sortTableBy = function(column) {
-          if (state.sortColumn === column) {
-            state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
-          } else {
-            state.sortColumn = column;
-            state.sortDirection = 'asc';
-          }
-          window.renderContactTable();
-        };
-
-        // Helper function to change page
-        window.goToPage = function(page) {
-          if (page >= 1 && page <= totalPages) {
-            state.currentPage = page;
-            window.renderContactTable();
-          }
-        };
-
-        // Helper function to update search query (no render)
-        window.updateSearchQuery = function(event) {
-          const state = window.qualifiedLeadsData;
-          state.searchQuery = event.target.value;
-        };
-
-        // Helper function to execute search
-        window.executeSearch = function() {
-          const state = window.qualifiedLeadsData;
-          state.currentPage = 1; // Reset to page 1 when searching
-          window.renderContactTable();
-        };
-
-        // Allow Enter key to trigger search
-        window.handleSearchKeypress = function(event) {
-          if (event.key === 'Enter') {
-            window.executeSearch();
-          }
-        };
-
-        // Sort indicator
-        const getSortIcon = (column) => {
-          if (state.sortColumn !== column) {
-            return '<svg class="w-4 h-4 text-gray-400 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path></svg>';
-          }
-          if (state.sortDirection === 'asc') {
-            return '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg>';
-          }
-          return '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>';
-        };
-
-        const tableHTML = `
-          <div class="flex items-center justify-between mb-3">
-            <h4 class="font-semibold text-gray-900">${filterTitle}</h4>
-            ${state.currentFilter !== 'all' ? `<button onclick="window.renderContactTable('all')" class="text-sm text-indigo-600 hover:text-indigo-800">Show All</button>` : ''}
-          </div>
-
-          <!-- Search Box -->
-          <div class="mb-4 flex gap-2">
-            <input
-              type="text"
-              placeholder="Search by name, email, or phone..."
-              value="${state.searchQuery}"
-              oninput="window.updateSearchQuery(event)"
-              onkeypress="window.handleSearchKeypress(event)"
-              class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            />
-            <button
-              onclick="window.executeSearch()"
-              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-            >
-              Search
-            </button>
-          </div>
-
-          <div class="overflow-x-auto" style="max-height: 500px;">
-            <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50 sticky top-0">
-                <tr>
-                  <th onclick="window.sortTableBy('name')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Name ${getSortIcon('name')}
-                  </th>
-                  <th onclick="window.sortTableBy('email')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Email ${getSortIcon('email')}
-                  </th>
-                  <th onclick="window.sortTableBy('phone')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Phone ${getSortIcon('phone')}
-                  </th>
-                  <th onclick="window.sortTableBy('status')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Status ${getSortIcon('status')}
-                  </th>
-                  <th onclick="window.sortTableBy('created')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Created ${getSortIcon('created')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
-                ${paginatedContacts.map(lead => {
-                  const hasOpportunity = contactIdsFromOpportunities.has(lead.data?.id);
-                  const statusBadge = hasOpportunity
-                    ? '<span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Qualified</span>'
-                    : '<span class="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Not Qualified</span>';
-
-                  return `
-                    <tr class="hover:bg-gray-50">
-                      <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                        ${lead.data?.contactName || lead.data?.name || (lead.data?.firstName && lead.data?.lastName ? lead.data.firstName + ' ' + lead.data.lastName : 'N/A')}
-                      </td>
-                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${lead.data?.email || 'N/A'}</td>
-                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${lead.data?.phone || 'N/A'}</td>
-                      <td class="px-4 py-3 whitespace-nowrap text-sm">${statusBadge}</td>
-                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${new Date(lead.source_created_at).toLocaleDateString()}</td>
-                    </tr>
-                  `;
-                }).join('')}
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Pagination Controls -->
-          <div class="mt-4 flex items-center justify-between">
-            <div class="text-sm text-gray-600">
-              Showing ${startIdx + 1} to ${endIdx} of ${totalRecords} ${filterTitle.toLowerCase()}
-            </div>
-            <div class="flex items-center gap-2">
-              <button
-                onclick="window.goToPage(${state.currentPage - 1})"
-                ${state.currentPage === 1 ? 'disabled' : ''}
-                class="px-3 py-1 text-sm border rounded ${state.currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
-              >
-                Previous
-              </button>
-              <div class="flex items-center gap-1">
-                ${Array.from({length: Math.min(totalPages, 7)}, (_, i) => {
-                  let pageNum;
-                  if (totalPages <= 7) {
-                    pageNum = i + 1;
-                  } else if (state.currentPage <= 4) {
-                    pageNum = i + 1;
-                  } else if (state.currentPage >= totalPages - 3) {
-                    pageNum = totalPages - 6 + i;
-                  } else {
-                    pageNum = state.currentPage - 3 + i;
-                  }
-
-                  return `
-                    <button
-                      onclick="window.goToPage(${pageNum})"
-                      class="px-3 py-1 text-sm border rounded ${state.currentPage === pageNum ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}"
-                    >
-                      ${pageNum}
-                    </button>
-                  `;
-                }).join('')}
-              </div>
-              <button
-                onclick="window.goToPage(${state.currentPage + 1})"
-                ${state.currentPage === totalPages ? 'disabled' : ''}
-                class="px-3 py-1 text-sm border rounded ${state.currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        `;
-
+        if (filter !== undefined) state.currentFilter = filter;
+        if (viewType !== undefined) state.viewType = viewType;
+        const viewKey = QUALIFIED_LEAD_VIEWS[state.viewType] ? state.viewType : 'contacts';
+        const view = QUALIFIED_LEAD_VIEWS[viewKey];
         const container = document.getElementById('contactTableContainer');
-        if (container) {
-          container.innerHTML = tableHTML;
+        if (!container) return;
+        if (!container.querySelector('[data-ql-table]')) {
+          container.innerHTML = '<div data-ql-nav></div><div data-ql-table></div>';
         }
+        container.querySelector('[data-ql-nav]').innerHTML = viewKey === 'contacts' ? '' : `
+          <div class="flex justify-end mb-2">
+            <button onclick="window.renderContactTable('all', 'contacts')" class="text-sm text-indigo-600 hover:text-indigo-800">Back to Contacts</button>
+          </div>`;
+        LanaInsightsTables.render(container.querySelector('[data-ql-table]'), view.key, state, { segment: state.currentFilter, title: view.title });
       };
-
-      // Render opportunities table
       window.renderOpportunitiesTable = function(filter) {
-        console.log('[renderOpportunitiesTable] Called with filter:', filter);
-
-        const state = window.qualifiedLeadsData;
-        const { opportunities, allContactIds } = state;
-
-        console.log('[renderOpportunitiesTable] Total opportunities:', opportunities.length);
-
-        // Update filter if provided
-        if (filter !== undefined) {
-          state.currentFilter = filter;
-          state.currentPage = 1; // Reset to page 1 when changing filter
-        }
-
-        let filteredOpportunities = opportunities;
-        let filterTitle = 'All Opportunities';
-
-        // Apply filter based on currentFilter
-        if (state.currentFilter === 'missing_contacts') {
-          // Show only opportunities where contactId exists but is not in allContactIds
-          filteredOpportunities = opportunities.filter(opp => {
-            const contactId = opp.data?.contactId;
-            return contactId && !allContactIds.has(contactId);
-          });
-          filterTitle = 'Opportunities with Missing Contacts';
-        }
-
-        // Apply search filter
-        if (state.searchQuery) {
-          const query = state.searchQuery.toLowerCase();
-          filteredOpportunities = filteredOpportunities.filter(opp => {
-            const name = opp.data?.name || '';
-            const contactName = opp.data?.contact?.name || '';
-            const status = opp.data?.status || '';
-            return name.toLowerCase().includes(query) || contactName.toLowerCase().includes(query) || status.toLowerCase().includes(query);
-          });
-        }
-
-        // Apply sorting
-        if (state.sortColumn) {
-          filteredOpportunities.sort((a, b) => {
-            let aVal, bVal;
-            switch(state.sortColumn) {
-              case 'name':
-                aVal = a.data?.name || '';
-                bVal = b.data?.name || '';
-                break;
-              case 'contact':
-                aVal = a.data?.contact?.name || '';
-                bVal = b.data?.contact?.name || '';
-                break;
-              case 'value':
-                aVal = parseFloat(a.data?.monetaryValue || 0);
-                bVal = parseFloat(b.data?.monetaryValue || 0);
-                break;
-              case 'status':
-                aVal = a.data?.status || '';
-                bVal = b.data?.status || '';
-                break;
-              case 'created':
-                aVal = new Date(a.source_created_at).getTime();
-                bVal = new Date(b.source_created_at).getTime();
-                break;
-              default:
-                return 0;
-            }
-            if (aVal < bVal) return state.sortDirection === 'asc' ? -1 : 1;
-            if (aVal > bVal) return state.sortDirection === 'asc' ? 1 : -1;
-            return 0;
-          });
-        }
-
-        // Calculate pagination
-        const totalRecords = filteredOpportunities.length;
-        const totalPages = Math.ceil(totalRecords / state.rowsPerPage);
-        const startIdx = (state.currentPage - 1) * state.rowsPerPage;
-        const endIdx = Math.min(startIdx + state.rowsPerPage, totalRecords);
-        const paginatedOpportunities = filteredOpportunities.slice(startIdx, endIdx);
-
-        const getSortIcon = (column) => {
-          if (state.sortColumn !== column) {
-            return '<svg class="w-4 h-4 text-gray-400 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path></svg>';
-          }
-          if (state.sortDirection === 'asc') {
-            return '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg>';
-          }
-          return '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>';
-        };
-
-        const tableHTML = `
-          <div class="flex items-center justify-between mb-3">
-            <h4 class="font-semibold text-gray-900">${filterTitle}</h4>
-            <button onclick="window.renderContactTable('all', 'contacts')" class="text-sm text-indigo-600 hover:text-indigo-800">Back to Contacts</button>
-          </div>
-
-          <div class="mb-4 flex gap-2">
-            <input
-              type="text"
-              placeholder="Search by name, contact, or status..."
-              value="${state.searchQuery}"
-              oninput="window.updateSearchQuery(event)"
-              onkeypress="window.handleSearchKeypress(event)"
-              class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            />
-            <button
-              onclick="window.executeSearch()"
-              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-            >
-              Search
-            </button>
-          </div>
-
-          <div class="overflow-x-auto" style="max-height: 500px;">
-            <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50 sticky top-0">
-                <tr>
-                  <th onclick="window.sortTableBy('name')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Opportunity ${getSortIcon('name')}
-                  </th>
-                  <th onclick="window.sortTableBy('contact')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Contact ${getSortIcon('contact')}
-                  </th>
-                  <th onclick="window.sortTableBy('value')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Value ${getSortIcon('value')}
-                  </th>
-                  <th onclick="window.sortTableBy('status')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Status ${getSortIcon('status')}
-                  </th>
-                  <th onclick="window.sortTableBy('created')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Created ${getSortIcon('created')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
-                ${paginatedOpportunities.map(opp => `
-                  <tr class="hover:bg-gray-50">
-                    <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">${opp.data?.name || 'N/A'}</td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${opp.data?.contact?.name || 'N/A'}</td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">$${parseFloat(opp.data?.monetaryValue || 0).toLocaleString()}</td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm">
-                      <span class="px-2 py-1 text-xs font-medium rounded-full ${
-                        opp.data?.status === 'won' ? 'bg-green-100 text-green-800' :
-                        opp.data?.status === 'lost' ? 'bg-red-100 text-red-800' :
-                        'bg-yellow-100 text-yellow-800'
-                      }">${opp.data?.status || 'N/A'}</span>
-                    </td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${new Date(opp.source_created_at).toLocaleDateString()}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          </div>
-
-          <div class="mt-4 flex items-center justify-between">
-            <div class="text-sm text-gray-600">
-              Showing ${startIdx + 1} to ${endIdx} of ${totalRecords} opportunities
-            </div>
-            <div class="flex items-center gap-2">
-              <button
-                onclick="window.goToPage(${state.currentPage - 1})"
-                ${state.currentPage === 1 ? 'disabled' : ''}
-                class="px-3 py-1 text-sm border rounded ${state.currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
-              >
-                Previous
-              </button>
-              <div class="flex items-center gap-1">
-                ${Array.from({length: Math.min(totalPages, 7)}, (_, i) => {
-                  let pageNum;
-                  if (totalPages <= 7) {
-                    pageNum = i + 1;
-                  } else if (state.currentPage <= 4) {
-                    pageNum = i + 1;
-                  } else if (state.currentPage >= totalPages - 3) {
-                    pageNum = totalPages - 6 + i;
-                  } else {
-                    pageNum = state.currentPage - 3 + i;
-                  }
-                  return `
-                    <button
-                      onclick="window.goToPage(${pageNum})"
-                      class="px-3 py-1 text-sm border rounded ${state.currentPage === pageNum ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}"
-                    >
-                      ${pageNum}
-                    </button>
-                  `;
-                }).join('')}
-              </div>
-              <button
-                onclick="window.goToPage(${state.currentPage + 1})"
-                ${state.currentPage === totalPages ? 'disabled' : ''}
-                class="px-3 py-1 text-sm border rounded ${state.currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        `;
-
-        const container = document.getElementById('contactTableContainer');
-        if (container) {
-          container.innerHTML = tableHTML;
-        }
+        window.renderContactTable(filter, 'opportunities');
       };
-
-      // Render contact-opportunities grouped table
       window.renderContactOpportunitiesTable = function() {
-        console.log('[renderContactOpportunitiesTable] Called');
-
-        const state = window.qualifiedLeadsData;
-        const { contacts, opportunities, contactIdsFromOpportunities } = state;
-
-        console.log('[renderContactOpportunitiesTable] Total contacts:', contacts.length);
-        console.log('[renderContactOpportunitiesTable] Total opportunities:', opportunities.length);
-
-        // Group opportunities by contact ID
-        const oppsByContact = {};
-        opportunities.forEach(opp => {
-          const contactId = opp.data?.contactId;
-          if (contactId) {
-            if (!oppsByContact[contactId]) {
-              oppsByContact[contactId] = [];
-            }
-            oppsByContact[contactId].push(opp);
-          }
-        });
-
-        // Get contacts that have opportunities
-        let contactsWithOpps = contacts.filter(c => contactIdsFromOpportunities.has(c.data?.id));
-
-        // Apply search filter
-        if (state.searchQuery) {
-          const query = state.searchQuery.toLowerCase();
-          contactsWithOpps = contactsWithOpps.filter(contact => {
-            const name = contact.data?.contactName || contact.data?.name || '';
-            const email = contact.data?.email || '';
-            return name.toLowerCase().includes(query) || email.toLowerCase().includes(query);
-          });
-        }
-
-        // Pagination
-        const totalRecords = contactsWithOpps.length;
-        const totalPages = Math.ceil(totalRecords / state.rowsPerPage);
-        const startIdx = (state.currentPage - 1) * state.rowsPerPage;
-        const endIdx = Math.min(startIdx + state.rowsPerPage, totalRecords);
-        const paginatedContacts = contactsWithOpps.slice(startIdx, endIdx);
-
-        const tableHTML = `
-          <div class="flex items-center justify-between mb-3">
-            <h4 class="font-semibold text-gray-900">Contacts with Opportunities</h4>
-            <button onclick="window.renderContactTable('all', 'contacts')" class="text-sm text-indigo-600 hover:text-indigo-800">Back to Contacts</button>
-          </div>
-
-          <div class="mb-4 flex gap-2">
-            <input
-              type="text"
-              placeholder="Search by contact name or email..."
-              value="${state.searchQuery}"
-              oninput="window.updateSearchQuery(event)"
-              onkeypress="window.handleSearchKeypress(event)"
-              class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            />
-            <button
-              onclick="window.executeSearch()"
-              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-            >
-              Search
-            </button>
-          </div>
-
-          <div class="space-y-4" style="max-height: 500px; overflow-y: auto;">
-            ${paginatedContacts.map(contact => {
-              const contactName = contact.data?.contactName || contact.data?.name || 'N/A';
-              const contactEmail = contact.data?.email || 'N/A';
-              const contactOpps = oppsByContact[contact.data?.id] || [];
-
-              return `
-                <div class="border border-gray-200 rounded-lg p-4 bg-white">
-                  <div class="flex items-start justify-between mb-3">
-                    <div>
-                      <h5 class="font-semibold text-gray-900">${contactName}</h5>
-                      <p class="text-sm text-gray-500">${contactEmail}</p>
-                    </div>
-                    <span class="px-2 py-1 text-xs font-medium rounded-full bg-indigo-100 text-indigo-800">
-                      ${contactOpps.length} ${contactOpps.length === 1 ? 'Opportunity' : 'Opportunities'}
-                    </span>
-                  </div>
-
-                  <div class="space-y-2">
-                    ${contactOpps.map(opp => `
-                      <div class="pl-4 border-l-2 border-gray-200 py-2">
-                        <div class="flex items-start justify-between">
-                          <div class="flex-1">
-                            <p class="text-sm font-medium text-gray-900">${opp.data?.name || 'Unnamed Opportunity'}</p>
-                            <div class="flex items-center gap-4 mt-1">
-                              <span class="text-xs text-gray-500">Value: $${parseFloat(opp.data?.monetaryValue || 0).toLocaleString()}</span>
-                              <span class="px-2 py-0.5 text-xs rounded-full ${
-                                opp.data?.status === 'won' ? 'bg-green-100 text-green-800' :
-                                opp.data?.status === 'lost' ? 'bg-red-100 text-red-800' :
-                                'bg-yellow-100 text-yellow-800'
-                              }">${opp.data?.status || 'N/A'}</span>
-                            </div>
-                          </div>
-                          <span class="text-xs text-gray-400">${new Date(opp.source_created_at).toLocaleDateString()}</span>
-                        </div>
-                      </div>
-                    `).join('')}
-                  </div>
-                </div>
-              `;
-            }).join('')}
-          </div>
-
-          <div class="mt-4 flex items-center justify-between">
-            <div class="text-sm text-gray-600">
-              Showing ${startIdx + 1} to ${endIdx} of ${totalRecords} contacts with opportunities
-            </div>
-            <div class="flex items-center gap-2">
-              <button
-                onclick="window.goToPage(${state.currentPage - 1})"
-                ${state.currentPage === 1 ? 'disabled' : ''}
-                class="px-3 py-1 text-sm border rounded ${state.currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
-              >
-                Previous
-              </button>
-              <div class="flex items-center gap-1">
-                ${Array.from({length: Math.min(totalPages, 7)}, (_, i) => {
-                  let pageNum;
-                  if (totalPages <= 7) {
-                    pageNum = i + 1;
-                  } else if (state.currentPage <= 4) {
-                    pageNum = i + 1;
-                  } else if (state.currentPage >= totalPages - 3) {
-                    pageNum = totalPages - 6 + i;
-                  } else {
-                    pageNum = state.currentPage - 3 + i;
-                  }
-                  return `
-                    <button
-                      onclick="window.goToPage(${pageNum})"
-                      class="px-3 py-1 text-sm border rounded ${state.currentPage === pageNum ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}"
-                    >
-                      ${pageNum}
-                    </button>
-                  `;
-                }).join('')}
-              </div>
-              <button
-                onclick="window.goToPage(${state.currentPage + 1})"
-                ${state.currentPage === totalPages ? 'disabled' : ''}
-                class="px-3 py-1 text-sm border rounded ${state.currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        `;
-
-        const container = document.getElementById('contactTableContainer');
-        if (container) {
-          container.innerHTML = tableHTML;
-        }
+        window.renderContactTable('all', 'contact_opportunities');
       };
-
-      // Render unique contact IDs table (including missing contacts)
       window.renderUniqueContactIdsTable = function() {
-        console.log('[renderUniqueContactIdsTable] Called');
-
-        const state = window.qualifiedLeadsData;
-        const { contacts, opportunities, contactIdsFromOpportunities, allContactIds } = state;
-
-        console.log('[renderUniqueContactIdsTable] Unique contact IDs:', contactIdsFromOpportunities.size);
-
-        // Group opportunities by contact ID
-        const oppsByContact = {};
-        opportunities.forEach(opp => {
-          const contactId = opp.data?.contactId;
-          if (contactId) {
-            if (!oppsByContact[contactId]) {
-              oppsByContact[contactId] = [];
-            }
-            oppsByContact[contactId].push(opp);
-          }
-        });
-
-        // Build array of ALL unique contact IDs with their data
-        let allUniqueContacts = [];
-        const contactMap = new Map(contacts.map(c => [c.data?.id, c]));
-
-        // For each unique contact ID in opportunities
-        contactIdsFromOpportunities.forEach(contactId => {
-          const contact = contactMap.get(contactId);
-          if (contact) {
-            // Contact record exists
-            allUniqueContacts.push({
-              id: contactId,
-              name: contact.data?.contactName || contact.data?.name || 'N/A',
-              email: contact.data?.email || 'N/A',
-              isMissing: false
-            });
-          } else {
-            // Contact record is missing
-            allUniqueContacts.push({
-              id: contactId,
-              name: 'Missing Contact',
-              email: 'No contact record',
-              isMissing: true
-            });
-          }
-        });
-
-        let filteredContacts = allUniqueContacts;
-
-        // Apply search filter
-        if (state.searchQuery) {
-          const query = state.searchQuery.toLowerCase();
-          filteredContacts = filteredContacts.filter(contact => {
-            return contact.name.toLowerCase().includes(query) ||
-                   contact.email.toLowerCase().includes(query) ||
-                   contact.id.toLowerCase().includes(query);
-          });
-        }
-
-        // Pagination
-        const totalRecords = filteredContacts.length;
-        const totalPages = Math.ceil(totalRecords / state.rowsPerPage);
-        const startIdx = (state.currentPage - 1) * state.rowsPerPage;
-        const endIdx = Math.min(startIdx + state.rowsPerPage, totalRecords);
-        const paginatedContacts = filteredContacts.slice(startIdx, endIdx);
-
-        const tableHTML = `
-          <div class="flex items-center justify-between mb-3">
-            <h4 class="font-semibold text-gray-900">Unique Contact IDs (${totalRecords} total)</h4>
-            <button onclick="window.renderContactTable('all', 'contacts')" class="text-sm text-indigo-600 hover:text-indigo-800">Back to Contacts</button>
-          </div>
-
-          <div class="mb-4 flex gap-2">
-            <input
-              type="text"
-              placeholder="Search by name, email, or contact ID..."
-              value="${state.searchQuery}"
-              oninput="window.updateSearchQuery(event)"
-              onkeypress="window.handleSearchKeypress(event)"
-              class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            />
-            <button
-              onclick="window.executeSearch()"
-              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-            >
-              Search
-            </button>
-          </div>
-
-          <div class="space-y-4" style="max-height: 500px; overflow-y: auto;">
-            ${paginatedContacts.map(contact => {
-              const contactOpps = oppsByContact[contact.id] || [];
-
-              return `
-                <div class="border ${contact.isMissing ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white'} rounded-lg p-4">
-                  <div class="flex items-start justify-between mb-3">
-                    <div>
-                      <h5 class="font-semibold ${contact.isMissing ? 'text-red-700' : 'text-gray-900'}">${contact.name}</h5>
-                      <p class="text-sm ${contact.isMissing ? 'text-red-600' : 'text-gray-500'}">${contact.email}</p>
-                      ${contact.isMissing ? `<p class="text-xs text-red-500 mt-1">Contact ID: ${contact.id}</p>` : ''}
-                    </div>
-                    <span class="px-2 py-1 text-xs font-medium rounded-full ${contact.isMissing ? 'bg-red-100 text-red-800' : 'bg-indigo-100 text-indigo-800'}">
-                      ${contactOpps.length} ${contactOpps.length === 1 ? 'Opportunity' : 'Opportunities'}
-                    </span>
-                  </div>
-
-                  <div class="space-y-2">
-                    ${contactOpps.map(opp => `
-                      <div class="pl-4 border-l-2 ${contact.isMissing ? 'border-red-300' : 'border-gray-200'} py-2">
-                        <div class="flex items-start justify-between">
-                          <div class="flex-1">
-                            <p class="text-sm font-medium text-gray-900">${opp.data?.name || 'Unnamed Opportunity'}</p>
-                            <div class="flex items-center gap-4 mt-1">
-                              <span class="text-xs text-gray-500">Value: $${parseFloat(opp.data?.monetaryValue || 0).toLocaleString()}</span>
-                              <span class="px-2 py-0.5 text-xs rounded-full ${
-                                opp.data?.status === 'won' ? 'bg-green-100 text-green-800' :
-                                opp.data?.status === 'lost' ? 'bg-red-100 text-red-800' :
-                                'bg-yellow-100 text-yellow-800'
-                              }">${opp.data?.status || 'N/A'}</span>
-                            </div>
-                          </div>
-                          <span class="text-xs text-gray-400">${new Date(opp.source_created_at).toLocaleDateString()}</span>
-                        </div>
-                      </div>
-                    `).join('')}
-                  </div>
-                </div>
-              `;
-            }).join('')}
-          </div>
-
-          <div class="mt-4 flex items-center justify-between">
-            <div class="text-sm text-gray-600">
-              Showing ${startIdx + 1} to ${endIdx} of ${totalRecords} unique contact IDs
-            </div>
-            <div class="flex items-center gap-2">
-              <button
-                onclick="window.goToPage(${state.currentPage - 1})"
-                ${state.currentPage === 1 ? 'disabled' : ''}
-                class="px-3 py-1 text-sm border rounded ${state.currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
-              >
-                Previous
-              </button>
-              <div class="flex items-center gap-1">
-                ${Array.from({length: Math.min(totalPages, 7)}, (_, i) => {
-                  let pageNum;
-                  if (totalPages <= 7) {
-                    pageNum = i + 1;
-                  } else if (state.currentPage <= 4) {
-                    pageNum = i + 1;
-                  } else if (state.currentPage >= totalPages - 3) {
-                    pageNum = totalPages - 6 + i;
-                  } else {
-                    pageNum = state.currentPage - 3 + i;
-                  }
-                  const isActive = pageNum === state.currentPage;
-                  return `
-                    <button
-                      onclick="window.goToPage(${pageNum})"
-                      class="px-3 py-1 text-sm border rounded ${isActive ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 hover:bg-gray-50'}"
-                    >
-                      ${pageNum}
-                    </button>
-                  `;
-                }).join('')}
-              </div>
-              <button
-                onclick="window.goToPage(${state.currentPage + 1})"
-                ${state.currentPage === totalPages ? 'disabled' : ''}
-                class="px-3 py-1 text-sm border rounded ${state.currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        `;
-
-        const container = document.getElementById('contactTableContainer');
-        if (container) {
-          container.innerHTML = tableHTML;
-        }
+        window.renderContactTable('all', 'unique_contact_ids');
       };
 
       content.innerHTML = `
@@ -2102,7 +1151,7 @@
 
     // Drill-down: Consultation Booking Rate
     async function showConsultationBookingDrilldown(content, periodStart, periodEnd) {
-      const response = await api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}&limit=500`);
+      const response = await LanaInsightsTables.fetchConnectorData(api, { entity_type: 'opportunity', start_date: periodStart, end_date: periodEnd });
 
       if (!response || !response.data || response.data.length === 0) {
         content.innerHTML = '<div class="text-center py-8 text-gray-500">No opportunities found in this period.</div>';
@@ -2185,186 +1234,7 @@
         `;
         document.getElementById('consultationSummaryCards').innerHTML = summaryCardsHTML;
 
-        // Apply filter
-        let filteredOpps = state.allOpportunities;
-        if (filter === 'booked') {
-          filteredOpps = state.booked;
-        } else if (filter === 'not_booked') {
-          filteredOpps = state.notBooked;
-        }
-
-        // Apply search
-        if (state.searchQuery) {
-          const query = state.searchQuery.toLowerCase();
-          filteredOpps = filteredOpps.filter(opp =>
-            (opp.data?.name && opp.data.name.toLowerCase().includes(query)) ||
-            (opp.data?.contact?.name && opp.data.contact.name.toLowerCase().includes(query)) ||
-            (opp.data?.contact?.email && opp.data.contact.email.toLowerCase().includes(query))
-          );
-        }
-
-        // Apply sorting
-        if (state.sortColumn) {
-          filteredOpps.sort((a, b) => {
-            let aVal, bVal;
-            if (state.sortColumn === 'name') {
-              aVal = (a.data?.name || '').toLowerCase();
-              bVal = (b.data?.name || '').toLowerCase();
-            } else if (state.sortColumn === 'contact') {
-              aVal = (a.data?.contact?.name || '').toLowerCase();
-              bVal = (b.data?.contact?.name || '').toLowerCase();
-            } else if (state.sortColumn === 'value') {
-              aVal = parseFloat(a.data?.monetaryValue || 0);
-              bVal = parseFloat(b.data?.monetaryValue || 0);
-            }
-            if (aVal < bVal) return state.sortDirection === 'asc' ? -1 : 1;
-            if (aVal > bVal) return state.sortDirection === 'asc' ? 1 : -1;
-            return 0;
-          });
-        }
-
-        // Pagination
-        const totalRecords = filteredOpps.length;
-        const totalPages = Math.ceil(totalRecords / state.rowsPerPage);
-        const startIdx = (state.currentPage - 1) * state.rowsPerPage;
-        const endIdx = Math.min(startIdx + state.rowsPerPage, totalRecords);
-        const paginatedOpps = filteredOpps.slice(startIdx, endIdx);
-
-        // Helper functions
-        window.sortConsultationBy = function(column) {
-          if (state.sortColumn === column) {
-            state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
-          } else {
-            state.sortColumn = column;
-            state.sortDirection = column === 'value' ? 'desc' : 'asc';
-          }
-          window.renderConsultationBookingTable(state.currentFilter);
-        };
-
-        window.goToConsultationPage = function(page) {
-          if (page >= 1 && page <= totalPages) {
-            state.currentPage = page;
-            window.renderConsultationBookingTable(state.currentFilter);
-          }
-        };
-
-        window.updateConsultationSearch = function(event) {
-          state.searchQuery = event.target.value;
-        };
-
-        window.executeConsultationSearch = function() {
-          state.currentPage = 1;
-          window.renderConsultationBookingTable(state.currentFilter);
-        };
-
-        window.handleConsultationKeypress = function(event) {
-          if (event.key === 'Enter') {
-            window.executeConsultationSearch();
-          }
-        };
-
-        const getSortIcon = (column) => {
-          if (state.sortColumn !== column) return '';
-          return state.sortDirection === 'asc'
-            ? '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg>'
-            : '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>';
-        };
-
-        const tableHTML = `
-          <!-- Search Box -->
-          <div class="mb-4 flex gap-2">
-            <input
-              type="text"
-              placeholder="Search by opportunity name, contact, or email..."
-              value="${state.searchQuery}"
-              oninput="window.updateConsultationSearch(event)"
-              onkeypress="window.handleConsultationKeypress(event)"
-              class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            />
-            <button
-              onclick="window.executeConsultationSearch()"
-              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-            >
-              Search
-            </button>
-          </div>
-
-          <!-- Table -->
-          <div class="overflow-x-auto border border-gray-200 rounded-lg">
-            <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th onclick="window.sortConsultationBy('name')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Opportunity ${getSortIcon('name')}
-                  </th>
-                  <th onclick="window.sortConsultationBy('contact')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Contact ${getSortIcon('contact')}
-                  </th>
-                  <th onclick="window.sortConsultationBy('value')" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Value ${getSortIcon('value')}
-                  </th>
-                  <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Booking Status</th>
-                  <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
-                ${paginatedOpps.map(opp => {
-                  const value = parseFloat(opp.data?.monetaryValue || 0);
-                  const contactName = opp.data?.contact?.name || opp.data?.name || 'N/A';
-                  const contactEmail = opp.data?.contact?.email || '';
-                  const attributions = opp.data?.attributions || [];
-                  const hasBooking = Array.isArray(attributions) && attributions.some(attr => attr.medium === 'calendar');
-
-                  return `
-                    <tr class="hover:bg-gray-50">
-                      <td class="px-4 py-3 text-sm font-medium text-gray-900">${opp.data?.name || 'N/A'}</td>
-                      <td class="px-4 py-3 text-sm text-gray-600">
-                        ${contactName}
-                        ${contactEmail ? `<br><span class="text-xs text-gray-500">${contactEmail}</span>` : ''}
-                      </td>
-                      <td class="px-4 py-3 text-sm text-right font-semibold ${hasBooking ? 'text-green-600' : 'text-orange-600'}">${formatCurrency(value)}</td>
-                      <td class="px-4 py-3 text-center">
-                        ${hasBooking
-                          ? '<span class="px-2 py-1 text-xs rounded-full font-medium bg-green-100 text-green-800 flex items-center gap-1 justify-center"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Booked</span>'
-                          : '<span class="px-2 py-1 text-xs rounded-full font-medium bg-orange-100 text-orange-800">Not Booked</span>'
-                        }
-                      </td>
-                      <td class="px-4 py-3 text-center">
-                        <span class="px-2 py-1 text-xs rounded-full font-medium bg-blue-100 text-blue-800">${opp.data?.status || 'N/A'}</span>
-                      </td>
-                    </tr>
-                  `;
-                }).join('')}
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Pagination -->
-          <div class="mt-4 flex items-center justify-between">
-            <p class="text-sm text-gray-600">
-              Showing ${startIdx + 1}-${endIdx} of ${totalRecords} opportunities
-            </p>
-            <div class="flex gap-2">
-              <button
-                onclick="window.goToConsultationPage(${state.currentPage - 1})"
-                ${state.currentPage === 1 ? 'disabled' : ''}
-                class="px-3 py-1 border rounded ${state.currentPage === 1 ? 'bg-gray-100 text-gray-400' : 'bg-white hover:bg-gray-50'}"
-              >
-                Previous
-              </button>
-              <span class="px-3 py-1 text-sm text-gray-600">Page ${state.currentPage} of ${totalPages || 1}</span>
-              <button
-                onclick="window.goToConsultationPage(${state.currentPage + 1})"
-                ${state.currentPage >= totalPages ? 'disabled' : ''}
-                class="px-3 py-1 border rounded ${state.currentPage >= totalPages ? 'bg-gray-100 text-gray-400' : 'bg-white hover:bg-gray-50'}"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        `;
-
-        document.getElementById('consultationTableContainer').innerHTML = tableHTML;
+        LanaInsightsTables.render(document.getElementById('consultationTableContainer'), 'consultationBooking', state, { segment: filter });
       };
 
       // Render content
@@ -2429,9 +1299,9 @@
     async function showResponseTimeDrilldown(content, periodStart, periodEnd) {
       // Fetch contacts, opportunities, and conversations
       const [contactsResponse, opportunitiesResponse, conversationsResponse] = await Promise.all([
-        api.get(`/api/v1/integrations/connector-data?entity_type=contact&start_date=${periodStart}&end_date=${periodEnd}&limit=500`),
-        api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}&limit=500`),
-        api.get(`/api/v1/integrations/connector-data?entity_type=conversation&start_date=${periodStart}&end_date=${periodEnd}&limit=2000`)
+        LanaInsightsTables.fetchConnectorData(api, { entity_type: 'contact', start_date: periodStart, end_date: periodEnd }),
+        LanaInsightsTables.fetchConnectorData(api, { entity_type: 'opportunity', start_date: periodStart, end_date: periodEnd }),
+        LanaInsightsTables.fetchConnectorData(api, { entity_type: 'conversation', start_date: periodStart, end_date: periodEnd })
       ]);
 
       const contacts = contactsResponse?.data || [];
@@ -2564,257 +1434,7 @@
         state.currentFilter = filter;
         state.currentPage = 1; // Reset to page 1 when changing filter
 
-        // Apply filter
-        let filteredContacts = state.contacts;
-        if (filter === 'responded') {
-          filteredContacts = state.contacts.filter(c => c.responseStatus === 'Responded');
-        } else if (filter === 'awaiting_response') {
-          filteredContacts = state.contacts.filter(c => c.responseStatus === 'Awaiting Response');
-        }
-
-        // Apply search filter
-        if (state.searchQuery) {
-          const query = state.searchQuery.toLowerCase();
-          filteredContacts = filteredContacts.filter(contact =>
-            (contact.name && contact.name.toLowerCase().includes(query)) ||
-            (contact.email && contact.email.toLowerCase().includes(query)) ||
-            (contact.phone && contact.phone.toLowerCase().includes(query))
-          );
-        }
-
-        // Apply sorting
-        if (state.sortColumn) {
-          filteredContacts.sort((a, b) => {
-            let aVal = a[state.sortColumn];
-            let bVal = b[state.sortColumn];
-
-            // Handle null values for response time (no response = Infinity for sorting purposes)
-            if (state.sortColumn === 'responseTimeHours') {
-              aVal = aVal === null ? Infinity : aVal;
-              bVal = bVal === null ? Infinity : bVal;
-            }
-
-            // Handle date sorting
-            if (state.sortColumn === 'contactCreatedAt' || state.sortColumn === 'firstConversationTime') {
-              aVal = aVal ? aVal.getTime() : 0;
-              bVal = bVal ? bVal.getTime() : 0;
-            }
-
-            // String comparison
-            if (typeof aVal === 'string') {
-              aVal = aVal.toLowerCase();
-              bVal = bVal ? bVal.toLowerCase() : '';
-            }
-
-            if (aVal < bVal) return state.sortDirection === 'asc' ? -1 : 1;
-            if (aVal > bVal) return state.sortDirection === 'asc' ? 1 : -1;
-            return 0;
-          });
-        }
-
-        // Pagination
-        const totalRecords = filteredContacts.length;
-        const totalPages = Math.ceil(totalRecords / state.rowsPerPage);
-        const startIdx = (state.currentPage - 1) * state.rowsPerPage;
-        const endIdx = Math.min(startIdx + state.rowsPerPage, totalRecords);
-        const paginatedContacts = filteredContacts.slice(startIdx, endIdx);
-
-        // Helper functions
-        window.sortResponseTimeBy = function(column) {
-          if (state.sortColumn === column) {
-            state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
-          } else {
-            state.sortColumn = column;
-            state.sortDirection = 'asc';
-          }
-          window.renderResponseTimeTable(state.currentFilter);
-        };
-
-        window.goToResponseTimePage = function(page) {
-          if (page >= 1 && page <= totalPages) {
-            state.currentPage = page;
-            window.renderResponseTimeTable(state.currentFilter);
-          }
-        };
-
-        window.updateResponseTimeSearch = function(event) {
-          state.searchQuery = event.target.value;
-        };
-
-        window.executeResponseTimeSearch = function() {
-          state.currentPage = 1;
-          window.renderResponseTimeTable(state.currentFilter);
-        };
-
-        window.handleResponseTimeKeypress = function(event) {
-          if (event.key === 'Enter') {
-            window.executeResponseTimeSearch();
-          }
-        };
-
-        const getSortIcon = (column) => {
-          if (state.sortColumn !== column) return '';
-          return state.sortDirection === 'asc'
-            ? '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg>'
-            : '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>';
-        };
-
-        const formatDate = (date) => {
-          if (!date) return 'N/A';
-          return date.toLocaleString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
-          });
-        };
-
-        const formatResponseTime = (hours) => {
-          if (hours === null) return 'N/A';
-          if (hours < 1) {
-            const minutes = Math.round(hours * 60);
-            return `${minutes} min${minutes !== 1 ? 's' : ''}`;
-          }
-          return `${hours.toFixed(1)} hrs`;
-        };
-
-        const formatContactMethod = (method) => {
-          if (!method || method === 'N/A') return 'N/A';
-
-          // Map GoHighLevel types to friendly names with icons
-          const methodMap = {
-            'TYPE_EMAIL': '📧 Email',
-            'TYPE_CALL': '📞 Phone Call',
-            'TYPE_SMS': '💬 Text/SMS',
-            'TYPE_INSTAGRAM': '📷 Instagram',
-            'TYPE_PHONE': '📞 Phone',
-            'TYPE_FACEBOOK': '👥 Facebook',
-            'TYPE_WHATSAPP': '💚 WhatsApp',
-            'TYPE_WEBCHAT': '💻 Web Chat'
-          };
-
-          return methodMap[method] || method;
-        };
-
-        const tableHTML = `
-          <!-- Search Box -->
-          <div class="mb-4 flex gap-2">
-            <input
-              type="text"
-              placeholder="Search by name, email, or phone..."
-              value="${state.searchQuery}"
-              oninput="window.updateResponseTimeSearch(event)"
-              onkeypress="window.handleResponseTimeKeypress(event)"
-              class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            />
-            <button
-              onclick="window.executeResponseTimeSearch()"
-              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-            >
-              Search
-            </button>
-          </div>
-
-          <div class="overflow-x-auto" style="max-height: 500px;">
-            <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50 sticky top-0">
-                <tr>
-                  <th onclick="window.sortResponseTimeBy('name')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Contact Name ${getSortIcon('name')}
-                  </th>
-                  <th onclick="window.sortResponseTimeBy('email')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Email ${getSortIcon('email')}
-                  </th>
-                  <th onclick="window.sortResponseTimeBy('contactCreatedAt')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Contact Created ${getSortIcon('contactCreatedAt')}
-                  </th>
-                  <th onclick="window.sortResponseTimeBy('firstConversationTime')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    First Response ${getSortIcon('firstConversationTime')}
-                  </th>
-                  <th onclick="window.sortResponseTimeBy('contactMethod')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Contact Method ${getSortIcon('contactMethod')}
-                  </th>
-                  <th onclick="window.sortResponseTimeBy('responseTimeHours')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Response Time ${getSortIcon('responseTimeHours')}
-                  </th>
-                  <th onclick="window.sortResponseTimeBy('responseStatus')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Status ${getSortIcon('responseStatus')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
-                ${paginatedContacts.map(contact => {
-                  const statusColor = contact.responseStatus === 'Responded' ? 'text-green-600' : 'text-amber-600';
-                  const responseTimeColor =
-                    contact.responseTimeHours === null ? 'text-gray-400' :
-                    contact.responseTimeHours <= 24 ? 'text-green-600' :
-                    contact.responseTimeHours <= 48 ? 'text-yellow-600' : 'text-red-600';
-
-                  return `
-                    <tr class="hover:bg-gray-50">
-                      <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">${contact.name}</td>
-                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">${contact.email}</td>
-                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">${formatDate(contact.contactCreatedAt)}</td>
-                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">${formatDate(contact.firstConversationTime)}</td>
-                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">${formatContactMethod(contact.contactMethod)}</td>
-                      <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold ${responseTimeColor}">${formatResponseTime(contact.responseTimeHours)}</td>
-                      <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold ${statusColor}">${contact.responseStatus}</td>
-                    </tr>
-                  `;
-                }).join('')}
-              </tbody>
-            </table>
-          </div>
-
-          <div class="mt-4 flex items-center justify-between">
-            <div class="text-sm text-gray-600">
-              Showing ${startIdx + 1} to ${endIdx} of ${totalRecords} ${state.currentFilter === 'all' ? 'leads' : state.currentFilter === 'responded' ? 'responded leads' : 'leads awaiting response'}
-            </div>
-            <div class="flex items-center gap-2">
-              <button
-                onclick="window.goToResponseTimePage(${state.currentPage - 1})"
-                ${state.currentPage === 1 ? 'disabled' : ''}
-                class="px-3 py-1 text-sm border rounded ${state.currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
-              >
-                Previous
-              </button>
-              <div class="flex items-center gap-1">
-                ${Array.from({length: Math.min(totalPages, 7)}, (_, i) => {
-                  let pageNum;
-                  if (totalPages <= 7) {
-                    pageNum = i + 1;
-                  } else if (state.currentPage <= 4) {
-                    pageNum = i + 1;
-                  } else if (state.currentPage >= totalPages - 3) {
-                    pageNum = totalPages - 6 + i;
-                  } else {
-                    pageNum = state.currentPage - 3 + i;
-                  }
-                  const isActive = pageNum === state.currentPage;
-                  return `
-                    <button
-                      onclick="window.goToResponseTimePage(${pageNum})"
-                      class="px-3 py-1 text-sm border rounded ${isActive ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 hover:bg-gray-50'}"
-                    >
-                      ${pageNum}
-                    </button>
-                  `;
-                }).join('')}
-              </div>
-              <button
-                onclick="window.goToResponseTimePage(${state.currentPage + 1})"
-                ${state.currentPage === totalPages ? 'disabled' : ''}
-                class="px-3 py-1 text-sm border rounded ${state.currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        `;
-
-        document.getElementById('responseTimeTableContainer').innerHTML = tableHTML;
+        LanaInsightsTables.render(document.getElementById('responseTimeTableContainer'), 'responseTime', state, { segment: filter });
       };
 
       // Render the content
@@ -2883,8 +1503,8 @@
     async function showQualityScoreDrilldown(content, periodStart, periodEnd) {
       // Fetch opportunities (enriched contact data) and standalone contacts
       const [opportunitiesResponse, contactsResponse] = await Promise.all([
-        api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}&limit=500`),
-        api.get(`/api/v1/integrations/connector-data?entity_type=contact&start_date=${periodStart}&end_date=${periodEnd}&limit=500`)
+        LanaInsightsTables.fetchConnectorData(api, { entity_type: 'opportunity', start_date: periodStart, end_date: periodEnd }),
+        LanaInsightsTables.fetchConnectorData(api, { entity_type: 'contact', start_date: periodStart, end_date: periodEnd })
       ]);
 
       const opportunities = opportunitiesResponse?.data || [];
@@ -2962,224 +1582,7 @@
       // Render table function
       window.renderLeadQualityTable = function() {
         const state = window.leadQualityData;
-        let filteredLeads = [...state.leads];
-
-        // Apply search filter
-        if (state.searchQuery) {
-          const query = state.searchQuery.toLowerCase();
-          filteredLeads = filteredLeads.filter(lead => {
-            const name = lead.name.toLowerCase();
-            const email = lead.email.toLowerCase();
-            const phone = lead.phone.toLowerCase();
-            const tags = (lead.tags || []).join(' ').toLowerCase();
-            return name.includes(query) || email.includes(query) || phone.includes(query) || tags.includes(query);
-          });
-        }
-
-        // Apply sorting
-        if (state.sortColumn) {
-          filteredLeads.sort((a, b) => {
-            let aVal, bVal;
-            switch(state.sortColumn) {
-              case 'name':
-                aVal = a.name.toLowerCase();
-                bVal = b.name.toLowerCase();
-                break;
-              case 'qualityScore':
-                aVal = a.qualityScore;
-                bVal = b.qualityScore;
-                break;
-              case 'email':
-                aVal = a.email !== 'N/A' ? 1 : 0;
-                bVal = b.email !== 'N/A' ? 1 : 0;
-                break;
-              case 'phone':
-                aVal = a.phone !== 'N/A' ? 1 : 0;
-                bVal = b.phone !== 'N/A' ? 1 : 0;
-                break;
-              case 'tags':
-                aVal = a.tags ? a.tags.length : 0;
-                bVal = b.tags ? b.tags.length : 0;
-                break;
-              case 'source':
-                aVal = (a.attributions && a.attributions.length > 0) ? 1 : 0;
-                bVal = (b.attributions && b.attributions.length > 0) ? 1 : 0;
-                break;
-              default:
-                return 0;
-            }
-
-            if (aVal < bVal) return state.sortDirection === 'asc' ? -1 : 1;
-            if (aVal > bVal) return state.sortDirection === 'asc' ? 1 : -1;
-            return 0;
-          });
-        }
-
-        // Pagination
-        const totalRecords = filteredLeads.length;
-        const totalPages = Math.ceil(totalRecords / state.rowsPerPage);
-        const startIdx = (state.currentPage - 1) * state.rowsPerPage;
-        const endIdx = Math.min(startIdx + state.rowsPerPage, totalRecords);
-        const paginatedLeads = filteredLeads.slice(startIdx, endIdx);
-
-        // Helper functions
-        window.sortLeadQualityBy = function(column) {
-          if (state.sortColumn === column) {
-            state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
-          } else {
-            state.sortColumn = column;
-            state.sortDirection = 'desc';
-          }
-          window.renderLeadQualityTable();
-        };
-
-        window.goToLeadQualityPage = function(page) {
-          if (page >= 1 && page <= totalPages) {
-            state.currentPage = page;
-            window.renderLeadQualityTable();
-          }
-        };
-
-        window.updateLeadQualitySearch = function(event) {
-          state.searchQuery = event.target.value;
-        };
-
-        window.executeLeadQualitySearch = function() {
-          state.currentPage = 1;
-          window.renderLeadQualityTable();
-        };
-
-        window.handleLeadQualityKeypress = function(event) {
-          if (event.key === 'Enter') {
-            window.executeLeadQualitySearch();
-          }
-        };
-
-        const getSortIcon = (column) => {
-          if (state.sortColumn !== column) {
-            return '<svg class="w-4 h-4 text-gray-400 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path></svg>';
-          }
-          return state.sortDirection === 'asc'
-            ? '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg>'
-            : '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>';
-        };
-
-        const tableHTML = `
-          <!-- Search Box -->
-          <div class="mb-4 flex gap-2">
-            <input
-              type="text"
-              placeholder="Search by name, email, phone, or tags..."
-              value="${state.searchQuery}"
-              oninput="window.updateLeadQualitySearch(event)"
-              onkeypress="window.handleLeadQualityKeypress(event)"
-              class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            />
-            <button
-              onclick="window.executeLeadQualitySearch()"
-              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-            >
-              Search
-            </button>
-          </div>
-
-          <div class="overflow-x-auto" style="max-height: 500px;">
-            <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50 sticky top-0">
-                <tr>
-                  <th onclick="window.sortLeadQualityBy('name')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Name ${getSortIcon('name')}
-                  </th>
-                  <th onclick="window.sortLeadQualityBy('email')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Email ${getSortIcon('email')}
-                  </th>
-                  <th onclick="window.sortLeadQualityBy('phone')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Phone ${getSortIcon('phone')}
-                  </th>
-                  <th onclick="window.sortLeadQualityBy('tags')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Tags ${getSortIcon('tags')}
-                  </th>
-                  <th onclick="window.sortLeadQualityBy('source')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Source ${getSortIcon('source')}
-                  </th>
-                  <th onclick="window.sortLeadQualityBy('qualityScore')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Score ${getSortIcon('qualityScore')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
-                ${paginatedLeads.map(lead => {
-                  const scoreColor = lead.qualityScore >= 75 ? 'text-green-600' : lead.qualityScore >= 50 ? 'text-yellow-600' : 'text-red-600';
-                  const hasAttribution = lead.attributions && lead.attributions.length > 0;
-                  const attributionSource = hasAttribution
-                    ? lead.attributions[0].medium || lead.attributions[0].source || 'Unknown'
-                    : 'None';
-                  const tagsDisplay = lead.tags && lead.tags.length > 0
-                    ? `${lead.tags.length} tag${lead.tags.length > 1 ? 's' : ''}`
-                    : 'None';
-
-                  return `
-                    <tr class="hover:bg-gray-50">
-                      <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">${lead.name}</td>
-                      <td class="px-4 py-3 whitespace-nowrap text-sm">${lead.email !== 'N/A' ? '✓' : '✗'}</td>
-                      <td class="px-4 py-3 whitespace-nowrap text-sm">${lead.phone !== 'N/A' ? '✓' : '✗'}</td>
-                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500" title="${(lead.tags || []).join(', ')}">${tagsDisplay}</td>
-                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${hasAttribution ? '✓ ' + attributionSource : '✗'}</td>
-                      <td class="px-4 py-3 whitespace-nowrap text-sm font-bold ${scoreColor}">${lead.qualityScore}/100</td>
-                    </tr>
-                  `;
-                }).join('')}
-              </tbody>
-            </table>
-          </div>
-
-          <div class="mt-4 flex items-center justify-between">
-            <div class="text-sm text-gray-600">
-              Showing ${startIdx + 1} to ${endIdx} of ${totalRecords} total leads
-            </div>
-            <div class="flex items-center gap-2">
-              <button
-                onclick="window.goToLeadQualityPage(${state.currentPage - 1})"
-                ${state.currentPage === 1 ? 'disabled' : ''}
-                class="px-3 py-1 text-sm border rounded ${state.currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
-              >
-                Previous
-              </button>
-              <div class="flex items-center gap-1">
-                ${Array.from({length: Math.min(totalPages, 7)}, (_, i) => {
-                  let pageNum;
-                  if (totalPages <= 7) {
-                    pageNum = i + 1;
-                  } else if (state.currentPage <= 4) {
-                    pageNum = i + 1;
-                  } else if (state.currentPage >= totalPages - 3) {
-                    pageNum = totalPages - 6 + i;
-                  } else {
-                    pageNum = state.currentPage - 3 + i;
-                  }
-                  const isActive = pageNum === state.currentPage;
-                  return `
-                    <button
-                      onclick="window.goToLeadQualityPage(${pageNum})"
-                      class="px-3 py-1 text-sm border rounded ${isActive ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 hover:bg-gray-50'}"
-                    >
-                      ${pageNum}
-                    </button>
-                  `;
-                }).join('')}
-              </div>
-              <button
-                onclick="window.goToLeadQualityPage(${state.currentPage + 1})"
-                ${state.currentPage === totalPages ? 'disabled' : ''}
-                class="px-3 py-1 text-sm border rounded ${state.currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        `;
-
-        document.getElementById('leadQualityTableContainer').innerHTML = tableHTML;
+        LanaInsightsTables.render(document.getElementById('leadQualityTableContainer'), 'leadQuality', state);
       };
 
       // Log for debugging the count discrepancy
@@ -3213,8 +1616,8 @@
     async function showConsultationShowRateDrilldown(content, periodStart, periodEnd) {
       // Fetch opportunities and pipelines
       const [oppResponse, pipelineResponse] = await Promise.all([
-        api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}&limit=500`),
-        api.get(`/api/v1/integrations/connector-data?entity_type=pipeline&limit=50`)
+        LanaInsightsTables.fetchConnectorData(api, { entity_type: 'opportunity', start_date: periodStart, end_date: periodEnd }),
+        LanaInsightsTables.fetchConnectorData(api, { entity_type: 'pipeline' })
       ]);
 
       const opportunities = oppResponse?.data || [];
@@ -3300,121 +1703,10 @@
         currentFilter: 'all' // 'all', 'showed', 'no_show', 'cancelled', 'pending'
       };
 
-      // Helper functions
-      window.updateShowRateSearch = (event) => {
-        window.showRateData.searchQuery = event.target.value;
-      };
-
-      window.executeShowRateSearch = () => {
-        window.showRateData.currentPage = 1;
-        window.renderShowRateTable(window.showRateData.currentFilter);
-      };
-
-      window.handleShowRateKeypress = (event) => {
-        if (event.key === 'Enter') {
-          window.executeShowRateSearch();
-        }
-      };
-
-      window.sortShowRateBy = (column) => {
-        const state = window.showRateData;
-        if (state.sortColumn === column) {
-          state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
-          state.sortColumn = column;
-          state.sortDirection = 'asc';
-        }
-        window.renderShowRateTable(state.currentFilter);
-      };
-
-      window.goToShowRatePage = (page) => {
-        const state = window.showRateData;
-        const totalPages = Math.ceil(state.filteredOpportunities.length / state.rowsPerPage);
-        if (page >= 1 && page <= totalPages) {
-          state.currentPage = page;
-          window.renderShowRateTable(state.currentFilter);
-        }
-      };
-
       // Main render function
       window.renderShowRateTable = function(filter = 'all') {
         const state = window.showRateData;
         state.currentFilter = filter;
-
-        // Filter data based on selected filter
-        let displayOpps = [];
-        switch (filter) {
-          case 'showed':
-            displayOpps = state.showed;
-            break;
-          case 'no_show':
-            displayOpps = state.noShow;
-            break;
-          case 'cancelled':
-            displayOpps = state.cancelled;
-            break;
-          case 'pending':
-            displayOpps = state.pending;
-            break;
-          case 'all':
-          default:
-            displayOpps = state.allOpportunities;
-            break;
-        }
-
-        // Apply search filter
-        if (state.searchQuery.trim()) {
-          const query = state.searchQuery.toLowerCase();
-          displayOpps = displayOpps.filter(opp => {
-            const oppName = (opp.data?.name || '').toLowerCase();
-            const contactName = (opp.data?.contact?.name || opp.data?.contact?.firstName || '').toLowerCase();
-            const contactEmail = (opp.data?.contact?.email || '').toLowerCase();
-            return oppName.includes(query) || contactName.includes(query) || contactEmail.includes(query);
-          });
-        }
-
-        state.filteredOpportunities = displayOpps;
-
-        // Apply sorting
-        displayOpps.sort((a, b) => {
-          let aVal, bVal;
-          switch (state.sortColumn) {
-            case 'name':
-              aVal = (a.data?.name || '').toLowerCase();
-              bVal = (b.data?.name || '').toLowerCase();
-              break;
-            case 'contact':
-              aVal = (a.data?.contact?.name || '').toLowerCase();
-              bVal = (b.data?.contact?.name || '').toLowerCase();
-              break;
-            case 'value':
-              aVal = parseFloat(a.data?.monetaryValue || 0);
-              bVal = parseFloat(b.data?.monetaryValue || 0);
-              break;
-            case 'stage':
-              aVal = (a.stageName || '').toLowerCase();
-              bVal = (b.stageName || '').toLowerCase();
-              break;
-            case 'created_date':
-              aVal = new Date(a.source_created_at);
-              bVal = new Date(b.source_created_at);
-              break;
-            default:
-              return 0;
-          }
-          if (aVal < bVal) return state.sortDirection === 'asc' ? -1 : 1;
-          if (aVal > bVal) return state.sortDirection === 'asc' ? 1 : -1;
-          return 0;
-        });
-
-        // Pagination
-        const totalRecords = displayOpps.length;
-        const totalPages = Math.ceil(totalRecords / state.rowsPerPage) || 1;
-        if (state.currentPage > totalPages) state.currentPage = totalPages;
-
-        const startIdx = (state.currentPage - 1) * state.rowsPerPage;
-        const endIdx = Math.min(startIdx + state.rowsPerPage, totalRecords);
-        const paginatedOpps = displayOpps.slice(startIdx, endIdx);
 
         // Render summary cards with active state
         const isActive = (cardFilter) => cardFilter === filter ? 'ring-2 ring-indigo-600 shadow-lg' : '';
@@ -3448,140 +1740,7 @@
 
         document.getElementById('showRateSummaryCards').innerHTML = summaryCardsHTML;
 
-        // Helper functions for table rendering
-        const getSortIcon = (column) => {
-          if (state.sortColumn !== column) return '';
-          return state.sortDirection === 'asc'
-            ? '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg>'
-            : '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>';
-        };
-
-        const formatDate = (dateStr) => {
-          if (!dateStr) return 'N/A';
-          const date = new Date(dateStr);
-          return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        };
-
-        const getAttendanceStatus = (opp) => {
-          const stageName = opp.stageName || '';
-          if (stageName.includes('Showed') || stageName.includes('Complete') || stageName.includes('Intake Complete')) {
-            return { label: 'Showed', color: 'bg-green-100 text-green-700' };
-          } else if (stageName.includes('No-Show')) {
-            return { label: 'No-Show', color: 'bg-red-100 text-red-700' };
-          } else if (stageName.includes('Cancelled')) {
-            return { label: 'Cancelled', color: 'bg-orange-100 text-orange-700' };
-          } else if (stageName.includes('Booked')) {
-            return { label: 'Booked (Pending)', color: 'bg-blue-100 text-blue-700' };
-          } else if (opp.stagePosition >= 7) {
-            return { label: 'Showed (Progressed)', color: 'bg-purple-100 text-purple-700' };
-          } else {
-            return { label: 'Other', color: 'bg-gray-100 text-gray-600' };
-          }
-        };
-
-        const tableHTML = `
-          <!-- Search Box -->
-          <div class="mb-4 flex gap-2">
-            <input
-              type="text"
-              placeholder="Search by opportunity name, contact, or email..."
-              value="${state.searchQuery}"
-              oninput="window.updateShowRateSearch(event)"
-              onkeypress="window.handleShowRateKeypress(event)"
-              class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            />
-            <button
-              onclick="window.executeShowRateSearch()"
-              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-            >
-              Search
-            </button>
-          </div>
-
-          <!-- Table -->
-          <div class="overflow-x-auto border border-gray-200 rounded-lg">
-            <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th onclick="window.sortShowRateBy('name')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Opportunity ${getSortIcon('name')}
-                  </th>
-                  <th onclick="window.sortShowRateBy('contact')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Contact ${getSortIcon('contact')}
-                  </th>
-                  <th onclick="window.sortShowRateBy('value')" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Value ${getSortIcon('value')}
-                  </th>
-                  <th onclick="window.sortShowRateBy('stage')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Current Stage ${getSortIcon('stage')}
-                  </th>
-                  <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                    Attendance Status
-                  </th>
-                  <th onclick="window.sortShowRateBy('created_date')" class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Created ${getSortIcon('created_date')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
-                ${paginatedOpps.map(opp => {
-                  const value = parseFloat(opp.data?.monetaryValue || 0);
-                  const contactName = opp.data?.contact?.name ||
-                                     (opp.data?.contact?.firstName && opp.data?.contact?.lastName
-                                       ? `${opp.data.contact.firstName} ${opp.data.contact.lastName}`
-                                       : 'Unknown');
-                  const contactEmail = opp.data?.contact?.email || '';
-                  const contactPhone = opp.data?.contact?.phone || '';
-                  const attendanceStatus = getAttendanceStatus(opp);
-                  const stageName = opp.stageName || 'Unknown';
-
-                  return `
-                    <tr class="hover:bg-gray-50">
-                      <td class="px-4 py-3 text-sm font-medium text-gray-900">${opp.data?.name || 'N/A'}</td>
-                      <td class="px-4 py-3 text-sm text-gray-600">
-                        ${contactName}
-                        ${contactEmail ? `<br><span class="text-xs text-gray-500">${contactEmail}</span>` : ''}
-                        ${contactPhone ? `<br><span class="text-xs text-gray-500">${contactPhone}</span>` : ''}
-                      </td>
-                      <td class="px-4 py-3 text-right text-sm font-semibold text-green-600">${formatCurrency(value)}</td>
-                      <td class="px-4 py-3 text-sm text-gray-700">${stageName}</td>
-                      <td class="px-4 py-3 text-center text-sm">
-                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${attendanceStatus.color}">
-                          ${attendanceStatus.label}
-                        </span>
-                      </td>
-                      <td class="px-4 py-3 text-center text-sm text-gray-500">${formatDate(opp.source_created_at)}</td>
-                    </tr>
-                  `;
-                }).join('')}
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Pagination -->
-          <div class="mt-4 flex items-center justify-between text-sm text-gray-700">
-            <p>Showing ${startIdx + 1}-${endIdx} of ${totalRecords} consultations</p>
-            <div class="flex gap-2">
-              <button
-                onclick="window.goToShowRatePage(${state.currentPage - 1})"
-                ${state.currentPage === 1 ? 'disabled' : ''}
-                class="px-3 py-1 border rounded ${state.currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
-              >
-                Previous
-              </button>
-              <span class="px-3 py-1">Page ${state.currentPage} of ${totalPages}</span>
-              <button
-                onclick="window.goToShowRatePage(${state.currentPage + 1})"
-                ${state.currentPage === totalPages ? 'disabled' : ''}
-                class="px-3 py-1 border rounded ${state.currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        `;
-
-        document.getElementById('showRateTableContainer').innerHTML = tableHTML;
+        LanaInsightsTables.render(document.getElementById('showRateTableContainer'), 'showRate', state, { segment: filter });
       };
 
       // Render content
@@ -3630,8 +1789,8 @@
     async function showAverageCaseValueDrilldown(content, periodStart, periodEnd) {
       //Fetch both opportunities and contacts
       const [oppResponse, contactsResponse] = await Promise.all([
-        api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}&limit=500`),
-        api.get(`/api/v1/integrations/connector-data?entity_type=contact&start_date=${periodStart}&end_date=${periodEnd}&limit=1000`)
+        LanaInsightsTables.fetchConnectorData(api, { entity_type: 'opportunity', start_date: periodStart, end_date: periodEnd }),
+        LanaInsightsTables.fetchConnectorData(api, { entity_type: 'contact', start_date: periodStart, end_date: periodEnd })
       ]);
 
       const opportunities = oppResponse?.data || [];
@@ -3796,237 +1955,7 @@
         `;
         document.getElementById('caseValueSummaryCards').innerHTML = summaryCardsHTML;
 
-        // Apply filter
-        let filteredOpps = state.opportunities;
-        if (filter !== 'all') {
-          filteredOpps = state.opportunities.filter(o => o.data?.status === filter);
-        }
-
-        // Apply search
-        if (state.searchQuery) {
-          const query = state.searchQuery.toLowerCase();
-          filteredOpps = filteredOpps.filter(opp =>
-            (opp.data?.name && opp.data.name.toLowerCase().includes(query)) ||
-            (opp.data?.contact?.name && opp.data.contact.name.toLowerCase().includes(query)) ||
-            (opp.data?.contact?.email && opp.data.contact.email.toLowerCase().includes(query)) ||
-            (opp.data?.source && opp.data.source.toLowerCase().includes(query))
-          );
-        }
-
-        // Apply sorting
-        if (state.sortColumn) {
-          filteredOpps.sort((a, b) => {
-            let aVal, bVal;
-
-            if (state.sortColumn === 'monetaryValue') {
-              aVal = parseFloat(a.data?.monetaryValue || 0);
-              bVal = parseFloat(b.data?.monetaryValue || 0);
-            } else if (state.sortColumn === 'name') {
-              aVal = (a.data?.name || '').toLowerCase();
-              bVal = (b.data?.name || '').toLowerCase();
-            } else if (state.sortColumn === 'contactName') {
-              aVal = (a.data?.contact?.name || '').toLowerCase();
-              bVal = (b.data?.contact?.name || '').toLowerCase();
-            } else if (state.sortColumn === 'source') {
-              aVal = (a.data?.source || '').toLowerCase();
-              bVal = (b.data?.source || '').toLowerCase();
-            } else if (state.sortColumn === 'status') {
-              aVal = (a.data?.status || '').toLowerCase();
-              bVal = (b.data?.status || '').toLowerCase();
-            } else if (state.sortColumn === 'createdAt') {
-              aVal = new Date(a.data?.createdAt || 0).getTime();
-              bVal = new Date(b.data?.createdAt || 0).getTime();
-            }
-
-            if (aVal < bVal) return state.sortDirection === 'asc' ? -1 : 1;
-            if (aVal > bVal) return state.sortDirection === 'asc' ? 1 : -1;
-            return 0;
-          });
-        }
-
-        // Pagination
-        const totalRecords = filteredOpps.length;
-        const totalPages = Math.ceil(totalRecords / state.rowsPerPage);
-        const startIdx = (state.currentPage - 1) * state.rowsPerPage;
-        const endIdx = Math.min(startIdx + state.rowsPerPage, totalRecords);
-        const paginatedOpps = filteredOpps.slice(startIdx, endIdx);
-
-        // Helper functions
-        window.sortCaseValueBy = function(column) {
-          if (state.sortColumn === column) {
-            state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
-          } else {
-            state.sortColumn = column;
-            state.sortDirection = column === 'monetaryValue' ? 'desc' : 'asc';
-          }
-          window.renderCaseValueTable(state.currentFilter);
-        };
-
-        window.goToCaseValuePage = function(page) {
-          if (page >= 1 && page <= totalPages) {
-            state.currentPage = page;
-            window.renderCaseValueTable(state.currentFilter);
-          }
-        };
-
-        window.updateCaseValueSearch = function(event) {
-          state.searchQuery = event.target.value;
-        };
-
-        window.executeCaseValueSearch = function() {
-          state.currentPage = 1;
-          window.renderCaseValueTable(state.currentFilter);
-        };
-
-        window.handleCaseValueKeypress = function(event) {
-          if (event.key === 'Enter') {
-            window.executeCaseValueSearch();
-          }
-        };
-
-        const getSortIcon = (column) => {
-          if (state.sortColumn !== column) return '';
-          return state.sortDirection === 'asc'
-            ? '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg>'
-            : '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>';
-        };
-
-        const formatDate = (dateStr) => {
-          if (!dateStr) return 'N/A';
-          const date = new Date(dateStr);
-          return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        };
-
-        const getStatusColor = (status) => {
-          const colors = {
-            'open': 'text-blue-600 bg-blue-50',
-            'won': 'text-green-600 bg-green-50',
-            'lost': 'text-red-600 bg-red-50'
-          };
-          return colors[status] || 'text-gray-600 bg-gray-50';
-        };
-
-        const tableHTML = `
-          <!-- Search Box -->
-          <div class="mb-4 flex gap-2">
-            <input
-              type="text"
-              placeholder="Search by opportunity name, contact, email, or source..."
-              value="${state.searchQuery}"
-              oninput="window.updateCaseValueSearch(event)"
-              onkeypress="window.handleCaseValueKeypress(event)"
-              class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            />
-            <button
-              onclick="window.executeCaseValueSearch()"
-              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-            >
-              Search
-            </button>
-          </div>
-
-          <!-- Scrollable Table with Visual Indicator -->
-          <div class="relative">
-            ${totalRecords > 7 ? '<div class="absolute top-0 right-4 z-10 bg-indigo-100 text-indigo-700 text-xs px-3 py-1 rounded-b-lg shadow-md flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>Scroll to see all ${totalRecords}</div>' : ''}
-            <div class="overflow-x-auto overflow-y-auto border border-gray-200 rounded-lg shadow-inner" style="max-height: 500px;">
-              <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50 sticky top-0 z-10">
-                  <tr>
-                    <th onclick="window.sortCaseValueBy('name')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                      Opportunity ${getSortIcon('name')}
-                    </th>
-                    <th onclick="window.sortCaseValueBy('contactName')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                      Contact ${getSortIcon('contactName')}
-                    </th>
-                    <th onclick="window.sortCaseValueBy('monetaryValue')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                      Value ${getSortIcon('monetaryValue')}
-                    </th>
-                    <th onclick="window.sortCaseValueBy('status')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                      Status ${getSortIcon('status')}
-                    </th>
-                    <th onclick="window.sortCaseValueBy('source')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                      Source ${getSortIcon('source')}
-                    </th>
-                    <th onclick="window.sortCaseValueBy('createdAt')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                      Created ${getSortIcon('createdAt')}
-                    </th>
-                  </tr>
-                </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
-                ${paginatedOpps.map(opp => {
-                  const value = parseFloat(opp.data?.monetaryValue || 0);
-                  const status = opp.data?.status || 'unknown';
-                  const contactName = opp.data?.contact?.name || opp.data?.name || 'N/A';
-                  const contactEmail = opp.data?.contact?.email || '';
-
-                  return `
-                    <tr class="hover:bg-gray-50">
-                      <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">${opp.data?.name || 'N/A'}</td>
-                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                        ${contactName}
-                        ${contactEmail ? `<br><span class="text-xs text-gray-500">${contactEmail}</span>` : ''}
-                      </td>
-                      <td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-green-600">${formatCurrency(value)}</td>
-                      <td class="px-4 py-3 whitespace-nowrap text-xs">
-                        <span class="px-2 py-1 rounded-full font-medium ${getStatusColor(status)}">${status.toUpperCase()}</span>
-                      </td>
-                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">${opp.data?.source || 'N/A'}</td>
-                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${formatDate(opp.data?.createdAt)}</td>
-                    </tr>
-                  `;
-                }).join('')}
-              </tbody>
-            </table>
-            </div>
-          </div>
-
-          <div class="mt-4 flex items-center justify-between">
-            <div class="text-sm text-gray-600">
-              Showing ${startIdx + 1} to ${endIdx} of ${totalRecords} ${state.currentFilter === 'all' ? 'opportunities' : state.currentFilter + ' opportunities'}
-            </div>
-            <div class="flex items-center gap-2">
-              <button
-                onclick="window.goToCaseValuePage(${state.currentPage - 1})"
-                ${state.currentPage === 1 ? 'disabled' : ''}
-                class="px-3 py-1 text-sm border rounded ${state.currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
-              >
-                Previous
-              </button>
-              <div class="flex items-center gap-1">
-                ${Array.from({length: Math.min(totalPages, 7)}, (_, i) => {
-                  let pageNum;
-                  if (totalPages <= 7) {
-                    pageNum = i + 1;
-                  } else if (state.currentPage <= 4) {
-                    pageNum = i + 1;
-                  } else if (state.currentPage >= totalPages - 3) {
-                    pageNum = totalPages - 6 + i;
-                  } else {
-                    pageNum = state.currentPage - 3 + i;
-                  }
-                  const isActive = pageNum === state.currentPage;
-                  return `
-                    <button
-                      onclick="window.goToCaseValuePage(${pageNum})"
-                      class="px-3 py-1 text-sm border rounded ${isActive ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 hover:bg-gray-50'}"
-                    >
-                      ${pageNum}
-                    </button>
-                  `;
-                }).join('')}
-              </div>
-              <button
-                onclick="window.goToCaseValuePage(${state.currentPage + 1})"
-                ${state.currentPage === totalPages ? 'disabled' : ''}
-                class="px-3 py-1 text-sm border rounded ${state.currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        `;
-
-        document.getElementById('caseValueTableContainer').innerHTML = tableHTML;
+        LanaInsightsTables.render(document.getElementById('caseValueTableContainer'), 'caseValue', state, { segment: filter });
       };
 
       // Render content
@@ -4089,7 +2018,7 @@
     // Drill-down: Consultations Held
     async function showConsultationsHeldDrilldown(content, periodStart, periodEnd) {
       // Fetch all opportunities
-      const oppResponse = await api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}&limit=500`);
+      const oppResponse = await LanaInsightsTables.fetchConnectorData(api, { entity_type: 'opportunity', start_date: periodStart, end_date: periodEnd });
       const opportunities = oppResponse?.data || [];
 
       // Categorize opportunities by consultation status
@@ -4156,124 +2085,10 @@
         currentFilter: 'all' // 'all', 'booked', 'not_booked', 'confirmed', 'progressed', 'open'
       };
 
-      // Helper functions
-      window.updateConsultationsHeldSearch = (event) => {
-        window.consultationsHeldData.searchQuery = event.target.value;
-      };
-
-      window.executeConsultationsHeldSearch = () => {
-        window.consultationsHeldData.currentPage = 1;
-        window.renderConsultationsHeldTable(window.consultationsHeldData.currentFilter);
-      };
-
-      window.handleConsultationsHeldKeypress = (event) => {
-        if (event.key === 'Enter') {
-          window.executeConsultationsHeldSearch();
-        }
-      };
-
-      window.sortConsultationsHeldBy = (column) => {
-        const state = window.consultationsHeldData;
-        if (state.sortColumn === column) {
-          state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
-          state.sortColumn = column;
-          state.sortDirection = 'asc';
-        }
-        window.renderConsultationsHeldTable(state.currentFilter);
-      };
-
-      window.goToConsultationsHeldPage = (page) => {
-        const state = window.consultationsHeldData;
-        const totalPages = Math.ceil(state.filteredOpportunities.length / state.rowsPerPage);
-        if (page >= 1 && page <= totalPages) {
-          state.currentPage = page;
-          window.renderConsultationsHeldTable(state.currentFilter);
-        }
-      };
-
       // Main render function
       window.renderConsultationsHeldTable = function(filter = 'all') {
         const state = window.consultationsHeldData;
         state.currentFilter = filter;
-
-        // Filter data based on selected filter
-        let displayOpps = [];
-        switch (filter) {
-          case 'booked':
-            displayOpps = state.withCalendarBooking;
-            break;
-          case 'not_booked':
-            displayOpps = state.notBooked;
-            break;
-          case 'confirmed':
-            displayOpps = state.confirmedShowed;
-            break;
-          case 'progressed':
-            displayOpps = state.progressed;
-            break;
-          case 'open':
-            displayOpps = state.stillOpen;
-            break;
-          case 'all':
-          default:
-            displayOpps = state.allOpportunities;
-            break;
-        }
-
-        // Apply search filter
-        if (state.searchQuery.trim()) {
-          const query = state.searchQuery.toLowerCase();
-          displayOpps = displayOpps.filter(opp => {
-            const oppName = (opp.data?.name || '').toLowerCase();
-            const contactName = (opp.data?.contact?.name || opp.data?.contact?.firstName || '').toLowerCase();
-            const contactEmail = (opp.data?.contact?.email || '').toLowerCase();
-            return oppName.includes(query) || contactName.includes(query) || contactEmail.includes(query);
-          });
-        }
-
-        state.filteredOpportunities = displayOpps;
-
-        // Apply sorting
-        displayOpps.sort((a, b) => {
-          let aVal, bVal;
-          switch (state.sortColumn) {
-            case 'name':
-              aVal = (a.data?.name || '').toLowerCase();
-              bVal = (b.data?.name || '').toLowerCase();
-              break;
-            case 'contact':
-              aVal = (a.data?.contact?.name || '').toLowerCase();
-              bVal = (b.data?.contact?.name || '').toLowerCase();
-              break;
-            case 'value':
-              aVal = parseFloat(a.data?.monetaryValue || 0);
-              bVal = parseFloat(b.data?.monetaryValue || 0);
-              break;
-            case 'status':
-              aVal = (a.data?.status || '').toLowerCase();
-              bVal = (b.data?.status || '').toLowerCase();
-              break;
-            case 'created_date':
-              aVal = new Date(a.source_created_at);
-              bVal = new Date(b.source_created_at);
-              break;
-            default:
-              return 0;
-          }
-          if (aVal < bVal) return state.sortDirection === 'asc' ? -1 : 1;
-          if (aVal > bVal) return state.sortDirection === 'asc' ? 1 : -1;
-          return 0;
-        });
-
-        // Pagination
-        const totalRecords = displayOpps.length;
-        const totalPages = Math.ceil(totalRecords / state.rowsPerPage) || 1;
-        if (state.currentPage > totalPages) state.currentPage = totalPages;
-
-        const startIdx = (state.currentPage - 1) * state.rowsPerPage;
-        const endIdx = Math.min(startIdx + state.rowsPerPage, totalRecords);
-        const paginatedOpps = displayOpps.slice(startIdx, endIdx);
 
         // Render summary cards with active state
         const isActive = (cardFilter) => cardFilter === filter ? 'ring-2 ring-indigo-600 shadow-lg' : '';
@@ -4312,159 +2127,7 @@
 
         document.getElementById('consultationsHeldSummaryCards').innerHTML = summaryCardsHTML;
 
-        // Helper functions for table rendering
-        const getSortIcon = (column) => {
-          if (state.sortColumn !== column) return '';
-          return state.sortDirection === 'asc'
-            ? '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg>'
-            : '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>';
-        };
-
-        const formatDate = (dateStr) => {
-          if (!dateStr) return 'N/A';
-          const date = new Date(dateStr);
-          return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        };
-
-        const getAttendanceStatus = (opp) => {
-          const attributions = opp.data?.attributions || [];
-          const hasCalendarBooking = Array.isArray(attributions) && attributions.some(attr => attr.medium === 'calendar');
-          const appointmentStatus = opp.data?.appointmentStatus;
-          const oppStatus = opp.data?.status;
-
-          if (appointmentStatus === 'showed') {
-            return { label: 'Confirmed Showed', color: 'bg-green-100 text-green-700' };
-          } else if (oppStatus === 'won' || oppStatus === 'active') {
-            return { label: 'Progressed', color: 'bg-purple-100 text-purple-700' };
-          } else if (hasCalendarBooking) {
-            return { label: 'Booked', color: 'bg-blue-100 text-blue-700' };
-          } else {
-            return { label: 'No Booking', color: 'bg-gray-100 text-gray-600' };
-          }
-        };
-
-        const tableHTML = `
-          <!-- Search Box -->
-          <div class="mb-4 flex gap-2">
-            <input
-              type="text"
-              placeholder="Search by opportunity name, contact, or email..."
-              value="${state.searchQuery}"
-              oninput="window.updateConsultationsHeldSearch(event)"
-              onkeypress="window.handleConsultationsHeldKeypress(event)"
-              class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            />
-            <button
-              onclick="window.executeConsultationsHeldSearch()"
-              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-            >
-              Search
-            </button>
-          </div>
-
-          <!-- Table -->
-          <div class="overflow-x-auto border border-gray-200 rounded-lg">
-            <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th onclick="window.sortConsultationsHeldBy('name')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Opportunity ${getSortIcon('name')}
-                  </th>
-                  <th onclick="window.sortConsultationsHeldBy('contact')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Contact ${getSortIcon('contact')}
-                  </th>
-                  <th onclick="window.sortConsultationsHeldBy('value')" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Value ${getSortIcon('value')}
-                  </th>
-                  <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                    Calendar Booking
-                  </th>
-                  <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                    Attendance Status
-                  </th>
-                  <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                    Opp Status
-                  </th>
-                  <th onclick="window.sortConsultationsHeldBy('created_date')" class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
-                    Created ${getSortIcon('created_date')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
-                ${paginatedOpps.map(opp => {
-                  const value = parseFloat(opp.data?.monetaryValue || 0);
-                  const contactName = opp.data?.contact?.name ||
-                                     (opp.data?.contact?.firstName && opp.data?.contact?.lastName
-                                       ? `${opp.data.contact.firstName} ${opp.data.contact.lastName}`
-                                       : 'Unknown');
-                  const contactEmail = opp.data?.contact?.email || '';
-                  const contactPhone = opp.data?.contact?.phone || '';
-                  const attributions = opp.data?.attributions || [];
-                  const hasCalendarBooking = Array.isArray(attributions) && attributions.some(attr => attr.medium === 'calendar');
-                  const attendanceStatus = getAttendanceStatus(opp);
-                  const oppStatus = opp.data?.status || 'unknown';
-
-                  return `
-                    <tr class="hover:bg-gray-50">
-                      <td class="px-4 py-3 text-sm font-medium text-gray-900">${opp.data?.name || 'N/A'}</td>
-                      <td class="px-4 py-3 text-sm text-gray-600">
-                        ${contactName}
-                        ${contactEmail ? `<br><span class="text-xs text-gray-500">${contactEmail}</span>` : ''}
-                        ${contactPhone ? `<br><span class="text-xs text-gray-500">${contactPhone}</span>` : ''}
-                      </td>
-                      <td class="px-4 py-3 text-right text-sm font-semibold text-green-600">${formatCurrency(value)}</td>
-                      <td class="px-4 py-3 text-center text-sm">
-                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${hasCalendarBooking ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}">
-                          ${hasCalendarBooking ? '✅ Yes' : '❌ No'}
-                        </span>
-                      </td>
-                      <td class="px-4 py-3 text-center text-sm">
-                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${attendanceStatus.color}">
-                          ${attendanceStatus.label}
-                        </span>
-                      </td>
-                      <td class="px-4 py-3 text-center text-sm">
-                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          oppStatus === 'won' ? 'bg-green-100 text-green-700' :
-                          oppStatus === 'active' ? 'bg-purple-100 text-purple-700' :
-                          oppStatus === 'open' ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-gray-100 text-gray-600'
-                        }">
-                          ${oppStatus.toUpperCase()}
-                        </span>
-                      </td>
-                      <td class="px-4 py-3 text-center text-sm text-gray-500">${formatDate(opp.source_created_at)}</td>
-                    </tr>
-                  `;
-                }).join('')}
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Pagination -->
-          <div class="mt-4 flex items-center justify-between text-sm text-gray-700">
-            <p>Showing ${startIdx + 1}-${endIdx} of ${totalRecords} opportunities</p>
-            <div class="flex gap-2">
-              <button
-                onclick="window.goToConsultationsHeldPage(${state.currentPage - 1})"
-                ${state.currentPage === 1 ? 'disabled' : ''}
-                class="px-3 py-1 border rounded ${state.currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
-              >
-                Previous
-              </button>
-              <span class="px-3 py-1">Page ${state.currentPage} of ${totalPages}</span>
-              <button
-                onclick="window.goToConsultationsHeldPage(${state.currentPage + 1})"
-                ${state.currentPage === totalPages ? 'disabled' : ''}
-                class="px-3 py-1 border rounded ${state.currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        `;
-
-        document.getElementById('consultationsHeldTableContainer').innerHTML = tableHTML;
+        LanaInsightsTables.render(document.getElementById('consultationsHeldTableContainer'), 'consultationsHeld', state, { segment: filter });
       };
 
       // Render content
@@ -4511,7 +2174,7 @@
     // Drill-down: Time to Engagement
     async function showTimeToEngagementDrilldown(content, periodStart, periodEnd) {
       // Fetch all engaged opportunities
-      const opportunitiesResponse = await api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}&limit=1000`);
+      const opportunitiesResponse = await LanaInsightsTables.fetchConnectorData(api, { entity_type: 'opportunity', start_date: periodStart, end_date: periodEnd });
       const allOpps = opportunitiesResponse?.data || [];
 
       // Filter to engaged opportunities (won/open/active with createdAt and updatedAt)
@@ -4625,97 +2288,9 @@
       `;
 
       // Render function for the table
+      const engagementState = { opportunities: opportunitiesWithEngagement };
       window.renderEngagementTable = function(filter) {
-        let filteredOpps = [...opportunitiesWithEngagement];
-
-        if (filter === 'same_day') {
-          filteredOpps = filteredOpps.filter(o => o.daysToEngage === 0);
-        } else if (filter === 'fast') {
-          filteredOpps = filteredOpps.filter(o => o.daysToEngage > 0 && o.daysToEngage <= 1);
-        } else if (filter === 'medium') {
-          filteredOpps = filteredOpps.filter(o => o.daysToEngage > 1 && o.daysToEngage <= 3);
-        } else if (filter === 'slow') {
-          filteredOpps = filteredOpps.filter(o => o.daysToEngage > 3);
-        }
-
-        const tableRows = filteredOpps.map(opp => {
-          const oppName = opp.data?.name || 'Unnamed Opportunity';
-          const contactName = opp.data?.contact?.name ||
-            (opp.data?.contact?.firstName && opp.data?.contact?.lastName ?
-              `${opp.data.contact.firstName} ${opp.data.contact.lastName}` : 'Unknown');
-          const contactEmail = opp.data?.contact?.email || '-';
-          const contactPhone = opp.data?.contact?.phone || '-';
-          const value = parseFloat(opp.data?.monetaryValue || 0);
-          const status = opp.data?.status || 'unknown';
-
-          const statusBadge = {
-            'won': '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Won</span>',
-            'open': '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">Open</span>',
-            'active': '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">Active</span>'
-          }[status] || `<span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">${status}</span>`;
-
-          const speedBadge = {
-            'Same Day': '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">⚡ Same Day</span>',
-            'Fast (≤1 day)': '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">🚀 Fast</span>',
-            'Medium (1-3 days)': '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">⏱️ Medium</span>',
-            'Slow (>3 days)': '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">🐌 Slow</span>'
-          }[opp.engagementSpeed] || opp.engagementSpeed;
-
-          return `
-            <tr class="hover:bg-gray-50">
-              <td class="px-6 py-4 text-sm font-medium text-gray-900">${oppName}</td>
-              <td class="px-6 py-4 text-sm text-gray-900">
-                <div>${contactName}</div>
-                <div class="text-xs text-gray-500">${contactEmail}</div>
-              </td>
-              <td class="px-6 py-4 text-sm text-right font-semibold text-gray-900">${formatCurrency(value)}</td>
-              <td class="px-6 py-4 text-sm text-center">${statusBadge}</td>
-              <td class="px-6 py-4 text-sm text-gray-600">${opp.createdAtFormatted}</td>
-              <td class="px-6 py-4 text-sm text-gray-600">${opp.updatedAtFormatted}</td>
-              <td class="px-6 py-4 text-sm text-center font-semibold text-indigo-600">${opp.daysToEngage.toFixed(2)} days</td>
-              <td class="px-6 py-4 text-sm text-center">${speedBadge}</td>
-            </tr>
-          `;
-        }).join('');
-
-        const filterLabel = {
-          'all': 'All Engaged Opportunities',
-          'same_day': 'Same Day Engagement',
-          'fast': 'Fast Engagement (≤1 day)',
-          'medium': 'Medium Engagement (1-3 days)',
-          'slow': 'Slow Engagement (>3 days)'
-        }[filter] || 'All Engaged Opportunities';
-
-        const tableHTML = `
-          <div class="bg-white rounded-lg shadow overflow-hidden">
-            <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
-              <h3 class="text-lg font-semibold text-gray-900">${filterLabel}</h3>
-              <p class="text-sm text-gray-600 mt-1">Showing ${filteredOpps.length} ${filteredOpps.length === 1 ? 'opportunity' : 'opportunities'}</p>
-            </div>
-
-            <div class="overflow-x-auto">
-              <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                  <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Opportunity</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
-                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
-                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Update</th>
-                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Days to Engage</th>
-                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Speed</th>
-                  </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                  ${tableRows || '<tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">No opportunities found</td></tr>'}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        `;
-
-        document.getElementById('engagementTableContainer').innerHTML = tableHTML;
+        LanaInsightsTables.render(document.getElementById('engagementTableContainer'), 'engagement', engagementState, { segment: filter });
       };
 
       // Set the content
@@ -5402,81 +2977,15 @@
     /**
      * Render helpText modal - reusable across all visualizations
      */
+    /**
+     * Help icon for a visualization's helpText. Clicking it opens a lex-modal
+     * (js: insights/js/insights-overlays.js).
+     * @param {Object} helpText - Help text configuration with title and sections
+     * @param {string} uniqueId - Unique identifier for the help entry
+     * @returns {string} HTML string for the help icon button
+     */
     function renderHelpTextModal(helpText, uniqueId) {
-      if (!helpText || !helpText.sections || helpText.sections.length === 0) {
-        return '';
-      }
-
-      const modalId = `help-modal-${uniqueId}`;
-
-      // Generate sections HTML
-      const sectionsHTML = helpText.sections.map(section => {
-        let contentHTML = '';
-
-        if (section.content) {
-          contentHTML = `<p class="text-sm text-gray-700 leading-relaxed">${section.content}</p>`;
-        }
-
-        if (section.bullets && section.bullets.length > 0) {
-          const bulletsHTML = section.bullets.map(bullet =>
-            `<li class="text-sm text-gray-700 leading-relaxed">${bullet}</li>`
-          ).join('');
-          contentHTML = `<ul class="list-disc pl-5 space-y-2">${bulletsHTML}</ul>`;
-        }
-
-        return `
-          <div class="mb-6">
-            <h4 class="text-md font-semibold text-gray-900 mb-3">${section.heading}</h4>
-            ${contentHTML}
-          </div>
-        `;
-      }).join('');
-
-      return `
-        <!-- Help Icon Button -->
-        <button
-          onclick="document.getElementById('${modalId}').classList.remove('hidden')"
-          class="ml-2 inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
-          title="Click for help understanding this chart"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-          </svg>
-        </button>
-
-        <!-- Help Modal -->
-        <div id="${modalId}" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-            <!-- Modal Header -->
-            <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-              <h3 class="text-xl font-bold text-gray-900">${helpText.title || 'Help'}</h3>
-              <button
-                onclick="document.getElementById('${modalId}').classList.add('hidden')"
-                class="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                </svg>
-              </button>
-            </div>
-
-            <!-- Modal Content -->
-            <div class="px-6 py-6">
-              ${sectionsHTML}
-            </div>
-
-            <!-- Modal Footer -->
-            <div class="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4">
-              <button
-                onclick="document.getElementById('${modalId}').classList.add('hidden')"
-                class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-              >
-                Got it!
-              </button>
-            </div>
-          </div>
-        </div>
-      `;
+      return InsightsOverlays.helpButton(helpText, uniqueId);
     }
 
     /**
@@ -5689,218 +3198,15 @@
       }
 
       const tableData = metric.current;
-      const columns = viz.columns || [
-        { field: 'label', header: 'Label', align: 'left' },
-        { field: 'count', header: 'Count', align: 'right' },
-        { field: 'value', header: 'Value', align: 'right', format: 'percent' }
-      ];
 
-      // Table state
-      let filteredData = [...tableData];
-      let currentPage = 1;
-      const rowsPerPage = 10;
-      let sortField = null;
-      let sortDirection = 'asc';
-
-      // Build initial HTML structure
       div.innerHTML = `
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">${viz.title || 'Table'}</h3>
         ${viz.description ? `<p class="text-sm text-gray-500 mb-4">${viz.description}</p>` : ''}
-
-        <!-- Search box -->
-        <div class="mb-4">
-          <input
-            type="text"
-            id="search-${uniqueId}"
-            placeholder="Search..."
-            class="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-
-        <!-- Table -->
-        <div class="overflow-x-auto mb-4">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr id="table-header-${uniqueId}"></tr>
-            </thead>
-            <tbody id="table-body-${uniqueId}" class="bg-white divide-y divide-gray-200">
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Pagination -->
-        <div class="flex items-center justify-between">
-          <div class="text-sm text-gray-700">
-            Showing <span id="start-${uniqueId}">1</span> to <span id="end-${uniqueId}">10</span> of <span id="total-${uniqueId}">0</span> results
-          </div>
-          <div class="flex gap-2">
-            <button
-              id="prev-${uniqueId}"
-              class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled
-            >
-              Previous
-            </button>
-            <button
-              id="next-${uniqueId}"
-              class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Next
-            </button>
-          </div>
-        </div>
+        <div data-distribution-table></div>
       `;
 
-      // Render table header with sort controls
-      function renderHeader() {
-        const headerRow = div.querySelector(`#table-header-${uniqueId}`);
-        headerRow.innerHTML = columns.map(col => {
-          const isSorted = sortField === col.field;
-          const sortIcon = isSorted
-            ? (sortDirection === 'asc' ? ' ▲' : ' ▼')
-            : ' ⇅';
-
-          return `
-            <th
-              class="px-4 py-3 text-${col.align || 'left'} text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
-              data-field="${col.field}"
-            >
-              ${col.header}${sortIcon}
-            </th>
-          `;
-        }).join('');
-
-        // Add click handlers for sorting
-        headerRow.querySelectorAll('th').forEach(th => {
-          th.addEventListener('click', () => {
-            const field = th.dataset.field;
-            if (sortField === field) {
-              sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
-            } else {
-              sortField = field;
-              sortDirection = 'asc';
-            }
-            currentPage = 1;
-            render();
-          });
-        });
-      }
-
-      // Format cell value
-      function formatValue(value, column) {
-        if (column.format === 'percent' && typeof value === 'number') {
-          return `${value.toFixed(1)}%`;
-        } else if (typeof value === 'number') {
-          return value.toLocaleString();
-        }
-        return value;
-      }
-
-      // Render table body
-      function renderBody() {
-        const tbody = div.querySelector(`#table-body-${uniqueId}`);
-
-        // Sort data
-        let sortedData = [...filteredData];
-        if (sortField) {
-          sortedData.sort((a, b) => {
-            let aVal = a[sortField];
-            let bVal = b[sortField];
-
-            // Handle numeric sorting
-            if (typeof aVal === 'number' && typeof bVal === 'number') {
-              return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
-            }
-
-            // Handle string sorting
-            aVal = String(aVal).toLowerCase();
-            bVal = String(bVal).toLowerCase();
-            if (sortDirection === 'asc') {
-              return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
-            } else {
-              return bVal < aVal ? -1 : bVal > aVal ? 1 : 0;
-            }
-          });
-        }
-
-        // Paginate
-        const startIdx = (currentPage - 1) * rowsPerPage;
-        const endIdx = Math.min(startIdx + rowsPerPage, sortedData.length);
-        const pageData = sortedData.slice(startIdx, endIdx);
-
-        // Render rows
-        tbody.innerHTML = pageData.map((row, idx) => {
-          const cellsHTML = columns.map(col => {
-            const value = formatValue(row[col.field], col);
-            return `<td class="px-4 py-3 text-${col.align || 'left'} text-sm text-gray-900">${value}</td>`;
-          }).join('');
-
-          const bgClass = idx % 2 === 0 ? 'bg-white' : 'bg-gray-50';
-          return `<tr class="${bgClass}">${cellsHTML}</tr>`;
-        }).join('');
-
-        // Update pagination info
-        div.querySelector(`#start-${uniqueId}`).textContent = sortedData.length > 0 ? startIdx + 1 : 0;
-        div.querySelector(`#end-${uniqueId}`).textContent = endIdx;
-        div.querySelector(`#total-${uniqueId}`).textContent = sortedData.length;
-
-        // Update pagination buttons
-        const prevBtn = div.querySelector(`#prev-${uniqueId}`);
-        const nextBtn = div.querySelector(`#next-${uniqueId}`);
-
-        prevBtn.disabled = currentPage === 1;
-        nextBtn.disabled = endIdx >= sortedData.length;
-      }
-
-      // Handle search
-      function handleSearch(searchTerm) {
-        const term = searchTerm.toLowerCase().trim();
-
-        if (!term) {
-          filteredData = [...tableData];
-        } else {
-          filteredData = tableData.filter(row => {
-            return columns.some(col => {
-              const value = String(row[col.field]).toLowerCase();
-              return value.includes(term);
-            });
-          });
-        }
-
-        currentPage = 1;
-        render();
-      }
-
-      // Complete render
-      function render() {
-        renderHeader();
-        renderBody();
-      }
-
-      // Set up event listeners after DOM insertion
+      // The table mounts once the card is in the page (its toolbar is wired by id).
       setTimeout(() => {
-        // Search input
-        const searchInput = div.querySelector(`#search-${uniqueId}`);
-        searchInput.addEventListener('input', (e) => handleSearch(e.target.value));
-
-        // Pagination buttons
-        div.querySelector(`#prev-${uniqueId}`).addEventListener('click', () => {
-          if (currentPage > 1) {
-            currentPage--;
-            render();
-          }
-        });
-
-        div.querySelector(`#next-${uniqueId}`).addEventListener('click', () => {
-          const maxPage = Math.ceil(filteredData.length / rowsPerPage);
-          if (currentPage < maxPage) {
-            currentPage++;
-            render();
-          }
-        });
-
-        // Initial render
-        render();
+        LanaInsightsTables.renderDistribution(div.querySelector('[data-distribution-table]'), viz, tableData, uniqueId);
       }, 0);
 
       return div;
@@ -5924,7 +3230,7 @@
     // Execute module
     async function executeModule() {
       const moduleKey = document.getElementById('moduleSelect').value;
-      const periodType = document.getElementById('periodType').value;
+      const periodType = lexSelectValue(document.getElementById('periodType'));
       const periodStart = document.getElementById('periodStart').value;
       const periodEnd = document.getElementById('periodEnd').value;
       const useCache = false; // Caching disabled - always fetch fresh data
@@ -6231,7 +3537,7 @@
     // Export to PDF
     function exportToPDF() {
       if (!currentModuleData) {
-        alert('No data to export. Please execute a module first.');
+        Lex.Modal.alertAsync('Nothing to export', 'No data to export. Please execute a module first.');
         return;
       }
 
@@ -6283,7 +3589,7 @@
     // Export to CSV
     function exportToCSV() {
       if (!currentModuleData) {
-        alert('No data to export. Please execute a module first.');
+        Lex.Modal.alertAsync('Nothing to export', 'No data to export. Please execute a module first.');
         return;
       }
 
@@ -6337,264 +3643,46 @@
     });
 
     // ========================================================================
-    // DATA OVERRIDE PANEL FUNCTIONS
+    // DATA OVERRIDE PANEL (shared lex-drawer: js/components/data-override-panel.js)
     // ========================================================================
 
-    // Global state for data override panel
-    let currentOverrideMetric = null;
-    let currentOverrideData = null;
+    // The page's one DataOverridePanel, created on first use.
+    function dataOverridePanel() {
+      return InsightsOverlays.overridePanel({
+        apiClient: api,
+        formatNumber,
+        formatDateRange,
+        onError: (error) => showError(error.message || 'Failed to save override. Please try again.'),
+        onSaveSuccess: (metricName) => showInfo(`Override saved for ${metricName}. Re-execute module to see updated values.`),
+        onDeleteSuccess: () => showInfo('Override deleted successfully. Re-execute module to see updated values.')
+      });
+    }
 
     // Open data override panel
     function openDataOverridePanel(metricKey, metricName, metricDescription, currentValue, overrideType = 'target') {
-      const moduleKey = document.getElementById('moduleSelect').value;
-      const periodStart = document.getElementById('periodStart').value;
-      const periodEnd = document.getElementById('periodEnd').value;
-
-      if (!periodStart || !periodEnd) {
-        showError('Please select a date range first');
+      const panel = dataOverridePanel();
+      if (!panel) {
+        showError('The override panel could not be loaded. Please reload the page.');
         return;
       }
-
-      // Store current metric info
-      currentOverrideMetric = {
-        key: metricKey,
-        name: metricName,
-        description: metricDescription,
-        currentValue: currentValue,
-        overrideType: overrideType
-      };
-
-      // Populate panel
-      document.getElementById('overrideMetricName').textContent = metricName;
-      document.getElementById('overrideMetricDescription').textContent = metricDescription || 'No description available';
-      document.getElementById('overridePeriodRange').textContent = formatDateRange(
-        new Date(LanaTime.utcDayStart(periodStart)),
-        new Date(LanaTime.utcDayEnd(periodEnd))
-      );
-
-      // Update labels based on override type
-      const valueLabel = overrideType === 'target' ? 'Current Target' : 'Current Value';
-      document.getElementById('overrideCurrentValue').parentElement.querySelector('p.text-xs').textContent = valueLabel;
-      document.getElementById('overrideCurrentValue').textContent = formatNumber(currentValue, 2);
-
-      // Reset form
-      document.getElementById('overrideForm').reset();
-      document.getElementById('overrideValue').value = '';
-      document.getElementById('overrideNotes').value = '';
-      document.getElementById('overrideType').value = overrideType;
-
-      // Load existing overrides for this metric
-      loadExistingOverrides(moduleKey, metricKey, periodStart, periodEnd);
-
-      // Show panel
-      const overlay = document.getElementById('dataOverrideOverlay');
-      const panel = document.getElementById('dataOverridePanel');
-
-      overlay.classList.remove('hidden');
-      panel.classList.remove('translate-x-full');
-
-      // Prevent body scroll
-      document.body.style.overflow = 'hidden';
+      panel.open(metricKey, metricName, metricDescription, currentValue, {
+        periodStart: document.getElementById('periodStart').value,
+        periodEnd: document.getElementById('periodEnd').value,
+        periodType: lexSelectValue(document.getElementById('periodType')),
+        moduleKey: document.getElementById('moduleSelect').value
+      }, overrideType);
     }
 
     // Close data override panel
     function closeDataOverridePanel() {
-      const overlay = document.getElementById('dataOverrideOverlay');
-      const panel = document.getElementById('dataOverridePanel');
-
-      panel.classList.add('translate-x-full');
-      overlay.classList.add('hidden');
-
-      // Restore body scroll
-      document.body.style.overflow = '';
-
-      // Clear state
-      currentOverrideMetric = null;
-      currentOverrideData = null;
-    }
-
-    // Close panel when clicking overlay
-    document.getElementById('dataOverrideOverlay').addEventListener('click', closeDataOverridePanel);
-    document.getElementById('closeDataOverridePanel').addEventListener('click', closeDataOverridePanel);
-
-    // Load existing overrides for a metric
-    async function loadExistingOverrides(moduleKey, metricKey, periodStart, periodEnd) {
-      try {
-        const periodStartISO = LanaTime.utcDayStart(periodStart);
-        const periodEndISO = LanaTime.utcDayEnd(periodEnd);
-
-        const data = await api.get(`/api/v1/modules/${moduleKey}/data-overrides`, {
-          periodStart: periodStartISO,
-          periodEnd: periodEndISO
-        });
-
-        // Filter to current metric
-        const metricOverrides = data.filter(o => o.metric_key === metricKey);
-
-        const existingSection = document.getElementById('existingOverridesSection');
-        const existingList = document.getElementById('existingOverridesList');
-
-        if (metricOverrides.length > 0) {
-          existingSection.classList.remove('hidden');
-          existingList.innerHTML = metricOverrides.map(override => `
-            <div class="p-3 bg-gray-50 rounded-lg border border-gray-200">
-              <div class="flex items-start justify-between mb-2">
-                <div class="flex-1">
-                  <p class="text-sm font-semibold text-gray-900">Override Value: ${formatNumber(override.override_value, 2)}</p>
-                  <p class="text-xs text-gray-500 mt-1">
-                    Period: ${formatDateRange(override.period_start, override.period_end)}
-                  </p>
-                  ${override.notes ? `<p class="text-xs text-gray-600 mt-1 italic">"${override.notes}"</p>` : ''}
-                </div>
-                <button
-                  onclick="deleteOverride('${override.override_id}')"
-                  class="text-red-600 hover:text-red-800 ml-2"
-                  title="Delete override"
-                >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                  </svg>
-                </button>
-              </div>
-              <div class="text-xs text-gray-400">
-                Created: ${new Date(override.created_at).toLocaleDateString()}
-              </div>
-            </div>
-          `).join('');
-        } else {
-          existingSection.classList.add('hidden');
-        }
-      } catch (error) {
-        console.error('Failed to load existing overrides:', error);
-        // Non-critical - just hide the section
-        document.getElementById('existingOverridesSection').classList.add('hidden');
-      }
-    }
-
-    // Save data override
-    document.getElementById('overrideForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-
-      if (!currentOverrideMetric) {
-        showError('No metric selected for override');
-        return;
-      }
-
-      const moduleKey = document.getElementById('moduleSelect').value;
-      const periodType = document.getElementById('periodType').value;
-      const periodStart = document.getElementById('periodStart').value;
-      const periodEnd = document.getElementById('periodEnd').value;
-      const overrideValue = parseFloat(document.getElementById('overrideValue').value);
-      const overrideNotes = document.getElementById('overrideNotes').value.trim();
-      const overrideType = document.getElementById('overrideType').value;
-
-      // Validation
-      if (isNaN(overrideValue)) {
-        showError('Please enter a valid numeric value');
-        return;
-      }
-
-      // Convert to ISO
-      const periodStartISO = LanaTime.utcDayStart(periodStart);
-      const periodEndISO = LanaTime.utcDayEnd(periodEnd);
-
-      // Show loading state
-      const saveBtn = document.getElementById('saveOverrideBtn');
-      const saveBtnText = document.getElementById('saveOverrideBtnText');
-      const saveBtnSpinner = document.getElementById('saveOverrideBtnSpinner');
-
-      saveBtn.disabled = true;
-      saveBtnText.textContent = 'Saving...';
-      saveBtnSpinner.classList.remove('hidden');
-
-      try {
-        await api.post(`/api/v1/modules/${moduleKey}/data-overrides`, {
-          metricKey: currentOverrideMetric.key,
-          periodStart: periodStartISO,
-          periodEnd: periodEndISO,
-          periodType: periodType,
-          overrideValue: overrideValue,
-          overrideType: overrideType,
-          notes: overrideNotes || null
-        });
-
-        showInfo(`Override saved for ${currentOverrideMetric.name}. Re-execute module to see updated values.`);
-
-        // Close panel
-        closeDataOverridePanel();
-
-        // Optionally auto-refresh module execution
-        // await executeModule();
-
-      } catch (error) {
-        console.error('Failed to save override:', error);
-        showError(error.message || 'Failed to save override. Please try again.');
-      } finally {
-        saveBtn.disabled = false;
-        saveBtnText.textContent = 'Save Override';
-        saveBtnSpinner.classList.add('hidden');
-      }
-    });
-
-    // Delete data override
-    async function deleteOverride(overrideId) {
-      if (!confirm('Are you sure you want to delete this override?')) {
-        return;
-      }
-
-      const moduleKey = document.getElementById('moduleSelect').value;
-
-      try {
-        await api.delete(`/api/v1/modules/${moduleKey}/data-overrides/${overrideId}`);
-
-        showInfo('Override deleted successfully. Re-execute module to see updated values.');
-
-        // Reload existing overrides
-        const periodStart = document.getElementById('periodStart').value;
-        const periodEnd = document.getElementById('periodEnd').value;
-        await loadExistingOverrides(moduleKey, currentOverrideMetric.key, periodStart, periodEnd);
-
-      } catch (error) {
-        console.error('Failed to delete override:', error);
-        showError(error.message || 'Failed to delete override. Please try again.');
-      }
+      const panel = dataOverridePanel();
+      if (panel) panel.close();
     }
 
     // Initialize dynamic menu
     renderMenu('#mainNav');
   </script>
 
-  <!-- Drill-down Modal -->
-  <div id="drilldownModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 overflow-y-auto h-full w-full z-50">
-    <div class="relative w-full h-full p-6 bg-white">
-      <!-- Modal Header -->
-      <div class="flex items-start justify-between mb-6 pb-4 border-b border-gray-200">
-        <h3 id="drilldownTitle" class="text-2xl font-semibold text-gray-900"></h3>
-        <button
-          onclick="closeDrilldownModal()"
-          class="text-gray-400 hover:text-gray-600 transition-colors"
-        >
-          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-
-      <!-- Modal Content -->
-      <div id="drilldownContent" class="mt-4 overflow-y-auto" style="max-height: calc(100vh - 180px);">
-        <!-- Content will be dynamically inserted here -->
-      </div>
-
-      <!-- Modal Footer -->
-      <div class="mt-6 pt-4 border-t border-gray-200 flex justify-end">
-        <button
-          onclick="closeDrilldownModal()"
-          class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
-        >
-          Close
-        </button>
-      </div>
-    </div>
-  </div>
+  <!-- Drill-down modal: InsightsOverlays.openDrilldown() mounts a full-size lex-modal (#drilldownModal). -->
 </body>
 </html>

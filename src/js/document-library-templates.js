@@ -15,7 +15,7 @@
    @requires document-studio-templates-mapper.js — window.DocumentStudioTemplatesMapper
    @requires lex.utils.js                        — Lex.Utils.escapeHtml / timeAgo
    @requires lex-toast.js                        — Lex.Toast
-   @requires lex-pagination / lex-segmented / lex-drawer components
+   @requires lex-table / lex-empty / lex-segmented / lex-drawer components
 */
 
 (function () {
@@ -92,32 +92,20 @@
     return '';
   }
 
-  function hydrateIcons(root) {
-    var scope = root || document;
-    var nodes = scope.querySelectorAll('[data-document-library-icon]');
-    for (var i = 0; i < nodes.length; i += 1) {
-      nodes[i].innerHTML = icon(nodes[i].getAttribute('data-document-library-icon'));
-    }
-  }
-
+  // Dates go through Lex.Utils: API timestamps are system time (UTC) and
+  // display in the user's timezone (profile, then org, then browser).
   function relativeTime(value) {
-    if (!value) return '';
-    if (window.LanaTime && typeof LanaTime.timeAgo === 'function') {
-      return LanaTime.timeAgo(value, { style: 'words' });
-    }
-    var date = new Date(value);
-    if (!Number.isFinite(date.getTime())) return '';
-    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    if (!value || !window.Lex || !Lex.Utils) return '';
+    var text = Lex.Utils.timeAgo(value);
+    return text === '-' ? '' : text;
   }
 
   function absoluteTime(value) {
-    if (!value) return '';
-    var date = new Date(value);
-    if (!Number.isFinite(date.getTime())) return '';
-    return date.toLocaleString(undefined, {
-      year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
-    });
+    if (!value || !window.Lex || !Lex.Utils) return '';
+    var text = Lex.Utils.formatDateTime(value);
+    return text === 'Never' ? '' : text;
   }
+
 
   function extensionFromName(name) {
     var value = String(name || '');
@@ -143,69 +131,92 @@
 
   function workspaceCellHtml(row) {
     if (row.scope === 'org') {
-      return '<span class="document-library-file-workspace">' +
-          '<span class="document-library-mobile-label">Workspace</span>' +
-          '<span>Organization</span>' +
-        '</span>';
+      return '<span class="document-library-cell-muted">Organization</span>';
     }
     var label = row.matterName || '—';
-    if (row.matterId && row.matterName) {
-      return '<button class="document-library-file-workspace document-library-workspace-link" type="button" data-workspace-id="' + escHtml(row.matterId) + '" title="Open ' + escHtml(label) + ' workspace">' +
-          '<span class="document-library-mobile-label">Workspace</span>' +
+    // Templates carry the workspace's internal id; workspace-details opens
+    // its readable matter_id, known once the workspace list loads.
+    var workspaceKey = row.matterId ? _state.matterKeyById[row.matterId] : '';
+    if (workspaceKey && row.matterName) {
+      return '<button class="document-library-workspace-link" type="button" data-workspace-id="' + escHtml(workspaceKey) + '" title="Open ' + escHtml(label) + ' workspace">' +
           '<span>' + escHtml(label) + '</span>' +
         '</button>';
     }
-    return '<span class="document-library-file-workspace">' +
-        '<span class="document-library-mobile-label">Workspace</span>' +
-        '<span>' + escHtml(label) + '</span>' +
+    return '<span class="document-library-cell-muted">' + escHtml(label) + '</span>';
+  }
+
+  function nameCellHtml(row) {
+    var presentation = templatePresentation(row);
+    return '<span class="document-library-file-cell">' +
+        '<span class="document-library-file-icon document-library-file-icon--' + escHtml(presentation.tone) + '" aria-hidden="true">' + icon(presentation.icon) + '</span>' +
+        '<span class="document-library-file-name" title="' + escHtml(row.name) + '">' + escHtml(row.name) + '</span>' +
       '</span>';
   }
 
-  function renderRow(row) {
-    var presentation = templatePresentation(row);
-    var metaParts = [
-      row.kindLabel,
-      row.documentTypeLabel || row.documentType || row.category,
-      row.variableCount !== null ? row.variableCount + ' variables' : '',
-      row.documentCount !== null ? row.documentCount + ' docs' : ''
-    ];
-    var meta = metaParts.filter(Boolean).join(' · ');
-    var edited = row.updatedAt || row.createdAt || '';
-    var editedLabel = relativeTime(edited);
-    var timeText = editedLabel ? 'Edited ' + editedLabel : 'Edit time unavailable';
+  function mutedCellHtml(value) {
+    return '<span class="document-library-cell-muted" title="' + escHtml(value || '') + '">' + escHtml(value || '\u2014') + '</span>';
+  }
 
-    return (
-      '<div class="document-library-file" data-kind="' + escHtml(row.kind) + '" data-id="' + escHtml(row.id) + '"' +
-        ' role="link" tabindex="0" aria-label="Open ' + escHtml(row.name) + '">' +
-        '<span class="document-library-file-icon document-library-file-icon--' + escHtml(presentation.tone) + '" data-document-library-icon="' + escHtml(presentation.icon) + '" aria-hidden="true"></span>' +
-        '<span class="document-library-file-primary">' +
-          '<span class="document-library-file-name" title="' + escHtml(row.name) + '">' + escHtml(row.name) + '</span>' +
-          '<span class="document-library-file-type">' + escHtml(meta) + '</span>' +
-        '</span>' +
-        workspaceCellHtml(row) +
-        '<time class="document-library-file-time" datetime="' + escHtml(edited) + '" title="' + escHtml(absoluteTime(edited)) + '">' +
-          '<span class="document-library-mobile-label">Last edited</span>' + escHtml(timeText) +
-        '</time>' +
-        '<span class="document-library-file-arrow" data-document-library-icon="chevron-right" aria-hidden="true"></span>' +
-      '</div>'
-    );
+  function humanize(value) {
+    return window.Lex && Lex.Utils && Lex.Utils.humanizeLabel ? Lex.Utils.humanizeLabel(value) : String(value || '');
+  }
+
+  function templateTypeLabel(row) {
+    return humanize(row.documentTypeLabel || row.documentType || row.category || '');
+  }
+
+  // Variables for fill templates; a document set shows how many documents it holds.
+  function variablesLabel(row) {
+    if (row.variableCount !== null) return String(row.variableCount);
+    if (row.documentCount !== null) return row.documentCount + (row.documentCount === 1 ? ' doc' : ' docs');
+    return '';
+  }
+
+  function timeCellHtml(value, text) {
+    return '<time class="document-library-file-time" datetime="' + escHtml(value || '') + '" title="' + escHtml(absoluteTime(value)) + '">' +
+        escHtml(text || '\u2014') +
+      '</time>';
+  }
+
+  // lex-table cells read the mapped template kept on each table row.
+  function cellRenderers() {
+    return {
+      name: function (val, tableRow) { return nameCellHtml(tableRow._row); },
+      kind: function (val) { return mutedCellHtml(val); },
+      template_type: function (val) { return mutedCellHtml(val); },
+      variables: function (val) { return mutedCellHtml(val); },
+      workspace: function (val, tableRow) { return workspaceCellHtml(tableRow._row); },
+      created_at: function (val) { return timeCellHtml(val, absoluteTime(val)); },
+      updated_at: function (val) { return timeCellHtml(val, relativeTime(val)); }
+    };
   }
 
   // ===========================================================================
   // Page state
   // ===========================================================================
 
+  var TABLE_ID = 'dstTable';
+  // Table column -> templates API sort_by.
+  var SORT_BY_COLUMN = {
+    name: 'name', kind: 'kind', template_type: 'document_type', variables: 'variables',
+    workspace: 'workspace', created_at: 'created_at', updated_at: 'updated_at'
+  };
+  // Type column filter values (the server's template kinds).
+  var KIND_OPTIONS = [
+    { value: 'fill', label: 'Documents' },
+    { value: 'compose', label: 'Document Sets' },
+    { value: 'render', label: 'Layouts' }
+  ];
+  var ORGANIZATION_OPTION = { value: 'organization', label: 'Organization' };
+
   var _state = {
-    currentPage: 1,
-    // 12 per page, matching the Document Library's list rhythm exactly.
-    pageSize: 12,
-    kindFilter: '',
     includeOrgWide: true,
     matterId: '',
     searchTerm: '',
     searchDebounce: null,
-    totalItems: 0,
-    rowsByKey: {}
+    loadSequence: 0,
+    rowsByKey: {},
+    matterKeyById: {}
   };
 
   function _rowKey(kind, id) {
@@ -216,133 +227,136 @@
   // Data access (thin — delegates query building + mapping)
   // ===========================================================================
 
-  function _currentFilters() {
+  // Values a column filter selected: lex-table sends { operator: 'in', value: [...] }.
+  function _filterValues(filter) {
+    if (!filter) return [];
+    var value = filter.value !== undefined ? filter.value : filter;
+    return (Array.isArray(value) ? value : [value]).map(String).filter(Boolean);
+  }
+
+  function _currentFilters(query) {
+    var limit = query.limit || 20;
+    var filters = query.filters || {};
+    var shared = window.LanaLibraryColumnFilters;
+    var none = { after: '', before: '' };
+    var edited = shared ? shared.editedRangeBounds(_filterValues(filters.updated_at)[0]) : none;
+    var created = shared ? shared.editedRangeBounds(_filterValues(filters.created_at)[0]) : none;
+    var variables = VARIABLE_RANGES[_filterValues(filters.variables)[0]] || {};
     return {
-      kind: _state.kindFilter,
+      kind: _filterValues(filters.kind),
+      name: _filterValues(filters.name)[0] || '',
+      documentType: _filterValues(filters.template_type),
+      minVariables: variables.min,
+      maxVariables: variables.max,
+      workspaces: _filterValues(filters.workspace),
+      updatedAfter: edited.after,
+      updatedBefore: edited.before,
+      createdAfter: created.after,
+      createdBefore: created.before,
       matterId: _state.matterId,
       q: _state.searchTerm,
       includeOrgWide: _state.includeOrgWide,
-      limit: _state.pageSize,
-      offset: (_state.currentPage - 1) * _state.pageSize
+      limit: limit,
+      offset: ((query.page || 1) - 1) * limit,
+      sortBy: SORT_BY_COLUMN[query.sortBy] || 'updated_at',
+      sortOrder: query.sortDir || 'desc'
     };
   }
 
-  function _setColumnsVisible(visible) {
-    var columns = el('dstColumns');
-    if (columns) columns.hidden = !visible;
+  function _table() {
+    return el(TABLE_ID);
   }
 
+  // The count shows in the toolbar and the section header, as on the Library.
   function _setCount(text) {
-    var count = el('dstTotalCount');
-    if (count) count.textContent = text;
-  }
-
-  function _updatePagination(view) {
-    var pag = el('dstPagination');
-    if (!pag) return;
-    if (!view) {
-      pag.hidden = true;
-      return;
-    }
-    var totalPages = Math.max(1, Math.ceil(view.total / _state.pageSize));
-    pag.setAttribute('page', String(_state.currentPage));
-    pag.setAttribute('total-pages', String(totalPages));
-    pag.setAttribute('total', String(view.total));
-    pag.setAttribute('limit', String(_state.pageSize));
-    pag.hidden = totalPages <= 1;
-  }
-
-  function _renderLoading() {
-    var list = el('dstList');
-    if (!list) return;
-    _setCount('');
-    _setColumnsVisible(false);
-    _updatePagination(null);
-    list.setAttribute('aria-busy', 'true');
-    list.innerHTML =
-      '<div class="document-library-skeleton" aria-hidden="true"></div>' +
-      '<div class="document-library-skeleton" aria-hidden="true"></div>' +
-      '<div class="document-library-skeleton" aria-hidden="true"></div>' +
-      '<div class="document-library-skeleton" aria-hidden="true"></div>';
-  }
-
-  function _renderEmpty() {
-    var list = el('dstList');
-    if (!list) return;
-    _setCount('0 templates');
-    _setColumnsVisible(false);
-    _updatePagination(null);
-    list.setAttribute('aria-busy', 'false');
-    list.innerHTML =
-      '<div class="document-library-empty">' +
-        '<span class="document-library-empty-icon" data-document-library-icon="file-plus" aria-hidden="true"></span>' +
-        '<h3>No templates yet</h3>' +
-        '<p>Create an organization template to reuse it from every workspace.</p>' +
-        '<lex-btn variant="secondary" leading-icon="file-plus" data-action="new-template">New Template</lex-btn>' +
-      '</div>';
-    hydrateIcons(list);
-  }
-
-  function _renderError(message) {
-    var list = el('dstList');
-    if (!list) return;
-    _setCount('');
-    _setColumnsVisible(false);
-    _updatePagination(null);
-    list.setAttribute('aria-busy', 'false');
-    list.innerHTML =
-      '<div class="document-library-empty document-library-error" role="alert">' +
-        '<span class="document-library-empty-icon" data-document-library-icon="alert-circle" aria-hidden="true"></span>' +
-        '<h3>Templates could not be loaded</h3>' +
-        '<p>' + escHtml(message || 'Check your connection and try again.') + '</p>' +
-        '<lex-btn variant="secondary" data-action="retry">Try again</lex-btn>' +
-      '</div>';
-    hydrateIcons(list);
-  }
-
-  function _fetchTemplates() {
-    _renderLoading();
-
-    DocStudioAPI.listTemplates(_currentFilters()).then(function (res) {
-      var view = mapper.mapTemplates(res);
-
-      _state.totalItems = view.total;
-
-      // Index rows so the detail drawer can show list data immediately.
-      _state.rowsByKey = {};
-      for (var i = 0; i < view.rows.length; i++) {
-        _state.rowsByKey[_rowKey(view.rows[i].kind, view.rows[i].id)] = view.rows[i];
-      }
-
-      if (!view.rows.length) {
-        _renderEmpty();
-        return;
-      }
-
-      _renderList(view.rows);
-      _setCount(view.total + (view.total === 1 ? ' template' : ' templates'));
-      _setColumnsVisible(true);
-      _updatePagination(view);
-    }).catch(function (err) {
-      _renderError(err && err.message ? err.message : '');
+    ['dstToolbarCount', 'dstTotalCount'].forEach(function (id) {
+      var count = el(id);
+      if (count) count.textContent = text;
     });
   }
 
-  // ===========================================================================
-  // List rendering + selection
-  // ===========================================================================
+  function _sortOrder() {
+    var button = el('dstSortOrder');
+    return button && button.dataset.order === 'asc' ? 'asc' : 'desc';
+  }
 
-  function _renderList(rows) {
-    var list = el('dstList');
-    if (!list) return;
+  // Toolbar sort drives the table, which asks the server for page 1.
+  function _applySort(column, direction) {
+    var table = _table();
+    if (!table || !table.dataSource) return;
+    table.sortBy = column;
+    table.sortDir = direction;
+    table.dataSource.setSort(column, direction);
+  }
 
-    var html = '';
-    for (var i = 0; i < rows.length; i++) {
-      html += renderRow(rows[i]);
+  // A header click sorted the table: mirror it in the toolbar.
+  function _syncToolbarSort(column, direction) {
+    var select = el('dstSort');
+    var button = el('dstSortOrder');
+    if (select && select.value !== column) select.value = column;
+    if (button) button.dataset.order = direction === 'asc' ? 'asc' : 'desc';
+  }
+
+  // Empty copy depends on the filters outside the table: a filtered-empty
+  // state offers no create button.
+  function _syncEmptyState(table, filters) {
+    var filtered = Boolean(_state.searchTerm || Object.keys(filters || {}).length);
+    table.emptyText = filtered
+      ? 'No matching templates. Try a different search or template type.'
+      : 'No templates yet. Create an organization template to reuse it from every workspace.';
+    table.emptyActionLabel = filtered ? '' : 'New Template';
+  }
+
+  /** Answers the table's lex-query-change with one page of templates. */
+  function _fetchTemplates(query) {
+    var table = _table();
+    if (!table) return;
+    var sequence = ++_state.loadSequence;
+    query = query || table.serverQuery;
+
+    DocStudioAPI.listTemplates(_currentFilters(query)).then(function (res) {
+      if (sequence !== _state.loadSequence) return;
+      var view = mapper.mapTemplates(res);
+
+      // Index rows so the detail drawer can show list data immediately.
+      _state.rowsByKey = {};
+      var tableRows = view.rows.map(function (row) {
+        var key = _rowKey(row.kind, row.id);
+        _state.rowsByKey[key] = row;
+        return {
+          key: key,
+          name: row.name,
+          kind: row.kindLabel,
+          template_type: templateTypeLabel(row),
+          variables: variablesLabel(row),
+          workspace: row.matterName || '',
+          created_at: row.createdAt || '',
+          updated_at: row.updatedAt || row.createdAt || '',
+          _row: row
+        };
+      });
+
+      _rememberDocumentTypes(table, view.rows);
+      _syncEmptyState(table, query.filters);
+      _setCount(view.total + (view.total === 1 ? ' template' : ' templates'));
+      table.setServerData(tableRows, {
+        page: query.page || 1,
+        limit: query.limit || 20,
+        total: view.total
+      });
+    }).catch(function (err) {
+      if (sequence !== _state.loadSequence) return;
+      _setCount('');
+      table.setServerError('Templates could not be loaded. ' + (err && err.message ? err.message : 'Check your connection and try again.'));
+    });
+  }
+
+  // Outside filters changed: back to page 1 through the table.
+  function _reloadFromFirstPage() {
+    var table = _table();
+    if (table && typeof table.requestServerQuery === 'function') {
+      table.requestServerQuery({ resetPage: true });
     }
-    list.setAttribute('aria-busy', 'false');
-    list.innerHTML = html;
-    hydrateIcons(list);
   }
 
   // ===========================================================================
@@ -535,21 +549,26 @@
       var actionTarget = event.target && event.target.closest ? event.target.closest('[data-action]') : null;
       if (actionTarget && actionTarget.getAttribute('data-action') === 'new-template') {
         _openNewTemplate();
-        return;
       }
-      if (actionTarget && actionTarget.getAttribute('data-action') === 'retry') {
-        _fetchTemplates();
-        return;
-      }
-      var rowTarget = event.target && event.target.closest ? event.target.closest('[data-kind][data-id]') : null;
-      if (rowTarget) _openDetail(rowTarget.getAttribute('data-kind'), rowTarget.getAttribute('data-id'));
     });
 
-    root.addEventListener('keydown', function (event) {
-      var rowTarget = event.target && event.target.closest ? event.target.closest('[data-kind][data-id]') : null;
-      if (!rowTarget || event.target !== rowTarget || (event.key !== 'Enter' && event.key !== ' ')) return;
-      event.preventDefault();
-      _openDetail(rowTarget.getAttribute('data-kind'), rowTarget.getAttribute('data-id'));
+    // lex-table events bubble from #dstTable.
+    root.addEventListener('lex-query-change', function (event) {
+      if (!event.target || event.target.id !== TABLE_ID) return;
+      _fetchTemplates(event.detail);
+    });
+    root.addEventListener('row-click', function (event) {
+      if (!event.target || event.target.id !== TABLE_ID) return;
+      var row = event.detail && event.detail.row && event.detail.row._row;
+      if (row) _openDetail(row.kind, row.id);
+    });
+    root.addEventListener('empty-action', function (event) {
+      if (!event.target || event.target.id !== TABLE_ID) return;
+      _openNewTemplate();
+    });
+    root.addEventListener('sort-change', function (event) {
+      if (!event.target || event.target.id !== TABLE_ID || !event.detail) return;
+      _syncToolbarSort(event.detail.sortBy, event.detail.sortDir);
     });
   }
 
@@ -559,9 +578,27 @@
     var kindFilter = el('dstKindFilter');
     if (kindFilter) {
       kindFilter.addEventListener('lex-change', function (e) {
-        _state.kindFilter = (e.detail && e.detail.value) || '';
-        _state.currentPage = 1;
-        _fetchTemplates();
+        // Same state as the Type column filter, as My Tasks' Status select does.
+        var kind = (e.detail && e.detail.value) || '';
+        var table = _table();
+        if (!table) return;
+        if (kind && kind !== 'all') table.addFilter('kind', 'in', [kind]);
+        else table.removeFilter('kind');
+      });
+    }
+
+    var sortSelect = el('dstSort');
+    if (sortSelect) {
+      sortSelect.addEventListener('lex-change', function (e) {
+        _applySort((e.detail && e.detail.value) || 'updated_at', _sortOrder());
+      });
+    }
+
+    var sortOrderBtn = el('dstSortOrder');
+    if (sortOrderBtn) {
+      sortOrderBtn.addEventListener('click', function () {
+        sortOrderBtn.dataset.order = _sortOrder() === 'asc' ? 'desc' : 'asc';
+        _applySort(sortSelect ? sortSelect.value : 'updated_at', _sortOrder());
       });
     }
 
@@ -569,29 +606,24 @@
     if (orgWide) {
       orgWide.addEventListener('change', function () {
         _state.includeOrgWide = !!orgWide.checked;
-        _state.currentPage = 1;
-        _fetchTemplates();
+        _reloadFromFirstPage();
       });
     }
 
+    // lex-input emits lex-input while typing and lex-change on clear.
     var searchInput = el('dstSearch');
     if (searchInput) {
-      searchInput.addEventListener('input', function () {
+      var onSearch = function (e) {
+        var value = String((e.detail && e.detail.value) || '').trim();
         clearTimeout(_state.searchDebounce);
         _state.searchDebounce = setTimeout(function () {
-          _state.searchTerm = searchInput.value.trim();
-          _state.currentPage = 1;
-          _fetchTemplates();
+          if (value === _state.searchTerm) return;
+          _state.searchTerm = value;
+          _reloadFromFirstPage();
         }, 350);
-      });
-    }
-
-    var pag = el('dstPagination');
-    if (pag) {
-      pag.addEventListener('page-change', function (e) {
-        _state.currentPage = (e.detail && e.detail.page) || 1;
-        _fetchTemplates();
-      });
+      };
+      searchInput.addEventListener('lex-input', onSearch);
+      searchInput.addEventListener('lex-change', onSearch);
     }
   }
 
@@ -603,7 +635,97 @@
     // Optional matter scope from the URL (?matter_id=...) — "what can I use here".
     _state.matterId = getQueryParam('matter_id');
     _bindEvents();
-    _fetchTemplates();
+    var ready = window.customElements && typeof window.customElements.whenDefined === 'function'
+      ? window.customElements.whenDefined('lex-table')
+      : Promise.resolve();
+    ready.then(function () {
+      var table = _table();
+      if (!table) return;
+      // Renderers must be registered before the first page lands.
+      table.setCellRenderers(cellRenderers());
+      _applyColumnFilterOptions(table, []);
+      _reloadFromFirstPage();
+      var shared = window.LanaLibraryColumnFilters;
+      if (shared) {
+        shared.loadWorkspaces(window.api).then(function (matters) {
+          if (_table() !== table) return;
+          _state.matterKeyById = {};
+          matters.forEach(function (m) { if (m && m.id && m.matter_id) _state.matterKeyById[m.id] = m.matter_id; });
+          // Filter values are internal ids: the templates API matches on those.
+          _applyColumnFilterOptions(table, shared.workspaceOptions(matters, 'id'));
+        });
+      }
+      _loadDocumentTypeOptions().then(function (options) {
+        if (_table() !== table || !options.length) return;
+        _state.documentTypesFromServer = true;
+        _state.documentTypeOptions = options;
+        _applyColumnFilterOptions(table);
+      });
+    });
+  }
+
+  // Variables column filter: counts, min inclusive, max exclusive.
+  var VARIABLE_RANGES = {
+    none: { label: 'None', min: 0, max: 1 },
+    '1_5': { label: '1 – 5', min: 1, max: 6 },
+    '6_10': { label: '6 – 10', min: 6, max: 11 },
+    over_10: { label: 'More than 10', min: 11 }
+  };
+
+  // Until the server lists Template Types, offer the ones seen on loaded pages.
+  function _rememberDocumentTypes(table, rows) {
+    if (_state.documentTypesFromServer) return;
+    var known = _state.documentTypeOptions || [];
+    var added = false;
+    rows.forEach(function (row) {
+      var value = row.documentType || '';
+      if (!value || known.some(function (o) { return o.value === value; })) return;
+      known = known.concat([{ value: value, label: templateTypeLabel(row) || value }]);
+      added = true;
+    });
+    if (!added) return;
+    _state.documentTypeOptions = known;
+    _applyColumnFilterOptions(table);
+  }
+
+  // Template Type values in use, from the server; [] when it can't say.
+  async function _loadDocumentTypeOptions() {
+    var client = window.api;
+    if (!client || typeof client.get !== 'function') return [];
+    try {
+      var response = await client.get('/api/v1/document-studio/templates/document-types');
+      var rows = (response && (response.document_types || (response.data && response.data.document_types))) || [];
+      return rows.map(function (row) {
+        var value = String(row && row.value !== undefined ? row.value : row);
+        return { value: value, label: humanize(value) };
+      }).filter(function (o) { return o.value; });
+    } catch (_error) {
+      return [];
+    }
+  }
+
+  // Every column filters (the table standard): name by text, the rest by values.
+  function _applyColumnFilterOptions(table, workspaceOptions) {
+    if (workspaceOptions) _state.workspaceFilterOptions = workspaceOptions;
+    var shared = window.LanaLibraryColumnFilters;
+    var map = {
+      name: { text: true, placeholder: 'Template name contains...' },
+      variables: {
+        single: true,
+        options: Object.keys(VARIABLE_RANGES).map(function (key) { return { value: key, label: VARIABLE_RANGES[key].label }; })
+      },
+      kind: { options: KIND_OPTIONS },
+      // Org-wide templates have no workspace; "Organization" selects them.
+      workspace: { options: [ORGANIZATION_OPTION].concat(_state.workspaceFilterOptions || []) }
+    };
+    if (_state.documentTypeOptions && _state.documentTypeOptions.length) {
+      map.template_type = { options: _state.documentTypeOptions };
+    }
+    if (shared) {
+      map.created_at = { single: true, options: shared.EDITED_RANGE_OPTIONS };
+      map.updated_at = { single: true, options: shared.EDITED_RANGE_OPTIONS };
+    }
+    table.setColumnFilterOptions(map);
   }
 
   if (window.LexRouter && typeof LexRouter.registerPageInit === 'function') {

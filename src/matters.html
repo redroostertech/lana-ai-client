@@ -21,6 +21,7 @@
   <script src="js/components.js"></script>
   <script src="js/version.js"></script>
   <script src="js/menu.js"></script>
+  <script src="js/shared/header-user-menu.js"></script>
   <script src="js/navigation-helpers.js"></script>
   <script src="js/conversation-search-modal.js"></script>
   <script src="js/contact-search-modal.js"></script>
@@ -61,6 +62,46 @@
   <script src="js/lex/lex.utils.js"></script>
   <script src="js/lex/lex.auth.js"></script>
   <script src="js/lex/lex-nav.js"></script>
+
+  <!-- Lex components for the toolbar and the list view (docs/TABLE-STANDARD.md) -->
+  <link rel="stylesheet" href="css/admin/admin-tables.css">
+  <style>
+    /* Matters list: Name, Client, Matter ID, Status, Type, Created, Last edited, Actions */
+    #mattersListTable table { min-width: 1180px; }
+    #mattersListTable th { white-space: nowrap; }
+    #mattersListTable th:nth-child(1) { width: 44px; }  /* row select */
+    #mattersListTable th:nth-child(3) { width: 16%; }   /* Client (after the select column) */
+    #mattersListTable th:nth-child(4) { width: 150px; } /* Matter ID */
+    #mattersListTable th:nth-child(5) { width: 110px; } /* Status */
+    #mattersListTable th:nth-child(6) { width: 130px; } /* Type */
+    #mattersListTable th:nth-child(7) { width: 176px; } /* Created */
+    #mattersListTable th:nth-child(8) { width: 140px; } /* Last edited */
+    #mattersListTable th:nth-child(9) { width: 196px; } /* Actions */
+    .matters-list-actions { display: flex; gap: 6px; white-space: nowrap; }
+    .matters-list-action {
+      appearance: none; background: none; border: 1px solid var(--lex-border-default);
+      border-radius: var(--lex-radius-sm, 4px); color: var(--lex-text-secondary);
+      cursor: pointer; font: inherit; font-size: 12px; padding: 2px 8px;
+    }
+    .matters-list-action:hover { color: var(--lex-text-primary); background: var(--lex-bg-secondary, #F5F5F0); }
+    .matters-list-action--danger { color: var(--lex-status-error, #b42318); }
+    .matters-list-action:focus-visible { box-shadow: var(--lex-focus-ring); outline: none; }
+  </style>
+  <!-- lex-modal and lex-drawer load before lex-btn: their footers hold declarative lex-btns -->
+  <script src="js/lex/components/foundation/lex-modal.js"></script>
+  <script src="js/lex/components/foundation/lex-drawer.js"></script>
+  <script src="js/lex/components/foundation/lex-btn.js"></script>
+  <script src="js/lex/components/foundation/lex-badge.js"></script>
+  <script src="js/lex/components/foundation/lex-empty.js"></script>
+  <script src="js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="js/lex/components/form/lex-dropdown-btn.js"></script>
+  <script src="js/lex/components/form/lex-input.js"></script>
+  <script src="js/lex/components/form/lex-select.js"></script>
+  <script src="js/lex/components/data/lex-table.js"></script>
+  <script src="js/shared/library-column-filters.js"></script>
+  <script src="js/shared/list-query-params.js"></script>
+  <script src="js/admin/admin-table-kit.js"></script>
+  <script src="js/pages/matters-list-table.js"></script>
 
   <!-- Drawflow Library for Visual Workflow Builder -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/drawflow@0.0.60/dist/drawflow.min.css">
@@ -175,58 +216,12 @@
           </button>
 
           <!-- User Menu -->
-          <div class="relative" id="userMenu">
-            <button class="flex items-center gap-2 text-gray-700 hover:text-gray-900 p-1" title="Settings">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-              </svg>
-            </button>
-            <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-              <a href="settings-v2.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
-              <hr class="my-1">
-              <button id="logoutBtn" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sign out</button>
-            </div>
-          </div>
+          <div class="relative" id="userMenu" data-header-user-menu data-settings-href="settings-v2.html" data-login-href="login.html"></div>
         </div>
       </div>
     </header>
 
-    <!-- Notification Panel Overlay -->
-    <div id="notificationOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
-
-    <!-- Notification Slide-out Panel -->
-    <div id="notificationPanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
-      <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
-        <h2 class="text-lg font-semibold text-gray-900">Notifications</h2>
-        <div class="flex items-center gap-3">
-          <button id="markAllReadBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium hidden">Mark all read</button>
-          <button id="refreshNotificationsBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-            </svg>
-          </button>
-          <button id="closeNotificationPanel" class="text-gray-400 hover:text-gray-600">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-          </button>
-        </div>
-      </div>
-      <div class="flex border-b border-gray-200 px-6 flex-shrink-0">
-        <button id="filterAll" class="px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">All</button>
-        <button id="filterUnread" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700">Unread</button>
-      </div>
-      <div id="notificationList" class="flex-1 overflow-y-auto">
-        <div id="notificationLoading" class="p-8 text-center">
-          <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
-          <p class="text-gray-500 mt-3 text-sm">Loading notifications...</p>
-        </div>
-      </div>
-      <div id="notificationLoadingMore" class="hidden p-4 border-t border-gray-100 text-center flex-shrink-0">
-        <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
-      </div>
-    </div>
+    <!-- Notification panel: a lex-drawer mounted by js/notifications.js -->
 
     <main class="p-4 lg:p-8">
       <!-- Welcome Banner -->
@@ -244,54 +239,57 @@
         </div>
       </div>
 
-      <!-- Header Actions -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <!-- Left: Search -->
-        <div class="flex-1 max-w-md">
-          <div class="relative">
-            <input type="text" id="searchInput" placeholder="Search matters..."
-              class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+      <!-- Search / Sort / Filter toolbar (docs/TABLE-STANDARD.md) -->
+      <div class="bg-white rounded-lg shadow-sm border mb-4 mt-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and filter matters">
+        <div class="flex items-center gap-4 flex-wrap">
+          <div class="flex-1 min-w-[200px]">
+            <lex-input id="searchInput" placeholder="Search matters..." clearable="true" leading-icon="search"></lex-input>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Sort by:</label>
+            <lex-select id="mattersSort" options='[{"value":"created_at","label":"Created"},{"value":"updated_at","label":"Last edited"},{"value":"name","label":"Name"},{"value":"status","label":"Status"},{"value":"matter_type","label":"Type"}]' value="created_at"></lex-select>
+          </div>
+          <lex-btn id="mattersSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
             </svg>
+          </lex-btn>
+          <div class="flex items-center gap-2">
+            <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Status:</label>
+            <lex-select id="statusFilter" options='[{"value":"all","label":"All"},{"value":"active","label":"Active"},{"value":"inactive","label":"Inactive"},{"value":"closed","label":"Closed"},{"value":"archived","label":"Archived"},{"value":"shared","label":"Shared with me"}]' value="all"></lex-select>
           </div>
-        </div>
+          <div id="mattersCount" class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)"></div>
 
-        <!-- Right: Selection Controls + Filters + Actions -->
-        <div class="flex items-center gap-3 flex-wrap">
-          <!-- Select All Checkbox -->
-          <div class="flex items-center border-r border-gray-300 pr-3">
-            <input type="checkbox" id="selectAllMatters" class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
-            <label for="selectAllMatters" class="ml-2 text-sm text-gray-700 whitespace-nowrap">Select All</label>
+          <!-- Grid view selection (the list view selects through the table) -->
+          <div id="gridSelectionControls" class="flex items-center gap-3">
+            <div class="flex items-center">
+              <input type="checkbox" id="selectAllMatters" class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+              <label for="selectAllMatters" class="ml-2 text-sm text-gray-700 whitespace-nowrap">Select All</label>
+            </div>
+            <div id="bulkActions" class="hidden flex items-center gap-2">
+              <span id="selectedCount" class="text-sm font-medium text-gray-700 whitespace-nowrap">0 selected</span>
+              <button id="bulkDeleteBtn" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                </svg>
+                Delete Selected
+              </button>
+              <button id="clearSelectionBtn" class="text-xs text-gray-600 hover:text-gray-800 underline">Clear</button>
+            </div>
           </div>
 
-          <!-- Bulk Actions (shown when items selected) -->
-          <div id="bulkActions" class="hidden flex items-center gap-2 border-r border-gray-300 pr-3">
-            <span id="selectedCount" class="text-sm font-medium text-gray-700 whitespace-nowrap">0 selected</span>
-            <button id="bulkDeleteBtn" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+          <div class="flex items-center gap-1 ml-auto" style="border-left: 1px solid var(--lex-border-default); padding-left: 12px;">
+            <lex-btn id="gridViewBtn" variant="ghost" icon="true" title="Grid View" aria-label="Grid view">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
               </svg>
-              Delete Selected
-            </button>
-            <button id="clearSelectionBtn" class="text-xs text-gray-600 hover:text-gray-800 underline">Clear</button>
+            </lex-btn>
+            <lex-btn id="listViewBtn" variant="primary" icon="true" title="List View" aria-label="List view">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+              </svg>
+            </lex-btn>
           </div>
-
-          <!-- Status Filter -->
-          <select id="statusFilter" class="select-standard inline-block w-auto pl-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-            <option value="">All Status</option>
-            <option value="active">Active</option>
-            <option value="closed">Closed</option>
-            <option value="archived">Archived</option>
-            <option value="shared">Shared with Me</option>
-          </select>
-
-          <!-- Matter Type Filter -->
-          <select id="matterTypeFilter" class="select-standard inline-block w-auto pl-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-            <option value="">All Types</option>
-            <option value="matter">Client Matters Only</option>
-            <option value="workspace">Workspaces Only</option>
-          </select>
 
           <!-- New Matter Button -->
           <button id="createMatterBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2">
@@ -371,26 +369,52 @@
         </div>
       </div>
 
-      <!-- Matters Grid -->
+      <!-- Pinned matters above the list (list view, page 1) -->
+      <div id="listPinnedSection" class="hidden mb-6">
+        <div id="listPinnedCards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+      </div>
+
+      <!-- Matters Grid View: the table's current page as cards -->
       <div id="mattersGrid" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <!-- Matters will be loaded here -->
       </div>
 
-      <!-- Pagination -->
+      <!-- Matters List View: server-paged; the table owns paging, sort and
+           column filters, and the page answers its lex-query-change. -->
+      <section id="mattersListSection" class="hidden" aria-labelledby="mattersListHeading">
+        <div class="flex items-center justify-between mb-3">
+          <h2 id="mattersListHeading" class="text-lg font-semibold" style="color: var(--lex-text-primary)">All Matters</h2>
+          <span id="mattersSectionCount" class="text-sm" style="color: var(--lex-text-secondary)" aria-live="polite"></span>
+        </div>
+        <lex-table
+          id="mattersListTable"
+          class="admin-table matters-list-table lex-table--card"
+          server-paging
+          column-filters
+          selectable
+          columns="name,client_name,matter_id,status,matter_type,created_at,updated_at,actions"
+          labels="Name,Client,Matter ID,Status,Type,Created,Last edited,Actions"
+          sortable-columns="name,status,matter_type,created_at,updated_at"
+          sort-by="created_at"
+          sort-dir="desc"
+          limit="20"
+          id-key="matter_id"
+          empty-text="No matters yet"
+          empty-action-label="New Matter"
+          aria-label="Matters"
+          bulk-actions='[{"label":"Delete","action":"delete","variant":"danger"}]'
+        ></lex-table>
+      </section>
+
+      <!-- Grid view pager: the grid shows the table's current page. Hidden in
+           list view, where the table's own pager is the only pager. -->
       <div id="pagination" class="mt-8 flex justify-center"></div>
     </main>
   </div>
 
   <!-- Matter Modal -->
-  <div id="matterModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-        <h3 id="matterModalTitle" class="text-lg font-semibold text-gray-900">Create Matter</h3>
-        <button id="closeMatterModal" class="text-gray-400 hover:text-gray-600">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-        </button>
-      </div>
-      <form id="matterForm" class="p-6 space-y-5">
+  <lex-modal id="matterModal" heading="Create Matter" size="lg">
+      <form id="matterForm" class="space-y-5">
         <input type="hidden" id="matterId">
         <div id="matterIdDisplay" class="hidden">
           <label class="block text-sm font-medium text-gray-700 mb-1">Matter ID</label>
@@ -449,10 +473,7 @@
           <label class="block text-sm font-medium text-gray-700 mb-1">
             Link to Workspace <span class="text-gray-400">(Optional)</span>
           </label>
-          <select id="workspaceSelector" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-            <option value="">No workspace (standalone matter)</option>
-            <!-- Workspaces populated by JavaScript -->
-          </select>
+          <lex-select id="workspaceSelector" placeholder="No workspace (standalone matter)" options='[{"value": "", "label": "No workspace (standalone matter)"}]' value=""></lex-select>
           <p class="text-xs text-gray-500 mt-1">
             Linking to a workspace allows this matter to access documents from the workspace and other linked matters (read-only).
           </p>
@@ -465,19 +486,12 @@
 
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Visibility</label>
-          <select id="matterVisibility" class="select-standard w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-            <option value="private">Private - Only shared users can access</option>
-            <option value="organization">Organization - All org members can view</option>
-          </select>
+          <lex-select id="matterVisibility" options='[{"value": "private", "label": "Private - Only shared users can access"}, {"value": "organization", "label": "Organization - All org members can view"}]' value="private"></lex-select>
         </div>
 
         <div class="mt-4">
           <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-          <select id="matterStatus" class="select-standard w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-            <option value="active">Active</option>
-            <option value="closed">Closed</option>
-            <option value="archived">Archived</option>
-          </select>
+          <lex-select id="matterStatus" options='[{"value": "active", "label": "Active"}, {"value": "closed", "label": "Closed"}, {"value": "archived", "label": "Archived"}]' value="active"></lex-select>
         </div>
 
         <!-- Share with Users Section -->
@@ -511,27 +525,15 @@
         <!-- Conflict Detection Section -->
         <div id="conflictDetectionContainer"></div>
 
-        <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
-          <button type="button" id="cancelMatterBtn" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium">Cancel</button>
-          <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg">Save Matter</button>
-        </div>
       </form>
-    </div>
-  </div>
+      <lex-btn data-slot="footer" variant="secondary" id="cancelMatterBtn">Cancel</lex-btn>
+      <lex-btn data-slot="footer" variant="primary" type="submit" form="matterForm">Save Matter</lex-btn>
+  </lex-modal>
 
   <!-- Create Matter from Workspace Modal -->
-  <div id="workspaceMatterModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-        <div>
-          <h3 class="text-lg font-semibold text-gray-900">Create New Matter in Workspace</h3>
-          <p class="text-sm text-gray-500 mt-1">This matter will be automatically linked to the workspace</p>
-        </div>
-        <button id="closeWorkspaceMatterModal" class="text-gray-400 hover:text-gray-600">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-        </button>
-      </div>
-      <form id="workspaceMatterForm" class="p-6 space-y-5">
+  <lex-modal id="workspaceMatterModal" heading="Create New Matter in Workspace" size="lg">
+      <p class="text-sm text-gray-500 mb-5">This matter will be automatically linked to the workspace</p>
+      <form id="workspaceMatterForm" class="space-y-5">
         <input type="hidden" id="workspaceIdForMatter">
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -552,19 +554,12 @@
 
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Visibility</label>
-          <select id="workspaceMatterVisibility" class="select-standard w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-            <option value="private">Private - Only shared users can access</option>
-            <option value="organization">Organization - All org members can view</option>
-          </select>
+          <lex-select id="workspaceMatterVisibility" options='[{"value": "private", "label": "Private - Only shared users can access"}, {"value": "organization", "label": "Organization - All org members can view"}]' value="private"></lex-select>
         </div>
 
         <div class="mt-4">
           <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-          <select id="workspaceMatterStatus" class="select-standard w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-            <option value="active">Active</option>
-            <option value="closed">Closed</option>
-            <option value="archived">Archived</option>
-          </select>
+          <lex-select id="workspaceMatterStatus" options='[{"value": "active", "label": "Active"}, {"value": "closed", "label": "Closed"}, {"value": "archived", "label": "Archived"}]' value="active"></lex-select>
         </div>
 
         <!-- Share with Users Section -->
@@ -598,47 +593,27 @@
         <!-- Conflict Detection Section -->
         <div id="workspaceConflictDetectionContainer"></div>
 
-        <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
-          <button type="button" id="cancelWorkspaceMatterBtn" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium">Cancel</button>
-          <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg">Create Matter</button>
-        </div>
       </form>
-    </div>
-  </div>
+      <lex-btn data-slot="footer" variant="secondary" id="cancelWorkspaceMatterBtn">Cancel</lex-btn>
+      <lex-btn data-slot="footer" variant="primary" type="submit" form="workspaceMatterForm">Create Matter</lex-btn>
+  </lex-modal>
 
-  <!-- Matter Details Drawer -->
-  <div id="matterDrawer" class="hidden fixed inset-y-0 right-0 w-full bg-white shadow-xl z-40 transform translate-x-full transition-transform">
+  <!-- Matter Details Drawer (lex-drawer: title, close, backdrop, Escape, focus trap) -->
+  <lex-drawer id="matterDrawer" heading="Matter Details" width="full" flush>
+    <div data-slot="header-actions" class="flex items-center gap-2">
+      <lex-dropdown-btn id="drawerOptionsMenu" icon="more-vertical" icon-only aria-label="More options" align="end" variant="ghost" floating
+        options='[{"value":"edit","label":"Edit","icon":"edit"},{"value":"delete","label":"Delete","icon":"trash-2","variant":"danger"}]'></lex-dropdown-btn>
+      <button id="refreshMatterBtn" onclick="refreshCurrentMatter()" class="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Refresh matter details" aria-label="Refresh matter details">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+        </svg>
+      </button>
+    </div>
     <div class="h-full flex flex-col">
-      <!-- Header -->
-      <div class="px-6 py-4 border-b border-gray-200 flex-shrink-0">
-        <div class="flex items-center justify-between gap-4">
-          <div class="flex-1 min-w-0">
-            <span id="drawerMatterId" class="text-xs text-gray-400 font-mono block truncate"></span>
-            <h3 id="drawerMatterName" class="text-lg font-semibold text-gray-900">Matter Details</h3>
-            <p id="drawerClientName" class="text-sm text-gray-500"></p>
-          </div>
-          <div class="flex items-center gap-2 flex-shrink-0">
-            <div class="relative">
-              <button id="drawerMoreOptionsBtn" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="More options">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
-                </svg>
-              </button>
-              <div id="drawerOptionsDropdown" class="hidden absolute right-0 mt-1 w-36 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-                <button id="drawerOptionsEdit" class="w-full px-4 py-2 text-left text-sm text-indigo-600 hover:bg-indigo-50 transition-colors">Edit</button>
-                <button id="drawerOptionsDelete" class="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors">Delete</button>
-              </div>
-            </div>
-            <button id="refreshMatterBtn" onclick="refreshCurrentMatter()" class="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Refresh matter details">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-              </svg>
-            </button>
-            <button id="closeDrawer" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="Close">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-            </button>
-          </div>
-        </div>
+      <div class="px-6 py-3 border-b border-gray-200 flex-shrink-0">
+        <span id="drawerMatterId" class="text-xs text-gray-400 font-mono block truncate"></span>
+        <p id="drawerMatterName" class="text-base font-semibold text-gray-900"></p>
+        <p id="drawerClientName" class="text-sm text-gray-500"></p>
         <div id="drawerStatusBadge" class="mt-2"></div>
       </div>
 
@@ -694,20 +669,13 @@
         -->
         <div id="tabContentConnectedData" class="hidden p-6"></div>
       </div>
+
     </div>
-  </div>
-  <div id="drawerOverlay" class="hidden fixed inset-0 bg-black bg-opacity-50 z-30"></div>
+  </lex-drawer>
 
   <!-- Task Modal -->
-  <div id="taskModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-        <h3 id="taskModalTitle" class="text-lg font-semibold text-gray-900">Create Task</h3>
-        <button onclick="closeTaskModal()" class="text-gray-400 hover:text-gray-600">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-        </button>
-      </div>
-      <form id="taskForm" onsubmit="saveTask(event)" class="p-6 space-y-5">
+  <lex-modal id="taskModal" heading="Create Task" size="lg">
+      <form id="taskForm" onsubmit="saveTask(event)" class="space-y-5">
         <input type="hidden" id="taskId">
 
         <div>
@@ -728,21 +696,11 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-            <select id="taskStatus" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-              <option value="pending">Pending</option>
-              <option value="in_progress">In Progress</option>
-              <option value="in_review">In Review</option>
-              <option value="complete">Complete</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
+            <lex-select id="taskStatus" options='[{"value": "pending", "label": "Pending"}, {"value": "in_progress", "label": "In Progress"}, {"value": "in_review", "label": "In Review"}, {"value": "complete", "label": "Complete"}, {"value": "cancelled", "label": "Cancelled"}]' value="pending"></lex-select>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Priority</label>
-            <select id="taskPriority" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-              <option value="low">Low</option>
-              <option value="normal" selected>Normal</option>
-              <option value="high">High</option>
-            </select>
+            <lex-select id="taskPriority" options='[{"value": "low", "label": "Low"}, {"value": "normal", "label": "Normal"}, {"value": "high", "label": "High"}]' value="normal"></lex-select>
           </div>
         </div>
 
@@ -753,35 +711,18 @@
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Assign To</label>
-            <select id="taskAssignedTo" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-              <option value="">Unassigned</option>
-              <!-- Users populated dynamically -->
-            </select>
+            <lex-select id="taskAssignedTo" placeholder="Unassigned" options='[{"value": "", "label": "Unassigned"}]' value=""></lex-select>
           </div>
         </div>
 
-        <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
-          <button type="button" onclick="closeTaskModal()" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors">
-            Cancel
-          </button>
-          <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors">
-            Save Task
-          </button>
-        </div>
       </form>
-    </div>
-  </div>
+      <lex-btn data-slot="footer" variant="secondary" onclick="closeTaskModal()">Cancel</lex-btn>
+      <lex-btn data-slot="footer" variant="primary" type="submit" form="taskForm">Save Task</lex-btn>
+  </lex-modal>
 
   <!-- Contact Modal -->
-  <div id="contactModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-        <h3 class="text-lg font-semibold text-gray-900">Add Contact</h3>
-        <button onclick="closeContactModal()" class="text-gray-400 hover:text-gray-600">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-        </button>
-      </div>
-      <form id="contactForm" onsubmit="saveContact(event)" class="p-6 space-y-5">
+  <lex-modal id="contactModal" heading="Add Contact" size="lg">
+      <form id="contactForm" onsubmit="saveContact(event)" class="space-y-5">
         <input type="hidden" id="contactMatterId">
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -829,51 +770,24 @@
 
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Contact Type</label>
-          <select id="contactType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-            <option value="contact:participant">Participant</option>
-            <option value="contact:opportunity">Opportunity</option>
-            <option value="contact:lead">Lead</option>
-            <option value="contact:other">Other</option>
-          </select>
+          <lex-select id="contactType" options='[{"value": "contact:participant", "label": "Participant"}, {"value": "contact:opportunity", "label": "Opportunity"}, {"value": "contact:lead", "label": "Lead"}, {"value": "contact:other", "label": "Other"}]' value="contact:participant"></lex-select>
         </div>
 
-        <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
-          <button type="button" onclick="closeContactModal()" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors">
-            Cancel
-          </button>
-          <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors">
-            Save Contact
-          </button>
-        </div>
       </form>
-    </div>
-  </div>
+      <lex-btn data-slot="footer" variant="secondary" onclick="closeContactModal()">Cancel</lex-btn>
+      <lex-btn data-slot="footer" variant="primary" type="submit" form="contactForm">Save Contact</lex-btn>
+  </lex-modal>
 
   <!-- Contact Detail Modal -->
-  <div id="contactDetailModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-      <div class="flex items-center justify-between p-6 border-b border-gray-200">
-        <h2 class="text-xl font-semibold text-gray-900">Contact Details</h2>
-        <button onclick="closeContactDetailModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-        </button>
-      </div>
-      <div id="contactDetailContent" class="p-6">
+  <lex-modal id="contactDetailModal" heading="Contact Details" size="lg" hide-actions>
+      <div id="contactDetailContent">
         <!-- Content populated by JS -->
       </div>
-    </div>
-  </div>
+  </lex-modal>
 
   <!-- Edit Contact Modal -->
-  <div id="editContactModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-      <div class="flex items-center justify-between p-6 border-b border-gray-200">
-        <h2 class="text-xl font-semibold text-gray-900">Edit Contact</h2>
-        <button onclick="closeEditContactModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-        </button>
-      </div>
-      <form id="editContactForm" onsubmit="updateContact(event)" class="p-6 space-y-5">
+  <lex-modal id="editContactModal" heading="Edit Contact" size="lg">
+      <form id="editContactForm" onsubmit="updateContact(event)" class="space-y-5">
         <input type="hidden" id="editContactId">
         <input type="hidden" id="editContactMatterId">
 
@@ -922,49 +836,18 @@
 
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Contact Type</label>
-          <select id="editContactType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-            <option value="contact:participant">Participant</option>
-            <option value="contact:opportunity">Opportunity</option>
-            <option value="contact:lead">Lead</option>
-            <option value="contact:other">Other</option>
-          </select>
+          <lex-select id="editContactType" options='[{"value": "contact:participant", "label": "Participant"}, {"value": "contact:opportunity", "label": "Opportunity"}, {"value": "contact:lead", "label": "Lead"}, {"value": "contact:other", "label": "Other"}]' value="contact:participant"></lex-select>
         </div>
 
-        <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
-          <button type="button" onclick="closeEditContactModal()" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors">
-            Cancel
-          </button>
-          <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors">
-            Save Changes
-          </button>
-        </div>
       </form>
-    </div>
-  </div>
+      <lex-btn data-slot="footer" variant="secondary" onclick="closeEditContactModal()">Cancel</lex-btn>
+      <lex-btn data-slot="footer" variant="primary" type="submit" form="editContactForm">Save Changes</lex-btn>
+  </lex-modal>
 
   <!-- Create Link Modal -->
-  <div id="createLinkModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl">
-      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-            <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
-            </svg>
-          </div>
-          <div>
-            <h3 class="text-lg font-semibold text-gray-900">Link Related Matter</h3>
-            <p class="text-sm text-gray-500">Connect this matter to another matter</p>
-          </div>
-        </div>
-        <button onclick="closeCreateLinkModal()" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-
-      <form onsubmit="createLink(event)" class="p-6 space-y-4">
+  <lex-modal id="createLinkModal" heading="Link Related Matter" size="lg">
+      <p id="createLinkSubtitle" class="text-sm text-gray-500 mb-4">Connect this matter to another matter</p>
+      <form id="createLinkForm" onsubmit="createLink(event)" class="space-y-4">
         <input type="hidden" id="linkSourceMatterId" value="">
 
         <!-- Matter Search -->
@@ -1007,51 +890,21 @@
         <!-- Link Type -->
         <div id="linkTypeContainer">
           <label class="block text-sm font-medium text-gray-700 mb-1">Link Type</label>
-          <select id="linkType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-            <option value="related_to">Related To (bidirectional)</option>
-            <option value="parent_of">Parent Of (this matter is parent)</option>
-            <option value="child_of">Child Of (this matter is child)</option>
-          </select>
+          <lex-select id="linkType" options='[{"value": "related_to", "label": "Related To (bidirectional)"}, {"value": "parent_of", "label": "Parent Of (this matter is parent)"}, {"value": "child_of", "label": "Child Of (this matter is child)"}]' value="related_to"></lex-select>
           <p class="mt-1 text-xs text-gray-500">
             Choose how these matters are related to each other
           </p>
         </div>
 
-        <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
-          <button type="button" onclick="closeCreateLinkModal()" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors">
-            Cancel
-          </button>
-          <button type="submit" id="createLinkBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-            Create Link
-          </button>
-        </div>
       </form>
-    </div>
-  </div>
+      <lex-btn data-slot="footer" variant="secondary" onclick="closeCreateLinkModal()">Cancel</lex-btn>
+      <lex-btn data-slot="footer" variant="primary" type="submit" form="createLinkForm" id="createLinkBtn" label="Create Link" disabled></lex-btn>
+  </lex-modal>
 
   <!-- Document Metadata Modal -->
-  <div id="documentMetadataModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg">
-      <div class="px-6 py-4 border-b border-gray-200">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-              <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
-              </svg>
-            </div>
-            <div>
-              <h3 class="text-lg font-semibold text-gray-900">Document Details</h3>
-              <p class="text-sm text-gray-500">Add optional metadata to help organize and find this document</p>
-            </div>
-          </div>
-          <button id="closeMetadataModal" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-          </button>
-        </div>
-      </div>
-
-      <div class="p-6 space-y-4">
+  <lex-modal id="documentMetadataModal" heading="Document Details">
+      <div class="space-y-4">
+        <p class="text-sm text-gray-500">Add optional metadata to help organize and find this document</p>
         <!-- File info -->
         <div class="bg-gray-50 rounded-lg p-3 border border-gray-200">
           <p class="text-sm text-gray-600">
@@ -1064,19 +917,7 @@
         <!-- Document Type -->
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">Document Type</label>
-          <select id="metadataDocType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-            <option value="">Auto-detect (recommended)</option>
-            <option value="contract">Contract</option>
-            <option value="pleading">Pleading</option>
-            <option value="deposition">Deposition</option>
-            <option value="medical_record">Medical Record</option>
-            <option value="police_report">Police Report</option>
-            <option value="email">Email</option>
-            <option value="expert_report">Expert Report</option>
-            <option value="correspondence">Correspondence</option>
-            <option value="presentation">Presentation</option>
-            <option value="document">Other Document</option>
-          </select>
+          <lex-select id="metadataDocType" placeholder="Auto-detect (recommended)" options='[{"value": "", "label": "Auto-detect (recommended)"}, {"value": "contract", "label": "Contract"}, {"value": "pleading", "label": "Pleading"}, {"value": "deposition", "label": "Deposition"}, {"value": "medical_record", "label": "Medical Record"}, {"value": "police_report", "label": "Police Report"}, {"value": "email", "label": "Email"}, {"value": "expert_report", "label": "Expert Report"}, {"value": "correspondence", "label": "Correspondence"}, {"value": "presentation", "label": "Presentation"}, {"value": "document", "label": "Other Document"}]' value=""></lex-select>
           <p class="text-xs text-gray-500 mt-1">Leave as "Auto-detect" to let AI classify the document</p>
         </div>
 
@@ -1095,35 +936,13 @@
         </div>
       </div>
 
-      <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3 bg-gray-50 rounded-b-xl">
-        <button id="cancelMetadataUpload" class="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg font-medium transition-colors">
-          Cancel
-        </button>
-        <button id="confirmMetadataUpload" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-          </svg>
-          Upload Document
-        </button>
-      </div>
-    </div>
-  </div>
+      <lex-btn data-slot="footer" variant="secondary" id="cancelMetadataUpload">Cancel</lex-btn>
+      <lex-btn data-slot="footer" variant="primary" id="confirmMetadataUpload" leading-icon="upload">Upload Document</lex-btn>
+  </lex-modal>
 
   <!-- Matters Info Modal -->
-  <div id="mattersInfoModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="if(event.target === this) closeMattersInfoModal()">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
-      <!-- Modal Header -->
-      <div class="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white rounded-t-xl z-10">
-        <h2 class="text-2xl font-bold text-gray-900">What Are Matters?</h2>
-        <button onclick="closeMattersInfoModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-
-      <!-- Modal Body -->
-      <div class="p-6 space-y-6">
+  <lex-modal id="mattersInfoModal" heading="What Are Matters?" size="xl" hide-actions>
+      <div class="space-y-6">
         <!-- Introduction -->
         <div>
           <p class="text-gray-700 text-lg leading-relaxed">
@@ -1290,15 +1109,8 @@
           </div>
         </div>
       </div>
-
-      <!-- Modal Footer -->
-      <div class="p-6 border-t border-gray-200 bg-gray-50 rounded-b-xl">
-        <button onclick="closeMattersInfoModal()" class="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium">
-          Get Started with Matters
-        </button>
-      </div>
-    </div>
-  </div>
+      <lex-btn data-slot="footer" variant="primary" onclick="closeMattersInfoModal()">Get Started with Matters</lex-btn>
+  </lex-modal>
 
   <script>
     if (!api.requireAuth()) throw new Error('Not authenticated');
@@ -1362,22 +1174,12 @@
              roles.some(r => r?.name === 'org_admin' || r?.name === 'system_admin');
     }
 
-    // User menu toggle
-    const userMenu = document.getElementById('userMenu');
-    const userDropdown = document.getElementById('userDropdown');
-    userMenu.addEventListener('click', () => userDropdown.classList.toggle('hidden'));
-    document.addEventListener('click', (e) => {
-      if (!userMenu.contains(e.target)) userDropdown.classList.add('hidden');
-    });
+    // The header account menu (Settings / Sign out) is js/shared/header-user-menu.js.
 
     // Sidebar toggle
     const sidebar = document.getElementById('sidebar');
     document.getElementById('openSidebar').addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
     document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
-    document.getElementById('logoutBtn').addEventListener('click', async () => {
-      await api.logout();
-      window.location.href = 'login.html';
-    });
 
     // State
     let currentPage = 1;
@@ -1478,17 +1280,9 @@
             </div>
             <div class="flex items-center justify-between text-xs text-gray-400">
               <span>Created ${formatDate(matter.created_at)}</span>
-              <div class="relative">
-                <button onclick="event.stopPropagation(); toggleMatterCardOptions('${escapedMatterId}')" class="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors" title="More options">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
-                  </svg>
-                </button>
-                <div id="matter-card-options-${escapedMatterId}" class="hidden absolute right-0 top-full mt-1 w-32 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-                  <button onclick="event.stopPropagation(); editMatter('${escapedMatterId}'); closeMatterCardOptions('${escapedMatterId}')" class="w-full px-4 py-2 text-left text-sm text-indigo-600 hover:bg-indigo-50 transition-colors">Edit</button>
-                  <button onclick="event.stopPropagation(); deleteMatter('${escapedMatterId}'); closeMatterCardOptions('${escapedMatterId}')" class="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors">Delete</button>
-                </div>
-              </div>
+              <lex-dropdown-btn id="matter-card-options-${escapedMatterId}" class="matter-card-options" data-matter-id="${escapedMatterId}"
+                icon="more-vertical" icon-only aria-label="More options" align="end" variant="ghost" floating onclick="event.stopPropagation()"
+                options='[{"value":"edit","label":"Edit","icon":"edit"},{"value":"delete","label":"Delete","icon":"trash-2","variant":"danger"}]'></lex-dropdown-btn>
             </div>
           </div>
         </div>
@@ -1508,11 +1302,82 @@
       };
     }
 
-    // Load matters
-    async function loadMatters() {
+    // Confirmation through lex-modal (never window.confirm): resolves true
+    // when the user confirms, false when they cancel or close it.
+    function confirmAction(title, message, options) {
+      return new Promise((resolve) => {
+        let settled = false;
+        const settle = (value) => { if (!settled) { settled = true; resolve(value); } };
+        const modal = Lex.Modal.confirm(title, escapeHtml(message), () => settle(true), options || {});
+        modal.addEventListener('lex-cancel', () => settle(false));
+        modal.addEventListener('lex-close', () => settle(false));
+      });
+    }
+
+    // ── Matters list (docs/TABLE-STANDARD.md) ─────────────────────────────
+    //
+    // The list view is a server-paged lex-table (#mattersListTable): it owns
+    // the page, sort and column filters and asks for data with
+    // lex-query-change. The grid view shows the same page as cards, with
+    // #pagination as its pager. Pure table logic: js/pages/matters-list-table.js.
+
+    const MATTERS_TABLE_ID = 'mattersListTable';
+    const VIEW_STORAGE_KEY = 'lana.matters.viewMode';
+    let viewMode = 'list';
+    let searchTerm = '';
+    let loadSequence = 0;
+    let lastLoadPromise = Promise.resolve();
+    let lastPagination = { page: 1, limit: 20, total: 0, total_pages: 1 };
+    let loadingMorePinned = false;
+    let mattersToolbar = null;
+
+    try {
+      const storedView = window.localStorage.getItem(VIEW_STORAGE_KEY);
+      if (storedView === 'grid' || storedView === 'list') viewMode = storedView;
+    } catch (e) { /* storage unavailable: keep the default */ }
+
+    function mattersTable() {
+      return document.getElementById(MATTERS_TABLE_ID);
+    }
+
+    function currentFilters() {
+      const table = mattersTable();
+      return (table && table.serverQuery && table.serverQuery.filters) || {};
+    }
+
+    // Load matters: asks the table for its current query, which comes back as
+    // lex-query-change and lands in fetchMattersPage. Pass { resetPage: true }
+    // after the search or a filter changes. Resolves when that page arrives.
+    function loadMatters(options) {
+      // The first call can come before the table is defined and wired.
+      return mattersTableReady.then(() => {
+        const table = mattersTable();
+        if (!table || typeof table.requestServerQuery !== 'function') return undefined;
+        table.requestServerQuery({ resetPage: !!(options && options.resetPage) });
+        return lastLoadPromise;
+      });
+    }
+    window.loadMatters = loadMatters;
+
+    function fetchMattersPage(query) {
+      lastLoadPromise = doFetchMattersPage(query || {});
+      return lastLoadPromise;
+    }
+
+    // One page from /api/v1/matters (pinned matters excluded) plus the pinned
+    // matters on page 1. Stale answers are dropped.
+    async function doFetchMattersPage(query) {
+      const sequence = ++loadSequence;
       const grid = document.getElementById('mattersGrid');
       const loading = document.getElementById('mattersLoading');
-      const pagination = document.getElementById('pagination');
+      const table = mattersTable();
+      const filters = query.filters || {};
+      const listTable = window.MattersListTable;
+      currentPage = Number(query.page) || 1;
+      // A new query starts the pinned list over; "Show more" keeps adding.
+      if (!loadingMorePinned) pinnedPage = 1;
+      loadingMorePinned = false;
+      if (mattersToolbar) mattersToolbar.syncFilter(filters);
 
       // Track page view on initial load (use one-time flag to prevent race conditions)
       if (!hasTrackedPageView && window.analytics) {
@@ -1520,181 +1385,67 @@
         hasTrackedPageView = true;
       }
 
-      // Show loading state
-      loading.classList.remove('hidden');
-      grid.classList.add('hidden');
-      pagination.innerHTML = '';
-      
       try {
-        const search = document.getElementById('searchInput').value;
-        const statusFilterValue = document.getElementById('statusFilter').value;
-        const matterTypeFilterValue = document.getElementById('matterTypeFilter').value;
+        // org_admin sees all matters, others see only their own.
+        const context = { search: searchTerm, includeAll: isOrgAdmin() };
+        const params = listTable.toApiParams(query, context);
+        const pinnedFilters = listTable.pinnedFilters(query, context);
 
-        // Handle "shared" filter separately
-        let filters = { search };
-        if (statusFilterValue === 'shared') {
-          filters.shared_only = true;
-        } else if (statusFilterValue) {
-          filters.status = statusFilterValue;
-        }
-
-        // Add matter type filter if selected
-        if (matterTypeFilterValue) {
-          filters.matter_type = matterTypeFilterValue;
-        }
-
-        // org_admin sees all matters, others see only their own (unless filtering for shared)
-        const includeAll = isOrgAdmin() && statusFilterValue !== 'shared';
-        filters.include_all = includeAll;
-
-        // Fetch pinned and unpinned matters separately in parallel
         const [pinnedResult, unpinnedResult] = await Promise.all([
-          // Fetch pinned matters with pagination (only on page 1 of unpinned matters)
-          currentPage === 1 ? api.getPinnedMatters(pinnedPage, pinnedPageSize, filters) : Promise.resolve({ matters: allPinnedMatters, total: totalPinnedCount }),
-          // Fetch unpinned matters with pagination and exclude_pinned flag
-          api.getMatters(currentPage, pageSize, { ...filters, exclude_pinned: true })
+          currentPage === 1 ? api.getPinnedMatters(pinnedPage, pinnedPageSize, pinnedFilters) : Promise.resolve({ matters: allPinnedMatters, total: totalPinnedCount }),
+          api.get('/api/v1/matters?' + params.toString())
         ]);
+        if (sequence !== loadSequence) return;
 
-        const pinnedMatters = pinnedResult.matters || [];
+        // The pinned endpoint may not filter by type or hide archived rows.
+        const typeValue = pinnedFilters.matter_type || '';
+        const pinnedMatters = (pinnedResult.matters || []).filter(m => {
+          if (!m) return false;
+          if (typeValue && m.matter_type !== typeValue) return false;
+          return pinnedFilters.status === 'archived' || m.status !== 'archived';
+        });
         const unpinnedMatters = unpinnedResult.matters || [];
 
-        // Store pinned matters info for "Show More" functionality
         if (currentPage === 1) {
-          if (pinnedPage === 1) {
-            allPinnedMatters = pinnedMatters;
-          } else {
-            allPinnedMatters = [...allPinnedMatters, ...pinnedMatters];
-          }
-          totalPinnedCount = pinnedResult.total || pinnedMatters.length;
+          allPinnedMatters = pinnedPage === 1 ? pinnedMatters : [...allPinnedMatters, ...pinnedMatters];
+          totalPinnedCount = typeValue ? allPinnedMatters.length : (pinnedResult.total || pinnedMatters.length);
         }
+
+        // Pinned matters, newest pin first (null-safe).
+        allPinnedMatters.sort((a, b) => {
+          const parsedATime = a.pinned_at ? new Date(a.pinned_at).getTime() : 0;
+          const parsedBTime = b.pinned_at ? new Date(b.pinned_at).getTime() : 0;
+          const aTime = Number.isFinite(parsedATime) ? parsedATime : 0;
+          const bTime = Number.isFinite(parsedBTime) ? parsedBTime : 0;
+          return bTime - aTime;
+        });
 
         // Combine for currentMatters (for select all functionality)
         matters = [...allPinnedMatters, ...unpinnedMatters];
         currentMatters = matters;
 
-        console.log('[Matters] Pinned matters loaded:', pinnedMatters.length);
-        console.log('[Matters] Total pinned matters:', totalPinnedCount);
-        console.log('[Matters] Currently showing pinned:', allPinnedMatters.length);
-        console.log('[Matters] Unpinned matters:', unpinnedMatters.length);
-        console.log('[Matters] Total on page:', matters.length);
+        const total = Number(unpinnedResult.total !== undefined ? unpinnedResult.total
+          : (unpinnedResult.pagination && unpinnedResult.pagination.total)) || 0;
+        const limit = Number(params.get('page_size')) || 20;
+        lastPagination = { page: currentPage, limit: limit, total: total, total_pages: Math.max(1, Math.ceil(total / limit)) };
 
-        // Hide loading, show grid
         loading.classList.add('hidden');
-        grid.classList.remove('hidden');
-
-        // Check if there are NO matters at all (both pinned and unpinned)
-        if (allPinnedMatters.length === 0 && unpinnedMatters.length === 0 && currentPage === 1) {
-          grid.innerHTML = `
-            <div class="col-span-full py-16">
-              <div class="max-w-md mx-auto text-center">
-                <div class="w-24 h-24 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <svg class="w-12 h-12 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
-                  </svg>
-                </div>
-                <h3 class="text-xl font-semibold text-gray-900 mb-2">No matters yet</h3>
-                <p class="text-gray-500 mb-6">Get started by creating your first matter to organize your documents and collaborate with your team.</p>
-                <button onclick="document.getElementById('createMatterBtn').click()" class="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors shadow-lg shadow-indigo-200">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                  </svg>
-                  Create your first matter
-                </button>
-              </div>
-            </div>
-          `;
-          return;
+        const filtered = Boolean(searchTerm || Object.keys(filters).length);
+        if (table) {
+          const empty = listTable.emptyText(filtered);
+          table.emptyText = empty.text;
+          table.emptyActionLabel = empty.actionLabel;
+          table.setServerData(unpinnedMatters.map(listTable.mapMatter), lastPagination);
         }
-
-        // Sort pinned matters by pinned_at (most recent first)
-        // Security: Handle null/undefined pinned_at to prevent crashes
-        pinnedMatters.sort((a, b) => {
-          const parsedATime = a.pinned_at ? new Date(a.pinned_at).getTime() : 0;
-          const parsedBTime = b.pinned_at ? new Date(b.pinned_at).getTime() : 0;
-          const aTime = Number.isFinite(parsedATime) ? parsedATime : 0;
-          const bTime = Number.isFinite(parsedBTime) ? parsedBTime : 0;
-          return bTime - aTime; // Most recent first
-        });
-
-        // Render matters with grouping
-        let html = '';
-
-        // Pinned Matters Section (only show on page 1)
-        if (allPinnedMatters.length > 0 && currentPage === 1) {
-          console.log('[Matters] Rendering pinned matters section');
-          // Dynamic heading based on filter
-          let pinnedHeading = 'Pinned Matters';
-          if (matterTypeFilterValue === 'matter') {
-            pinnedHeading = 'Pinned Client Matters';
-          } else if (matterTypeFilterValue === 'workspace') {
-            pinnedHeading = 'Pinned Workspaces';
-          }
-          html += `
-            <div class="col-span-full">
-              <div class="flex items-center gap-2 mb-4">
-                <svg class="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/>
-                </svg>
-                <h2 class="text-lg font-semibold text-gray-900">${pinnedHeading}</h2>
-                <span class="text-sm text-gray-500">(${totalPinnedCount > allPinnedMatters.length ? `Showing ${formatNumber(allPinnedMatters.length)} of ${formatNumber(totalPinnedCount)}` : formatNumber(allPinnedMatters.length)})</span>
-              </div>
-            </div>
-          `;
-          html += allPinnedMatters.map(matter => renderMatterCard(matter)).join('');
-
-          // Show "Show More" button if there are more pinned matters to load
-          if (allPinnedMatters.length < totalPinnedCount) {
-            html += `
-              <div class="col-span-full">
-                <button
-                  id="showMorePinnedBtn"
-                  class="w-full py-3 px-4 bg-white border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-400 transition-colors flex items-center justify-center gap-2"
-                  onclick="loadMorePinnedMatters()"
-                >
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                  </svg>
-                  Show More Pinned Matters
-                </button>
-              </div>
-            `;
-          }
-        }
-
-        // All Matters Section
-        if (unpinnedMatters.length > 0) {
-          const totalUnpinned = unpinnedResult.total || 0;
-          // Dynamic heading based on filter
-          let sectionHeading = 'All Matters';
-          if (matterTypeFilterValue === 'matter') {
-            sectionHeading = 'Client Matters';
-          } else if (matterTypeFilterValue === 'workspace') {
-            sectionHeading = 'Workspaces';
-          }
-          html += `
-            <div class="col-span-full ${allPinnedMatters.length > 0 && currentPage === 1 ? 'mt-8' : ''}">
-              <div class="flex items-center gap-2 mb-4">
-                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
-                </svg>
-                <h2 class="text-lg font-semibold text-gray-900">${sectionHeading}</h2>
-                <span class="text-sm text-gray-500">(${formatNumber(totalUnpinned)})</span>
-              </div>
-            </div>
-          `;
-          html += unpinnedMatters.map(matter => renderMatterCard(matter)).join('');
-        }
-
-        grid.innerHTML = html;
-
-        // Update pagination (based on unpinned matters only)
-        const total = unpinnedResult.total || 0;
-        const totalPages = Math.ceil(total / pageSize);
-        updatePagination(totalPages);
+        grid.innerHTML = renderMattersGrid(unpinnedMatters, total, filtered);
+        renderPinnedAboveList();
+        renderMattersView();
       } catch (error) {
-        // Hide loading, show grid with error state
+        if (sequence !== loadSequence) return;
+        console.error('[Matters] Failed to load matters:', error);
         loading.classList.add('hidden');
-        grid.classList.remove('hidden');
+        if (mattersToolbar) mattersToolbar.setCount(null);
+        if (table) table.setServerError('Matters could not be loaded. Check your connection and try again.');
         grid.innerHTML = `
           <div class="col-span-full py-16">
             <div class="max-w-md mx-auto text-center">
@@ -1714,66 +1465,162 @@
             </div>
           </div>
         `;
+        lastPagination = { page: 1, limit: 20, total: 0, total_pages: 1 };
+        renderMattersView();
         Toast.error('Failed to load matters');
       }
     }
 
-    async function loadMorePinnedMatters() {
-      console.log('[Matters] Loading more pinned matters');
+    function sectionHeading(prefix) {
+      const typeValue = (window.LanaListQueryParams && window.LanaListQueryParams.filterValues(currentFilters().matter_type)[0]) || '';
+      if (typeValue === 'matter') return prefix + 'Client Matters';
+      if (typeValue === 'workspace') return prefix + 'Workspaces';
+      return prefix + 'Matters';
+    }
 
-      try {
-        const btn = document.getElementById('showMorePinnedBtn');
-        if (btn) {
-          btn.disabled = true;
-          btn.innerHTML = `
-            <svg class="animate-spin h-5 w-5 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    function pinnedSectionHtml() {
+      if (allPinnedMatters.length === 0 || currentPage !== 1) return '';
+      let html = `
+        <div class="col-span-full">
+          <div class="flex items-center gap-2 mb-4">
+            <svg class="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/>
             </svg>
-            Loading...
+            <h2 class="text-lg font-semibold text-gray-900">${sectionHeading('Pinned ')}</h2>
+            <span class="text-sm text-gray-500">(${totalPinnedCount > allPinnedMatters.length ? `Showing ${formatNumber(allPinnedMatters.length)} of ${formatNumber(totalPinnedCount)}` : formatNumber(allPinnedMatters.length)})</span>
+          </div>
+        </div>
+      `;
+      html += allPinnedMatters.map(matter => renderMatterCard(matter)).join('');
+      if (allPinnedMatters.length < totalPinnedCount) {
+        html += `
+          <div class="col-span-full">
+            <button
+              class="show-more-pinned-btn w-full py-3 px-4 bg-white border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-400 transition-colors flex items-center justify-center gap-2"
+              onclick="loadMorePinnedMatters()"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+              Show More Pinned Matters
+            </button>
+          </div>
+        `;
+      }
+      return html;
+    }
+
+    // Grid view: pinned cards (page 1) and the current page as cards.
+    function renderMattersGrid(unpinnedMatters, total, filtered) {
+      if (allPinnedMatters.length === 0 && unpinnedMatters.length === 0 && currentPage === 1) {
+        if (filtered) {
+          return `
+            <div class="col-span-full py-16">
+              <div class="max-w-md mx-auto text-center">
+                <h3 class="text-xl font-semibold text-gray-900 mb-2">No matching matters</h3>
+                <p class="text-gray-500 mb-6">Try a different search or clear the filters.</p>
+              </div>
+            </div>
           `;
         }
+        return `
+          <div class="col-span-full py-16">
+            <div class="max-w-md mx-auto text-center">
+              <div class="w-24 h-24 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg class="w-12 h-12 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
+                </svg>
+              </div>
+              <h3 class="text-xl font-semibold text-gray-900 mb-2">No matters yet</h3>
+              <p class="text-gray-500 mb-6">Get started by creating your first matter to organize your documents and collaborate with your team.</p>
+              <button onclick="document.getElementById('createMatterBtn').click()" class="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors shadow-lg shadow-indigo-200">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Create your first matter
+              </button>
+            </div>
+          </div>
+        `;
+      }
 
-        // Increment pinned page
-        pinnedPage++;
+      let html = pinnedSectionHtml();
+      if (unpinnedMatters.length > 0) {
+        html += `
+          <div class="col-span-full ${allPinnedMatters.length > 0 && currentPage === 1 ? 'mt-8' : ''}">
+            <div class="flex items-center gap-2 mb-4">
+              <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
+              </svg>
+              <h2 class="text-lg font-semibold text-gray-900">${sectionHeading('All ').replace('All Client Matters', 'Client Matters').replace('All Workspaces', 'Workspaces')}</h2>
+              <span class="text-sm text-gray-500">(${formatNumber(total)})</span>
+            </div>
+          </div>
+        `;
+        html += unpinnedMatters.map(matter => renderMatterCard(matter)).join('');
+      }
+      return html;
+    }
 
-        // Build filters
-        const filters = {};
-        const searchValue = searchInput.value.trim();
-        if (searchValue) filters.search = searchValue;
-        const statusValue = statusFilter.value;
-        if (statusValue) filters.status = statusValue;
-        const sourceValue = sourceFilter.value;
-        if (sourceValue) filters.source_filter = sourceValue;
+    // List view: the pinned cards sit above the table on page 1 (the table
+    // lists unpinned matters only).
+    function renderPinnedAboveList() {
+      const cards = document.getElementById('listPinnedCards');
+      if (cards) cards.innerHTML = pinnedSectionHtml();
+    }
 
-        // Fetch next batch of pinned matters by re-rendering
-        // loadMatters() will handle fetching the next page and accumulating
+    // Show the active view; the hidden one keeps its content.
+    function renderMattersView() {
+      const grid = document.getElementById('mattersGrid');
+      const listSection = document.getElementById('mattersListSection');
+      const pinnedSection = document.getElementById('listPinnedSection');
+      const gridControls = document.getElementById('gridSelectionControls');
+      const isGrid = viewMode === 'grid';
+      if (grid) grid.classList.toggle('hidden', !isGrid);
+      if (listSection) listSection.classList.toggle('hidden', isGrid);
+      if (pinnedSection) pinnedSection.classList.toggle('hidden', isGrid || allPinnedMatters.length === 0 || currentPage !== 1);
+      // The list view selects through the table's own checkboxes.
+      if (gridControls) gridControls.classList.toggle('hidden', !isGrid);
+      updatePagination(isGrid ? lastPagination.total_pages : 0);
+    }
+
+    function switchView(mode) {
+      viewMode = mode === 'grid' ? 'grid' : 'list';
+      try { window.localStorage.setItem(VIEW_STORAGE_KEY, viewMode); } catch (e) { /* ignore */ }
+      const gridBtn = document.getElementById('gridViewBtn');
+      const listBtn = document.getElementById('listViewBtn');
+      if (gridBtn) gridBtn.variant = viewMode === 'grid' ? 'primary' : 'ghost';
+      if (listBtn) listBtn.variant = viewMode === 'list' ? 'primary' : 'ghost';
+      // Selections made in one view don't carry into the other.
+      selectedMatters.clear();
+      updateSelectionUI();
+      const table = mattersTable();
+      if (table && typeof table.deselectAll === 'function') table.deselectAll();
+      renderMattersView();
+    }
+
+    async function loadMorePinnedMatters() {
+      const btn = document.querySelector('#mattersGrid .show-more-pinned-btn, #listPinnedCards .show-more-pinned-btn');
+      if (btn) btn.disabled = true;
+      pinnedPage++;
+      loadingMorePinned = true;
+      try {
         await loadMatters();
-
       } catch (error) {
         console.error('[Matters] Failed to load more pinned matters:', error);
         Toast.error('Failed to load more pinned matters');
-
-        // Decrement page back if failed
         pinnedPage--;
-
-        // Re-enable button
-        const btn = document.getElementById('showMorePinnedBtn');
-        if (btn) {
-          btn.disabled = false;
-          btn.innerHTML = `
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-            </svg>
-            Show More Pinned Matters
-          `;
-        }
+        loadingMorePinned = false;
+        if (btn) btn.disabled = false;
       }
     }
+    window.loadMorePinnedMatters = loadMorePinnedMatters;
 
+    // Grid view pager (hidden in list view, where the table pages).
     function updatePagination(totalPages) {
       const pagination = document.getElementById('pagination');
-      if (totalPages <= 1) {
+      if (!pagination) return;
+      if (!totalPages || totalPages <= 1) {
         pagination.innerHTML = '';
         return;
       }
@@ -1788,70 +1635,98 @@
     }
 
     window.goToPage = function(page) {
-      currentPage = page;
-      loadMatters();
+      const table = mattersTable();
+      if (table && table.dataSource) table.dataSource.goToPage(page);
     }
 
-    // Search and filter
-    document.getElementById('searchInput').addEventListener('input', debounce(() => {
-      const searchQuery = document.getElementById('searchInput').value;
-
-      // Track matter searched event (truncate query to 200 chars for analytics)
-      if (searchQuery && window.analytics) {
-        const truncatedQuery = searchQuery.length > 200 ? searchQuery.substring(0, 200) : searchQuery;
-        window.analytics.trackEvent('matter.searched', 'matter', null, {
-          matter_id: null, // Search is global, not matter-specific
-          query: truncatedQuery,
-          query_length: searchQuery.length,
-          truncated: searchQuery.length > 200
+    // Table + toolbar wiring
+    function initMattersTable() {
+      const table = mattersTable();
+      if (!table || !window.AdminTableKit || !window.MattersListTable) return Promise.resolve();
+      return window.AdminTableKit.whenTableReady().then(() => {
+        if (mattersTable() !== table) return;
+        // Renderers and filter options before the first page lands.
+        table.setCellRenderers(window.MattersListTable.cellRenderers());
+        table.setColumnFilterOptions(window.MattersListTable.filterOptions());
+        mattersToolbar = window.AdminTableKit.bindToolbar({
+          table: table,
+          searchId: 'searchInput',
+          sortId: 'mattersSort',
+          orderId: 'mattersSortOrder',
+          filterId: 'statusFilter',
+          filterKey: 'status',
+          countIds: ['mattersCount', 'mattersSectionCount'],
+          noun: ['matter', 'matters'],
+          onSearch: function (term) {
+            searchTerm = term;
+            // Track matter searched event (truncate query to 200 chars for analytics)
+            if (term && window.analytics) {
+              window.analytics.trackEvent('matter.searched', 'matter', null, {
+                matter_id: null,
+                query: term.length > 200 ? term.substring(0, 200) : term,
+                query_length: term.length,
+                truncated: term.length > 200
+              });
+            }
+            table.requestServerQuery({ resetPage: true });
+          }
         });
-      }
 
-      currentPage = 1;
-      pinnedPage = 1;
-      allPinnedMatters = [];
-      totalPinnedCount = 0;
-      loadMatters();
-    }, 300));
-
-    document.getElementById('statusFilter').addEventListener('change', () => {
-      const filterValue = document.getElementById('statusFilter').value;
-
-      // Track matter filtered event
-      if (window.analytics) {
-        window.analytics.trackEvent('matter.filtered', 'matter', null, {
-          matter_id: null, // Filter is global, not matter-specific
-          filter_type: 'status',
-          filter_value: filterValue
+        table.addEventListener('lex-query-change', (e) => {
+          if (e.target !== table) return;
+          fetchMattersPage(e.detail);
         });
-      }
 
-      currentPage = 1;
-      pinnedPage = 1;
-      allPinnedMatters = [];
-      totalPinnedCount = 0;
-      loadMatters();
-    });
-
-    document.getElementById('matterTypeFilter').addEventListener('change', () => {
-      const filterValue = document.getElementById('matterTypeFilter').value;
-
-      // Track matter type filtered event
-      if (window.analytics) {
-        window.analytics.trackEvent('matter.filtered', 'matter', null, {
-          matter_id: null,
-          filter_type: 'matter_type',
-          filter_value: filterValue
+        const statusSelect = document.getElementById('statusFilter');
+        if (statusSelect) statusSelect.addEventListener('lex-change', (e) => {
+          if (window.analytics) {
+            window.analytics.trackEvent('matter.filtered', 'matter', null, {
+              matter_id: null,
+              filter_type: 'status',
+              filter_value: String((e.detail && e.detail.value) || '')
+            });
+          }
         });
-      }
 
-      currentPage = 1;
-      pinnedPage = 1;
-      allPinnedMatters = [];
-      totalPinnedCount = 0;
-      loadMatters();
-    });
+        table.addEventListener('row-click', (e) => {
+          const row = e.detail && e.detail.row;
+          if (row && row.matter_id) viewMatter(row.matter_id);
+        });
 
+        // Row actions: lex-table's row-click skips buttons, so they are delegated.
+        table.addEventListener('click', (e) => {
+          const button = e.target && e.target.closest ? e.target.closest('.matters-list-action') : null;
+          if (!button) return;
+          e.preventDefault();
+          e.stopPropagation();
+          const id = button.getAttribute('data-row-matter-id');
+          const action = button.getAttribute('data-action');
+          if (action === 'pin') togglePin(id, button.getAttribute('data-source') || 'lana', button.getAttribute('data-pinned') === 'true');
+          else if (action === 'edit') editMatter(id);
+          else if (action === 'delete') deleteMatter(id);
+        });
+
+        table.addEventListener('empty-action', () => {
+          const b = document.getElementById('createMatterBtn');
+          if (b) b.click();
+        });
+
+        table.addEventListener('bulk-action', (e) => {
+          const action = e.detail && e.detail.action;
+          if (action !== 'delete' || !e.detail.items) return;
+          const ids = e.detail.items.map(m => m.matter_id).filter(Boolean);
+          if (ids.length) confirmBulkDeleteMatters(ids, () => table.deselectAll());
+        });
+      });
+    }
+
+    const _gridViewBtn = document.getElementById('gridViewBtn');
+    const _listViewBtn = document.getElementById('listViewBtn');
+    if (_gridViewBtn) _gridViewBtn.addEventListener('click', () => switchView('grid'));
+    if (_listViewBtn) _listViewBtn.addEventListener('click', () => switchView('list'));
+    if (_gridViewBtn) _gridViewBtn.variant = viewMode === 'grid' ? 'primary' : 'ghost';
+    if (_listViewBtn) _listViewBtn.variant = viewMode === 'list' ? 'primary' : 'ghost';
+    const mattersTableReady = initMattersTable();
     // Modal
     const modal = document.getElementById('matterModal');
     const form = document.getElementById('matterForm');
@@ -1887,25 +1762,48 @@
       }
     }
 
+    // lex-select is not form-associated, so form.reset() does not touch it.
+    // Restore each one to the value it was declared with when its form resets.
+    document.addEventListener('reset', (event) => {
+      const resetForm = event.target;
+      if (!resetForm || !resetForm.querySelectorAll) return;
+      resetForm.querySelectorAll('lex-select').forEach((select) => {
+        select.value = select.getAttribute('value') || '';
+      });
+    }, true);
+
+    // Text for a double-quoted HTML attribute. Escapes quotes itself: the
+    // page's later escapeHtml (div-based) does not.
+    function lexSelectAttr(text) {
+      return String(text == null ? '' : text)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    // lex-select options JSON for a double-quoted HTML attribute.
+    function lexSelectOptionsAttr(options) {
+      return lexSelectAttr(JSON.stringify(options));
+    }
+
     // Populate workspace selector dropdown
     function populateWorkspaceSelector() {
       const workspaceSelector = document.getElementById('workspaceSelector');
       if (!workspaceSelector) return;
 
-      // Keep the default "No workspace" option
-      const defaultOption = workspaceSelector.querySelector('option[value=""]');
-      workspaceSelector.innerHTML = '';
-      if (defaultOption) {
-        workspaceSelector.appendChild(defaultOption);
-      }
-
-      // Add workspace options
+      // Keep the default "No workspace" option, then add workspace options
+      const options = [{ value: '', label: 'No workspace (standalone matter)' }];
       allWorkspaces.forEach(workspace => {
-        const option = document.createElement('option');
-        option.value = workspace.matter_id;
-        option.textContent = workspace.matter_name || workspace.matter_id;
-        workspaceSelector.appendChild(option);
+        options.push({
+          value: String(workspace.matter_id),
+          label: workspace.matter_name || String(workspace.matter_id)
+        });
       });
+      const current = workspaceSelector.value;
+      workspaceSelector.options = options;
+      if (!options.some(o => o.value === current)) workspaceSelector.value = '';
 
       console.log('[populateWorkspaceSelector] Added workspace options:', allWorkspaces.length);
     }
@@ -2013,7 +1911,7 @@
 
     // Handle visibility change
     const visibilitySelect = document.getElementById('matterVisibility');
-    visibilitySelect.addEventListener('change', () => {
+    visibilitySelect.addEventListener('lex-change', () => {
       if (visibilitySelect.value === 'organization') {
         // Clear selected users when switching to organization visibility
         selectedUsers = [];
@@ -2074,7 +1972,7 @@
     // ================== DOCUMENT UPLOAD HANDLING (Removed - use Documents tab in matter drawer) ==================
 
     document.getElementById('createMatterBtn').addEventListener('click', () => {
-      document.getElementById('matterModalTitle').textContent = 'Create Matter';
+      modal.heading = 'Create Matter';
       document.getElementById('matterId').value = '';
       document.getElementById('matterIdDisplay').classList.add('hidden');
       document.getElementById('shareWithSection').classList.remove('hidden');
@@ -2097,17 +1995,17 @@
       conflictDetection = new ConflictDetection(api);
       conflictDetection.initialize('conflictDetectionContainer');
 
-      modal.classList.remove('hidden');
+      modal.open = true;
     });
 
-    document.getElementById('closeMatterModal').addEventListener('click', () => {
-      modal.classList.add('hidden');
+    // The lex-modal's close button, backdrop and Escape emit lex-close.
+    modal.addEventListener('lex-close', () => {
       if (conflictDetection) {
         conflictDetection.reset();
       }
     });
     document.getElementById('cancelMatterBtn').addEventListener('click', () => {
-      modal.classList.add('hidden');
+      modal.open = false;
       if (conflictDetection) {
         conflictDetection.reset();
       }
@@ -2242,7 +2140,7 @@
         const matter = matterResult.matter;
         const permissions = permResult.permissions || [];
 
-        document.getElementById('matterModalTitle').textContent = 'Edit Matter';
+        modal.heading = 'Edit Matter';
         document.getElementById('matterId').value = matter.matter_id;
         document.getElementById('matterIdDisplay').classList.remove('hidden');
         const matterIdValueEl = document.getElementById('matterIdValue');
@@ -2276,7 +2174,7 @@
               if (workspaceLink) {
                 // Set the workspace selector to the linked workspace
                 // For incoming links (matter linked to workspace), workspace ID is in linked_entity_id
-                document.getElementById('workspaceSelector').value = workspaceLink.linked_entity_id;
+                document.getElementById('workspaceSelector').value = String(workspaceLink.linked_entity_id);
                 console.log('[Edit Matter] Loaded existing workspace link:', workspaceLink.linked_entity_id);
               }
             }
@@ -2301,7 +2199,7 @@
         document.getElementById('shareWithSection').classList.remove('hidden');
         updateShareSectionVisibility();
 
-        modal.classList.remove('hidden');
+        modal.open = true;
       } catch (error) {
         Toast.error('Failed to load matter');
       }
@@ -3883,7 +3781,6 @@
     const metadataNotes = document.getElementById('metadataNotes');
     const confirmMetadataUpload = document.getElementById('confirmMetadataUpload');
     const cancelMetadataUpload = document.getElementById('cancelMetadataUpload');
-    const closeMetadataModal = document.getElementById('closeMetadataModal');
 
     let pendingFileUpload = null;
     let pendingMatterId = null;
@@ -3914,11 +3811,11 @@
       if (charCount) charCount.textContent = '0';
 
       // Show modal
-      metadataModal.classList.remove('hidden');
+      metadataModal.open = true;
     }
 
     function closeMetadataModalFn() {
-      metadataModal.classList.add('hidden');
+      metadataModal.open = false;
       pendingFileUpload = null;
       pendingMatterId = null;
 
@@ -3937,15 +3834,7 @@
       }
 
       // Disable button and show loading state
-      confirmMetadataUpload.disabled = true;
-      const originalContent = confirmMetadataUpload.innerHTML;
-      confirmMetadataUpload.innerHTML = `
-        <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-        <span>Uploading...</span>
-      `;
+      confirmMetadataUpload.loading = true;
 
       const file = pendingFileUpload;
       const matterId = pendingMatterId;
@@ -3973,8 +3862,7 @@
       closeMetadataModalFn();
 
       // Reset button state
-      confirmMetadataUpload.disabled = false;
-      confirmMetadataUpload.innerHTML = originalContent;
+      confirmMetadataUpload.loading = false;
 
       // Show upload progress
       const dropContent = document.getElementById('drawerDocDropContent');
@@ -4009,7 +3897,8 @@
     }
 
     // Event listeners for metadata modal
-    closeMetadataModal.addEventListener('click', closeMetadataModalFn);
+    // The lex-modal's close button, backdrop and Escape emit lex-close.
+    metadataModal.addEventListener('lex-close', closeMetadataModalFn);
     cancelMetadataUpload.addEventListener('click', closeMetadataModalFn);
     confirmMetadataUpload.addEventListener('click', confirmMetadataUploadFn);
 
@@ -4021,19 +3910,6 @@
       }
     });
 
-    // Close modal when clicking outside
-    metadataModal.addEventListener('click', (e) => {
-      if (e.target === metadataModal) {
-        closeMetadataModalFn();
-      }
-    });
-
-    // Close modal with ESC key
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && !metadataModal.classList.contains('hidden')) {
-        closeMetadataModalFn();
-      }
-    });
 
     // Navigate to dedicated file viewer page
     window.navToFileViewer = function(fileId, matterId) {
@@ -5696,16 +5572,10 @@
     function showTaskReadonlyModal(task) {
       const title = task.title || task.task_name;
 
-      const modalHtml = `
-        <div id="taskReadonlyModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-              <h3 class="text-lg font-semibold text-gray-900">${title}</h3>
-              <button onclick="closeTaskReadonlyModal()" class="text-gray-400 hover:text-gray-600">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-              </button>
-            </div>
-            <div class="p-6 space-y-4">
+      // Lex.Modal.open: escaped heading, close button, backdrop, Escape, focus trap.
+      window.closeTaskReadonlyModal();
+      const content = `
+            <div class="space-y-4">
               <div class="flex items-center gap-2">
                 <span class="text-xs bg-purple-100 text-purple-800 px-3 py-1 rounded">ActionStep Task (Read-only)</span>
                 ${getStatusBadge(task.status, task.source)}
@@ -5740,21 +5610,18 @@
                 </div>
               ` : ''}
             </div>
-            <div class="px-6 py-4 border-t border-gray-200 flex justify-end">
-              <button onclick="closeTaskReadonlyModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors">
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+            <lex-btn data-slot="footer" variant="secondary" onclick="closeTaskReadonlyModal()">Close</lex-btn>
       `;
 
-      document.body.insertAdjacentHTML('beforeend', modalHtml);
+      const modal = Lex.Modal.open({ heading: title || 'Task', content, size: 'lg', hideActions: true });
+      modal.id = 'taskReadonlyModal';
     }
 
     window.closeTaskReadonlyModal = function() {
       const modal = document.getElementById('taskReadonlyModal');
-      if (modal) modal.remove();
+      if (!modal) return;
+      if (typeof modal.removeAfterClose === 'function') modal.removeAfterClose();
+      else modal.remove();
     };
 
     // Attach event listeners for Kanban board
@@ -5949,12 +5816,12 @@
       const modal = document.getElementById('contactModal');
       document.getElementById('contactForm').reset();
       document.getElementById('contactMatterId').value = matterId;
-      modal.classList.remove('hidden');
+      modal.open = true;
     };
 
     // Close Contact Modal
     window.closeContactModal = function() {
-      document.getElementById('contactModal').classList.add('hidden');
+      document.getElementById('contactModal').open = false;
       document.getElementById('contactForm').reset();
     };
 
@@ -5995,7 +5862,7 @@
         Toast.success('Contact created successfully');
 
         // Close modal
-        document.getElementById('contactModal').classList.add('hidden');
+        document.getElementById('contactModal').open = false;
 
         // Restore button state
         submitBtn.disabled = false;
@@ -6028,7 +5895,7 @@
           <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
         </div>
       `;
-      modal.classList.remove('hidden');
+      modal.open = true;
 
       try {
         // Get current matter ID from drawer
@@ -6230,7 +6097,7 @@
 
     // Close Contact Detail Modal
     window.closeContactDetailModal = function() {
-      document.getElementById('contactDetailModal').classList.add('hidden');
+      document.getElementById('contactDetailModal').open = false;
     };
 
     // Open Edit Contact Modal
@@ -6273,7 +6140,7 @@
         document.getElementById('editContactType').value = contact.contact_type || 'contact:other';
 
         // Show modal
-        document.getElementById('editContactModal').classList.remove('hidden');
+        document.getElementById('editContactModal').open = true;
       } catch (error) {
         console.error('Error loading contact for editing:', error);
         Toast.error('Failed to load contact');
@@ -6282,7 +6149,7 @@
 
     // Close Edit Contact Modal
     window.closeEditContactModal = function() {
-      document.getElementById('editContactModal').classList.add('hidden');
+      document.getElementById('editContactModal').open = false;
       document.getElementById('editContactForm').reset();
     };
 
@@ -6707,36 +6574,38 @@
               <!-- Filter by Type -->
               <div>
                 <label class="block text-xs font-medium text-gray-700 mb-1">Filter by Type</label>
-                <select
+                <lex-select
                   id="contactsFilterSelect"
-                  onchange="updateContactsFilter(this.value)"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
-                >
-                  <option value="all" ${contactsFilterType === 'all' ? 'selected' : ''}>All Types</option>
-                  <option value="contact:participant" ${contactsFilterType === 'contact:participant' ? 'selected' : ''}>Participants</option>
-                  <option value="contact:opportunity" ${contactsFilterType === 'contact:opportunity' ? 'selected' : ''}>Opportunities</option>
-                  <option value="contact:lead" ${contactsFilterType === 'contact:lead' ? 'selected' : ''}>Leads</option>
-                  <option value="contact:other" ${contactsFilterType === 'contact:other' ? 'selected' : ''}>Other</option>
-                </select>
+                  size="sm"
+                  options="${lexSelectOptionsAttr([
+                    { value: 'all', label: 'All types' },
+                    { value: 'contact:participant', label: 'Participants' },
+                    { value: 'contact:opportunity', label: 'Opportunities' },
+                    { value: 'contact:lead', label: 'Leads' },
+                    { value: 'contact:other', label: 'Other' }
+                  ])}"
+                  value="${lexSelectAttr(contactsFilterType)}"
+                ></lex-select>
               </div>
 
               <!-- Sort By -->
               <div>
                 <label class="block text-xs font-medium text-gray-700 mb-1">Sort By</label>
-                <select
+                <lex-select
                   id="contactsSortSelect"
-                  onchange="updateContactsSort(this.value)"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
-                >
-                  <option value="name" ${contactsSortBy === 'name' ? 'selected' : ''}>Name (A-Z)</option>
-                  <option value="name-desc" ${contactsSortBy === 'name-desc' ? 'selected' : ''}>Name (Z-A)</option>
-                  <option value="company" ${contactsSortBy === 'company' ? 'selected' : ''}>Company (A-Z)</option>
-                  <option value="company-desc" ${contactsSortBy === 'company-desc' ? 'selected' : ''}>Company (Z-A)</option>
-                  <option value="type" ${contactsSortBy === 'type' ? 'selected' : ''}>Type (A-Z)</option>
-                  <option value="type-desc" ${contactsSortBy === 'type-desc' ? 'selected' : ''}>Type (Z-A)</option>
-                  <option value="date" ${contactsSortBy === 'date' ? 'selected' : ''}>Date Added (Oldest)</option>
-                  <option value="date-desc" ${contactsSortBy === 'date-desc' ? 'selected' : ''}>Date Added (Newest)</option>
-                </select>
+                  size="sm"
+                  options="${lexSelectOptionsAttr([
+                    { value: 'name', label: 'Name (A-Z)' },
+                    { value: 'name-desc', label: 'Name (Z-A)' },
+                    { value: 'company', label: 'Company (A-Z)' },
+                    { value: 'company-desc', label: 'Company (Z-A)' },
+                    { value: 'type', label: 'Type (A-Z)' },
+                    { value: 'type-desc', label: 'Type (Z-A)' },
+                    { value: 'date', label: 'Date added (oldest)' },
+                    { value: 'date-desc', label: 'Date added (newest)' }
+                  ])}"
+                  value="${lexSelectAttr(contactsSortBy)}"
+                ></lex-select>
               </div>
             </div>
 
@@ -6823,6 +6692,13 @@
       }
     };
 
+    // Contacts toolbar selects are re-rendered with the tab, so listen once at the document.
+    document.addEventListener('lex-change', (event) => {
+      const id = event.target && event.target.id;
+      if (id === 'contactsFilterSelect') updateContactsFilter(event.detail.value);
+      else if (id === 'contactsSortSelect') updateContactsSort(event.detail.value);
+    });
+
     // Update contacts filter
     window.updateContactsFilter = function(filterType) {
       contactsFilterType = filterType;
@@ -6860,7 +6736,8 @@
 
     // Unlink a contact from the current matter
     window.unlinkContactFromMatter = async function(contactId, matterId) {
-      if (!confirm('Unlink this contact from the matter? The contact will still exist in the system.')) {
+      const confirmed = await confirmAction('Unlink Contact', 'Unlink this contact from the matter? The contact will still exist in the system.', { confirmText: 'Unlink', variant: 'danger' });
+      if (!confirmed) {
         return;
       }
 
@@ -7714,52 +7591,42 @@
     }
 
     async function showDeclinePendingMatchModal(matchId, matterId) {
-      // Show custom modal with optional reason
-      const modalHtml = `
-        <div id="declineMatchModal" class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
-          <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-            <div class="p-6">
-              <h3 class="text-lg font-semibold text-gray-900 mb-2">Decline Match</h3>
-              <p class="text-sm text-gray-600 mb-4">
-                This match will be permanently declined and never suggested again.
-                Optionally provide a reason to help improve future matching.
-              </p>
+      // Lex.Modal.open with an optional reason field
+      closeDeclineMatchModal();
+      const content = `
+        <p class="text-sm text-gray-600 mb-4">
+          This match will be permanently declined and never suggested again.
+          Optionally provide a reason to help improve future matching.
+        </p>
 
-              <label class="block text-sm font-medium text-gray-700 mb-2">
-                Reason (optional)
-              </label>
-              <textarea
-                id="declineReason"
-                rows="3"
-                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="E.g., Wrong client, Different matter, Incorrect data..."
-              ></textarea>
-
-              <div class="mt-6 flex gap-3 justify-end">
-                <button
-                  onclick="closeDeclineMatchModal()"
-                  class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
-                >
-                  Cancel
-                </button>
-                <button
-                  onclick="confirmDeclinePendingMatch('${matchId}', '${matterId}')"
-                  class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
-                >
-                  Decline Match
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <label for="declineReason" class="block text-sm font-medium text-gray-700 mb-2">
+          Reason (optional)
+        </label>
+        <textarea
+          id="declineReason"
+          rows="3"
+          class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          placeholder="E.g., Wrong client, Different matter, Incorrect data..."
+        ></textarea>
+        <lex-btn data-slot="footer" variant="secondary" data-decline-action="cancel">Cancel</lex-btn>
+        <lex-btn data-slot="footer" variant="danger" data-decline-action="confirm">Decline Match</lex-btn>
       `;
 
-      document.body.insertAdjacentHTML('beforeend', modalHtml);
+      const modal = Lex.Modal.open({ heading: 'Decline Match', content, size: 'md', hideActions: true });
+      modal.id = 'declineMatchModal';
+      modal.addEventListener('click', (e) => {
+        const btn = e.target.closest && e.target.closest('[data-decline-action]');
+        if (!btn) return;
+        if (btn.getAttribute('data-decline-action') === 'confirm') confirmDeclinePendingMatch(matchId, matterId);
+        else closeDeclineMatchModal();
+      });
     }
 
     function closeDeclineMatchModal() {
       const modal = document.getElementById('declineMatchModal');
-      if (modal) modal.remove();
+      if (!modal) return;
+      if (typeof modal.removeAfterClose === 'function') modal.removeAfterClose();
+      else modal.remove();
     }
 
     async function confirmDeclinePendingMatch(matchId, matterId) {
@@ -7917,8 +7784,7 @@
       const sourceInput = document.getElementById('linkSourceMatterId');
       const searchInput = document.getElementById('linkMatterSearch');
       const submitBtn = document.getElementById('createLinkBtn');
-      const modalTitle = modal.querySelector('h3');
-      const modalSubtitle = modal.querySelector('p.text-sm.text-gray-500');
+      const modalSubtitle = document.getElementById('createLinkSubtitle');
       const linkTypeContainer = document.getElementById('linkTypeContainer');
 
       // Set source matter ID
@@ -7929,12 +7795,12 @@
 
       // Update modal text based on source type
       if (isWorkspace) {
-        modalTitle.textContent = 'Add Matter to Workspace';
+        modal.heading = 'Add Matter to Workspace';
         modalSubtitle.textContent = 'Link an existing matter to this workspace';
         linkTypeContainer.style.display = 'none'; // Hide link type for workspaces
         document.getElementById('linkType').value = 'workspace_matter';
       } else {
-        modalTitle.textContent = 'Link Related Matter';
+        modal.heading = 'Link Related Matter';
         modalSubtitle.textContent = 'Connect this matter to another matter';
         linkTypeContainer.style.display = 'block'; // Show link type for matters
         document.getElementById('linkType').value = 'related_to';
@@ -7948,7 +7814,7 @@
       selectedLinkTargetMatter = null;
 
       // Show modal
-      modal.classList.remove('hidden');
+      modal.open = true;
       setTimeout(() => searchInput.focus(), 100);
 
       // Setup click outside handler to close dropdown
@@ -7977,7 +7843,7 @@
      */
     window.closeCreateLinkModal = function() {
       const modal = document.getElementById('createLinkModal');
-      modal.classList.add('hidden');
+      modal.open = false;
       selectedLinkTargetMatter = null;
 
       // Clear any pending search
@@ -8340,7 +8206,7 @@
 
       try {
         submitBtn.disabled = true;
-        submitBtn.textContent = 'Creating...';
+        submitBtn.label = 'Creating...';
 
         const response = await fetch(`${api.baseUrl}/api/v1/entity-links`, {
           method: 'POST',
@@ -8376,7 +8242,7 @@
         console.error('Create link error:', error);
         Toast.error(error.message || 'Failed to create link');
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Create Link';
+        submitBtn.label = 'Create Link';
       }
     }
 
@@ -8391,8 +8257,7 @@
       document.getElementById('unlinkMatterName').textContent = `"${linkedMatterName}"`;
 
       const modal = document.getElementById('unlinkConfirmModal');
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
+      modal.open = true;
 
       // Set up the confirm button click handler
       const confirmBtn = document.getElementById('confirmUnlinkButton');
@@ -8408,8 +8273,7 @@
      */
     window.closeUnlinkConfirmModal = function() {
       const modal = document.getElementById('unlinkConfirmModal');
-      modal.classList.remove('flex');
-      modal.classList.add('hidden');
+      modal.open = false;
       window.pendingUnlinkId = null;
     }
 
@@ -8476,7 +8340,7 @@
       workspaceConflictDetection.initialize('workspaceConflictDetectionContainer');
 
       // Show modal
-      modal.classList.remove('hidden');
+      modal.open = true;
     }
 
     // =============================================================================
@@ -8497,13 +8361,13 @@
         const currentUserId = api.user?.id;
 
         // Build dropdown options
-        let options = '<option value="">Unassigned</option>';
+        const options = [{ value: '', label: 'Unassigned' }];
 
         // Add "Me" option for current user
         if (currentUserId) {
           const currentUser = users.find(u => u.id === currentUserId);
           if (currentUser) {
-            options += `<option value="${currentUserId}">Me (${currentUser.first_name} ${currentUser.last_name})</option>`;
+            options.push({ value: String(currentUserId), label: `Me (${currentUser.first_name} ${currentUser.last_name})` });
           }
         }
 
@@ -8511,13 +8375,13 @@
         users
           .filter(u => u.id !== currentUserId)
           .forEach(user => {
-            options += `<option value="${user.id}">${user.first_name} ${user.last_name}</option>`;
+            options.push({ value: String(user.id), label: `${user.first_name} ${user.last_name}` });
           });
 
-        dropdown.innerHTML = options;
+        dropdown.options = options;
 
         // Set selected value (default to current user if no selection provided)
-        dropdown.value = selectedUserId || currentUserId || '';
+        dropdown.value = String(selectedUserId || currentUserId || '');
       } catch (error) {
         console.error('Failed to load users for task assignment:', error);
         Toast.error('Failed to load users');
@@ -8528,14 +8392,14 @@
     window.openCreateTaskModal = async function(matterId) {
       currentTaskMatterId = matterId;
       const modal = document.getElementById('taskModal');
-      document.getElementById('taskModalTitle').textContent = 'Create Task';
+      modal.heading = 'Create Task';
       document.getElementById('taskForm').reset();
       document.getElementById('taskId').value = '';
 
       // Populate assignees with current user as default
       await populateTaskAssignees();
 
-      modal.classList.remove('hidden');
+      modal.open = true;
     };
 
     // Edit Task
@@ -8551,7 +8415,7 @@
 
         currentEditingTask = task;
         const modal = document.getElementById('taskModal');
-        document.getElementById('taskModalTitle').textContent = 'Edit Task';
+        modal.heading = 'Edit Task';
         document.getElementById('taskId').value = task.id;
         document.getElementById('taskTitle').value = task.title || '';
         document.getElementById('taskDescription').value = task.description || '';
@@ -8567,7 +8431,7 @@
         // Populate assignees with task's assigned user selected
         await populateTaskAssignees(task.assigned_to_user_id || null);
 
-        modal.classList.remove('hidden');
+        modal.open = true;
       } catch (error) {
         console.error('Edit task error:', error);
         Toast.error('Failed to load task details');
@@ -8604,7 +8468,8 @@
 
     // Delete Task
     window.deleteTask = async function(taskId) {
-      if (!confirm('Are you sure you want to delete this task?')) {
+      const confirmed = await confirmAction('Delete Task', 'Are you sure you want to delete this task?', { confirmText: 'Delete', variant: 'danger' });
+      if (!confirmed) {
         return;
       }
 
@@ -8677,7 +8542,7 @@
         }
 
         // Close modal
-        document.getElementById('taskModal').classList.add('hidden');
+        document.getElementById('taskModal').open = false;
 
         // Restore button state (will be reset when modal reopens anyway)
         submitBtn.disabled = false;
@@ -8714,31 +8579,28 @@
 
     // Close Task Modal
     window.closeTaskModal = function() {
-      document.getElementById('taskModal').classList.add('hidden');
+      document.getElementById('taskModal').open = false;
       document.getElementById('taskForm').reset();
       currentTaskMatterId = null;
       currentEditingTask = null;
     };
 
     // Close drawer function (must be defined before event listeners)
+    // matterDrawer is a lex-drawer: its close button, backdrop and Escape close it.
     window.closeDrawer = function() {
-      const optionsDropdown = document.getElementById('drawerOptionsDropdown');
-      if (optionsDropdown) optionsDropdown.classList.add('hidden');
-      document.getElementById('matterDrawer').classList.add('translate-x-full');
-      setTimeout(() => {
-        document.getElementById('matterDrawer').classList.add('hidden');
-        document.getElementById('drawerOverlay').classList.add('hidden');
-      }, 300);
+      const drawer = document.getElementById('matterDrawer');
+      if (drawer) drawer.open = false;
     }
 
-    // Close drawer event listeners
-    const closeDrawerBtn = document.getElementById('closeDrawer');
-    const drawerOverlay = document.getElementById('drawerOverlay');
-    if (closeDrawerBtn) {
-      closeDrawerBtn.addEventListener('click', closeDrawer);
-    }
-    if (drawerOverlay) {
-      drawerOverlay.addEventListener('click', closeDrawer);
+    // Drawer kebab menu (lex-dropdown-btn): Edit / Delete the matter shown.
+    const drawerOptionsMenu = document.getElementById('drawerOptionsMenu');
+    if (drawerOptionsMenu) {
+      drawerOptionsMenu.addEventListener('lex-select', (e) => {
+        const matterId = currentMatterData?.matter?.matter_id;
+        if (!matterId) return;
+        if (e.detail.value === 'edit') editMatter(matterId);
+        else if (e.detail.value === 'delete') deleteMatter(matterId);
+      });
     }
 
     // Security: Prevent concurrent pin/unpin requests (race condition fix)
@@ -8746,7 +8608,8 @@
 
     // Pin/Unpin matter
     window.togglePin = async function(matterId, source = 'lana', isPinned) {
-      const button = document.querySelector(`.pin-button[data-matter-id="${matterId}"]`);
+      const button = document.querySelector(`.pin-button[data-matter-id="${matterId}"]`) ||
+        document.querySelector(`.matters-list-action[data-action="pin"][data-row-matter-id="${matterId}"]`);
       if (!button) return;
 
       // Prevent concurrent requests for same matter (race condition fix)
@@ -8885,30 +8748,15 @@
       updateSelectionUI();
     }
 
-    // Toggle matter card options dropdown (more options button on grid cards)
-    window.toggleMatterCardOptions = function(matterId) {
-      const dropdown = document.getElementById(`matter-card-options-${matterId}`);
-      if (!dropdown) return;
-      const isOpening = dropdown.classList.contains('hidden');
-      document.querySelectorAll('[id^="matter-card-options-"]').forEach(el => el.classList.add('hidden'));
-      dropdown.classList.toggle('hidden', !isOpening);
-      if (isOpening) {
-        setTimeout(() => {
-          const closeOnClickOutside = (ev) => {
-            if (!dropdown.contains(ev.target) && !ev.target.closest('[onclick*="toggleMatterCardOptions"]')) {
-              dropdown.classList.add('hidden');
-              document.removeEventListener('click', closeOnClickOutside);
-            }
-          };
-          document.addEventListener('click', closeOnClickOutside);
-        }, 0);
-      }
-    };
-
-    window.closeMatterCardOptions = function(matterId) {
-      const dropdown = document.getElementById(`matter-card-options-${matterId}`);
-      if (dropdown) dropdown.classList.add('hidden');
-    };
+    // Grid card options menu (lex-dropdown-btn: keyboard, outside click, Escape)
+    document.addEventListener('lex-select', (e) => {
+      const menu = e.target && e.target.closest ? e.target.closest('lex-dropdown-btn.matter-card-options') : null;
+      if (!menu) return;
+      const matterId = menu.getAttribute('data-matter-id');
+      if (!matterId) return;
+      if (e.detail.value === 'edit') editMatter(matterId);
+      else if (e.detail.value === 'delete') deleteMatter(matterId);
+    });
 
     // Update selection UI (checkboxes, count, bulk actions visibility)
     function updateSelectionUI() {
@@ -8971,10 +8819,13 @@
       updateSelectionUI();
     });
 
-    // Bulk delete
-    document.getElementById('bulkDeleteBtn').addEventListener('click', async () => {
-      const count = selectedMatters.size;
-      const matterIds = Array.from(selectedMatters);
+    // Bulk delete: the grid's "Delete Selected" and the list table's bulk action.
+    document.getElementById('bulkDeleteBtn').addEventListener('click', () => {
+      confirmBulkDeleteMatters(Array.from(selectedMatters));
+    });
+
+    function confirmBulkDeleteMatters(matterIds, afterDelete) {
+      const count = matterIds.length;
 
       Modal.confirm(
         'Delete Multiple Matters',
@@ -9003,6 +8854,7 @@
             // Clear selection and reload
             selectedMatters.clear();
             updateSelectionUI();
+            if (typeof afterDelete === 'function') afterDelete();
             closeDrawer();
             loadMatters();
           } catch (error) {
@@ -9017,7 +8869,7 @@
           }
         }
       );
-    });
+    }
 
     // Share modal
     async function showShareModal(matterId) {
@@ -9026,10 +8878,11 @@
 
       const content = document.createElement('div');
       content.innerHTML = `
-        <select id="shareUserId" class="w-full px-3 py-2 border border-gray-300 rounded-lg mb-4">
-          <option value="">Select a user</option>
-          ${users.map(u => `<option value="${u.id}">${u.email} (${u.first_name || ''} ${u.last_name || ''})</option>`).join('')}
-        </select>
+        <lex-select id="shareUserId" class="mb-4" searchable placeholder="Select a user" value=""
+          options="${lexSelectOptionsAttr([{ value: '', label: 'Select a user' }].concat(users.map(u => ({
+            value: String(u.id),
+            label: `${u.email} (${u.first_name || ''} ${u.last_name || ''})`
+          }))))}"></lex-select>
         <div class="flex gap-2">
           <label class="flex items-center gap-2">
             <input type="checkbox" name="perm" value="read" checked class="w-4 h-4"> Read
@@ -9224,7 +9077,7 @@
         const visibilitySelect = document.getElementById('modalMatterVisibility');
         const shareSection = document.getElementById('modalShareSection');
 
-        visibilitySelect.addEventListener('change', function() {
+        visibilitySelect.addEventListener('lex-change', function() {
           if (this.value === 'organization') {
             shareSection.style.opacity = '0.5';
             shareSection.style.pointerEvents = 'none';
@@ -9282,8 +9135,7 @@
 
         // Show modal
         const modal = document.getElementById('manageShareModal');
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
+        modal.open = true;
 
       } catch (error) {
         console.error('Error opening share modal:', error);
@@ -9296,8 +9148,7 @@
      */
     window.closeManageShareModal = function() {
       const modal = document.getElementById('manageShareModal');
-      modal.classList.remove('flex');
-      modal.classList.add('hidden');
+      modal.open = false;
       window.currentManageShareMatterId = null;
 
       // Clear search input
@@ -9318,14 +9169,7 @@
         }
 
         const saveButton = document.getElementById('saveShareButton');
-        saveButton.disabled = true;
-        saveButton.innerHTML = `
-          <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          Saving...
-        `;
+        saveButton.loading = true;
 
         const visibility = document.getElementById('modalMatterVisibility').value;
         const selectedUsers = Array.from(document.querySelectorAll('input[name="shareUser"]:checked'))
@@ -9394,13 +9238,7 @@
         Toast.error(error.message || 'Failed to save sharing settings');
       } finally {
         const saveButton = document.getElementById('saveShareButton');
-        saveButton.disabled = false;
-        saveButton.innerHTML = `
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-          </svg>
-          Save Changes
-        `;
+        saveButton.loading = false;
       }
     }
 
@@ -9618,7 +9456,7 @@
           }
         }
 
-        modal.classList.add('hidden');
+        modal.open = false;
         resetShareForm();
         if (conflictDetection) {
           conflictDetection.reset();
@@ -9655,15 +9493,14 @@
     const workspaceMatterForm = document.getElementById('workspaceMatterForm');
 
     // Close modal handlers
-    document.getElementById('closeWorkspaceMatterModal').addEventListener('click', () => {
-      workspaceMatterModal.classList.add('hidden');
+    workspaceMatterModal.addEventListener('lex-close', () => {
       if (workspaceConflictDetection) {
         workspaceConflictDetection.reset();
       }
     });
 
     document.getElementById('cancelWorkspaceMatterBtn').addEventListener('click', () => {
-      workspaceMatterModal.classList.add('hidden');
+      workspaceMatterModal.open = false;
       if (workspaceConflictDetection) {
         workspaceConflictDetection.reset();
       }
@@ -9817,7 +9654,7 @@
           }
         }
 
-        workspaceMatterModal.classList.add('hidden');
+        workspaceMatterModal.open = false;
         workspaceSelectedUsers = [];
         if (workspaceConflictDetection) {
           workspaceConflictDetection.reset();
@@ -9862,12 +9699,12 @@
     // Matters Info Modal Functions
     window.openMattersInfoModal = function() {
       const modal = document.getElementById('mattersInfoModal');
-      modal.classList.remove('hidden');
+      modal.open = true;
     }
 
     window.closeMattersInfoModal = function() {
       const modal = document.getElementById('mattersInfoModal');
-      modal.classList.add('hidden');
+      modal.open = false;
     }
 
     // Global refresh page function (accessible from inline onclick handlers)
@@ -9878,78 +9715,24 @@
   </script>
 
   <!-- Unlink Confirmation Modal -->
-  <div id="unlinkConfirmModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 10001;" onclick="if(event.target === this) closeUnlinkConfirmModal()">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md" onclick="event.stopPropagation()">
-      <!-- Modal Header -->
-      <div class="flex items-center justify-between p-6 border-b border-gray-200">
-        <div class="flex items-center gap-3">
-          <div class="flex-shrink-0 w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-            <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
-            </svg>
-          </div>
-          <h2 class="text-xl font-semibold text-gray-900">Remove Link</h2>
-        </div>
-        <button onclick="closeUnlinkConfirmModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-
-      <!-- Modal Body -->
-      <div class="p-6">
+  <lex-modal id="unlinkConfirmModal" heading="Remove Link" size="md" variant="danger">
+      <div>
         <p class="text-gray-900 font-medium mb-2">Are you sure you want to remove the link to <span id="unlinkMatterName" class="text-indigo-600"></span>?</p>
         <p class="text-sm text-gray-500">This action cannot be undone.</p>
       </div>
 
-      <!-- Modal Footer -->
-      <div class="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
-        <button onclick="closeUnlinkConfirmModal()" class="px-5 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-          Cancel
-        </button>
-        <button id="confirmUnlinkButton" class="px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
-          </svg>
-          Remove Link
-        </button>
-      </div>
-    </div>
-  </div>
+      <lex-btn data-slot="footer" variant="secondary" onclick="closeUnlinkConfirmModal()">Cancel</lex-btn>
+      <lex-btn data-slot="footer" variant="danger" id="confirmUnlinkButton" leading-icon="unlink">Remove Link</lex-btn>
+  </lex-modal>
 
   <!-- Manage Share Modal -->
-  <div id="manageShareModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 10001;" onclick="if(event.target === this) closeManageShareModal()">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg">
-      <!-- Modal Header -->
-      <div class="flex items-center justify-between p-6 border-b border-gray-200">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-            <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path>
-            </svg>
-          </div>
-          <div>
-            <h3 class="text-xl font-semibold text-gray-900">Manage Sharing</h3>
-            <p class="text-sm text-gray-500 mt-0.5">Control matter visibility and access</p>
-          </div>
-        </div>
-        <button onclick="closeManageShareModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-
-      <!-- Modal Body -->
-      <div class="p-6 space-y-6">
+  <lex-modal id="manageShareModal" heading="Manage Sharing" size="md">
+      <div class="space-y-6">
+        <p class="text-sm text-gray-500">Control matter visibility and access</p>
         <!-- Visibility Setting -->
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">Visibility</label>
-          <select id="modalMatterVisibility" class="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-            <option value="private">Private - Only shared users can access</option>
-            <option value="organization">Organization - All members can access</option>
-          </select>
+          <lex-select id="modalMatterVisibility" options='[{"value": "private", "label": "Private - Only shared users can access"}, {"value": "organization", "label": "Organization - All members can access"}]' value="private"></lex-select>
           <p class="text-xs text-gray-500 mt-2">Organization visibility allows all team members to view this matter</p>
         </div>
 
@@ -9981,46 +9764,15 @@
         </div>
       </div>
 
-      <!-- Modal Footer -->
-      <div class="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50 rounded-b-xl">
-        <button onclick="closeManageShareModal()" class="px-5 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-          Cancel
-        </button>
-        <button id="saveShareButton" onclick="saveShareSettings()" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-          </svg>
-          Save Changes
-        </button>
-      </div>
-    </div>
-  </div>
+      <lex-btn data-slot="footer" variant="secondary" onclick="closeManageShareModal()">Cancel</lex-btn>
+      <lex-btn data-slot="footer" variant="primary" id="saveShareButton" onclick="saveShareSettings()" leading-icon="check">Save Changes</lex-btn>
+  </lex-modal>
 
   <!-- Manual Connect Data Modal -->
-  <div id="manualConnectModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 10001;">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
-      <!-- Modal Header -->
-      <div class="flex items-center justify-between p-6 border-b border-gray-200">
-        <div class="flex items-center gap-3">
-          <div class="flex-shrink-0 w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-            <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
-            </svg>
-          </div>
-          <div>
-            <h2 class="text-xl font-semibold text-gray-900">Link Data to Matter</h2>
-            <p class="text-sm text-gray-500">Search and select connector data to link</p>
-          </div>
-        </div>
-        <button onclick="closeManualConnectModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-
+  <lex-modal id="manualConnectModal" heading="Link Data to Matter" size="xl" flush>
       <!-- Search Bar -->
       <div class="p-6 border-b border-gray-200">
+        <p class="text-sm text-gray-500 mb-3">Search and select connector data to link</p>
         <div class="relative">
           <input type="text" id="manualConnectSearch" placeholder="Search by ID, name, or content..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
           <svg class="absolute left-3 top-2.5 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -10028,24 +9780,13 @@
           </svg>
         </div>
         <div class="mt-3 flex gap-2">
-          <select id="manualConnectEntityType" class="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500">
-            <option value="">All Types</option>
-            <option value="matter">Matters</option>
-            <option value="contact">Contacts</option>
-            <option value="document">Documents</option>
-            <option value="task">Tasks</option>
-            <option value="time_entry">Time Entries</option>
-            <option value="expense">Expenses</option>
-            <option value="invoice">Invoices</option>
-          </select>
-          <select id="manualConnectConnector" class="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500">
-            <option value="">All Connectors</option>
-          </select>
+          <lex-select id="manualConnectEntityType" size="sm" style="min-width:10rem" placeholder="All types" options='[{"value": "", "label": "All types"}, {"value": "matter", "label": "Matters"}, {"value": "contact", "label": "Contacts"}, {"value": "document", "label": "Documents"}, {"value": "task", "label": "Tasks"}, {"value": "time_entry", "label": "Time Entries"}, {"value": "expense", "label": "Expenses"}, {"value": "invoice", "label": "Invoices"}]' value=""></lex-select>
+          <lex-select id="manualConnectConnector" size="sm" style="min-width:10rem" placeholder="All connectors" options='[{"value": "", "label": "All connectors"}]' value=""></lex-select>
         </div>
       </div>
 
       <!-- Results Area -->
-      <div id="manualConnectResults" class="flex-1 overflow-y-auto p-6">
+      <div id="manualConnectResults" class="p-6">
         <div class="text-center py-8 text-gray-500">
           <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
@@ -10054,14 +9795,8 @@
         </div>
       </div>
 
-      <!-- Footer -->
-      <div class="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
-        <button onclick="closeManualConnectModal()" class="px-5 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-          Cancel
-        </button>
-      </div>
-    </div>
-  </div>
+      <lex-btn data-slot="footer" variant="secondary" onclick="closeManualConnectModal()">Cancel</lex-btn>
+  </lex-modal>
 
   <script>
     // Manual Connect Modal State
@@ -10072,8 +9807,7 @@
     function showManualConnectModal(matterId) {
       currentManualConnectMatter = matterId;
       const modal = document.getElementById('manualConnectModal');
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
+      modal.open = true;
 
       // Load available connectors for filter
       loadAvailableConnectors();
@@ -10088,8 +9822,8 @@
         manualConnectSearchTimeout = setTimeout(() => performManualConnectSearch(), 300);
       });
 
-      entityTypeSelect.addEventListener('change', performManualConnectSearch);
-      connectorSelect.addEventListener('change', performManualConnectSearch);
+      entityTypeSelect.addEventListener('lex-change', performManualConnectSearch);
+      connectorSelect.addEventListener('lex-change', performManualConnectSearch);
 
       // Clear previous search
       searchInput.value = '';
@@ -10100,8 +9834,7 @@
     // Close manual connect modal
     function closeManualConnectModal() {
       const modal = document.getElementById('manualConnectModal');
-      modal.classList.add('hidden');
-      modal.classList.remove('flex');
+      modal.open = false;
       currentManualConnectMatter = null;
     }
 
@@ -10112,14 +9845,10 @@
         const connectors = response.sources || [];
 
         const select = document.getElementById('manualConnectConnector');
-        select.innerHTML = '<option value="">All Connectors</option>';
-
-        connectors.forEach(conn => {
-          const option = document.createElement('option');
-          option.value = conn.connector_id;
-          option.textContent = conn.connector_name || conn.connector_id;
-          select.appendChild(option);
-        });
+        select.options = [{ value: '', label: 'All connectors' }].concat(connectors.map(conn => ({
+          value: String(conn.connector_id),
+          label: conn.connector_name || String(conn.connector_id)
+        })));
       } catch (error) {
         console.error('[loadAvailableConnectors] Error:', error);
       }
@@ -10321,15 +10050,13 @@
       renderCustomFieldsModal();
 
       const modal = document.getElementById('editCustomFieldsModal');
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
+      modal.open = true;
     }
 
     // Close custom fields modal
     function closeEditCustomFieldsModal() {
       const modal = document.getElementById('editCustomFieldsModal');
-      modal.classList.remove('flex');
-      modal.classList.add('hidden');
+      modal.open = false;
       currentEditFieldsMatter = null;
       customFieldDefinitions = [];
       customFieldValues = [];
@@ -10388,19 +10115,21 @@
                   <!-- Type -->
                   <div class="col-span-2">
                     <label class="block text-xs font-medium text-gray-700 mb-1">Type</label>
-                    <select
-                      onchange="updateFieldDefinition(${index}, 'type', this.value)"
-                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    >
-                      <option value="text" ${def.type === 'text' ? 'selected' : ''}>Text</option>
-                      <option value="textarea" ${def.type === 'textarea' ? 'selected' : ''}>Long Text</option>
-                      <option value="number" ${def.type === 'number' ? 'selected' : ''}>Number</option>
-                      <option value="currency" ${def.type === 'currency' ? 'selected' : ''}>Currency</option>
-                      <option value="date" ${def.type === 'date' ? 'selected' : ''}>Date</option>
-                      <option value="datetime" ${def.type === 'datetime' ? 'selected' : ''}>Date+Time</option>
-                      <option value="boolean" ${def.type === 'boolean' ? 'selected' : ''}>Yes/No</option>
-                      <option value="select" ${def.type === 'select' ? 'selected' : ''}>Dropdown</option>
-                    </select>
+                    <lex-select
+                      data-field-definition-index="${index}"
+                      size="sm"
+                      options="${lexSelectOptionsAttr([
+                        { value: 'text', label: 'Text' },
+                        { value: 'textarea', label: 'Long text' },
+                        { value: 'number', label: 'Number' },
+                        { value: 'currency', label: 'Currency' },
+                        { value: 'date', label: 'Date' },
+                        { value: 'datetime', label: 'Date+Time' },
+                        { value: 'boolean', label: 'Yes/No' },
+                        { value: 'select', label: 'Dropdown' }
+                      ])}"
+                      value="${lexSelectAttr(def.type || '')}"
+                    ></lex-select>
                   </div>
 
                   <!-- Required -->
@@ -10535,17 +10264,14 @@
 
         case 'select':
           return `
-            <select
-              onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
-              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            >
-              <option value="">-- Select ${escapeHtml(def.display_name || def.key)} --</option>
-              ${(def.options || []).map(option => `
-                <option value="${escapeHtml(option)}" ${currentValue === option ? 'selected' : ''}>
-                  ${escapeHtml(option)}
-                </option>
-              `).join('')}
-            </select>
+            <lex-select
+              data-field-value-key="${lexSelectAttr(key)}"
+              size="sm"
+              placeholder="${lexSelectAttr(`Select ${def.display_name || def.key}`)}"
+              options="${lexSelectOptionsAttr([{ value: '', label: `Select ${def.display_name || def.key}` }]
+                .concat((def.options || []).map(option => ({ value: String(option), label: String(option) }))))}"
+              value="${lexSelectAttr(currentValue)}"
+            ></lex-select>
           `;
 
         case 'text':
@@ -10581,6 +10307,17 @@
     }
 
     // Update field definition (metadata)
+    // Custom-field selects are rendered as HTML strings; route their changes here.
+    document.addEventListener('lex-change', (event) => {
+      const target = event.target;
+      if (!target || target.tagName !== 'LEX-SELECT') return;
+      if (target.dataset.fieldDefinitionIndex !== undefined) {
+        updateFieldDefinition(Number(target.dataset.fieldDefinitionIndex), 'type', event.detail.value);
+      } else if (target.dataset.fieldValueKey !== undefined) {
+        updateFieldValue(target.dataset.fieldValueKey, event.detail.value);
+      }
+    });
+
     function updateFieldDefinition(index, property, value) {
       if (customFieldDefinitions[index]) {
         const oldKey = customFieldDefinitions[index].key;
@@ -10689,33 +10426,35 @@
         Toast.error(error.message || 'Failed to save custom fields');
       }
     }
+
+    // lex-modal's close button, backdrop and Escape emit lex-close; run each
+    // modal's page close function so its state resets as Cancel does.
+    // (createSkillModal/importSkillModal are wired by js/matter-skills.js.)
+    // Some of these modals sit below this script, so wire them once parsed.
+    document.addEventListener('DOMContentLoaded', () => [
+      ['taskModal', 'closeTaskModal'],
+      ['contactModal', 'closeContactModal'],
+      ['contactDetailModal', 'closeContactDetailModal'],
+      ['editContactModal', 'closeEditContactModal'],
+      ['createLinkModal', 'closeCreateLinkModal'],
+      ['mattersInfoModal', 'closeMattersInfoModal'],
+      ['unlinkConfirmModal', 'closeUnlinkConfirmModal'],
+      ['manageShareModal', 'closeManageShareModal'],
+      ['manualConnectModal', 'closeManualConnectModal'],
+      ['editCustomFieldsModal', 'closeEditCustomFieldsModal']
+    ].forEach(([id, fn]) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('lex-close', () => {
+        if (typeof window[fn] === 'function') window[fn]();
+      });
+    }));
   </script>
 
   <!-- Edit Custom Fields Modal -->
-  <div id="editCustomFieldsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 10001;">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
-      <!-- Modal Header -->
-      <div class="flex items-center justify-between p-6 border-b border-gray-200">
-        <div class="flex items-center gap-3">
-          <div class="flex-shrink-0 w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-            <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-            </svg>
-          </div>
-          <div>
-            <h2 class="text-xl font-semibold text-gray-900">Edit Custom Fields</h2>
-            <p class="text-sm text-gray-500">Add or modify custom field values for this matter</p>
-          </div>
-        </div>
-        <button onclick="closeEditCustomFieldsModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-
-      <!-- Modal Body -->
-      <div class="flex-1 overflow-y-auto p-6">
+  <lex-modal id="editCustomFieldsModal" heading="Edit Custom Fields" width="72rem">
+      <div>
+        <p class="text-sm text-gray-500 mb-4">Add or modify custom field values for this matter</p>
         <div id="customFieldsContainer"></div>
 
         <!-- Add Field Button -->
@@ -10730,47 +10469,14 @@
         </button>
       </div>
 
-      <!-- Modal Footer -->
-      <div class="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
-        <button
-          onclick="closeEditCustomFieldsModal()"
-          class="px-5 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-        >
-          Cancel
-        </button>
-        <button
-          onclick="saveCustomFields()"
-          class="px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
-        >
-          Save Changes
-        </button>
-      </div>
-    </div>
-  </div>
+      <lex-btn data-slot="footer" variant="secondary" onclick="closeEditCustomFieldsModal()">Cancel</lex-btn>
+      <lex-btn data-slot="footer" variant="primary" onclick="saveCustomFields()">Save Changes</lex-btn>
+  </lex-modal>
 
   <!-- Create Skill Modal - Full Screen Skill Builder -->
-  <div id="createSkillModal" class="fixed inset-0 bg-white hidden flex-col" style="z-index: 10001;">
-    <!-- Modal Header -->
-    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-white shadow-sm">
-      <div class="flex items-center gap-3">
-        <div class="flex-shrink-0 w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-          <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-          </svg>
-        </div>
-        <div>
-          <h2 class="text-xl font-semibold text-gray-900">Skill Builder</h2>
-          <p class="text-sm text-gray-500">Create a multi-step automated skill</p>
-        </div>
-      </div>
-      <button onclick="closeCreateSkillModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-        </svg>
-      </button>
-    </div>
-
+  <lex-modal id="createSkillModal" heading="Skill Builder" size="full" flush close-on-escape="false" close-on-overlay="false">
       <!-- Modal Body -->
+      <p class="text-sm text-gray-500 px-6 pt-3">Create a multi-step automated skill</p>
       <div class="flex-1 overflow-hidden flex">
 
         <!-- SIMPLE MODE -->
@@ -11037,52 +10743,21 @@
       </div>
       <!-- END VISUAL MODE -->
 
-    <!-- Modal Footer -->
-    <div class="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50">
+    <div data-slot="footer" class="flex items-center justify-between gap-3 w-full">
       <div class="text-sm text-gray-600">
         <span id="workflow-step-count">0</span> steps configured
       </div>
       <div class="flex gap-3">
-        <button onclick="closeCreateSkillModal()"
-                class="px-5 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-          Cancel
-        </button>
-        <button onclick="saveSkill()"
-                class="px-5 py-2.5 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-          </svg>
-          Save Skill
-        </button>
+        <lex-btn variant="secondary" onclick="closeCreateSkillModal()">Cancel</lex-btn>
+        <lex-btn variant="primary" onclick="saveSkill()" leading-icon="check">Save Skill</lex-btn>
       </div>
     </div>
-  </div>
+  </lex-modal>
 
   <!-- Import Skill Modal -->
-  <div id="importSkillModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 10001;">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
-      <!-- Modal Header -->
-      <div class="flex items-center justify-between p-6 border-b border-gray-200">
-        <div class="flex items-center gap-3">
-          <div class="flex-shrink-0 w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-            <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-            </svg>
-          </div>
-          <div>
-            <h2 class="text-xl font-semibold text-gray-900">Import Skill</h2>
-            <p class="text-sm text-gray-500">Import an existing skill from a JSON file</p>
-          </div>
-        </div>
-        <button onclick="closeImportSkillModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-
-      <!-- Modal Body -->
-      <div class="flex-1 overflow-y-auto p-6">
+  <lex-modal id="importSkillModal" heading="Import Skill" width="768px">
+      <div>
+        <p class="text-sm text-gray-500 mb-4">Import an existing skill from a JSON file</p>
 
         <!-- File Drop Zone -->
         <div id="skill-drop-zone" class="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center hover:border-purple-400 transition-colors cursor-pointer">
@@ -11138,22 +10813,9 @@
 
       </div>
 
-      <!-- Modal Footer -->
-      <div class="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
-        <button onclick="closeImportSkillModal()"
-                class="px-5 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-          Cancel
-        </button>
-        <button id="import-skill-btn" onclick="submitImportSkill()" disabled
-                class="px-5 py-2.5 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
-          </svg>
-          Import Skill
-        </button>
-      </div>
-    </div>
-  </div>
+      <lex-btn data-slot="footer" variant="secondary" onclick="closeImportSkillModal()">Cancel</lex-btn>
+      <lex-btn data-slot="footer" variant="primary" id="import-skill-btn" onclick="submitImportSkill()" leading-icon="upload" disabled>Import Skill</lex-btn>
+  </lex-modal>
 
   </div>
   <script src="js/lana-one-terminology.js"></script>

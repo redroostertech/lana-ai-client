@@ -76,7 +76,41 @@
                 <p class="metric-detail-tab-help">How this metric has changed over time. Each row is one captured snapshot.</p>
               </div>
             </div>
-            <lex-table id="metricSnapshotsTable" searchable sortable paginated page-size="10"></lex-table>
+            <div class="metric-detail-toolbar bg-white rounded-lg shadow-sm border mb-4 mt-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and filter snapshots">
+              <div class="flex items-center gap-4 flex-wrap">
+                <div class="flex-1 min-w-[200px]">
+                  <lex-input id="metricSnapshotsSearch" placeholder="Search snapshots..." clearable="true" leading-icon="search"></lex-input>
+                </div>
+                <div class="flex items-center gap-2">
+                  <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Sort by:</label>
+                  <lex-select id="metricSnapshotsSort" options='[{"value":"created_at","label":"Created"},{"value":"value","label":"Value"},{"value":"status","label":"Status"},{"value":"period_start","label":"Period start"},{"value":"period_end","label":"Period end"}]' value="created_at"></lex-select>
+                </div>
+                <lex-btn id="metricSnapshotsSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path></svg></lex-btn>
+                <div class="flex items-center gap-2">
+                  <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Status:</label>
+                  <lex-select id="metricSnapshotsStatusFilter" options='[{"value":"all","label":"All"}]' value="all"></lex-select>
+                </div>
+                <div id="metricSnapshotsCount" class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)"></div>
+              </div>
+            </div>
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-lg font-semibold" style="color: var(--lex-text-primary)">Snapshots</h3>
+              <span id="metricSnapshotsSectionCount" class="text-sm" style="color: var(--lex-text-secondary)" aria-live="polite"></span>
+            </div>
+            <lex-table
+              id="metricSnapshotsTable"
+              class="lex-table--card"
+              column-filters
+              columns="created_at,value,status,period_start,period_end"
+              labels="Created,Value,Status,Period start,Period end"
+              sortable-columns="created_at,value,status,period_start,period_end"
+              sort-by="created_at"
+              sort-dir="desc"
+              limit="20"
+              id-key="id"
+              empty-text="No snapshots captured yet"
+              aria-label="Metric snapshots"
+            ></lex-table>
           </div>
 
           <div id="metricSourcePanel" class="metric-detail-tab-panel" hidden>
@@ -87,7 +121,32 @@
                 <p class="metric-detail-tab-help">The records that produced the current value. One row per source record.</p>
               </div>
             </div>
-            <lex-table id="metricRawDataTable" searchable sortable paginated page-size="10"></lex-table>
+            <div class="metric-detail-toolbar bg-white rounded-lg shadow-sm border mb-4 mt-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and filter source records">
+              <div class="flex items-center gap-4 flex-wrap">
+                <div class="flex-1 min-w-[200px]">
+                  <lex-input id="metricRawDataSearch" placeholder="Search source records..." clearable="true" leading-icon="search"></lex-input>
+                </div>
+                <div class="flex items-center gap-2">
+                  <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Sort by:</label>
+                  <lex-select id="metricRawDataSort" options='[]' value=""></lex-select>
+                </div>
+                <lex-btn id="metricRawDataSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="asc"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path></svg></lex-btn>
+                <div id="metricRawDataCount" class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)"></div>
+              </div>
+            </div>
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-lg font-semibold" style="color: var(--lex-text-primary)">Source records</h3>
+              <span id="metricRawDataSectionCount" class="text-sm" style="color: var(--lex-text-secondary)" aria-live="polite"></span>
+            </div>
+            <lex-table
+              id="metricRawDataTable"
+              class="lex-table--card"
+              column-filters
+              limit="20"
+              id-key="_row_id"
+              empty-text="No source records for this period"
+              aria-label="Metric source records"
+            ></lex-table>
           </div>
         </section>
       </section>
@@ -131,8 +190,13 @@
   <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
   <script src="../js/lex/components/foundation/lex-banner.js"></script>
   <script src="../js/lex/components/foundation/lex-tabs.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/form/lex-input.js"></script>
+  <script src="../js/lex/components/form/lex-select.js"></script>
   <script src="../js/lex/components/data/lex-table.js"></script>
   <script src="../js/lex/lex-page-init.js"></script>
+  <script src="../js/shared/library-column-filters.js"></script>
+  <script src="../js/shared/metric-tables.js"></script>
   <script src="../js/admin/metric-detail.js"></script>
   <script src="../js/auth-guard.js"></script>
   <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>

@@ -743,7 +743,7 @@
   margin-top: 0.875rem;
 }
 
-.dash-builder__field span {
+.dash-builder__field > span {
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--lex-text-secondary, #6b7280);
@@ -1642,3 +1642,79 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Table standard (docs/TABLE-STANDARD.md section 8) ────────────────── */
+.insights-library-muted,
+.metric-detail-muted {
+  color: var(--lex-text-tertiary, #9ca3af);
+}
+
+.insights-library-time,
+.metric-detail-time {
+  white-space: nowrap;
+}
+
+.insights-library-actions {
+  display: inline-flex;
+  gap: 0.25rem;
+  justify-content: flex-end;
+}
+
+.insights-library-action {
+  appearance: none;
+  background: none;
+  border: 1px solid var(--lex-border-default, #e5e7eb);
+  border-radius: var(--lex-radius-sm, 4px);
+  color: var(--lex-text-secondary, #6b7280);
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+}
+
+.insights-library-action:hover {
+  color: var(--lex-text-primary, #111827);
+}
+
+.insights-library-action.is-danger {
+  color: var(--lex-danger, #b91c1c);
+}
+
+.metric-detail-cell-truncate {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Dashboard Library: pin, Name, Audience, Category, Scope, Visibility,
+   State, Created, Last edited, Actions. Name takes the rest. */
+#dashboardLibraryTable th { white-space: nowrap; }
+#dashboardLibraryTable table { min-width: 1240px; }
+#dashboardLibraryTable th:nth-child(1) { width: 44px; }
+#dashboardLibraryTable th:nth-child(3) { width: 120px; }
+#dashboardLibraryTable th:nth-child(4) { width: 132px; }
+#dashboardLibraryTable th:nth-child(5) { width: 150px; }
+#dashboardLibraryTable th:nth-child(6) { width: 140px; }
+#dashboardLibraryTable th:nth-child(7) { width: 96px; }
+#dashboardLibraryTable th:nth-child(8) { width: 176px; }
+#dashboardLibraryTable th:nth-child(9) { width: 150px; }
+#dashboardLibraryTable th:nth-child(10) { width: 140px; }
+/* The pin and Actions columns hold buttons, not data: lex-table has no
+   per-column filter opt-out yet, so hide the filter icon it adds there. */
+#dashboardLibraryTable th:nth-child(1) .lex-th-filter,
+#dashboardLibraryTable th:nth-child(10) .lex-th-filter { display: none; }
+
+/* Metric Detail snapshots: Created, Value, Status, Period start, Period end */
+#metricSnapshotsTable th,
+#metricRawDataTable th { white-space: nowrap; }
+#metricSnapshotsTable table { min-width: 760px; }
+#metricSnapshotsTable th:nth-child(1) { width: 176px; }
+#metricSnapshotsTable th:nth-child(3) { width: 150px; }
+#metricSnapshotsTable th:nth-child(4),
+#metricSnapshotsTable th:nth-child(5) { width: 140px; }
+/* Source records: columns vary by metric, so each gets a floor and long
+   values truncate with the full text in title. */
+#metricRawDataTable table { min-width: 760px; }
+#metricRawDataTable th { min-width: 120px; }
+#metricRawDataTable td { max-width: 280px; overflow: hidden; }

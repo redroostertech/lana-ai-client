@@ -10,148 +10,16 @@
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/tailwind-output.css">
   <link rel="stylesheet" href="css/companion-bridge-consent.css">
+  <link rel="stylesheet" href="css/connector-table.css">
   <script src="js/tailwind-loader.js"></script>
   <style>
-    .dc-table-wrap {
-      border: 1px solid var(--lex-border-default);
-      border-radius: var(--lex-radius-lg, 12px);
-      overflow: auto;
-      background: var(--lex-card-bg);
-      box-shadow: var(--lex-card-shadow);
-    }
-    .dc-table {
-      width: 100%;
-      min-width: 1040px;
-      border-collapse: collapse;
-    }
-    .dc-table th,
-    .dc-table td {
-      padding: 0.85rem 1rem;
-      border-bottom: 1px solid var(--lex-border-subtle);
-      text-align: left;
-      vertical-align: middle;
-    }
-    .dc-table th {
-      background: var(--lex-bg-secondary);
-      color: var(--lex-text-secondary);
-      font-size: 0.75rem;
-      font-weight: 800;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-    .dc-sort {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      color: inherit;
-      font: inherit;
-      letter-spacing: inherit;
-      text-transform: inherit;
-      background: transparent;
-      border: 0;
-      padding: 0;
-      cursor: pointer;
-    }
-    .dc-sort-indicator {
-      min-width: 0.75rem;
-      color: var(--lex-text-tertiary);
-      font-size: 0.7rem;
-      letter-spacing: 0;
-    }
-    .dc-table tbody tr:last-child td {
-      border-bottom: 0;
-    }
-    .dc-row {
-      cursor: pointer;
-      transition: background-color 120ms ease;
-    }
-    .dc-row:hover,
-    .dc-row:focus-visible {
-      background: var(--lex-bg-secondary);
-      outline: none;
-    }
-    .dc-row-actions {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    .dc-pin-cell {
-      width: 3.75rem;
-    }
-    .dc-pin-btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 2rem;
-      height: 2rem;
-      color: var(--lex-text-tertiary);
-      background: transparent;
-      border: 0;
-      border-radius: var(--lex-radius-md, 8px);
-      cursor: pointer;
-    }
-    .dc-pin-btn:hover,
-    .dc-pin-btn.is-pinned {
-      color: var(--lex-text-primary);
-      background: var(--lex-bg-secondary);
-    }
-    .dc-empty {
-      padding: 1.5rem;
-      text-align: center;
-      color: var(--lex-text-secondary);
-    }
-    .dc-pagination {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-      padding: 1rem 0;
-    }
-    .dc-pagination-controls {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    .dc-fullscreen-modal {
-      position: fixed;
-      inset: 0;
-      z-index: 10000;
-      display: flex;
-      flex-direction: column;
-      background: var(--lex-bg-primary);
-    }
-    .dc-fullscreen-modal.hidden {
-      display: none;
-    }
-    .dc-fullscreen-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-      min-height: 4rem;
-      padding: 0.75rem 1.25rem;
-      border-bottom: 1px solid var(--lex-border-default);
-      background: var(--lex-card-bg);
-      box-shadow: var(--lex-shadow-sm, 0 1px 3px rgba(0,0,0,0.08));
-    }
-    .dc-fullscreen-title {
-      min-width: 0;
-      font-size: 1rem;
-      font-weight: 800;
-      color: var(--lex-text-primary);
-    }
-    .dc-fullscreen-subtitle {
-      margin-top: 0.125rem;
-      font-size: 0.75rem;
-      color: var(--lex-text-secondary);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      max-width: min(56rem, 70vw);
-    }
+    /* The embedded connector page fills the full-size, flush lex-modal.
+       It has its own header and Back button, so the modal shows none. */
     .dc-fullscreen-frame {
-      flex: 1;
+      display: block;
+      flex: 1 1 auto;
       width: 100%;
+      min-height: 0;
       border: 0;
       background: var(--lex-bg-primary);
     }
@@ -279,88 +147,9 @@
       <div id="connectorsContent" class="hidden space-y-8 mb-4 p-4">
         <!-- Connectors from Local Catalog -->
         <section id="availableConnectorsSection" class="hidden">
-          <div class="mb-4">
-            <h2 class="text-lg font-semibold" style="color:var(--lex-text-primary)">Available to Configure</h2>
-            <p class="text-sm mt-1" style="color:var(--lex-text-secondary)">Connector packages available in the local platform catalog</p>
-          </div>
-
-          <!-- Search and Filter Controls -->
-          <div class="mb-6 flex flex-col md:flex-row gap-4">
-            <!-- Search Input -->
-            <div class="flex-1">
-              <lex-input
-                id="connectorSearch"
-                type="search"
-                placeholder="Search connectors by name, vendor, or description..."
-                clearable>
-              </lex-input>
-            </div>
-
-            <!-- Status Filter -->
-            <div class="w-full md:w-48">
-              <lex-select
-                id="statusFilter"
-                placeholder="All Statuses"
-                options='[{"value":"","label":"All Statuses"},{"value":"connected","label":"Connected"},{"value":"not_connected","label":"Not Connected"},{"value":"disconnected","label":"Disconnected"}]'>
-              </lex-select>
-            </div>
-
-            <!-- Category Filter -->
-            <div class="w-full md:w-48">
-              <lex-select
-                id="categoryFilter"
-                placeholder="All Categories"
-                options='[{"value":"","label":"All Categories"},{"value":"crm","label":"CRM"},{"value":"case_management","label":"Case Management"},{"value":"documents","label":"Documents"},{"value":"communications","label":"Communications"},{"value":"financial","label":"Financial"}]'>
-              </lex-select>
-            </div>
-
-            <!-- Auth Type Filter -->
-            <div class="w-full md:w-48">
-              <lex-select
-                id="authTypeFilter"
-                placeholder="All Auth Types"
-                options='[{"value":"","label":"All Auth Types"},{"value":"oauth2","label":"OAuth 2.0"},{"value":"api_key","label":"API Key"},{"value":"basic","label":"Basic Auth"}]'>
-              </lex-select>
-            </div>
-          </div>
-
-          <div class="dc-table-wrap">
-            <table class="dc-table">
-              <thead>
-                <tr>
-                  <th class="dc-pin-cell"></th>
-                  <th><button type="button" class="dc-sort" data-sort-key="name">Name <span class="dc-sort-indicator" data-sort-indicator="name"></span></button></th>
-                  <th><button type="button" class="dc-sort" data-sort-key="category">Category <span class="dc-sort-indicator" data-sort-indicator="category"></span></button></th>
-                  <th><button type="button" class="dc-sort" data-sort-key="auth">Auth <span class="dc-sort-indicator" data-sort-indicator="auth"></span></button></th>
-                  <th><button type="button" class="dc-sort" data-sort-key="scope">Scope <span class="dc-sort-indicator" data-sort-indicator="scope"></span></button></th>
-                  <th><button type="button" class="dc-sort" data-sort-key="status">Status <span class="dc-sort-indicator" data-sort-indicator="status"></span></button></th>
-                  <th><button type="button" class="dc-sort" data-sort-key="version">Version <span class="dc-sort-indicator" data-sort-indicator="version"></span></button></th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody id="availableConnectors">
-                <tr><td colspan="8" class="dc-empty">Loading available connectors...</td></tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div class="dc-pagination">
-            <div id="connectorsPaginationSummary" class="text-sm" style="color:var(--lex-text-secondary)">Showing 0 connectors</div>
-            <div class="dc-pagination-controls">
-              <lex-btn id="connectorsPrevPage" variant="ghost" size="sm">Previous</lex-btn>
-              <span id="connectorsPageLabel" class="text-sm" style="color:var(--lex-text-secondary)">Page 1 of 1</span>
-              <lex-btn id="connectorsNextPage" variant="ghost" size="sm">Next</lex-btn>
-            </div>
-          </div>
-
-          <!-- No Results Message -->
-          <lex-empty
-            id="noResultsMessage"
-            class="hidden"
-            icon="search"
-            message="No connectors found"
-            description="Try adjusting your search or filters">
-          </lex-empty>
+          <!-- Toolbar card, section heading and the connector lex-table,
+               rendered by js/shared/connector-table.js (docs/TABLE-STANDARD.md) -->
+          <div id="connectorTableMount"></div>
         </section>
       </div>
       <!-- End connectorsContent -->
@@ -368,16 +157,16 @@
     </main>
 
     <!-- Full-screen Connector Dashboard Modal -->
-    <div id="connectorDashboardModal" class="dc-fullscreen-modal hidden" role="dialog" aria-modal="true" aria-label="Connector dashboard">
+    <lex-modal id="connectorDashboardModal" size="full" flush hide-actions hide-close aria-label="Connector dashboard" style="--lex-z-modal: 10000">
       <iframe id="connectorDashboardFrame" class="dc-fullscreen-frame" title="Connector dashboard"></iframe>
-    </div>
+    </lex-modal>
 
     <!-- ══════════════════════════════════════════════════════════════════ -->
     <!-- Connector-specific Modals                                        -->
     <!-- ══════════════════════════════════════════════════════════════════ -->
 
     <!-- Connector Actions Modal (lex-modal — declarative, custom content) -->
-    <lex-modal id="connectorActionsModal" heading="Connector Actions" size="sm" hide-actions close-on-overlay>
+    <lex-modal id="connectorActionsModal" heading="Connector Actions" size="sm" hide-actions close-on-overlay footer-content="<lex-btn variant=&quot;secondary&quot; onclick=&quot;closeConnectorActionsModal()&quot;>Cancel</lex-btn>">
       <div id="connectorActionsContent">
         <!-- Header with Icon -->
         <div class="text-center mb-4 pb-4" style="border-bottom:1px solid var(--lex-border-subtle)">
@@ -474,17 +263,12 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
             </svg>
           </button>
-
-          <!-- Cancel -->
-          <div class="pt-1">
-            <lex-btn variant="secondary" onclick="closeConnectorActionsModal()" style="width:100%">Cancel</lex-btn>
-          </div>
         </div>
       </div>
     </lex-modal>
 
     <!-- Connector Accounts Modal (GAP-10: set default account for template engine) -->
-    <lex-modal id="connectorAccountsModal" heading="Manage Accounts" size="md" hide-actions close-on-overlay>
+    <lex-modal id="connectorAccountsModal" heading="Manage Accounts" size="md" hide-actions close-on-overlay footer-content="<lex-btn variant=&quot;secondary&quot; onclick=&quot;closeConnectorAccountsModal()&quot;>Close</lex-btn>">
       <div id="connectorAccountsContent">
         <p class="text-sm mb-4" style="color:var(--lex-text-secondary)">
           When multiple accounts are connected for this integration, mark one as the default.
@@ -496,9 +280,6 @@
             <lex-spinner size="sm"></lex-spinner>
           </div>
         </div>
-        <div class="pt-4 mt-2" style="border-top:1px solid var(--lex-border-subtle)">
-          <lex-btn variant="secondary" onclick="closeConnectorAccountsModal()" style="width:100%">Close</lex-btn>
-        </div>
       </div>
     </lex-modal>
 
@@ -507,7 +288,7 @@
     <!-- Delete Confirmation Modal: handled imperatively via Lex.Modal.confirm() in data_connectors.js -->
 
     <!-- Connector Details Modal (lex-modal — declarative, custom content) -->
-    <lex-modal id="connectorDetailsModal" heading="Connector Details" size="lg" hide-actions>
+    <lex-modal id="connectorDetailsModal" heading="Connector Details" size="lg" hide-actions footer-content="<lex-btn variant=&quot;secondary&quot; onclick=&quot;closeDetailsModal()&quot;>Close</lex-btn><lex-btn variant=&quot;primary&quot; id=&quot;detailsActionBtn&quot;>Connect</lex-btn>">
       <div class="flex items-center gap-4 mb-4 pb-4" style="border-bottom:1px solid var(--lex-border-default)">
         <div id="detailsLogo" class="w-16 h-16 rounded-lg flex items-center justify-center flex-shrink-0" style="background:var(--lex-bg-tertiary)"></div>
         <div>
@@ -518,14 +299,10 @@
       <div id="detailsContent" class="space-y-6">
         <!-- Content will be dynamically inserted -->
       </div>
-      <div class="mt-6 pt-4 flex gap-3" style="border-top:1px solid var(--lex-border-default)">
-        <lex-btn variant="primary" id="detailsActionBtn" style="flex:1">Connect</lex-btn>
-        <lex-btn variant="secondary" onclick="closeDetailsModal()">Close</lex-btn>
-      </div>
     </lex-modal>
 
     <!-- Import Connector Modal (lex-modal — declarative, custom content) -->
-    <lex-modal id="importConnectorModal" heading="Import Connector Configuration" size="lg" hide-actions>
+    <lex-modal id="importConnectorModal" heading="Import Connector Configuration" size="lg" hide-actions footer-content="<lex-btn variant=&quot;secondary&quot; onclick=&quot;closeImportConnectorModal()&quot;>Cancel</lex-btn><lex-btn variant=&quot;primary&quot; id=&quot;importConnectorBtn&quot; onclick=&quot;confirmImportConnector()&quot; disabled><svg class=&quot;w-4 h-4&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; viewBox=&quot;0 0 24 24&quot;><path stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; stroke-width=&quot;2&quot; d=&quot;M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12&quot;></path></svg><span id=&quot;importConnectorBtnLabel&quot;>Import Connector</span></lex-btn>">
       <div class="space-y-6">
         <!-- Instructions -->
         <div class="rounded-lg p-4" style="background:var(--lex-status-info-bg);border:1px solid var(--lex-status-info)">
@@ -587,17 +364,6 @@
 
           <!-- Validation Status -->
           <div id="validationStatus" class="mt-4"></div>
-        </div>
-
-        <!-- Modal Footer Actions -->
-        <div class="flex items-center justify-end gap-3 pt-2" style="border-top:1px solid var(--lex-border-default)">
-          <lex-btn variant="secondary" onclick="closeImportConnectorModal()">Cancel</lex-btn>
-          <lex-btn variant="primary" id="importConnectorBtn" onclick="confirmImportConnector()" disabled>
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
-            </svg>
-            <span id="importConnectorBtnLabel">Import Connector</span>
-          </lex-btn>
         </div>
       </div>
     </lex-modal>
@@ -663,6 +429,7 @@
   <script src="js/lex/components/foundation/lex-modal.js"></script>
   <script src="js/lex/components/form/lex-input.js"></script>
   <script src="js/lex/components/form/lex-select.js"></script>
+  <script src="js/lex/components/data/lex-table.js"></script>
 
   <!-- Inject page content + hoist modals -->
   <script src="js/lex/lex-page-init.js"></script>
@@ -671,6 +438,8 @@
   <script src="js/connectors.js"></script>
 
   <!-- Page controller (MUST be last before auth-guard) -->
+  <script src="js/shared/library-column-filters.js"></script>
+  <script src="js/shared/connector-table.js"></script>
   <script src="js/data_connectors.js"></script>
 
   <!-- PAC bridge consent handler (Lex modal for token requests) -->

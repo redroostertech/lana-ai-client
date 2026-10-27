@@ -18,43 +18,14 @@
   margin-top: 0.5rem;
 }
 
-.folder-banner-more {
-  align-items: center;
-  background: transparent;
-  border: 0;
-  border-radius: 0.5rem;
-  color: var(--lex-text-secondary);
-  cursor: pointer;
-  display: inline-flex;
-  height: 2.5rem;
-  justify-content: center;
-  padding: 0;
-  width: 2.5rem;
-}
-
-.folder-banner-more:hover,
-.folder-banner-more[aria-expanded="true"] {
-  background: var(--lex-bg-secondary);
-  color: var(--lex-text-primary);
-}
-
 .folder-actions-bar {
   display: flex;
   justify-content: flex-end;
   margin-bottom: 1rem;
 }
 
-.folder-context-heading {
-  color: var(--lex-text-tertiary);
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  padding: 0.375rem 1rem 0.25rem;
-  text-transform: uppercase;
-}
-
 /* Per-file Rename and Delete use the MatterDocumentsView component-owned
-   modal / confirm dialogs (see .mdv-rename-actions below); folder.js no longer
+   lex-modal and Lex.Modal confirm dialogs; folder.js no longer
    renders its own per-file delete modal. */
 
 /* ----------------------------------------------------------------------
@@ -122,11 +93,6 @@
 }
 
 .lf-card-menu {
-  background: none;
-  border: none;
-  color: var(--lex-text-tertiary);
-  cursor: pointer;
-  padding: 0.25rem;
   position: absolute;
   right: 0.5rem;
   top: 0.5rem;
@@ -220,14 +186,6 @@
   align-items: center;
   display: flex;
   justify-content: flex-end;
-}
-
-.lf-row-menu {
-  background: none;
-  border: none;
-  color: var(--lex-text-tertiary);
-  cursor: pointer;
-  padding: 0.25rem;
 }
 
 .lf-icon-sm {

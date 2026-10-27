@@ -18,7 +18,37 @@
    Column filters (per-column dropdown filters in header):
      <lex-table column-filters columns="status,type" ...></lex-table>
 
-   Events: row-click, sort-change, selection-change, bulk-action, lex-filter-change
+   Server paging (the API pages and sorts; the page owns the request):
+     <lex-table server-paging sortable-columns="name,updated_at" sort-by="updated_at" sort-dir="desc" limit="20"></lex-table>
+     table.addEventListener('lex-query-change', async (e) => {
+       const { page, limit, sortBy, sortDir } = e.detail;
+       const res = await api.get(...);              // map the query to the API's own params
+       table.setServerData(res.rows, res.pagination); // { page, limit|page_size, total, totalPages|total_pages }
+     });
+     table.requestServerQuery();                     // first load; { resetPage: true } after an outside filter changes
+     Column filters need the page to list each column's values, since one page cannot:
+       table.setColumnFilterOptions({ type: { options: [{ value: 'pdf', label: 'PDFs' }] },
+                                      updated_at: { single: true, options: [...] } });
+     Selections arrive in lex-query-change as filters[col] = { operator: 'in', value: [...] }.
+   A name-like column can take a text box instead of options: name: { text: true, placeholder }
+   (filters[col] = { operator: 'contains', value }).
+   Client-side tables can give supplied options a predicate instead of exact matching
+   (e.g. date ranges): created_at: { single: true, options: [...], match: (cell, values) => bool }.
+
+   State without private fields (both modes):
+     table.setError(message)          // error state, client-side tables too
+     table.setSearch(term)            // toolbar search: client filters, server asks for page 1
+     table.searchText                 // current search text
+     table.pagination                 // { page, limit, total, totalPages }
+     table.filteredRows               // client: every matching row (all pages); server: this page
+     table.restoreQuery({ search, sortBy, sortDir, filters, page, limit })  // set without fetching
+     table.resetQuery()               // default sort, no search/filters, page 1, without fetching
+   search-keys="name,email" limits client-side search to those columns.
+   Columns with a blank label (select, pin) get no header filter. The row-actions
+   column uses the key "actions" and the label "Actions": it never filters or sorts.
+
+   Events: row-click, sort-change, selection-change, bulk-action, lex-filter-change,
+           lex-query-change (server paging)
 */
 
 (function () {
@@ -147,6 +177,15 @@
       /* ── "Card" modifier ─────────────────────────────────────
          Opt-in (class on the <lex-table> host) that wraps the table in a
          white, rounded, bordered card — matching the Library list table. */
+      /* An open column filter must not be clipped by a short table: the card
+         and its scroll area stop clipping while a dropdown is open. */
+      lex-table.lex-table--filter-open,
+      lex-table.lex-table--filter-open .lex-table-scroll-area {
+        overflow: visible !important;
+      }
+      lex-table[hidden] {
+        display: none !important;
+      }
       lex-table.lex-table--card {
         display: block;
         background: var(--lex-bg-primary, #fff);
@@ -157,6 +196,10 @@
       }
 
       /* Page-size select */
+      .lex-page-size-lex-select {
+        display: inline-block;
+        min-width: 76px;
+      }
       .lex-page-size-select {
         appearance: none;
         -webkit-appearance: none;
@@ -238,7 +281,8 @@
         vertical-align: middle;
       }
       .lex-th-filter:hover,
-      .lex-th-filter--active {
+      .lex-th-filter--active,
+      .lex-th-filter--open {
         opacity: 1;
         color: var(--lex-text-accent, #8B7355);
       }
@@ -257,10 +301,55 @@
         padding: 6px;
         display: flex;
         flex-direction: column;
+        color: var(--lex-text-primary);
+        cursor: default;
+        text-transform: none;
+        letter-spacing: normal;
+        font-weight: normal;
+      }
+      .lex-th-filter-text {
+        margin: 2px 2px 6px;
+        padding: 6px 8px;
+        font: inherit;
+        font-size: 13px;
+        color: var(--lex-text-primary);
+        background: var(--lex-bg-primary);
+        border: 1px solid var(--lex-border-default);
+        border-radius: 6px;
+        min-width: 200px;
+      }
+      .lex-th-filter-dropdown--end {
+        left: auto;
+        right: 0;
       }
       .lex-th-filter-options {
         max-height: 200px;
         overflow-y: auto;
+      }
+      .lex-table-clear-filters {
+        margin-left: 8px;
+        padding: 2px 10px;
+        font: inherit;
+        color: var(--lex-text-primary);
+        background: var(--lex-bg-primary);
+        border: 1px solid var(--lex-border-default);
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .lex-th-filter-search {
+        box-sizing: border-box;
+        width: 100%;
+        margin: 0 0 6px;
+        padding: 5px 8px;
+        font: inherit;
+        font-size: var(--lex-body-xs-size, 0.75rem);
+        text-transform: none;
+        letter-spacing: 0;
+        color: var(--lex-text-primary);
+        background: var(--lex-bg-secondary);
+        border: 1px solid var(--lex-border-default);
+        border-radius: 4px;
+        outline: none;
       }
       .lex-th-filter-dropdown label {
         display: flex;
@@ -278,7 +367,8 @@
       .lex-th-filter-dropdown label:hover {
         background: var(--lex-bg-accent-soft, #F5F0EA);
       }
-      .lex-th-filter-dropdown input[type="checkbox"] {
+      .lex-th-filter-dropdown input[type="checkbox"],
+      .lex-th-filter-dropdown input[type="radio"] {
         width: 14px;
         height: 14px;
         accent-color: var(--lex-bg-accent, #8B7355);
@@ -418,8 +508,21 @@
         // page wires to its create flow. emptyActionIcon defaults to a plus glyph.
         emptyActionLabel: { type: String },
         emptyActionIcon:  { type: String, default: 'plus' },
+        // Comma-separated column keys whose headers sort. Absent = every column;
+        // empty = none. Server-paged tables list only what the API can sort.
+        sortableColumns: { type: String },
+        // Comma-separated column keys the client-side search looks in
+        // (absent = every column).
+        searchKeys:    { type: String },
         bulkActions:   { type: Array, default: [] }   // [{label, action, variant, icon}]
       };
+    }
+
+    _isSortable(col) {
+      // The row-actions column (key "actions", labelled "Actions") never sorts.
+      if (col === 'actions') return false;
+      if (this.sortableColumns === undefined || this.sortableColumns === null) return true;
+      return String(this.sortableColumns).split(',').map(c => c.trim()).filter(Boolean).includes(col);
     }
 
     constructor() {
@@ -430,6 +533,7 @@
       this._selectedIds = new Set();
       this._colFilterOpen = null;  // Which column's filter dropdown is open
       this._cellRenderers = {};
+      this._columnFilterOptions = {}; // col -> { options: [{ value, label }], single }
       // Column-type detection cache — invalidated when the raw data reference changes
       this._filterCacheDataRef = null;
       this._cachedFilterColumns = null;
@@ -438,6 +542,44 @@
     setCellRenderers(renderers) {
       this._cellRenderers = renderers && typeof renderers === 'object' ? renderers : {};
       this._scheduleUpdate();
+    }
+
+    // Page-supplied filter values per column: { col: { options: [{ value, label }],
+    // single } }. They replace values derived from the loaded rows, so a
+    // server-paged table can offer every value, not one page's. single = radios.
+    // match(cellValue, selectedValues) -> bool replaces exact matching on a
+    // client-side table (server-paged tables send the selection to the API).
+    setColumnFilterOptions(map) {
+      this._columnFilterOptions = map && typeof map === 'object' ? map : {};
+      this._scheduleUpdate();
+    }
+
+    // A text column filter: non-empty text filters by "contains", empty clears.
+    _applyTextFilter(raw) {
+      const col = this._colFilterOpen;
+      const value = String(raw || '').trim();
+      if (col && this.dataSource) {
+        if (value) this.dataSource.setFilter(col, 'contains', value);
+        else this.dataSource.removeFilter(col);
+      }
+      this._colFilterOpen = null;
+      this._scheduleUpdate();
+    }
+
+    _hasColumnFilter(col) {
+      if (!this.columnFilters) return false;
+      // The row-actions column (key "actions", labelled "Actions") never filters.
+      if (col === 'actions') return false;
+      // Columns without a header label (select, pin, actions) take no filter.
+      if (this.labels) {
+        const index = this._getColumns().indexOf(col);
+        const label = this._getLabels()[index];
+        if (index !== -1 && label !== undefined && !String(label).trim()) return false;
+      }
+      if (!this.serverPaging) return true;
+      const config = this._columnFilterOptions[col];
+      if (config && config.text) return true;
+      return !!(config && Array.isArray(config.options) && config.options.length);
     }
 
     connected() {
@@ -468,6 +610,7 @@
     }
 
     _getSearchColumns() {
+      if (this.searchKeys) return String(this.searchKeys).split(',').map(c => c.trim()).filter(Boolean);
       return this._getColumns();
     }
 
@@ -710,19 +853,40 @@
     // Column filter dropdown
     // -----------------------------------------------------------------------
 
-    _renderColFilterDropdown(col) {
-      const rawData = this.dataSource?._rawData || this.dataSource?._data || [];
-      const uniqueVals = window.Lex.LexDataPipeline.uniqueValues(rawData, col);
+    _renderColFilterDropdown(col, alignEnd) {
+      const config = this._columnFilterOptions[col];
+      if (config && config.text) {
+        const current = this.dataSource?._filters?.get(col);
+        const value = current && current.operator === 'contains' ? String(current.value) : '';
+        return `<div class="lex-th-filter-dropdown${alignEnd ? ' lex-th-filter-dropdown--end' : ''}" data-col-filter-dropdown>
+          <input type="search" class="lex-th-filter-text" data-col-filter-text value="${this.escapeHtml(value)}" placeholder="${this.escapeHtml(config.placeholder || 'Contains...')}" aria-label="Filter ${this.escapeHtml(col)}" />
+          <div class="lex-col-filter-actions">
+            <button class="lex-col-filter-clear" data-action="col-filter-clear">Clear</button>
+            <button class="lex-col-filter-apply" data-action="col-filter-apply">Apply</button>
+          </div>
+        </div>`;
+      }
+      const supplied = config && Array.isArray(config.options) ? config.options : null;
+      const options = supplied
+        ? supplied.map(o => ({ value: String(o.value), label: String(o.label !== undefined ? o.label : o.value) }))
+        : window.Lex.LexDataPipeline.uniqueValues(this.dataSource?._rawData || this.dataSource?._data || [], col)
+          .map(v => ({ value: String(v), label: String(v) }));
+      const inputType = config && config.single ? 'radio' : 'checkbox';
       const currentFilter = this.dataSource?._filters?.get(col);
-      const checkedVals = currentFilter && currentFilter.operator === 'in'
-        ? (Array.isArray(currentFilter.value) ? currentFilter.value : String(currentFilter.value).split(','))
-        : (currentFilter ? [String(currentFilter.value)] : []);
+      const checkedVals = !currentFilter ? []
+        : currentFilter.operator === 'match' ? currentFilter.value.values.map(String)
+        : currentFilter.operator === 'in'
+          ? (Array.isArray(currentFilter.value) ? currentFilter.value : String(currentFilter.value).split(',')).map(String)
+          : [String(currentFilter.value)];
 
-      let html = '<div class="lex-th-filter-dropdown" data-col-filter-dropdown>';
+      let html = `<div class="lex-th-filter-dropdown${alignEnd ? ' lex-th-filter-dropdown--end' : ''}" data-col-filter-dropdown>`;
+      if (options.length > 12) {
+        html += '<input type="search" class="lex-th-filter-search" data-col-filter-search placeholder="Search..." aria-label="Search filter values" />';
+      }
       html += '<div class="lex-th-filter-options">';
-      uniqueVals.forEach(val => {
-        const checked = checkedVals.includes(String(val)) ? ' checked' : '';
-        html += `<label><input type="checkbox" data-col-check="${this.escapeHtml(String(val))}"${checked} /> ${this.escapeHtml(String(val))}</label>`;
+      options.forEach(opt => {
+        const checked = checkedVals.includes(opt.value) ? ' checked' : '';
+        html += `<label data-col-option="${this.escapeHtml(opt.label.toLowerCase())}"><input type="${inputType}" name="lex-col-filter-${this.escapeHtml(col)}" data-col-check="${this.escapeHtml(opt.value)}"${checked} /> ${this.escapeHtml(opt.label)}</label>`;
       });
       html += '</div>';
       html += `<div class="lex-col-filter-actions">
@@ -740,8 +904,8 @@
         this._searchHadFocus = true;
       }
 
-      // Loading state
-      if (this.dataSource?.loading) {
+      // Loading state (a server-paged table is loading until the page answers)
+      if (this.dataSource?.loading || (this.serverPaging && !this.dataSource)) {
         return `
           <div class="animate-pulse space-y-3 p-4">
             <div class="h-8 lex-bg-tertiary rounded w-full"></div>
@@ -754,7 +918,12 @@
 
       // Error state
       if (this.dataSource?.error) {
-        return `<div class="lex-text-danger text-sm p-4">${this.escapeHtml(this.dataSource.error)}</div>`;
+        // A filter the server rejected would otherwise strand the user: the
+        // header row (and its filter icons) is gone in this state.
+        const clear = this.dataSource._filters && this.dataSource._filters.size > 0
+          ? ' <button type="button" class="lex-table-clear-filters" data-action="clear-col-filters">Clear filters</button>'
+          : '';
+        return `<div class="lex-text-danger text-sm p-4">${this.escapeHtml(this.dataSource.error)}${clear}</div>`;
       }
 
       const data = this.dataSource?.data;
@@ -766,11 +935,16 @@
       if (!hasData) {
         // A create CTA belongs on a genuine "no data yet" state, never when the user
         // has filtered/searched everything out (the toolbar already offers a clear).
-        const isFiltered = !!this._searchValue ||
-          (this.dataSource && this.dataSource._filters && this.dataSource._filters.size > 0);
-        const actionAttrs = (this.emptyActionLabel && !isFiltered)
-          ? ` action-label="${this.escapeHtml(this.emptyActionLabel)}" action-icon="${this.escapeHtml(this.emptyActionIcon || 'plus')}"`
-          : '';
+        const hasColumnFilters = !!(this.dataSource && this.dataSource._filters && this.dataSource._filters.size > 0);
+        const isFiltered = !!this._searchValue || hasColumnFilters;
+        // Column filters hide the header row with this state, so offer to clear
+        // them here; otherwise the page's create CTA when nothing is filtered.
+        let actionAttrs = '';
+        if (hasColumnFilters) {
+          actionAttrs = ' action-label="Clear filters" action-icon="x" data-empty-mode="clear-filters"';
+        } else if (this.emptyActionLabel && !isFiltered) {
+          actionAttrs = ` action-label="${this.escapeHtml(this.emptyActionLabel)}" action-icon="${this.escapeHtml(this.emptyActionIcon || 'plus')}"`;
+        }
         return `${toolbarHtml}<lex-empty message="${this.escapeHtml(this.emptyText)}" icon="folder"${actionAttrs}></lex-empty>`;
       }
 
@@ -815,22 +989,28 @@
       }
 
       columns.forEach((col, i) => {
-        const sortIcon = this.sortBy === col
+        const sortable = this._isSortable(col);
+        const sortIcon = sortable && this.sortBy === col
           ? (this.sortDir === 'asc' ? ' &#9650;' : ' &#9660;')
           : '';
 
-        // Column header filter icon
+        // Column header filter icon. Server-paged tables hold one page, so
+        // value lists built from it would be wrong; filter outside the table.
         let filterIcon = '';
-        if (this.columnFilters) {
+        if (this._hasColumnFilter(col)) {
           const hasFilter = this.dataSource?._filters?.has(col);
-          filterIcon = `<span class="lex-th-filter ${hasFilter ? 'lex-th-filter--active' : ''}" data-col-filter="${col}" style="position:relative">
+          const isOpen = this._colFilterOpen === col;
+          filterIcon = `<span class="lex-th-filter${hasFilter ? ' lex-th-filter--active' : ''}${isOpen ? ' lex-th-filter--open' : ''}" data-col-filter="${col}" style="position:relative">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-            ${this._colFilterOpen === col ? this._renderColFilterDropdown(col) : ''}
+            ${this._colFilterOpen === col ? this._renderColFilterDropdown(col, i >= columns.length / 2) : ''}
           </span>`;
         }
 
-        html += `<th scope="col" class="text-left ${cellPad} text-xs font-medium lex-text-secondary uppercase tracking-wider cursor-pointer select-none" data-sort-col="${col}">
-          ${this.escapeHtml(labels[i] || col)}${sortIcon}${filterIcon}
+        const sortAttrs = sortable
+          ? ` cursor-pointer select-none" data-sort-col="${col}"`
+          : '"';
+        html += `<th scope="col" class="text-left ${cellPad} text-xs font-medium lex-text-secondary uppercase tracking-wider${sortAttrs}>
+          ${this.escapeHtml(labels[i] !== undefined ? labels[i] : col)}${sortIcon}${filterIcon}
         </th>`;
       });
       html += `</tr></thead>`;
@@ -880,9 +1060,11 @@
             <div class="lex-pagination-controls">
               <label class="lex-pagination-label">
                 <span>Show</span>
-                <select data-action="page-size" class="lex-page-size-select">
+                ${window.customElements && window.customElements.get('lex-select')
+                  ? `<lex-select data-action="page-size" class="lex-page-size-lex-select" size="sm" value="${currentLimit}" options='${JSON.stringify(pageSizes.map(s => ({ value: String(s), label: String(s) })))}' aria-label="Rows per page"></lex-select>`
+                  : `<select data-action="page-size" class="lex-page-size-select">
                   ${pageSizes.map(s => `<option value="${s}"${s === currentLimit ? ' selected' : ''}>${s}</option>`).join('')}
-                </select>
+                </select>`}
               </label>
               <div style="display:flex;gap:4px">
                 <button class="lex-page-btn" data-action="prev" ${pg.page <= 1 ? 'disabled' : ''}>Prev</button>
@@ -897,6 +1079,8 @@
     }
 
     updated() {
+      this.classList.toggle('lex-table--filter-open', !!this._colFilterOpen);
+
       // Restore search input focus after re-render
       if (this._searchHadFocus) {
         const input = this.$('[data-action="table-search"]');
@@ -912,7 +1096,13 @@
       // flow (only rendered on a genuine no-data state, per the render logic above).
       const emptyEl = this.$('lex-empty');
       if (emptyEl) {
-        this.listen(emptyEl, 'action', () => { this.emit('empty-action'); });
+        this.listen(emptyEl, 'action', () => {
+          if (emptyEl.getAttribute('data-empty-mode') === 'clear-filters') {
+            if (this.dataSource) this.dataSource.clearFilters();
+            return;
+          }
+          this.emit('empty-action');
+        });
       }
 
       // Row click
@@ -980,6 +1170,12 @@
         const newLimit = parseInt(e.target.value, 10);
         if (this.dataSource && newLimit > 0) this.dataSource.setLimit(newLimit);
       });
+      // lex-select page size (when the component is loaded)
+      this.delegate('lex-change', '[data-action="page-size"]', (e) => {
+        e.stopPropagation();
+        const newLimit = parseInt(e.detail && e.detail.value, 10);
+        if (this.dataSource && newLimit > 0 && newLimit !== this.dataSource._pagination.limit) this.dataSource.setLimit(newLimit);
+      });
 
       // Filter bar integration
       if (this.filterable) {
@@ -1007,13 +1203,41 @@
         this._scheduleUpdate();
       });
 
+      // Clear every column filter (offered on a filtered error state)
+      this.delegate('click', '[data-action="clear-col-filters"]', (e) => {
+        e.stopPropagation();
+        if (this.dataSource) this.dataSource.clearFilters();
+      });
+
+      // Narrow a long filter list in place (no re-render, checks stay put)
+      const filterSearch = this.$('[data-col-filter-search]');
+      if (filterSearch) {
+        this.listen(filterSearch, 'click', (e) => e.stopPropagation());
+        this.listen(filterSearch, 'input', (e) => {
+          const term = String(e.target.value || '').trim().toLowerCase();
+          this.$$('[data-col-option]').forEach(label => {
+            label.hidden = !!term && !label.dataset.colOption.includes(term);
+          });
+        });
+      }
+
       // Column filter apply
       this.delegate('click', '[data-action="col-filter-apply"]', (e) => {
         e.stopPropagation();
+        const textInput = this.$('[data-col-filter-text]');
+        if (textInput) {
+          this._applyTextFilter(textInput.value);
+          return;
+        }
         const checks = this.$$('[data-col-check]:checked');
         const values = checks.map(c => c.dataset.colCheck);
         if (values.length > 0 && this.dataSource && this._colFilterOpen) {
-          this.dataSource.setFilter(this._colFilterOpen, 'in', values);
+          const config = this._columnFilterOptions[this._colFilterOpen];
+          if (!this.serverPaging && config && typeof config.match === 'function') {
+            this.dataSource.setFilter(this._colFilterOpen, 'match', { values, test: cell => config.match(cell, values) });
+          } else {
+            this.dataSource.setFilter(this._colFilterOpen, 'in', values);
+          }
         }
         this._colFilterOpen = null;
         this._scheduleUpdate();
@@ -1030,17 +1254,34 @@
       });
 
       // Close column filter dropdown on outside click
+      // (attached after the opening click has finished, so the next press
+      // anywhere outside closes it)
       if (this._colFilterOpen) {
-        let skipFirst = true;
         const closeColFilter = (ev) => {
-          if (skipFirst) { skipFirst = false; return; }
           if (!ev.target.closest('[data-col-filter-dropdown]') && !ev.target.closest('[data-col-filter]')) {
             this._colFilterOpen = null;
             this._scheduleUpdate();
           }
         };
+        const escapeColFilter = (ev) => {
+          if (ev.key !== 'Escape') return;
+          this._colFilterOpen = null;
+          this._scheduleUpdate();
+        };
         document.addEventListener('mousedown', closeColFilter);
-        this._eventCleanups.push(() => document.removeEventListener('mousedown', closeColFilter));
+        document.addEventListener('keydown', escapeColFilter);
+        this._eventCleanups.push(() => {
+          document.removeEventListener('mousedown', closeColFilter);
+          document.removeEventListener('keydown', escapeColFilter);
+        });
+        const textInput = this.$('[data-col-filter-text]');
+        if (textInput) {
+          this.listen(textInput, 'click', (ev) => ev.stopPropagation());
+          this.listen(textInput, 'keydown', (ev) => {
+            if (ev.key === 'Enter') { ev.preventDefault(); this._applyTextFilter(textInput.value); }
+          });
+          if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => textInput.focus());
+        }
       }
 
       // Selection: row checkbox — use targeted DOM updates to avoid full re-render.

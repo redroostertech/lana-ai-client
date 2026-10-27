@@ -71,15 +71,10 @@
               <span>Description</span>
               <textarea id="dashboardBuilderDescription" rows="4" placeholder="What this dashboard is for"></textarea>
             </label>
-            <label class="dash-builder__field">
+            <div class="dash-builder__field">
               <span>Default view</span>
-              <select id="dashboardBuilderType">
-                <option value="owner">Owner Performance</option>
-                <option value="department">Department Dashboards</option>
-                <option value="attorney">Attorney Performance</option>
-                <option value="other">Other Dashboards</option>
-              </select>
-            </label>
+              <lex-select id="dashboardBuilderType" options='[{"value":"owner","label":"Owner Performance"},{"value":"department","label":"Department Dashboards"},{"value":"attorney","label":"Attorney Performance"},{"value":"other","label":"Other Dashboards"}]' value="owner"></lex-select>
+            </div>
           </section>
 
           <section class="dash-builder__panel dash-builder__step" data-builder-step="visibility" aria-disabled="true">
@@ -90,14 +85,10 @@
               </div>
               <span class="dash-builder__step-state" data-builder-step-state="visibility">Locked</span>
             </div>
-            <label class="dash-builder__field">
+            <div class="dash-builder__field">
               <span>Access</span>
-              <select id="dashboardBuilderVisibility">
-                <option value="private">Private</option>
-                <option value="organization">Organization-wide</option>
-                <option value="custom">Specific people or groups</option>
-              </select>
-            </label>
+              <lex-select id="dashboardBuilderVisibility" options='[{"value":"private","label":"Private"},{"value":"organization","label":"Organization-wide"},{"value":"custom","label":"Specific people or groups"}]' value="private"></lex-select>
+            </div>
             <div id="dashboardBuilderShareSearchWrap" class="dash-builder__share" hidden>
               <label class="dash-builder__field">
                 <span>Add people or groups</span>
@@ -178,6 +169,7 @@
   <script src="../js/lex/components/foundation/lex-btn.js"></script>
   <script src="../js/lex/components/foundation/lex-empty.js"></script>
   <script src="../js/lex/components/form/lex-segmented.js"></script>
+  <script src="../js/lex/components/form/lex-select.js"></script>
   <script src="../js/lex/components/layout/lex-sidebar.js"></script>
   <script src="../js/lex/components/layout/lex-topbar.js"></script>
   <script src="../js/lex/components/layout/lex-conversation-item.js"></script>

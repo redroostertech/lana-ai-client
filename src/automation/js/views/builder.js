@@ -18,6 +18,27 @@ const OVERDUE_BUCKET_KEYS = ['slightly_overdue', 'moderately_overdue', 'severely
 const OVERDUE_STAGE_KEYS = ['follow_up_1', 'follow_up_2', 'follow_up_3'];
 const TEMPLATE_TOKEN_PATTERN = /\{\{([a-zA-Z0-9_.-]+)\}\}/g;
 
+const SCOPE_SELECT_OPTIONS = [
+  { value: 'matter', label: 'Specific matter' },
+  { value: 'organization', label: 'Organization-wide' }
+];
+const PUBLISH_SELECT_OPTIONS = [
+  { value: 'enabled', label: 'Publish live' },
+  { value: 'disabled', label: 'Create disabled' }
+];
+
+// Dropdowns are lex-select (UI standard section 11); values are strings and
+// changes arrive as lex-change. Fields that hold one sit in a div, not a
+// label element: a label re-clicks its trigger button when an option is
+// picked, which reopens the dropdown.
+function builderSelect(attributes, options, value, placeholder = 'Select...') {
+  const normalized = options.map((option) => ({
+    value: String(option.value ?? ''),
+    label: String(option.label ?? '')
+  }));
+  return `<lex-select ${attributes} options="${escapeAttribute(JSON.stringify(normalized))}" value="${escapeAttribute(value ?? '')}" placeholder="${escapeAttribute(placeholder)}"></lex-select>`;
+}
+
 function deepClone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
 }
@@ -1364,22 +1385,15 @@ export function renderBuilder(context) {
             subtitle: 'Choose what starts this automation.',
             body: `
               <div class="form-grid">
-                <label>
+                <div class="automation-field">
                   <span>Trigger Type</span>
-                  <select class="automation-builder-input" data-builder-field="triggerMode">
-                    <option value="event" ${triggerMode === 'event' ? 'selected' : ''}>System Event (captured in app)</option>
-                    <option value="scheduled" ${triggerMode === 'scheduled' ? 'selected' : ''}>Scheduled (pg-boss worker)</option>
-                  </select>
-                </label>
-                <label>
+                  ${builderSelect('data-builder-field="triggerMode"', [{ value: 'event', label: 'System Event (captured in app)' }, { value: 'scheduled', label: 'Scheduled (pg-boss worker)' }], triggerMode)}
+                </div>
+                <div class="automation-field">
                   <span>Trigger</span>
                   <div class="stack-sm">
                     <div class="flex items-center gap-2">
-                      <select class="automation-builder-input flex-1" id="builder-trigger" data-builder-field="triggerEvent">
-                        ${triggerOptions.map((eventType) => `
-                          <option value="${eventType}" ${context.state.builder.triggerEvent === eventType ? 'selected' : ''}>${eventType}</option>
-                        `).join('')}
-                      </select>
+                      ${builderSelect('class="flex-1" id="builder-trigger" data-builder-field="triggerEvent"', triggerOptions.map((eventType) => ({ value: eventType, label: eventType })), context.state.builder.triggerEvent)}
                       <lex-btn
                         variant="secondary"
                         size="sm"
@@ -1393,31 +1407,20 @@ export function renderBuilder(context) {
                       ${renderTriggerEventSummary(context.state.builder.triggerEvent || triggerOptions[0] || '')}
                     </div>
                   </div>
-                </label>
-                <label>
+                </div>
+                <div class="automation-field">
                   <span>Connector Data Source Filter</span>
-                  <select class="automation-builder-input" data-builder-field="triggerConnectorId">
-                    <option value="">All connector sources</option>
-                    ${connectorOptions.map((option) => `
-                      <option value="${escapeAttribute(option.id)}" ${context.state.builder.triggerConnectorId === option.id ? 'selected' : ''}>
-                        ${escapeHtml(option.label)}
-                      </option>
-                    `).join('')}
-                  </select>
-                </label>
+                  ${builderSelect('data-builder-field="triggerConnectorId"', [{ value: '', label: 'All connector sources' }, ...connectorOptions.map((option) => ({ value: option.id, label: option.label }))], context.state.builder.triggerConnectorId, 'All connector sources')}
+                </div>
                 ${triggerMode === 'scheduled' ? `
                   <label>
                     <span>Schedule Time</span>
                     <input class="automation-builder-input" id="builder-time" data-builder-field="scheduleTime" type="time" value="${escapeAttribute(context.state.builder.scheduleTime)}">
                   </label>
-                  <label>
+                  <div class="automation-field">
                     <span>Day of Week</span>
-                    <select class="automation-builder-input" id="builder-day" data-builder-field="dayOfWeek">
-                      ${DAY_OPTIONS.map(([value, label]) => `
-                        <option value="${value}" ${context.state.builder.dayOfWeek === value ? 'selected' : ''}>${label}</option>
-                      `).join('')}
-                    </select>
-                  </label>
+                    ${builderSelect('id="builder-day" data-builder-field="dayOfWeek"', DAY_OPTIONS.map(([value, label]) => ({ value, label })), context.state.builder.dayOfWeek)}
+                  </div>
                 ` : ''}
               </div>
               <div class="surface-note">
@@ -1511,17 +1514,10 @@ export function renderBuilder(context) {
               ${renderActionInsights(selectedActionInsights)}
               <div class="stack-md">
                 ${selectedActionIsAi ? `
-                  <label>
+                  <div class="automation-field">
                     <span>AI Instructions Mode</span>
-                    <select
-                      class="automation-builder-input"
-                      data-action-index="${selectedActionIndex}"
-                      data-action-field="prompt_mode"
-                    >
-                      <option value="default" ${selectedActionPromptMode === 'default' ? 'selected' : ''}>Use Default AI Instructions</option>
-                      <option value="custom" ${selectedActionPromptMode === 'custom' ? 'selected' : ''}>Use Custom System Prompt</option>
-                    </select>
-                  </label>
+                    ${builderSelect(`data-action-index="${selectedActionIndex}" data-action-field="prompt_mode"`, [{ value: 'default', label: 'Use Default AI Instructions' }, { value: 'custom', label: 'Use Custom System Prompt' }], selectedActionPromptMode)}
+                  </div>
                   ${selectedActionPromptMode === 'custom' ? `
                     <label>
                       <span>System Prompt</span>
@@ -1565,21 +1561,10 @@ export function renderBuilder(context) {
                     value="${escapeAttribute(selectedAction.type)}"
                   >
                 </label>
-                <label>
+                <div class="automation-field">
                   <span>Connector Data Source Filter</span>
-                  <select
-                    class="automation-builder-input"
-                    data-action-index="${selectedActionIndex}"
-                    data-action-field="connector_id"
-                  >
-                    <option value="">All connector sources</option>
-                    ${connectorOptions.map((option) => `
-                      <option value="${escapeAttribute(option.id)}" ${selectedAction.connectorId === option.id ? 'selected' : ''}>
-                        ${escapeHtml(option.label)}
-                      </option>
-                    `).join('')}
-                  </select>
-                </label>
+                  ${builderSelect(`data-action-index="${selectedActionIndex}" data-action-field="connector_id"`, [{ value: '', label: 'All connector sources' }, ...connectorOptions.map((option) => ({ value: option.id, label: option.label }))], selectedAction.connectorId, 'All connector sources')}
+                </div>
                 <label>
                   <span>Step Config JSON</span>
                   <textarea
@@ -1669,62 +1654,24 @@ export function renderBuilder(context) {
             <div class="automations-sidebar-section-title">Settings</div>
             <section class="automations-settings-panel">
               <p class="automations-settings-help">Configure scope, publish state, and visibility. Changes save with the automation.</p>
-              <label>
+              <div class="automation-field">
                 <span>Scope</span>
-                <select class="automation-builder-input" data-builder-field="scopeType">
-                  <option value="matter" ${context.state.builder.scopeType === 'matter' ? 'selected' : ''}>Specific matter</option>
-                  <option value="organization" ${context.state.builder.scopeType === 'organization' ? 'selected' : ''}>Organization-wide</option>
-                </select>
-              </label>
-              ${context.state.builder.scopeType === 'matter' ? (() => {
-                const matterQuery = (context.state.builder.matterSearch || '').toLowerCase();
-                const allMatters = context.state.matters;
-                const filteredMatters = matterQuery
-                  ? allMatters.filter((matter) =>
-                      String(matter.name || '').toLowerCase().includes(matterQuery) ||
-                      String(matterRef(matter) || '').toLowerCase().includes(matterQuery))
-                  : allMatters;
-                const selectedRef = context.state.builder.matterId;
-                const selectedMatter = allMatters.find((m) => matterRef(m) === selectedRef);
-                const optionMatters = selectedMatter && !filteredMatters.includes(selectedMatter)
-                  ? [selectedMatter, ...filteredMatters]
-                  : filteredMatters;
-                return `
-                  <label>
-                    <span>Matter</span>
-                    <input
-                      type="search"
-                      class="automation-builder-input automation-builder-matter-search"
-                      data-builder-field="matterSearch"
-                      placeholder="Search matters by name or ID${allMatters.length ? ` (${allMatters.length} total)` : ''}…"
-                      value="${escapeAttribute(context.state.builder.matterSearch || '')}"
-                      autocomplete="off">
-                    <select class="automation-builder-input" data-builder-field="matterId" size="${Math.min(Math.max(optionMatters.length, 3), 8)}">
-                      ${optionMatters.length === 0
-                        ? '<option disabled>No matters match your search</option>'
-                        : optionMatters.map((matter) => `
-                          <option value="${escapeAttribute(matterRef(matter))}" ${selectedRef === matterRef(matter) ? 'selected' : ''}>
-                            ${escapeHtml(matter.name || matterRef(matter))}
-                          </option>
-                        `).join('')}
-                    </select>
-                  </label>
-                `;
-              })() : ''}
-              <label>
+                ${builderSelect('data-builder-field="scopeType"', SCOPE_SELECT_OPTIONS, context.state.builder.scopeType)}
+              </div>
+              ${context.state.builder.scopeType === 'matter' ? `
+                <div class="automation-field">
+                  <span>Matter</span>
+                  ${builderSelect('data-builder-field="matterId" searchable', context.state.matters.map((matter) => ({ value: matterRef(matter), label: matter.name || matterRef(matter) })), context.state.builder.matterId, context.state.matters.length ? 'Select a matter' : 'No matters available')}
+                </div>
+              ` : ''}
+              <div class="automation-field">
                 <span>Publish state</span>
-                <select class="automation-builder-input" data-builder-field="publishMode">
-                  <option value="enabled" ${context.state.builder.publishMode === 'enabled' ? 'selected' : ''}>Active</option>
-                  <option value="disabled" ${context.state.builder.publishMode === 'disabled' ? 'selected' : ''}>Inactive</option>
-                </select>
-              </label>
-              <label>
+                ${builderSelect('data-builder-field="publishMode"', [{ value: 'enabled', label: 'Active' }, { value: 'disabled', label: 'Inactive' }], context.state.builder.publishMode)}
+              </div>
+              <div class="automation-field">
                 <span>Visibility</span>
-                <select class="automation-builder-input" data-builder-visibility data-edit-automation-id="${escapeAttribute(editAutomationId)}">
-                  <option value="private" ${(context.state.builder.editMode?.originalAutomation?.visibility || 'private') === 'private' ? 'selected' : ''}>Private</option>
-                  <option value="org_wide" ${context.state.builder.editMode?.originalAutomation?.visibility === 'org_wide' ? 'selected' : ''}>Organization-Wide</option>
-                </select>
-              </label>
+                ${builderSelect(`data-builder-visibility data-edit-automation-id="${escapeAttribute(editAutomationId)}"`, [{ value: 'private', label: 'Private' }, { value: 'org_wide', label: 'Organization-Wide' }], context.state.builder.editMode?.originalAutomation?.visibility === 'org_wide' ? 'org_wide' : 'private')}
+              </div>
             </section>
           ` : ''}
 
@@ -1771,67 +1718,46 @@ export function renderBuilder(context) {
         </div>
       </footer>
 
-      <div class="builder-publish-modal ${context.state.builder.publishModalOpen ? '' : 'hidden'}" role="dialog" aria-modal="true" aria-labelledby="builder-publish-title">
-        <div class="builder-publish-overlay" data-close-publish-modal></div>
-        <div class="builder-publish-panel">
-          <div class="builder-publish-header">
-            <h3 id="builder-publish-title">Publish Automation</h3>
-            <lex-btn variant="ghost" size="sm" data-close-publish-modal>Close</lex-btn>
-          </div>
-          <div class="builder-publish-body">
-            <div class="form-grid">
-              <label>
-                <span>Scope</span>
-                <select class="automation-builder-input" data-builder-field="scopeType">
-                  <option value="matter" ${context.state.builder.scopeType === 'matter' ? 'selected' : ''}>Specific matter</option>
-                  <option value="organization" ${context.state.builder.scopeType === 'organization' ? 'selected' : ''}>Organization-wide</option>
-                </select>
-              </label>
-              <label>
-                <span>Publish state</span>
-                <select class="automation-builder-input" data-builder-field="publishMode">
-                  <option value="enabled" ${context.state.builder.publishMode === 'enabled' ? 'selected' : ''}>Publish live</option>
-                  <option value="disabled" ${context.state.builder.publishMode === 'disabled' ? 'selected' : ''}>Create disabled</option>
-                </select>
-              </label>
-              ${context.state.builder.scopeType === 'matter' ? `
-                <label class="full">
-                  <span>Matter</span>
-                  <select class="automation-builder-input" data-builder-field="matterId">
-                    ${context.state.matters.map((matter) => `
-                      <option value="${escapeAttribute(matterRef(matter))}" ${context.state.builder.matterId === matterRef(matter) ? 'selected' : ''}>
-                        ${escapeHtml(matter.name || matterRef(matter))}
-                      </option>
-                    `).join('')}
-                  </select>
-                </label>
-              ` : ''}
+      <lex-modal id="builder-publish-modal" heading="Publish Automation" size="lg" hide-actions data-builder-publish-modal ${context.state.builder.publishModalOpen ? 'open' : ''}>
+        <div class="builder-publish-body">
+          <div class="form-grid">
+            <div class="automation-field">
+              <span>Scope</span>
+              ${builderSelect('data-builder-field="scopeType"', SCOPE_SELECT_OPTIONS, context.state.builder.scopeType)}
             </div>
-            ${metaGrid([
-              { label: 'Quick Start', value: selectedTemplate.name },
-              { label: 'Trigger', value: context.state.builder.triggerEvent },
-              { label: 'Scope', value: context.state.builder.scopeType === 'matter' ? `Matter: ${selectedMatterName(context)}` : 'Organization-wide' },
-              { label: 'Publish', value: context.state.builder.publishMode === 'enabled' ? 'Live' : 'Disabled' }
-            ])}
-            ${(() => {
-              const failing = preflight.filter((item) => !item.done);
-              if (failing.length === 0) return '';
-              return `
-                <div class="builder-publish-blockers" role="alert">
-                  <strong>Resolve before ${isEdit ? 'saving' : 'publishing'}:</strong>
-                  <ul>
-                    ${failing.map((item) => `<li><strong>${escapeHtml(item.title)}</strong> — ${escapeHtml(item.description)}</li>`).join('')}
-                  </ul>
-                </div>
-              `;
-            })()}
+            <div class="automation-field">
+              <span>Publish state</span>
+              ${builderSelect('data-builder-field="publishMode"', PUBLISH_SELECT_OPTIONS, context.state.builder.publishMode)}
+            </div>
+            ${context.state.builder.scopeType === 'matter' ? `
+              <div class="automation-field full">
+                <span>Matter</span>
+                ${builderSelect('data-builder-field="matterId" searchable', context.state.matters.map((matter) => ({ value: matterRef(matter), label: matter.name || matterRef(matter) })), context.state.builder.matterId, 'Select a matter')}
+              </div>
+            ` : ''}
           </div>
-          <div class="builder-publish-footer">
-            <lex-btn variant="secondary" size="sm" data-close-publish-modal>Cancel</lex-btn>
-            <lex-btn id="create-automation-btn" variant="primary" size="sm" ${preflight.every((item) => item.done) ? '' : 'disabled'}>${isEdit ? 'Save Changes' : 'Publish Automation'}</lex-btn>
-          </div>
+          ${metaGrid([
+            { label: 'Quick Start', value: selectedTemplate.name },
+            { label: 'Trigger', value: context.state.builder.triggerEvent },
+            { label: 'Scope', value: context.state.builder.scopeType === 'matter' ? `Matter: ${selectedMatterName(context)}` : 'Organization-wide' },
+            { label: 'Publish', value: context.state.builder.publishMode === 'enabled' ? 'Live' : 'Disabled' }
+          ])}
+          ${(() => {
+            const failing = preflight.filter((item) => !item.done);
+            if (failing.length === 0) return '';
+            return `
+              <div class="builder-publish-blockers" role="alert">
+                <strong>Resolve before ${isEdit ? 'saving' : 'publishing'}:</strong>
+                <ul>
+                  ${failing.map((item) => `<li><strong>${escapeHtml(item.title)}</strong> — ${escapeHtml(item.description)}</li>`).join('')}
+                </ul>
+              </div>
+            `;
+          })()}
         </div>
-      </div>
+        <lex-btn data-slot="footer" variant="secondary" size="sm" data-close-publish-modal>Cancel</lex-btn>
+        <lex-btn data-slot="footer" id="create-automation-btn" variant="primary" size="sm" ${preflight.every((item) => item.done) ? '' : 'disabled'}>${isEdit ? 'Save Changes' : 'Publish Automation'}</lex-btn>
+      </lex-modal>
     </section>
   `;
 }
@@ -2337,15 +2263,11 @@ function renderBuilderStepBody(context, currentStep, selectedTemplate, recommend
             <span>Category</span>
             <input class="automation-builder-input" id="builder-category" data-builder-field="category" value="${escapeAttribute(context.state.builder.category)}">
           </label>
-          <label>
+          <div class="automation-field">
             <span>Trigger</span>
             <div class="stack-sm">
               <div class="flex items-center gap-2">
-                <select class="automation-builder-input flex-1" id="builder-trigger" data-builder-field="triggerEvent">
-                  ${TRIGGER_OPTIONS.map((eventType) => `
-                    <option value="${eventType}" ${context.state.builder.triggerEvent === eventType ? 'selected' : ''}>${eventType}</option>
-                  `).join('')}
-                </select>
+                ${builderSelect('class="flex-1" id="builder-trigger" data-builder-field="triggerEvent"', TRIGGER_OPTIONS.map((eventType) => ({ value: eventType, label: eventType })), context.state.builder.triggerEvent)}
                 <lex-btn
                   variant="secondary"
                   size="sm"
@@ -2359,19 +2281,15 @@ function renderBuilderStepBody(context, currentStep, selectedTemplate, recommend
                 ${renderTriggerEventSummary(context.state.builder.triggerEvent || TRIGGER_OPTIONS[0] || '')}
               </div>
             </div>
-          </label>
+          </div>
           <label>
             <span>Schedule Time</span>
             <input class="automation-builder-input" id="builder-time" data-builder-field="scheduleTime" type="time" value="${escapeAttribute(context.state.builder.scheduleTime)}">
           </label>
-          <label>
+          <div class="automation-field">
             <span>Day of Week</span>
-            <select class="automation-builder-input" id="builder-day" data-builder-field="dayOfWeek">
-              ${DAY_OPTIONS.map(([value, label]) => `
-                <option value="${value}" ${context.state.builder.dayOfWeek === value ? 'selected' : ''}>${label}</option>
-              `).join('')}
-            </select>
-          </label>
+            ${builderSelect('id="builder-day" data-builder-field="dayOfWeek"', DAY_OPTIONS.map(([value, label]) => ({ value, label })), context.state.builder.dayOfWeek)}
+          </div>
         </div>
         <div class="badge-row">
           ${selectedTemplate.connectorHints.map((hint) => badge(hint)).join('')}
@@ -2436,31 +2354,19 @@ function renderBuilderStepBody(context, currentStep, selectedTemplate, recommend
           Decide where this automation should run first. Matter scope is the safer default for initial rollout.
         </div>
         <div class="form-grid">
-          <label>
+          <div class="automation-field">
             <span>Scope</span>
-            <select class="automation-builder-input" data-builder-field="scopeType">
-              <option value="matter" ${context.state.builder.scopeType === 'matter' ? 'selected' : ''}>Specific matter</option>
-              <option value="organization" ${context.state.builder.scopeType === 'organization' ? 'selected' : ''}>Organization-wide</option>
-            </select>
-          </label>
-          <label>
+            ${builderSelect('data-builder-field="scopeType"', SCOPE_SELECT_OPTIONS, context.state.builder.scopeType)}
+          </div>
+          <div class="automation-field">
             <span>Publish state</span>
-            <select class="automation-builder-input" data-builder-field="publishMode">
-              <option value="enabled" ${context.state.builder.publishMode === 'enabled' ? 'selected' : ''}>Publish live</option>
-              <option value="disabled" ${context.state.builder.publishMode === 'disabled' ? 'selected' : ''}>Create disabled</option>
-            </select>
-          </label>
+            ${builderSelect('data-builder-field="publishMode"', PUBLISH_SELECT_OPTIONS, context.state.builder.publishMode)}
+          </div>
           ${context.state.builder.scopeType === 'matter' ? `
-            <label class="full">
+            <div class="automation-field full">
               <span>Matter</span>
-              <select class="automation-builder-input" data-builder-field="matterId">
-                ${context.state.matters.map((matter) => `
-                  <option value="${escapeAttribute(matterRef(matter))}" ${context.state.builder.matterId === matterRef(matter) ? 'selected' : ''}>
-                    ${escapeHtml(matter.name || matterRef(matter))}
-                  </option>
-                `).join('')}
-              </select>
-            </label>
+              ${builderSelect('data-builder-field="matterId" searchable', context.state.matters.map((matter) => ({ value: matterRef(matter), label: matter.name || matterRef(matter) })), context.state.builder.matterId, 'Select a matter')}
+            </div>
           ` : `
             <div class="check-item full-width">
               <strong>Organization-wide rollout</strong>

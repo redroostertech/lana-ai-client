@@ -206,9 +206,9 @@ describe('Template Library', () => {
     expect(templatesPageHtml).toContain('<title>Template Library - LANA AI</title>');
     expect(templatesPageHtml).toContain('page-title="Template Library"');
     expect(templatesPageHtml).toContain('id="dstNewTemplate"');
-    expect(templatesPageHtml).toContain('id="dstKindFilterLabel">Template type');
+    expect(templatesPageHtml).toContain('id="dstKindFilter"');
     expect(templatesPageHtml).toContain('"label":"Documents"');
-    expect(templatesPageHtml).toContain('"label":"Document sets"');
+    expect(templatesPageHtml).toContain('"label":"Document Sets"');
     expect(templatesPageHtml).toContain('"label":"Layouts"');
     expect(templatesPageHtml).toContain('js/services/document-create-modal.js');
     expect(templatesPageHtml).toContain('js/app-catalog.js');

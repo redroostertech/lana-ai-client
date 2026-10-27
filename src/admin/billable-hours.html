@@ -7,6 +7,7 @@
 
   <link rel="stylesheet" href="../css/lex-tokens.css">
   <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/admin/admin-tables.css">
   <link rel="stylesheet" href="../css/tailwind-output.css">
   <link rel="stylesheet" href="../css/lex-chat.css">
   <script src="../js/tailwind-loader.js"></script>
@@ -26,6 +27,45 @@
   <template id="page-content">
 
     <main>
+
+      <style>
+        /* Billable hours tables (docs/TABLE-STANDARD.md section 8) */
+        .bh-num { display: block; font-variant-numeric: tabular-nums; font-size: 13px; color: var(--lex-text-primary); white-space: nowrap; }
+        .bh-num--strong { font-weight: 600; color: var(--lex-color-blue-700, #1d4ed8); }
+        .bh-row-actions { display: flex; gap: 0.25rem; justify-content: flex-end; flex-wrap: nowrap; }
+        .bh-row-btn { padding: 0.25rem 0.5rem; font-size: 0.75rem; font-weight: 600; background: var(--lex-bg-primary, #fff); color: var(--lex-text-primary); border: 1px solid var(--lex-border-default, #e5e7eb); border-radius: 0.25rem; cursor: pointer; white-space: nowrap; }
+        .bh-row-btn--approve { background: var(--lex-color-green-50, #f0fdf4); color: var(--lex-color-green-700, #15803d); border-color: var(--lex-color-green-200, #bbf7d0); }
+        .bh-row-btn:disabled { opacity: 0.6; cursor: default; }
+
+        /* By attorney: Attorney, Email, Total hours, Billable, Amount, Drafts, Submitted, Approved, Created */
+        #bhAttorneysTable table { min-width: 1180px; }
+        #bhAttorneysTable th { white-space: nowrap; }
+        #bhAttorneysTable th:nth-child(2) { width: 20%; }
+        #bhAttorneysTable th:nth-child(3), #bhAttorneysTable th:nth-child(4) { width: 120px; }
+        #bhAttorneysTable th:nth-child(5) { width: 130px; }
+        #bhAttorneysTable th:nth-child(6), #bhAttorneysTable th:nth-child(7), #bhAttorneysTable th:nth-child(8) { width: 110px; }
+        #bhAttorneysTable th:nth-child(9) { width: 176px; }
+
+        /* By matter: Matter, Client, Attorneys, Total hours, Billable, Amount, Created */
+        #bhMattersTable table { min-width: 1080px; }
+        #bhMattersTable th { white-space: nowrap; }
+        #bhMattersTable th:nth-child(2) { width: 20%; }
+        #bhMattersTable th:nth-child(3) { width: 110px; }
+        #bhMattersTable th:nth-child(4), #bhMattersTable th:nth-child(5) { width: 120px; }
+        #bhMattersTable th:nth-child(6) { width: 130px; }
+        #bhMattersTable th:nth-child(7) { width: 176px; }
+
+        /* Approval queue: (select), Attorney, Matter, Hours, Type, Description, Worked, Created, actions */
+        #bhApprovalsTable table { min-width: 1320px; }
+        #bhApprovalsTable th { white-space: nowrap; }
+        #bhApprovalsTable th:nth-child(1) { width: 44px; }
+        #bhApprovalsTable th:nth-child(2) { width: 16%; }
+        #bhApprovalsTable th:nth-child(3) { width: 18%; }
+        #bhApprovalsTable th:nth-child(4) { width: 90px; }
+        #bhApprovalsTable th:nth-child(5) { width: 140px; }
+        #bhApprovalsTable th:nth-child(7), #bhApprovalsTable th:nth-child(8) { width: 176px; }
+        #bhApprovalsTable th:nth-child(9) { width: 220px; }
+      </style>
 
       <lex-banner
         id="bhBanner"
@@ -73,9 +113,131 @@
       </div>
 
       <!-- Tab contents -->
-      <div id="bhAdminTabAttorneys"></div>
-      <div id="bhAdminTabMatters" class="hidden"></div>
-      <div id="bhAdminTabApprovals" class="hidden"></div>
+      <div id="bhAdminTabAttorneys">
+        <div class="bg-white rounded-lg shadow-sm border mb-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and filter attorneys">
+          <div class="flex items-center gap-4 flex-wrap">
+            <div class="flex-1 min-w-[200px]">
+              <lex-input id="bhAttorneysSearch" placeholder="Search attorneys..." clearable="true" leading-icon="search"></lex-input>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Sort by:</label>
+              <lex-select id="bhAttorneysSort" options='[{"value":"billable_hours","label":"Billable"},{"value":"total_hours","label":"Total hours"},{"value":"billable_amount","label":"Amount"},{"value":"submitted_count","label":"Submitted"},{"value":"name","label":"Attorney"},{"value":"created_at","label":"Created"}]' value="billable_hours"></lex-select>
+            </div>
+            <lex-btn id="bhAttorneysSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path></svg>
+            </lex-btn>
+            <div class="flex items-center gap-2">
+              <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Pending approval:</label>
+              <lex-select id="bhAttorneysPendingFilter" options='[{"value":"all","label":"All"},{"value":"yes","label":"Has pending entries"},{"value":"no","label":"Nothing pending"}]' value="all"></lex-select>
+            </div>
+            <div id="bhAttorneysCount" class="admin-table-toolbar-label text-sm whitespace-nowrap"></div>
+          </div>
+        </div>
+        <section aria-labelledby="bhAttorneysHeading">
+          <div class="flex items-center justify-between mb-3">
+            <h2 id="bhAttorneysHeading" class="admin-table-section-title text-lg font-semibold">By Attorney</h2>
+            <span id="bhAttorneysSectionCount" class="admin-table-toolbar-label text-sm" aria-live="polite"></span>
+          </div>
+          <lex-table
+            id="bhAttorneysTable"
+            class="admin-table lex-table--card"
+            column-filters
+            columns="name,email,total_hours,billable_hours,billable_amount,draft_count,submitted_count,approved_count,created_at"
+            labels="Attorney,Email,Total hours,Billable,Amount,Drafts,Submitted,Approved,Created"
+            search-keys="name,email"
+            sort-by="billable_hours"
+            sort-dir="desc"
+            limit="20"
+            id-key="user_id"
+            empty-text="No billable hours for this period"
+            aria-label="Billable hours by attorney"
+          ></lex-table>
+        </section>
+      </div>
+      <div id="bhAdminTabMatters" class="hidden">
+        <div class="bg-white rounded-lg shadow-sm border mb-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and filter matters">
+          <div class="flex items-center gap-4 flex-wrap">
+            <div class="flex-1 min-w-[200px]">
+              <lex-input id="bhMattersSearch" placeholder="Search matters or clients..." clearable="true" leading-icon="search"></lex-input>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Sort by:</label>
+              <lex-select id="bhMattersSort" options='[{"value":"billable_hours","label":"Billable"},{"value":"total_hours","label":"Total hours"},{"value":"billable_amount","label":"Amount"},{"value":"attorneys","label":"Attorneys"},{"value":"matter_name","label":"Matter"},{"value":"client_name","label":"Client"},{"value":"created_at","label":"Created"}]' value="billable_hours"></lex-select>
+            </div>
+            <lex-btn id="bhMattersSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path></svg>
+            </lex-btn>
+            <div class="flex items-center gap-2">
+              <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Client:</label>
+              <lex-select id="bhMattersClientFilter" options='[{"value":"all","label":"All"}]' value="all"></lex-select>
+            </div>
+            <div id="bhMattersCount" class="admin-table-toolbar-label text-sm whitespace-nowrap"></div>
+          </div>
+        </div>
+        <section aria-labelledby="bhMattersHeading">
+          <div class="flex items-center justify-between mb-3">
+            <h2 id="bhMattersHeading" class="admin-table-section-title text-lg font-semibold">By Matter</h2>
+            <span id="bhMattersSectionCount" class="admin-table-toolbar-label text-sm" aria-live="polite"></span>
+          </div>
+          <lex-table
+            id="bhMattersTable"
+            class="admin-table lex-table--card"
+            column-filters
+            columns="matter_name,client_name,attorneys,total_hours,billable_hours,billable_amount,created_at"
+            labels="Matter,Client,Attorneys,Total hours,Billable,Amount,Created"
+            search-keys="matter_name,client_name"
+            sort-by="billable_hours"
+            sort-dir="desc"
+            limit="20"
+            id-key="matter_id"
+            empty-text="No billable hours for this period"
+            aria-label="Billable hours by matter"
+          ></lex-table>
+        </section>
+      </div>
+      <div id="bhAdminTabApprovals" class="hidden">
+        <div class="bg-white rounded-lg shadow-sm border mb-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and filter the approval queue">
+          <div class="flex items-center gap-4 flex-wrap">
+            <div class="flex-1 min-w-[200px]">
+              <lex-input id="bhApprovalsSearch" placeholder="Search entries..." clearable="true" leading-icon="search"></lex-input>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Sort by:</label>
+              <lex-select id="bhApprovalsSort" options='[{"value":"start_time","label":"Worked"},{"value":"created_at","label":"Created"},{"value":"duration_minutes","label":"Hours"},{"value":"attorney","label":"Attorney"},{"value":"matter","label":"Matter"},{"value":"activity_type","label":"Type"}]' value="start_time"></lex-select>
+            </div>
+            <lex-btn id="bhApprovalsSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path></svg>
+            </lex-btn>
+            <div class="flex items-center gap-2">
+              <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Type:</label>
+              <lex-select id="bhApprovalsTypeFilter" options='[{"value":"all","label":"All"}]' value="all"></lex-select>
+            </div>
+            <div id="bhApprovalsCount" class="admin-table-toolbar-label text-sm whitespace-nowrap"></div>
+          </div>
+        </div>
+        <section aria-labelledby="bhApprovalsHeading">
+          <div class="flex items-center justify-between mb-3">
+            <h2 id="bhApprovalsHeading" class="admin-table-section-title text-lg font-semibold">Approval Queue</h2>
+            <span id="bhApprovalsSectionCount" class="admin-table-toolbar-label text-sm" aria-live="polite"></span>
+          </div>
+          <lex-table
+            id="bhApprovalsTable"
+            class="admin-table lex-table--card"
+            column-filters
+            selectable
+            bulk-actions='[{"label":"Approve selected","action":"approve"}]'
+            columns="attorney,matter,duration_minutes,activity_type,description,start_time,created_at,actions"
+            labels="Attorney,Matter,Hours,Type,Description,Worked,Created,Actions"
+            search-keys="attorney,matter,activity_type,description"
+            sort-by="start_time"
+            sort-dir="desc"
+            limit="20"
+            id-key="id"
+            empty-text="No entries pending approval"
+            aria-label="Approval queue"
+          ></lex-table>
+        </section>
+      </div>
 
     </main>
 
@@ -103,6 +265,10 @@
   <script src="../js/lex/components/foundation/lex-banner.js"></script>
   <script src="../js/lex/components/foundation/lex-card.js"></script>
   <script src="../js/lex/components/foundation/lex-drawer.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/foundation/lex-modal.js"></script>
+  <script src="../js/lex/components/data/lex-table.js"></script>
+  <script src="../js/lex/components/form/lex-input.js"></script>
   <script src="../js/lex/components/form/lex-select.js"></script>
   <script src="../js/lex/components/form/lex-segmented.js"></script>
 
@@ -146,6 +312,8 @@
   <script src="../js/api.js"></script>
 
   <!-- Page controller -->
+  <script src="../js/shared/library-column-filters.js"></script>
+  <script src="../js/admin/admin-table-kit.js"></script>
   <script src="../js/admin/billable-hours-reporting.js"></script>
 
   <!-- Auth guard (MUST be last) -->

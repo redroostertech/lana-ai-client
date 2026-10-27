@@ -1690,7 +1690,7 @@
   // Delete confirm
   // -------------------------------------------------------------------------
 
-  function confirmDelete(ctx, state) {
+  async function confirmDelete(ctx, state) {
     if (!state.agent || !state.slug) return;
     if (isSystemAgent(state.agent)) {
       if (window.Lex && window.Lex.Toast) {
@@ -1698,19 +1698,12 @@
       }
       return;
     }
-    if (!window.Lex || !window.Lex.Modal || typeof window.Lex.Modal.confirm !== 'function') {
-      if (window.confirm('Delete this agent? This soft-disables it for your org.')) {
-        performDelete(ctx, state);
-      }
-      return;
-    }
-
-    window.Lex.Modal.confirm(
+    var confirmed = await window.Lex.Modal.confirmAsync(
       'Delete agent?',
       'This soft-disables "' + (state.agent.name || state.slug) + '" for your organization. Past runs are kept for audit but the agent will no longer accept new runs.',
-      function () { performDelete(ctx, state); },
       { variant: 'danger', confirmText: 'Delete', cancelText: 'Cancel' }
     );
+    if (confirmed) performDelete(ctx, state);
   }
 
   function performDelete(ctx, state) {

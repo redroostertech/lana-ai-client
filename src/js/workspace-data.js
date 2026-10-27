@@ -19,6 +19,8 @@
   // ═══════════════════════════════════════════════════════════════
 
   var fmtDateTime = Lex.Utils.formatDateTime;
+  var WsTable = window.LanaWorkspaceDataTable;
+  var TABLE_ID = 'wsDataTable';
 
   // ═══════════════════════════════════════════════════════════════
   // Module-level state
@@ -27,13 +29,15 @@
   var _gen         = 0;
   var _matterId    = '';
   var _matterName  = '';
-  var _currentPage = 1;
-  var _pageSize    = 50;
   var _searchTerm  = '';
-  var _entityFilter = '';
-  var _connectorFilter = '';
-  var _sortBy      = 'synced_at';
-  var _sortDir     = 'desc';
+  var _searchDebounce = null;
+  // Deep-link state (?entity_type=&connector_id=&search=&page=) applied to the
+  // table before its first query.
+  var _initialQuery = { entityType: '', connectorId: '', search: '', page: 1 };
+  // Column filter values seen in the API's facets (it narrows them by the
+  // active filters, so they are merged rather than replaced).
+  var _entityOptions = [];
+  var _connectorOptions = [];
   var _matterUuid  = '';  // actual UUID from DB (for backend APIs)
   // _chatEl / _threadsEl removed — managed by lex-lana-panel
 
@@ -139,13 +143,12 @@
   }
 
   function _hydrateFiltersFromQuery() {
-    _entityFilter = String(getQueryParam('entity_type') || getQueryParam('entity') || '').trim();
-    _connectorFilter = String(getQueryParam('connector_id') || getQueryParam('connector') || '').trim();
-    _searchTerm = String(getQueryParam('search') || '').trim();
-    _currentPage = Math.max(1, Number(getQueryParam('page') || 1) || 1);
+    _initialQuery = WsTable.readQueryState(window.location.search);
+    _searchTerm = _initialQuery.search;
 
     var searchInput = el('wsDataSearch');
     if (searchInput && _searchTerm) {
+      searchInput.setAttribute('value', _searchTerm);
       searchInput.value = _searchTerm;
     }
   }
@@ -180,10 +183,9 @@
         // Wire everything and load data
         _wireSearch();
         _wireFilters();
-        _wirePagination();
         _wireImportWizard();
         _initLanaPanel();
-        _loadData();
+        _whenTableReady(_wireTable);
         _loadImportRollup(true);
         _loadImportHistory(true);
         if (_shouldAutoOpenImportWizard()) {
@@ -199,189 +201,147 @@
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // Search
+  // Toolbar: search, sort, entity type filter
   // ═══════════════════════════════════════════════════════════════
 
+  function _table() { return el(TABLE_ID); }
+
+  function _whenTableReady(fn) {
+    var ready = window.customElements && typeof window.customElements.whenDefined === 'function'
+      ? window.customElements.whenDefined('lex-table')
+      : Promise.resolve();
+    ready.then(fn);
+  }
+
+  // lex-input emits lex-input while typing and lex-change on clear.
   function _wireSearch() {
     var input = el('wsDataSearch');
     if (!input || input._wired) return;
     input._wired = true;
-
-    var debounce = null;
-    input.addEventListener('input', function () {
-      clearTimeout(debounce);
-      debounce = setTimeout(function () {
-        _searchTerm = input.value.trim();
-        _currentPage = 1;
-        _loadData();
-      }, 300);
+    ['lex-input', 'lex-change'].forEach(function (name) {
+      input.addEventListener(name, function (e) {
+        var value = String((e.detail && e.detail.value) || '').trim();
+        clearTimeout(_searchDebounce);
+        _searchDebounce = setTimeout(function () {
+          if (value === _searchTerm) return;
+          _searchTerm = value;
+          var table = _table();
+          if (table) table.requestServerQuery({ resetPage: true });
+        }, 350);
+      });
     });
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // Filters
-  // ═══════════════════════════════════════════════════════════════
+  function _sortOrder() {
+    var button = el('wsDataSortOrder');
+    return button && button.dataset.order === 'asc' ? 'asc' : 'desc';
+  }
+
+  // Toolbar sort drives the table, which asks the server for page 1.
+  function _applySort(column, direction) {
+    var table = _table();
+    if (!table || !table.dataSource) return;
+    table.sortBy = column;
+    table.sortDir = direction;
+    table.dataSource.setSort(column, direction);
+  }
+
+  // A header click sorted the table: mirror it in the toolbar.
+  function _syncToolbarSort(column, direction) {
+    var select = el('wsDataSort');
+    var button = el('wsDataSortOrder');
+    if (select && select.value !== column) select.value = column;
+    if (button) button.dataset.order = direction === 'asc' ? 'asc' : 'desc';
+  }
 
   function _wireFilters() {
     var entitySelect = el('wsDataEntityFilter');
-    var connectorSelect = el('wsDataConnectorFilter');
-
     if (entitySelect && !entitySelect._wired) {
       entitySelect._wired = true;
+      // Held in the table's own filter state (the Entity type column), so
+      // the table's Clear filters resets it too.
       entitySelect.addEventListener('lex-change', function (e) {
-        _entityFilter = (e.detail && e.detail.value) || '';
-        _currentPage = 1;
-        _loadData();
+        var table = _table();
+        if (!table) return;
+        var value = String((e.detail && e.detail.value) || '');
+        if (value && value !== 'all') table.addFilter('entity_type', 'in', [value]);
+        else table.removeFilter('entity_type');
       });
     }
 
-    if (connectorSelect && !connectorSelect._wired) {
-      connectorSelect._wired = true;
-      connectorSelect.addEventListener('lex-change', function (e) {
-        _connectorFilter = (e.detail && e.detail.value) || '';
-        _currentPage = 1;
-        _loadData();
+    var sortSelect = el('wsDataSort');
+    if (sortSelect && !sortSelect._wired) {
+      sortSelect._wired = true;
+      sortSelect.addEventListener('lex-change', function (e) {
+        _applySort(String((e.detail && e.detail.value) || 'synced_at'), _sortOrder());
+      });
+    }
+
+    var orderButton = el('wsDataSortOrder');
+    if (orderButton && !orderButton._wired) {
+      orderButton._wired = true;
+      orderButton.addEventListener('click', function () {
+        orderButton.dataset.order = _sortOrder() === 'asc' ? 'desc' : 'asc';
+        var select = el('wsDataSort');
+        _applySort(select && select.value ? select.value : 'synced_at', _sortOrder());
       });
     }
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // Pagination
+  // Table: server paging, renderers, row selection
   // ═══════════════════════════════════════════════════════════════
 
-  function _wirePagination() {
-    var pager = el('wsDataPagination');
-    if (!pager || pager._wired) return;
-    pager._wired = true;
-    pager.addEventListener('page-change', function (e) {
-      var page = e.detail && e.detail.page;
-      if (page && page !== _currentPage) {
-        _currentPage = page;
-        _loadData();
-      }
+  function _wireTable() {
+    var table = _table();
+    if (!table || table._wsWired) return;
+    table._wsWired = true;
+
+    // Renderers must be registered before the first page lands.
+    table.setCellRenderers(WsTable.cellRenderers({
+      isSelected: function (id) { return !!_selectedRowIds[id]; }
+    }));
+    _applyColumnFilterOptions();
+
+    table.addEventListener('lex-query-change', function (e) {
+      if (e.target !== table) return;
+      _loadPage(e.detail);
     });
-  }
-
-  function _updatePagination(total) {
-    var pager = el('wsDataPagination');
-    if (!pager) return;
-    var totalPages = Math.max(1, Math.ceil(total / _pageSize));
-    pager.page       = _currentPage;
-    pager.totalPages = totalPages;
-    pager.total      = total;
-    pager.limit      = _pageSize;
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // Annotation badges on table rows
-  // ═══════════════════════════════════════════════════════════════
-
-  /**
-   * Post-process the rendered table DOM to append annotation badge(s) and
-   * correction indicator to each row that has annotations.
-   *
-   * Runs inside requestAnimationFrame so the table has finished painting.
-   *
-   * @param {HTMLElement} table - The lex-table element.
-   */
-  function _addAnnotationBadges(table) {
-    if (!table) return;
-    requestAnimationFrame(function () {
-      var rows = table.querySelectorAll('tbody tr');
-      for (var i = 0; i < rows.length; i++) {
-        var rowId   = rows[i].getAttribute('data-row-id');
-        var fullRow = _rowDataMap[rowId];
-        if (!fullRow) continue;
-
-        var count       = fullRow.annotation_count || 0;
-        var hasCorrect  = fullRow.has_corrections  || false;
-        if (!count && !hasCorrect) continue;
-
-        // Inject badges into the last visible cell
-        var cells = rows[i].querySelectorAll('td');
-        if (!cells.length) continue;
-        var lastCell = cells[cells.length - 1];
-
-        var badgeWrap = document.createElement('span');
-        badgeWrap.style.cssText = 'display:inline-flex;align-items:center;gap:4px;margin-left:6px;';
-
-        if (count > 0) {
-          var countBadge = document.createElement('span');
-          countBadge.title = count + ' annotation' + (count === 1 ? '' : 's');
-          countBadge.style.cssText =
-            'display:inline-flex;align-items:center;justify-content:center;' +
-            'background:#2563eb;color:#fff;border-radius:9999px;' +
-            'font-size:10px;font-weight:600;min-width:16px;height:16px;padding:0 4px;' +
-            'line-height:1;';
-          countBadge.textContent = String(count);
-          badgeWrap.appendChild(countBadge);
-        }
-
-        if (hasCorrect) {
-          var corrBadge = document.createElement('span');
-          corrBadge.title = 'Has corrections';
-          corrBadge.style.cssText =
-            'display:inline-flex;align-items:center;justify-content:center;' +
-            'background:#d97706;color:#fff;border-radius:3px;' +
-            'font-size:10px;font-weight:700;min-width:16px;height:16px;padding:0 3px;' +
-            'line-height:1;';
-          corrBadge.textContent = 'C';
-          badgeWrap.appendChild(corrBadge);
-        }
-
-        lastCell.appendChild(badgeWrap);
-      }
+    table.addEventListener('sort-change', function (e) {
+      if (e.target !== table || !e.detail) return;
+      _syncToolbarSort(e.detail.sortBy, e.detail.sortDir);
     });
+    // Bulk-annotate checkboxes live in the ID cell; lex-table's row-click
+    // ignores clicks on inputs.
+    table.addEventListener('change', function (e) {
+      var cb = e.target && e.target.closest ? e.target.closest('[data-ws-select]') : null;
+      if (!cb) return;
+      var rowId = cb.getAttribute('data-ws-select');
+      if (cb.checked) _selectedRowIds[rowId] = true;
+      else delete _selectedRowIds[rowId];
+      _syncBulkBar();
+    });
+    _wireRowClick();
+    table.addEventListener('empty-action', function (e) {
+      if (e.target === table) _openImportWizard();
+    });
+
+    // Deep link: filters and page before the first query.
+    // (Set on the data source directly: addFilter would query page 1 at once.)
+    void table.serverQuery; // creates the server-mode data source
+    var source = table.dataSource;
+    if (_initialQuery.entityType) source._filters.set('entity_type', { operator: 'in', value: [_initialQuery.entityType] });
+    if (_initialQuery.connectorId) source._filters.set('connector_id', { operator: 'in', value: [_initialQuery.connectorId] });
+    if (_initialQuery.page > 1) source._pagination.page = _initialQuery.page;
+    _syncEntitySelect(table.serverQuery.filters);
+    table.requestServerQuery();
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // AI action column — inject "send to chat" button per row
-  // ═══════════════════════════════════════════════════════════════
-
-  var AI_ICON_SVG = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">'
-    + '<path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1.27a7 7 0 0 1-13.46 0H5a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>'
-    + '<circle cx="9" cy="15" r="1"/><circle cx="15" cy="15" r="1"/></svg>';
-
-  function _addAiActionButtons(table) {
-    if (!table) return;
-    requestAnimationFrame(function () {
-      var rows = table.querySelectorAll('tbody tr');
-      for (var i = 0; i < rows.length; i++) {
-        var cells = rows[i].querySelectorAll('td');
-        if (!cells.length) continue;
-        // The _ai_action column is the last column
-        var actionCell = cells[cells.length - 1];
-        if (!actionCell) continue;
-
-        var rowId = rows[i].getAttribute('data-row-id');
-        actionCell.innerHTML = '';
-        actionCell.style.cssText = 'text-align:center;padding:4px;width:40px;';
-
-        var btn = document.createElement('button');
-        btn.className = 'lex-ai-row-btn';
-        btn.setAttribute('data-ai-row', rowId);
-        btn.title = 'Send to LANA chat';
-        btn.style.cssText =
-          'display:inline-flex;align-items:center;justify-content:center;' +
-          'width:28px;height:28px;border-radius:6px;border:1px solid var(--lex-border-default, #e5e7eb);' +
-          'background:var(--lex-surface-primary, #fff);color:var(--lex-text-secondary, #6b7280);' +
-          'cursor:pointer;transition:all 0.15s ease;padding:0;';
-        btn.innerHTML = AI_ICON_SVG;
-
-        // Hover state
-        btn.addEventListener('mouseenter', function () {
-          this.style.background = '#7c3aed';
-          this.style.color = '#fff';
-          this.style.borderColor = '#7c3aed';
-        });
-        btn.addEventListener('mouseleave', function () {
-          this.style.background = 'var(--lex-surface-primary, #fff)';
-          this.style.color = 'var(--lex-text-secondary, #6b7280)';
-          this.style.borderColor = 'var(--lex-border-default, #e5e7eb)';
-        });
-
-        actionCell.appendChild(btn);
-      }
+  function _setCount(total) {
+    var text = total === '' ? '' : total + (total === 1 ? ' record' : ' records');
+    ['wsDataCount', 'wsDataSectionCount'].forEach(function (id) {
+      var node = el(id);
+      if (node) node.textContent = text;
     });
   }
 
@@ -490,51 +450,6 @@
   // ═══════════════════════════════════════════════════════════════
 
   /**
-   * Add a checkbox to the first cell of each table row and wire shift+click
-   * multi-select. When 1+ rows are selected, show the bulk action bar.
-   *
-   * @param {HTMLElement} table
-   */
-  function _wireCheckboxColumn(table) {
-    if (!table) return;
-    requestAnimationFrame(function () {
-      var rows = table.querySelectorAll('tbody tr');
-      for (var i = 0; i < rows.length; i++) {
-        (function (row) {
-          var rowId = row.getAttribute('data-row-id');
-          if (!rowId) return;
-          var firstCell = row.querySelector('td');
-          if (!firstCell) return;
-
-          // Avoid double-wiring on re-renders
-          if (firstCell.querySelector('.ws-row-checkbox')) return;
-
-          var cb = document.createElement('input');
-          cb.type = 'checkbox';
-          cb.className = 'ws-row-checkbox';
-          cb.style.cssText = 'margin-right:6px;cursor:pointer;flex-shrink:0;';
-          cb.checked = !!_selectedRowIds[rowId];
-
-          cb.addEventListener('change', function (e) {
-            e.stopPropagation();
-            if (cb.checked) {
-              _selectedRowIds[rowId] = true;
-            } else {
-              delete _selectedRowIds[rowId];
-            }
-            _syncBulkBar();
-          });
-
-          // Stop row-click from propagating when clicking checkbox
-          cb.addEventListener('click', function (e) { e.stopPropagation(); });
-
-          firstCell.insertBefore(cb, firstCell.firstChild);
-        })(rows[i]);
-      }
-    });
-  }
-
-  /**
    * Show or hide the bulk annotate action bar based on current selection.
    */
   function _syncBulkBar() {
@@ -572,13 +487,9 @@
 
     bar.innerHTML =
       '<span id="wsDataBulkCount" style="font-size:13px;font-weight:500;"></span>' +
-      '<select id="wsDataBulkType" style="padding:4px 8px;border-radius:6px;border:1px solid #475569;background:#334155;color:#f8fafc;font-size:13px;">' +
-        '<option value="note">Note</option>' +
-        '<option value="tag">Tag</option>' +
-        '<option value="status">Status</option>' +
-        '<option value="correction">Correction</option>' +
-        '<option value="flag">Flag</option>' +
-      '</select>' +
+      '<lex-select id="wsDataBulkType" size="sm" value="note" style="width:140px;" ' +
+        'options=\'[{"value":"note","label":"Note"},{"value":"tag","label":"Tag"},{"value":"status","label":"Status"},{"value":"correction","label":"Correction"},{"value":"flag","label":"Flag"}]\'>' +
+      '</lex-select>' +
       '<input id="wsDataBulkValue" type="text" placeholder="Annotation text..." ' +
         'style="flex:1;padding:4px 10px;border-radius:6px;border:1px solid #475569;background:#334155;color:#f8fafc;font-size:13px;" />' +
       '<button id="wsDataBulkApply" style="padding:4px 16px;border-radius:6px;background:#2563eb;color:#fff;border:none;cursor:pointer;font-size:13px;font-weight:500;">Apply</button>' +
@@ -608,7 +519,7 @@
    * When more than 5 rows are selected, prompts the user for confirmation
    * before proceeding.
    */
-  function _executeBulkAnnotate() {
+  async function _executeBulkAnnotate() {
     var dataIds = Object.keys(_selectedRowIds);
     if (!dataIds.length) return;
 
@@ -616,7 +527,7 @@
     var valueEl = el('wsDataBulkValue');
     if (!typeEl || !valueEl) return;
 
-    var annotationType = typeEl.value;
+    var annotationType = typeEl.value || 'note';
     var text           = (valueEl.value || '').trim();
     if (!text) {
       if (typeof Lex !== 'undefined' && Lex.Toast) {
@@ -627,9 +538,11 @@
 
     // Confirm when applying to a large selection to prevent accidental bulk operations
     if (dataIds.length > 5) {
-      var confirmed = window.confirm(
+      var confirmed = await Lex.Modal.confirmAsync(
+        'Apply Annotation',
         'You are about to apply a "' + annotationType + '" annotation to ' +
-        dataIds.length + ' records. Continue?'
+        dataIds.length + ' records. Continue?',
+        { confirmText: 'Apply' }
       );
       if (!confirmed) return;
     }
@@ -811,13 +724,9 @@
         '<div id="wsAnnotationForm" style="border-top:1px solid #e5e7eb;padding-top:0.75rem;">' +
           '<p style="margin:0 0 0.5rem;font-size:11px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:0.05em;">Add Annotation</p>' +
           '<div style="display:flex;gap:0.5rem;margin-bottom:0.5rem;">' +
-            '<select id="wsAnnNewType" style="padding:4px 8px;border-radius:6px;border:1px solid #d1d5db;font-size:12px;">' +
-              '<option value="note">Note</option>' +
-              '<option value="tag">Tag</option>' +
-              '<option value="status">Status</option>' +
-              '<option value="correction">Correction</option>' +
-              '<option value="flag">Flag</option>' +
-            '</select>' +
+            '<lex-select id="wsAnnNewType" size="sm" value="note" style="width:140px;" ' +
+              'options=\'[{"value":"note","label":"Note"},{"value":"tag","label":"Tag"},{"value":"status","label":"Status"},{"value":"correction","label":"Correction"},{"value":"flag","label":"Flag"}]\'>' +
+            '</lex-select>' +
             '<input id="wsAnnNewField" type="text" placeholder="Field (optional)" ' +
               'style="width:110px;padding:4px 8px;border-radius:6px;border:1px solid #d1d5db;font-size:12px;" />' +
           '</div>' +
@@ -842,7 +751,7 @@
           if (!text) return;
 
           var body = {
-            annotation_type: typeEl ? typeEl.value : 'note',
+            annotation_type: (typeEl && typeEl.value) || 'note',
             value: { text: text }
           };
           if (fieldEl && fieldEl.value.trim()) {
@@ -1466,17 +1375,15 @@
     var current = (_importWizard.mapping && (_importWizard.mapping.entityType || _importWizard.mapping.entity_type)) ||
       (_importWizard.job && (_importWizard.job.target_entity_type || _importWizard.job.targetEntityType)) ||
       'lead';
-    var html = '';
-    for (var i = 0; i < _importEntityOptions.length; i++) {
-      var opt = _importEntityOptions[i];
-      html += '<option value="' + _escAttr(opt.value) + '"' + (opt.value === current ? ' selected' : '') + '>' + _escHtml(opt.label) + '</option>';
-    }
-    select.innerHTML = html;
+    select.options = _importEntityOptions.map(function (opt) {
+      return { value: String(opt.value), label: String(opt.label) };
+    });
+    select.value = String(current);
     if (!select._wired) {
       select._wired = true;
-      select.addEventListener('change', function () {
+      select.addEventListener('lex-change', function (event) {
         if (!_importWizard.mapping) return;
-        _importWizard.mapping.entityType = select.value;
+        _importWizard.mapping.entityType = (event.detail && event.detail.value) || select.value;
         _importWizard.customFieldApproved = false;
         _importWizard.spotCheckConfirmed = false;
         _importWizard.importPlanConfirmation = '';
@@ -1544,15 +1451,16 @@
       ? '<div class="ws-import-mapping-guidance" data-testid="workspace-csv-mapping-guidance">' + _escHtml(guidance) + '</div>'
       : '';
 
-    var selectHtml =
-      '<select class="ws-import-map-mode" data-map-index="' + index + '" data-testid="workspace-csv-mapping-target">' +
-        '<option value="unmapped"' + (mode === 'unmapped' ? ' selected' : '') + '>Do not import</option>' +
-        '<option value="custom"' + (mode === 'custom' ? ' selected' : '') + '>Custom field</option>';
+    var modeOptions = [
+      { value: 'unmapped', label: 'Do not import' },
+      { value: 'custom', label: 'Custom field' }
+    ];
     for (var i = 0; i < fieldOptions.length; i++) {
-      var value = fieldOptions[i];
-      selectHtml += '<option value="field:' + _escAttr(value) + '"' + (mode === 'field:' + value ? ' selected' : '') + '>' + _escHtml(_formatFieldLabel(value)) + '</option>';
+      modeOptions.push({ value: 'field:' + fieldOptions[i], label: _formatFieldLabel(fieldOptions[i]) });
     }
-    selectHtml += '</select>';
+    var selectHtml =
+      '<lex-select size="sm" class="ws-import-map-mode" data-map-index="' + index + '" data-testid="workspace-csv-mapping-target"' +
+        ' options="' + _escAttr(JSON.stringify(modeOptions)) + '" value="' + _escAttr(mode) + '"></lex-select>';
 
     return '<tr class="ws-import-map-row' + (mode === 'custom' ? ' is-custom-field' : '') + '" data-source-column="' + _escAttr(row.sourceColumn) + '">' +
       '<td><div class="ws-import-column-name">' + _escHtml(row.sourceColumn) + '</div></td>' +
@@ -1575,11 +1483,11 @@
     for (var i = 0; i < controls.length; i++) {
       if (controls[i]._wired) continue;
       controls[i]._wired = true;
-      controls[i].addEventListener('change', function () {
+      controls[i].addEventListener('lex-change', function (event) {
         var row = this.closest('.ws-import-map-row');
         var customInput = row ? row.querySelector('.ws-import-custom-key') : null;
         var customPreview = row ? row.querySelector('[data-custom-preview]') : null;
-        var isCustom = this.value === 'custom';
+        var isCustom = ((event.detail && event.detail.value) || this.value) === 'custom';
         if (customInput) customInput.hidden = !isCustom;
         if (customPreview) customPreview.hidden = !isCustom;
         if (row) row.classList.toggle('is-custom-field', isCustom);
@@ -2354,7 +2262,7 @@
     _setImportStep('promotion');
   }
 
-  function _promoteCsvImport() {
+  async function _promoteCsvImport() {
     if (_importWizard.busy) return;
     var jobId = _getImportJobId();
     if (!jobId) {
@@ -2364,11 +2272,14 @@
 
     var summary = _getImportValidationSummary();
     if (summary && summary.invalidRows > 0) {
-      var confirmed = window.confirm(
+      var confirmed = await Lex.Modal.confirmAsync(
+        'Import Valid Rows',
         'This import has ' + summary.invalidRows + ' invalid row' + (summary.invalidRows === 1 ? '' : 's') +
-        '. Only valid rows will be imported. Continue?'
+        '. Only valid rows will be imported. Continue?',
+        { confirmText: 'Import' }
       );
       if (!confirmed) return;
+      if (_importWizard.busy) return;
     }
 
     var rows = _normalizeImportRows(_importWizard.rows.length ? _importWizard.rows : ((_importWizard.validation && _importWizard.validation.outcomes) || []));
@@ -3729,29 +3640,32 @@
   // Data loading
   // ═══════════════════════════════════════════════════════════════
 
+  // Reload the current page (after imports or annotations).
   function _loadData() {
-    var gen = ++_gen;
-    var table = el('wsDataTable');
-    if (!table) return;
+    var table = _table();
+    if (table && typeof table.requestServerQuery === 'function') table.requestServerQuery();
+  }
 
-    _rowDataMap = {};
+  function _isFiltered(query) {
+    return Boolean(_searchTerm || Object.keys((query && query.filters) || {}).length);
+  }
+
+  // Answers the table's lex-query-change with one page of connected data.
+  function _loadPage(query) {
+    var gen = ++_gen;
+    var table = _table();
+    if (!table) return;
+    query = query || table.serverQuery;
+
     Lex.Redact.on(table);
 
-    var url = '/api/v1/matters/' + encodeURIComponent(_matterId) + '/connected-data' +
-      '?page=' + _currentPage +
-      '&limit=' + _pageSize +
-      '&sort_by=' + encodeURIComponent(_sortBy) +
-      '&sort_dir=' + encodeURIComponent(_sortDir);
-
-    if (_searchTerm) {
-      url += '&search=' + encodeURIComponent(_searchTerm);
-    }
-    if (_entityFilter) {
-      url += '&entity_type=' + encodeURIComponent(_entityFilter);
-    }
-    if (_connectorFilter) {
-      url += '&connector_id=' + encodeURIComponent(_connectorFilter);
-    }
+    var ranges = window.LanaLibraryColumnFilters;
+    var params = WsTable.buildQueryParams(query, {
+      search: _searchTerm,
+      rangeBounds: ranges ? ranges.editedRangeBounds : null
+    });
+    _syncEntitySelect(query.filters || {});
+    var url = '/api/v1/matters/' + encodeURIComponent(_matterId) + '/connected-data?' + params.toString();
 
     api.get(url)
       .then(function (result) {
@@ -3760,35 +3674,34 @@
         var rows = (result && result.data) || [];
         var pagination = (result && result.pagination) || {};
         var filters = (result && result.filters) || {};
-        var total = pagination.total || rows.length;
+        var total = Number(pagination.total);
+        if (!Number.isFinite(total)) total = rows.length;
 
-        // Update stat cards
+        // Full records by id, for the detail modal, chat and annotations.
+        _rowDataMap = {};
+        rows.forEach(function (row) { if (row && row.id) _rowDataMap[row.id] = row; });
+
         _updateStatCards(total, filters);
-
-        // Update filter dropdowns
         _updateFilterOptions(filters);
 
-        // Format rows for display
-        var formatted = rows.map(function (row) {
-          return _formatRow(row);
-        });
-
         Lex.Redact.off(table);
-        table.setData(formatted);
-        _updatePagination(total);
-        _wireRowClick();
-        _linkifyConnectorCells(table);
-        _addAnnotationBadges(table);
-        _addAiActionButtons(table);
-        _wireCheckboxColumn(table);
+        var filtered = _isFiltered(query);
+        table.emptyText = WsTable.emptyText(filtered);
+        table.emptyActionLabel = filtered ? '' : 'Import CSV';
+        _setCount(total);
+        table.setServerData(rows.map(WsTable.mapRow), {
+          page: pagination.page,
+          limit: pagination.limit,
+          total: total,
+          totalPages: pagination.totalPages || pagination.total_pages
+        });
       })
       .catch(function (err) {
         if (gen !== _gen) return;
         Lex.Redact.off(table);
         console.error('[WorkspaceData] Load failed:', err);
-        if (typeof Lex !== 'undefined' && Lex.Toast) {
-          Lex.Toast.error('Failed to load connected data');
-        }
+        _setCount('');
+        table.setServerError('Connected data could not be loaded. Check your connection and try again.');
       });
   }
 
@@ -3919,49 +3832,55 @@
   // Filter options
   // ═══════════════════════════════════════════════════════════════
 
-  function _updateFilterOptions(filters) {
-    var entitySelect = el('wsDataEntityFilter');
-    var connectorSelect = el('wsDataConnectorFilter');
-
-    if (entitySelect && filters.entity_types) {
-      var entityOptions = [{ value: '', label: 'All Entity Types' }];
-      for (var i = 0; i < filters.entity_types.length; i++) {
-        var et = filters.entity_types[i];
-        var label = _formatEntityType(et.entity_type) + ' (' + et.count + ')';
-        entityOptions.push({ value: et.entity_type, label: label });
-      }
-      if (_entityFilter && !_hasOptionValue(entityOptions, _entityFilter)) {
-        entityOptions.push({ value: _entityFilter, label: _formatEntityType(_entityFilter) });
-      }
-      entitySelect.setAttribute('options', JSON.stringify(entityOptions));
-      if (_entityFilter) {
-        entitySelect.setAttribute('value', _entityFilter);
-      }
-    }
-
-    if (connectorSelect && filters.connectors) {
-      var connectorOptions = [{ value: '', label: 'All Connectors' }];
-      for (var j = 0; j < filters.connectors.length; j++) {
-        var c = filters.connectors[j];
-        var cLabel = (c.connector_id || 'Unknown') + ' (' + c.count + ')';
-        connectorOptions.push({ value: c.connector_id, label: cLabel });
-      }
-      if (_connectorFilter && !_hasOptionValue(connectorOptions, _connectorFilter)) {
-        connectorOptions.push({ value: _connectorFilter, label: _connectorFilter });
-      }
-      connectorSelect.setAttribute('options', JSON.stringify(connectorOptions));
-      if (_connectorFilter) {
-        connectorSelect.setAttribute('value', _connectorFilter);
-      }
-    }
+  function _entityLabel(value) {
+    return Lex.Utils.humanizeLabel(value);
   }
 
-  function _hasOptionValue(options, value) {
-    value = String(value || '');
-    for (var i = 0; i < options.length; i++) {
-      if (String(options[i].value || '') === value) return true;
+  function _connectorLabel(value) {
+    return value;
+  }
+
+  function _updateFilterOptions(filters) {
+    _entityOptions = WsTable.mergeFacetOptions(_entityOptions, filters && filters.entity_types, 'entity_type', _entityLabel);
+    _connectorOptions = WsTable.mergeFacetOptions(_connectorOptions, filters && filters.connectors, 'connector_id', _connectorLabel);
+    _applyColumnFilterOptions();
+    var table = _table();
+    _syncEntitySelect(table ? table.serverQuery.filters : {});
+  }
+
+  // Every column filters (the table standard).
+  function _applyColumnFilterOptions() {
+    var table = _table();
+    if (!table) return;
+    var shared = window.LanaLibraryColumnFilters;
+    var pick = function (option) { return { value: option.value, label: option.label }; };
+    var map = {
+      external_id: { text: true, placeholder: 'ID contains...' },
+      raw_data: { text: true, placeholder: 'Data contains...' }
+    };
+    if (_entityOptions.length) map.entity_type = { single: true, options: _entityOptions.map(pick) };
+    if (_connectorOptions.length) map.connector_id = { single: true, options: _connectorOptions.map(pick) };
+    if (shared) {
+      map.synced_at = { single: true, options: shared.EDITED_RANGE_OPTIONS };
+      map.created_at = { single: true, options: shared.EDITED_RANGE_OPTIONS };
     }
-    return false;
+    table.setColumnFilterOptions(map);
+  }
+
+  // The toolbar Entity type select mirrors the table's entity_type filter.
+  function _syncEntitySelect(filters) {
+    var select = el('wsDataEntityFilter');
+    if (!select) return;
+    var current = WsTable.filterValues(filters && filters.entity_type)[0] || 'all';
+    var options = [{ value: 'all', label: 'All' }].concat(_entityOptions.map(function (option) {
+      return { value: option.value, label: option.label + (option.count != null ? ' (' + option.count + ')' : '') };
+    }));
+    if (current !== 'all' && !options.some(function (o) { return o.value === current; })) {
+      options.push({ value: current, label: _entityLabel(current) });
+    }
+    var serialized = JSON.stringify(options);
+    if (select.getAttribute('options') !== serialized) select.setAttribute('options', serialized);
+    if (select.getAttribute('value') !== current) select.setAttribute('value', current);
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -3977,95 +3896,7 @@
    * may store them flat in data directly.
    */
   function _getRowData(data) {
-    if (!data || typeof data !== 'object') return {};
-    if (data.row_data && typeof data.row_data === 'object') return data.row_data;
-    // Fallback: use non-internal fields from data itself
-    var out = {};
-    var keys = Object.keys(data);
-    for (var i = 0; i < keys.length; i++) {
-      if (keys[i].charAt(0) !== '_') out[keys[i]] = data[keys[i]];
-    }
-    return out;
-  }
-
-  function _formatDataSummary(data) {
-    var rowData = _getRowData(data);
-    var keys = Object.keys(rowData);
-    if (keys.length === 0) return '-';
-    var parts = [];
-    for (var i = 0; i < keys.length && parts.length < 3; i++) {
-      var val = rowData[keys[i]];
-      if (val == null || val === '') continue;
-      var str = String(val);
-      if (str.length > 40) str = str.substring(0, 37) + '...';
-      parts.push(keys[i] + ': ' + str);
-    }
-    var result = parts.join('  |  ');
-    if (result.length > 140) result = result.substring(0, 137) + '...';
-    return result || '-';
-  }
-
-  function _formatRow(row) {
-    if (row.id) _rowDataMap[row.id] = row;
-    var formatted = {
-      id:               row.id || '',
-      external_id:      row.external_id ? '...' + row.external_id.substring(row.external_id.length - 6) : '-',
-      entity_type:      _formatEntityType(row.entity_type),
-      connector_id:     row.connector_name || row.connector_id || 'LANA',
-      raw_data:         _formatDataSummary(row.data),
-      ai_action:        '',
-      // Annotation metadata passed through for badge rendering
-      annotation_count: row.annotation_count || 0,
-      has_corrections:  row.has_corrections  || false
-    };
-    // Visual indicator for source-deleted records — muted/strikethrough style
-    if (row.source_deleted) {
-      formatted._rowStyle = 'opacity:0.45;text-decoration:line-through;';
-      formatted.entity_type = formatted.entity_type + ' (removed)';
-    }
-    return formatted;
-  }
-
-  /**
-   * Post-process rendered table to turn connector cells into hyperlinks
-   * pointing directly to the connector viewer page.
-   * Non-connector data shows "LANA" with no link.
-   */
-  function _linkifyConnectorCells(table) {
-    if (!table) return;
-    requestAnimationFrame(function () {
-      var rows = table.querySelectorAll('tbody tr');
-      for (var i = 0; i < rows.length; i++) {
-        var rowId = rows[i].getAttribute('data-row-id');
-        var fullRow = _rowDataMap[rowId];
-        // connector_id is the 3rd visible column (index 2)
-        var cells = rows[i].querySelectorAll('td');
-        if (cells.length < 3) continue;
-        var cell = cells[2];
-        var text = (cell.textContent || '').trim();
-        if (!text || text === 'LANA' || text === '-') continue;
-        if (!fullRow || !fullRow.connector_ui_url) continue;
-
-        // Build direct link to connector-viewer
-        var params = new URLSearchParams({
-          ui: fullRow.connector_ui_url,
-          name: fullRow.connector_name || fullRow.connector_id || '',
-          connectorId: fullRow.connector_id || '',
-          connectorType: fullRow.connector_id || ''
-        });
-        var href = 'integrations/connector-viewer.html?' + params.toString();
-
-        var link = document.createElement('a');
-        link.href = href;
-        link.textContent = fullRow.connector_name || text;
-        link.style.cssText = 'color:var(--lex-accent, #2563eb);text-decoration:none;';
-        link.addEventListener('mouseenter', function () { this.style.textDecoration = 'underline'; });
-        link.addEventListener('mouseleave', function () { this.style.textDecoration = 'none'; });
-        link.addEventListener('click', function (e) { e.stopPropagation(); });
-        cell.textContent = '';
-        cell.appendChild(link);
-      }
-    });
+    return WsTable.getRowData(data);
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -4154,128 +3985,67 @@
     // ── Changes tab: content is loaded lazily when the tab is first activated ──
     // _renderChangesTab() is called from _setActiveTab when index === 2
 
-    // ── Assemble modal ────────────────────────────────────────────
-    var overlay = document.createElement('div');
-    overlay.id = 'wsDataRawModal';
-    overlay.style.cssText =
-      'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;' +
-      'justify-content:center;background:rgba(0,0,0,0.4);';
+    // ── Assemble modal (lex-modal) ────────────────────────────────
+    var content = document.createElement('div');
+    content.className = 'ws-data-record-detail';
 
-    var panel = document.createElement('div');
-    panel.style.cssText =
-      'background:#fff;border-radius:12px;width:680px;max-width:92vw;max-height:82vh;' +
-      'display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.15);';
-
-    // Header
-    var header = document.createElement('div');
-    header.style.cssText =
-      'padding:1rem 1.25rem;border-bottom:1px solid #e5e7eb;' +
-      'display:flex;align-items:center;justify-content:space-between;flex-shrink:0;';
-    header.innerHTML =
-      '<div>' +
-        '<p style="margin:0;font-weight:600;font-size:14px;color:#111827;">Record Detail</p>' +
-        '<p style="margin:2px 0 0;font-size:12px;color:#6b7280;">' +
-          escHtml(row.connector_id || '') + ' &middot; ' + escHtml(row.entity_type || '') +
-          (row.synced_at ? ' &middot; ' + (fmtDateTime(row.synced_at) || '') : '') +
-        '</p>' +
-      '</div>' +
-      '<button id="wsDataRawClose" style="background:none;border:none;cursor:pointer;padding:4px;color:#9ca3af;border-radius:4px;" title="Close">' +
-        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-          '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>' +
-        '</svg>' +
-      '</button>';
-
-    // Tab bar
-    var tabBar = document.createElement('div');
-    tabBar.style.cssText =
-      'display:flex;border-bottom:1px solid #e5e7eb;flex-shrink:0;padding:0 1.25rem;';
+    var subtitle = document.createElement('p');
+    subtitle.className = 'ws-data-record-subtitle';
+    subtitle.textContent = [
+      row.connector_name || row.connector_id || 'LANA',
+      _formatEntityType(row.entity_type),
+      row.synced_at ? (fmtDateTime(row.synced_at) || '') : ''
+    ].filter(Boolean).join(' \u00b7 ');
 
     var tabNames  = ['Data', 'Annotations', 'Changes'];
     var tabIds    = ['wsModalTabData', 'wsModalTabAnnotations', 'wsModalTabChanges'];
     var tabBodies = ['wsModalBodyData', 'wsModalBodyAnnotations', 'wsModalBodyChanges'];
+
+    var tabBar = document.createElement('div');
+    tabBar.className = 'ws-data-record-tabs';
+    tabBar.setAttribute('role', 'tablist');
+    tabBar.innerHTML = tabNames.map(function (name, idx) {
+      return '<button type="button" role="tab" class="ws-data-record-tab" id="' + tabIds[idx] + '" data-ws-modal-tab="' + idx + '">' + name + '</button>';
+    }).join('');
+
+    var bodyWrap = document.createElement('div');
+    bodyWrap.className = 'ws-data-record-body';
+    bodyWrap.innerHTML =
+      '<div id="' + tabBodies[0] + '"></div>' +
+      '<div id="' + tabBodies[1] + '" style="display:none;"></div>' +
+      '<div id="' + tabBodies[2] + '" style="display:none;"></div>';
+    bodyWrap.firstChild.innerHTML = dataTabContent;
+
+    content.appendChild(subtitle);
+    content.appendChild(tabBar);
+    content.appendChild(bodyWrap);
 
     function _setActiveTab(index) {
       for (var t = 0; t < tabNames.length; t++) {
         var tabEl = document.getElementById(tabIds[t]);
         var bodyEl = document.getElementById(tabBodies[t]);
         if (!tabEl || !bodyEl) continue;
-        if (t === index) {
-          tabEl.style.borderBottom = '2px solid #2563eb';
-          tabEl.style.color = '#2563eb';
-          bodyEl.style.display = 'block';
-        } else {
-          tabEl.style.borderBottom = '2px solid transparent';
-          tabEl.style.color = '#6b7280';
-          bodyEl.style.display = 'none';
-        }
-        // Load annotations tab lazily on first activation
-        if (t === 1 && index === 1) {
-          var annContainer = document.getElementById(tabBodies[1]);
-          if (annContainer && !annContainer.getAttribute('data-loaded')) {
-            annContainer.setAttribute('data-loaded', '1');
-            _renderAnnotationsTab(annContainer, row.id, _matterId);
-          }
-        }
-        // Load changes tab lazily on first activation
-        if (t === 2 && index === 2) {
-          var changesContainer = document.getElementById(tabBodies[2]);
-          if (changesContainer && !changesContainer.getAttribute('data-loaded')) {
-            changesContainer.setAttribute('data-loaded', '1');
-            _renderChangesTab(changesContainer, row.id, _matterId);
-          }
-        }
+        var active = t === index;
+        tabEl.classList.toggle('ws-data-record-tab--active', active);
+        tabEl.setAttribute('aria-selected', active ? 'true' : 'false');
+        bodyEl.style.display = active ? 'block' : 'none';
+      }
+      // Annotations and Changes load lazily on first activation
+      var lazy = index === 1 ? _renderAnnotationsTab : (index === 2 ? _renderChangesTab : null);
+      var container = document.getElementById(tabBodies[index]);
+      if (lazy && container && !container.getAttribute('data-loaded')) {
+        container.setAttribute('data-loaded', '1');
+        lazy(container, row.id, _matterId);
       }
     }
 
-    for (var ti = 0; ti < tabNames.length; ti++) {
-      var btn = document.createElement('button');
-      btn.id = tabIds[ti];
-      btn.textContent = tabNames[ti];
-      btn.style.cssText =
-        'padding:0.5rem 1rem;border:none;background:none;cursor:pointer;font-size:13px;' +
-        'font-weight:500;border-bottom:2px solid transparent;color:#6b7280;';
-      (function (idx) {
-        btn.addEventListener('click', function () { _setActiveTab(idx); });
-      })(ti);
-      tabBar.appendChild(btn);
-    }
-
-    // Body container
-    var bodyWrap = document.createElement('div');
-    bodyWrap.style.cssText = 'flex:1;min-height:0;overflow:auto;padding:1rem 1.25rem;';
-
-    var dataBody = document.createElement('div');
-    dataBody.id = tabBodies[0];
-    dataBody.innerHTML = dataTabContent;
-
-    var annBody = document.createElement('div');
-    annBody.id = tabBodies[1];
-    annBody.style.display = 'none';
-
-    var changesBody = document.createElement('div');
-    changesBody.id = tabBodies[2];
-    changesBody.style.display = 'none';
-    // Content loaded lazily by _setActiveTab when index === 2
-
-    bodyWrap.appendChild(dataBody);
-    bodyWrap.appendChild(annBody);
-    bodyWrap.appendChild(changesBody);
-
-    panel.appendChild(header);
-    panel.appendChild(tabBar);
-    panel.appendChild(bodyWrap);
-    overlay.appendChild(panel);
-    document.body.appendChild(overlay);
-
-    // Activate first tab
-    _setActiveTab(0);
-
-    // Close handlers
-    document.getElementById('wsDataRawClose').addEventListener('click', function () { overlay.remove(); });
-    overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.remove(); });
-    document.addEventListener('keydown', function onEsc(e) {
-      if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', onEsc); }
+    var modal = Lex.Modal.open({ heading: 'Record detail', size: 'lg', content: content });
+    modal.id = 'wsDataRawModal';
+    modal.addEventListener('click', function (e) {
+      var tab = e.target && e.target.closest ? e.target.closest('[data-ws-modal-tab]') : null;
+      if (tab) _setActiveTab(Number(tab.getAttribute('data-ws-modal-tab')) || 0);
     });
+    requestAnimationFrame(function () { _setActiveTab(0); });
   }
 
   // _setupChat() removed — managed by lex-lana-panel component

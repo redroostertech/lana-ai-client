@@ -205,7 +205,11 @@ const WidgetRenderer = (function() {
    * @returns {Promise<void>}
    */
   async function removeWidget(widgetId) {
-    if (!confirm('Remove this widget from your dashboard?')) return;
+    var confirmed = await Lex.Modal.confirmAsync('Remove widget', 'Remove this widget from your dashboard?', {
+      confirmText: 'Remove',
+      variant: 'danger'
+    });
+    if (!confirmed) return;
 
     try {
       await api.deleteDashboardWidget(widgetId);

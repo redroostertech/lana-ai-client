@@ -17,7 +17,13 @@
   <script src="js/menu.js"></script>
   <script src="js/notifications.js"></script>
   <script src="js/navigation-helpers.js"></script>
+  <script src="js/lex/lex.core.js"></script>
+  <script src="js/lex/lex.forms.js"></script>
+  <script src="js/lex/components/form/lex-select.js"></script>
   <script src="js/shared/event-catalog.js"></script>
+  <!-- The event browser renders in a lex-modal -->
+  <script src="js/lex/lex.core.js"></script>
+  <script src="js/lex/components/foundation/lex-modal.js"></script>
   <script src="js/shared/event-browser.js"></script>
   <script src="js/matter-skills.js"></script>
 </head>
@@ -90,32 +96,17 @@
   </div>
 
   <!-- Configure Skill Modal -->
-  <div id="configure-modal" class="modal hidden">
-    <div class="modal-overlay"></div>
-    <div class="modal-content max-w-3xl">
-      <div class="modal-header">
-        <h3 class="text-xl font-semibold text-gray-900">Configure Skill</h3>
-        <button class="modal-close">&times;</button>
-      </div>
-      <div id="configure-modal-body" class="modal-body">
+  <lex-modal id="configure-modal" heading="Configure Skill" width="768px">
+      <div id="configure-modal-body">
         <!-- Populated by JS -->
       </div>
-      <div class="modal-footer">
-        <button id="configure-cancel-btn" class="btn-secondary">Cancel</button>
-        <button id="configure-save-btn" class="btn-primary">Save Configuration</button>
-      </div>
-    </div>
-  </div>
+      <button data-slot="footer" id="configure-cancel-btn" class="btn-secondary">Cancel</button>
+      <button data-slot="footer" id="configure-save-btn" class="btn-primary">Save Configuration</button>
+  </lex-modal>
 
   <!-- Execute Skill Modal -->
-  <div id="execute-modal" class="modal hidden">
-    <div class="modal-overlay"></div>
-    <div class="modal-content max-w-2xl">
-      <div class="modal-header">
-        <h3 class="text-xl font-semibold text-gray-900">Execute Skill Manually</h3>
-        <button class="modal-close">&times;</button>
-      </div>
-      <div id="execute-modal-body" class="modal-body">
+  <lex-modal id="execute-modal" heading="Execute Skill Manually" size="lg">
+      <div id="execute-modal-body">
         <p class="text-sm text-gray-600 mb-4">Provide input data to execute this skill:</p>
         <div class="mb-4">
           <label class="block text-sm font-medium text-gray-700 mb-2">Input Data (JSON)</label>
@@ -128,39 +119,21 @@
         </div>
         <div id="execute-error" class="hidden text-sm text-red-600 mb-4"></div>
       </div>
-      <div class="modal-footer">
-        <button id="execute-cancel-btn" class="btn-secondary">Cancel</button>
-        <button id="execute-run-btn" class="btn-primary">Execute</button>
-      </div>
-    </div>
-  </div>
+      <button data-slot="footer" id="execute-cancel-btn" class="btn-secondary">Cancel</button>
+      <button data-slot="footer" id="execute-run-btn" class="btn-primary">Execute</button>
+  </lex-modal>
 
   <!-- Execution History Modal -->
-  <div id="history-modal" class="modal hidden">
-    <div class="modal-overlay"></div>
-    <div class="modal-content max-w-4xl">
-      <div class="modal-header">
-        <h3 class="text-xl font-semibold text-gray-900">Execution History</h3>
-        <button class="modal-close">&times;</button>
-      </div>
-      <div id="history-modal-body" class="modal-body max-h-96 overflow-y-auto">
+  <lex-modal id="history-modal" heading="Execution History" width="896px">
+      <div id="history-modal-body">
         <!-- Populated by JS -->
       </div>
-      <div class="modal-footer">
-        <button id="history-close-btn" class="btn-secondary">Close</button>
-      </div>
-    </div>
-  </div>
+      <button data-slot="footer" id="history-close-btn" class="btn-secondary">Close</button>
+  </lex-modal>
 
   <!-- Add Skill Modal -->
-  <div id="add-skill-modal" class="modal hidden">
-    <div class="modal-overlay"></div>
-    <div class="modal-content max-w-3xl">
-      <div class="modal-header">
-        <h3 class="text-xl font-semibold text-gray-900">Add Skill to Matter</h3>
-        <button class="modal-close">&times;</button>
-      </div>
-      <div class="modal-body">
+  <lex-modal id="add-skill-modal" heading="Add Skill to Matter" width="768px">
+      <div>
         <p class="text-sm text-gray-600 mb-4">Select a skill to add to this matter:</p>
         <div class="relative mb-4">
           <input
@@ -177,11 +150,8 @@
           <!-- Populated by JS -->
         </div>
       </div>
-      <div class="modal-footer">
-        <button id="add-skill-cancel-btn" class="btn-secondary">Cancel</button>
-      </div>
-    </div>
-  </div>
+      <button data-slot="footer" id="add-skill-cancel-btn" class="btn-secondary">Cancel</button>
+  </lex-modal>
 
   <!-- Toast Notification Container -->
   <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2"></div>

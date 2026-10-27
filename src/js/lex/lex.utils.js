@@ -176,6 +176,29 @@
     return Number(parts.month) + '/' + Number(parts.day) + '/' + parts.year;
   }
 
+  /**
+   * Uppercase the first letter of a display value ("template" -> "Template").
+   * Table standard: label-style cells and filter options start with a capital.
+   * @param {*} value
+   * @returns {string}
+   */
+  function capitalizeFirst(value) {
+    var text = value === null || value === undefined ? '' : String(value);
+    return text ? text.charAt(0).toUpperCase() + text.slice(1) : text;
+  }
+
+  /**
+   * An enum or slug as a readable label: "lead-management" -> "Lead management",
+   * "automation_execution" -> "Automation execution". Not for names, file names,
+   * emails or codes, which display as stored.
+   * @param {*} value
+   * @returns {string}
+   */
+  function humanizeLabel(value) {
+    var text = value === null || value === undefined ? '' : String(value);
+    return capitalizeFirst(text.split('_').join(' ').split('-').join(' ').split(' ').filter(Boolean).join(' '));
+  }
+
   function formatDateTime(dateString, options) {
     if (!dateString) return 'Never';
     var parts = dateParts(dateString, Object.assign({}, options || {}, { includeTime: true }));
@@ -348,7 +371,7 @@
   var STATUS_DEFAULT_TOKEN = { bg: 'var(--lex-status-neutral-bg, #F5F3F0)', text: 'var(--lex-status-neutral-text, #423F3A)' };
 
   function statusBadge(status) {
-    var escaped = escapeHtml(status);
+    var escaped = escapeHtml(humanizeLabel(status));
     var tokens = STATUS_TOKEN_STYLES[status] || STATUS_DEFAULT_TOKEN;
     var inlineStyle = 'background:' + tokens.bg + ';color:' + tokens.text + ';';
     return '<span style="display:inline-flex;align-items:center;padding:2px 8px;font-size:var(--lex-body-xs-size,0.75rem);font-weight:500;border-radius:var(--lex-radius-full,9999px);' + inlineStyle + '">' + escaped + '</span>';
@@ -533,6 +556,8 @@
     getOrganizationTimezone: getOrganizationTimezone,
     formatDate:         formatDate,
     formatDateTime:     formatDateTime,
+    capitalizeFirst:    capitalizeFirst,
+    humanizeLabel:      humanizeLabel,
     formatDateLong:     formatDateLong,
     formatDateWeekday:  formatDateWeekday,
     formatTime:         formatTime,

@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/components/document-metadata.css">
   <link rel="stylesheet" href="css/matter-notes.css">
+  <link rel="stylesheet" href="css/workspaces-list.css">
   <link rel="stylesheet" href="css/matter-type-diagram.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/drawflow@0.0.60/dist/drawflow.min.css">
   <link rel="stylesheet" href="css/tailwind-output.css">
@@ -90,7 +91,7 @@
       </div>
 
       <!-- Search / Sort / Filter toolbar — Library-style, drives grid + list -->
-      <div class="matters-toolbar bg-white rounded-lg shadow-sm border mb-4 p-4" style="border-color: var(--lex-border-default)">
+      <div class="matters-toolbar bg-white rounded-lg shadow-sm border mb-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and filter workspaces">
         <div class="flex items-center gap-4 flex-wrap">
           <div class="flex-1 min-w-[200px]">
             <lex-input
@@ -105,7 +106,7 @@
             <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Sort by:</label>
             <lex-select
               id="mattersSort"
-              options='[{"value":"created_at","label":"Created Date"},{"value":"updated_at","label":"Modified Date"},{"value":"name","label":"Name"},{"value":"status","label":"Status"}]'
+              options='[{"value":"created_at","label":"Created"},{"value":"updated_at","label":"Last edited"},{"value":"name","label":"Name"},{"value":"status","label":"Status"},{"value":"matter_type","label":"Type"}]'
               value="created_at"
             ></lex-select>
           </div>
@@ -120,7 +121,7 @@
             <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Status:</label>
             <lex-select
               id="statusFilter"
-              options='[{"value":"all","label":"All"},{"value":"active","label":"Active"},{"value":"closed","label":"Closed"},{"value":"archived","label":"Archived"}]'
+              options='[{"value":"all","label":"All"},{"value":"active","label":"Active"},{"value":"inactive","label":"Inactive"},{"value":"closed","label":"Closed"},{"value":"archived","label":"Archived"}]'
               value="all"
             ></lex-select>
           </div>
@@ -172,38 +173,36 @@
         <!-- Matters Grid View -->
         <div id="mattersGrid" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
 
-        <!-- Matters List View -->
+        <!-- Matters List View: server-paged; the table owns paging, sort and
+             column filters, and js/workspace.js answers its lex-query-change. -->
         <lex-table
           id="mattersListView"
-          class="hidden lex-table--card"
-          columns="matter_id,name,status,matter_type,created_at"
-          labels="Matter ID,Name,Status,Type,Created"
+          class="hidden matters-list-table lex-table--card"
+          server-paging
           column-filters
           selectable
-          compact
+          columns="name,matter_id,status,matter_type,created_at,updated_at"
+          labels="Name,Matter ID,Status,Type,Created,Last edited"
+          sortable-columns="name,status,matter_type,created_at,updated_at"
           sort-by="created_at"
           sort-dir="desc"
-          empty-text="No matters found"
-          empty-action-label="Create your first matter"
+          limit="20"
           id-key="matter_id"
+          empty-text="No matters yet"
+          empty-action-label="Create your first matter"
+          aria-label="Workspaces"
           bulk-actions='[{"label":"Delete","action":"delete","variant":"danger"}]'
         ></lex-table>
 
-        <!-- Pagination -->
-        <lex-pagination id="pagination"></lex-pagination>
+        <!-- Grid view pager: the grid shows the table's current page. Hidden in
+             list view, where the table's own pager is the only pager. -->
+        <lex-pagination id="mattersGridPagination" class="hidden mt-6"></lex-pagination>
       </div>
     </main>
 
-    <!-- Shared Matter Options Dropdown -->
-    <div id="matterOptionsDropdown" class="hidden fixed w-36 bg-white rounded-lg shadow-lg border border-gray-200 py-1" style="z-index: 9999">
-      <button id="matterOptionsEdit" class="w-full px-4 py-2 text-left text-sm lex-text-accent hover:bg-gray-50 transition-colors">Edit</button>
-      <!-- Label flips to "Unarchive" when the targeted matter is already archived; see js/workspace.js showMatterOptions. -->
-      <button id="matterOptionsArchive" class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors">Archive</button>
-      <button id="matterOptionsDelete" class="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors">Delete</button>
-    </div>
-
     <!-- Matter Modal -->
-    <lex-modal id="matterModal" heading="Create Workspace" size="full" hide-actions>
+    <lex-modal id="matterModal" heading="Create Workspace" size="full" hide-actions
+      footer-content='<lex-btn type="button" id="cancelMatterBtn" variant="secondary">Cancel</lex-btn><lex-btn type="submit" form="matterForm" id="saveMatterBtn" variant="primary">Save Matter</lex-btn>'>
         <form id="matterForm" class="max-w-2xl mx-auto px-6 py-8 space-y-6">
           <input type="hidden" id="matterId">
 
@@ -319,16 +318,14 @@
 
           <div id="conflictDetectionContainer"></div>
 
-          <div class="flex justify-end gap-3 pt-6 border-t border-gray-200">
-            <lex-btn type="button" id="cancelMatterBtn" variant="secondary">Cancel</lex-btn>
-            <lex-btn type="submit" variant="primary">Save Matter</lex-btn>
-          </div>
         </form>
     </lex-modal>
 
     <!-- Create Matter from Workspace Modal -->
-    <lex-modal id="workspaceMatterModal" heading="Create New Matter in Workspace" subtitle="This matter will be automatically linked to the workspace" size="full" hide-actions>
+    <lex-modal id="workspaceMatterModal" heading="Create New Matter in Workspace" size="full" hide-actions
+      footer-content='<lex-btn type="button" id="cancelWorkspaceMatterBtn" variant="secondary">Cancel</lex-btn><lex-btn type="submit" form="workspaceMatterForm" id="createWorkspaceMatterBtn" variant="primary">Create Matter</lex-btn>'>
         <form id="workspaceMatterForm" class="max-w-2xl mx-auto px-6 py-8 space-y-6">
+          <p class="text-sm text-gray-500">This matter will be automatically linked to the workspace</p>
           <input type="hidden" id="workspaceIdForMatter">
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -366,10 +363,6 @@
 
           <div id="workspaceConflictDetectionContainer"></div>
 
-          <div class="flex justify-end gap-3 pt-6 border-t border-gray-200">
-            <lex-btn type="button" id="cancelWorkspaceMatterBtn" variant="secondary">Cancel</lex-btn>
-            <lex-btn type="submit" variant="primary">Create Matter</lex-btn>
-          </div>
         </form>
     </lex-modal>
 
@@ -441,11 +434,14 @@
   <script src="js/lex/components/foundation/lex-accordion.js"></script>
   <script src="js/lex/components/form/lex-input.js"></script>
   <script src="js/lex/components/form/lex-select.js"></script>
+  <script src="js/lex/components/form/lex-dropdown-btn.js"></script>
   <script src="js/lex/components/form/lex-checkbox.js"></script>
   <script src="js/lex/components/form/lex-textarea.js"></script>
   <script src="js/lex/components/data/lex-table.js"></script>
   <script src="js/lex/components/data/lex-filter-bar.js"></script>
   <script src="js/lex/components/data/lex-pagination.js"></script>
+  <script src="js/shared/library-column-filters.js"></script>
+  <script src="js/shared/list-query-params.js"></script>
 
   <!-- Inject page content + hoist modals -->
   <script src="js/lex/lex-page-init.js"></script>

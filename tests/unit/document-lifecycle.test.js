@@ -71,6 +71,27 @@ describe('documentLifecycle utility', () => {
     expect(summarized.isActionableInChat).toBe(true);
   });
 
+  test.each([
+    ['an empty created document is a draft', { status: 'pending', processing_status: 'pending', metadata: { processing_skipped_reason: 'empty_document' } }, 'draft', 'Draft'],
+    ['a pending document without the marker is still uploaded', { status: 'pending', processing_status: 'pending', metadata: {} }, 'uploaded', 'Uploaded'],
+    ['processing that started takes over the label', { status: 'pending', processing_status: 'processing', metadata: { processing_skipped_reason: 'empty_document' } }, 'uploaded', 'Uploaded'],
+    ['a processed document is ready', { status: 'completed', processing_status: 'completed', metadata: { processing_skipped_reason: 'empty_document' } }, 'ready', 'Ready'],
+    ['a failed document still needs attention', { status: 'pending', processing_status: 'failed', metadata: { processing_skipped_reason: 'empty_document' } }, 'needs_attention', 'Needs Attention']
+  ])('%s', (_label, doc, lifecycle, label) => {
+    const context = createContext();
+    loadScript(path.join(__dirname, '../../src/js/utils/document-lifecycle.js'), context);
+    const util = context.window.documentLifecycle;
+
+    expect(util.getDocumentLifecycle(doc)).toBe(lifecycle);
+    const display = util.getDocumentLifecycleDisplay(doc);
+    expect(display.label).toBe(label);
+    if (lifecycle === 'draft') {
+      // A draft is not waiting on anything, so nothing should poll it.
+      expect(display.isInProgress).toBe(false);
+      expect(display.isTerminal).toBe(true);
+    }
+  });
+
   test('metadata formatter exposes lifecycle helpers when utility is loaded', () => {
     const context = createContext();
     loadScript(path.join(__dirname, '../../src/js/utils/document-lifecycle.js'), context);

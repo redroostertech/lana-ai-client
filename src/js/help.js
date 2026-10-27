@@ -258,145 +258,6 @@ const HelpSystem = (function() {
   }
 
   /**
-   * Show article in modal (legacy - no longer used)
-   */
-  function showArticleModalLegacy(sectionId, articleId) {
-    const section = helpData.sections.find(s => s.id === sectionId);
-    const article = section?.articles.find(a => a.id === articleId);
-
-    if (!article) return;
-
-    // Create modal
-    const modal = document.createElement('div');
-    modal.className = 'fixed inset-0 z-50 overflow-y-auto';
-    modal.innerHTML = `
-      <div class="min-h-screen px-4 flex items-center justify-center">
-        <div class="fixed inset-0 bg-black opacity-50" id="articleModalOverlay"></div>
-        <div class="relative bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-          <!-- Header -->
-          <div class="flex items-start justify-between p-6 border-b border-gray-200">
-            <div class="flex-1">
-              <h2 class="text-2xl font-bold text-gray-900 mb-2">${article.title}</h2>
-              <div class="flex items-center gap-4 text-sm text-gray-500">
-                <span>${article.readTime} min read</span>
-                <span>•</span>
-                <span>${section.title}</span>
-              </div>
-            </div>
-            <button id="closeArticleModal" class="text-gray-400 hover:text-gray-600">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-              </svg>
-            </button>
-          </div>
-
-          <!-- Content -->
-          <div class="flex-1 overflow-y-auto p-6">
-            <div class="prose prose-indigo max-w-none">
-              ${markdownToHtml(article.content)}
-            </div>
-
-            ${article.tags && article.tags.length > 0 ? `
-              <div class="mt-6 pt-6 border-t border-gray-200">
-                <p class="text-sm font-medium text-gray-700 mb-2">Tags:</p>
-                <div class="flex flex-wrap gap-2">
-                  ${article.tags.map(tag => `
-                    <span class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">${tag}</span>
-                  `).join('')}
-                </div>
-              </div>
-            ` : ''}
-
-            ${article.relatedArticles && article.relatedArticles.length > 0 ? `
-              <div class="mt-6 pt-6 border-t border-gray-200">
-                <p class="text-sm font-medium text-gray-700 mb-3">Related Articles:</p>
-                <div class="space-y-2">
-                  ${article.relatedArticles.map(relatedId => {
-                    const related = findArticleById(relatedId);
-                    return related ? `
-                      <button
-                        class="block w-full text-left px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded text-sm text-indigo-600 hover:text-indigo-800 related-article-link"
-                        data-article-id="${related.id}"
-                        data-section-id="${related.sectionId}"
-                      >
-                        ${related.title} →
-                      </button>
-                    ` : '';
-                  }).join('')}
-                </div>
-              </div>
-            ` : ''}
-          </div>
-        </div>
-      </div>
-    `;
-
-    document.body.appendChild(modal);
-
-    // Close handlers
-    document.getElementById('closeArticleModal').addEventListener('click', () => {
-      document.body.removeChild(modal);
-    });
-
-    document.getElementById('articleModalOverlay').addEventListener('click', () => {
-      document.body.removeChild(modal);
-    });
-
-    // Related article handlers
-    modal.querySelectorAll('.related-article-link').forEach(link => {
-      link.addEventListener('click', () => {
-        document.body.removeChild(modal);
-        showArticleModal(link.dataset.sectionId, link.dataset.articleId);
-      });
-    });
-  }
-
-  /**
-   * Find article by ID across all sections
-   */
-  function findArticleById(articleId) {
-    for (const section of helpData.sections) {
-      const article = section.articles.find(a => a.id === articleId);
-      if (article) {
-        return { ...article, sectionId: section.id };
-      }
-    }
-    return null;
-  }
-
-  /**
-   * Basic markdown to HTML conversion
-   */
-  function markdownToHtml(markdown) {
-    let html = markdown
-      // Headers
-      .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-      .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-      .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-      // Bold
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      // Lists
-      .replace(/^\d+\. (.*$)/gim, '<li>$1</li>')
-      .replace(/^- (.*$)/gim, '<li>$1</li>')
-      // Paragraphs
-      .split('\n\n')
-      .map(para => {
-        if (para.startsWith('<h') || para.startsWith('<li>')) {
-          return para;
-        }
-        return `<p>${para}</p>`;
-      })
-      .join('\n');
-
-    // Wrap lists
-    html = html.replace(/(<li>.*?<\/li>)/gis, match => {
-      return `<ul>${match}</ul>`;
-    });
-
-    return html;
-  }
-
-  /**
    * Search help articles
    */
   function searchContent(query) {
@@ -462,6 +323,10 @@ const HelpSystem = (function() {
     const contactForm = document.getElementById('contactSupportForm');
     if (contactForm) {
       contactForm.addEventListener('submit', handleContactFormSubmit);
+      const categorySelect = document.getElementById('contactCategory');
+      if (categorySelect) {
+        categorySelect.addEventListener('lex-change', () => { categorySelect.error = ''; });
+      }
     }
   }
 
@@ -549,6 +414,13 @@ const HelpSystem = (function() {
     successMsg.classList.add('hidden');
     errorMsg.classList.add('hidden');
 
+    // lex-select is not form-associated, so the browser's required check
+    // does not cover it: validate the category explicitly.
+    const categorySelect = document.getElementById('contactCategory');
+    if (categorySelect && typeof categorySelect.validate === 'function' && !categorySelect.validate().valid) {
+      return;
+    }
+
     // Disable submit button
     submitBtn.disabled = true;
     submitBtn.innerHTML = `
@@ -613,8 +485,10 @@ const HelpSystem = (function() {
         document.getElementById('ticketId').textContent = result.ticket_id || result.ticketId || 'N/A';
         successMsg.classList.remove('hidden');
 
-        // Reset form
+        // Reset form (lex-selects are not form-associated, so reset them too)
         form.reset();
+        document.getElementById('contactCategory').value = '';
+        document.getElementById('contactPriority').value = 'normal';
 
         // Re-fill user data
         prefillContactForm();

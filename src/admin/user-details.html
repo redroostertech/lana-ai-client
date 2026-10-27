@@ -8,6 +8,7 @@
   <!-- ── CSS + Tailwind in head — behavioral scripts at end of body ── -->
   <link rel="stylesheet" href="../css/lex-tokens.css">
   <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/admin/admin-tables.css">
   <link rel="stylesheet" href="../css/tailwind-output.css">
   <script src="../js/tailwind-loader.js"></script>
 
@@ -89,16 +90,38 @@
           <lex-btn id="revokeAllBtn" variant="danger" size="sm" icon="log-out">Revoke All Sessions</lex-btn>
         </div>
 
+        <!-- Search / Sort toolbar (docs/TABLE-STANDARD.md) -->
+        <div class="flex items-center gap-4 flex-wrap mb-3" role="search" aria-label="Search and sort sessions">
+          <div class="flex-1 min-w-[200px]">
+            <lex-input id="userSessionsSearch" placeholder="Search sessions..." clearable="true" leading-icon="search"></lex-input>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Sort by:</label>
+            <lex-select id="userSessionsSort" options='[{"value":"created_at","label":"Created"},{"value":"last_activity","label":"Last activity"},{"value":"expires_at","label":"Expires"}]' value="created_at"></lex-select>
+          </div>
+          <lex-btn id="userSessionsSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+            </svg>
+          </lex-btn>
+          <div id="userSessionsCount" class="admin-table-toolbar-label text-sm whitespace-nowrap" aria-live="polite"></div>
+        </div>
+
         <lex-table
           id="userSessionsTable"
-          columns="device,ip_address,created_at,expires_at"
-          labels="Device,IP Address,Created,Expires"
-          empty-text="No active sessions"
+          class="admin-table lex-table--card"
+          column-filters
+          server-paging
+          columns="device,ip_address,created_at,last_activity,expires_at"
+          labels="Device,IP address,Created,Last activity,Expires"
+          sortable-columns="created_at,last_activity,expires_at"
           sort-by="created_at"
           sort-dir="desc"
+          limit="20"
+          id-key="id"
+          empty-text="No active sessions"
+          aria-label="Active sessions"
         ></lex-table>
-
-        <lex-pagination id="sessionsPagination" style="margin-top:1rem;"></lex-pagination>
 
       </lex-card>
 
@@ -107,8 +130,8 @@
 
     <!-- ================================================================
          Edit User Modal
-         hide-actions: the form has its own Save button so we suppress the
-         modal footer. data-hoist: moved to document.body so it is not
+         hide-actions + footer-content: Cancel/Save live in the modal footer and
+         admin-user-details.js submits the form from Save. data-hoist: moved to document.body so it is not
          clipped by lex-content's overflow stacking context.
          ================================================================ -->
     <lex-modal
@@ -117,7 +140,7 @@
       size="md"
       hide-actions
       data-hoist
-    >
+      footer-content="<lex-btn id=&quot;userModalCancelBtn&quot; variant=&quot;secondary&quot; size=&quot;md&quot;>Cancel</lex-btn><lex-btn id=&quot;userModalSaveBtn&quot; variant=&quot;primary&quot; size=&quot;md&quot; type=&quot;submit&quot; form=&quot;userForm&quot;>Save</lex-btn>">
       <lex-form id="userForm">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
           <lex-input
@@ -161,18 +184,13 @@
           options='[]'
           style="margin-bottom:1.25rem;"
         ></lex-select>
-        <!-- Form footer: Cancel + Save buttons inside the form -->
-        <div style="display:flex;justify-content:flex-end;gap:0.5rem;padding-top:0.75rem;border-top:1px solid var(--lex-border-subtle);">
-          <lex-btn id="userModalCancelBtn" variant="secondary" size="md">Cancel</lex-btn>
-          <lex-btn id="userModalSaveBtn"   variant="primary"   size="md" type="submit">Save</lex-btn>
-        </div>
       </lex-form>
     </lex-modal>
 
 
     <!-- ================================================================
          Reset Password Modal
-         hide-actions: the form has its own Reset button.
+         hide-actions + footer-content: Cancel/Reset live in the modal footer.
          data-hoist: same stacking context fix as above.
          ================================================================ -->
     <lex-modal
@@ -181,7 +199,7 @@
       size="sm"
       hide-actions
       data-hoist
-    >
+      footer-content="<lex-btn id=&quot;resetPasswordCancelBtn&quot; variant=&quot;secondary&quot; size=&quot;md&quot;>Cancel</lex-btn><lex-btn id=&quot;resetPasswordSubmitBtn&quot; variant=&quot;danger&quot; size=&quot;md&quot; type=&quot;submit&quot; form=&quot;resetPasswordForm&quot;>Reset Password</lex-btn>">
       <lex-form id="resetPasswordForm">
         <p class="lex-text-secondary" style="font-size:var(--lex-body-sm-size,0.875rem);margin-bottom:1rem;">
           Set a new temporary password for this user. They will be prompted to change it on next login.
@@ -207,11 +225,6 @@
           class="lex-text-tertiary"
           style="font-size:var(--lex-body-xs-size,0.75rem);margin-top:0.5rem;margin-bottom:1.25rem;"
         ></div>
-        <!-- Form footer -->
-        <div style="display:flex;justify-content:flex-end;gap:0.5rem;padding-top:0.75rem;border-top:1px solid var(--lex-border-subtle);">
-          <lex-btn id="resetPasswordCancelBtn" variant="secondary" size="md">Cancel</lex-btn>
-          <lex-btn id="resetPasswordSubmitBtn" variant="danger"    size="md" type="submit">Reset Password</lex-btn>
-        </div>
       </lex-form>
     </lex-modal>
 
@@ -277,7 +290,6 @@
   <script src="../js/lex/components/foundation/lex-kv.js"></script>
   <script src="../js/lex/components/foundation/lex-modal.js"></script>
   <script src="../js/lex/components/data/lex-table.js"></script>
-  <script src="../js/lex/components/data/lex-pagination.js"></script>
   <script src="../js/lex/components/form/lex-form.js"></script>
   <script src="../js/lex/components/form/lex-input.js"></script>
   <script src="../js/lex/components/form/lex-select.js"></script>
@@ -287,6 +299,8 @@
   <script src="../js/lex/lex-page-init.js"></script>
 
   <!-- Page controller -->
+  <script src="../js/shared/library-column-filters.js"></script>
+  <script src="../js/admin/admin-table-kit.js"></script>
   <script src="../js/admin/admin-user-details.js"></script>
 
   <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>

@@ -2251,43 +2251,54 @@
       onClose: function () { _activityDrawerEl = null; }
     });
 
-    var activities = currentMatterData.activities || [];
-    try {
-      var result = await api.getMatterActivity(matterId, 200, 0);
-      if (result && result.activities) {
-        activities = result.activities;
-        currentMatterData.activities = activities;
-        currentMatterData.activityPagination = result.pagination || {};
-      }
-    } catch (error) {
-      console.warn('[openActivityDrawer] Falling back to cached activity:', error.message);
-    }
-
     var body = document.getElementById('activityDrawerBody');
-    if (!body) return; // drawer was closed while loading
+    if (!body) return;
+    var tables = window.LanaWorkspaceDetailsTables;
 
-    if (!activities.length) {
-      body.innerHTML = '<lex-empty icon="inbox" message="No activity yet" description="Activity in this workspace will appear here"></lex-empty>';
-      return;
-    }
-
-    body.innerHTML = '<lex-table id="activityDrawerTable" columns="message,when" limit="25"></lex-table>';
+    // Server-paged: the activity API pages by limit/offset, newest first. It
+    // has no sort, search or filter parameters yet, so the table offers none.
+    body.innerHTML = '<lex-table id="activityDrawerTable" class="wd-activity-table lex-table--card" server-paging column-filters' +
+      ' columns="message,type,created_at" labels="Activity,Type,Created" sortable-columns=""' +
+      ' sort-by="created_at" sort-dir="desc" limit="20" id-key="id" aria-label="Workspace activity"' +
+      ' empty-text="No activity yet. Activity in this workspace will appear here."></lex-table>';
     var table = document.getElementById('activityDrawerTable');
-    if (!table || typeof table.setData !== 'function') return;
+    if (!table) return;
+    var loadSequence = 0;
 
-    var rows = activities.map(function (act, idx) {
-      return {
-        id: act.id != null ? String(act.id) : 'idx-' + idx,
-        message: getActivityText(act),
-        when: timeAgo(act.created_at),
-        _activity: act
-      };
+    table.addEventListener('lex-query-change', async function (e) {
+      var seq = ++loadSequence;
+      var request = tables ? tables.activityRequest(e.detail) : { limit: 20, offset: 0 };
+      try {
+        var result = await api.getMatterActivity(matterId, request.limit, request.offset);
+        if (seq !== loadSequence || !document.getElementById('activityDrawerTable')) return;
+        var activities = (result && result.activities) || [];
+        if (request.offset === 0) {
+          currentMatterData.activities = activities;
+          currentMatterData.activityPagination = (result && result.pagination) || {};
+        }
+        var rows = activities.map(tables ? tables.activityRow : function (act, idx) {
+          return { id: act.id != null ? String(act.id) : 'idx-' + idx, message: getActivityText(act), type: '', created_at: act.created_at, _raw: act, _activity: act };
+        });
+        table.setServerData(rows, tables ? tables.activityPagination(result, e.detail, rows.length) : { page: 1, total: rows.length });
+      } catch (error) {
+        if (seq !== loadSequence) return;
+        console.warn('[openActivityDrawer] Activity could not be loaded:', error && error.message);
+        table.setServerError('Activity could not be loaded. Check your connection and try again.');
+      }
     });
-    table.setData(rows);
     table.addEventListener('row-click', function (e) {
       var row = e.detail && e.detail.row;
       if (row && row._activity) openActivityArtifact(row._activity);
     });
+
+    var ready = window.customElements && typeof window.customElements.whenDefined === 'function'
+      ? window.customElements.whenDefined('lex-table')
+      : Promise.resolve();
+    await ready;
+    if (typeof table.requestServerQuery !== 'function') return;
+    // Renderers must be registered before the first page lands.
+    if (tables) table.setCellRenderers(tables.activityRenderers({ describe: getActivityDescription }));
+    table.requestServerQuery();
   }
 
   // Navigate to the artifact behind an activity record. Closes the drawer
@@ -3190,7 +3201,9 @@
 
   async function requestDocStudioLegalReview(documentId, matterId) {
     try {
-      var proceed = window.confirm('Request Lana legal review for this generated document?');
+      var proceed = await Lex.Modal.confirmAsync('Request Legal Review', 'Request Lana legal review for this generated document?', {
+        confirmText: 'Request Review'
+      });
       if (!proceed) return;
       await docStudioApiPost('/api/v1/deck-studio/matter-documents/' + encodeURIComponent(documentId) + '/legal-review', {
         notes: 'Review requested from the matter Documents tab.'
@@ -3204,7 +3217,12 @@
 
   async function requestDocStudioSignatures(documentId, matterId) {
     try {
-      var signerText = window.prompt('Enter signer names or emails separated by commas. Leave blank to create a signature request without named signers.', '');
+      var signerText = await Lex.Modal.prompt('Request Signatures', {
+        message: 'Enter signer names or emails separated by commas. Leave blank to create a signature request without named signers.',
+        label: 'Signers',
+        placeholder: 'jane@example.com, John Smith',
+        confirmText: 'Request Signatures'
+      });
       if (signerText === null) return;
       var signers = signerText.split(',')
         .map(function (value) { return value.trim(); })
@@ -5365,18 +5383,9 @@
       contact_type: document.getElementById('contactType').value
     };
 
-    var submitBtn = event.target.querySelector('button[type="submit"]');
-    var originalButtonHtml = submitBtn ? submitBtn.innerHTML : '';
-
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
-      submitBtn.innerHTML =
-        '<svg class="animate-spin h-4 w-4 inline-block mr-2" fill="none" viewBox="0 0 24 24">' +
-          '<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>' +
-          '<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>' +
-        '</svg>Creating...';
-    }
+    // The Save button lives in the modal footer (footer-content), outside the form.
+    var submitBtn = document.getElementById('contactSubmitBtn');
+    if (submitBtn) submitBtn.loading = true;
 
     try {
       await api.createContact(matterId, contactData);
@@ -5384,22 +5393,14 @@
 
       document.getElementById('contactModal').open = false;
 
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-        submitBtn.innerHTML = originalButtonHtml;
-      }
+      if (submitBtn) submitBtn.loading = false;
 
       await refreshCurrentMatter();
     } catch (error) {
       console.error('Save contact error:', error);
       Lex.Toast.error('Failed to create contact');
 
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-        submitBtn.innerHTML = originalButtonHtml;
-      }
+      if (submitBtn) submitBtn.loading = false;
     }
   }
 
@@ -5647,13 +5648,9 @@
       contact_type: document.getElementById('editContactType').value
     };
 
-    var submitBtn = event.target.querySelector('lex-btn[type="submit"]') || event.target.querySelector('button[type="submit"]');
-    var originalButtonText = submitBtn ? submitBtn.textContent : '';
-
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Updating...';
-    }
+    // The Save button lives in the modal footer (footer-content), outside the form.
+    var submitBtn = document.getElementById('editContactSubmitBtn');
+    if (submitBtn) submitBtn.loading = true;
 
     try {
       var response = await fetch(api.baseUrl + '/api/v1/matters/' + matterId + '/contacts/' + contactId, {
@@ -5670,20 +5667,14 @@
       Lex.Toast.success('Contact updated successfully');
       closeEditContactModal();
 
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = originalButtonText;
-      }
+      if (submitBtn) submitBtn.loading = false;
 
       await refreshCurrentMatter();
     } catch (error) {
       console.error('Update contact error:', error);
       Lex.Toast.error('Failed to update contact');
 
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = originalButtonText;
-      }
+      if (submitBtn) submitBtn.loading = false;
     }
   }
 
@@ -7169,7 +7160,7 @@
         };
       });
 
-    var saveBtn = document.querySelector('#taskPlanForm lex-btn[type="submit"]');
+    var saveBtn = document.getElementById('taskPlanSubmitBtn');
     if (saveBtn) saveBtn.loading = true;
 
     try {
@@ -7846,14 +7837,14 @@
 
       if (action === 'link') {
         // Only link available connector data (skip contacts and already-linked)
-        if (item.status === 'Linked' || item._linkType === 'contact' || id.indexOf('contact_') === 0) {
+        if (item.status === 'linked' || item._linkType === 'contact' || id.indexOf('contact_') === 0) {
           skipped++;
           continue;
         }
         promises.push(api.linkConnectorDataToMatter(matterId, id));
       } else if (action === 'unlink') {
         // Only unlink linked connector data (skip contacts and available)
-        if (item.status === 'Available' || item._linkType === 'contact' || id.indexOf('contact_') === 0) {
+        if (item.status === 'available' || item._linkType === 'contact' || id.indexOf('contact_') === 0) {
           skipped++;
           continue;
         }
@@ -7915,9 +7906,14 @@
 
       // Set table columns and bulk actions
       if (table) {
-        table.setAttribute('columns', 'source,type,name,detail,status');
-        table.setAttribute('labels', 'Source,Type,Name,Detail,Status');
-        table.setAttribute('empty-text', 'No data available. Connect an integration to sync data.');
+        // Rows and formatting: js/shared/workspace-details-tables.js.
+        if (window.LanaWorkspaceDetailsTables && typeof table.setCellRenderers === 'function') {
+          table.setCellRenderers(window.LanaWorkspaceDetailsTables.connectedDataRenderers());
+        }
+        if (table.dataSource && typeof table.dataSource.clearFilters === 'function' &&
+            table.dataSource._filters && table.dataSource._filters.size > 0) {
+          table.dataSource.clearFilters();
+        }
         table.bulkActions = [
           { label: 'Link Selected', action: 'link', variant: 'primary', icon: 'link' },
           { label: 'Unlink Selected', action: 'unlink', variant: 'danger', icon: 'unlink' }
@@ -7962,6 +7958,11 @@
           connectorSelect.addEventListener('lex-change', function () { _cdModalSearch(); });
         }
 
+        // Column filters changed: the empty copy says whether they hid everything.
+        if (table) {
+          table.addEventListener('lex-filter-change', function () { _cdModalSyncEmptyText(table); });
+        }
+
         // Bulk link/unlink actions
         if (table) {
           table.addEventListener('bulk-action', function (e) {
@@ -7979,6 +7980,46 @@
     }); });
   }
 
+  var _cdModalLoadSequence = 0;
+
+  // Every available record the toolbar's search, type and connector match,
+  // page by page (the endpoint serves at most 50 per page), up to 500 rows.
+  function _cdModalFetchAvailable(matterId, params) {
+    var tables = window.LanaWorkspaceDetailsTables;
+    var pageSize = tables ? tables.CD_SEARCH_PAGE_SIZE : 50;
+    var maxPages = tables ? tables.CD_SEARCH_MAX_PAGES : 10;
+    var collected = [];
+    function fetchPage(page) {
+      return api.searchConnectorDataForLinking(matterId, {
+        search: params.search, entity_type: params.entity_type, connector_id: params.connector_id,
+        page: page, limit: pageSize
+      }).then(function (response) {
+        var results = (response && response.results) || [];
+        collected = collected.concat(results);
+        var totalPages = Number(response && response.pagination && response.pagination.total_pages) || 1;
+        if (!results.length || page >= totalPages || page >= maxPages) return collected;
+        return fetchPage(page + 1);
+      });
+    }
+    return fetchPage(1).catch(function () { return collected; });
+  }
+
+  // Empty copy follows the toolbar and the column filters.
+  function _cdModalSyncEmptyText(table) {
+    var tables = window.LanaWorkspaceDetailsTables;
+    if (!table || !tables) return;
+    var searchInput = document.getElementById('cdModalSearch');
+    var entityTypeSelect = document.getElementById('cdModalEntityType');
+    var connectorSelect = document.getElementById('cdModalConnector');
+    var columnFiltered = !!(table.dataSource && table.dataSource._filters && table.dataSource._filters.size > 0);
+    var filtered = columnFiltered ||
+      !!(searchInput && String(searchInput.value || '').trim()) ||
+      !!(entityTypeSelect && entityTypeSelect.value) ||
+      !!(connectorSelect && connectorSelect.value);
+    var text = tables.connectedDataEmptyText(filtered);
+    if (table.emptyText !== text) table.emptyText = text;
+  }
+
   function _cdModalSearch() {
     var table = document.getElementById('cdModalTable');
     if (!table) return;
@@ -7987,6 +8028,9 @@
       return;
     }
     if (!_cdModalMatter) return;
+    var tables = window.LanaWorkspaceDetailsTables;
+    if (!tables) return;
+    var seq = ++_cdModalLoadSequence;
 
     var searchInput = document.getElementById('cdModalSearch');
     var entityTypeSelect = document.getElementById('cdModalEntityType');
@@ -7995,101 +8039,31 @@
     var search = searchInput ? (searchInput.value || '').trim() : '';
     var entityType = entityTypeSelect ? (entityTypeSelect.value || '') : '';
     var connectorId = connectorSelect ? (connectorSelect.value || '') : '';
-    var searchLower = search.toLowerCase();
 
     // Fetch both linked and available data in parallel
     var linkedPromise = api.getMatterConnectorData(_cdModalMatter.matter_id).catch(function () { return { data: {} }; });
-    var availablePromise = api.searchConnectorDataForLinking(_cdModalMatter.matter_id, {
-      search: search, entity_type: entityType, connector_id: connectorId, limit: 100
-    }).catch(function () { return { results: [] }; });
+    var availablePromise = _cdModalFetchAvailable(_cdModalMatter.matter_id, {
+      search: search, entity_type: entityType, connector_id: connectorId
+    });
 
     Promise.all([linkedPromise, availablePromise]).then(function (responses) {
-      var linkedResponse = responses[0];
-      var availableResponse = responses[1];
-      var rows = [];
-
-      // 1) Add contacts (already linked to matter)
-      var contacts = (currentMatterData && currentMatterData.contacts) || _cdModalMatter.contacts || [];
-      if (!entityType || entityType === 'contact') {
-        for (var ci = 0; ci < contacts.length; ci++) {
-          var c = contacts[ci];
-          var fullName = ((c.first_name || '') + ' ' + (c.last_name || '')).trim() || c.display_name || 'Unknown';
-          if (searchLower) {
-            var haystack = (fullName + ' ' + (c.email || '') + ' ' + (c.phone || '')).toLowerCase();
-            if (haystack.indexOf(searchLower) === -1) continue;
-          }
-          rows.push({
-            id: 'contact_' + (c.id || ci),
-            source: 'LANA',
-            type: 'Contact',
-            name: fullName,
-            detail: c.email || c.phone || '--',
-            status: 'Linked',
-            _linkType: 'contact'
-          });
-        }
-      }
-
-      // 2) Add linked connector data records
-      var linkedGroups = linkedResponse.data || {};
-      var linkedIds = {};
-      var groupKeys = Object.keys(linkedGroups);
-      for (var gi = 0; gi < groupKeys.length; gi++) {
-        var records = linkedGroups[groupKeys[gi]];
-        if (!Array.isArray(records)) continue;
-        for (var li = 0; li < records.length; li++) {
-          var lr = records[li];
-          var lrEntityLabel = lr.entity_type ? lr.entity_type.split('_').join(' ') : 'Unknown';
-          var lrData = lr.data || {};
-          var lrName = lrData.name || lrData.title || lr.external_id || '';
-          var lrDetail = lrData.description || lrData.email || lrData.status || lr.external_id || '';
-
-          // Apply client-side filters for linked records
-          if (entityType && lr.entity_type !== entityType) continue;
-          if (connectorId && lr.connector_id !== connectorId) continue;
-          if (searchLower) {
-            var lrHaystack = (lrName + ' ' + lrDetail + ' ' + (lr.connector_name || '')).toLowerCase();
-            if (lrHaystack.indexOf(searchLower) === -1) continue;
-          }
-
-          linkedIds[lr.id] = true;
-          rows.push({
-            id: lr.id || '',
-            source: lr.connector_name || lr.connector_id || '',
-            type: lrEntityLabel,
-            name: lrName,
-            detail: lrDetail,
-            status: 'Linked',
-            _linkType: 'connector'
-          });
-        }
-      }
-
-      // 3) Add available (unlinked) connector data records
-      var availableResults = availableResponse.results || [];
-      for (var ri = 0; ri < availableResults.length; ri++) {
-        var r = availableResults[ri];
-        if (linkedIds[r.id]) continue; // skip duplicates
-        var entityLabel = r.entity_type ? r.entity_type.split('_').join(' ') : 'Unknown';
-        var data = r.data || {};
-        var recordName = data.name || data.title || r.external_id || '';
-        var detail = data.description || data.email || data.status || r.external_id || '';
-
-        rows.push({
-          id: r.id || '',
-          source: r.connector_name || r.connector_id || '',
-          type: entityLabel,
-          name: recordName,
-          detail: detail,
-          status: 'Available',
-          _linkType: 'connector'
-        });
-      }
-
+      if (seq !== _cdModalLoadSequence) return;
+      var rows = tables.buildConnectedDataRows({
+        contacts: (currentMatterData && currentMatterData.contacts) || _cdModalMatter.contacts || [],
+        linkedGroups: (responses[0] && responses[0].data) || {},
+        available: responses[1] || [],
+        search: search,
+        entityType: entityType,
+        connectorId: connectorId
+      });
+      table.setColumnFilterOptions(tables.connectedDataFilterOptions(rows, window.LanaLibraryColumnFilters));
       table.setData(rows);
+      _cdModalSyncEmptyText(table);
     }).catch(function (err) {
+      if (seq !== _cdModalLoadSequence) return;
       console.error('[ConnectedDataModal] Search error:', err);
       table.setData([]);
+      _cdModalSyncEmptyText(table);
     });
   }
 
@@ -8192,12 +8166,32 @@
   }
 
   /**
+   * The type and dropdown-value controls are lex-selects, which fire
+   * lex-change rather than change; one delegated listener per container.
+   */
+  function bindCustomFieldSelects(container) {
+    if (container.dataset.customFieldSelectsBound === 'true') return;
+    container.dataset.customFieldSelectsBound = 'true';
+    container.addEventListener('lex-change', function (e) {
+      var target = e.target;
+      if (!target || !target.dataset) return;
+      var value = e.detail ? e.detail.value : target.value;
+      if (target.dataset.fieldDefIndex !== undefined) {
+        updateFieldDefinition(Number(target.dataset.fieldDefIndex), target.dataset.fieldDefProp, value);
+      } else if (target.dataset.fieldValueKey !== undefined) {
+        updateFieldValue(target.dataset.fieldValueKey, value);
+      }
+    });
+  }
+
+  /**
    * Render the custom fields modal content.
    * Builds HTML for each field definition and its current value input.
    */
   function renderCustomFieldsModal() {
     var container = document.getElementById('customFieldsContainer');
     if (!container) return;
+    bindCustomFieldSelects(container);
 
     if (customFieldDefinitions.length === 0) {
       container.innerHTML =
@@ -8220,15 +8214,16 @@
       }
       var currentValue = valueObj ? valueObj.value : (def.default_value || '');
 
-      var selectTypeHtml =
-        '<option value="text"' + (def.type === 'text' ? ' selected' : '') + '>Text</option>' +
-        '<option value="textarea"' + (def.type === 'textarea' ? ' selected' : '') + '>Long Text</option>' +
-        '<option value="number"' + (def.type === 'number' ? ' selected' : '') + '>Number</option>' +
-        '<option value="currency"' + (def.type === 'currency' ? ' selected' : '') + '>Currency</option>' +
-        '<option value="date"' + (def.type === 'date' ? ' selected' : '') + '>Date</option>' +
-        '<option value="datetime"' + (def.type === 'datetime' ? ' selected' : '') + '>Date+Time</option>' +
-        '<option value="boolean"' + (def.type === 'boolean' ? ' selected' : '') + '>Yes/No</option>' +
-        '<option value="select"' + (def.type === 'select' ? ' selected' : '') + '>Dropdown</option>';
+      var selectTypeOptions = [
+        { value: 'text', label: 'Text' },
+        { value: 'textarea', label: 'Long text' },
+        { value: 'number', label: 'Number' },
+        { value: 'currency', label: 'Currency' },
+        { value: 'date', label: 'Date' },
+        { value: 'datetime', label: 'Date and time' },
+        { value: 'boolean', label: 'Yes/No' },
+        { value: 'select', label: 'Dropdown' }
+      ];
 
       var optionsRowHtml = '';
       if (def.type === 'select') {
@@ -8262,10 +8257,9 @@
             '</div>' +
             '<div class="col-span-2">' +
               '<label class="block text-xs font-medium text-gray-700 mb-1">Type</label>' +
-              '<select onchange="updateFieldDefinition(' + i + ', \'type\', this.value)"' +
-                ' class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus">' +
-                selectTypeHtml +
-              '</select>' +
+              '<lex-select size="sm" data-field-def-index="' + i + '" data-field-def-prop="type"' +
+                ' options="' + escapeHtml(JSON.stringify(selectTypeOptions)) + '"' +
+                ' value="' + escapeHtml(def.type || 'text') + '"></lex-select>' +
             '</div>' +
             '<div class="col-span-2">' +
               '<label class="block text-xs font-medium text-gray-700 mb-1">Required</label>' +
@@ -8351,15 +8345,16 @@
         '</label>';
 
       case 'select':
-        var optionsHtml = '<option value="">-- Select ' + displayName + ' --</option>';
+        var emptyLabel = 'Select ' + (def.display_name || def.key || '');
+        var selectOptions = [{ value: '', label: emptyLabel }];
         var opts = def.options || [];
         for (var o = 0; o < opts.length; o++) {
-          var optVal = escapeHtml(opts[o]);
-          optionsHtml += '<option value="' + optVal + '"' + (currentValue === opts[o] ? ' selected' : '') + '>' + optVal + '</option>';
+          selectOptions.push({ value: String(opts[o]), label: String(opts[o]) });
         }
-        return '<select onchange="updateFieldValue(\'' + key + '\', this.value)"' +
-          ' class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus">' +
-          optionsHtml + '</select>';
+        return '<lex-select size="sm" data-field-value-key="' + key + '"' +
+          ' placeholder="' + escapeHtml(emptyLabel) + '"' +
+          ' options="' + escapeHtml(JSON.stringify(selectOptions)) + '"' +
+          ' value="' + escapeHtml(currentValue == null ? '' : String(currentValue)) + '"></lex-select>';
 
       case 'text':
       default:
@@ -9254,10 +9249,6 @@
     var practiceEl = document.getElementById('detailPracticeArea');
     if (practiceEl) practiceEl.value = matter.practice_area || '';
 
-    // Check modal state before opening
-    var overlay = modal.querySelector('.lex-modal-overlay');
-    console.info('[openEditMatterModal] modal parent:', modal.parentNode && modal.parentNode.tagName, '| overlay:', overlay ? 'found' : 'MISSING', '| current open:', modal.open);
-
     modal.open = true;
   }
 
@@ -10066,6 +10057,7 @@
     });
 
     container.innerHTML = html;
+    mountDocumentTypesTable(docGenState.documentTypes);
   }
 
   function buildDocumentTypesContent(types) {
@@ -10079,33 +10071,63 @@
       '</div>';
     }
 
-    var html = '<div class="overflow-x-auto"><table class="w-full text-sm">' +
-      '<thead><tr class="border-b border-gray-200">' +
-        '<th class="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase">Type</th>' +
-        '<th class="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase">Documents</th>' +
-        '<th class="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase">Confidence</th>' +
-        '<th class="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase">Structure</th>' +
-      '</tr></thead><tbody>';
+    // Rows, renderers and filters: js/shared/document-types-table.js.
+    // mountDocumentTypesTable() fills the table once the tab is in the DOM.
+    return '<div class="wd-doc-types">' +
+      '<div class="wd-doc-types-toolbar" role="search" aria-label="Search document types">' +
+        '<div class="wd-doc-types-search"><lex-input id="docTypesSearch" placeholder="Search document types..." clearable="true" leading-icon="search"></lex-input></div>' +
+        '<span id="docTypesCount" class="wd-table-muted text-sm whitespace-nowrap" aria-live="polite"></span>' +
+      '</div>' +
+      '<lex-table id="docTypesTable" class="wd-doc-types-table lex-table--card" column-filters' +
+        ' columns="document_type,source,document_count,confidence,structure,created_at"' +
+        ' labels="Type,Source,Documents,Confidence,Structure,Created"' +
+        ' search-keys="document_type"' +
+        ' sort-by="document_count" sort-dir="desc" limit="20" id-key="id"' +
+        ' empty-text="No document types learned yet" aria-label="Learned document types"></lex-table>' +
+    '</div>';
+  }
 
-    for (var i = 0; i < types.length; i++) {
-      var t = types[i];
-      var conf = t.confidence_score ? Math.round(t.confidence_score * 100) : 0;
-      var confColor = conf >= 70 ? 'text-green-600' : conf >= 40 ? 'text-amber-600' : 'text-red-500';
-      var hasStructure = t.has_structure || t.structure_version;
-      html += '<tr class="border-b border-gray-100 hover:bg-gray-50">' +
-        '<td class="py-2 px-3 font-medium text-gray-900">' + escapeHtml(t.document_type_label || t.document_type || 'Unknown') + '</td>' +
-        '<td class="py-2 px-3 text-gray-600">' + (t.document_count || 0) + '</td>' +
-        '<td class="py-2 px-3 ' + confColor + ' font-medium">' + conf + '%</td>' +
-        '<td class="py-2 px-3">' +
-          (hasStructure
-            ? '<span class="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full">Learned</span>'
-            : '<span class="text-xs text-gray-400">Not analyzed</span>') +
-        '</td>' +
-      '</tr>';
-    }
-
-    html += '</tbody></table></div>';
-    return html;
+  /**
+   * Fill the Learned Document Types table (client-side: the API returns the
+   * matter's whole set) and wire its toolbar search and count.
+   * @param {Array} types - GET /api/v1/matters/:id/document-types data
+   */
+  function mountDocumentTypesTable(types) {
+    var helpers = window.LanaDocumentTypesTable;
+    var table = document.getElementById('docTypesTable');
+    if (!helpers || !table || !types || types.length === 0) return;
+    var whenReady = window.customElements && customElements.whenDefined
+      ? customElements.whenDefined('lex-table') : Promise.resolve();
+    whenReady.then(function () {
+      if (document.getElementById('docTypesTable') !== table) return;
+      var rows = helpers.buildRows(types);
+      var countEl = document.getElementById('docTypesCount');
+      function updateCount() {
+        var filtered = Boolean(table.searchText) || table.getActiveFilters().size > 0;
+        var n = filtered ? table.filteredRows.length : rows.length;
+        if (countEl) countEl.textContent = n + (n === 1 ? ' type' : ' types');
+        table.emptyText = helpers.emptyText(filtered);
+      }
+      table.setCellRenderers(helpers.renderers());
+      table.setColumnFilterOptions(helpers.filterOptions(rows, window.LanaLibraryColumnFilters));
+      table.setData(rows);
+      table.addEventListener('lex-filter-change', function (e) { if (e.target === table) updateCount(); });
+      var search = document.getElementById('docTypesSearch');
+      var debounce = null;
+      if (search) {
+        ['lex-input', 'lex-change'].forEach(function (name) {
+          search.addEventListener(name, function (e) {
+            var value = String((e.detail && e.detail.value) || '').trim();
+            clearTimeout(debounce);
+            debounce = setTimeout(function () {
+              if (table.dataSource) table.dataSource.setSearch(value);
+              updateCount();
+            }, 350);
+          });
+        });
+      }
+      updateCount();
+    });
   }
 
   function buildTemplateSetsContent(sets) {
@@ -10148,42 +10170,33 @@
 
   function buildGenerateFormContent(matter) {
     // Merge document types from learned + template sets for the select options
-    var options = '<option value="">-- Select Document Type --</option>';
-
-    if (docGenState.documentTypes.length > 0) {
-      options += '<optgroup label="Learned Types">';
-      for (var i = 0; i < docGenState.documentTypes.length; i++) {
-        var dt = docGenState.documentTypes[i];
-        options += '<option value="' + escapeHtml(dt.document_type) + '">' + escapeHtml(dt.document_type_label || dt.document_type) + '</option>';
-      }
-      options += '</optgroup>';
+    var docTypeOptions = [{ value: '', label: 'Select document type' }];
+    for (var i = 0; i < docGenState.documentTypes.length; i++) {
+      var dt = docGenState.documentTypes[i];
+      docTypeOptions.push({ value: String(dt.document_type || ''), label: String(dt.document_type_label || dt.document_type || ''), group: 'Learned types' });
     }
-
-    if (docGenState.templateSets.length > 0) {
-      options += '<optgroup label="Template Sets">';
-      for (var j = 0; j < docGenState.templateSets.length; j++) {
-        var ts = docGenState.templateSets[j];
-        options += '<option value="' + escapeHtml(ts.document_type) + '" data-set-id="' + escapeHtml(ts.id) + '">' + escapeHtml(ts.name) + '</option>';
-      }
-      options += '</optgroup>';
+    for (var j = 0; j < docGenState.templateSets.length; j++) {
+      var ts = docGenState.templateSets[j];
+      // Template sets carry their id in the value ("set:<id>") so the
+      // submit can send template_set_id; a learned type may share the
+      // same document_type.
+      docTypeOptions.push({ value: 'set:' + String(ts.id || ''), label: String(ts.name || ts.document_type || ''), group: 'Template sets' });
     }
 
     // Contact options
-    var contactOptions = '<option value="">-- No Target Contact --</option>';
+    var contactOptions = [{ value: '', label: 'No target contact' }];
     for (var k = 0; k < docGenState.contacts.length; k++) {
       var c = docGenState.contacts[k];
       var cName = c.display_name || ((c.first_name || '') + ' ' + (c.last_name || '')).trim();
       if (cName) {
-        contactOptions += '<option value="' + escapeHtml(cName) + '">' + escapeHtml(cName) + '</option>';
+        contactOptions.push({ value: cName, label: cName });
       }
     }
 
     return '<form id="docGenForm" onsubmit="submitDocGeneration(event)" class="space-y-4">' +
       '<div>' +
         '<label class="block text-sm font-medium text-gray-700 mb-1">Document Type</label>' +
-        '<select id="dgDocType" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required>' +
-          options +
-        '</select>' +
+        '<lex-select id="dgDocType" searchable required placeholder="Select document type" options="' + escapeHtml(JSON.stringify(docTypeOptions)) + '" value=""></lex-select>' +
       '</div>' +
       '<div>' +
         '<label class="block text-sm font-medium text-gray-700 mb-1">Instructions</label>' +
@@ -10191,9 +10204,7 @@
       '</div>' +
       '<div>' +
         '<label class="block text-sm font-medium text-gray-700 mb-1">Target Contact</label>' +
-        '<select id="dgContact" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">' +
-          contactOptions +
-        '</select>' +
+        '<lex-select id="dgContact" searchable placeholder="No target contact" options="' + escapeHtml(JSON.stringify(contactOptions)) + '" value=""></lex-select>' +
         '<p class="text-xs text-gray-400 mt-1">Participant data will be injected into the generated document</p>' +
       '</div>' +
       '<div>' +
@@ -10428,9 +10439,7 @@
       addSection.style.cssText = 'border-top:1px solid #e5e7eb;padding:12px 20px;';
       addSection.innerHTML = '<p style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px;">Add Document from Matter</p>' +
         '<div style="display:flex;gap:8px;">' +
-          '<select id="tsDocSelect" style="flex:1;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">' +
-            '<option value="">Loading documents...</option>' +
-          '</select>' +
+          '<lex-select id="tsDocSelect" size="sm" searchable style="flex:1;" placeholder="Loading documents..." options="[]" value=""></lex-select>' +
           '<button id="tsDocAddBtn" onclick="addDocToSet(\'' + setId + '\')" style="padding:6px 14px;border-radius:6px;border:none;background:#7c3aed;color:white;font-size:13px;font-weight:500;cursor:pointer;">Add</button>' +
         '</div>';
       panel.appendChild(addSection);
@@ -10452,13 +10461,14 @@
         var matterDocs = (docsResp && docsResp.data) ? docsResp.data : (Array.isArray(docsResp) ? docsResp : []);
         var select = document.getElementById('tsDocSelect');
         if (select) {
-          var optHtml = '<option value="">-- Select a document --</option>';
+          var docOptions = [];
           for (var di = 0; di < matterDocs.length; di++) {
             var md = matterDocs[di];
             if (existingIds[md.id]) continue; // Already in set
-            optHtml += '<option value="' + escapeHtml(md.id) + '">' + escapeHtml(md.filename || 'Document') + '</option>';
+            docOptions.push({ value: String(md.id), label: String(md.filename || 'Document') });
           }
-          select.innerHTML = optHtml;
+          select.placeholder = docOptions.length ? 'Select a document' : 'No documents to add';
+          select.options = docOptions;
         }
       }
     } catch (err) {
@@ -10526,7 +10536,14 @@
     if (!currentMatterData || docGenState.isGenerating) return;
 
     var matter = currentMatterData.matter;
-    var docType = (document.getElementById('dgDocType') || {}).value;
+    var docTypeValue = String((document.getElementById('dgDocType') || {}).value || '');
+    var docType = docTypeValue;
+    var templateSetId = null;
+    if (docTypeValue.indexOf('set:') === 0) {
+      templateSetId = docTypeValue.slice(4);
+      var selectedSet = docGenState.templateSets.find(function (set) { return String(set.id) === templateSetId; });
+      docType = selectedSet ? selectedSet.document_type : '';
+    }
     var instructions = (document.getElementById('dgInstructions') || {}).value;
     var contactName = (document.getElementById('dgContact') || {}).value;
     var useStream = document.getElementById('dgStream') ? document.getElementById('dgStream').checked : true;
@@ -10547,16 +10564,6 @@
         if (k && valInputs[i]) {
           customVars[k] = valInputs[i].value;
         }
-      }
-    }
-
-    // Check if a template set was selected
-    var templateSetId = null;
-    var selectEl = document.getElementById('dgDocType');
-    if (selectEl && selectEl.selectedIndex >= 0) {
-      var opt = selectEl.options[selectEl.selectedIndex];
-      if (opt && opt.getAttribute('data-set-id')) {
-        templateSetId = opt.getAttribute('data-set-id');
       }
     }
 

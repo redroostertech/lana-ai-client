@@ -608,6 +608,23 @@
         case 'citations':
           return { type: 'citations', citations: data.citations || data.sources || [] };
 
+        // LANA went as far as she honestly could and stopped to ask.
+        //
+        // Carried through as typed data rather than prose so the thread can
+        // render it as a CHOICE. The whole point of the backend contract is
+        // that answering takes one tap instead of the user retyping an exact
+        // stored name, and that only pays off if the answer space reaches here
+        // intact.
+        case 'uncertainty':
+          return {
+            type: 'uncertainty',
+            uncertaintyKind: data.uncertainty_kind || null,
+            prompt: data.prompt || '',
+            candidates: Array.isArray(data.candidates) ? data.candidates : [],
+            lookedFor: data.looked_for || null,
+            resolvesBy: data.resolves_by || 'choice'
+          };
+
         case 'references':
           return { type: 'references', references: data.references || [] };
 
