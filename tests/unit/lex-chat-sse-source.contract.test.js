@@ -594,3 +594,45 @@ describe('SSEChatSource contract', () => {
     expect(sequence).toEqual(['stop-post', 'abort']);
   });
 });
+
+
+describe('chat view detachment versus explicit Stop', () => {
+  test('unavailable activity status does not claim generation has ended', async () => {
+    const api = canonicalApi({ getConversationActivity: jest.fn().mockRejectedValue(new Error('offline')) });
+    const { Source } = loadSource(jest.fn(), { api });
+    const source = new Source({ api });
+    expect(await source.checkActiveGeneration('thread-1')).toBeNull();
+  });
+  test('disconnect releases only the local stream', () => {
+    const api = canonicalApi();
+    const { Source } = loadSource(jest.fn(), { api });
+    const source = new Source({ api });
+    source._conversationId = 'thread-1';
+    const controller = new AbortController();
+    source._abortController = controller;
+    source.disconnect();
+    expect(controller.signal.aborted).toBe(true);
+    expect(api.stopConversationActivity).not.toHaveBeenCalled();
+  });
+  test('explicit Stop requests server cancellation', async () => {
+    const api = canonicalApi();
+    const { Source } = loadSource(jest.fn(), { api });
+    const source = new Source({ api });
+    source._conversationId = 'thread-1';
+    const controller = new AbortController();
+    source._abortController = controller;
+    await source.stop();
+    expect(api.stopConversationActivity).toHaveBeenCalledWith('thread-1');
+    expect(controller.signal.aborted).toBe(true);
+  });
+  test('failed Stop keeps the stream available instead of claiming success', async () => {
+    const api = canonicalApi({ stopConversationActivity: jest.fn().mockRejectedValue(new Error('offline')) });
+    const { Source } = loadSource(jest.fn(), { api });
+    const source = new Source({ api });
+    source._conversationId = 'thread-1';
+    const controller = new AbortController();
+    source._abortController = controller;
+    expect(await source.stop()).toMatchObject({ success: false });
+    expect(controller.signal.aborted).toBe(false);
+  });
+});

@@ -1008,7 +1008,7 @@
 
         const sameGenerationActive = status && status.active === true &&
           (!status.generationId || !generationId || status.generationId === generationId);
-        if (sameGenerationActive || !status) {
+        if ((sameGenerationActive && !receipt?.statusUnknown) || !status) {
           this._retryReceiptPollTimer = global.setTimeout(poll, this._retryReceiptPollDelayMs);
           return;
         }
@@ -1146,7 +1146,17 @@
      */
     async stop() {
       if (this._source) {
-        await this._source.stop();
+        const result = await this._source.stop();
+        if (result && result.success === false && result.active !== false) {
+          this._showSystemMessage('Could not confirm the response stopped. Please try Stop again.');
+          return;
+        }
+        this._clearActiveRetryReceipt();
+        if (this._composerEl) this._composerEl.setGenerating(false);
+        if (this._activityEl) this._activityEl.hide();
+        this.dispatchEvent(new CustomEvent('lex-chat-generation-active', {
+          bubbles: true, composed: true, detail: { conversationId: this.conversationId, active: false }
+        }));
       }
     }
 
@@ -1263,13 +1273,20 @@
           if (!isCurrentLoad() || this._activeTurnId) return;
           if (status && status.active) {
             this._showPendingGenerationRecovery(lastPersistedMessage, { activeGeneration: true });
+            this._watchActiveRetryReceipt({ generationId: status.generationId });
             this.dispatchEvent(new CustomEvent('lex-chat-generation-active', {
               bubbles: true,
               composed: true,
               detail: { conversationId: id, ...status }
             }));
-          } else {
+          } else if (status) {
+            this.dispatchEvent(new CustomEvent('lex-chat-generation-active', {
+              bubbles: true, composed: true, detail: { conversationId: id, active: false }
+            }));
             this._showPendingGenerationRecovery(lastPersistedMessage, { activeGeneration: false });
+          } else {
+            // A temporary connection failure is not evidence of completion.
+            this._watchActiveRetryReceipt({ statusUnknown: true });
           }
         } catch (_) { /* best-effort */ }
       }
@@ -2129,7 +2146,7 @@
         if (this._composerEl) {
           this._composerEl.setGenerating(true);
         }
-        this._showSystemMessage('LANA was still generating a response when this page loaded. Keep this conversation open for a moment or resend the last message if nothing appears.');
+        this._showSystemMessage('LANA is still working. You can leave this page; the answer will be saved here when it is ready.');
         return;
       }
 

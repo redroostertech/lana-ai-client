@@ -473,3 +473,36 @@ describe('Lex Chat system-message Retry UI', () => {
     expect(html).toContain('>Retry</lex-btn>');
   });
 });
+
+
+test('Stop clears the recovered generation UI without a local stream', async () => {
+  const source = { stop: jest.fn().mockResolvedValue({ success: true }) };
+  const { chat } = makeHarness(source);
+  await chat.stop();
+  expect(source.stop).toHaveBeenCalledTimes(1);
+  expect(chat._composerEl.setGenerating).toHaveBeenCalledWith(false);
+  expect(chat._activityEl.hide).toHaveBeenCalled();
+});
+
+test('opening an in-flight conversation polls and reloads the saved answer', async () => {
+  jest.useFakeTimers();
+  try {
+    const source = {
+      connect: jest.fn(), loadState: jest.fn(),
+      loadHistory: jest.fn().mockResolvedValue({ messages: [], hasMore: false }),
+      checkActiveGeneration: jest.fn().mockResolvedValueOnce({ active: true, generationId: 'g1' }).mockResolvedValueOnce(null).mockResolvedValueOnce({ active: false })
+    };
+    const { chat } = makeHarness(source);
+    chat._resetContextMeter = jest.fn();
+    chat._threadEl.clear = jest.fn();
+    chat._threadEl.scrollToBottom = jest.fn();
+    await chat.loadConversation('conversation-1');
+    expect(chat._activeRetryReceipt).toEqual({ conversationId: 'conversation-1', generationId: 'g1' });
+    chat.loadConversation = jest.fn().mockResolvedValue(undefined);
+    await jest.advanceTimersByTimeAsync(chat._retryReceiptPollDelayMs);
+    expect(chat.loadConversation).not.toHaveBeenCalled();
+    await jest.advanceTimersByTimeAsync(chat._retryReceiptPollDelayMs);
+    expect(chat.loadConversation).toHaveBeenCalledWith('conversation-1');
+    expect(chat._composerEl.setGenerating).toHaveBeenCalledWith(false);
+  } finally { jest.useRealTimers(); }
+});

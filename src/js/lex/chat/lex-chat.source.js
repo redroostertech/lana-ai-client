@@ -423,11 +423,13 @@
       }
 
       try {
-        return await this._conversationsApi.stopGeneration(this._conversationId);
+        const result = await this._conversationsApi.stopGeneration(this._conversationId);
+        if (result?.success !== false || result?.active === false) {
+          if (this._abortController) this._abortController.abort();
+        }
+        return result;
       } catch (err) {
         return { success: false, error: err.message };
-      } finally {
-        if (this._abortController) this._abortController.abort();
       }
     }
 
@@ -437,7 +439,7 @@
      * tab or device.
      *
      * @param {string} [conversationId] defaults to the currently-bound conversation
-     * @returns {Promise<{active:boolean, startedAt?:string, durationSeconds?:number, clientId?:string}>}
+     * @returns {Promise<{active:boolean, startedAt?:string, durationSeconds?:number, clientId?:string}|null>} null means status is temporarily unavailable.
      */
     async checkActiveGeneration(conversationId) {
       const id = conversationId || this._conversationId;
@@ -460,12 +462,14 @@
           durationSeconds: data.duration_seconds || activeResponse.duration_seconds || 0
         };
       } catch (_) {
-        return { active: false };
+        return null;
       }
     }
 
     disconnect() {
-      this.stop();
+      // Detach this page's transport. Only an explicit Stop cancels the
+      // server-owned generation, which may be viewed from another page.
+      if (this._abortController) this._abortController.abort();
       super.disconnect();
     }
 
