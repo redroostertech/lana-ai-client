@@ -6,6 +6,9 @@
    (lex-lana-panel, column mode). Two states:
      expanded  — full chat panel (width --lex-lana-dock-width, default 420px)
      minimized — slim icon rail showing ONLY the toggle icon
+   While expanded, the header's full screen button grows the dock left to
+   the dynamic menu, covering the main content. Full screen is per page
+   view (not persisted), and minimizing or navigating leaves it.
    The state animates with the same slide mechanics as lex-sidebar
    (--lex-transition-slide) and persists across pages via localStorage, so
    the dock feels like part of the app shell, not a per-page drawer.
@@ -27,14 +30,16 @@
 
    Events (bubble + compose):
      lex-lana-dock-toggle — { collapsed } after every state change
+     lex-lana-dock-fullscreen — { fullscreen } after full screen changes
 
    Public API:
      expand() / minimize() / toggleDock()
+     toggleFullscreen() / exitFullscreen()
      openWith(opts)
      openConversation(threadId, matterId?, opts?)
      newChat()
      panel() → the inner lex-lana-panel (built lazily on first expand)
-   Also registered as Lex.LanaDock ({ get, toggle, expand, minimize,
+   Also registered as Lex.LanaDock ({ get, toggle, toggleFullscreen, expand, minimize,
    openWith, openConversation, newChat }).
    ========================================================================== */
 
@@ -72,6 +77,31 @@
       });
     }
     return conversationSearchLoad;
+  }
+
+  // The full screen side panel (conversation details) loads on first use.
+  // It uses lex-btn, which not every page lists, so that comes along too.
+  var sidePanelLoad = null;
+  function loadDockScript(tag, rel) {
+    if (window.customElements && window.customElements.get(tag)) return Promise.resolve(true);
+    return new Promise(function (resolve, reject) {
+      var script = document.createElement('script');
+      script.src = jsBase() + rel;
+      script.onload = function () { resolve(true); };
+      script.onerror = function () { reject(new Error(tag + ' could not be loaded')); };
+      document.head.appendChild(script);
+    });
+  }
+  function loadSidePanel() {
+    if (!sidePanelLoad) {
+      sidePanelLoad = loadDockScript('lex-btn', 'lex/components/foundation/lex-btn.js').then(function () {
+        return loadDockScript('lex-lana-side-panel', 'lex/components/chat/lex-lana-side-panel.js');
+      }).catch(function (err) {
+        sidePanelLoad = null;
+        throw err;
+      });
+    }
+    return sidePanelLoad;
   }
 
   var COLLAPSED_KEY = 'lana:lanaDock:collapsed';
@@ -176,6 +206,13 @@
   var CHEVRONS_LEFT_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" '
     + 'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
     + '<path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg>';
+  /* Full screen toggle (maximize / restore arrows). */
+  var MAXIMIZE_SVG = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" '
+    + 'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    + '<path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/></svg>';
+  var RESTORE_SVG = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" '
+    + 'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    + '<path d="M4 14h6v6"/><path d="M20 10h-6V4"/><path d="m14 10 7-7"/><path d="m3 21 7-7"/></svg>';
   /* Chat bubble — the rail footer's "start a chat" affordance. */
   var CHAT_BUBBLE_SVG = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" '
     + 'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
@@ -207,6 +244,43 @@
       + '}'
       + 'lex-lana-dock[data-collapsed="true"] {'
       + '  width: var(--lex-lana-dock-collapsed-width, 48px);'
+      + '}'
+      /* Full screen: the dock grows left until it meets the dynamic menu
+         and covers the main content. The page keeps its normal reflow
+         width underneath, so leaving full screen needs no relayout. */
+      + 'lex-lana-dock[data-fullscreen="true"] {'
+      + '  width: calc(100vw - var(--lex-sidebar-current-width, var(--lex-sidebar-width, 256px)));'
+      + '}'
+      + 'lex-lana-dock[data-fullscreen="true"] .lld-resize { display: none; }'
+      /* Side panel (conversation details) sits beside the chat stream, only
+         in full screen, and scrolls on its own. RECENTS, the banners and the
+         conversation header keep the full width above both columns. It is a
+         sibling of lex-chat (moving lex-chat would rebuild it), so the panel
+         container becomes a grid with one row per known child. */
+      + 'lex-lana-dock lex-lana-side-panel { display: none !important; }'
+      + 'lex-lana-dock[data-fullscreen="true"] .llp-chat-container {'
+      + '  display: grid;'
+      + '  grid-template-columns: minmax(0, 1fr) auto;'
+      + '  grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;'
+      + '}'
+      + 'lex-lana-dock[data-fullscreen="true"] .llp-chat-container > lex-chat-threads { grid-column: 1 / -1; grid-row: 1; }'
+      + 'lex-lana-dock[data-fullscreen="true"] .llp-chat-container > .llp-generation-banner { grid-column: 1 / -1; grid-row: 2; }'
+      + 'lex-lana-dock[data-fullscreen="true"] .llp-chat-container > .llp-compact-banner { grid-column: 1 / -1; grid-row: 3; }'
+      + 'lex-lana-dock[data-fullscreen="true"] .llp-chat-container > .lld-convo { grid-column: 1 / -1; grid-row: 4; }'
+      + 'lex-lana-dock[data-fullscreen="true"] .llp-chat-container > lex-chat { grid-column: 1; grid-row: 5; }'
+      + 'lex-lana-dock[data-fullscreen="true"] .llp-chat-container > .llp-followups { grid-column: 1; grid-row: 6; }'
+      + 'lex-lana-dock[data-fullscreen="true"] .llp-chat-container > lex-lana-side-panel {'
+      + '  display: flex !important;'
+      + '  grid-column: 2;'
+      + '  grid-row: 5 / 7;'
+      + '  min-height: 0;'
+      + '}'
+      /* The Scope card shows the workspace, so the header chip steps aside. */
+      + 'lex-lana-dock[data-fullscreen="true"] .lld-convo-ws { display: none !important; }'
+      + 'lex-lana-dock[data-fullscreen="true"] .lex-chat-thread-container,'
+      + 'lex-lana-dock[data-fullscreen="true"] lex-chat-composer {'
+      + '  padding-left: 24px;'
+      + '  padding-right: 24px;'
       + '}'
 
       /* ── Resize handle: grab strip on the left edge. Hover (or an active
@@ -274,6 +348,12 @@
       + '  border-radius: var(--lex-radius-md, 6px);'
       + '  transition: color 0.15s, background 0.15s;'
       + '  line-height: 0;'
+      + '  flex-shrink: 0;'
+      + '}'
+      + 'lex-lana-dock .lld-header-actions {'
+      + '  display: flex;'
+      + '  align-items: center;'
+      + '  gap: 2px;'
       + '  flex-shrink: 0;'
       + '}'
       + 'lex-lana-dock .lld-toggle:hover {'
@@ -582,6 +662,9 @@
       super();
       this._panelEl = null;
       this._collapsed = true;
+      this._fullscreen = false;   // per page view; never persisted
+      this._fullscreenBtn = null;
+      this._sidePanelEl = null;
       this._convoEl = null;
       this._workspaceName = '';
       this._scopeMatterId = '';       // the conversation's applied scope
@@ -593,6 +676,7 @@
       this._restoringActiveConversation = false;
       this._skipActiveConversationRestore = false;
       this._boundTriggerClick = this._handleDockTriggerClick.bind(this);
+      this._boundExitFullscreen = this.exitFullscreen.bind(this);
       this._resizeState = null;   // live pointer-drag bookkeeping
       this._baseWidthPx = 0;      // resolved default width = resize minimum
     }
@@ -625,13 +709,24 @@
       };
       Lex.LanaDock.newChat = function () { var d = Lex.LanaDock.get(); if (d) return d.newChat(); };
 
+      Lex.LanaDock.toggleFullscreen = function () { var d = Lex.LanaDock.get(); if (d) d.toggleFullscreen(); };
+
       document.addEventListener('click', this._boundTriggerClick);
+      // Navigating means the user wants to see the page, so full screen
+      // steps aside and the dock goes back to its docked width.
+      document.addEventListener('lex-app-navigate', this._boundExitFullscreen);
+      var self = this;
+      this.addEventListener('lex-lana-side-panel-scope-change', function (e) {
+        e.stopPropagation();
+        self._toggleScopeMenu(e.detail && e.detail.anchor);
+      });
     }
 
     disconnected() {
       // Leave the CSS variable untouched: page teardown during navigation
       // should not cause a visible content reflow before unload.
       document.removeEventListener('click', this._boundTriggerClick);
+      document.removeEventListener('lex-app-navigate', this._boundExitFullscreen);
     }
 
     render() { return null; }
@@ -668,12 +763,27 @@
     minimize() {
       if (this._collapsed) return;
       this._collapsed = true;
+      this._fullscreen = false;
       this._applyState();
     }
 
     toggleDock() {
       this._collapsed = !this._collapsed;
+      if (this._collapsed) this._fullscreen = false;
       this._applyState();
+    }
+
+    /** Full screen is only reachable from the open dock. */
+    toggleFullscreen() {
+      if (this._collapsed) return;
+      this._fullscreen = !this._fullscreen;
+      this._applyFullscreen();
+    }
+
+    exitFullscreen() {
+      if (!this._fullscreen) return;
+      this._fullscreen = false;
+      this._applyFullscreen();
     }
 
     panel() { return this._panelEl; }
@@ -695,8 +805,16 @@
       collapseBtn.type = 'button';
       collapseBtn.setAttribute('aria-label', 'Minimize LANA panel');
       collapseBtn.innerHTML = CHEVRONS_RIGHT_SVG;
+      var fullscreenBtn = document.createElement('button');
+      fullscreenBtn.className = 'lld-toggle lld-fullscreen';
+      fullscreenBtn.type = 'button';
+      this._fullscreenBtn = fullscreenBtn;
+      var actions = document.createElement('div');
+      actions.className = 'lld-header-actions';
+      actions.appendChild(fullscreenBtn);
+      actions.appendChild(collapseBtn);
       header.appendChild(title);
-      header.appendChild(collapseBtn);
+      header.appendChild(actions);
 
       var body = document.createElement('div');
       body.className = 'lld-body';
@@ -728,6 +846,7 @@
 
       var self = this;
       collapseBtn.addEventListener('click', function () { self.minimize(); });
+      fullscreenBtn.addEventListener('click', function () { self.toggleFullscreen(); });
       expandBtn.addEventListener('click', function () { self.expand(); });
       railNewBtn.addEventListener('click', function () { self.newChat(); });
 
@@ -1315,6 +1434,7 @@
      */
     setPageContext(ctx) {
       this._pageContext = ctx || null;
+      this._syncSidePanel();
       var p = this._panelEl;
       if (p && p._threadsEl && ctx && ctx.matterId) {
         p._threadsEl.setAttribute('matter-id', ctx.matterId);
@@ -1353,6 +1473,7 @@
     _syncScopeLocal(matterId, matterName) {
       this._scopeMatterId = matterId || '';
       this._workspaceName = matterName || '';
+      this._syncSidePanel();
       if (matterId) this.setAttribute('matter-id', matterId);
       else this.removeAttribute('matter-id');
 
@@ -1406,20 +1527,29 @@
       if (this._scopeMenuEl) this._scopeMenuEl.setAttribute('data-open', 'false');
     }
 
-    _toggleScopeMenu() {
-      if (!this._convoEl) return;
+    /**
+     * Open or close the workspace picker. It lives in the conversation
+     * header by default; `anchor` (the side panel's Scope row) moves it
+     * there, and opening it from a new spot always opens it.
+     */
+    _toggleScopeMenu(anchor) {
+      var host = anchor || this._convoEl;
+      if (!host) return;
       if (!this._scopeMenuEl) {
         var menu = document.createElement('div');
         menu.className = 'lld-scope-menu';
         menu.innerHTML = '<input type="text" class="lld-scope-search" placeholder="Search workspaces...">'
           + '<div class="lld-scope-list"></div>';
-        this._convoEl.appendChild(menu);
         this._scopeMenuEl = menu;
         var self = this;
         menu.querySelector('.lld-scope-search').addEventListener('input', function (e) {
           self._renderScopeList(e.target.value);
         });
         menu.addEventListener('click', function (e) { e.stopPropagation(); });
+      }
+      if (this._scopeMenuEl.parentNode !== host) {
+        host.appendChild(this._scopeMenuEl);
+        this._scopeMenuEl.setAttribute('data-open', 'false');
       }
       var open = this._scopeMenuEl.getAttribute('data-open') === 'true';
       this._scopeMenuEl.setAttribute('data-open', open ? 'false' : 'true');
@@ -1558,6 +1688,7 @@
     _applyState(opts) {
       var initial = opts && opts.initial === true;
       this.setAttribute('data-collapsed', String(this._collapsed));
+      this._applyFullscreen({ silent: true });
 
       if (!this._collapsed) this._buildPanel();
 
@@ -1586,6 +1717,57 @@
           }, 300);
         }
       }
+    }
+
+    _applyFullscreen(opts) {
+      var on = this._fullscreen && !this._collapsed;
+      this.setAttribute('data-fullscreen', String(on));
+      // Separate from data-lana-dock so the expanded-only CSS hooks
+      // (hidden Ask LANA triggers) keep matching in full screen.
+      document.documentElement.setAttribute('data-lana-dock-fullscreen', String(on));
+      // The page underneath is covered, so keep keyboard focus out of it.
+      var page = document.querySelector('lex-body');
+      if (page) page.inert = on;
+      var btn = this._fullscreenBtn;
+      if (btn) {
+        var label = on ? 'Exit full screen' : 'Full screen';
+        btn.setAttribute('aria-label', label);
+        btn.setAttribute('aria-pressed', String(on));
+        btn.title = label;
+        btn.innerHTML = on ? RESTORE_SVG : MAXIMIZE_SVG;
+      }
+      if (on) this._mountSidePanel();
+      if (this._sidePanelEl && typeof this._sidePanelEl.setActive === 'function') this._sidePanelEl.setActive(on);
+      if (!(opts && opts.silent)) this.emit('lex-lana-dock-fullscreen', { fullscreen: on });
+    }
+
+    _mountSidePanel() {
+      var self = this;
+      loadSidePanel().then(function () {
+        if (!self._fullscreen || self._collapsed) return;
+        var chatEl = self._panelEl && self._panelEl._chatEl;
+        var container = chatEl && chatEl.parentNode;
+        if (!container) return;
+        if (!self._sidePanelEl) {
+          self._sidePanelEl = document.createElement('lex-lana-side-panel');
+        }
+        if (self._sidePanelEl.parentNode !== container) container.appendChild(self._sidePanelEl);
+        self._sidePanelEl.attachChat(chatEl);
+        self._syncSidePanel();
+        self._sidePanelEl.setActive(true);
+      }).catch(function (err) {
+        console.warn('[lex-lana-dock] ' + err.message);
+      });
+    }
+
+    _syncSidePanel() {
+      if (!this._sidePanelEl || typeof this._sidePanelEl.setScope !== 'function') return;
+      var ctx = this._pageContext || {};
+      this._sidePanelEl.setScope({
+        workspaceName: this._workspaceName,
+        matterId: this._scopeMatterId,
+        documentName: ctx.documentName || ''
+      });
     }
 
     _readStoredCollapsed() {
