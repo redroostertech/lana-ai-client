@@ -231,3 +231,33 @@ describe('SlashCommandsService integration', () => {
     expect(result.message).not.toContain('Sarah Martinez');
   });
 });
+
+// ---------------------------------------------------------------------------
+// slashCommandsEnabled (feature gate, hidden until a later release)
+// ---------------------------------------------------------------------------
+
+describe('slashCommandsEnabled', () => {
+  test('off unless LanaConfig.SLASH_COMMANDS_ENABLED is exactly true', () => {
+    expect(helpers.slashCommandsEnabled(null)).toBe(false);
+    expect(helpers.slashCommandsEnabled({})).toBe(false);
+    expect(helpers.slashCommandsEnabled({ SLASH_COMMANDS_ENABLED: 'true' })).toBe(false);
+    expect(helpers.slashCommandsEnabled({ SLASH_COMMANDS_ENABLED: true })).toBe(true);
+  });
+
+  test('reads the global config when none is passed', () => {
+    const prev = globalThis.LanaConfig;
+    try {
+      delete globalThis.LanaConfig;
+      expect(helpers.slashCommandsEnabled()).toBe(false);
+      globalThis.LanaConfig = { SLASH_COMMANDS_ENABLED: true };
+      expect(helpers.slashCommandsEnabled()).toBe(true);
+    } finally {
+      if (prev === undefined) delete globalThis.LanaConfig; else globalThis.LanaConfig = prev;
+    }
+  });
+
+  test('ships off in config.js', () => {
+    const src = require('fs').readFileSync(require('path').join(__dirname, '../../src/js/config.js'), 'utf8');
+    expect(src).toMatch(/SLASH_COMMANDS_ENABLED:\s*false/);
+  });
+});

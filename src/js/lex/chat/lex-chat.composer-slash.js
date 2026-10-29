@@ -129,7 +129,18 @@
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Feature gate: slash commands are hidden until a later release
+  // (LanaConfig.SLASH_COMMANDS_ENABLED). Pages without config read it as off.
+  // ---------------------------------------------------------------------------
+
+  function slashCommandsEnabled(config) {
+    const cfg = config !== undefined ? config : (root.LanaConfig || null);
+    return !!(cfg && cfg.SLASH_COMMANDS_ENABLED === true);
+  }
+
   const api = {
+    slashCommandsEnabled: slashCommandsEnabled,
     detectSlashTrigger: detectSlashTrigger,
     applyCommandToValue: applyCommandToValue,
     isExactCommand: isExactCommand,

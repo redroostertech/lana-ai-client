@@ -1094,6 +1094,8 @@
       const service = (typeof window !== 'undefined' && window.SlashCommandsService) || null;
       const helpers = global.Lex.Chat && global.Lex.Chat.SlashHelpers;
       if (!service || !helpers || typeof service.execute !== 'function') return false;
+      // Hidden until a later release: typed /commands go to normal chat.
+      if (!helpers.slashCommandsEnabled()) return false;
       if (!helpers.isExactCommand(content, Object.keys(service.commands || {}))) return false;
       this._runSlashCommand(content, service, this._buildSendOptions(opts));
       return true;

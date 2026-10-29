@@ -292,5 +292,21 @@ window.LanaConfig = {
    * this to true, then remove the flag and its two checks in lex-app.js
    * (_buildSidebarSections and _loadTopMoversForSidebar).
    */
-  INSIGHTS_TOP_MOVERS_ENABLED: false
+  INSIGHTS_TOP_MOVERS_ENABLED: false,
+
+  /**
+   * Slash commands in the chat composer (the "/" command picker, and running
+   * a typed command such as /search or /export instead of sending it to
+   * LANA). Hidden, not removed, until the next version: while off, "/" text
+   * is sent to LANA as an ordinary message. Pages without this config read
+   * it as off.
+   *
+   * Plan for the next version: review the command list in
+   * services/slash-commands.service.js (several commands, such as /noshow
+   * and /staff, are not law firm commands), test each one end to end, set
+   * this to true, then remove the flag and its two checks
+   * (lex-chat.composer.js _checkSlashTrigger and lex-chat.js
+   * _maybeRunSlashCommand, both through SlashHelpers.slashCommandsEnabled).
+   */
+  SLASH_COMMANDS_ENABLED: false
 };

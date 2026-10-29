@@ -1572,6 +1572,7 @@
     _checkSlashTrigger() {
       const service = this._getSlashService();
       if (!this._slashHelpers || !service || !this._textarea) return;
+      if (!this._slashHelpers.slashCommandsEnabled()) return;
       const trigger = this._slashHelpers.detectSlashTrigger(
         this._textarea.value, this._textarea.selectionStart
       );
