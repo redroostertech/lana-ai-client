@@ -117,3 +117,15 @@ describe('button choice', () => {
     expect(el.textContent).toContain('Ask an admin to connect Stripe.');
   });
 });
+
+describe('logo', () => {
+  test('uses the row logo the Data Connectors table shows, and keeps the plug for unsafe URLs', async () => {
+    const safe = boot({ rows: [{ id: 'src-1', connector_id: 'stripe', status: 'connected', manifest: { icon: 'https://cdn.example/stripe.svg' } }] });
+    const el = await render(safe);
+    expect(el.querySelector('img.lex-csc__logo').getAttribute('src')).toBe('https://cdn.example/stripe.svg');
+
+    const unsafe = boot({ rows: [{ id: 'src-1', connector_id: 'stripe', status: 'connected', logo_url: 'javascript:alert(1)' }] });
+    const el2 = await render(unsafe);
+    expect(el2.querySelector('img')).toBeNull();
+  });
+});

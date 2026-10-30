@@ -28,6 +28,12 @@ lex-connector-setup-card {
   border: 1px solid var(--lex-border-default);
 }
 
+.lex-csc__logo {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
 .lex-csc__body {
   flex: 1 1 auto;
   min-width: 0;

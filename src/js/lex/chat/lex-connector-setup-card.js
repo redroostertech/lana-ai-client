@@ -99,6 +99,23 @@
     return !!(global.LanaConfig && global.LanaConfig.CONNECT_WIZARD_ENABLED === true);
   }
 
+  // The logo the Data Connectors table shows for this row. Only web, data
+  // image and same-app relative URLs are used; anything else keeps the plug.
+  function logoUrl(row) {
+    if (!row) return '';
+    const value = (row.manifest && row.manifest.icon) || row.logo_url || row.logo || row.icon || '';
+    if (typeof value !== 'string' || !value.trim()) return '';
+    let url;
+    try {
+      url = new URL(value, global.location ? global.location.href : 'file:///');
+    } catch (_error) {
+      return '';
+    }
+    if (url.protocol === 'https:' || url.protocol === 'http:' || url.protocol === 'file:') return value;
+    if (url.protocol === 'data:' && url.pathname.indexOf('image/') === 0) return value;
+    return '';
+  }
+
   function canManage() {
     return !!(Lex.Auth && typeof Lex.Auth.canAccessAdminPages === 'function' && Lex.Auth.canAccessAdminPages());
   }
@@ -154,7 +171,9 @@
       const card = this._card();
       if (!card) return '';
       const name = this.escapeHtml(card.connector_name);
-      const icon = Lex.Icons && Lex.Icons.has && Lex.Icons.has('plug') ? String(Lex.Icons.plug) : '';
+      const plug = Lex.Icons && Lex.Icons.has && Lex.Icons.has('plug') ? String(Lex.Icons.plug) : '';
+      const logo = logoUrl(this._row);
+      const icon = logo ? `<img class="lex-csc__logo" src="${this.escapeHtml(logo)}" alt="">` : plug;
       if (this._status === 'loading') {
         return `<div class="lex-csc" role="group" aria-label="Connect ${name}">
           <div class="lex-csc__icon" aria-hidden="true">${icon}</div>
