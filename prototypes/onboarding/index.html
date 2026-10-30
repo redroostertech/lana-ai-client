@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LANA Onboarding Harness</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23f7f5f2'/%3E%3Cg fill='none' stroke='%2314110f' stroke-width='6' stroke-linecap='square'%3E%3Cpath d='M25,43 L25,25 L43,25'/%3E%3Cpath d='M75,57 L75,75 L57,75'/%3E%3C/g%3E%3C/svg%3E">
+  <link rel="stylesheet" href="../../src/css/lex-tokens.css">
+  <link rel="stylesheet" href="../../src/css/lex-onboarding.css">
+  <link rel="stylesheet" href="harness.css">
+</head>
+<body>
+
+  <!-- Stand-in for the dashboard. The tour itself is the real <lex-onboarding>. -->
+  <main class="harness">
+    <h1 class="harness__title">Dashboard (harness)</h1>
+    <p class="harness__lede">The real onboarding component runs on top of this page with a stand-in API, so it can be reviewed in Chrome without the backend.</p>
+
+    <section class="harness__panel" aria-labelledby="destination-title">
+      <h2 id="destination-title">Where the tour sent the user</h2>
+      <p class="harness__destination" id="destination">Nothing yet.</p>
+    </section>
+
+    <section class="harness__panel" aria-labelledby="controls-title">
+      <h2 id="controls-title">Controls</h2>
+      <div class="harness__controls">
+        <button type="button" id="replay">Replay the tour</button>
+        <button type="button" id="relaunch">Relaunch</button>
+        <button type="button" id="reset">Reset as a new user</button>
+      </div>
+      <p class="harness__hint">URL options: <code>name=Michael</code>, <code>role=admin</code> (admin who cannot create users) or <code>role=member</code> (non-admin), <code>theme=dark</code>.</p>
+      <p class="harness__state" id="saved-state"></p>
+    </section>
+  </main>
+
+  <!-- Stand-in for the Ask LANA dock; harness.js gives it openWith(). -->
+  <lex-lana-dock></lex-lana-dock>
+
+  <script src="../../src/js/time-utils.js"></script>
+  <script src="../../src/js/lex/lex.core.js"></script>
+  <script src="harness.js"></script>
+  <script src="../../src/js/onboarding/onboarding-flow.js"></script>
+  <script src="../../src/js/onboarding/onboarding-state.js"></script>
+  <script src="../../src/js/lex/components/foundation/lex-onboarding.js"></script>
+  <script>window.harnessLaunch();</script>
+</body>
+</html>
