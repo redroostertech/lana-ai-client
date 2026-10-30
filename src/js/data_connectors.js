@@ -1677,8 +1677,9 @@
     var embeddedOpenExternalHandler = function (event) {
       var data = event && event.data;
       if (!data || data.type !== 'lex-open-external-url' || !data.url) return;
+      // Only the connector frame we opened may ask us to open a URL.
       var frame = document.getElementById('connectorDashboardFrame');
-      if (frame && event.source !== frame.contentWindow) return;
+      if (!frame || event.source !== frame.contentWindow) return;
 
       if (window.electronAPI && typeof window.electronAPI.invoke === 'function') {
         window.electronAPI.invoke('open-external-url', data.url).catch(function (error) {

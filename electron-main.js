@@ -94,6 +94,7 @@ const companionBridge = require('./electron-bridge');
 const { redactUrlForLog } = require('./electron-log-redaction');
 const { BrainchildManager, discover, validateLink, mcpBinForRoot, isAllowedVaultRoot } = require('./src/electron-brainchild-manager');
 const { ElectronScreenVoice } = require('./src/screen-voice/electron-screen-voice');
+const { isAllowedExternalUrl } = require('./src/electron-external-url');
 const {
   SCREEN_DICTION_APP_ID,
   capabilityItems,
@@ -1430,6 +1431,10 @@ ipcMain.handle('session-tracker:initialize', async (event, backendUrl, authToken
 // Open URL in system browser (used by update dialog for manual download)
 ipcMain.handle('open-external-url', async (event, url) => {
   const { shell } = require('electron');
+  if (!isAllowedExternalUrl(url)) {
+    console.warn('[open-external-url] Refused URL with a scheme that is not allowed');
+    return false;
+  }
   await shell.openExternal(url);
   return true;
 });
