@@ -608,3 +608,28 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+.lex-chat-external-approval-full summary {
+  cursor: pointer;
+  font-size: var(--lex-form-help-size);
+  font-weight: var(--lex-weight-medium);
+  color: var(--lex-chat-text);
+}
+
+.lex-chat-external-approval-full pre {
+  margin: 4px 0 0;
+  max-height: 240px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid var(--lex-border-default);
+  border-radius: var(--lex-radius-md, 6px);
+  font-size: var(--lex-form-help-size);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.lex-chat-external-approval-warning {
+  margin: 0;
+  font-size: var(--lex-form-help-size);
+  color: var(--lex-status-warning-text);
+}

@@ -34,6 +34,9 @@
   const EXTERNAL_TEXT_LIMIT = 300;
   const EXTERNAL_SUMMARY_LIMIT = 2000;
   const EXTERNAL_SUMMARY_LINES = 20;
+  // The backend refuses MCP arguments larger than 16 KB, so the full view of
+  // what will be sent always fits; anything longer is shown as not viewable.
+  const EXTERNAL_FULL_LIMIT = 32768;
 
   function plainObject(value) {
     return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -97,11 +100,17 @@
       || pick('provider', 64) === 'mcp-server' || pick('connector_id', 64) === 'mcp-server';
     const external = marked || (action.capability === 'connector_live_action' && Boolean(serverName));
     if (!external) return null;
+    // The complete arguments, sent when the summary had to shorten anything,
+    // so the user can always read exactly what will leave the firm.
+    const full = typeof block.arguments_full === 'string' ? block.arguments_full : '';
     return {
       serverName: serverName || 'an external server',
       toolTitle: pick('tool_title', EXTERNAL_TEXT_LIMIT) || pick('tool_name', EXTERNAL_TEXT_LIMIT)
         || boundedText(action.label, EXTERNAL_TEXT_LIMIT) || 'A tool',
-      argumentsSummary: pickSummary()
+      argumentsSummary: pickSummary(),
+      truncated: block.truncated === true,
+      argumentsFull: full.length <= EXTERNAL_FULL_LIMIT ? full : '',
+      argumentsFullTooLong: full.length > EXTERNAL_FULL_LIMIT
     };
   }
 
@@ -138,6 +147,23 @@
       }
       header.appendChild(label);
       header.appendChild(list);
+    }
+    if (view.argumentsFull) {
+      const details = document.createElement('details');
+      details.className = 'lex-chat-external-approval-full';
+      details.open = true;
+      const summary = document.createElement('summary');
+      summary.textContent = 'Everything LANA will send';
+      const pre = document.createElement('pre');
+      pre.textContent = view.argumentsFull;
+      details.appendChild(summary);
+      details.appendChild(pre);
+      header.appendChild(details);
+    } else if (view.truncated || view.argumentsFullTooLong) {
+      const warning = document.createElement('p');
+      warning.className = 'lex-chat-external-approval-warning';
+      warning.textContent = 'Part of this request is not shown here. Decline unless you can check it another way.';
+      header.appendChild(warning);
     }
     const note = document.createElement('p');
     note.className = 'lex-chat-external-approval-note';

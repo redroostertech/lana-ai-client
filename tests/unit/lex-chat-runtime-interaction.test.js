@@ -174,14 +174,14 @@ describe('approval for a tool on a third-party MCP server', () => {
     const view = w.Lex.Chat.externalApprovalView(external({
       action: { capability: 'connector_live_action', arguments: { server_name: 'Research', tool_name: 'search', arguments_summary: 'query: retainer' } }
     }));
-    expect(view).toEqual({ serverName: 'Research', toolTitle: 'search', argumentsSummary: ['query: retainer'] });
+    expect(view).toEqual(expect.objectContaining({ serverName: 'Research', toolTitle: 'search', argumentsSummary: ['query: retainer'], truncated: false, argumentsFull: '' }));
     dom.window.close();
   });
 
   test('provider mcp-server marks it external even without a server name', () => {
     const { dom, w } = setup();
     const view = w.Lex.Chat.externalApprovalView(external({ action: { capability: 'connector_live_action', label: 'Search', arguments: { provider: 'mcp-server' } } }));
-    expect(view).toEqual({ serverName: 'an external server', toolTitle: 'Search', argumentsSummary: [] });
+    expect(view).toEqual(expect.objectContaining({ serverName: 'an external server', toolTitle: 'Search', argumentsSummary: [] }));
     dom.window.close();
   });
 
@@ -191,6 +191,31 @@ describe('approval for a tool on a third-party MCP server', () => {
     expect(container.querySelector('.lex-chat-external-approval')).toBeNull();
     expect(w.Lex.Chat.externalApprovalView({ kind: 'approval', approval: { action: { capability: 'connector_live_action', arguments: { connector: 'stripe' } } } })).toBeNull();
     expect(w.Lex.Chat.externalApprovalView({ kind: 'question', external: true })).toBeNull();
+    dom.window.close();
+  });
+
+  test('a shortened summary also shows everything that will be sent, as text', () => {
+    const { dom, chat, container } = setup();
+    const hidden = '{\n  "query": "retainer",\n  "extra_12": "<img src=x onerror=alert(1)> matter notes"\n}';
+    chat._insertRuntimeInteraction(external({
+      external: { server_name: 'Research', tool_title: 'Search', truncated: true, arguments_summary: ['query: retainer', '1 more argument'], arguments_full: hidden }
+    }));
+    const full = container.querySelector('.lex-chat-external-approval-full');
+    expect(full).not.toBeNull();
+    expect(full.open).toBe(true);
+    expect(full.querySelector('pre').textContent).toBe(hidden);
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.querySelector('.lex-chat-external-approval-warning')).toBeNull();
+    dom.window.close();
+  });
+
+  test('a shortened summary with no full view warns instead', () => {
+    const { dom, chat, container } = setup();
+    chat._insertRuntimeInteraction(external({
+      external: { server_name: 'Research', tool_title: 'Search', truncated: true, arguments_summary: ['query: retainer'] }
+    }));
+    expect(container.querySelector('.lex-chat-external-approval-full')).toBeNull();
+    expect(container.querySelector('.lex-chat-external-approval-warning').textContent).toContain('not shown');
     dom.window.close();
   });
 
