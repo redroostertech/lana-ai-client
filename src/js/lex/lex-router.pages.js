@@ -27,7 +27,9 @@
       title: 'Implementation Assurance', activeNav: 'workspaces',
       scripts: ['js/lex/components/foundation/lex-banner.js', 'js/lex/components/foundation/lex-card.js',
         'js/lex/components/form/lex-select.js', 'js/lex/components/form/lex-textarea.js',
-        'js/services/implementation-assurance-client.js', 'js/implementation-assurance.js'],
+        'js/lex/components/form/lex-form.js', 'js/lex/components/form/lex-checkbox.js',
+        'js/services/assurance-onboarding-client.js', 'js/services/assurance-value-controls.js', 'js/services/assurance-evidence-controls.js',
+        'js/services/implementation-assurance-client.js', 'js/assurance-onboarding.js', 'js/implementation-assurance.js'],
       stylesheets: ['css/implementation-assurance.css']
     },
 

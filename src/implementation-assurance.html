@@ -29,30 +29,112 @@
 
   <template id="page-content">
     <main class="assurance-page" id="assurancePage">
-      <lex-banner variant="light" heading="Implementation assurance" subtitle="Review what the records support before recording a professional decision."></lex-banner>
+      <lex-banner variant="light" heading="Implementation assurance" subtitle="Connect the accepted plan to reported assets, evidence, and professional decisions."></lex-banner>
       <div class="assurance-actions"><lex-btn id="assuranceBack" variant="secondary">Back to matter</lex-btn><lex-btn id="assuranceDocuments" variant="secondary">Open matter documents</lex-btn><lex-btn id="assuranceRefresh" variant="ghost">Refresh records</lex-btn></div>
       <p id="assuranceMatter" class="assurance-muted"></p>
       <div id="assuranceNotice" class="assurance-status" role="status" aria-live="polite">Loading available records…</div>
-      <div class="assurance-grid">
-        <lex-card heading="Reported asset inventory">
-          <section class="assurance-section"><p class="assurance-muted">Inventory describes reported assets. A listed asset is not proof that a plan has been implemented.</p><ul id="assuranceAssets" class="assurance-list"></ul><lex-btn id="assuranceMore" variant="secondary" hidden>Load more records</lex-btn></section>
-        </lex-card>
-        <lex-card heading="Review an accepted target">
-          <section class="assurance-section">
-            <p class="assurance-muted">Plan approval, target setup, and evidence review happen before this step. This page reviews existing accepted targets; it does not create a plan or certify legal compliance.</p>
-            <lex-select id="assuranceTarget" label="Target to review" placeholder="Select an accepted target" disabled></lex-select>
-            <div id="assuranceTargetDetails" class="assurance-muted"></div>
-            <lex-btn id="assuranceAssess" variant="primary" disabled>Assess current evidence</lex-btn>
-            <div id="assuranceAssessment" class="assurance-section" hidden></div>
-            <section id="assuranceDecisionForm" class="assurance-section" hidden aria-label="Professional decision">
-              <p class="assurance-muted">Check the referenced plan and source documents before deciding. Your decision is recorded separately from the system’s finding.</p>
-              <lex-select id="assuranceDecision" label="Your decision" placeholder="Choose a decision"></lex-select>
-              <lex-textarea id="assuranceRationale" label="Reason for your decision" placeholder="Describe the evidence reviewed and the basis for your decision." rows="4" maxlength="4000" required></lex-textarea>
-              <lex-btn id="assuranceSave" variant="primary" label="Record professional decision"></lex-btn>
-            </section>
-          </section>
-        </lex-card>
-      </div>
+      <section id="assuranceRecovery" class="assurance-status" hidden aria-label="Pending change recovery"><p id="assuranceRecoveryText"></p><lex-btn id="assuranceRecover" label="Recover the same change" variant="primary"></lex-btn></section>
+      <div id="assuranceReadiness" class="assurance-muted"></div>
+      <lex-btn id="assuranceMore" variant="secondary" hidden>Load more choices and records</lex-btn>
+      <lex-select id="assuranceStep" label="Workflow section" aria-label="Implementation assurance sections"></lex-select>
+      <section data-assurance-step="inventory" class="assurance-grid">
+        <lex-card heading="Reported asset inventory"><section class="assurance-section"><p class="assurance-muted">A reported asset is not evidence that the plan has been implemented.</p><ul id="assuranceAssets" class="assurance-list"></ul></section></lex-card>
+        <lex-card heading="Add or update an asset"><section class="assurance-section">
+          <lex-select id="assuranceAssetEdit" label="Asset" placeholder="Add a new asset"></lex-select>
+          <lex-form id="assuranceAssetForm"><div class="assurance-section">
+            <lex-select id="assuranceAssetClass" name="asset_classification" label="Asset type" required></lex-select>
+            <lex-input id="assuranceAssetDescription" name="description" label="Description" placeholder="Family savings account" required></lex-input>
+            <lex-input id="assuranceAssetLastFour" name="account_last_four" label="Account last four (optional)" maxlength="4"></lex-input>
+            <lex-input id="assuranceAssetValue" name="asset_value" label="Reported value (optional)" placeholder="45000.00"></lex-input>
+            <lex-input id="assuranceAssetCurrency" name="currency" label="Currency" value="USD" maxlength="3" required></lex-input>
+            <lex-btn id="assuranceAssetSave" type="submit" variant="primary" label="Save reported asset" data-assurance-permission="write"></lex-btn>
+          </div></lex-form>
+        </section></lex-card>
+      </section>
+      <section data-assurance-step="plan" class="assurance-grid" hidden>
+        <lex-card heading="Accepted plans"><section class="assurance-section"><div id="assurancePlans" class="assurance-list"></div></section></lex-card>
+        <lex-card heading="Accept a plan version"><section class="assurance-section">
+          <p class="assurance-muted">Choose retained document versions, inspect their content, and record your professional acceptance. Uploading or selecting a file does not approve it.</p>
+          <lex-form id="assurancePlanForm"><div class="assurance-section">
+            <lex-select id="assurancePlanEdit" label="Plan record" placeholder="Accept a new plan"></lex-select>
+            <lex-select id="assurancePlanReleases" label="Retained plan documents" multiple searchable required></lex-select>
+            <div id="assurancePlanSources" class="assurance-source-list"></div>
+            <lex-textarea id="assurancePlanRationale" name="rationale" label="Basis for accepting this plan" rows="3" required></lex-textarea>
+            <lex-checkbox id="assurancePlanConfirm" label="I reviewed these document versions and accept them as the plan for this matter."></lex-checkbox>
+            <lex-btn id="assurancePlanSave" type="submit" label="Accept this plan version" variant="primary" data-assurance-permission="review"></lex-btn>
+          </div></lex-form>
+        </section></lex-card>
+      </section>
+      <section data-assurance-step="targets" class="assurance-grid" hidden>
+        <lex-card heading="Implementation targets"><section class="assurance-section"><div id="assuranceTargetsList" class="assurance-list"></div><p class="assurance-muted">Targets express the accepted plan's intended result. They do not assert that an institution or record already reflects it.</p></section></lex-card>
+        <lex-card heading="Accept an implementation target"><lex-form id="assuranceTargetForm"><div class="assurance-section">
+          <lex-select id="assuranceTargetEdit" label="Target record" placeholder="Create a new target"></lex-select>
+          <lex-select id="assuranceTargetPlan" label="Accepted plan" required></lex-select>
+          <lex-select id="assuranceTargetProtocol" label="Published firm protocol" required></lex-select>
+          <lex-select id="assuranceTargetRule" label="Requirement" required></lex-select>
+          <p id="assuranceTargetRuleDetails" class="assurance-muted"></p>
+          <lex-select id="assuranceTargetAsset" label="Reported asset" searchable required></lex-select>
+          <div id="assuranceTargetValue" class="assurance-section"></div>
+          <lex-textarea id="assuranceTargetRationale" label="Basis for this target" rows="3" required></lex-textarea>
+          <lex-checkbox id="assuranceTargetConfirm" label="I reviewed the plan and accept this target and its selected protocol version."></lex-checkbox>
+          <lex-btn id="assuranceTargetSave" type="submit" variant="primary" label="Accept target" data-assurance-permission="review"></lex-btn>
+        </div></lex-form></lex-card>
+      </section>
+      <section data-assurance-step="observations" class="assurance-grid" hidden>
+        <lex-card heading="Record observed evidence"><lex-form id="assuranceObservationForm"><div class="assurance-section">
+          <p class="assurance-muted">Record what a source establishes. Saving an observation leaves it pending professional review; it does not establish implementation.</p>
+          <lex-select id="assuranceObservationTarget" label="Target this evidence concerns" required></lex-select>
+          <lex-select id="assuranceObservationEdit" label="Observation record" placeholder="Record a new observation"></lex-select>
+          <div id="assuranceObservationValue" class="assurance-section"></div>
+          <lex-input id="assuranceObservationFrom" label="Valid from (your local time)" required></lex-input>
+          <lex-input id="assuranceObservationUntil" label="Valid until (optional, your local time)"></lex-input>
+          <lex-select id="assuranceObservationSupersedes" label="Earlier observations this replaces (optional)" multiple searchable></lex-select>
+          <lex-btn id="assuranceObservationSave" type="submit" variant="primary" label="Save for professional review" data-assurance-permission="write"></lex-btn>
+        </div></lex-form></lex-card>
+        <lex-card heading="Source evidence"><section class="assurance-section"><p class="assurance-muted">Use an exact retained release. Open the selected source to inspect it. If it has not been released, use the existing document review flow first.</p><div id="assuranceObservationEvidence" class="assurance-section"></div></section></lex-card>
+      </section>
+      <section data-assurance-step="evidence-review" class="assurance-grid" hidden>
+        <lex-card heading="Review an observation"><section class="assurance-section"><lex-select id="assuranceObservationReview" label="Observation" searchable></lex-select><div id="assuranceObservationDetails" class="assurance-section"></div></section></lex-card>
+        <lex-card heading="Professional evidence review"><lex-form id="assuranceObservationReviewForm"><div class="assurance-section">
+          <p class="assurance-muted">Inspect the exact sources and recorded value. Reviewing this observation does not accept the final implementation conclusion.</p>
+          <lex-textarea id="assuranceObservationReviewRationale" label="Review rationale" rows="4" required></lex-textarea>
+          <lex-checkbox id="assuranceObservationReviewConfirm" label="I inspected the sources and reviewed this exact observation version."></lex-checkbox>
+          <lex-btn id="assuranceObservationReviewSave" type="submit" variant="primary" label="Record evidence review" data-assurance-permission="review"></lex-btn>
+        </div></lex-form></lex-card>
+      </section>
+      <section data-assurance-step="review" class="assurance-grid" hidden>
+        <lex-card heading="Assess an accepted target"><section class="assurance-section">
+          <p class="assurance-muted">The application compares the accepted target with eligible reviewed evidence. A system finding remains separate from your decision.</p>
+          <lex-select id="assuranceTarget" label="Target to review" placeholder="Select an accepted target" disabled></lex-select>
+          <div id="assuranceTargetDetails" class="assurance-muted"></div>
+          <lex-btn id="assuranceAssess" variant="primary" disabled>Assess current evidence</lex-btn>
+          <div id="assuranceAssessment" class="assurance-section" hidden></div>
+        </section></lex-card>
+        <lex-card heading="Professional decision"><section id="assuranceDecisionForm" class="assurance-section" hidden aria-label="Professional decision">
+          <p class="assurance-muted">Check the referenced plan and sources before deciding. An exception does not turn an unsupported finding into a match.</p>
+          <lex-select id="assuranceDecision" label="Your decision" placeholder="Choose a decision"></lex-select>
+          <lex-textarea id="assuranceRationale" label="Reason for your decision" placeholder="Describe the evidence reviewed and the basis for your decision." rows="4" maxlength="4000" required></lex-textarea>
+          <lex-btn id="assuranceSave" variant="primary" label="Record professional decision"></lex-btn>
+        </section></lex-card>
+      </section>
+      <section data-assurance-step="closeout" class="assurance-grid" hidden>
+        <lex-card heading="Closeout of recorded requirements"><section class="assurance-section">
+          <p class="assurance-muted">Prepare a pinned record of the requirements recorded for this plan, their assessments, decisions and unresolved exceptions. This is not a claim that every estate obligation is captured or complete. The server reports its recorded scope; preparation alone is not acceptance.</p>
+          <lex-select id="assuranceCloseoutPlan" label="Accepted plan"></lex-select>
+          <lex-btn id="assuranceCloseoutPrepare" label="Prepare closeout record" variant="primary" data-assurance-permission="prepareCloseout"></lex-btn>
+          <lex-select id="assuranceCloseoutSelect" label="Prepared closeout"></lex-select>
+          <div id="assuranceCloseoutDetails" class="assurance-section"></div>
+          <lex-btn id="assuranceCloseoutDownload" label="Download pinned record" variant="secondary" disabled></lex-btn>
+        </section></lex-card>
+        <lex-card heading="Accept a closeout"><lex-form id="assuranceCloseoutForm"><div class="assurance-section">
+          <p class="assurance-muted">Review every target and exception. If records have changed, prepare a fresh closeout before accepting it.</p>
+          <lex-textarea id="assuranceCloseoutRationale" label="Acceptance rationale" rows="4" required></lex-textarea>
+          <lex-checkbox id="assuranceCloseoutConfirm" label="I accept closeout for these recorded requirements only, including the stated exceptions. This does not establish coverage of every estate obligation."></lex-checkbox>
+          <lex-btn id="assuranceCloseoutAccept" type="submit" label="Accept this closeout" variant="primary" data-assurance-permission="acceptCloseout"></lex-btn>
+          <div id="assuranceMaintenance" class="assurance-muted"></div>
+        </div></lex-form></lex-card>
+      </section>
+      <div class="assurance-actions" aria-label="Onboarding navigation"><lex-btn id="assurancePrevious" variant="secondary" label="Previous section"></lex-btn><lex-btn id="assuranceNext" variant="secondary" label="Next section"></lex-btn></div>
     </main>
   </template>
   <!-- Universal shell scripts -->
@@ -88,10 +170,11 @@
   <script src="js/lex/components/foundation/lex-spinner.js"></script>
   <script src="js/lex/components/foundation/lex-btn.js"></script>
   <script src="js/lex/components/foundation/lex-empty.js"></script>
-  <script src="js/lex/components/form/lex-segmented.js"></script>
   <script src="js/lex/components/form/lex-input.js"></script>
   <script src="js/lex/components/form/lex-select.js"></script>
   <script src="js/lex/components/form/lex-textarea.js"></script>
+  <script src="js/lex/components/form/lex-form.js"></script>
+  <script src="js/lex/components/form/lex-checkbox.js"></script>
   <script src="js/lex/components/layout/lex-sidebar.js"></script>
   <script src="js/lex/components/layout/lex-topbar.js"></script>
   <script src="js/lex/components/layout/lex-conversation-item.js"></script>
@@ -109,7 +192,11 @@
   <script src="js/lex/lex-page-init.js"></script>
 
   <!-- Page controller (MUST be last before auth-guard) -->
+  <script src="js/services/assurance-onboarding-client.js"></script>
+  <script src="js/services/assurance-value-controls.js"></script>
+  <script src="js/services/assurance-evidence-controls.js"></script>
   <script src="js/services/implementation-assurance-client.js"></script>
+  <script src="js/assurance-onboarding.js"></script>
   <script src="js/implementation-assurance.js"></script>
 
   <!-- PAC bridge consent handler (Lex modal for token requests) -->

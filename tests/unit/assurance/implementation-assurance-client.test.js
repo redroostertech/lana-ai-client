@@ -1,6 +1,7 @@
 'use strict';
 const { createReviewSession, scopedDecisionStore, errorMessage } = require('../../../src/js/services/implementation-assurance-client');
 const target = '44444444-4444-4444-8444-444444444444';
+const decisionResult = (record, replayed = false) => ({ record, replayed, reference: { id: record.id || 'receipt' }, command: { requestId: 'stable-request', operation: 'decide', sha256: 'server-hash' } });
 const assessment = () => ({ record: { evaluation: { target: { id: target }, binding: 'binding-from-server', outcome: 'unknown' } } });
 function fixture() {
   const api = { request: jest.fn() };
@@ -27,7 +28,7 @@ test('paging one remaining list does not restart an exhausted list', async () =>
 test('decision uses only the server binding and confirms the exact recorded outcome', async () => {
   const { api, session } = fixture(); api.request.mockResolvedValueOnce(assessment());
   await session.assess(target);
-  api.request.mockResolvedValueOnce({ record: { id: 'receipt', subject_id: target, payload_sha256: 'binding-from-server', decision: 'accept_exception' } });
+  api.request.mockResolvedValueOnce(decisionResult({ id: 'receipt', subject_id: target, payload_sha256: 'binding-from-server', decision: 'accept_exception' }));
   await session.decide('accept_exception', ' Reviewed the source. ');
   expect(api.request.mock.calls[1][2]).toEqual({ targetId: target, expectedBinding: 'binding-from-server', requestId: 'stable-request', decision: 'accept_exception', rationale: 'Reviewed the source.' });
   expect(session.assessment()).toBeNull();
@@ -48,7 +49,7 @@ test('uncertain delivery retries the same request and blocks a different decisio
   const original = api.request.mock.calls[1][2];
   await expect(session.decide('accept_exception', 'Different.')).rejects.toThrow('Recover the pending');
   await expect(session.assess(target)).rejects.toThrow('Recover the pending');
-  api.request.mockResolvedValueOnce({ replayed: true, record: { decision: 'reject', subject_id: target, payload_sha256: 'binding-from-server' } });
+  api.request.mockResolvedValueOnce(decisionResult({ decision: 'reject', subject_id: target, payload_sha256: 'binding-from-server' }, true));
   expect((await session.decide('reject', 'Evidence missing.')).replayed).toBe(true);
   expect(api.request.mock.calls[2][2]).toEqual(original);
 });
@@ -59,7 +60,7 @@ test('a second click cannot dispatch concurrently', async () => {
   const first = session.decide('reject', 'Reviewed.');
   await expect(session.decide('reject', 'Reviewed.')).rejects.toThrow('already in progress');
   expect(api.request).toHaveBeenCalledTimes(2);
-  finish({ record: { decision: 'reject', subject_id: target, payload_sha256: 'binding-from-server' } });
+  finish(decisionResult({ decision: 'reject', subject_id: target, payload_sha256: 'binding-from-server' }));
   await first;
 });
 test('a missing target or unconfirmed receipt cannot become a successful decision', async () => {
@@ -67,7 +68,7 @@ test('a missing target or unconfirmed receipt cannot become a successful decisio
   await expect(session.assess(target)).rejects.toThrow('for this target');
   expect(session.assessment()).toBeNull();
   api.request.mockResolvedValueOnce(assessment()); await session.assess(target);
-  api.request.mockResolvedValueOnce({ record: { decision: 'reject', subject_id: 'other', payload_sha256: 'binding-from-server' } });
+  api.request.mockResolvedValueOnce(decisionResult({ decision: 'reject', subject_id: 'other', payload_sha256: 'binding-from-server' }));
   await expect(session.decide('reject', 'Reviewed.')).rejects.toThrow('did not confirm');
   expect(session.pendingDecision()).not.toBeNull();
 });
@@ -91,7 +92,7 @@ test.each([401, 403, 404, 408, 429])('refresh recovers the exact pending request
   for (const parts of [['other', 'org', 'http://server', 'matter/scope'], ['user', 'other', 'http://server', 'matter/scope'], ['user', 'org', 'http://other', 'matter/scope'], ['user', 'org', 'http://server', 'other']]) {
     expect(scopedDecisionStore(storage, parts[2], { id: parts[0], organizationId: parts[1] }, parts[3]).read()).toBeNull();
   }
-  api.request.mockResolvedValueOnce({ replayed: true, record: { decision: 'reject', subject_id: target, payload_sha256: 'binding-from-server' } });
+  api.request.mockResolvedValueOnce(decisionResult({ decision: 'reject', subject_id: target, payload_sha256: 'binding-from-server' }, true));
   await restored.decide('reject', 'Reviewed.');
   expect(api.request.mock.calls[2][2]).toEqual(api.request.mock.calls[1][2]);
   expect(store.read()).toBeNull();
@@ -103,7 +104,7 @@ test('persistence failure blocks dispatch, and corrupt recovery data blocks a ne
   await expect(session.decide('reject', 'Reviewed.')).rejects.toThrow('Storage unavailable');
   expect(api.request).toHaveBeenCalledTimes(1);
   const corrupt = createReviewSession(api, 'matter', () => 'id', { ...broken, read: () => ({ requestId: 'incomplete' }) });
-  await expect(corrupt.decide('reject', 'Reviewed.')).rejects.toThrow('recovery is unavailable');
+  await expect(corrupt.decide('reject', 'Reviewed.')).rejects.toThrow('Recovery must be restored');
 });
 
 test('unknown delivery followed by access loss retains the original recovery identity', async () => {
@@ -111,5 +112,12 @@ test('unknown delivery followed by access loss retains the original recovery ide
   api.request.mockRejectedValueOnce({ status: 0 }); await expect(session.decide('reject', 'Reviewed.')).rejects.toMatchObject({ status: 0 });
   const original = store.read(); api.request.mockRejectedValueOnce({ status: 403 });
   await expect(session.decide('reject', 'Reviewed.')).rejects.toMatchObject({ status: 403 });
-  expect(store.read()).toEqual(original); expect(session.pendingDecision()).toEqual(original);
+  expect(store.read()).toEqual(original); expect(session.pendingDecision()).toEqual(original.payload);
+});
+
+test('refreshing onboarding records invalidates a prior assessment before another decision', async () => {
+  const { api, session } = fixture(); api.request.mockResolvedValueOnce(assessment()); await session.assess(target);
+  session.invalidateAssessment(); expect(session.assessment()).toBeNull();
+  await expect(session.decide('accept_conclusion', 'Old finding.')).rejects.toThrow('Assess this target');
+  expect(api.request).toHaveBeenCalledTimes(1);
 });

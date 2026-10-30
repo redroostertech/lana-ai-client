@@ -11,11 +11,11 @@
     var authenticatedUser = (Lex.state && Lex.state.user) || window.api.user;
     var store = null;
     try { store = ImplementationAssuranceClient.scopedDecisionStore(window.sessionStorage, window.api.baseUrl, authenticatedUser, matterId); } catch (error) { /* Read-only if session persistence is unavailable. */ }
-    var session = ImplementationAssuranceClient.createReviewSession(window.api, matterId, null, store);
+    var commands = AssuranceOnboardingClient.createCommandSession(window.api, matterId, store);
+    var session = ImplementationAssuranceClient.createReviewSession(window.api, matterId, null, store, commands);
+    var onboarding;
     var assets = [];
     var targets = [];
-    var assetCursor = null;
-    var targetCursor = null;
     var available = false;
     var loading = false;
     var selected = '';
@@ -25,16 +25,16 @@
     function notice(message) { el('assuranceNotice').textContent = message; }
     function setDisabled(id, value) { el(id).disabled = Boolean(value); }
     function controls() {
-      var waiting = loading || session.busy();
-      var pending = session.pendingDecision();
+      var waiting = loading || session.busy() || (onboarding && onboarding.busy());
+      var pending = commands.pending();
       setDisabled('assuranceRefresh', waiting || pending);
       setDisabled('assuranceMore', waiting || pending);
       setDisabled('assuranceTarget', waiting || pending || !available || !targets.length);
-      setDisabled('assuranceAssess', waiting || pending || !available || !selected);
+      setDisabled('assuranceAssess', waiting || pending || !available || !selected || !onboarding || !onboarding.actionAllowed('read'));
       setDisabled('assuranceDecision', waiting || pending);
       setDisabled('assuranceRationale', waiting || pending);
-      setDisabled('assuranceSave', waiting || !available || !session.canPersist() || (!session.assessment() && !pending));
-      el('assuranceSave').label = pending ? 'Retry the same decision' : 'Record professional decision';
+      setDisabled('assuranceSave', waiting || pending || !available || !session.canPersist() || !session.assessment() || !onboarding || !onboarding.actionAllowed('review'));
+      el('assuranceSave').label = 'Record professional decision';
     }
     function assetName(id) {
       var asset = assets.find(function (item) { return item.id === id; });
@@ -45,9 +45,10 @@
     }
     function expectedValue(value) {
       if (!value) return 'Unavailable';
-      if (value.kind === 'reference') return value.value.kind + ': ' + value.value.id;
-      if (value.kind === 'reference_set') return value.value.map(function (item) { return item.kind + ': ' + item.id; }).join('; ');
-      if (value.kind === 'allocations') return value.value.map(function (item) { return item.beneficiary.kind + ': ' + item.beneficiary.id + ' — ' + (item.share_basis_points / 100) + '%'; }).join('; ');
+      function name(reference) { var contact = onboarding && onboarding.data().contacts.find(function (entry) { return entry.id === reference.id; }); return contact ? contact.label : 'Contact outside loaded lookup'; }
+      if (value.kind === 'reference') return name(value.value);
+      if (value.kind === 'reference_set') return value.value.map(name).join('; ');
+      if (value.kind === 'allocations') return value.value.map(function (item) { return name(item.beneficiary) + ' — ' + (item.share_basis_points / 100) + '%'; }).join('; ');
       return typeof value.value === 'object' ? 'See accepted plan for this value' : String(value.value);
     }
     function renderTargets() {
@@ -63,32 +64,12 @@
       el('assuranceTargetDetails').textContent = target ? 'Expected value: ' + expectedValue(target.record.value) : '';
       controls();
     }
-    function renderInventory() {
-      el('assuranceAssets').innerHTML = assets.length ? assets.map(function (item) {
-        return '<li><strong>' + esc(item.description) + '</strong><span class="assurance-muted">' + esc(item.asset_classification.split('_').join(' ')) +
-          (item.account_number_mask ? ' · ' + esc(item.account_number_mask) : '') + '</span><span>' +
-          (item.asset_value === null || item.asset_value === undefined ? 'Value not reported' : esc(item.currency || '') + ' ' + esc(String(item.asset_value))) + '</span></li>';
-      }).join('') : '<li class="assurance-muted">No reported assets in the loaded inventory.</li>';
-      el('assuranceMore').hidden = !assetCursor && !targetCursor;
-      renderTargets();
-    }
     async function load(append) {
-      if (loading || session.pendingDecision()) return;
+      if (loading || commands.pending() || !onboarding) return;
       loading = true; available = false; controls();
-      try {
-        el('assuranceAssessment').hidden = true; el('assuranceDecisionForm').hidden = true;
-        var pages = await session.load(append ? assetCursor : null, append ? targetCursor : null,
-          append ? { assets: Boolean(assetCursor), targets: Boolean(targetCursor) } : undefined);
-        if (!alive()) return;
-        // Merge by record identity so paging never duplicates displayed rows.
-        assets = Array.from(new Map((append ? assets : []).concat(pages.assets.assets || []).map(function (item) { return [item.id, item]; })).values());
-        targets = Array.from(new Map((append ? targets : []).concat(pages.targets.items || []).map(function (item) { return [item.record.id, item]; })).values());
-        assetCursor = pages.assets.next_cursor; targetCursor = pages.targets.nextCursor;
-        available = true;
-        renderInventory();
-        notice(targets.length ? 'Select a target and assess its current evidence. A system finding is not a professional decision.'
-          : 'No accepted targets are available. An authorized professional must set up and approve the plan and its targets before this review can begin.');
-      } catch (error) { if (alive()) notice(ImplementationAssuranceClient.errorMessage(error)); }
+      el('assuranceAssessment').hidden = true; el('assuranceDecisionForm').hidden = true;
+      try { await onboarding.refresh(append); }
+      catch (error) { if (alive()) notice(ImplementationAssuranceClient.errorMessage(error)); }
       finally { loading = false; if (alive()) controls(); }
     }
     function renderAssessment(response) {
@@ -142,7 +123,7 @@
     root.addEventListener('click', function (event) {
       var button = event.target.closest('lex-btn');
       if (!button || button.disabled) return;
-      if ((button.id === 'assuranceBack' || button.id === 'assuranceDocuments') && session.pendingDecision()) { notice('Recover the pending decision before leaving this review.'); return; }
+      if ((button.id === 'assuranceBack' || button.id === 'assuranceDocuments') && commands.pending()) { notice('Recover the pending decision before leaving this review.'); return; }
       if (button.id === 'assuranceBack') Lex.Nav.go('workspace-details.html', { params: { id: matterId } });
       if (button.id === 'assuranceDocuments') Lex.Nav.go('workspace-details.html', { params: { id: matterId, tab: 'documents' } });
       if (button.id === 'assuranceRefresh') load(false);
@@ -154,17 +135,16 @@
       if (event.target.id === 'assuranceTarget') { selected = event.detail.value; showTarget(); }
     });
     el('assuranceMatter').textContent = params.get('matter_name') || 'Current matter';
+    onboarding = AssuranceOnboarding.mount(root, { api: window.api, matterId: matterId, commands: commands,
+      notice: notice, onState: controls, onRecords: function (records) {
+        assets = records.assets; available = true; session.invalidateAssessment();
+        el('assuranceAssessment').hidden = true; el('assuranceDecisionForm').hidden = true;
+        renderTargetsFromRecords(records.targets); controls();
+      } });
+    function renderTargetsFromRecords(records) { targets = records; renderTargets(); }
     if (!matterId) { notice('Open implementation assurance from a matter to review its records.'); controls(); return; }
-    var recovery = session.pendingDecision();
-    if (recovery) {
-      selected = recovery.targetId; available = true;
-      el('assuranceDecisionForm').hidden = false;
-      el('assuranceDecision').options = [{ value: recovery.decision, label: 'Recover the previously submitted decision' }];
-      el('assuranceDecision').value = recovery.decision;
-      el('assuranceRationale').value = recovery.rationale;
-      notice('A prior decision has an unconfirmed delivery outcome. Retry the same request to recover its result before continuing this review.');
-      controls();
-    } else if (session.recoveryError()) { notice(session.recoveryError()); controls(); }
+    if (commands.pending()) { notice('Recover the previously submitted change before continuing.'); onboarding.controls(); }
+    else if (commands.recoveryError()) { notice(commands.recoveryError()); controls(); }
     else load(false);
   }
   if (window.LexRouter) LexRouter.registerPageInit('implementation-assurance.html', init);

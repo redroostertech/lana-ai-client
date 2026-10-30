@@ -15,3 +15,14 @@
 .assurance-facts dd { margin: 0; overflow-wrap: anywhere; }
 .assurance-references { font-size: 12px; overflow-wrap: anywhere; }
 @container assurance (max-width: 720px) { .assurance-grid { grid-template-columns: minmax(0, 1fr); } .assurance-facts { grid-template-columns: 1fr; } }
+
+.assurance-repeatable { display: grid; gap: 16px; }
+.assurance-allocation-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(90px, .4fr) auto; gap: 12px; align-items: end; }
+.assurance-evidence-row { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--lex-border-default); border-radius: 8px; }
+.assurance-source-list { display: grid; gap: 8px; }
+.assurance-record { display: grid; gap: 8px; padding-bottom: 16px; border-bottom: 1px solid var(--lex-border-default); }
+.assurance-record + .assurance-record { padding-top: 16px; }
+.assurance-record p { margin: 0; overflow-wrap: anywhere; }
+.assurance-readiness { display: flex; gap: 12px; flex-wrap: wrap; padding: 0; list-style: none; }
+.assurance-source-link { text-decoration: underline; color: var(--lex-text-accent); overflow-wrap: anywhere; }
+@container assurance (max-width: 720px) { .assurance-allocation-row { grid-template-columns: minmax(0, 1fr); } }
