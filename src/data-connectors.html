@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/tailwind-output.css">
   <link rel="stylesheet" href="css/companion-bridge-consent.css">
   <link rel="stylesheet" href="css/connector-table.css">
+  <link rel="stylesheet" href="css/components/connect-wizard.css">
   <script src="js/tailwind-loader.js"></script>
   <style>
     /* The embedded connector page fills the full-size, flush lex-modal.
@@ -430,12 +431,21 @@
   <script src="js/lex/components/form/lex-input.js"></script>
   <script src="js/lex/components/form/lex-select.js"></script>
   <script src="js/lex/components/data/lex-table.js"></script>
+  <!-- Guided Connect wizard (CONNECT_WIZARD_ENABLED): drawer, stepper, fields -->
+  <script src="js/lex/components/foundation/lex-drawer.js"></script>
+  <script src="js/lex/components/foundation/lex-stepper.js"></script>
+  <script src="js/lex/components/form/lex-toggle.js"></script>
+  <script src="js/lex/components/form/lex-radio.js"></script>
+  <script src="js/lex/components/integrations/lex-connect-wizard.js"></script>
 
   <!-- Inject page content + hoist modals -->
   <script src="js/lex/lex-page-init.js"></script>
 
   <!-- Page dependencies -->
   <script src="js/connectors.js"></script>
+  <script src="js/shared/connector-oauth-exchange.js"></script>
+  <script src="js/connect-wizard.model.js"></script>
+  <script src="js/connect-wizard.js"></script>
 
   <!-- Page controller (MUST be last before auth-guard) -->
   <script src="js/shared/library-column-filters.js"></script>

@@ -265,7 +265,8 @@
       sync_frequency: true,
       scheduled_sync_time: true,
       sync_interval_minutes: true,
-      last_sync: true
+      last_sync: true,
+      guided_connect_pending: true
     };
 
     return Object.keys(config).some(function (key) {
@@ -395,16 +396,40 @@
     return 'open';
   }
 
-  function handleConnectorRowSelection(connectorId) {
+  function isConnectWizardEnabled() {
+    return !!(window.LanaConfig && window.LanaConfig.CONNECT_WIZARD_ENABLED === true &&
+      window.Lex && window.Lex.ConnectWizard && typeof window.Lex.ConnectWizard.open === 'function');
+  }
+
+  /**
+   * Where opening a connector goes: 'details' (coming soon), 'wizard' (Guided
+   * Connect, flag on and status not_connected) or 'viewer' (the connector
+   * viewer, as before). A disconnected row keeps its config, so it still
+   * opens the viewer, where it is reconnected.
+   */
+  function connectorOpenRoute(connector, installedConnectors) {
+    var status = getConnectorStatusKey(connector, installedConnectors);
+    if (status === 'coming_soon') return 'details';
+    if (status === 'not_connected' && isConnectWizardEnabled()) return 'wizard';
+    return 'viewer';
+  }
+
+  function openConnectorEntry(connectorId) {
     var connector = findConnectorById(connectorId);
     if (!connector) return;
 
-    if (getConnectorStatusKey(connector, currentInstalledConnectors) === 'coming_soon') {
+    var route = connectorOpenRoute(connector, currentInstalledConnectors);
+    if (route === 'details') {
       showConnectorDetails(connectorId, null);
-      return;
+    } else if (route === 'wizard') {
+      openConnectWizard(connectorId);
+    } else {
+      openConnectorManage(connectorId);
     }
+  }
 
-    openConnectorManage(connectorId);
+  function handleConnectorRowSelection(connectorId) {
+    openConnectorEntry(connectorId);
   }
 
   function getConnectorUpdateSlug(connector) {
@@ -681,6 +706,54 @@
     openConnectorManage(connectorId);
   }
 
+  // Open the viewer for a source the wizard created or already knows about.
+  function openConnectorViewerForSource(connectorId, sourceId) {
+    var connector = findConnectorById(connectorId);
+    if (!connector || !sourceId) {
+      openConnectorManage(connectorId);
+      return;
+    }
+    var connectorType = getCatalogConnectorSlug(connector, connectorId);
+    var context = {
+      connector: connector,
+      sourceId: sourceId,
+      connectorType: connectorType,
+      connectorScope: normalizeConnectorScope(connector.connector_scope || connector.scope || (connector.manifest && connector.manifest.scope))
+    };
+    var name = (connector.manifest && connector.manifest.name) || connector.name || connector.connector_name || 'Connector Dashboard';
+    openConnectorDashboardModal(buildConnectorManageUrl(connectorId, context), name);
+  }
+
+  // Guided Connect (CONNECT_WIZARD_ENABLED). The wizard creates the source
+  // row itself, on manual sync, so ensureConnectorIntegrationSource's silent
+  // configure is not used on this path.
+  function openConnectWizard(connectorId) {
+    var connector = findConnectorById(connectorId);
+    if (!connector) return;
+    var normalized = normalizeConnector(connector);
+    var connectorType = getCatalogConnectorSlug(connector, connectorId);
+    var source = isUuid(connector.id) ? connector : findInstalledSourceForSlug(connectorType);
+    var openViewer = function (detail) {
+      var sourceId = (detail && detail.sourceId) || (source && source.id) || '';
+      if (sourceId) openConnectorViewerForSource(connectorId, sourceId);
+      else openConnectorManage(connectorId);
+    };
+
+    try {
+      window.Lex.ConnectWizard.open({
+        connectorType: connectorType,
+        connectorName: normalized.name,
+        source: source,
+        onDone: loadConnectors,
+        onAdvanced: openViewer,
+        onOpenConnector: openViewer
+      });
+    } catch (error) {
+      console.error('Failed to open the connect wizard:', error && error.message);
+      openConnectorManage(connectorId);
+    }
+  }
+
   function buildCustomConnectorUIUrl(uiEntryPoint, connectorName, sourceId, connectorType, connectorScope) {
     var params = new URLSearchParams({
       ui: uiEntryPoint,
@@ -727,6 +800,13 @@
   // ── Install connector ───────────────────────────────────────────────
 
   function installConnector(connectorId, evt) {
+    var target = findConnectorById(connectorId);
+    if (target && connectorOpenRoute(target, currentInstalledConnectors) === 'wizard') {
+      if (evt) evt.stopPropagation();
+      openConnectWizard(connectorId);
+      return;
+    }
+
     var button = evt ? evt.target : null;
     if (button) {
       button.disabled = true;
@@ -846,7 +926,7 @@
       }
       actionBtn.onclick = function () {
         closeDetailsModal();
-        openConnectorManage(nc.id);
+        openConnectorEntry(nc.id);
       };
     }
 
@@ -1768,6 +1848,8 @@
   // Pure table logic, exposed for unit tests.
   window.DataConnectorsTable = {
     CONNECTOR_STATUSES: CONNECTOR_STATUSES,
+    connectorOpenRoute: connectorOpenRoute,
+    connectorHasMeaningfulConfig: connectorHasMeaningfulConfig,
     mapConnectorRow: mapConnectorRow,
     connectorActionsCell: connectorActionsCell,
     buildCombinedConnectorList: buildCombinedConnectorList

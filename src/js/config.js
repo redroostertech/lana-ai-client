@@ -308,5 +308,22 @@ window.LanaConfig = {
    * (lex-chat.composer.js _checkSlashTrigger and lex-chat.js
    * _maybeRunSlashCommand, both through SlashHelpers.slashCommandsEnabled).
    */
-  SLASH_COMMANDS_ENABLED: false
+  SLASH_COMMANDS_ENABLED: false,
+
+  /**
+   * Guided Connect wizard on Data Connectors (the step by step drawer that
+   * walks a user through a connector's setup guide, saves and tests the
+   * credentials, runs OAuth, and offers auto sync). Hidden until it is
+   * verified end to end against the backend `connectors.guidedConnect`
+   * flag: while off, clicking a connector that is not connected opens the
+   * connector viewer exactly as before (including the silent configure
+   * that creates its source row). Pages without this config read it as off.
+   *
+   * Plan: run the wizard live with a Stripe test key, Google (LANA managed
+   * OAuth), a BYO OAuth connector and a second Postgres instance, set this
+   * to true, then remove the flag and its check (data_connectors.js
+   * connectorOpenRoute through isConnectWizardEnabled) so the wizard always
+   * opens for connectors that are not connected.
+   */
+  CONNECT_WIZARD_ENABLED: false
 };

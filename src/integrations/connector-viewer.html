@@ -416,6 +416,7 @@
   <script src="../js/menu.js"></script>
   <script src="../js/navigation-helpers.js"></script>
   <script src="../js/connectors.js"></script>
+  <script src="../js/shared/connector-oauth-exchange.js"></script>
 
   <script src="../js/lex/lex.core.js"></script>
   <script src="../js/lex/lex.icons.js"></script>
@@ -6701,13 +6702,10 @@
         try {
           showPageAlert(`Completing ${state.connectorName} authorization...`, 'info');
           const connectorType = state.connectorType || state.connectorId;
-          const result = await api.post('/api/v1/integrations/oauth/exchange', {
-            code: data.code,
-            state: data.state,
-            provider: connectorType,
-            connectorId: connectorType,
-            redirectUri: state.oauthRedirectUri || 'lana-ai://oauth/callback',
-            realmId: data.realmId || data.realm_id
+          const result = await window.ConnectorOAuth.exchangeCode(api, {
+            data,
+            connectorType,
+            redirectUri: state.oauthRedirectUri
           });
 
           if (result?.integrationSourceId) {

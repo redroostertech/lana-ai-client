@@ -458,6 +458,72 @@ const Connectors = {
     return api.post(`/api/v1/integrations/connectors/${connectorId}/test`, config);
   },
 
+  // ── Guided Connect (connect-wizard.js) ──────────────────────────────
+  // Thin calls; the backend validates, authorizes and stores.
+
+  /** Full connector package: { connector, metadata }. */
+  async getCatalogPackage(connectorType) {
+    return api.get(`/api/v1/integrations/connectors/catalog/${encodeURIComponent(connectorType)}`);
+  },
+
+  /** { redirect_uri, provider, flow, mode: 'standard'|'bridge' }; 403 when not allowed. */
+  async getRedirectUri(connectorType, flow, scope) {
+    const params = new URLSearchParams({ flow: flow || 'electron', scope: scope || 'org' });
+    return api.get(`/api/v1/integrations/connectors/catalog/${encodeURIComponent(connectorType)}/redirect-uri?${params.toString()}`);
+  },
+
+  /** Saved config view for a type, including lana_managed_available and credential_source. */
+  async getBridgeConfig(connectorType) {
+    return api.get(`/api/connectors/${encodeURIComponent(connectorType)}/config`);
+  },
+
+  /** Org save by type: { success, connector_id }. Not for a second instance. */
+  async configureGuided(connectorType, config) {
+    return api.post('/api/v1/integrations/connectors/configure', {
+      connector_type: connectorType,
+      config: config || {},
+      setup_source: 'guided_connect'
+    });
+  },
+
+  /** New instance of a multi-instance connector: { data: { id, ... } }. */
+  async createInstance(connectorType, instanceKey, displaySuffix) {
+    const body = { instance_key: instanceKey };
+    if (displaySuffix) body.display_suffix = displaySuffix;
+    return api.post(`/api/v1/integrations/connectors/${encodeURIComponent(connectorType)}/instances`, body);
+  },
+
+  /** Save config on one source by id. */
+  async patchSourceConfig(sourceId, config) {
+    return api.patch(`/api/v1/generic-connectors/integration-sources/${encodeURIComponent(sourceId)}/config`, config || {});
+  },
+
+  /** { success, status_code, message, error, code, identity, checked, verified }. */
+  async testSourceConnection(sourceId) {
+    return api.post(`/api/v1/generic-connectors/integration-sources/${encodeURIComponent(sourceId)}/test-connection`, {
+      setup_source: 'guided_connect'
+    });
+  },
+
+  /** { authorization_url, redirect_uri, ... } for an org source. */
+  async authorizeSource(sourceId, flow, returnTo) {
+    const params = new URLSearchParams();
+    if (flow === 'electron') params.set('flow', 'electron');
+    else if (returnTo) params.set('return_to', returnTo);
+    const query = params.toString();
+    return api.get(`/api/v1/integrations/connectors/${encodeURIComponent(sourceId)}/authorize${query ? `?${query}` : ''}`);
+  },
+
+  /** { auth_status, ... } */
+  async getAuthStatus(sourceId) {
+    return api.get(`/api/v1/integrations/connectors/${encodeURIComponent(sourceId)}/auth-status`);
+  },
+
+  /** Same endpoint the connector viewer saves sync frequency through. */
+  async updateSyncSettings(sourceId, settings) {
+    return api.patch(`/api/v1/generic-connectors/integration-sources/${encodeURIComponent(sourceId)}/sync-settings`, settings || {});
+  },
+
   /**
    * Trigger manual sync
    */

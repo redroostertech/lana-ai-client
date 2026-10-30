@@ -1,0 +1,252 @@
+/* connect-wizard.css
+   Component-owned styles for <lex-connect-wizard>
+   (js/lex/components/integrations/lex-connect-wizard.js), the Guided Connect
+   wizard shown in a lex-drawer by Lex.ConnectWizard.open (js/connect-wizard.js).
+   Data Connectors links this file; other hosts get it from the opener.
+   Scoped under lex-connect-wizard / .lex-cw so it never leaks. */
+
+lex-connect-wizard {
+  display: block;
+  container: lex-cw / inline-size;
+  min-width: 0;
+}
+
+.lex-cw {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-lg);
+  min-width: 0;
+}
+
+.lex-cw-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-md);
+  min-width: 0;
+}
+
+.lex-cw-title {
+  margin: 0;
+  font-size: var(--lex-body-base-size);
+  font-weight: 600;
+  color: var(--lex-text-primary);
+}
+
+.lex-cw-title:focus {
+  outline: none;
+}
+
+.lex-cw-subtitle {
+  margin: var(--lex-space-sm) 0 0;
+  font-size: var(--lex-body-sm-size);
+  font-weight: 600;
+  color: var(--lex-text-primary);
+}
+
+.lex-cw-text,
+.lex-cw-result {
+  margin: 0;
+  font-size: var(--lex-body-sm-size);
+  line-height: var(--lex-body-sm-height);
+  color: var(--lex-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.lex-cw-muted {
+  color: var(--lex-text-tertiary);
+}
+
+.lex-cw-result {
+  font-weight: 600;
+  color: var(--lex-text-primary);
+}
+
+.lex-cw-result--ok {
+  color: var(--lex-status-success-text);
+}
+
+.lex-cw-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  list-style: disc;
+  font-size: var(--lex-body-sm-size);
+  line-height: var(--lex-body-sm-height);
+  color: var(--lex-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.lex-cw-list--numbered {
+  list-style: decimal;
+}
+
+.lex-cw-list li + li {
+  margin-top: var(--lex-space-sm);
+}
+
+.lex-cw-link-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lex-space-md);
+}
+
+.lex-cw-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--lex-border-default);
+  border-radius: var(--lex-radius-md);
+}
+
+/* ── Callouts (tip, warning) ──────────────────────────── */
+
+.lex-cw-callout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-xs);
+  padding: var(--lex-space-md) var(--lex-space-lg);
+  border-left: 3px solid var(--lex-status-info);
+  border-radius: var(--lex-radius-md);
+  background: var(--lex-status-info-bg);
+}
+
+.lex-cw-callout--warning {
+  border-left-color: var(--lex-status-warning);
+  background: var(--lex-status-warning-bg);
+}
+
+.lex-cw-callout-label {
+  font-size: var(--lex-body-xs-size);
+  font-weight: 600;
+  color: var(--lex-status-info-text);
+}
+
+.lex-cw-callout--warning .lex-cw-callout-label {
+  color: var(--lex-status-warning-text);
+}
+
+.lex-cw-callout-text {
+  margin: 0;
+  font-size: var(--lex-body-sm-size);
+  line-height: var(--lex-body-sm-height);
+  color: var(--lex-text-primary);
+  overflow-wrap: anywhere;
+}
+
+/* ── Code and redirect URL with copy ──────────────────── */
+
+.lex-cw-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-sm);
+  min-width: 0;
+}
+
+.lex-cw-copy-label {
+  font-size: var(--lex-body-xs-size);
+  font-weight: 600;
+  color: var(--lex-text-secondary);
+}
+
+.lex-cw-copy-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--lex-space-md);
+  min-width: 0;
+}
+
+.lex-cw-code {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: var(--lex-space-md);
+  max-height: 14rem;
+  overflow: auto;
+  border: 1px solid var(--lex-border-default);
+  border-radius: var(--lex-radius-md);
+  background: var(--lex-bg-secondary);
+  font-family: var(--lex-font-mono);
+  font-size: var(--lex-body-xs-size);
+  line-height: 1.5;
+  color: var(--lex-text-primary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ── Fields ───────────────────────────────────────────── */
+
+.lex-cw-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-lg);
+  margin-top: var(--lex-space-sm);
+}
+
+.lex-cw-managed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-md);
+  padding: var(--lex-space-md) var(--lex-space-lg);
+  border: 1px solid var(--lex-border-default);
+  border-radius: var(--lex-radius-md);
+}
+
+.lex-cw-waiting {
+  display: flex;
+  align-items: center;
+  gap: var(--lex-space-md);
+}
+
+/* ── Error ────────────────────────────────────────────── */
+
+.lex-cw-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--lex-space-md);
+  padding: var(--lex-space-md) var(--lex-space-lg);
+  border-left: 3px solid var(--lex-status-danger);
+  border-radius: var(--lex-radius-md);
+  background: var(--lex-status-danger-bg);
+}
+
+.lex-cw-error-text {
+  margin: 0;
+  font-size: var(--lex-body-sm-size);
+  color: var(--lex-status-danger-text);
+  overflow-wrap: anywhere;
+}
+
+/* ── Footer ───────────────────────────────────────────── */
+
+.lex-cw-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lex-space-md);
+  padding-top: var(--lex-space-lg);
+  border-top: 1px solid var(--lex-border-default);
+}
+
+.lex-cw-footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--lex-space-md);
+}
+
+/* Narrow drawer: stack the footer, actions first. */
+@container lex-cw (max-width: 419px) {
+  .lex-cw-footer {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .lex-cw-footer-actions {
+    justify-content: stretch;
+  }
+
+  .lex-cw-copy-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
