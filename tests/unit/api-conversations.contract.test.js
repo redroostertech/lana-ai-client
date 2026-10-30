@@ -10,6 +10,7 @@ function loadApi(options = {}) {
     console,
     URLSearchParams,
     AbortController,
+    Headers,
     FormData: class FormData {},
     setTimeout,
     clearTimeout,
@@ -234,5 +235,38 @@ describe('ApiClient canonical conversation aliases', () => {
     await api.stopConversationActivity('thread-1');
 
     expect(api.post).toHaveBeenCalledWith('/api/v1/conversations/thread-1/stop', {});
+  });
+});
+
+describe('ApiClient debug log redaction', () => {
+  test('a request body logged in debug mode never shows a typed secret', () => {
+    const api = loadApi();
+    const redact = api.constructor.redactForLog;
+    const body = {
+      connector_type: 'stripe',
+      config: { api_key: 'sk_live_SECRET', account_name: 'Acme' },
+      token: 'bearer-SECRET',
+      client_secret: 'cs-SECRET',
+      nested: [{ password: 'pw-SECRET', label: 'ok' }]
+    };
+    const logged = JSON.stringify(redact(body));
+    expect(logged).not.toContain('SECRET');
+    expect(logged).toContain('Acme');
+    expect(logged).toContain('stripe');
+    expect(logged).toContain('ok');
+    expect(body.config.api_key).toBe('sk_live_SECRET');
+  });
+
+  test('the request path logs the redacted body, and still sends the real one', async () => {
+    const api = loadApi();
+    api.baseUrl = 'http://api.test';
+    api.debugMode = true;
+    const logged = [];
+    api.log = (...args) => logged.push(JSON.stringify(args));
+    api.__fetchMock.mockRejectedValue(new Error('offline'));
+    await api.post('/api/v1/integrations/connectors/configure', { config: { api_key: 'sk_live_SECRET' } }).catch(() => null);
+    expect(logged.some((line) => line.indexOf('/configure') !== -1)).toBe(true);
+    expect(logged.join(' ')).not.toContain('sk_live_SECRET');
+    expect(api.__fetchMock.mock.calls[0][1].body).toContain('sk_live_SECRET');
   });
 });

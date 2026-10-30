@@ -227,6 +227,25 @@ class ApiClient {
   }
 
   /**
+   * A request body for a debug log line: values under keys that name a
+   * secret (keys, tokens, passwords, client secrets) are replaced, so debug
+   * mode never prints a credential someone typed into a form.
+   */
+  static redactForLog(value, depth = 0) {
+    if (value === null || typeof value !== 'object') return value;
+    if (typeof FormData !== 'undefined' && value instanceof FormData) return '[form data]';
+    if (depth > 6) return '[nested]';
+    if (Array.isArray(value)) return value.map((item) => ApiClient.redactForLog(item, depth + 1));
+    const out = {};
+    Object.keys(value).forEach((key) => {
+      const lower = key.toLowerCase();
+      const secret = ApiClient.SECRET_KEY_HINTS.some((hint) => lower.indexOf(hint) !== -1);
+      out[key] = secret ? '[redacted]' : ApiClient.redactForLog(value[key], depth + 1);
+    });
+    return out;
+  }
+
+  /**
    * Check if a URL is invalid for API calls (file:// protocol or null)
    * Handles edge cases on Windows Electron where origin might be:
    * - "file://" (2 slashes)
@@ -591,7 +610,7 @@ class ApiClient {
       }
     }
 
-    this.log(`${method} ${endpoint}`, data);
+    this.log(`${method} ${endpoint}`, ApiClient.redactForLog(data));
 
     try {
       const controller = new AbortController();
@@ -766,7 +785,7 @@ class ApiClient {
     // Simulate network delay
     await (mockLoader.delay ? mockLoader.delay(300) : new Promise(r => setTimeout(r, 300)));
 
-    this.log(`[DEMO] ${method} ${endpoint}`, data);
+    this.log(`[DEMO] ${method} ${endpoint}`, ApiClient.redactForLog(data));
 
     // Parse endpoint to determine response
     const path = endpoint.split('?')[0];
@@ -3984,4 +4003,7 @@ class ApiError extends Error {
 
 // Global instance — also exposed on window so IIFEs (Lex components) can access it
 const api = new ApiClient();
+// Key fragments that mark a request body value as a secret in debug logs.
+ApiClient.SECRET_KEY_HINTS = ['secret', 'password', 'passwd', 'token', 'api_key', 'apikey', 'private_key', 'credential', 'authorization'];
+
 window.api = api;
