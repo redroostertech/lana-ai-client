@@ -71,3 +71,19 @@ CHROME_PATH='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' node 
 The private fixture config defaults to `/tmp/lana-estate-browser-fixture.json`; do not commit it. The browser forwards API requests to the production router/controllers, real assurance/asset services and isolated PostgreSQL. Its scoped bearer, professional grants, contact, protocol and retained source bytes are synthetic. This does not verify production JWT, real storage infrastructure, or legal content. The completed flow checked invalid bearer and forged matter refusal, an actually committed asset with a dropped browser response followed by exact replay and one saved row, all seven sections, and an asset change making the accepted closeout stale. A subsequent real-API amendment flow updated the existing plan to version 2, explicitly rebound the same target, revised the same observation and required review again; current record counts stayed at one each, and the old closeout remained readable but stale. The first two harness runs also confirmed that future-dated evidence and a class not permitted by the selected protocol remain unknown.
 
 Validation: 53 focused tests and 103 tests with existing reuse controls passed. The synthetic browser completed 14 scenarios with no page errors. The combined real HTTP browser completed 19 onboarding and amendment checks through 145 API requests with no page errors. Wide and 390px screenshots have no horizontal overflow. Re-run these checks on the final integrated build before production rollout.
+
+### Runtime approval review correction (2026-10-30)
+
+Runtime approval cards now offer a read-only **Review full change** disclosure
+when the server supplies `lana.approval-review.v1`. It shows long values without
+truncation, preserves nested structure, and renders text without interpreting
+HTML. The server masks fields declared private in the capability schema. The
+client never falls back to raw arguments for legacy or unsupported review data.
+The approval reply still refers to the existing interaction; it does not send an
+edited command or change its argument hash.
+
+Verify with `node tests/browser/runtime-approval.browser.cjs` and the runtime
+interaction unit suite. Actual Lex browser checks passed for wide/narrow layouts,
+keyboard toggle and scrolling, long values, hostile text, privacy masking and the
+unchanged approval reply. Pair this client with the backend approval projection
+change; older API payloads retain the previous prompt-only presentation.

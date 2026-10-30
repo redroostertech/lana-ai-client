@@ -412,6 +412,19 @@
       }
       .lex-chat-context-meter-fill[data-warn] { background: #f59e0b; }
       .lex-chat-context-meter-fill[data-danger] { background: #ef4444; }
+      .lex-chat-approval-details { min-width: 0; margin-bottom: 0.75rem; }
+      .lex-chat-approval-values {
+        max-height: 28rem;
+        overflow: auto;
+        overflow-wrap: anywhere;
+        padding: 0.75rem;
+        border: 1px solid var(--lex-border, #e5e7eb);
+        border-radius: var(--lex-radius-md, 0.5rem);
+      }
+      .lex-chat-approval-values dl { margin: 0; }
+      .lex-chat-approval-values dt { font-weight: 600; margin-top: 0.5rem; }
+      .lex-chat-approval-values dd { margin: 0.25rem 0 0.75rem 0.75rem; white-space: pre-wrap; }
+      .lex-chat-approval-values ol { padding-left: 1.25rem; }
     `;
     document.head.appendChild(style);
   }
@@ -2267,6 +2280,11 @@
       const status = document.createElement('p');
       status.setAttribute('role', 'status');
       const controls = document.createElement('div');
+      const review = interaction.approval?.review;
+      if (interaction.kind === 'approval' && review?.schema_version === 'lana.approval-review.v1'
+          && review.arguments && typeof review.arguments === 'object' && !Array.isArray(review.arguments)) {
+        host.appendChild(this._runtimeApprovalDetails(review.arguments));
+      }
       host.appendChild(controls);
       host.appendChild(status);
       container.appendChild(host);
@@ -2334,6 +2352,67 @@
       if (!isCurrentLoad() || this._activeTurnId) return;
       if (!pendingInteractionMatches(saved, live)) return;
       this._insertRuntimeInteraction(live);
+    }
+
+    _runtimeApprovalDetails(argumentsForApproval) {
+      const section = document.createElement('section');
+      section.className = 'lex-chat-approval-details';
+      const toggle = document.createElement('lex-btn');
+      toggle.setAttribute('variant', 'ghost');
+      toggle.setAttribute('size', 'sm');
+      toggle.setAttribute('aria-expanded', 'false');
+      toggle.textContent = 'Review full change';
+      const values = document.createElement('div');
+      values.className = 'lex-chat-approval-values';
+      values.setAttribute('role', 'region');
+      values.setAttribute('aria-label', 'Full change details');
+      values.tabIndex = 0;
+      values.hidden = true;
+      // The server-owned review retains full values except declared private
+      // fields. Never fall back to raw command arguments or infer redactions.
+      // Do not edit, abbreviate, or send this projection as a new command.
+      const renderValue = value => {
+        if (Array.isArray(value)) {
+          const list = document.createElement('ol');
+          for (const item of value) {
+            const row = document.createElement('li');
+            row.appendChild(renderValue(item));
+            list.appendChild(row);
+          }
+          if (!value.length) { list.textContent = 'Empty list'; }
+          return list;
+        }
+        if (value !== null && typeof value === 'object') {
+          const list = document.createElement('dl');
+          for (const [name, child] of Object.entries(value)) {
+            const label = document.createElement('dt');
+            const words = name.split('_').join(' ');
+            label.textContent = Lex.Utils?.humanizeLabel ? Lex.Utils.humanizeLabel(name)
+              : words.charAt(0).toUpperCase() + words.slice(1);
+            const content = document.createElement('dd');
+            content.appendChild(renderValue(child));
+            list.append(label, content);
+          }
+          if (!Object.keys(value).length) { list.textContent = 'No fields'; }
+          return list;
+        }
+        const text = document.createElement('span');
+        text.textContent = value === null ? 'No value' : value === '' ? 'Empty text' : String(value);
+        return text;
+      };
+      values.appendChild(renderValue(argumentsForApproval));
+      toggle.addEventListener('click', () => {
+        values.hidden = !values.hidden;
+        toggle.setAttribute('aria-expanded', String(!values.hidden));
+        const button = toggle.querySelector('button');
+        if (button) button.setAttribute('aria-expanded', String(!values.hidden));
+        const label = values.hidden ? 'Review full change' : 'Hide full change';
+        if (Lex.Utils?.setLexButtonText) Lex.Utils.setLexButtonText(toggle, label);
+        else (toggle.querySelector('slot-content') || toggle).textContent = label;
+      });
+      section.append(toggle, values);
+      queueMicrotask(() => toggle.querySelector('button')?.setAttribute('aria-expanded', 'false'));
+      return section;
     }
 
     _insertUncertaintyBlock(event) {

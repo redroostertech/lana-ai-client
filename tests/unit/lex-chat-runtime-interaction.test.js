@@ -41,6 +41,77 @@ test('approval shows the server proposal, submits the bound decision once, and d
   dom.window.close();
 });
 
+test('approval full review exposes all exact values safely, then submits only the bound decision', async () => {
+  const { dom, w, chat, container, render, interaction } = setup();
+  const longBody = 'Full note content.\n'.repeat(300) + 'LAST VALUE';
+  const args = { action: 'update', task_id: 'task-exact', fields: { description: longBody,
+    custom_field: '<img src=x onerror="window.injected=true">', enabled: false, count: 0,
+    cleared: null, empty: '', recipients: ['first', { unknown_key: 'last' }] } };
+  const before = JSON.stringify(args);
+  Object.freeze(args.fields.recipients[1]);
+  Object.freeze(args.fields.recipients);
+  Object.freeze(args.fields);
+  Object.freeze(args);
+  chat._insertRuntimeInteraction({ ...interaction, prompt: 'Summary shortened. Review the full change.',
+    approval: { action: { arguments: args, arguments_sha256: 'fixed-binding' },
+      review: { schema_version: 'lana.approval-review.v1', arguments: args } } });
+  const details = container.querySelector('.lex-chat-approval-details');
+  const toggle = details.querySelector('lex-btn');
+  const values = details.querySelector('.lex-chat-approval-values');
+  expect(values.hidden).toBe(true);
+  toggle.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  expect(values.hidden).toBe(false);
+  expect(toggle.getAttribute('aria-expanded')).toBe('true');
+  expect(values.textContent).toContain(longBody);
+  expect(values.textContent).toContain(args.fields.custom_field);
+  expect(values.querySelector('img')).toBeNull();
+  expect(w.injected).toBeUndefined();
+  expect(values.textContent).toContain('Unknown key');
+  expect(values.textContent).toContain('last');
+  expect(values.textContent).toContain('false');
+  expect(values.textContent).toContain('0');
+  expect(values.textContent).toContain('No value');
+  expect(values.textContent).toContain('Empty text');
+  expect(values.querySelectorAll('input, textarea, select, [contenteditable]')).toHaveLength(0);
+  expect(JSON.stringify(args)).toBe(before);
+  expect(chat.send).not.toHaveBeenCalled();
+  toggle.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  expect(values.hidden).toBe(true);
+  const controls = render.mock.calls[0][0];
+  controls.dispatchEvent(new w.CustomEvent('lex-decision', { bubbles: true, detail: { value: 'approve' } }));
+  await new Promise(resolve => setImmediate(resolve));
+  expect(chat.send).toHaveBeenCalledWith('Approve', { runtimeTaskId: interaction.task_id,
+    runtimeReply: { interaction_id: interaction.id, value: { decision: 'approve' } } });
+  expect(JSON.stringify(args)).toBe(before);
+  dom.window.close();
+});
+
+test('empty argument collections stay explicit in full review', () => {
+  const { dom, chat, container, interaction } = setup();
+  chat._insertRuntimeInteraction({ ...interaction, approval: { review: {
+    schema_version: 'lana.approval-review.v1', arguments: { fields: {}, recipients: [] } } } });
+  expect(container.textContent).toContain('No fields');
+  expect(container.textContent).toContain('Empty list');
+  dom.window.close();
+});
+
+test.each([null, { schema_version: 'unknown', arguments: { credential: 'SECRET' } }])('legacy or unsupported approval review never displays raw arguments', review => {
+  const { dom, chat, container, interaction } = setup();
+  chat._insertRuntimeInteraction({ ...interaction, approval: { action: { arguments: { credential: 'SECRET' } }, review } });
+  expect(container.querySelector('.lex-chat-approval-details')).toBeNull();
+  expect(container.textContent).not.toContain('SECRET');
+  dom.window.close();
+});
+
+test('full review uses the server redaction rather than raw secret values', () => {
+  const { dom, chat, container, interaction } = setup();
+  chat._insertRuntimeInteraction({ ...interaction, approval: { action: { arguments: { credential: 'SECRET' } },
+    review: { schema_version: 'lana.approval-review.v1', arguments: { credential: '[hidden]' } } } });
+  expect(container.textContent).toContain('[hidden]');
+  expect(container.textContent).not.toContain('SECRET');
+  dom.window.close();
+});
+
 test('a choice uses the exact offered id and ignores clicks after navigation', async () => {
   const { dom, w, chat, render, interaction } = setup();
   chat._insertRuntimeInteraction({ ...interaction, kind: 'question', choices: [{ id: 'c1', label: 'Intake due Friday' }] });
