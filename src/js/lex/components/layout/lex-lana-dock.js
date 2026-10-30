@@ -80,10 +80,17 @@
   }
 
   // The full screen side panel (conversation details) loads on first use.
-  // It uses lex-btn, which not every page lists, so that comes along too.
+  // It uses lex-btn, lex-badge, lex-kv, lex-spinner and lex-progress-bar,
+  // which not every page lists, so those come along too, then its data
+  // module.
   var sidePanelLoad = null;
-  function loadDockScript(tag, rel) {
-    if (window.customElements && window.customElements.get(tag)) return Promise.resolve(true);
+  // `loaded` is a custom element tag, or a check for a plain module.
+  function loadDockScript(loaded, rel) {
+    var present = typeof loaded === 'function'
+      ? loaded()
+      : !!(window.customElements && window.customElements.get(loaded));
+    if (present) return Promise.resolve(true);
+    var tag = typeof loaded === 'function' ? rel : loaded;
     return new Promise(function (resolve, reject) {
       var script = document.createElement('script');
       script.src = jsBase() + rel;
@@ -94,7 +101,15 @@
   }
   function loadSidePanel() {
     if (!sidePanelLoad) {
-      sidePanelLoad = loadDockScript('lex-btn', 'lex/components/foundation/lex-btn.js').then(function () {
+      sidePanelLoad = Promise.all([
+        loadDockScript('lex-btn', 'lex/components/foundation/lex-btn.js'),
+        loadDockScript('lex-badge', 'lex/components/foundation/lex-badge.js'),
+        loadDockScript('lex-kv', 'lex/components/foundation/lex-kv.js'),
+        loadDockScript('lex-spinner', 'lex/components/foundation/lex-spinner.js'),
+        loadDockScript('lex-progress-bar', 'lex/components/foundation/lex-progress-bar.js'),
+        loadDockScript(function () { return !!(window.Lex && window.Lex.Chat && window.Lex.Chat.SidePanelData); },
+          'lex/components/chat/lex-lana-side-panel.data.js')
+      ]).then(function () {
         return loadDockScript('lex-lana-side-panel', 'lex/components/chat/lex-lana-side-panel.js');
       }).catch(function (err) {
         sidePanelLoad = null;

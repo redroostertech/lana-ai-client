@@ -130,6 +130,34 @@ describe('SSEChatSource contract', () => {
     expect(citations[0].document_id).toBe('doc-original');
   });
 
+  test('maps the side panel frames: paired tool calls, entity changes and the whole context snapshot', () => {
+    const { Source } = loadSource(jest.fn(), { api: canonicalApi() });
+    const source = new Source();
+    // Frames as agent-runtime events.port.js and chat-harness.js send them.
+    expect(source._mapEvent('tool_start', { tool_name: 'create_matter_task', tool_label: 'Create a task on a matter',
+      params: {}, call_id: 'call_7', iteration: 2, started_at: '2026-10-30T10:05:00.000Z' })).toEqual(expect.objectContaining({
+      type: 'tool_start', toolName: 'create_matter_task', label: 'Create a task on a matter',
+      callId: 'call_7', iteration: 2, startedAt: '2026-10-30T10:05:00.000Z'
+    }));
+    expect(source._mapEvent('tool_end', { tool_name: 'create_matter_task', tool_label: 'Create a task on a matter',
+      success: false, summary: 'Denied.', call_id: 'call_7', iteration: 2, started_at: '2026-10-30T10:05:00.000Z',
+      duration_ms: 412 })).toEqual(expect.objectContaining({
+      type: 'tool_end', success: false, summary: 'Denied.', callId: 'call_7', durationMs: 412, iteration: 2
+    }));
+    expect(source._mapEvent('entity_change', { type: 'entity_change', operation: 'created', entity_type: 'task',
+      entity_id: 't1', label: 'File the answer', view_url: '/matters/MATT-00039/tasks/t1', matter_id: 'MATT-00039' })).toEqual({
+      type: 'entity_change', operation: 'created', entityType: 'task', entityId: 't1', label: 'File the answer',
+      viewUrl: '/matters/MATT-00039/tasks/t1', matterId: 'MATT-00039'
+    });
+    const usage = { type: 'context_usage', percent_used: 18.4, tokens_used: 6031, tokens_available: 32768,
+      usable_tokens: 30617, percent_until_compact: 75, basis: 'engine', breakdown: { system: 3900, rag: 1711 } };
+    expect(source._mapEvent('context_usage', usage)).toEqual({
+      type: 'context_usage', percentUsed: 18.4, tokensUsed: 6031, percentUntilCompact: 75, usage
+    });
+    // Older streams without the new fields still map.
+    expect(source._mapEvent('tool_start', { tool_name: 'search' })).toEqual(expect.objectContaining({ callId: null, iteration: null, startedAt: null }));
+  });
+
   test('creates a canonical conversation before first-message streaming', async () => {
     const fetchMock = jest.fn()
       .mockResolvedValueOnce(responseFromChunks([

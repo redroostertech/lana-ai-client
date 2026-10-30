@@ -183,6 +183,30 @@
       return api.get(`/api/v1/conversations/${encode(conversationId)}/activity`);
     }
 
+    // The Ask LANA side panel's per-conversation cards. Each is 404 when the
+    // caller does not own the conversation and 400 for a non-UUID id.
+
+    /** { context_usage } for the latest assistant turn, or { context_usage: null }. */
+    async getContextUsage(conversationId) {
+      return this._requireApi().get(`/api/v1/conversations/${encode(conversationId)}/context`);
+    }
+
+    /** { documents, authorities, records, totals } cited across the whole conversation. */
+    async getSources(conversationId) {
+      return this._requireApi().get(`/api/v1/conversations/${encode(conversationId)}/sources`);
+    }
+
+    /** { items, totals }: entity changes, drafts, documents and approvals. */
+    async getOutputs(conversationId) {
+      return this._requireApi().get(`/api/v1/conversations/${encode(conversationId)}/outputs`);
+    }
+
+    /** { active, active_response, runs, tool_calls }; limit 1 to 500. */
+    async getActivityHistory(conversationId, options = {}) {
+      const query = buildQuery({ limit: options.limit });
+      return this._requireApi().get(`/api/v1/conversations/${encode(conversationId)}/activity/history${query ? `?${query}` : ''}`);
+    }
+
     async executeSlashCommand(conversationId, command, args) {
       const api = this._requireApi();
       if (typeof api.executeConversationSlashCommand === 'function') {

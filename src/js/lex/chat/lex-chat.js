@@ -782,6 +782,9 @@
         if (this._activityEl) this._activityEl.hide();
         if (this._composerEl) this._composerEl.setGenerating(false);
         this._activeTurnId = null;
+        // Every way a turn ends (done, error, stop, a dropped stream), for
+        // hosts that track the turn in progress (the dock's side panel).
+        this.emit('lex-chat-turn-end', { conversationId: this.conversationId, failed: !!failure });
       }
 
       if (failure) {
@@ -1572,6 +1575,14 @@
               phase: ''
             });
           }
+          this.emit('lex-chat-tool-start', {
+            conversationId: this.conversationId,
+            callId: event.callId || null,
+            toolName: event.toolName || event.tool || '',
+            label: event.label || null,
+            iteration: event.iteration ?? null,
+            startedAt: event.startedAt || null
+          });
           break;
 
         case 'tool_progress':
@@ -1635,6 +1646,17 @@
               phase: ''
             });
           }
+          this.emit('lex-chat-tool-end', {
+            conversationId: this.conversationId,
+            callId: event.callId || null,
+            toolName: event.toolName || event.tool || '',
+            label: event.label || null,
+            iteration: event.iteration ?? null,
+            startedAt: event.startedAt || null,
+            success: event.type === 'tool_call_complete' ? event.ok !== false : event.success !== false,
+            durationMs: event.durationMs ?? null,
+            summary: event.summary || ''
+          });
           break;
 
         case 'content': {
@@ -1666,11 +1688,29 @@
           break;
 
         case 'context_usage':
-          this._updateContextMeter(event.percentUsed, event.percentUntilCompact);
+          // A snapshot with basis "unavailable" carries no numbers: leave
+          // the meter as it was rather than show an empty window as free.
+          if (typeof event.percentUsed === 'number' && Number.isFinite(event.percentUsed)) {
+            this._updateContextMeter(event.percentUsed, event.percentUntilCompact);
+          }
           this.emit('lex-chat-context-usage', {
+            conversationId: this.conversationId,
             percentUsed: event.percentUsed,
             tokensUsed: event.tokensUsed,
-            percentUntilCompact: event.percentUntilCompact
+            percentUntilCompact: event.percentUntilCompact,
+            usage: event.usage || null
+          });
+          break;
+
+        case 'entity_change':
+          this.emit('lex-chat-entity-change', {
+            conversationId: this.conversationId,
+            operation: event.operation,
+            entityType: event.entityType,
+            entityId: event.entityId,
+            label: event.label,
+            viewUrl: event.viewUrl,
+            matterId: event.matterId
           });
           break;
 

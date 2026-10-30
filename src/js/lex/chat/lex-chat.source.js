@@ -549,11 +549,17 @@
           // Forward tool_name AND params so the chat component can
           // humanize the activity-bar primary line (e.g. inspect
           // params.data_type for get_matter_data).
+          // call_id, iteration and started_at let the side panel's Activity
+          // card pair this start with its tool_end.
           return {
             type: 'tool_start',
             tool: data.tool || data.tool_name || '',
             toolName: data.tool_name || data.tool || '',
-            params: data.params || {}
+            label: data.tool_label || null,
+            params: data.params || {},
+            callId: data.call_id || null,
+            iteration: numberValue(data.iteration),
+            startedAt: data.started_at || null
           };
 
         case 'tool_progress':
@@ -581,7 +587,12 @@
             // Backend emits a human-readable rollup like "Found 1 user
             // (top: Jennifer Norton)." — pass it through; the UI uses
             // this for telemetry but no longer renders it on the bar.
-            summary: data.summary || data.message || ''
+            summary: data.summary || data.message || '',
+            label: data.tool_label || null,
+            callId: data.call_id || null,
+            iteration: numberValue(data.iteration),
+            startedAt: data.started_at || null,
+            durationMs: numberValue(data.duration_ms)
           };
 
         // Legacy variants emitted by matter-context-tool-loop.js. Same
@@ -650,11 +661,26 @@
           };
 
         case 'context_usage':
+          // `usage` is the whole snapshot (window, breakdown, basis) for the
+          // side panel's Context card, in the GET /context shape.
           return {
             type: 'context_usage',
             percentUsed: data.percent_used,
             tokensUsed: data.tokens_used,
-            percentUntilCompact: data.percent_until_compact
+            percentUntilCompact: data.percent_until_compact,
+            usage: data
+          };
+
+        // A record a write created or changed (side panel Outputs card).
+        case 'entity_change':
+          return {
+            type: 'entity_change',
+            operation: data.operation || null,
+            entityType: data.entity_type || null,
+            entityId: data.entity_id || null,
+            label: data.label || null,
+            viewUrl: data.view_url || null,
+            matterId: data.matter_id || null
           };
 
         case 'agentic_progress':
