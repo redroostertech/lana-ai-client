@@ -266,6 +266,26 @@ describe('lex-select', () => {
     el.focus();
     expect(window.document.activeElement).toBe(el.querySelector('.lex-select-trigger'));
   });
+
+  // Regression: workspace.js does form.reset() then sets status to 'active';
+  // the deferred reset used to wipe it, so matters were created with status ''.
+  test.each([
+    ['a different value', 'c', 'b'],
+    ['the value it already has', 'c', 'c'],
+  ])('a value set right after form.reset() survives the reset (%s)', async (_label, before, setAfter) => {
+    const window = bootSelect('<form id="f"></form>');
+    const form = window.document.getElementById('f');
+    const el = window.document.createElement('lex-select');
+    el.options = ['a', 'b', 'c'];
+    form.appendChild(el);
+    await tick(window);
+    el.value = before;
+    await tick(window);
+    form.reset();
+    el.value = setAfter;
+    await tick(window);
+    expect(el.value).toBe(setAfter);
+  });
 });
 
 // ── lex-modal / lex-drawer ────────────────────────────────────────────────

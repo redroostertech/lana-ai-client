@@ -373,6 +373,9 @@
       Object.defineProperty(this, 'value', {
         get: () => this._readValue(),
         set: (val) => {
+          // Counts explicit assignments (even of the current value) so a
+          // pending form reset can tell the caller set a value after it.
+          this._valueWrites = (this._valueWrites || 0) + 1;
           const old = this._props.value;
           let next = val;
           if (Array.isArray(val)) next = val.map((v) => String(v));
@@ -476,8 +479,13 @@
       const form = typeof this.closest === 'function' ? this.closest('form') : null;
       if (!form) return;
       const onReset = (e) => {
+        // Deferred so a later reset listener can still preventDefault(). Like a
+        // native control, a value assigned right after form.reset() wins: the
+        // common "reset, then set defaults" pattern must not be undone here.
+        const writesAtReset = this._valueWrites || 0;
         queueMicrotask(() => {
           if (e.defaultPrevented) return;
+          if ((this._valueWrites || 0) !== writesAtReset) return;
           const init = this._initialValue;
           this._open = false;
           this._searchTerm = '';
