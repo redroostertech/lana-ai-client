@@ -17,8 +17,8 @@ const read = (rel) => fs.readFileSync(path.join(SRC, rel), 'utf8');
 const STORED_USER = JSON.stringify({ timezone: 'America/New_York' });
 const NOW = new Date('2026-10-20T15:30:00.000Z');
 
-function loadPage(rel, extra) {
-  const win = { localStorage: { getItem: () => STORED_USER }, Intl, Date };
+function loadPage(rel, extra, opts = {}) {
+  const win = { localStorage: { getItem: () => STORED_USER }, Intl, Date, location: { search: opts.search || '' } };
   // eslint-disable-next-line no-new-func
   new Function('window', read('js/time-utils.js'))(win);
   // eslint-disable-next-line no-new-func
@@ -31,7 +31,7 @@ function loadPage(rel, extra) {
   win.Lex.Toast = { error: () => {}, success: () => {} };
 
   const document = {
-    getElementById: () => null,
+    getElementById: (id) => (opts.elements && opts.elements[id]) || null,
     addEventListener: () => {},
     querySelector: () => null
   };
@@ -80,6 +80,21 @@ describe('AdminTableKit', () => {
       { value: 'in_progress', label: 'In progress' },
       { value: 'lead-management', label: 'Lead management' }
     ]);
+  });
+});
+
+describe('Users page deep link', () => {
+  // "Invite your team" in the onboarding tour links to admin/users.html?action=create.
+  const modalOpenedFor = (search) => {
+    const modal = { open: false, addEventListener: () => {} };
+    loadPage('js/admin/admin-users.js', { AdminUsersPagination: require('../../src/js/admin/admin-users.pagination') }, { search, elements: { userModal: modal } });
+    return modal.open;
+  };
+
+  test('?action=create opens the Add User modal; other visits leave it closed', () => {
+    expect(modalOpenedFor('?action=create')).toBe(true);
+    expect(modalOpenedFor('')).toBe(false);
+    expect(modalOpenedFor('?action=edit')).toBe(false);
   });
 });
 

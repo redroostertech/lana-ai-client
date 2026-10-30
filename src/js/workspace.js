@@ -2389,6 +2389,11 @@
         if (urlParams.get('action') === 'create') {
           const _createBtn = document.getElementById('createMatterBtn');
           if (_createBtn) _createBtn.click();
+          // &type=matter (e.g. "Open a matter" in the onboarding tour) preselects Matter.
+          if (urlParams.get('type') === 'matter') {
+            const _matterPanel = document.querySelector('#matterTypeDiagram [data-matter-type="matter"]');
+            if (_matterPanel) _matterPanel.click();
+          }
         }
       })();
     }

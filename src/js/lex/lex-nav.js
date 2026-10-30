@@ -75,7 +75,7 @@
     'admin/traces.html':                      { id: 'string', trace_id: 'string' },
     'admin/updates.html':                     { id: 'string' },
     'admin/user-details.html':                { userId: 'string' },
-    'admin/users.html':                       { userId: 'string', q: 'string' },
+    'admin/users.html':                       { userId: 'string', q: 'string', action: 'string' },
     'admin/workspace-analytics.html':         { matter_id: 'string', id: 'string' },
     'agents/index.html':                      {},
     'alerts.html':                            { id: 'string', severity: 'string', status: 'string' },
@@ -85,7 +85,7 @@
     'auth_error.html':                        { type: 'string', message: 'string', return: 'string' },
     'automation/index.html':                  { automationId: 'string' },
     'brainchild/index.html':                  { vault: 'string', path: 'string' },
-    'dashboard.html':                         {},
+    'dashboard.html':                         { tour: 'string' },
     'data-connectors.html':                   { connector: 'string', source: 'string', matter_id: 'string' },
     'deck-studio/index.html':                 { id: 'string', deck_id: 'string', matter_id: 'string', matter_name: 'string', view: 'string' },
     'doc-studio/index.html':                  { id: 'string', view: 'string', editor: 'string', file_id: 'string', file_name: 'string', matter_id: 'string', matter_name: 'string' },
@@ -139,7 +139,7 @@
     'workflows/templates.html':               { id: 'string', template: 'string' },
     'workspace-data.html':                    { id: 'string', matter_id: 'string', tab: 'string' },
     'workspace-details.html':                 { id: 'string', matter: 'string', tab: 'string', task: 'string', task_id: 'string', upload: 'string', open_file: 'string', artifact: 'string', artifact_id: 'string', activity: 'string' },
-    'workspaces.html':                        { action: 'string', search: 'string', status: 'string' }
+    'workspaces.html':                        { action: 'string', search: 'string', status: 'string', type: 'string' }
   };
 
   // =========================================================================

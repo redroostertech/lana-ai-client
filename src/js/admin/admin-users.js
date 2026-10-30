@@ -62,6 +62,13 @@
     _wireHeaderButtons();
     _wireUserModal();
 
+    // ?action=create (e.g. "Invite your team" in the onboarding tour) opens the
+    // Add User modal, mirroring workspaces.html?action=create.
+    var search = (window.location && window.location.search) || '';
+    if (new URLSearchParams(search).get('action') === 'create') {
+      openUserModalCreate();
+    }
+
     // Topbar refresh button
     document.addEventListener('lex-refresh', function (e) {
       e.preventDefault();

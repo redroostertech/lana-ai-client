@@ -910,6 +910,7 @@
         }
         menuItems.push({ id: 'settings', label: 'Settings', icon: 'settings', href: 'settings-v2.html' });
         menuItems.push({ id: 'help', label: 'Help & Support', icon: 'help-circle', href: 'help.html' });
+        menuItems.push({ id: 'tour', label: 'Replay the tour', icon: 'play', href: 'dashboard.html?tour=replay' });
         menuItems.push({ id: 'signout', label: 'Sign Out', icon: 'log-out', action: 'signout', danger: true });
         this.setUserMenuItems(menuItems);
 

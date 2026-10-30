@@ -2955,6 +2955,25 @@
    * Loads user profile first, then fans out to all six zones in parallel
    * using Promise.allSettled for graceful degradation.
    */
+  /**
+   * Show the first-run tour when the flow says so. "Replay the tour" in the
+   * profile menu arrives as ?tour=replay; drop the param so a refresh does not
+   * replay again. Never blocks the dashboard from loading underneath.
+   */
+  function launchOnboarding() {
+    if (!window.Lex || !Lex.Onboarding) return;
+    var params = new URLSearchParams(window.location.search);
+    var replay = params.get('tour') === 'replay';
+    if (replay) {
+      params.delete('tour');
+      var qs = params.toString();
+      window.history.replaceState(window.history.state, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+    }
+    Lex.Onboarding.launch({ replay: replay }).catch(function (err) {
+      console.warn('[Dashboard] onboarding launch failed (non-fatal):', err && err.message);
+    });
+  }
+
   async function initDashboard() {
     resetDashboardLanaContext();
 
@@ -2975,6 +2994,9 @@
     } catch (profileErr) {
       console.warn('[Dashboard] loadUserProfile failed (non-fatal):', profileErr && profileErr.message);
     }
+
+    // ── 1b. First-run onboarding (needs roles for first-step gating) ─────
+    launchOnboarding();
 
     // ── 2. Initialize shell-level components ──────────────────────────────
     if (typeof ConversationActionsModal !== 'undefined') {
