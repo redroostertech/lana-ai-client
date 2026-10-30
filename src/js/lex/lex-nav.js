@@ -40,6 +40,7 @@
   // =========================================================================
 
   var _deepLinks = {
+    'implementation-assurance.html':          { matter_id: 'string', matter_name: 'string' },
     'action-queue.html':                      { action_type: 'string', severity: 'string' },
     'admin/alerts.html':                      { id: 'string', status: 'string', severity: 'string' },
     'admin/analytics.html':                   { tab: 'string' },

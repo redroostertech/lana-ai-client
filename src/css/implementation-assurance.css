@@ -1,0 +1,17 @@
+.assurance-page { display: grid; gap: var(--lex-space-6, 24px); padding: var(--lex-space-6, 24px); container: assurance / inline-size; color: var(--lex-text-primary); }
+.assurance-page [hidden] { display: none !important; }
+.assurance-actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.assurance-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 24px; align-items: start; }
+.assurance-grid > * { min-width: 0; }
+.assurance-section { display: grid; gap: 16px; }
+.assurance-muted { color: var(--lex-text-secondary); line-height: 1.6; }
+.assurance-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+.assurance-list li { border-bottom: 1px solid var(--lex-border-default); padding-bottom: 12px; }
+.assurance-list strong, .assurance-list span { display: block; overflow-wrap: anywhere; }
+.assurance-status { padding: 16px; border: 1px solid var(--lex-border-default); border-radius: 8px; background: var(--lex-bg-secondary); line-height: 1.6; }
+.assurance-status[data-outcome="conflict"], .assurance-status[data-outcome="mismatch"] { border-color: var(--lex-color-warning-500, #a66a12); }
+.assurance-facts { display: grid; grid-template-columns: minmax(100px, .7fr) minmax(0, 1fr); gap: 8px 16px; margin: 0; }
+.assurance-facts dt { color: var(--lex-text-secondary); }
+.assurance-facts dd { margin: 0; overflow-wrap: anywhere; }
+.assurance-references { font-size: 12px; overflow-wrap: anywhere; }
+@container assurance (max-width: 720px) { .assurance-grid { grid-template-columns: minmax(0, 1fr); } .assurance-facts { grid-template-columns: 1fr; } }

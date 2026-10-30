@@ -716,6 +716,10 @@
 
         var id = target.id;
 
+        if (id === 'headerOptionsAssurance') {
+          Lex.Nav.go('implementation-assurance.html', { params: { matter_id: matter.id || matter.matter_id, matter_name: matter.name || matter.matter_name || '' } });
+          return;
+        }
         if (id === 'headerOptionsEdit') {
           openEditMatterModal(matter);
           return;

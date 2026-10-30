@@ -23,6 +23,13 @@
   // =========================================================================
 
   var PAGE_DESCRIPTORS = {
+    'implementation-assurance.html': {
+      title: 'Implementation Assurance', activeNav: 'workspaces',
+      scripts: ['js/lex/components/foundation/lex-banner.js', 'js/lex/components/foundation/lex-card.js',
+        'js/lex/components/form/lex-select.js', 'js/lex/components/form/lex-textarea.js',
+        'js/services/implementation-assurance-client.js', 'js/implementation-assurance.js'],
+      stylesheets: ['css/implementation-assurance.css']
+    },
 
     // ── Dashboard ── (standalone page — no descriptor needed)
 
