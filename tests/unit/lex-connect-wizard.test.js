@@ -350,6 +350,33 @@ describe('<lex-connect-wizard>', () => {
     wizard.remove();
   });
 
+  test('personal OAuth reconnect: an already connected row does not finish the poll', async () => {
+    const window = boot();
+    const ticks = [];
+    window.setTimeout = (fn) => { ticks.push(fn); return ticks.length; };
+    window.clearTimeout = () => {};
+    let rows = [{ id: 'user-src', connector_id: 'gmail', status: 'connected', auth_status: 'connected', updated_at: '2026-10-01T00:00:00Z' }];
+    const { services } = fakeServices({ userConnections: () => Promise.resolve({ connections: rows }) });
+    const catalog = {
+      connector: { id: 'gmail', metadata: { name: 'Gmail' }, connector_scope: 'user', auth: { type: 'oauth2' }, configuration: { required_fields: [] } },
+      metadata: { connectorType: 'gmail' }
+    };
+    const wizard = await mountWizard(window, {
+      catalog, capability: { canManageCredentials: false }, userConnection: { status: 'connected' }
+    }, services);
+    wizard._goTo(wizard.model.steps.findIndex((s) => s.id === 'connect'));
+    await flush();
+    click(wizard, 'connect'); await flush(); await flush();
+
+    ticks.shift()(); await flush(); await flush();
+    expect(wizard.currentStep.id).toBe('connect');
+
+    rows = [Object.assign({}, rows[0], { updated_at: '2026-10-30T12:00:00Z' })];
+    ticks.shift()(); await flush(); await flush();
+    expect(wizard.currentStep.id).toBe('result');
+    wizard.remove();
+  });
+
   test('multi instance: creates the instance, then saves by id', async () => {
     const window = boot();
     const { services, calls } = fakeServices();

@@ -611,7 +611,20 @@
       var self = this;
       var services = this._services();
       var type = this._model.connectorType;
-      return services.userConnect().then(function (res) {
+      // A reconnect starts with a row that is already connected, so the poll
+      // only counts a row that changed after sign in began.
+      var before = {};
+      function connectedRows(payload) {
+        var list = (payload && payload.connections) || [];
+        return list.filter(function (row) {
+          return row && row.connector_id === type && Model().isAuthorized(row);
+        });
+      }
+      return services.userConnections().then(function (payload) {
+        connectedRows(payload).forEach(function (row) { before[row.id] = row.updated_at || ''; });
+      }, function () { /* no snapshot: the deep link callback still finishes */ }).then(function () {
+        return services.userConnect();
+      }).then(function (res) {
         var data = (res && res.data) || res || {};
         if (!data.authorizationUrl) throw new Error('The sign in link was not returned. Try again.');
         self._beginOAuth({
@@ -625,10 +638,11 @@
           },
           poll: function () {
             return services.userConnections().then(function (payload) {
-              var list = (payload && payload.connections) || [];
-              for (var i = 0; i < list.length; i++) {
-                var row = list[i] || {};
-                if (row.connector_id === type && Model().isAuthorized(row)) return row.id || '';
+              var rows = connectedRows(payload);
+              for (var i = 0; i < rows.length; i++) {
+                var row = rows[i];
+                if (!Object.prototype.hasOwnProperty.call(before, row.id)) return row.id || '';
+                if ((row.updated_at || '') !== before[row.id]) return row.id || '';
               }
               return '';
             });
