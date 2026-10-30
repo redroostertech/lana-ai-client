@@ -556,3 +556,55 @@
 [data-runtime-interaction] .lex-dec-prompt {
   white-space: pre-line;
 }
+
+/* Approval for a tool on a third-party MCP server (lex-chat.js
+   externalApprovalHeader). Server text is plain and wrapped. */
+.lex-chat-external-approval {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--lex-chat-decision-border);
+  border-left: 3px solid var(--lex-status-info);
+  border-radius: var(--lex-radius-lg);
+  background: var(--lex-chat-decision-bg);
+  min-width: 0;
+}
+
+.lex-chat-external-approval-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.lex-chat-external-approval-title {
+  margin: 0;
+  font-size: var(--lex-form-font-size);
+  font-weight: var(--lex-weight-medium);
+  color: var(--lex-chat-text);
+  overflow-wrap: anywhere;
+}
+
+.lex-chat-external-approval-from,
+.lex-chat-external-approval-label,
+.lex-chat-external-approval-note {
+  margin: 0;
+  font-size: var(--lex-form-help-size);
+  color: var(--lex-chat-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.lex-chat-external-approval-label {
+  font-weight: var(--lex-weight-medium);
+}
+
+.lex-chat-external-approval-args {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: var(--lex-form-help-size);
+  color: var(--lex-chat-text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

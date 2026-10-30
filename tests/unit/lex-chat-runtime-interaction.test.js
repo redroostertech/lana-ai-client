@@ -138,3 +138,67 @@ test('a live dynamic_card frame is handed to the card renderer under the answer'
   expect(w.LexDynamicCardRenderer.renderCard).toHaveBeenCalledWith(card, container);
   dom.window.close();
 });
+
+describe('approval for a tool on a third-party MCP server', () => {
+  const external = (approval, extra) => ({ id: 'int-mcp', task_id: 'runtime-1', kind: 'approval', status: 'pending',
+    prompt: 'Run "Search documents" on Research?', approval, ...(extra || {}) });
+
+  test('shows the server name, tool title, External label and argument summary above the choices, as text only', () => {
+    const { dom, chat, container, render } = setup();
+    chat._insertRuntimeInteraction(external({
+      action: { capability: 'connector_live_action', label: 'Use connector', arguments: {} },
+      external: {
+        server_name: 'Research <img src=x onerror=alert(1)>',
+        tool_title: '<b>Search</b> documents',
+        arguments_summary: [{ label: 'query', value: '<script>x</script>' }, 'limit: 5']
+      }
+    }));
+    const header = container.querySelector('.lex-chat-external-approval');
+    expect(header).not.toBeNull();
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.querySelector('script')).toBeNull();
+    expect(container.querySelector('b')).toBeNull();
+    expect(header.querySelector('lex-badge').getAttribute('label')).toBe('External');
+    expect(header.querySelector('.lex-chat-external-approval-title').textContent).toBe('<b>Search</b> documents');
+    expect(header.querySelector('.lex-chat-external-approval-from').textContent).toBe('Provided by Research <img src=x onerror=alert(1)>');
+    expect(Array.from(header.querySelectorAll('.lex-chat-external-approval-args li')).map((li) => li.textContent))
+      .toEqual(['query: <script>x</script>', 'limit: 5']);
+    // The choices still render below, from the same interaction.
+    expect(header.nextSibling).toBe(render.mock.calls[0][0]);
+    expect(render.mock.calls[0][1][0].options.map((o) => o.value)).toEqual(['approve', 'reject']);
+    dom.window.close();
+  });
+
+  test('reads the fields from the action arguments when there is no external block', () => {
+    const { dom, w } = setup();
+    const view = w.Lex.Chat.externalApprovalView(external({
+      action: { capability: 'connector_live_action', arguments: { server_name: 'Research', tool_name: 'search', arguments_summary: 'query: retainer' } }
+    }));
+    expect(view).toEqual({ serverName: 'Research', toolTitle: 'search', argumentsSummary: ['query: retainer'] });
+    dom.window.close();
+  });
+
+  test('provider mcp-server marks it external even without a server name', () => {
+    const { dom, w } = setup();
+    const view = w.Lex.Chat.externalApprovalView(external({ action: { capability: 'connector_live_action', label: 'Search', arguments: { provider: 'mcp-server' } } }));
+    expect(view).toEqual({ serverName: 'an external server', toolTitle: 'Search', argumentsSummary: [] });
+    dom.window.close();
+  });
+
+  test('other approvals keep the plain decision (no External header)', () => {
+    const { dom, w, chat, container, interaction } = setup();
+    chat._insertRuntimeInteraction(interaction);
+    expect(container.querySelector('.lex-chat-external-approval')).toBeNull();
+    expect(w.Lex.Chat.externalApprovalView({ kind: 'approval', approval: { action: { capability: 'connector_live_action', arguments: { connector: 'stripe' } } } })).toBeNull();
+    expect(w.Lex.Chat.externalApprovalView({ kind: 'question', external: true })).toBeNull();
+    dom.window.close();
+  });
+
+  test('long remote text is bounded', () => {
+    const { dom, w } = setup();
+    const view = w.Lex.Chat.externalApprovalView(external({ external: { server_name: 'x'.repeat(1000), tool_title: 't', arguments_summary: new Array(50).fill('a') } }));
+    expect(view.serverName).toHaveLength(300);
+    expect(view.argumentsSummary).toHaveLength(20);
+    dom.window.close();
+  });
+});

@@ -270,6 +270,13 @@ const ConnectorsMockData = {
   }
 };
 
+// The MCP server routes answer { success: true, data }.
+function unwrapMcp(response) {
+  return response && typeof response === 'object' && Object.prototype.hasOwnProperty.call(response, 'data')
+    ? response.data
+    : response;
+}
+
 // Shared identity helpers — used by getMergedList() and exposed for callers
 // that need to key connectors by stable identity (e.g. dropdown selection).
 function looksLikeUuid(value) {
@@ -522,6 +529,61 @@ const Connectors = {
   /** Same endpoint the connector viewer saves sync frequency through. */
   async updateSyncSettings(sourceId, settings) {
     return api.patch(`/api/v1/generic-connectors/integration-sources/${encodeURIComponent(sourceId)}/sync-settings`, settings || {});
+  },
+
+  // ── MCP servers (mcp-connect.js) ────────────────────────────────────
+  // /api/v1/integrations/mcp-servers, admins only, behind the backend's
+  // FEATURE_MCP_CONNECTORS (404 when off). Responses are { success, data };
+  // these return data. The backend checks URLs, auth modes and approvals.
+
+  /** { auth: 'oauth'|'bearer_or_header'|'none', authorization_server, registration, resource, scope } */
+  async mcpDiscover(url) {
+    return unwrapMcp(await api.post('/api/v1/integrations/mcp-servers/discover', { url }));
+  },
+
+  /** Create a server: { name, url, auth_mode, header_name?, token?, client_id?, client_secret? } -> server */
+  async mcpCreateServer(body) {
+    return unwrapMcp(await api.post('/api/v1/integrations/mcp-servers', body));
+  },
+
+  /** The organization's servers. */
+  async mcpListServers() {
+    const data = unwrapMcp(await api.get('/api/v1/integrations/mcp-servers'));
+    return Array.isArray(data) ? data : [];
+  },
+
+  /** One server with its tools[]. */
+  async mcpGetServer(sourceId) {
+    return unwrapMcp(await api.get(`/api/v1/integrations/mcp-servers/${encodeURIComponent(sourceId)}`));
+  },
+
+  /** { authorization_url, redirect_uri, provider: 'mcp-server', expires_in } */
+  async mcpAuthorize(sourceId, flow) {
+    const params = new URLSearchParams({ flow: flow === 'web' ? 'web' : 'electron' });
+    return unwrapMcp(await api.get(`/api/v1/integrations/mcp-servers/${encodeURIComponent(sourceId)}/authorize?${params.toString()}`));
+  },
+
+  /** Finish an OAuth sign in from a callback outside the desktop deep link. */
+  async mcpCompleteOAuth(code, state) {
+    return unwrapMcp(await api.post('/api/v1/integrations/mcp-servers/oauth/complete', { code, state }));
+  },
+
+  /** initialize + tools/list: { server, protocol_version, transport, truncated, tools, changes } */
+  async mcpTestServer(sourceId) {
+    return unwrapMcp(await api.post(`/api/v1/integrations/mcp-servers/${encodeURIComponent(sourceId)}/test`, {}));
+  },
+
+  /** Turn one tool on or off: { enabled, expected_hash? } -> tool (409 when it changed). */
+  async mcpSetTool(sourceId, alias, body) {
+    return unwrapMcp(await api.patch(
+      `/api/v1/integrations/mcp-servers/${encodeURIComponent(sourceId)}/tools/${encodeURIComponent(alias)}`,
+      body
+    ));
+  },
+
+  /** Disconnect: { source_id, tools_removed } */
+  async mcpDeleteServer(sourceId) {
+    return unwrapMcp(await api.delete(`/api/v1/integrations/mcp-servers/${encodeURIComponent(sourceId)}`));
   },
 
   /**

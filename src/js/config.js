@@ -325,5 +325,27 @@ window.LanaConfig = {
    * connectorOpenRoute through isConnectWizardEnabled) so the wizard always
    * opens for connectors that are not connected.
    */
-  CONNECT_WIZARD_ENABLED: false
+  CONNECT_WIZARD_ENABLED: false,
+
+  /**
+   * Third-party MCP servers as connectors on Data Connectors: the "Add MCP
+   * server" action, the MCP server rows, the MCP steps of the connect wizard
+   * (Lex.ConnectWizard.open({ connectorType: 'mcp-server' })) and the server
+   * panel with tool review. Hidden until it is verified end to end. It must
+   * also stay off until the backend's FEATURE_MCP_CONNECTORS is on: with the
+   * backend flag off every /api/v1/integrations/mcp-servers route answers 404.
+   * Pages without this config read it as off.
+   *
+   * Even with the flag on, the MCP UI shows only for the two roles the
+   * backend accepts, system_admin and org_admin (McpConnectModel.isVisible).
+   * organization_admin is not shown the UI, although Lex.Auth.isOrgAdmin()
+   * counts it, because the backend refuses that role with a 403.
+   *
+   * Plan: turn FEATURE_MCP_CONNECTORS on for a test box, connect one OAuth
+   * server (dynamic registration), one with a manual client and one with a
+   * bearer token, approve one tool and run it from chat with its approval,
+   * then set this to true and remove the flag and its single check
+   * (McpConnectModel.isVisible).
+   */
+  MCP_CONNECTORS_ENABLED: false
 };

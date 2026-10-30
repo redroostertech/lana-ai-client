@@ -19,6 +19,133 @@
       && live.id === saved.id && live.task_id === saved.task_id && live.kind === saved.kind);
   }
 
+  // An approval for a tool on a third-party MCP server (connector_live_action
+  // through an MCP server). The runtime's approval payload names the server,
+  // the tool and a bounded summary of what will be sent; the fields are read
+  // from approval.external (or approval.mcp), then approval.action,
+  // approval.action.arguments, approval and the interaction itself:
+  //   server_name, tool_title (or tool_name), arguments_summary
+  //   (a string, or a list of strings or { label | name, value }).
+  // An approval counts as external when it says so (external: true, an
+  // external or mcp block, provider or connector_id 'mcp-server'), or when a
+  // connector_live_action names a server. Every value is remote or derived
+  // from remote text: it is bounded here and rendered with textContent only.
+  // Returns null for any other approval.
+  const EXTERNAL_TEXT_LIMIT = 300;
+  const EXTERNAL_SUMMARY_LIMIT = 2000;
+  const EXTERNAL_SUMMARY_LINES = 20;
+
+  function plainObject(value) {
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  }
+
+  function boundedText(value, max) {
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    return typeof value === 'string' ? value.trim().slice(0, max) : '';
+  }
+
+  function summaryLines(value) {
+    if (typeof value === 'string') {
+      const text = boundedText(value, EXTERNAL_SUMMARY_LIMIT);
+      return text ? [text] : [];
+    }
+    if (!Array.isArray(value)) return [];
+    const lines = [];
+    for (const item of value.slice(0, EXTERNAL_SUMMARY_LINES)) {
+      if (typeof item === 'string' || typeof item === 'number') {
+        const text = boundedText(item, EXTERNAL_TEXT_LIMIT);
+        if (text) lines.push(text);
+        continue;
+      }
+      const entry = plainObject(item);
+      const label = boundedText(entry.label || entry.name, EXTERNAL_TEXT_LIMIT);
+      let raw = entry.value;
+      if (raw !== null && typeof raw === 'object') {
+        try { raw = JSON.stringify(raw); } catch (_error) { raw = ''; }
+      }
+      const shown = boundedText(raw, EXTERNAL_TEXT_LIMIT);
+      if (label || shown) lines.push(label && shown ? label + ': ' + shown : (label || shown));
+    }
+    return lines;
+  }
+
+  function externalApprovalView(interaction) {
+    const i = plainObject(interaction);
+    if (i.kind !== 'approval') return null;
+    const approval = plainObject(i.approval);
+    const action = plainObject(approval.action);
+    const args = plainObject(action.arguments);
+    const block = Object.keys(plainObject(approval.external)).length ? plainObject(approval.external) : plainObject(approval.mcp);
+    const sources = [block, action, args, approval, i];
+    const pick = (key, max) => {
+      for (const source of sources) {
+        const text = boundedText(source[key], max);
+        if (text) return text;
+      }
+      return '';
+    };
+    const pickSummary = () => {
+      for (const source of sources) {
+        const lines = summaryLines(source.arguments_summary);
+        if (lines.length) return lines;
+      }
+      return [];
+    };
+    const serverName = pick('server_name', EXTERNAL_TEXT_LIMIT);
+    const marked = approval.external === true || action.external === true || i.external === true
+      || Object.keys(block).length > 0
+      || pick('provider', 64) === 'mcp-server' || pick('connector_id', 64) === 'mcp-server';
+    const external = marked || (action.capability === 'connector_live_action' && Boolean(serverName));
+    if (!external) return null;
+    return {
+      serverName: serverName || 'an external server',
+      toolTitle: pick('tool_title', EXTERNAL_TEXT_LIMIT) || pick('tool_name', EXTERNAL_TEXT_LIMIT)
+        || boundedText(action.label, EXTERNAL_TEXT_LIMIT) || 'A tool',
+      argumentsSummary: pickSummary()
+    };
+  }
+
+  // The header above an external approval's Approve and Decline choices.
+  function externalApprovalHeader(view) {
+    const header = document.createElement('div');
+    header.className = 'lex-chat-external-approval';
+    const top = document.createElement('div');
+    top.className = 'lex-chat-external-approval-top';
+    const badge = document.createElement('lex-badge');
+    badge.setAttribute('label', 'External');
+    badge.setAttribute('color', 'blue');
+    badge.setAttribute('size', 'sm');
+    const title = document.createElement('p');
+    title.className = 'lex-chat-external-approval-title';
+    title.textContent = view.toolTitle;
+    top.appendChild(badge);
+    top.appendChild(title);
+    header.appendChild(top);
+    const from = document.createElement('p');
+    from.className = 'lex-chat-external-approval-from';
+    from.textContent = 'Provided by ' + view.serverName;
+    header.appendChild(from);
+    if (view.argumentsSummary.length) {
+      const label = document.createElement('p');
+      label.className = 'lex-chat-external-approval-label';
+      label.textContent = 'What LANA will send';
+      const list = document.createElement('ul');
+      list.className = 'lex-chat-external-approval-args';
+      for (const line of view.argumentsSummary) {
+        const item = document.createElement('li');
+        item.textContent = line;
+        list.appendChild(item);
+      }
+      header.appendChild(label);
+      header.appendChild(list);
+    }
+    const note = document.createElement('p');
+    note.className = 'lex-chat-external-approval-note';
+    note.textContent = 'This tool runs on a server outside LANA. Approve only if you expect this request.';
+    header.appendChild(note);
+    return header;
+  }
+
   // Server-authored "what I checked" line saved with a message, if any.
   function persistedCoverageSummary(message) {
     const m = message || {};
@@ -2153,6 +2280,8 @@
         controls.appendChild(cancel);
       } else {
         const approval = interaction.kind === 'approval';
+        const external = approval ? externalApprovalView(interaction) : null;
+        if (external) host.insertBefore(externalApprovalHeader(external), controls);
         const options = approval ? [{ label: 'Approve', value: 'approve' }, { label: 'Decline', value: 'reject' }]
           : (interaction.choices || []).map(choice => ({ label: choice.label, value: choice.id, description: choice.description }));
         Lex.BlockRenderer.render(controls, [{ type: 'decision', prompt: interaction.prompt, options, allow_custom: false }]);
@@ -2809,5 +2938,6 @@
 
   global.Lex.Chat = global.Lex.Chat || {};
   global.Lex.Chat.LexChat = LexChat;
+  global.Lex.Chat.externalApprovalView = externalApprovalView;
 
 })(typeof window !== 'undefined' ? window : globalThis);

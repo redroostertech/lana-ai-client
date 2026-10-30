@@ -401,13 +401,76 @@
       window.Lex && window.Lex.ConnectWizard && typeof window.Lex.ConnectWizard.open === 'function');
   }
 
+  // ── MCP servers (MCP_CONNECTORS_ENABLED, admins only) ───────────────
+  // A third-party MCP server is its own row (the mcp-server package is
+  // multi instance) and opens the MCP server panel, never the generic
+  // viewer or wizard, which do not handle MCP rows.
+
+  function mcpModel() {
+    return window.McpConnectModel || null;
+  }
+
+  function isMcpVisible() {
+    return !!(window.Lex && window.Lex.McpConnect && typeof window.Lex.McpConnect.isVisible === 'function' &&
+      window.Lex.McpConnect.isVisible());
+  }
+
+  function isMcpConnector(connector) {
+    var raw = connector || {};
+    return String(raw.connector_id || raw.connector_type || '').toLowerCase() === 'mcp-server';
+  }
+
+  /** Generic connector rows without MCP servers (they are listed on their own). */
+  function withoutMcpRows(connectors) {
+    return (connectors || []).filter(function (connector) { return !isMcpConnector(connector); });
+  }
+
+  /** Data Connectors rows for the MCP servers the backend listed. */
+  function mcpServerRows(servers) {
+    var model = mcpModel();
+    if (!model) return [];
+    return (servers || []).filter(function (server) { return server && server.id; }).map(model.serverToConnectorRow);
+  }
+
+  function openMcpServerPanel(connectorId, event) {
+    if (event) event.stopPropagation();
+    var connector = findConnectorById(connectorId);
+    if (!connector || !isMcpConnector(connector) || !isMcpVisible()) return;
+    window.Lex.McpConnect.openPanel({
+      sourceId: connector.id,
+      serverName: connector.name,
+      onClose: loadConnectors
+    });
+  }
+
+  function openAddMcpServer() {
+    if (!isMcpVisible() || !window.Lex.ConnectWizard) return;
+    window.Lex.ConnectWizard.open({
+      connectorType: 'mcp-server',
+      onDone: loadConnectors,
+      onOpenServer: function (detail) {
+        if (!detail || !detail.sourceId) return;
+        window.Lex.McpConnect.openPanel({ sourceId: detail.sourceId, onClose: loadConnectors });
+      }
+    });
+  }
+
+  function syncMcpAction() {
+    var button = document.getElementById('addMcpServerBannerBtn');
+    if (!button) return;
+    if (isMcpVisible()) button.removeAttribute('hidden');
+    else button.setAttribute('hidden', '');
+  }
+
   /**
-   * Where opening a connector goes: 'details' (coming soon), 'wizard' (Guided
-   * Connect, flag on and status not_connected) or 'viewer' (the connector
-   * viewer, as before). A disconnected row keeps its config, so it still
-   * opens the viewer, where it is reconnected.
+   * Where opening a connector goes: 'mcp_panel' (a third-party MCP server),
+   * 'details' (coming soon), 'wizard' (Guided Connect, flag on and status
+   * not_connected) or 'viewer' (the connector viewer, as before). A
+   * disconnected row keeps its config, so it still opens the viewer, where
+   * it is reconnected.
    */
   function connectorOpenRoute(connector, installedConnectors) {
+    if (isMcpConnector(connector)) return 'mcp_panel';
     var status = getConnectorStatusKey(connector, installedConnectors);
     if (status === 'coming_soon') return 'details';
     if (status === 'not_connected' && isConnectWizardEnabled()) return 'wizard';
@@ -419,7 +482,9 @@
     if (!connector) return;
 
     var route = connectorOpenRoute(connector, currentInstalledConnectors);
-    if (route === 'details') {
+    if (route === 'mcp_panel') {
+      openMcpServerPanel(connectorId);
+    } else if (route === 'details') {
       showConnectorDetails(connectorId, null);
     } else if (route === 'wizard') {
       openConnectWizard(connectorId);
@@ -434,6 +499,7 @@
 
   function getConnectorUpdateSlug(connector) {
     var normalized = normalizeConnector(connector);
+    if (isMcpConnector(normalized.raw)) return '';
     return normalized.raw.connector_id || '';
   }
 
@@ -502,6 +568,9 @@
   function connectorActionsCell(row) {
     var safeId = escapeAttribute(row.id);
     var safeName = escapeAttribute(row.name);
+    if (isMcpConnector(row._raw)) {
+      return '<lex-btn variant="primary" size="sm" onclick="openMcpServerPanel(\'' + safeId + '\', event)">Manage</lex-btn>';
+    }
     var action = getConnectorAction(row._raw, currentInstalledConnectors);
     var details = '<lex-btn variant="ghost" size="sm" icon="true" onclick="showConnectorDetails(\'' + safeId + '\', event)" aria-label="View details of ' + safeName + '" title="View details">' + INFO_ICON + '</lex-btn>';
     var html;
@@ -685,6 +754,11 @@
   }
 
   async function openConnectorManage(connectorId) {
+    var target = findConnectorById(connectorId);
+    if (target && isMcpConnector(target)) {
+      openMcpServerPanel(connectorId);
+      return;
+    }
     try {
       var context = await ensureConnectorIntegrationSource(connectorId);
       var connector = context.connector;
@@ -801,6 +875,10 @@
 
   function installConnector(connectorId, evt) {
     var target = findConnectorById(connectorId);
+    if (target && isMcpConnector(target)) {
+      openMcpServerPanel(connectorId, evt);
+      return;
+    }
     if (target && connectorOpenRoute(target, currentInstalledConnectors) === 'wizard') {
       if (evt) evt.stopPropagation();
       openConnectWizard(connectorId);
@@ -1160,17 +1238,26 @@
     connectorsLoading.classList.remove('hidden');
     connectorsContent.classList.add('hidden');
 
+    syncMcpAction();
+    var mcpVisible = isMcpVisible();
+
     return Promise.allSettled([
       Connectors.getAll(),
-      ConnectorRegistry.getCatalog()
+      ConnectorRegistry.getCatalog(),
+      mcpVisible ? Connectors.mcpListServers() : Promise.resolve([])
     ]).then(function (results) {
       var installedData = results[0];
       var registryData = results[1];
+      var mcpData = results[2];
 
       var installedConnectors = [];
+      var mcpRows = mcpVisible && mcpData.status === 'fulfilled' ? mcpServerRows(mcpData.value) : [];
+      if (mcpVisible && mcpData.status !== 'fulfilled') {
+        console.warn('MCP servers could not be loaded:', mcpData.reason && mcpData.reason.message);
+      }
 
       if (installedData.status === 'fulfilled') {
-        installedConnectors = installedData.value.connectors || [];
+        installedConnectors = withoutMcpRows(installedData.value.connectors || []);
         allConnectors = installedConnectors.slice();
       } else {
         console.error('Failed to fetch installed connectors:', installedData.reason);
@@ -1180,18 +1267,20 @@
       // Process catalog connectors
       var availableSection = document.getElementById('availableConnectorsSection');
       if (registryData.status === 'fulfilled') {
-        var availableConnectors = registryData.value.connectors || [];
+        var availableConnectors = withoutMcpRows(registryData.value.connectors || []);
 
-        allAvailableConnectors = buildCombinedConnectorList(installedConnectors, availableConnectors);
+        var combined = buildCombinedConnectorList(installedConnectors, availableConnectors);
+        allAvailableConnectors = combined.concat(mcpRows);
         currentInstalledConnectors = installedConnectors;
-        allConnectors = buildCombinedConnectorList(allConnectors, allAvailableConnectors);
+        allConnectors = buildCombinedConnectorList(allConnectors, combined).concat(mcpRows);
         renderConnectorTable();
         if (availableSection) availableSection.classList.remove('hidden');
       } else {
         console.warn('Connector catalog unavailable:', registryData.reason);
 
-        allAvailableConnectors = installedConnectors.slice();
+        allAvailableConnectors = installedConnectors.concat(mcpRows);
         currentInstalledConnectors = installedConnectors;
+        allConnectors = allConnectors.concat(mcpRows);
         renderConnectorTable();
         if (availableSection) availableSection.classList.remove('hidden');
       }
@@ -1731,6 +1820,14 @@
       bannerImportBtn.addEventListener('click', openImportConnectorModal);
     }
 
+    // "Add MCP server" (shown only when the MCP UI is visible). Delegated:
+    // lex-banner re-creates its action children when it re-renders.
+    trackDocListener('click', function (event) {
+      var target = event.target && event.target.closest ? event.target.closest('#addMcpServerBannerBtn') : null;
+      if (target) openAddMcpServer();
+    });
+    syncMcpAction();
+
     // Embedded iframe back-button → dismiss the host modal
     var embeddedBackHandler = function (event) {
       var data = event && event.data;
@@ -1807,6 +1904,7 @@
     exposeGlobal('openConnectorManage', openConnectorManage);
     exposeGlobal('openCustomConnectorUI', openCustomConnectorUI);
     exposeGlobal('refreshConnectorsPage', refreshConnectorsPage);
+    exposeGlobal('openMcpServerPanel', openMcpServerPanel);
 
     // Setup event listeners
     setupEventListeners();
@@ -1865,7 +1963,11 @@
     connectorHasMeaningfulConfig: connectorHasMeaningfulConfig,
     mapConnectorRow: mapConnectorRow,
     connectorActionsCell: connectorActionsCell,
-    buildCombinedConnectorList: buildCombinedConnectorList
+    buildCombinedConnectorList: buildCombinedConnectorList,
+    withoutMcpRows: withoutMcpRows,
+    mcpServerRows: mcpServerRows,
+    isMcpVisible: isMcpVisible,
+    getConnectorStatusKey: getConnectorStatusKey
   };
 
   // ── Init — standalone page, called directly ────────────────────────

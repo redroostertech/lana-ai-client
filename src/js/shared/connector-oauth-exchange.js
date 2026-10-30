@@ -99,13 +99,108 @@
     };
   }
 
+  function nowMs() {
+    var time = global && global.LanaTime;
+    return time && typeof time.nowMs === 'function' ? time.nowMs() : Date.now();
+  }
+
+  /**
+   * Wait for a sign in started in the browser: listen for the deep link
+   * callback (matched on state) and poll the backend until it says the sign
+   * in finished, up to a time limit. Opens the URL. Used by the connect
+   * wizard and the MCP server screens, so the waiting logic has one copy.
+   *
+   * @param {Object} opts
+   * @param {string} opts.url - the authorization URL to open
+   * @param {string} [opts.expectedState] - callbacks with another state are ignored
+   * @param {Function} [opts.subscribe] - (handler) => unsubscribe | null
+   * @param {Function} opts.openExternal - (url) opens the browser
+   * @param {Function} opts.onCallback - (data) => Promise<result>, for a matching
+   *   callback; a truthy result finishes
+   * @param {Function} opts.poll - () => Promise<result>; a truthy result finishes
+   * @param {Function} opts.onFinished - (result) after a truthy callback or poll
+   * @param {Function} opts.onError - (error) for a callback error or failure
+   * @param {Function} opts.onTimeout - () after limitMs without a result
+   * @param {number} [opts.intervalMs=2000]
+   * @param {number} [opts.limitMs=120000]
+   * @returns {{stop: Function, isActive: Function, reopen: Function}}
+   */
+  function waitForSignIn(opts) {
+    var interval = opts.intervalMs || 2000;
+    var limit = opts.limitMs || 120000;
+    var startedAt = nowMs();
+    var active = true;
+    var timer = null;
+    var unsubscribe = null;
+
+    function stop() {
+      if (!active) return;
+      active = false;
+      if (timer) clearTimeout(timer);
+      if (typeof unsubscribe === 'function') unsubscribe();
+    }
+
+    if (typeof opts.subscribe === 'function') {
+      unsubscribe = opts.subscribe(function (data) {
+        if (!active || !isCallbackPayload(data)) return;
+        if (opts.expectedState && data.state && data.state !== opts.expectedState) return;
+        if (data.error) {
+          stop();
+          opts.onError(new Error(String(data.error_description || data.error)));
+          return;
+        }
+        Promise.resolve().then(function () { return opts.onCallback(data); }).then(function (result) {
+          if (!active || !result) return;
+          stop();
+          opts.onFinished(result);
+        }, function (error) {
+          if (!active) return;
+          stop();
+          opts.onError(error);
+        });
+      });
+    }
+
+    function schedule() {
+      if (active) timer = setTimeout(tick, interval);
+    }
+
+    function tick() {
+      if (!active) return;
+      if (nowMs() - startedAt > limit) {
+        stop();
+        opts.onTimeout();
+        return;
+      }
+      Promise.resolve().then(opts.poll).then(function (result) {
+        if (!active) return;
+        if (result) {
+          stop();
+          opts.onFinished(result);
+        } else {
+          schedule();
+        }
+      }).catch(schedule);
+    }
+
+    schedule();
+    opts.openExternal(opts.url);
+
+    return {
+      stop: stop,
+      isActive: function () { return active; },
+      reopen: function () { if (active) opts.openExternal(opts.url); }
+    };
+  }
+
   var api = {
     DEFAULT_REDIRECT_URI: DEFAULT_REDIRECT_URI,
     resolveElectronAPI: resolveElectronAPI,
     isCallbackPayload: isCallbackPayload,
     exchangeCode: exchangeCode,
     stateFromAuthorizationUrl: stateFromAuthorizationUrl,
-    subscribe: subscribe
+    subscribe: subscribe,
+    waitForSignIn: waitForSignIn
   };
 
   if (typeof module !== 'undefined' && module.exports) {

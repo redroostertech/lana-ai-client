@@ -11,6 +11,10 @@
  *     onOpenConnector: function ({ sourceId }) {}  // "Open connector" on Done
  *   });
  *
+ * connectorType 'mcp-server' (a third-party MCP server) opens the MCP steps
+ * instead, through Lex.McpConnect.openWizard (js/mcp-connect.js); it takes
+ * onDone and onOpenServer({ sourceId }).
+ *
  * Loads what the wizard model needs (the connector package, the redirect URI,
  * LANA managed OAuth availability, the personal connection availability) and
  * hands <lex-connect-wizard> the backend calls. Used by Data Connectors and,
@@ -25,25 +29,28 @@
   'use strict';
 
   var STYLESHEET_NAME = 'connect-wizard.css';
+  var MCP_CONNECTOR_ID = 'mcp-server';
   var scriptSrc = (document.currentScript && document.currentScript.src) || '';
 
   function isEnabled() {
     return !!(window.LanaConfig && window.LanaConfig.CONNECT_WIZARD_ENABLED === true);
   }
 
-  // Pages that do not link the stylesheet get it next to this script.
-  function ensureStylesheet() {
+  // Pages that do not link a css/components stylesheet get it from the
+  // css folder next to this script's js folder.
+  function ensureStylesheet(name) {
+    var file = name || STYLESHEET_NAME;
     var links = document.querySelectorAll('link[rel="stylesheet"]');
     for (var i = 0; i < links.length; i++) {
       var href = links[i].getAttribute('href') || '';
-      if (href.slice(-STYLESHEET_NAME.length) === STYLESHEET_NAME) return;
+      if (href.slice(-file.length) === file) return;
     }
     var marker = 'js/connect-wizard.js';
     var at = scriptSrc.lastIndexOf(marker);
     if (at === -1) return;
     var link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = scriptSrc.slice(0, at) + 'css/components/' + STYLESHEET_NAME;
+    link.href = scriptSrc.slice(0, at) + 'css/components/' + file;
     document.head.appendChild(link);
   }
 
@@ -196,6 +203,12 @@
   function open(opts) {
     opts = opts || {};
     if (!opts.connectorType) throw new Error('connectorType is required');
+    // A third-party MCP server runs its own steps (Server, Sign in, Connect,
+    // Test, Review tools) in the same drawer: js/mcp-connect.js.
+    if (opts.connectorType === MCP_CONNECTOR_ID) {
+      if (!window.Lex.McpConnect) throw new Error('MCP servers are not available on this page.');
+      return window.Lex.McpConnect.openWizard(opts);
+    }
     ensureStylesheet();
 
     var drawer = null;
@@ -261,6 +274,12 @@
   window.Lex = window.Lex || {};
   window.Lex.ConnectWizard = {
     open: open,
-    isEnabled: isEnabled
+    isEnabled: isEnabled,
+    // Shared with js/mcp-connect.js.
+    helpers: {
+      ensureStylesheet: ensureStylesheet,
+      isElectronFlow: isElectronFlow,
+      openExternal: openExternal
+    }
   };
 })();

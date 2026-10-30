@@ -34,10 +34,6 @@
     return window.ConnectWizardModel;
   }
 
-  function nowMs() {
-    return window.LanaTime && typeof window.LanaTime.nowMs === 'function' ? window.LanaTime.nowMs() : Date.now();
-  }
-
   class LexConnectWizard extends LexElement {
     constructor() {
       super();
@@ -421,7 +417,7 @@
         case 'next': this._next(); break;
         case 'error-back': this._goTo(this._error.backIndex); break;
         case 'connect': this._connect(); break;
-        case 'reopen-oauth': if (this._oauth && this._oauth.url) this._services().openExternal(this._oauth.url); break;
+        case 'reopen-oauth': if (this._oauth && this._oauth.handle) this._oauth.handle.reopen(); break;
         case 'cancel-oauth': this._stopOAuth(); this._scheduleUpdate(); break;
         case 'sync-on': this._saveSync(true); break;
         case 'sync-later': this._saveSync(false); break;
@@ -595,12 +591,12 @@
             return services.exchange(data, auth.redirect_uri).then(function () {
               return services.authStatus(self._sourceId);
             }).then(function (status) {
-              if (Model().isAuthorized(status)) self._oauthConnected(self._sourceId);
+              return Model().isAuthorized(status) ? { sourceId: self._sourceId } : null;
             });
           },
           poll: function () {
             return services.authStatus(self._sourceId).then(function (status) {
-              return Model().isAuthorized(status) ? self._sourceId : '';
+              return Model().isAuthorized(status) ? { sourceId: self._sourceId } : null;
             });
           }
         });
@@ -633,7 +629,7 @@
           onCallback: function (callback) {
             return services.userComplete({ code: callback.code, state: callback.state }).then(function (done) {
               var payload = (done && done.data) || done || {};
-              self._oauthConnected(payload.integrationSourceId || '');
+              return { sourceId: payload.integrationSourceId || '' };
             });
           },
           poll: function () {
@@ -641,10 +637,11 @@
               var rows = connectedRows(payload);
               for (var i = 0; i < rows.length; i++) {
                 var row = rows[i];
-                if (!Object.prototype.hasOwnProperty.call(before, row.id)) return row.id || '';
-                if ((row.updated_at || '') !== before[row.id]) return row.id || '';
+                if (!row.id) continue;
+                if (!Object.prototype.hasOwnProperty.call(before, row.id)) return { sourceId: row.id };
+                if ((row.updated_at || '') !== before[row.id]) return { sourceId: row.id };
               }
-              return '';
+              return null;
             });
           }
         });
@@ -655,53 +652,46 @@
       var self = this;
       var services = this._services();
       this._stopOAuth();
-      this._oauth = { waiting: true, url: flow.url, startedAt: nowMs(), timer: null, unsubscribe: null };
-
-      var unsubscribe = services.subscribeOAuth ? services.subscribeOAuth(function (data) {
-        if (!self._oauth || !window.ConnectorOAuth || !window.ConnectorOAuth.isCallbackPayload(data)) return;
-        if (flow.expectedState && data.state && data.state !== flow.expectedState) return;
-        if (data.error) {
-          self._stopOAuth();
-          self._showError(data.error_description || data.error, Model().firstFieldStepIndex(self._model));
-          return;
-        }
-        flow.onCallback(data).catch(function (error) {
+      // The waiting logic (callback match, poll, time limit) is shared with
+      // the MCP server screens: ConnectorOAuth.waitForSignIn.
+      var oauth = { waiting: true, url: flow.url, handle: null };
+      this._oauth = oauth;
+      oauth.handle = window.ConnectorOAuth.waitForSignIn({
+        url: flow.url,
+        expectedState: flow.expectedState,
+        subscribe: services.subscribeOAuth,
+        openExternal: function (url) { services.openExternal(url); },
+        intervalMs: POLL_INTERVAL_MS,
+        limitMs: POLL_LIMIT_MS,
+        onCallback: flow.onCallback,
+        poll: flow.poll,
+        onFinished: function (result) {
+          if (self._oauth !== oauth) return;
+          self._oauthConnected((result && result.sourceId) || '');
+        },
+        onError: function (error) {
+          if (self._oauth !== oauth) return;
           self._stopOAuth();
           self._showError(self._errorMessage(error, 'Could not finish signing in.'), Model().firstFieldStepIndex(self._model));
-        });
-      }) : null;
-      this._oauth.unsubscribe = unsubscribe;
-
-      var tick = function () {
-        if (!self._oauth) return;
-        if (nowMs() - self._oauth.startedAt > POLL_LIMIT_MS) {
+        },
+        onTimeout: function () {
+          if (self._oauth !== oauth) return;
           self._stopOAuth();
           self._showError('LANA did not hear back from ' + self._model.connectorName + '. If you finished signing in, connect again to check.', -1);
-          return;
         }
-        flow.poll().then(function (sourceId) {
-          if (sourceId && self._oauth) self._oauthConnected(sourceId);
-          else if (self._oauth) self._oauth.timer = setTimeout(tick, POLL_INTERVAL_MS);
-        }).catch(function () {
-          if (self._oauth) self._oauth.timer = setTimeout(tick, POLL_INTERVAL_MS);
-        });
-      };
-      this._oauth.timer = setTimeout(tick, POLL_INTERVAL_MS);
-
+      });
       this._busy = false;
-      services.openExternal(flow.url);
       this._scheduleUpdate();
     }
 
     _stopOAuth() {
       if (!this._oauth) return;
-      if (this._oauth.timer) clearTimeout(this._oauth.timer);
-      if (typeof this._oauth.unsubscribe === 'function') this._oauth.unsubscribe();
+      var oauth = this._oauth;
       this._oauth = null;
+      if (oauth.handle) oauth.handle.stop();
     }
 
     _oauthConnected(sourceId) {
-      if (!this._oauth) return;
       this._stopOAuth();
       if (sourceId) this._sourceId = sourceId;
       this._succeed({ outcome: 'connected', message: '', identity: null });

@@ -1,0 +1,248 @@
+/* mcp-connect.css
+   Component-owned styles for the third-party MCP server screens:
+   <lex-mcp-connect-wizard>, <lex-mcp-tool-review> and <lex-mcp-server-panel>
+   (js/lex/components/integrations/). The shared step layout, callouts,
+   errors and footer come from connect-wizard.css (.lex-cw-*), which the
+   opener (js/mcp-connect.js) also loads. Scoped under the hosts and .lex-mcp-*
+   so it never leaks. */
+
+lex-mcp-connect-wizard,
+lex-mcp-server-panel {
+  display: block;
+  container: lex-cw / inline-size;
+  min-width: 0;
+}
+
+lex-mcp-tool-review {
+  display: block;
+  min-width: 0;
+}
+
+.lex-mcp-cw-footer {
+  justify-content: flex-end;
+}
+
+.lex-mcp-error-detail {
+  color: var(--lex-text-secondary);
+}
+
+/* ── Key and value list (server facts) ─────────────────── */
+
+.lex-mcp-kv {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--lex-space-sm) var(--lex-space-lg);
+  margin: 0;
+  font-size: var(--lex-body-sm-size);
+  line-height: var(--lex-body-sm-height);
+}
+
+.lex-mcp-kv dt {
+  color: var(--lex-text-tertiary);
+}
+
+.lex-mcp-kv dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--lex-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.lex-mcp-kv-url {
+  font-family: var(--lex-font-mono);
+  font-size: var(--lex-body-xs-size);
+}
+
+/* ── Tool review ───────────────────────────────────────── */
+
+.lex-mcp-tools {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-md);
+  min-width: 0;
+}
+
+.lex-mcp-note {
+  margin: 0;
+  padding: var(--lex-space-md) var(--lex-space-lg);
+  border-left: 3px solid var(--lex-status-info);
+  border-radius: var(--lex-radius-md);
+  background: var(--lex-status-info-bg);
+  font-size: var(--lex-body-sm-size);
+  line-height: var(--lex-body-sm-height);
+  color: var(--lex-text-primary);
+}
+
+.lex-mcp-tool-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-md);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lex-mcp-tool {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-sm);
+  min-width: 0;
+  padding: var(--lex-space-md) var(--lex-space-lg);
+  border: 1px solid var(--lex-border-default);
+  border-radius: var(--lex-radius-md);
+}
+
+.lex-mcp-tool-head {
+  display: flex;
+  align-items: center;
+  gap: var(--lex-space-md);
+  min-width: 0;
+}
+
+.lex-mcp-tool-names {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--lex-space-xs);
+  min-width: 0;
+}
+
+.lex-mcp-tool-title {
+  font-size: var(--lex-body-sm-size);
+  font-weight: 600;
+  color: var(--lex-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.lex-mcp-tool-name {
+  font-family: var(--lex-font-mono);
+  font-size: var(--lex-body-xs-size);
+  color: var(--lex-text-tertiary);
+  overflow-wrap: anywhere;
+}
+
+.lex-mcp-tool-switch {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--lex-space-sm);
+}
+
+.lex-mcp-tool-state {
+  min-width: 3.5rem;
+  font-size: var(--lex-body-xs-size);
+  color: var(--lex-text-secondary);
+}
+
+.lex-mcp-provided,
+.lex-mcp-hints {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-xs);
+  min-width: 0;
+}
+
+.lex-mcp-provided-label {
+  font-size: var(--lex-body-xs-size);
+  font-weight: 600;
+  color: var(--lex-text-tertiary);
+}
+
+/* Server text: plain, wrapped, never formatted. */
+.lex-mcp-tool-desc {
+  margin: 0;
+  font-size: var(--lex-body-sm-size);
+  line-height: var(--lex-body-sm-height);
+  color: var(--lex-text-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.lex-mcp-hint-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lex-space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lex-mcp-tool-note {
+  margin: 0;
+  font-size: var(--lex-body-sm-size);
+  color: var(--lex-status-warning-text);
+}
+
+.lex-mcp-tool-error {
+  margin: 0;
+  font-size: var(--lex-body-sm-size);
+  color: var(--lex-status-danger-text);
+  overflow-wrap: anywhere;
+}
+
+/* ── Server panel ──────────────────────────────────────── */
+
+.lex-mcp-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-xl, var(--lex-space-lg));
+  min-width: 0;
+}
+
+.lex-mcp-panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-md);
+  min-width: 0;
+}
+
+.lex-mcp-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--lex-space-md);
+  min-width: 0;
+}
+
+.lex-mcp-panel-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--lex-body-base-size);
+  font-weight: 600;
+  color: var(--lex-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.lex-mcp-reauth {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-md);
+}
+
+.lex-mcp-check {
+  padding: var(--lex-space-md) var(--lex-space-lg);
+  border: 1px solid var(--lex-border-default);
+  border-radius: var(--lex-radius-md);
+}
+
+.lex-mcp-panel-danger {
+  padding-top: var(--lex-space-lg);
+  border-top: 1px solid var(--lex-border-default);
+}
+
+@container lex-cw (max-width: 419px) {
+  .lex-mcp-tool-head {
+    flex-wrap: wrap;
+  }
+
+  .lex-mcp-kv {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Data Connectors "Add MCP server" banner action: lex-btn sets its own
+   display, so the hidden attribute needs this to take effect. */
+.lex-mcp-add-action[hidden] {
+  display: none;
+}

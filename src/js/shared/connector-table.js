@@ -54,10 +54,12 @@
     oauth2_or_api_key: 'OAuth 2.0 or API key',
     api_key: 'API key',
     basic: 'Basic auth',
+    bearer: 'Bearer token',
+    header: 'Custom header',
     none: 'None',
     unknown: 'Unknown'
   };
-  var CATEGORY_LABELS = { crm: 'CRM', case: 'Case management', unknown: 'Other' };
+  var CATEGORY_LABELS = { crm: 'CRM', case: 'Case management', mcp: 'MCP server', unknown: 'Other' };
   var SEARCH_DEBOUNCE_MS = 350;
 
   // The automation app's readiness vocabulary. The backend pre-creates an

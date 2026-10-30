@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="css/companion-bridge-consent.css">
   <link rel="stylesheet" href="css/connector-table.css">
   <link rel="stylesheet" href="css/components/connect-wizard.css">
+  <link rel="stylesheet" href="css/components/mcp-connect.css">
   <script src="js/tailwind-loader.js"></script>
   <style>
     /* The embedded connector page fills the full-size, flush lex-modal.
@@ -62,6 +63,10 @@
       >
         <lex-btn id="importConnectorBannerBtn" variant="secondary" leading-icon="upload">
           Import Connector
+        </lex-btn>
+        <!-- Shown by data_connectors.js only when MCP_CONNECTORS_ENABLED is on and the user is a system or org admin -->
+        <lex-btn id="addMcpServerBannerBtn" class="lex-mcp-add-action" variant="secondary" leading-icon="plus" hidden>
+          Add MCP server
         </lex-btn>
       </lex-banner>
 
@@ -437,6 +442,9 @@
   <script src="js/lex/components/form/lex-toggle.js"></script>
   <script src="js/lex/components/form/lex-radio.js"></script>
   <script src="js/lex/components/integrations/lex-connect-wizard.js"></script>
+  <script src="js/lex/components/integrations/lex-mcp-tool-review.js"></script>
+  <script src="js/lex/components/integrations/lex-mcp-connect-wizard.js"></script>
+  <script src="js/lex/components/integrations/lex-mcp-server-panel.js"></script>
 
   <!-- Inject page content + hoist modals -->
   <script src="js/lex/lex-page-init.js"></script>
@@ -446,6 +454,8 @@
   <script src="js/shared/connector-oauth-exchange.js"></script>
   <script src="js/connect-wizard.model.js"></script>
   <script src="js/connect-wizard.js"></script>
+  <script src="js/mcp-connect.model.js"></script>
+  <script src="js/mcp-connect.js"></script>
 
   <!-- Page controller (MUST be last before auth-guard) -->
   <script src="js/shared/library-column-filters.js"></script>
