@@ -319,13 +319,18 @@ window.LanaConfig = {
    * connector viewer exactly as before (including the silent configure
    * that creates its source row). Pages without this config read it as off.
    *
+   * Turned on 2026-10-30 for live verification (the backend needs
+   * FEATURE_CONNECTORS_GUIDED_CONNECT=true for a wizard test to mark a
+   * credential connector connected). Set back to false to return to the
+   * viewer-only flow.
+   *
    * Plan: run the wizard live with a Stripe test key, Google (LANA managed
-   * OAuth), a BYO OAuth connector and a second Postgres instance, set this
-   * to true, then remove the flag and its check (data_connectors.js
-   * connectorOpenRoute through isConnectWizardEnabled) so the wizard always
-   * opens for connectors that are not connected.
+   * OAuth), a BYO OAuth connector and a second Postgres instance, then
+   * remove the flag and its check (data_connectors.js connectorOpenRoute
+   * through isConnectWizardEnabled) so the wizard always opens for
+   * connectors that are not connected.
    */
-  CONNECT_WIZARD_ENABLED: false,
+  CONNECT_WIZARD_ENABLED: true,
 
   /**
    * Third-party MCP servers as connectors on Data Connectors: the "Add MCP
@@ -341,11 +346,14 @@ window.LanaConfig = {
    * organization_admin is not shown the UI, although Lex.Auth.isOrgAdmin()
    * counts it, because the backend refuses that role with a 403.
    *
-   * Plan: turn FEATURE_MCP_CONNECTORS on for a test box, connect one OAuth
-   * server (dynamic registration), one with a manual client and one with a
-   * bearer token, approve one tool and run it from chat with its approval,
-   * then set this to true and remove the flag and its single check
+   * Turned on 2026-10-30 for live verification; the backend must also run
+   * with FEATURE_MCP_CONNECTORS=true or the UI reports that MCP servers are
+   * not turned on. Set back to false to hide the MCP UI.
+   *
+   * Plan: connect one OAuth server (dynamic registration), one with a
+   * manual client and one with a bearer token, approve one tool and run it
+   * from chat with its approval, then remove the flag and its single check
    * (McpConnectModel.isVisible).
    */
-  MCP_CONNECTORS_ENABLED: false
+  MCP_CONNECTORS_ENABLED: true
 };
