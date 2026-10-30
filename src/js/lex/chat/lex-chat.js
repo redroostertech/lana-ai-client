@@ -12,6 +12,13 @@
   const Chat = global.Lex.Chat || {};
   if (!LexElement) { console.error('[lex-chat] LexElement not loaded'); return; }
 
+  // A saved interaction is offered again only when the live read returns the
+  // same interaction for the same task, still pending.
+  function pendingInteractionMatches(saved, live) {
+    return Boolean(saved && live && live.status === 'pending'
+      && live.id === saved.id && live.task_id === saved.task_id && live.kind === saved.kind);
+  }
+
   // Server-authored "what I checked" line saved with a message, if any.
   function persistedCoverageSummary(message) {
     const m = message || {};
@@ -1234,8 +1241,8 @@
             // Older approval messages are historical, even if their saved
             // interaction still says pending.
             const latestRuntimeMessage = result.messages.slice().reverse().find(m => m.metadata?.intelligence_runtime);
-            const pending = latestRuntimeMessage?.metadata?.intelligence_runtime?.interaction;
-            if (pending?.status === 'pending') this._insertRuntimeInteraction(pending);
+            const saved = latestRuntimeMessage?.metadata?.intelligence_runtime?.interaction;
+            if (saved?.status === 'pending') this._restoreRuntimeInteraction(id, saved, isCurrentLoad);
 
             // Batch-refresh card states after all messages are rendered so
             // cards reflect their real current state (e.g. approved) rather
@@ -1739,6 +1746,15 @@
           this._insertRuntimeInteraction(event.interaction);
           break;
 
+        // A card attached to the answer (the connector setup card). The
+        // backend releases it after the answer, so it lands under it.
+        case 'dynamic_card':
+          if (this._threadEl && this._threadEl._container && global.LexDynamicCardRenderer) {
+            global.LexDynamicCardRenderer.renderCard(event.card, this._threadEl._container);
+            if (this._threadEl.scrollToBottom) this._threadEl.scrollToBottom();
+          }
+          break;
+
         case 'plan_ready':
           // Backend generated a plan that requires user approval before execution.
           // Hide the activity indicator and insert a plan card into the thread.
@@ -2148,6 +2164,21 @@
         });
       }
       if (this._threadEl.scrollToBottom) this._threadEl.scrollToBottom();
+    }
+
+    /**
+     * Offer a saved runtime interaction again after a reload, but only when
+     * the run record says it is still the pending one. The saved message
+     * holds a minimal projection (no prefilled values); the live read
+     * supplies the current interaction, so an approval decided in another
+     * tab or in Approvals is not offered twice.
+     */
+    async _restoreRuntimeInteraction(conversationId, saved, isCurrentLoad) {
+      const live = this._source && typeof this._source.loadPendingInteraction === 'function'
+        ? await this._source.loadPendingInteraction(conversationId) : null;
+      if (!isCurrentLoad() || this._activeTurnId) return;
+      if (!pendingInteractionMatches(saved, live)) return;
+      this._insertRuntimeInteraction(live);
     }
 
     _insertUncertaintyBlock(event) {

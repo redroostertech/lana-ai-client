@@ -113,6 +113,20 @@ describe('SSEChatSource contract', () => {
     expect(body.context).toEqual({ task_id: 'task-1', reply });
   });
 
+  test('a dynamic_card frame reaches the chat as a card, and the live interaction read returns the pending one', async () => {
+    const card = { card_type: 'connector_setup', connector_type: 'stripe', connector_name: 'Stripe', scope: 'org' };
+    const interaction = { id: 'int-1', kind: 'wizard', task_id: 'task-1', status: 'pending' };
+    const api = canonicalApi({ get: jest.fn().mockResolvedValue({ status: 'success', interaction }) });
+    const { Source } = loadSource(jest.fn(), { api });
+    const source = new Source({ api });
+    expect(source._mapEvent('dynamic_card', { card })).toEqual({ type: 'dynamic_card', card });
+    expect(source._mapEvent('dynamic_card', {})).toBeNull();
+    expect(await source.loadPendingInteraction('thread-1')).toEqual(interaction);
+    expect(api.get).toHaveBeenCalledWith('/api/v1/conversations/thread-1/runtime-interaction');
+    api.get.mockRejectedValueOnce(new Error('offline'));
+    expect(await source.loadPendingInteraction('thread-1')).toBeUndefined();
+  });
+
   test('live and history adapters preserve exact display labels separately from document routing', async () => {
     const citations = [{ document_id: 'doc-original', filename: 'E2E-_.pdf',
       display_filename: 'E2E (देवनागरी) [2026].pdf', source_type: 'document' }];

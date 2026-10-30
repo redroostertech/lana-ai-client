@@ -207,6 +207,12 @@
       return this._requireApi().get(`/api/v1/conversations/${encode(conversationId)}/activity/history${query ? `?${query}` : ''}`);
     }
 
+    /** The runtime interaction the conversation is waiting on now, or null. */
+    async getRuntimeInteraction(conversationId) {
+      const api = this._requireApi();
+      return api.get(`/api/v1/conversations/${encode(conversationId)}/runtime-interaction`);
+    }
+
     async executeSlashCommand(conversationId, command, args) {
       const api = this._requireApi();
       if (typeof api.executeConversationSlashCommand === 'function') {

@@ -1154,13 +1154,13 @@
     var connectorsLoading = document.getElementById('connectorsLoading');
     var connectorsContent = document.getElementById('connectorsContent');
 
-    if (!connectorsLoading || !connectorsContent) return;
+    if (!connectorsLoading || !connectorsContent) return null;
 
     // Show loading, hide content
     connectorsLoading.classList.remove('hidden');
     connectorsContent.classList.add('hidden');
 
-    Promise.allSettled([
+    return Promise.allSettled([
       Connectors.getAll(),
       ConnectorRegistry.getCatalog()
     ]).then(function (results) {
@@ -1811,8 +1811,21 @@
     // Setup event listeners
     setupEventListeners();
 
-    // Load data
-    loadConnectors();
+    // Load data. The chat connector setup card opens this page for one
+    // connector (Lex.Nav params connector and source); open it once the list
+    // has loaded, the same way a row click does.
+    var requested = requestedConnectorFromNav();
+    var loaded = loadConnectors();
+    if (requested && loaded) {
+      loaded.then(function () { openConnectorEntry(requested); });
+    }
+  }
+
+  function requestedConnectorFromNav() {
+    if (!window.Lex || !window.Lex.Nav || typeof window.Lex.Nav.getParams !== 'function') return null;
+    var params = window.Lex.Nav.getParams();
+    if (!params || typeof params.get !== 'function') return null;
+    return params.get('source') || params.get('connector') || null;
   }
 
   function onLeave() {

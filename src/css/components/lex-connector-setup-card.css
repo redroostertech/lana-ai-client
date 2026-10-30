@@ -1,0 +1,69 @@
+/* <lex-connector-setup-card>: the chat card for connecting a service.
+   Component: src/js/lex/chat/lex-connector-setup-card.js */
+
+lex-connector-setup-card {
+  display: block;
+  margin: var(--lex-space-sm, 8px) 0;
+}
+
+.lex-csc {
+  display: flex;
+  align-items: center;
+  gap: var(--lex-space-md, 12px);
+  padding: var(--lex-space-md, 12px);
+  background: var(--lex-bg-muted);
+  border: 1px solid var(--lex-border-default);
+  border-radius: var(--lex-radius-lg, 8px);
+}
+
+.lex-csc__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--lex-radius-md, 6px);
+  color: var(--lex-text-secondary);
+  border: 1px solid var(--lex-border-default);
+}
+
+.lex-csc__body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.lex-csc__name {
+  font-weight: 600;
+  color: var(--lex-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lex-csc__status {
+  font-size: 0.8125rem;
+  color: var(--lex-text-secondary);
+}
+
+.lex-csc__status[data-status="connected"] {
+  color: var(--lex-status-success-text, var(--lex-text-secondary));
+}
+
+.lex-csc__status[data-status="disconnected"] {
+  color: var(--lex-status-danger-text, var(--lex-text-secondary));
+}
+
+.lex-csc__note {
+  margin: var(--lex-space-xs, 4px) 0 0;
+  font-size: 0.8125rem;
+  color: var(--lex-text-tertiary);
+}
+
+.lex-csc__action {
+  flex: 0 0 auto;
+}
+
+.lex-csc__action:empty {
+  display: none;
+}

@@ -113,6 +113,14 @@
       return { active: false };
     }
 
+    /**
+     * The runtime interaction (question, wizard, approval) the conversation is
+     * waiting on now, read live. Sources without a runtime return null.
+     */
+    async loadPendingInteraction(conversationId) {
+      return null;
+    }
+
     /** Cleanup on disconnect. */
     disconnect() {
       this._connected = false;
@@ -469,6 +477,25 @@
       }
     }
 
+    /**
+     * The interaction the run record is waiting on now, or null. A saved
+     * message only remembers a minimal projection; this read is what decides
+     * whether it is still pending.
+     *
+     * @param {string} [conversationId] defaults to the currently-bound conversation
+     * @returns {Promise<Object|null|undefined>} undefined means the read failed
+     */
+    async loadPendingInteraction(conversationId) {
+      const id = conversationId || this._conversationId;
+      if (!id) return null;
+      try {
+        const data = await this._conversationsApi.getRuntimeInteraction(id);
+        return data && data.interaction ? data.interaction : null;
+      } catch (_) {
+        return undefined;
+      }
+    }
+
     disconnect() {
       // Detach this page's transport. Only an explicit Stop cancels the
       // server-owned generation, which may be viewed from another page.
@@ -646,6 +673,11 @@
 
         case 'interaction_required':
           return data.interaction ? { type: 'interaction_required', interaction: data.interaction } : null;
+
+        // A card attached to a runtime answer (connector_setup). Rendered by
+        // LexDynamicCardRenderer, which only creates allow-listed types.
+        case 'dynamic_card':
+          return data.card ? { type: 'dynamic_card', card: data.card } : null;
 
         case 'references':
           return { type: 'references', references: data.references || [] };

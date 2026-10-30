@@ -4,8 +4,15 @@
    descriptors. Works identically for live SSE streams and history reloads.
 
    Card descriptors arrive from the backend in two ways:
-     1. Live stream  : embedded in the `plan_ready` SSE event (event.card)
+     1. Live stream  : embedded in the `plan_ready` SSE event (event.card), or
+                       a `dynamic_card` SSE event (event.card) from the runtime
      2. History load : stored in message metadata under `dynamic_cards[]`
+
+   Two descriptor shapes:
+     - { type: '<tag>', props, data, actions, ... }  the tag is the element
+     - { card_type: '<name>', ...fields }            a typed card: the name
+       maps to a tag in CARD_TYPE_ELEMENTS, its fields become attributes, and
+       the component script loads on first use (connector_setup)
 
    The renderer is data-driven — it never contains feature-specific logic.
    Adding a new card type requires only:
@@ -39,9 +46,67 @@
    * @type {string[]}
    */
   var ALLOWED_CARD_TYPES = [
-    'lex-agentic-plan-card'
+    'lex-agentic-plan-card',
+    'connector_setup'
     // Future: 'lex-artifact-preview-card', 'lex-skill-approval-card', etc.
   ];
+
+  /**
+   * Typed cards (descriptor.card_type): the element, the descriptor fields
+   * set as attributes (nothing else on the descriptor reaches the element),
+   * and the scripts that define it, relative to js/.
+   */
+  var CARD_TYPE_ELEMENTS = {
+    connector_setup: {
+      tag: 'lex-connector-setup-card',
+      attributes: { connector_type: 'connector-type', connector_name: 'connector-name', scope: 'scope' },
+      scripts: ['lex/chat/connector-setup-card.model.js', 'lex/chat/lex-connector-setup-card.js']
+    }
+  };
+
+  var RENDERER_MARKER = 'js/lex/chat/lex-dynamic-card.renderer.js';
+  var rendererSrc = (typeof document !== 'undefined' && document.currentScript && document.currentScript.src) || '';
+  var jsBase = rendererSrc.lastIndexOf(RENDERER_MARKER) === -1
+    ? 'js/' : rendererSrc.slice(0, rendererSrc.lastIndexOf(RENDERER_MARKER)) + 'js/';
+  var scriptLoads = {};
+
+  function loadScript(rel) {
+    if (!scriptLoads[rel]) {
+      scriptLoads[rel] = new Promise(function (resolve, reject) {
+        var script = document.createElement('script');
+        script.src = jsBase + rel;
+        script.onload = function () { resolve(true); };
+        script.onerror = function () { delete scriptLoads[rel]; reject(new Error(rel + ' could not be loaded')); };
+        document.head.appendChild(script);
+      });
+    }
+    return scriptLoads[rel];
+  }
+
+  /** Load a typed card's scripts in order, once, unless its element exists. */
+  function ensureCardElement(spec) {
+    if (global.customElements && global.customElements.get(spec.tag)) return Promise.resolve(true);
+    return spec.scripts.reduce(function (chain, rel) {
+      return chain.then(function () { return loadScript(rel); });
+    }, Promise.resolve(true));
+  }
+
+  function renderTypedCard(descriptor, container) {
+    var spec = CARD_TYPE_ELEMENTS[descriptor.card_type];
+    if (!spec) return null;
+    var el = document.createElement(spec.tag);
+    var fields = Object.keys(spec.attributes);
+    for (var i = 0; i < fields.length; i++) {
+      var value = descriptor[fields[i]];
+      if (value !== undefined && value !== null) el.setAttribute(spec.attributes[fields[i]], String(value));
+    }
+    el.setAttribute('card-type', descriptor.card_type);
+    container.appendChild(el);
+    ensureCardElement(spec).catch(function (err) {
+      console.warn('[LexDynamicCardRenderer] Card could not be loaded:', descriptor.card_type, err && err.message);
+    });
+    return el;
+  }
 
   /**
    * Render a dynamic card from a descriptor and append it to a container.
@@ -61,7 +126,16 @@
    * @returns {HTMLElement|null} The created card element, or null if skipped
    */
   function renderCard(descriptor, container) {
-    if (!descriptor || !descriptor.type || !container) return null;
+    if (!descriptor || !container) return null;
+    if (!descriptor.type && descriptor.card_type) {
+      if (ALLOWED_CARD_TYPES.indexOf(descriptor.card_type) === -1) {
+        console.warn('[LexDynamicCardRenderer] Unknown card type, skipping:', descriptor.card_type);
+        return null;
+      }
+      return renderTypedCard(descriptor, container);
+    }
+    // A typed card name is never an element tag.
+    if (!descriptor.type || CARD_TYPE_ELEMENTS[descriptor.type]) return null;
 
     if (ALLOWED_CARD_TYPES.indexOf(descriptor.type) === -1) {
       console.warn('[LexDynamicCardRenderer] Unknown card type — skipping:', descriptor.type);
@@ -157,7 +231,8 @@
   global.LexDynamicCardRenderer = {
     renderCard: renderCard,
     refreshCardStates: refreshCardStates,
-    ALLOWED_CARD_TYPES: ALLOWED_CARD_TYPES
+    ALLOWED_CARD_TYPES: ALLOWED_CARD_TYPES,
+    CARD_TYPE_ELEMENTS: CARD_TYPE_ELEMENTS
   };
 
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -70,6 +70,42 @@ test('wizard preserves server fields and a failed response does not claim submis
   dom.window.close();
 });
 
+function reloadWith(chat, container, messages, live) {
+  chat._props = {};
+  chat._updateDocumentState = jest.fn();
+  chat._showPendingGenerationRecovery = jest.fn();
+  chat._threadEl.clear = () => container.replaceChildren();
+  chat._threadEl.addMessage = jest.fn();
+  chat._source = {
+    connect: jest.fn().mockResolvedValue(), loadState: jest.fn().mockResolvedValue({}),
+    loadHistory: jest.fn().mockResolvedValue({ messages }),
+    checkActiveGeneration: jest.fn().mockResolvedValue({ active: false }),
+    loadPendingInteraction: jest.fn().mockResolvedValue(live)
+  };
+}
+
+test.each([
+  ['still pending in the run record', 'live', 1],
+  ['answered elsewhere (nothing pending)', null, 0],
+  ['the live read failed', undefined, 0],
+  ['another interaction is pending now', 'other', 0]
+])('reload offers a saved interaction only when it is %s', async (_label, liveKind, rendered) => {
+  const { dom, chat, container, render, interaction } = setup();
+  const saved = { id: interaction.id, task_id: interaction.task_id, kind: 'wizard', status: 'pending', title: 'Task details', prompt: '',
+    fields: [{ name: 'title', type: 'text', label: 'Title', required: true }] };
+  const live = liveKind === 'live' ? { ...saved, fields: [{ ...saved.fields[0], value: 'Intake call' }] }
+    : liveKind === 'other' ? { ...saved, id: 'int-9' } : liveKind;
+  reloadWith(chat, container, [{ role: 'assistant', content: 'Task details',
+    metadata: { intelligence_runtime: { task_id: interaction.task_id, interaction: saved } } }], live);
+  await chat.loadConversation('conversation-1');
+  await new Promise(resolve => setImmediate(resolve));
+  expect(chat._source.loadPendingInteraction).toHaveBeenCalledWith('conversation-1');
+  expect(render).toHaveBeenCalledTimes(rendered);
+  // The live interaction (with its prefilled value) is what is offered.
+  if (rendered) expect(render.mock.calls[0][1][0].fields[0].value).toBe('Intake call');
+  dom.window.close();
+});
+
 test.each([false, true])('refresh restores only a still-pending task interaction (resolved: %s)', async (resolved) => {
   const { dom, chat, container, render, interaction } = setup();
   chat._props = {};
@@ -84,10 +120,21 @@ test.each([false, true])('refresh restores only a still-pending task interaction
   chat._source = {
     connect: jest.fn().mockResolvedValue(), loadState: jest.fn().mockResolvedValue({}),
     loadHistory: jest.fn().mockResolvedValue({ messages }),
-    checkActiveGeneration: jest.fn().mockResolvedValue({ active: false })
+    checkActiveGeneration: jest.fn().mockResolvedValue({ active: false }),
+    loadPendingInteraction: jest.fn().mockResolvedValue(interaction)
   };
   await chat.loadConversation('conversation-1');
+  await new Promise(resolve => setImmediate(resolve));
   expect(render).toHaveBeenCalledTimes(resolved ? 0 : 1);
   expect(container.children).toHaveLength(resolved ? 0 : 1);
+  dom.window.close();
+});
+
+test('a live dynamic_card frame is handed to the card renderer under the answer', () => {
+  const { dom, w, chat, container } = setup();
+  w.LexDynamicCardRenderer = { renderCard: jest.fn() };
+  const card = { card_type: 'connector_setup', connector_type: 'stripe', connector_name: 'Stripe', scope: 'org' };
+  chat._handleEvent({ type: 'dynamic_card', card }, true);
+  expect(w.LexDynamicCardRenderer.renderCard).toHaveBeenCalledWith(card, container);
   dom.window.close();
 });
