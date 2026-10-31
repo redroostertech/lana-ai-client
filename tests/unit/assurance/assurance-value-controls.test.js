@@ -14,5 +14,9 @@ test('maps allocation rows while leaving eligibility and total validation to the
   expect(valueFromFields('allocations', { allocations: [{ contactId: 'one', percent: '33.33' }, { contactId: 'two', percent: '66.67' }] }, contacts)).toEqual({ kind: 'allocations', value: [
     { beneficiary: { kind: 'contact', id: 'one' }, share_basis_points: 3333 }, { beneficiary: { kind: 'contact', id: 'two' }, share_basis_points: 6667 }
   ] });
-  expect(() => valueFromFields('text', { selected: 'one' }, contacts)).toThrow('not available');
+  expect(() => valueFromFields('number', { selected: '1' }, contacts)).toThrow('not available');
+  const mechanisms = ['probate', 'trust_title'];
+  expect(valueFromFields('text', { selected: 'trust_title' }, contacts, mechanisms)).toEqual({ kind: 'text', value: 'trust_title' });
+  expect(() => valueFromFields('text', { selected: 'invented' }, contacts, mechanisms)).toThrow('allows');
+  expect(() => valueFromFields('text', { selected: '' }, contacts, mechanisms)).toThrow('allows');
 });

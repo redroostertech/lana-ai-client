@@ -125,15 +125,23 @@
       finally { if (alive()) controls(); }
     }
     function targetRulebook() { return item(data.rulebooks, el('assuranceTargetRulebook').value); }
-    function targetRule() { var rulebook = targetRulebook(); return rulebook && rulebook.rules.find(function (rule) { return rule.predicate === el('assuranceTargetRule').value; }); }
+    // Rules are chosen by rule id: several rulebook rules can check the same predicate.
+    function ruleKey(rule) { return rule.id || rule.predicate; }
+    // An observation of a text target chooses from the same rule's allowed values.
+    function targetAllowedValues(target) {
+      var id = target.rule_id || target.ruleId; var match = null;
+      (data.rulebooks || []).forEach(function (rulebook) { (rulebook.rules || []).forEach(function (rule) { if (!match && id && rule.id === id) match = rule; }); });
+      return match && match.allowedValues || [];
+    }
+    function targetRule() { var rulebook = targetRulebook(); return rulebook && rulebook.rules.find(function (rule) { return ruleKey(rule) === el('assuranceTargetRule').value; }); }
     function renderRule(initialValue) {
       var rule = targetRule();
       el('assuranceTargetRuleDetails').textContent = rule ? 'Rule ' + Rulebook.ruleLabel(rule) + ' · evidence classes: ' + rule.evidenceClasses.join(', ').split('_').join(' ') + (rule.requireReviewedObservation ? '. Professional evidence review is required.' : '.') : 'Choose a rulebook and one of its rules.';
-      targetValue = rule ? AssuranceValueControls.createValueEditor(el('assuranceTargetValue'), { kind: rule.valueKind, contacts: data.contacts, value: initialValue }) : null;
+      targetValue = rule ? AssuranceValueControls.createValueEditor(el('assuranceTargetValue'), { kind: rule.valueKind, allowedValues: rule.allowedValues, contacts: data.contacts, value: initialValue }) : null;
       if (!rule) el('assuranceTargetValue').replaceChildren();
     }
     function renderRulebookRules(initialValue) {
-      var rulebook = targetRulebook(); select('assuranceTargetRule', rulebook ? rulebook.rules.map(function (rule) { return { value: rule.predicate, label: Rulebook.ruleLabel(rule) }; }) : []); renderRule(initialValue);
+      var rulebook = targetRulebook(); select('assuranceTargetRule', rulebook ? rulebook.rules.map(function (rule) { return { value: ruleKey(rule), label: Rulebook.ruleLabel(rule) }; }) : []); renderRule(initialValue);
     }
     function renderTargets() {
       el('assuranceTargetsList').innerHTML = data.targets.length ? data.targets.map(function (entry) { return '<article class="assurance-record"><strong>' + esc(labelTarget(entry)) + '</strong><p>Expected: ' + esc(describeValue(entry.record.value)) + '</p></article>'; }).join('') : '<p>No implementation targets have been accepted.</p>';
@@ -160,7 +168,7 @@
       el('assuranceObservationSupersedes').value = previous ? previous.supersedes.map(function (entry) { return entry.id; }) : [];
       el('assuranceObservationFrom').value = previous ? AssuranceEvidenceControls.localInput(previous.valid_from) : '';
       el('assuranceObservationUntil').value = previous ? AssuranceEvidenceControls.localInput(previous.valid_until) : '';
-      observedValue = target ? AssuranceValueControls.createValueEditor(el('assuranceObservationValue'), { kind: target.value.kind, contacts: data.contacts, value: previous && previous.value, observed: true }) : null;
+      observedValue = target ? AssuranceValueControls.createValueEditor(el('assuranceObservationValue'), { kind: target.value.kind, allowedValues: targetAllowedValues(target), contacts: data.contacts, value: previous && previous.value, observed: true }) : null;
       if (!target) el('assuranceObservationValue').textContent = 'Choose an accepted target before recording its evidence.';
       evidenceEditor = AssuranceEvidenceControls.createEvidenceEditor(el('assuranceObservationEvidence'), { releases: data.releases, evidenceClasses: status && status.supported && status.supported.evidenceClasses || [], value: previous && previous.evidence, openSource: openSource });
     }
@@ -261,7 +269,7 @@
       var target = record(data.targets, el('assuranceTargetEdit').value);
       if (!target) { el('assuranceTargetConfirm').checked = false; renderRule(); return; }
       el('assuranceTargetPlan').value = target.plan_ref.id; el('assuranceTargetRulebook').value = target.rulebook_ref.id;
-      renderRulebookRules(); el('assuranceTargetRule').value = target.predicate; el('assuranceTargetAsset').value = target.subject.id;
+      renderRulebookRules(); el('assuranceTargetRule').value = target.rule_id || target.ruleId || target.predicate; el('assuranceTargetAsset').value = target.subject.id;
       el('assuranceTargetConfirm').checked = false; renderRule(target.value);
     }
     async function submit(formId) {
@@ -282,7 +290,7 @@
       if (formId === 'assuranceTargetForm') {
         confirmed('assuranceTargetConfirm'); var rule = targetRule();
         if (!rule || !targetValue) throw new Error('Choose a rule from the adopted firm rulebook.');
-        return mutate('saveTarget', Object.assign(identity(data.targets, el('assuranceTargetEdit').value), { planRef: ref(data.plans, el('assuranceTargetPlan').value), rulebookRef: ref(data.rulebooks, el('assuranceTargetRulebook').value), subject: { kind: 'matter_asset', id: el('assuranceTargetAsset').value }, predicate: rule.predicate, value: targetValue.value(), rationale: el('assuranceTargetRationale').value.trim() }));
+        return mutate('saveTarget', Object.assign(identity(data.targets, el('assuranceTargetEdit').value), { planRef: ref(data.plans, el('assuranceTargetPlan').value), rulebookRef: ref(data.rulebooks, el('assuranceTargetRulebook').value), subject: { kind: 'matter_asset', id: el('assuranceTargetAsset').value }, ruleId: ruleKey(rule), predicate: rule.predicate, value: targetValue.value(), rationale: el('assuranceTargetRationale').value.trim() }));
       }
       if (formId === 'assuranceObservationForm') {
         var target = record(data.targets, el('assuranceObservationTarget').value);

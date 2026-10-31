@@ -51,7 +51,8 @@ function fixtureApi() {
     } else if (url.endsWith('/plans')) {
       const record = { id: 'plan', version: 1, releases: body.releases, acceptance_ref: ref('plan-acceptance') }; state.plan = [{ record, reference: ref('plan') }]; response = receipt('savePlan', body, record);
     } else if (url.endsWith('/targets')) {
-      const record = { id: 'target', version: 1, subject: body.subject, predicate: body.predicate, value: body.value, plan_ref: body.planRef, rulebook_ref: body.rulebookRef }; state.target = [{ record, reference: ref('target') }]; response = receipt('saveTarget', body, record);
+      if (typeof body.ruleId !== 'string' || !body.ruleId) throw new Error('saveTarget must send the chosen ruleId');
+      const record = { id: 'target', version: 1, rule_id: body.ruleId, subject: body.subject, predicate: body.predicate, value: body.value, plan_ref: body.planRef, rulebook_ref: body.rulebookRef }; state.target = [{ record, reference: ref('target') }]; response = receipt('saveTarget', body, record);
     } else if (url.endsWith('/observations/review')) {
       state.reviewed = true; const record = state.observation[0].record; record.version += 1; record.review_ref = ref('review'); state.observation[0].reference.version = record.version; response = receipt('reviewObservation', body, record); response.reference.version = record.version;
     } else if (url.endsWith('/observations')) {
@@ -99,7 +100,7 @@ const server = createPageServer('(' + fixtureApi.toString() + ')()');
     await value('assuranceRulebookRationale', 'Reviewed the Indiana starter and its flags.'); await check('assuranceRulebookConfirm'); await submit('assuranceRulebookForm'); await saved('adoptRulebook');
     await page.waitForFunction(() => document.getElementById('assuranceRulebookSummary').textContent.includes('Adopted'));
     assert.equal(await page.locator('#assuranceRulebookForm').evaluate(element => element.hidden), true);
-    await step('targets'); await value('assuranceTargetPlan', 'plan'); await value('assuranceTargetRulebook', 'rulebook', true); await value('assuranceTargetRule', 'owner', true); await value('assuranceTargetAsset', 'asset');
+    await step('targets'); await value('assuranceTargetPlan', 'plan'); await value('assuranceTargetRulebook', 'rulebook', true); await value('assuranceTargetRule', 'IN-OWN-1', true); await value('assuranceTargetAsset', 'asset');
     await page.locator('#assuranceTargetValue lex-select').evaluate(element => { element.value = 'contact'; }); await value('assuranceTargetRationale', 'The accepted plan identifies the trust as intended owner.'); await check('assuranceTargetConfirm'); await submit('assuranceTargetForm'); await saved('saveTarget');
     await step('observations'); await value('assuranceObservationTarget', 'target', true); await page.locator('#assuranceObservationValue lex-select').evaluate(element => { element.value = 'contact'; }); await value('assuranceObservationFrom', '2026-10-30T09:00');
     await page.locator('#assuranceObservationEvidence').evaluate(host => { const selects = host.querySelectorAll('lex-select'); selects[0].value = 'release'; selects[1].value = 'institution_acceptance'; selects[2].value = 'complete'; const inputs = host.querySelectorAll('lex-input'); inputs[0].value = '2026-10-30T09:00'; inputs[1].value = '1'; host.querySelector('lex-textarea').value = 'The institution confirms the registered owner.'; });
