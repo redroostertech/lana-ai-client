@@ -6,7 +6,7 @@
     var commands = options.commands;
     var client = AssuranceOnboardingClient.createOnboardingClient(api, options.matterId);
     var base = '/api/v1/implementation-assurance/matters/' + encodeURIComponent(options.matterId);
-    var data = { assets: [], plans: [], targets: [], observations: [], closeouts: [], contacts: [], releases: [], protocols: [] };
+    var data = { assets: [], plans: [], targets: [], observations: [], closeouts: [], contacts: [], releases: [], rulebooks: [] };
     var cursors = {};
     var status = null;
     var loading = false;
@@ -16,12 +16,15 @@
     var evidenceEditor;
     var closeout = null;
     var closeoutRequest = 0;
+    var starter = null;
+    var starterRequest = 0;
+    var Rulebook = AssuranceRulebookView;
     var esc = Lex.Utils.escapeHtml;
-    var operationLabels = { createAsset: 'reported asset', updateAsset: 'asset changes', savePlan: 'plan acceptance', saveTarget: 'target acceptance', recordObservation: 'observation pending review', reviewObservation: 'professional evidence review', decide: 'professional decision', prepareCloseout: 'closeout of recorded requirements', acceptCloseout: 'closeout acceptance' };
+    var operationLabels = { createAsset: 'reported asset', updateAsset: 'asset changes', savePlan: 'plan acceptance', saveTarget: 'target acceptance', recordObservation: 'observation pending review', reviewObservation: 'professional evidence review', decide: 'professional decision', prepareCloseout: 'closeout of recorded requirements', acceptCloseout: 'closeout acceptance', adoptRulebook: 'firm rulebook adoption', publishRulebook: 'firm rulebook publication' };
     var decisionLabels = { accept_conclusion: 'Finding accepted', accept_exception: 'Exception accepted', reject: 'Finding rejected' };
     var steps = [
-      ['inventory', '1 · Inventory'], ['plan', '2 · Plan'], ['targets', '3 · Targets'],
-      ['observations', '4 · Evidence'], ['evidence-review', '5 · Evidence review'], ['review', '6 · Decisions'], ['closeout', '7 · Closeout']
+      ['inventory', '1 · Inventory'], ['plan', '2 · Plan'], ['rulebook', '3 · Rulebook'], ['targets', '4 · Targets'],
+      ['observations', '5 · Evidence'], ['evidence-review', '6 · Evidence review'], ['review', '7 · Decisions'], ['closeout', '8 · Closeout']
     ];
     function el(id) { return root.querySelector('#' + id); }
     function alive() { return root.isConnected; }
@@ -30,7 +33,7 @@
     function record(items, id) { var entry = item(items, id); return entry && entry.record; }
     function ref(items, id) { var entry = item(items, id); if (!entry || !entry.reference) throw new Error('Choose an available saved version. Refresh if the record has changed.'); return Object.assign({}, entry.reference); }
     function labelAsset(id) { var asset = item(data.assets, id); return asset ? asset.description : 'Asset outside the loaded inventory'; }
-    function labelTarget(entry) { return labelAsset(entry.record.subject.id) + ' · ' + entry.record.predicate.split('_').join(' ') + ' · v' + entry.record.version; }
+    function labelTarget(entry) { var rule = Rulebook.ruleForTarget(data.rulebooks, entry.record); return labelAsset(entry.record.subject.id) + ' · ' + (rule ? Rulebook.ruleLabel(rule) : entry.record.predicate.split('_').join(' ')) + ' · v' + entry.record.version; }
     function labelObservation(entry) { return labelAsset(entry.record.subject.id) + ' · ' + entry.record.predicate + ' · v' + entry.record.version + (entry.record.review_ref ? ' · reviewed' : ' · pending review'); }
     function select(id, values, initial) {
       var control = el(id); var previous = initial === undefined ? control.value : initial;
@@ -49,6 +52,9 @@
       el('assuranceRecoveryText').textContent = commands.recoveryError() || (pending ? 'A prior ' + (operationLabels[pending.operation] || 'change') + ' request has an unconfirmed delivery outcome. Recover that exact change before submitting another.' : '');
       el('assuranceCloseoutAccept').disabled = disabled || !actionAllowed('acceptCloseout') || !closeout || closeout.current !== true || closeout.accepted === true;
       el('assuranceCloseoutDownload').disabled = loading || commands.busy() || !closeout;
+      var adopt = Rulebook.adoptState({ mode: rulebookMode(), pending: pending, busy: loading || commands.busy(), canPersist: commands.canPersist(), jurisdiction: el('assuranceRulebookJurisdiction').value, starter: starter });
+      el('assuranceRulebookAdopt').disabled = disabled || !adopt.enabled;
+      el('assuranceRulebookJurisdiction').disabled = loading || Boolean(adoptedRulebook());
       if (options.onState) options.onState();
     }
     function showStep(step) {
@@ -81,7 +87,7 @@
     function renderReadiness() {
       var checks = status && status.readiness && status.readiness.checks || [];
       el('assuranceReadiness').innerHTML = '<ul class="assurance-readiness">' + checks.map(function (check) { return '<li><strong>' + esc(check.status) + '</strong> · ' + esc(check.detail || check.code) + '</li>'; }).join('') + '</ul>';
-      if (!data.protocols.length) el('assuranceReadiness').appendChild(document.createTextNode(' No effective published protocol is available in the loaded choices. A firm administrator must publish approved protocol content before targets can be accepted.'));
+      if (!data.rulebooks.length) el('assuranceReadiness').appendChild(document.createTextNode(' No effective adopted rulebook is available in the loaded choices. A firm administrator must adopt a rulebook in the Rulebook section before targets can be accepted.'));
       if (!actionAllowed('review')) el('assuranceReadiness').appendChild(document.createTextNode(' Professional acceptance requires an explicit firm grant. Contact your administrator if this is your role.'));
     }
     function renderAssets() {
@@ -95,24 +101,47 @@
       el('assurancePlanReleases').options = data.releases.map(function (release) { return { value: release.id, label: release.label + ' · version ' + release.reference.version }; });
       sourceList(el('assurancePlanSources'), (el('assurancePlanReleases').value || []).map(function (id) { return ref(data.releases, id); }));
     }
-    function targetProtocol() { return item(data.protocols, el('assuranceTargetProtocol').value); }
-    function targetRule() { var protocol = targetProtocol(); return protocol && protocol.rules.find(function (rule) { return rule.predicate === el('assuranceTargetRule').value; }); }
+    function adoptedRulebook() { return data.rulebooks[0] || null; }
+    function rulebookMode() { return Rulebook.viewMode(adoptedRulebook(), status && status.actions); }
+    function renderRulebook() {
+      var adopted = adoptedRulebook(); var mode = rulebookMode(); var shown = adopted || starter;
+      el('assuranceRulebookAccess').textContent = Rulebook.accessExplanation(mode);
+      el('assuranceRulebookFlags').textContent = Rulebook.reviewFlagNotice;
+      el('assuranceRulebookForm').hidden = mode !== 'adopt';
+      el('assuranceRulebookSummary').textContent = adopted ? 'Adopted: ' + adopted.label + (adopted.effectiveFrom ? ' · effective ' + adopted.effectiveFrom : '') + ' · ' + Rulebook.summary(adopted)
+        : starter ? 'Starter preview, not adopted: ' + starter.title + ' · ' + Rulebook.jurisdictionLabel(starter.jurisdiction) + ' · version ' + starter.version + ' · ' + Rulebook.summary(starter)
+          : 'No firm rulebook is adopted. Choose a jurisdiction to preview its starter rulebook.';
+      if (shown) Rulebook.renderRules(el('assuranceRulebookRules'), shown); else el('assuranceRulebookRules').replaceChildren();
+    }
+    async function previewStarter() {
+      var jurisdiction = el('assuranceRulebookJurisdiction').value; var request = ++starterRequest;
+      starter = null; el('assuranceRulebookConfirm').checked = false; renderRulebook(); controls();
+      if (!Rulebook.isJurisdiction(jurisdiction)) return;
+      try {
+        var result = Rulebook.unwrapStarter(await client.starter(jurisdiction), jurisdiction);
+        if (!alive() || request !== starterRequest) return;
+        starter = result; renderRulebook();
+      } catch (error) { if (request === starterRequest) notify(error.status ? ImplementationAssuranceClient.errorMessage(error) : error.message); }
+      finally { if (alive()) controls(); }
+    }
+    function targetRulebook() { return item(data.rulebooks, el('assuranceTargetRulebook').value); }
+    function targetRule() { var rulebook = targetRulebook(); return rulebook && rulebook.rules.find(function (rule) { return rule.predicate === el('assuranceTargetRule').value; }); }
     function renderRule(initialValue) {
       var rule = targetRule();
-      el('assuranceTargetRuleDetails').textContent = rule ? 'Protocol evidence classes: ' + rule.evidenceClasses.join(', ').split('_').join(' ') + (rule.requireReviewedObservation ? '. Professional evidence review is required.' : '.') : 'Choose a protocol and its declared requirement.';
+      el('assuranceTargetRuleDetails').textContent = rule ? 'Rule ' + Rulebook.ruleLabel(rule) + ' · evidence classes: ' + rule.evidenceClasses.join(', ').split('_').join(' ') + (rule.requireReviewedObservation ? '. Professional evidence review is required.' : '.') : 'Choose a rulebook and one of its rules.';
       targetValue = rule ? AssuranceValueControls.createValueEditor(el('assuranceTargetValue'), { kind: rule.valueKind, contacts: data.contacts, value: initialValue }) : null;
       if (!rule) el('assuranceTargetValue').replaceChildren();
     }
-    function renderProtocol(initialValue) {
-      var protocol = targetProtocol(); select('assuranceTargetRule', protocol ? protocol.rules.map(function (rule) { return { value: rule.predicate, label: rule.label }; }) : []); renderRule(initialValue);
+    function renderRulebookRules(initialValue) {
+      var rulebook = targetRulebook(); select('assuranceTargetRule', rulebook ? rulebook.rules.map(function (rule) { return { value: rule.predicate, label: Rulebook.ruleLabel(rule) }; }) : []); renderRule(initialValue);
     }
     function renderTargets() {
       el('assuranceTargetsList').innerHTML = data.targets.length ? data.targets.map(function (entry) { return '<article class="assurance-record"><strong>' + esc(labelTarget(entry)) + '</strong><p>Expected: ' + esc(describeValue(entry.record.value)) + '</p></article>'; }).join('') : '<p>No implementation targets have been accepted.</p>';
       var choices = data.targets.map(function (entry) { return { value: entry.record.id, label: labelTarget(entry) }; });
       select('assuranceTargetEdit', [{ value: 'new', label: 'Create a new target' }].concat(choices));
       select('assuranceObservationTarget', choices);
-      select('assuranceTargetProtocol', data.protocols.map(function (protocol) { return { value: protocol.id, label: protocol.label + ' · effective ' + protocol.effectiveFrom }; }));
-      renderProtocol();
+      select('assuranceTargetRulebook', data.rulebooks.map(function (rulebook) { return { value: rulebook.id, label: rulebook.label + ' · effective ' + rulebook.effectiveFrom }; }));
+      renderRulebookRules();
     }
     function describeValue(value) {
       function name(reference) { var contact = item(data.contacts, reference.id); return contact ? contact.label : 'Contact outside loaded lookup'; }
@@ -163,14 +192,14 @@
       finally { if (alive()) controls(); }
     }
     function render() {
-      renderReadiness(); renderAssets(); renderPlans(); renderTargets(); renderObservations();
+      renderReadiness(); renderAssets(); renderPlans(); renderRulebook(); renderTargets(); renderObservations();
       select('assuranceCloseoutSelect', data.closeouts.map(function (entry) { return { value: entry.record.id, label: 'Closeout · ' + entry.record.recorded_at }; }));
       el('assuranceMore').hidden = !Object.values(cursors).some(Boolean);
       showStep(currentStep); controls();
       if (options.onRecords) options.onRecords(data);
     }
     var loaders = {
-      contacts: function (cursor) { return client.lookup('contacts', cursor); }, releases: function (cursor) { return client.lookup('releases', cursor); }, protocols: function (cursor) { return client.lookup('protocols', cursor); },
+      contacts: function (cursor) { return client.lookup('contacts', cursor); }, releases: function (cursor) { return client.lookup('releases', cursor); }, rulebooks: function (cursor) { return client.lookup('rulebooks', cursor); },
       plans: function (cursor) { return client.records('plan', cursor); }, targets: function (cursor) { return client.records('target', cursor); }, observations: function (cursor) { return client.records('observation', cursor); }, closeouts: function (cursor) { return client.records('closeout', cursor); },
       assets: function (cursor) { return api.request('GET', base + '/assets?limit=50' + (cursor ? '&after_id=' + encodeURIComponent(cursor) : ''), null).then(function (page) { return { items: page.assets, nextCursor: page.next_cursor, complete: !page.next_cursor }; }); }
     };
@@ -231,8 +260,8 @@
     function editTarget() {
       var target = record(data.targets, el('assuranceTargetEdit').value);
       if (!target) { el('assuranceTargetConfirm').checked = false; renderRule(); return; }
-      el('assuranceTargetPlan').value = target.plan_ref.id; el('assuranceTargetProtocol').value = target.protocol_ref.id;
-      renderProtocol(); el('assuranceTargetRule').value = target.predicate; el('assuranceTargetAsset').value = target.subject.id;
+      el('assuranceTargetPlan').value = target.plan_ref.id; el('assuranceTargetRulebook').value = target.rulebook_ref.id;
+      renderRulebookRules(); el('assuranceTargetRule').value = target.predicate; el('assuranceTargetAsset').value = target.subject.id;
       el('assuranceTargetConfirm').checked = false; renderRule(target.value);
     }
     async function submit(formId) {
@@ -252,8 +281,8 @@
       }
       if (formId === 'assuranceTargetForm') {
         confirmed('assuranceTargetConfirm'); var rule = targetRule();
-        if (!rule || !targetValue) throw new Error('Choose an available published protocol requirement.');
-        return mutate('saveTarget', Object.assign(identity(data.targets, el('assuranceTargetEdit').value), { planRef: ref(data.plans, el('assuranceTargetPlan').value), protocolRef: ref(data.protocols, el('assuranceTargetProtocol').value), subject: { kind: 'matter_asset', id: el('assuranceTargetAsset').value }, predicate: rule.predicate, value: targetValue.value(), rationale: el('assuranceTargetRationale').value.trim() }));
+        if (!rule || !targetValue) throw new Error('Choose a rule from the adopted firm rulebook.');
+        return mutate('saveTarget', Object.assign(identity(data.targets, el('assuranceTargetEdit').value), { planRef: ref(data.plans, el('assuranceTargetPlan').value), rulebookRef: ref(data.rulebooks, el('assuranceTargetRulebook').value), subject: { kind: 'matter_asset', id: el('assuranceTargetAsset').value }, predicate: rule.predicate, value: targetValue.value(), rationale: el('assuranceTargetRationale').value.trim() }));
       }
       if (formId === 'assuranceObservationForm') {
         var target = record(data.targets, el('assuranceObservationTarget').value);
@@ -264,6 +293,14 @@
         confirmed('assuranceObservationReviewConfirm'); var observation = record(data.observations, el('assuranceObservationReview').value);
         if (!observation) throw new Error('Choose the exact observation to review.');
         return mutate('reviewObservation', { id: observation.id, expectedVersion: observation.version, rationale: el('assuranceObservationReviewRationale').value.trim() });
+      }
+      if (formId === 'assuranceRulebookForm') {
+        confirmed('assuranceRulebookConfirm');
+        var command = Rulebook.adoptCommand({ adopted: adoptedRulebook(), jurisdiction: el('assuranceRulebookJurisdiction').value, starter: starter, rationale: el('assuranceRulebookRationale').value });
+        return mutate('adoptRulebook', command).then(function (response) { starter = null; el('assuranceRulebookRationale').value = ''; el('assuranceRulebookConfirm').checked = false; renderRulebook(); return response; }, function (error) {
+          var message = Rulebook.adoptErrorMessage(error); if (!message) throw error;
+          notify(message + (commands.pending() ? ' Recover the same pending change before continuing.' : '')); controls();
+        });
       }
       if (formId === 'assuranceCloseoutForm') {
         confirmed('assuranceCloseoutConfirm');
@@ -287,7 +324,8 @@
       if (id === 'assurancePlanEdit') editPlan();
       if (id === 'assurancePlanReleases') { try { sourceList(el('assurancePlanSources'), selectedRefs(id, data.releases)); } catch (error) { handleError(error); } }
       if (id === 'assuranceTargetEdit') editTarget();
-      if (id === 'assuranceTargetProtocol') renderProtocol();
+      if (id === 'assuranceTargetRulebook') renderRulebookRules();
+      if (id === 'assuranceRulebookJurisdiction') previewStarter();
       if (id === 'assuranceTargetRule') renderRule();
       if (id === 'assuranceObservationTarget' || id === 'assuranceObservationEdit') renderObservationEditor();
       if (id === 'assuranceObservationReview') renderObservationReview();
@@ -310,6 +348,7 @@
     });
     el('assuranceStep').options = steps.map(function (step) { return { value: step[0], label: step[1] }; });
     el('assuranceAssetClass').options = ['annuity', 'bank_account', 'life_insurance', 'retirement', 'real_estate', 'brokerage', 'business_interest', 'personal_property', 'other'].map(function (value) { return { value: value, label: value.split('_').join(' ') }; });
+    el('assuranceRulebookJurisdiction').options = Rulebook.jurisdictions.map(function (entry) { return { value: entry.value, label: Rulebook.jurisdictionLabel(entry.value) }; });
     el('assuranceObservationFrom').type = 'datetime-local'; el('assuranceObservationUntil').type = 'datetime-local';
     showStep(currentStep); controls();
     return { refresh: refresh, controls: controls, showStep: showStep, actionAllowed: actionAllowed, data: function () { return data; }, busy: function () { return loading; } };

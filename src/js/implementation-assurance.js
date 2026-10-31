@@ -51,17 +51,21 @@
       if (value.kind === 'allocations') return value.value.map(function (item) { return name(item.beneficiary) + ' — ' + (item.share_basis_points / 100) + '%'; }).join('; ');
       return typeof value.value === 'object' ? 'See accepted plan for this value' : String(value.value);
     }
+    function targetRuleLabel(target) {
+      var rule = onboarding && AssuranceRulebookView.ruleForTarget(onboarding.data().rulebooks, target);
+      return rule ? AssuranceRulebookView.ruleLabel(rule) : target.predicate.split('.').join(' ');
+    }
     function renderTargets() {
       var select = el('assuranceTarget');
       select.options = targets.map(function (entry) { return { value: entry.record.id,
-        label: assetName(entry.record.subject.id) + ' · ' + entry.record.predicate.split('.').join(' ') + ' · v' + entry.record.version }; });
+        label: assetName(entry.record.subject.id) + ' · ' + targetRuleLabel(entry.record) + ' · v' + entry.record.version }; });
       select.value = selected;
     }
     function showTarget() {
       var target = targets.find(function (entry) { return entry.record.id === selected; });
       el('assuranceAssessment').hidden = true;
       el('assuranceDecisionForm').hidden = true;
-      el('assuranceTargetDetails').textContent = target ? 'Expected value: ' + expectedValue(target.record.value) : '';
+      el('assuranceTargetDetails').textContent = target ? 'Rulebook rule: ' + targetRuleLabel(target.record) + ' · Expected value: ' + expectedValue(target.record.value) : '';
       controls();
     }
     async function load(append) {
@@ -78,7 +82,7 @@
       var target = el('assuranceAssessment');
       target.hidden = false;
       target.innerHTML = '<div class="assurance-status" data-outcome="' + esc(finding.outcome) + '"><strong>' + esc(labels[finding.outcome] || 'Assessment unavailable') + '</strong><p>' + esc(finding.reason.split('_').join(' ')) + '</p>' + (finding.inventory && finding.inventory.reason ? '<p>' + esc(finding.inventory.reason) + '</p>' : '') + '</div>' +
-        '<dl class="assurance-facts">' + reference('Accepted plan', finding.plan) + reference('Protocol', finding.protocol) + reference('Target', finding.target) +
+        '<dl class="assurance-facts">' + reference('Accepted plan', finding.plan) + reference('Rulebook', finding.rulebook) + reference('Target', finding.target) +
         '<dt>Observations checked</dt><dd>' + esc(String(finding.observations.length)) + '</dd><dt>Assessed at</dt><dd>' + esc(finding.as_of) + '</dd></dl>';
       el('assuranceDecisionForm').hidden = false;
       var supported = finding.outcome === 'match';

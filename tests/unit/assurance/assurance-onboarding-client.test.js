@@ -62,3 +62,28 @@ test('closeout acceptance must return the exact bound professional receipt', asy
   await expect(session.execute('acceptCloseout', { closeoutId: 'closeout', expectedBinding: 'binding', scopeAcknowledgement: 'recorded_plan_targets', rationale: 'Reviewed' })).rejects.toThrow('bound closeout');
   expect(session.pending()).not.toBeNull();
 });
+test('rulebook lookups and starter preview use the rulebook paths only', async () => {
+  const { api } = setup(); api.request.mockResolvedValue({}); const client = createOnboardingClient(api, 'matter');
+  await client.lookup('rulebooks'); await client.starter('US-IN');
+  expect(api.request.mock.calls[0][1]).toBe('/api/v1/implementation-assurance/matters/matter/lookups/rulebooks?limit=50');
+  expect(api.request.mock.calls[1]).toEqual(['GET', '/api/v1/implementation-assurance/rulebooks/starter?jurisdiction=US-IN', null]);
+  await expect(client.lookup('protocols')).rejects.toThrow('Unknown lookup');
+  await expect(client.starter('US-XX')).rejects.toThrow('Unknown jurisdiction');
+});
+test('rulebook adoption is a global exact command that survives an unknown outcome', async () => {
+  const { api, session } = setup(); api.request.mockRejectedValueOnce({ status: 0 });
+  const payload = { jurisdiction: 'US-GA', expectedVersion: 0, rationale: 'Reviewed starter' };
+  await expect(session.execute('adoptRulebook', payload)).rejects.toMatchObject({ status: 0 });
+  expect(api.request.mock.calls[0]).toEqual(['POST', '/api/v1/implementation-assurance/rulebooks/adopt', { ...payload, requestId: 'request' }]);
+  await expect(session.execute('adoptRulebook', { ...payload, rationale: 'Different' })).rejects.toThrow('Recover the pending');
+  api.request.mockResolvedValueOnce(receipt('adoptRulebook'));
+  await session.retry(); expect(api.request.mock.calls[1]).toEqual(api.request.mock.calls[0]); expect(session.pending()).toBeNull();
+});
+test('stale rulebook adoption is a definitive refusal and publish uses the renamed route', async () => {
+  const { api, session } = setup(); api.request.mockRejectedValueOnce({ status: 409 });
+  await expect(session.execute('adoptRulebook', { jurisdiction: 'US-FL', expectedVersion: 0, rationale: 'x' })).rejects.toMatchObject({ status: 409 });
+  expect(session.pending()).toBeNull();
+  api.request.mockResolvedValueOnce(receipt('publishRulebook')); await session.execute('publishRulebook', { expectedVersion: 0, definition: {} });
+  expect(api.request.mock.calls[1][1]).toBe('/api/v1/implementation-assurance/rulebooks');
+  await expect(session.execute('publishProtocol', {})).rejects.toThrow('not available');
+});

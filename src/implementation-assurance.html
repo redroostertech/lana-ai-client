@@ -65,18 +65,35 @@
           </div></lex-form>
         </section></lex-card>
       </section>
+      <section data-assurance-step="rulebook" class="assurance-grid" hidden>
+        <lex-card heading="Firm rulebook"><section class="assurance-section">
+          <p id="assuranceRulebookSummary" class="assurance-muted"></p>
+          <p id="assuranceRulebookFlags" class="assurance-status"></p>
+          <div id="assuranceRulebookRules" class="assurance-section"></div>
+        </section></lex-card>
+        <lex-card heading="Starter rulebook"><section class="assurance-section">
+          <p id="assuranceRulebookAccess" class="assurance-muted"></p>
+          <lex-select id="assuranceRulebookJurisdiction" label="Jurisdiction to preview" placeholder="Choose a jurisdiction"></lex-select>
+          <lex-form id="assuranceRulebookForm"><div class="assurance-section">
+            <p class="assurance-muted">Adoption publishes this starter as the firm rulebook. It records your professional choice; it does not verify the flagged rules.</p>
+            <lex-textarea id="assuranceRulebookRationale" label="Basis for adopting this rulebook" rows="3" required></lex-textarea>
+            <lex-checkbox id="assuranceRulebookConfirm" label="I reviewed this starter rulebook, including its review flags, and adopt it as the firm rulebook."></lex-checkbox>
+            <lex-btn id="assuranceRulebookAdopt" type="submit" variant="primary" label="Adopt this rulebook" data-assurance-permission="publishRulebook"></lex-btn>
+          </div></lex-form>
+        </section></lex-card>
+      </section>
       <section data-assurance-step="targets" class="assurance-grid" hidden>
         <lex-card heading="Implementation targets"><section class="assurance-section"><div id="assuranceTargetsList" class="assurance-list"></div><p class="assurance-muted">Targets express the accepted plan's intended result. They do not assert that an institution or record already reflects it.</p></section></lex-card>
         <lex-card heading="Accept an implementation target"><lex-form id="assuranceTargetForm"><div class="assurance-section">
           <lex-select id="assuranceTargetEdit" label="Target record" placeholder="Create a new target"></lex-select>
           <lex-select id="assuranceTargetPlan" label="Accepted plan" required></lex-select>
-          <lex-select id="assuranceTargetProtocol" label="Published firm protocol" required></lex-select>
-          <lex-select id="assuranceTargetRule" label="Requirement" required></lex-select>
+          <lex-select id="assuranceTargetRulebook" label="Adopted firm rulebook" required></lex-select>
+          <lex-select id="assuranceTargetRule" label="Rulebook rule" searchable required></lex-select>
           <p id="assuranceTargetRuleDetails" class="assurance-muted"></p>
           <lex-select id="assuranceTargetAsset" label="Reported asset" searchable required></lex-select>
           <div id="assuranceTargetValue" class="assurance-section"></div>
           <lex-textarea id="assuranceTargetRationale" label="Basis for this target" rows="3" required></lex-textarea>
-          <lex-checkbox id="assuranceTargetConfirm" label="I reviewed the plan and accept this target and its selected protocol version."></lex-checkbox>
+          <lex-checkbox id="assuranceTargetConfirm" label="I reviewed the plan and accept this target and its selected rulebook rule."></lex-checkbox>
           <lex-btn id="assuranceTargetSave" type="submit" variant="primary" label="Accept target" data-assurance-permission="review"></lex-btn>
         </div></lex-form></lex-card>
       </section>
@@ -195,6 +212,7 @@
   <script src="js/services/assurance-onboarding-client.js"></script>
   <script src="js/services/assurance-value-controls.js"></script>
   <script src="js/services/assurance-evidence-controls.js"></script>
+  <script src="js/services/assurance-rulebook-view.js"></script>
   <script src="js/services/implementation-assurance-client.js"></script>
   <script src="js/assurance-onboarding.js"></script>
   <script src="js/implementation-assurance.js"></script>

@@ -4,13 +4,14 @@
 **Last updated:** 2026-10-30
 **Applies to:** `lana-estate-assurance-ui` client and the implementation-assurance Core API
 
-Open a matter's menu and choose **Implementation assurance**. The page guides the existing matter through seven sections. Navigation is presentation state; it does not mark the matter complete.
+Open a matter's menu and choose **Implementation assurance**. The page guides the existing matter through eight sections. Navigation is presentation state; it does not mark the matter complete.
 
 | Section | What a person can do | Authoritative owner |
 |---|---|---|
 | Inventory | Create or update a reported asset, including a masked account suffix and reported value | Matter asset service |
 | Plan | Select exact retained document releases, inspect them, and explicitly accept a plan version | Assurance service and existing Document Review release owner |
-| Targets | Select an accepted plan, published protocol, declared requirement, asset and contact value; accept the intended result | Assurance service |
+| Rulebook | View the firm's adopted rulebook; without one, preview a jurisdiction's starter rulebook and, with `estate-assurance:rulebook-publish`, adopt it with a rationale | Assurance service |
+| Targets | Select an accepted plan, adopted firm rulebook, rulebook rule (shown by rule id and title), asset and contact value; accept the intended result | Assurance service |
 | Evidence | Record a value with retained sources, dates, coverage and optional page/quote locators; revise or supersede an observation | Assurance service |
 | Evidence review | Inspect the recorded value and source versions and record professional review | Assurance service and explicit professional grant |
 | Decisions | Request an assessment and explicitly accept, reject or accept an exception against its exact binding | Assurance service |
@@ -22,11 +23,19 @@ A saved observation is pending review. A system match is separate from a profess
 
 ## Firm prerequisites and existing owners
 
-This is matter onboarding for an existing authenticated firm. A firm administrator must establish access grants and publish professionally approved protocol content through the documented backend/operator process. There are no default legal rules, wildcard professional grants, or grant-administration shortcuts in the client.
+This is matter onboarding for an existing authenticated firm. A firm administrator must establish access grants and adopt a firm rulebook (see below). There are no default legal rules, wildcard professional grants, or grant-administration shortcuts in the client.
 
-An uploaded file alone is not retained evidence. Use the existing Documents and Document Review flow to prepare and release a genuine document version. The assurance page selects and opens those retained versions; it does not create fake review batches or a second document editor. Missing protocol, source, or contact choices are shown explicitly. **Load more choices and records** continues bounded catalogs; an unloaded record is never silently substituted.
+An uploaded file alone is not retained evidence. Use the existing Documents and Document Review flow to prepare and release a genuine document version. The assurance page selects and opens those retained versions; it does not create fake review batches or a second document editor. Missing rulebook, source, or contact choices are shown explicitly. **Load more choices and records** continues bounded catalogs; an unloaded record is never silently substituted.
 
 Optional agents and maintenance use their existing application owners. This Core page does not instantiate an agent runtime or depend on those optional apps being enabled. Configured agents produce advisory work; they cannot grant professional acceptance by completing a run.
+
+## Firm rulebook
+
+The **Rulebook** section shows the firm's adopted rulebook when one is effective. Otherwise anyone with assurance read access can choose a jurisdiction (Alabama, Florida, Georgia or Indiana) and preview its starter rulebook: rules grouped by module with their kind (law or firm practice), verification badge, severity and citations. Citation links open in the system browser. A person holding `estate-assurance:rulebook-publish` can adopt the previewed starter with a required rationale and explicit confirmation; others see the same preview read-only with an explanation of the permission required.
+
+Verification codes: **O** and **O-2025** are official sources. **S** and **C** are secondary sources and **U** is unverified; the page labels all three as review flags for a professional to check against the cited source. They are not legal conclusions, and adopting a starter does not verify them. Core owns rule content, verification and the permission check; the client only presents them.
+
+Adoption uses the same pending-command mailbox as every other change. A lost response keeps the exact request for same-tab recovery and blocks any other change until it is recovered. A stale version (HTTP 409) is refused; refresh and review the current rulebook before trying again.
 
 ## Exact save and recovery behavior
 
@@ -52,7 +61,7 @@ Existing reuse controls can be checked alongside them:
 npx jest tests/unit/assurance tests/unit/document-review-api.service.test.js tests/unit/lex-select-dropdown-layout.contract.test.js --runInBand --coverage=false
 ```
 
-The browser fixture runs the actual Lex controls and page controllers against a synthetic API. It covers all seven sections, an asset save whose response is lost followed by refresh recovery, unknown evidence before review, mismatched/stale decision controls, changed closeout, unavailable server behavior, and wide/narrow layout:
+The browser fixture runs the actual Lex controls and page controllers against a synthetic API. It covers all eight sections, including starter rulebook preview and adoption, an asset save whose response is lost followed by refresh recovery, unknown evidence before review, mismatched/stale decision controls, changed closeout, unavailable server behavior, and wide/narrow layout:
 
 ```sh
 node tests/browser/assurance-onboarding.fixture.cjs
@@ -68,9 +77,11 @@ Real HTTP/Core/PostgreSQL integration uses a separate isolated synthetic fixture
 CHROME_PATH='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' node tests/browser/assurance-onboarding.http.cjs
 ```
 
-The private fixture config defaults to `/tmp/lana-estate-browser-fixture.json`; do not commit it. The browser forwards API requests to the production router/controllers, real assurance/asset services and isolated PostgreSQL. Its scoped bearer, professional grants, contact, protocol and retained source bytes are synthetic. This does not verify production JWT, real storage infrastructure, or legal content. The completed flow checked invalid bearer and forged matter refusal, an actually committed asset with a dropped browser response followed by exact replay and one saved row, all seven sections, and an asset change making the accepted closeout stale. A subsequent real-API amendment flow updated the existing plan to version 2, explicitly rebound the same target, revised the same observation and required review again; current record counts stayed at one each, and the old closeout remained readable but stale. The first two harness runs also confirmed that future-dated evidence and a class not permitted by the selected protocol remain unknown.
+The private fixture config defaults to `/tmp/lana-estate-browser-fixture.json`; do not commit it. The browser forwards API requests to the production router/controllers, real assurance/asset services and isolated PostgreSQL. Its scoped bearer, professional grants, contact, rulebook and retained source bytes are synthetic. This does not verify production JWT, real storage infrastructure, or legal content. The completed flow checked invalid bearer and forged matter refusal, an actually committed asset with a dropped browser response followed by exact replay and one saved row, all onboarding sections, and an asset change making the accepted closeout stale. A subsequent real-API amendment flow updated the existing plan to version 2, explicitly rebound the same target, revised the same observation and required review again; current record counts stayed at one each, and the old closeout remained readable but stale. The first two harness runs also confirmed that future-dated evidence and a class not permitted by the selected rulebook rule remain unknown.
 
 Validation: 53 focused tests and 103 tests with existing reuse controls passed. The synthetic browser completed 14 scenarios with no page errors. The combined real HTTP browser completed 19 onboarding and amendment checks through 145 API requests with no page errors. Wide and 390px screenshots have no horizontal overflow. Re-run these checks on the final integrated build before production rollout.
+
+Rulebook change (2026-10-30): 64 focused assurance tests and the full client unit suite (2686 tests) passed; the synthetic browser fixture completed 15 scenarios, including starter preview, external citation opening and adoption, with no page errors. The real HTTP harness was not re-run against the renamed backend contract.
 
 ### Runtime approval review correction (2026-10-30)
 

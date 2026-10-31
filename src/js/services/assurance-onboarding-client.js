@@ -6,7 +6,8 @@
     savePlan: { path: '/plans' }, saveTarget: { path: '/targets' },
     recordObservation: { path: '/observations' }, reviewObservation: { path: '/observations/review' },
     decide: { path: '/decisions' }, prepareCloseout: { path: '/closeouts' },
-    acceptCloseout: { path: '/closeouts/accept' }, publishProtocol: { path: '/protocols', global: true }
+    acceptCloseout: { path: '/closeouts/accept' }, publishRulebook: { path: '/rulebooks', global: true },
+    adoptRulebook: { path: '/rulebooks/adopt', global: true }
   };
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
   function normalizePending(value) {
@@ -91,12 +92,16 @@
     return {
       status: function () { return get('/onboarding'); },
       lookup: function (kind, afterId) {
-        if (!['contacts', 'releases', 'protocols'].includes(kind)) return Promise.reject(new Error('Unknown lookup.'));
+        if (!['contacts', 'releases', 'rulebooks'].includes(kind)) return Promise.reject(new Error('Unknown lookup.'));
         return get('/lookups/' + kind + query(afterId));
       },
       records: function (kind, afterId) {
         if (!['plan', 'target', 'observation', 'assessment', 'closeout'].includes(kind)) return Promise.reject(new Error('Unknown record type.'));
         return get('/records/' + kind + query(afterId));
+      },
+      starter: function (jurisdiction) {
+        if (!['US-IN', 'US-GA', 'US-FL', 'US-AL'].includes(jurisdiction)) return Promise.reject(new Error('Unknown jurisdiction.'));
+        return api.request('GET', '/api/v1/implementation-assurance/rulebooks/starter?jurisdiction=' + encodeURIComponent(jurisdiction), null);
       },
       closeout: function (id) { return get('/records/closeout/' + encodeURIComponent(id)); },
       downloadCloseout: function (id) { return get('/records/closeout/' + encodeURIComponent(id)); }

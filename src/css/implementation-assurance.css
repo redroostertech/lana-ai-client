@@ -26,3 +26,6 @@
 .assurance-readiness { display: flex; gap: 12px; flex-wrap: wrap; padding: 0; list-style: none; }
 .assurance-source-link { text-decoration: underline; color: var(--lex-text-accent); overflow-wrap: anywhere; }
 @container assurance (max-width: 720px) { .assurance-allocation-row { grid-template-columns: minmax(0, 1fr); } }
+.assurance-rulebook-module { display: grid; gap: 12px; }
+.assurance-rulebook-heading { margin: 0; font-size: 16px; font-weight: 600; }
+.assurance-rulebook-badges { display: flex; gap: 8px; flex-wrap: wrap; }

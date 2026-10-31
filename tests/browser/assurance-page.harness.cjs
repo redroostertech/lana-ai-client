@@ -5,10 +5,10 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '../../src');
 const template = fs.readFileSync(path.join(root, 'implementation-assurance.html'), 'utf8').split('<template id="page-content">')[1].split('</template>')[0];
 const scripts = ['time-utils.js', 'lex/lex.core.js', 'lex/lex.icons.js', 'lex/lex.forms.js', 'lex/lex.utils.js',
-  'lex/components/foundation/lex-btn.js', 'lex/components/foundation/lex-banner.js', 'lex/components/foundation/lex-card.js',
+  'lex/components/foundation/lex-btn.js', 'lex/components/foundation/lex-banner.js', 'lex/components/foundation/lex-card.js', 'lex/components/foundation/lex-badge.js',
   'lex/components/form/lex-select.js', 'lex/components/form/lex-textarea.js', 'lex/components/form/lex-input.js',
   'lex/components/form/lex-checkbox.js', 'lex/components/form/lex-form.js',
-  'services/assurance-onboarding-client.js', 'services/assurance-value-controls.js', 'services/assurance-evidence-controls.js',
+  'services/assurance-onboarding-client.js', 'services/assurance-value-controls.js', 'services/assurance-evidence-controls.js', 'services/assurance-rulebook-view.js',
   'services/implementation-assurance-client.js', 'assurance-onboarding.js', 'implementation-assurance.js'];
 function createPageServer(bootstrap) {
 const html = `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="/css/lex-tokens.css"><link rel="stylesheet" href="/css/components.css"><link rel="stylesheet" href="/css/implementation-assurance.css"></head><body>${template}<script>${bootstrap}</script>${scripts.map(src => '<script src="/js/' + src + '"></script>').join('')}</body></html>`;
