@@ -41,7 +41,7 @@
 
   var TRACE_STATUSES = ['completed', 'failed', 'pending', 'aborted'];
   var STATUS_COLORS = { completed: 'green', failed: 'red', pending: 'yellow', aborted: 'gray' };
-  var ROUTES = ['unified', 'workspace', 'document', 'agentic', 'rag', 'general', 'data', 'insights', 'automations', 'text_transform', 'pending_detection'];
+  var ROUTES = ['unified', 'workspace', 'document', 'agentic', 'rag', 'general', 'data', 'insights', 'analytics', 'automations', 'text_transform', 'pending_detection'];
 
   // Duration column filter: milliseconds, min inclusive, max exclusive.
   var DURATION_RANGES = {
@@ -278,6 +278,7 @@
       document: 'Document',
       data: 'Data',
       insights: 'Insights',
+      analytics: 'Analytics',
       automations: 'Automations',
       text_transform: 'Text transform',
       pending_detection: 'Pending route',
