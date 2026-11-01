@@ -2119,6 +2119,7 @@
         var status = err && (err.status || (err.response && err.response.status));
         var msg = 'Unable to start run';
         if (status === 401) msg = 'Your session expired. Please sign in again.';
+        else if (status === 403) msg = 'You do not have permission to run this agent.';
         else if (status === 404) msg = 'This agent no longer exists.';
         if (window.Lex && window.Lex.Toast) window.Lex.Toast.error(msg);
       });

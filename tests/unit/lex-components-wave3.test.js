@@ -206,6 +206,19 @@ describe('lex-select', () => {
     expect(el.value).toEqual(['c', 'a']);
   });
 
+  test('a long multiple pill truncates its label, keeps the remove mark and carries the full label', async () => {
+    const window = bootSelect();
+    const long = 'Executed trust agreement, release 3 of 4, county stamp page';
+    const el = mount(window, { multiple: 'true' }, (s) => { s.options = [{ value: 'a', label: long }]; });
+    el.value = ['a'];
+    await tick(window);
+    const pill = el.querySelector('.lex-select-pill');
+    expect(pill.getAttribute('title')).toBe(long);
+    expect(pill.querySelector('.lex-select-pill-label').textContent).toBe(long);
+    expect(pill.querySelector('.lex-select-pill-x').dataset.remove).toBe('a');
+    expect(el.querySelector('.lex-select-trigger').classList.contains('lex-select-trigger--multiple')).toBe(true);
+  });
+
   test('a multiple value attribute set as JSON still works (existing callers)', async () => {
     const window = bootSelect();
     const el = mount(window, { multiple: 'true', value: '["a"]' }, (s) => { s.options = ['a', 'b']; });

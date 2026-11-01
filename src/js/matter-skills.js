@@ -1013,7 +1013,7 @@ function updateStepConfigUI(stepId, type) {
           </div>
           <div class="ai-system-prompt-field hidden">
             <label class="block text-xs font-medium text-gray-700 mb-1.5">System Prompt</label>
-            <textarea rows="3" placeholder="You are a concise estate deadline specialist..."
+            <textarea rows="3" placeholder="You are a concise deadline specialist..."
                       class="ai-system-prompt-input w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 text-sm resize-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"></textarea>
           </div>
           <div>

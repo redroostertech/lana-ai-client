@@ -23,16 +23,6 @@
   // =========================================================================
 
   var PAGE_DESCRIPTORS = {
-    'implementation-assurance.html': {
-      title: 'Implementation Assurance', activeNav: 'workspaces',
-      scripts: ['js/lex/components/foundation/lex-banner.js', 'js/lex/components/foundation/lex-card.js', 'js/lex/components/foundation/lex-badge.js',
-        'js/lex/components/form/lex-select.js', 'js/lex/components/form/lex-textarea.js',
-        'js/lex/components/form/lex-form.js', 'js/lex/components/form/lex-checkbox.js',
-        'js/services/assurance-onboarding-client.js', 'js/services/assurance-value-controls.js', 'js/services/assurance-evidence-controls.js', 'js/services/assurance-rulebook-view.js',
-        'js/services/implementation-assurance-client.js', 'js/assurance-onboarding.js', 'js/implementation-assurance.js'],
-      stylesheets: ['css/implementation-assurance.css']
-    },
-
     // ── Dashboard ── (standalone page — no descriptor needed)
 
     // ── Workspaces ── (standalone page — no descriptor needed)
@@ -53,6 +43,7 @@
         'js/lex/components/form/lex-select.js',
         'js/lex/components/form/lex-dropdown-btn.js',
         'js/lex/components/form/lex-checkbox.js',
+        'js/lex/components/form/lex-toggle.js',
         'js/lex/components/form/lex-textarea.js',
         'js/lex/components/data/lex-table.js',
         'js/lex/components/data/lex-pagination.js',
@@ -70,6 +61,23 @@
         'js/components/document-metadata-viewer.js',
         'js/tiptap-bundle-built.js',
         'js/api/matter-notes-api.client.js',
+        'js/api/matter-links-api.client.js',
+        'js/shared/note-labels.js',
+        'js/shared/entity-links.js',
+        'js/shared/note-actions.js',
+        'js/api/matter-makeup-api.client.js',
+        'js/shared/form-values.js',
+        'js/shared/pending-submit.js',
+        'js/shared/server-form-fields.js',
+        'js/shared/server-form.js',
+        'js/shared/matter-tab-registry.js',
+        'js/shared/matter-generic-tabs.js',
+        'js/shared/task-actions.js',
+        'js/shared/run-history.js',
+        'js/shared/matter-runnables.js',
+        'js/shared/makeup-switch.js',
+        'js/shared/matter-runnables-panel.js',
+        'js/shared/makeup-switch-dialog.js',
         'js/components/note-list.component.js',
         'js/components/note-editor.component.js',
         'js/components/task-detail-drawer.js',
@@ -94,6 +102,9 @@
         'css/components/document-metadata.css',
         'css/document-create-modal.css',
         'css/matter-notes.css',
+        'css/server-form.css',
+        'css/matter-generic-tabs.css',
+        'css/matter-runnables.css',
         'css/workspace-summary.css',
         'css/workspace-switcher.css',
         'https://cdn.jsdelivr.net/npm/drawflow@0.0.60/dist/drawflow.min.css',

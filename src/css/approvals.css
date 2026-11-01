@@ -587,3 +587,12 @@
   box-shadow: var(--lex-focus-ring);
   outline: none;
 }
+
+/* ─── Proposal (agent artifact with tasks and notes) ─────────── */
+
+.apd-proposal {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+}

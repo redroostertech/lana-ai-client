@@ -41,7 +41,7 @@
 
   var TRACE_STATUSES = ['completed', 'failed', 'pending', 'aborted'];
   var STATUS_COLORS = { completed: 'green', failed: 'red', pending: 'yellow', aborted: 'gray' };
-  var ROUTES = ['unified', 'workspace', 'document', 'agentic', 'rag', 'general', 'data', 'insights', 'analytics', 'automations', 'text_transform', 'pending_detection'];
+  var ROUTES = ['unified', 'workspace', 'document', 'agentic', 'rag', 'general', 'data', 'insights', 'analytics', 'operations', 'automations', 'text_transform', 'pending_detection'];
 
   // Duration column filter: milliseconds, min inclusive, max exclusive.
   var DURATION_RANGES = {
@@ -99,6 +99,19 @@
     els.sseTable            = document.getElementById('sseEventsTable');
 
     initTable();
+    openLinkedTrace();
+  }
+
+  // Deep link: admin/traces.html?trace_id=<uuid> (or ?id=) opens that trace,
+  // for example a run's own trace from a matter's run history.
+  function linkedTraceId(params) {
+    var value = params ? String(params.get('trace_id') || params.get('id') || '').trim() : '';
+    return UUID_PATTERN.test(value) ? value : '';
+  }
+
+  function openLinkedTrace() {
+    var traceId = linkedTraceId(window.Lex && Lex.Nav && Lex.Nav.getParams ? Lex.Nav.getParams() : null);
+    if (traceId) viewTraceDetail(traceId);
   }
 
   // =========================================================================
@@ -279,6 +292,7 @@
       data: 'Data',
       insights: 'Insights',
       analytics: 'Analytics',
+      operations: 'Operations',
       automations: 'Automations',
       text_transform: 'Text transform',
       pending_detection: 'Pending route',
@@ -758,7 +772,8 @@
     SORT_BY_COLUMN: SORT_BY_COLUMN,
     mapSseEvent: mapSseEvent,
     sseRenderers: sseRenderers,
-    sseFilterOptions: sseFilterOptions
+    sseFilterOptions: sseFilterOptions,
+    linkedTraceId: linkedTraceId
   };
 
 })();

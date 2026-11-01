@@ -557,10 +557,13 @@
     actions.className = 'agent-run-artifact-actions';
     var disableApprove = (artState === 'approved' || artState === 'applied');
     var disableReject  = (artState === 'rejected');
+    // An apply that stopped part way (failed_to_apply) may be pressed again;
+    // the server finishes what is missing.
+    var applyLabel = artState === 'failed_to_apply' ? 'Apply again' : 'Apply';
     actions.innerHTML = ''
       + '<lex-btn variant="ghost" size="sm" data-art-action="reject" data-artifact-id="' + escHtml(artifact.id || '') + '"' + (disableReject ? ' disabled' : '') + '>Reject</lex-btn>'
       + '<lex-btn variant="secondary" size="sm" data-art-action="approve" data-artifact-id="' + escHtml(artifact.id || '') + '"' + (disableApprove ? ' disabled' : '') + '>Approve</lex-btn>'
-      + '<lex-btn variant="primary" size="sm" data-art-action="apply" data-artifact-id="' + escHtml(artifact.id || '') + '">Apply</lex-btn>';
+      + '<lex-btn variant="primary" size="sm" data-art-action="apply" data-artifact-id="' + escHtml(artifact.id || '') + '">' + applyLabel + '</lex-btn>';
     card.appendChild(actions);
 
     return card;
@@ -603,6 +606,22 @@
         BlockRenderer.render(container, [Object.assign({ type: 'compare' }, artifact.payload)]);
         return;
       }
+    }
+
+    // Any artifact that proposes tasks and notes lists them with their rule and record chips.
+    var proposal = global.LanaProposalOutline ? global.LanaProposalOutline.outline(artifact.payload || artifact.content_jsonb) : null;
+    if (proposal) {
+      var line = global.LanaProposalOutline.stateLine({ status: getArtifactState(state, artifact) });
+      var href = line.state === 'applied' ? global.LanaProposalOutline.tasksHref(artifact.matter_id, '../') : '';
+      var stateHtml = '';
+      if (href) {
+        stateHtml = '<p class="proposal-outline__state">' + escHtml(line.text) +
+          ' <a class="proposal-outline__link" href="' + escHtml(href) + '">Open the tasks</a></p>';
+      } else if (line.state === 'failed') {
+        stateHtml = '<p class="proposal-outline__state">' + escHtml(line.text) + '</p>';
+      }
+      container.innerHTML = stateHtml + global.LanaProposalOutline.html(proposal, escHtml);
+      return;
     }
 
     var pre = document.createElement('pre');
@@ -659,12 +678,15 @@
 
   function applyArtifact(state, id) {
     return callArtifactEndpoint(state, id, 'apply')
-      .then(function () {
+      .then(function (res) {
         if (state.destroyed) return;
-        setArtifactState(state, id, 'applied');
+        setArtifactState(state, id, (res && res.artifact && res.artifact.status) || 'applied');
         if (window.Lex && window.Lex.Toast) window.Lex.Toast.success('Artifact applied');
       })
       .catch(function (err) {
+        // A refused apply answers the artifact (409); failed_to_apply offers "Apply again".
+        var refused = err && err.data && err.data.artifact;
+        if (refused && refused.status && !state.destroyed) setArtifactState(state, id, refused.status);
         if (err && (err.status === 501 || (err.response && err.response.status === 501))) {
           var btn = document.querySelector('[data-art-action="apply"][data-artifact-id="' + (id || '').replace('"', '') + '"]');
           if (btn) btn.disabled = true;
@@ -1579,5 +1601,5 @@
     rootEl._agentRunState = null;
   }
 
-  global.LanaAgentsApp.Views.agentRun = { render: render, destroy: destroy };
+  global.LanaAgentsApp.Views.agentRun = { render: render, destroy: destroy, __test: { buildArtifactCard: buildArtifactCard, applyArtifact: applyArtifact } };
 })(typeof window !== 'undefined' ? window : globalThis);

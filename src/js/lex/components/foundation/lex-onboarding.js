@@ -45,7 +45,7 @@
     ], { duration: 420, easing: EASE_SPRING, fill: 'none' });
   }
 
-  // Sample estate used to illustrate the shared value proposition.
+  // Sample matter used to illustrate the shared value proposition.
   const FILES = {
     trust: {
       label: 'Smith Family Trust',
@@ -121,7 +121,7 @@
           <span class="lob-choice__check" aria-hidden="true"></span>
         </button>`;
       }).join('');
-      const note = '<p class="lob-note">Sample estate for illustration.</p>';
+      const note = '<p class="lob-note">Sample matter for illustration.</p>';
 
       return `
 <div class="lob" role="dialog" aria-modal="true" aria-label="Welcome to LANA" hidden>

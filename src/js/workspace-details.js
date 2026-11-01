@@ -46,6 +46,8 @@
   var customFieldDefinitions = [];
   var customFieldValues = [];
   var _navContext = null;              // navigation context (source, conversationId, etc.)
+  var matterTabs = null;               // tabs from the matter's makeup (LanaMatterTabRegistry.buildTabs)
+  var makeupClient = null;             // MatterMakeupAPIClient
   var _pendingTaskDeepLinkId = null;
 
   // Document tab page size, passed to the MatterDocumentsView component, which
@@ -453,7 +455,8 @@
         api.getMatterTasks(matterId).catch(function () { return { tasks: [], total_count: 0 }; }),
         api.getComments(matterId, { limit: 0 }).catch(function () { return { data: [], pagination: { total: 0 } }; }),
         api.getPinnedConversations({ matterId: matterId, limit: 100, offset: 0 }).catch(function () { return { sessions: [] }; }),
-        api.getMatterWorkspaceState(matterId, { view: 'summary' }).catch(function () { return null; })
+        api.getMatterWorkspaceState(matterId, { view: 'summary' }).catch(function () { return null; }),
+        getMakeupClient().getMakeup(matterId)
       ]);
 
       // Extract results (match shapes returned by api.js methods)
@@ -513,6 +516,11 @@
       var commentsResult = results[7].status === 'fulfilled' ? results[7].value : { data: [], pagination: { total: 0 } };
       var pinnedChatsData = results[8].status === 'fulfilled' ? results[8].value : { sessions: [] };
       var workspaceStateResult = results[9].status === 'fulfilled' ? results[9].value : null;
+      // null: the server has no makeup for this matter (standard tabs). A
+      // rejection is a real failure: the tabs say so instead of guessing.
+      var makeup = results[10].status === 'fulfilled' ? results[10].value : null;
+      var makeupFailed = results[10].status === 'rejected';
+      if (makeupFailed) console.error('[loadMatterDetails] Matter makeup failed to load:', results[10].reason);
       currentWorkspaceState = (workspaceStateResult && (workspaceStateResult.workspace_state || workspaceStateResult.state)) || null;
       var commentCount = (commentsResult.pagination && commentsResult.pagination.total) || 0;
 
@@ -537,8 +545,12 @@
         contacts: contacts,
         notes: notes,
         commentCount: commentCount,
-        workspaceState: currentWorkspaceState
+        workspaceState: currentWorkspaceState,
+        makeup: makeup
       };
+      matterTabs = makeupFailed
+        ? window.LanaMatterTabRegistry.failedTabs()
+        : window.LanaMatterTabRegistry.buildTabs(makeup && makeup.tabs);
 
       currentTaskMatterId = matter.matter_id;
       currentTasksList = currentMatterData.tasks;
@@ -716,8 +728,12 @@
 
         var id = target.id;
 
-        if (id === 'headerOptionsAssurance') {
-          Lex.Nav.go('implementation-assurance.html', { params: { matter_id: matter.id || matter.matter_id, matter_name: matter.name || matter.matter_name || '' } });
+        if (id === 'headerOptionsRunnables') {
+          openRunnablesPanel();
+          return;
+        }
+        if (id === 'headerOptionsMakeup') {
+          openMakeupSwitch();
           return;
         }
         if (id === 'headerOptionsEdit') {
@@ -743,12 +759,10 @@
         if (tab) switchMatterTab(tab);
       });
 
-      // Dropdown shown in place of the tabs on narrow layouts
+      // Dropdown shown in place of the tabs on narrow layouts (options set
+      // with the tab bar by applyMatterTabs)
       var tabSelect = document.getElementById('tabSelect');
       if (tabSelect) {
-        var tabDefs = JSON.parse(tabBar.getAttribute('tabs') || '[]');
-        tabSelect.options = tabDefs.map(function (t) { return { value: t.id, label: t.label }; });
-        tabSelect.value = tabBar.getAttribute('active') || 'summary';
         tabSelect.addEventListener('lex-change', function (e) {
           var tab = (e.detail && e.detail.value) || tabSelect.value;
           if (tab) switchMatterTab(tab);
@@ -803,7 +817,12 @@
       tab = 'documents';
     }
 
-    var tabs = ['notes', 'tasks', 'comments', 'documents', 'conversations', 'billableHours', 'summary', 'docGeneration', 'analytics'];
+    var registry = window.LanaMatterTabRegistry;
+    var tabs = currentMatterTabs();
+    var entry = registry.resolve(tabs, tab);
+    if (!entry) return;
+    tab = entry.key;
+
     var tabBar = document.getElementById('tabBar');
     if (tabBar && tabBar.getAttribute('active') !== tab) {
       tabBar.setAttribute('active', tab);
@@ -813,51 +832,20 @@
       tabSelect.value = tab;
     }
 
-    tabs.forEach(function (t) {
-      var content = document.getElementById('tabContent' + t.charAt(0).toUpperCase() + t.substring(1));
-
-      if (t === tab) {
-        if (content) content.classList.remove('hidden');
-      } else {
-        if (content) content.classList.add('hidden');
-      }
+    allTabPanelIds(tabs).forEach(function (panelId) {
+      var content = document.getElementById(panelId);
+      if (content) content.classList.toggle('hidden', panelId !== entry.panelId);
     });
 
     // Render content for the selected tab
     if (!currentMatterData) return;
 
-    var m = currentMatterData;
-    switch (tab) {
-      case 'summary':
-        renderSummaryTab();
-        break;
-      case 'documents':
-        renderDocumentsTab(m.matter, m.documents, m.docPagination, m.orphanedFiles);
-        refreshDrawerDocuments(_getMatterIdentity(m.matter));
-        break;
-      case 'conversations':
-        renderConversationsTab(m.matter, m.chats, m.chatPagination, m.pinnedChats || []);
-        break;
-      case 'comments':
-        renderCommentsTab(m.matter, m.commentCount);
-        break;
-      case 'tasks':
-        renderTasksTab(m.matter, m.tasks);
-        openPendingTaskDeepLink();
-        break;
-      case 'notes':
-        renderNotesTab(m.matter);
-        break;
-      case 'billableHours':
-        renderBillableHoursTab(m.matter);
-        break;
-      case 'docGeneration':
-        renderDocGenerationTab(m.matter);
-        break;
-      case 'analytics':
-        renderMatterAnalyticsTab(m.matter);
-        break;
-    }
+    registry.render(entry, {
+      document: document,
+      matterId: currentMatterData.matter.matter_id,
+      client: getMakeupClient(),
+      openForm: openMakeupForm
+    });
 
     if (tab !== 'documents') {
       clearDocumentsProcessingPoll();
@@ -868,12 +856,251 @@
   }
 
   function getCurrentActiveTab() {
-    var tabs = ['summary', 'notes', 'tasks', 'comments', 'documents', 'conversations', 'billableHours', 'docGeneration', 'analytics'];
+    var tabs = currentMatterTabs();
     for (var i = 0; i < tabs.length; i++) {
-      var content = document.getElementById('tabContent' + tabs[i].charAt(0).toUpperCase() + tabs[i].substring(1));
-      if (content && !content.classList.contains('hidden')) return tabs[i];
+      var content = document.getElementById(tabs[i].panelId);
+      if (content && !content.classList.contains('hidden')) return tabs[i].key;
     }
     return 'summary';
+  }
+
+  // =========================================================================
+  // Makeup tabs (design 7.1): the tab list comes from the matter's makeup,
+  // each kind's renderer from LanaMatterTabRegistry.
+  // =========================================================================
+
+  function getMakeupClient() {
+    if (!makeupClient) makeupClient = new window.MatterMakeupAPIClient(api);
+    return makeupClient;
+  }
+
+  function currentMatterTabs() {
+    if (!matterTabs) matterTabs = window.LanaMatterTabRegistry.buildTabs(null);
+    return matterTabs;
+  }
+
+  // Every panel a tab could show, including built-in panels the current
+  // makeup leaves out, so none of them stays visible.
+  function allTabPanelIds(tabs) {
+    var builtIn = window.LanaMatterTabRegistry.BUILT_IN_KINDS;
+    var ids = Object.keys(builtIn).map(function (kind) { return builtIn[kind].panelId; });
+    tabs.forEach(function (t) { if (ids.indexOf(t.panelId) === -1) ids.push(t.panelId); });
+    return ids;
+  }
+
+  function applyMatterTabs() {
+    var registry = window.LanaMatterTabRegistry;
+    var tabs = currentMatterTabs();
+    registry.ensurePanels(document.querySelector('.matter-tab-panels'), tabs);
+    var barTabs = registry.barTabs(tabs);
+    var tabBar = document.getElementById('tabBar');
+    if (tabBar) tabBar.tabs = barTabs;
+    var tabSelect = document.getElementById('tabSelect');
+    if (tabSelect) tabSelect.options = barTabs.map(function (t) { return { value: t.id, label: t.label }; });
+    applyMakeupMenu();
+  }
+
+  // Header items that need the makeup view model: "Agents and skills" and
+  // "Makeup". The switch is hidden when the server says the user may not
+  // configure the makeup (matters:configure_makeup); the server enforces it.
+  function applyMakeupMenu() {
+    var banner = document.getElementById('matterBanner');
+    if (!banner) return;
+    var makeup = currentMatterData && currentMatterData.makeup;
+    banner.classList.toggle('matter-banner--no-makeup', !makeup);
+    banner.classList.toggle('matter-banner--no-makeup-switch', !window.LanaMakeupSwitch.canConfigure(makeup));
+  }
+
+  function makeupPanelDeps() {
+    var matter = currentMatterData && currentMatterData.matter;
+    return {
+      client: getMakeupClient(),
+      matterId: matter && matter.matter_id,
+      matterRef: matter && (matter.id || matter.matter_id),
+      makeup: currentMatterData && currentMatterData.makeup,
+      tabs: currentMatterTabs(),
+      goToTab: switchMatterTab,
+      openForm: openMakeupForm,
+      onChanged: refreshMakeupView,
+      onMakeup: function (makeup) { if (currentMatterData) currentMatterData.makeup = makeup; },
+      notify: function (kind, message) { if (Lex.Toast && Lex.Toast[kind]) Lex.Toast[kind](message); },
+      // Run traces open on the admin Traces page (UI gate only; the server decides).
+      openTrace: Lex.Auth && Lex.Auth.isAdmin() ? function (traceId) {
+        Lex.Nav.go('admin/traces.html', { params: { trace_id: traceId } });
+      } : null
+    };
+  }
+
+  function openRunnablesPanel(initialTab) {
+    if (!currentMatterData || !currentMatterData.makeup || !window.LanaMatterRunnablesPanel) return;
+    window.LanaMatterRunnablesPanel.open(Object.assign(makeupPanelDeps(), { initialTab: initialTab }));
+  }
+
+  function openRunCausation(runKind, runId) {
+    if (!runKind || !runId || !window.LanaMatterRunnablesPanel) return;
+    window.LanaMatterRunnablesPanel.openCausation(makeupPanelDeps(), runKind, runId);
+  }
+
+  function openMakeupSwitch() {
+    if (!currentMatterData || !currentMatterData.makeup || !window.LanaMakeupSwitchDialog) return;
+    var deps = makeupPanelDeps();
+    deps.onSwitched = refreshCurrentMatter;
+    window.LanaMakeupSwitchDialog.open(deps);
+  }
+
+  // A skill toggle changes the makeup view model's `enabled` flags only.
+  async function refreshMakeupView() {
+    var matterId = currentMatterData && currentMatterData.matter && currentMatterData.matter.matter_id;
+    if (!matterId) return;
+    try {
+      var makeup = await getMakeupClient().getMakeup(matterId);
+      if (makeup && currentMatterData) currentMatterData.makeup = makeup;
+    } catch (error) {
+      console.warn('[MatterMakeup] Could not reload the matter makeup:', error && error.message);
+    }
+  }
+
+  function registerBuiltInTabs() {
+    var registry = window.LanaMatterTabRegistry;
+    function withData(render) {
+      return function () { if (currentMatterData) render(currentMatterData); };
+    }
+    registry.register('summary', withData(function () { renderSummaryTab(); }));
+    registry.register('documents', withData(function (m) {
+      renderDocumentsTab(m.matter, m.documents, m.docPagination, m.orphanedFiles);
+      refreshDrawerDocuments(_getMatterIdentity(m.matter));
+    }));
+    registry.register('conversations', withData(function (m) { renderConversationsTab(m.matter, m.chats, m.chatPagination, m.pinnedChats || []); }));
+    registry.register('comments', withData(function (m) { renderCommentsTab(m.matter, m.commentCount); }));
+    registry.register('tasks', withData(function (m) { renderTasksTab(m.matter, m.tasks); openPendingTaskDeepLink(); }));
+    registry.register('notes', withData(function (m) { renderNotesTab(m.matter); }));
+    registry.register('billable_hours', withData(function (m) { renderBillableHoursTab(m.matter); }));
+    registry.register('doc_generation', withData(function (m) { renderDocGenerationTab(m.matter); }));
+    registry.register('analytics', withData(function (m) { renderMatterAnalyticsTab(m.matter); }));
+  }
+
+  function formRecoveryScope(matterId, target) {
+    var user = (window.Lex && Lex.state && Lex.state.user) || (api && api.user);
+    return window.LanaPendingSubmit.formScope(api && api.baseUrl, user, matterId, target);
+  }
+
+  // A row or tab action from a generic makeup tab: { form, subject }. A
+  // recorded form may add tasks (decision tasks), so the Board is re-read.
+  function openMakeupForm(action, onRecorded, extra) {
+    var matterId = currentMatterData && currentMatterData.matter && currentMatterData.matter.matter_id;
+    if (!matterId || !action || !action.form) return;
+    var client = getMakeupClient();
+    window.LanaServerForm.open({
+      load: function (subject) { return client.getForm(matterId, action.form, subject); },
+      submit: function (body) { return client.submitForm(matterId, action.form, body); },
+      subject: action.subject || null,
+      chooseSubject: extra && extra.chooseSubject,
+      scope: formRecoveryScope(matterId, 'form:' + action.form + ':' + (action.subject || '')),
+      onRecorded: function (result) {
+        if (typeof onRecorded === 'function') onRecorded(result);
+        reloadBoardTasks();
+      }
+    });
+  }
+
+  // Note actions the makeup view declares (shared/note-actions.js): the form
+  // opens for the note; a 422 with candidates asks which record it is for.
+  function noteActions() {
+    var actions = window.LanaNoteActions;
+    return {
+      actionsFor: function (note) {
+        var makeup = currentMatterData && currentMatterData.makeup;
+        return actions && makeup ? actions.actionsFor(note, makeup.note_actions) : [];
+      },
+      run: function (note, action, onRecorded) {
+        openMakeupForm({ form: action.form, subject: actions.subjectFor(action, note.note_id) }, onRecorded, {
+          chooseSubject: actions.candidateChoice
+        });
+      }
+    };
+  }
+
+  function openTaskActionForm(task, action) {
+    var matterId = currentMatterData && currentMatterData.matter && currentMatterData.matter.matter_id;
+    if (!matterId) return;
+    var client = getMakeupClient();
+    window.LanaServerForm.open({
+      load: function () { return client.getTaskActionForm(task.id, action.id); },
+      submit: function (body) { return client.submitTaskActionForm(task.id, action.id, body); },
+      scope: formRecoveryScope(matterId, 'task-action:' + task.id + ':' + action.id),
+      onRecorded: reloadBoardTasks
+    });
+  }
+
+  async function reloadBoardTasks() {
+    var matterId = currentMatterData && currentMatterData.matter && currentMatterData.matter.matter_id;
+    if (!matterId) return;
+    try {
+      var response = await api.getMatterTasks(matterId);
+      currentMatterData.tasks = response.tasks || [];
+      if (getCurrentActiveTab() === 'tasks') renderTasksTab(currentMatterData.matter, currentMatterData.tasks);
+    } catch (error) {
+      console.error('[Tasks] Failed to reload tasks:', error);
+    }
+  }
+
+  // "From agent run" chips on Board cards open "Why did this run?". The
+  // card opens the task on click and is draggable; chip presses do neither.
+  function taskProvenanceHtml(task) {
+    if (!window.LanaEntityLinks) return '';
+    var chips = window.LanaEntityLinks.linkChips(task.links, { kind: 'task', id: String(task.id) }, null).filter(function (chip) { return chip.run; });
+    if (!chips.length) return '';
+    return '<div class="run-provenance" data-task-provenance>' + chips.map(function (chip) {
+      return '<lex-btn variant="ghost" size="sm" leading-icon="git-branch" data-run-kind="' + escapeHtml(chip.run.kind) + '" data-run-id="' + escapeHtml(chip.run.id) + '">' +
+        escapeHtml('From ' + window.LanaRunHistory.runKindLabel(chip.run.kind).toLowerCase()) + '</lex-btn>';
+    }).join('') + '</div>';
+  }
+
+  // Linked rule ids on Board cards (design 7.3), read-only: starter or firm,
+  // the pinned version, and a muted flag when the starter text has changed.
+  function taskRuleChipsHtml(task) {
+    if (!window.LanaEntityLinks) return '';
+    var chips = window.LanaEntityLinks.ruleChips(task.links, { kind: 'task', id: String(task.id) });
+    if (!chips.length) return '';
+    return '<div class="task-rule-chips">' + chips.map(function (chip) {
+      return '<lex-badge color="gray" size="sm" label="' + escapeHtml(chip.kindText + ' ' + chip.text) + '" title="' + escapeHtml(chip.title) + '"></lex-badge>' +
+        (chip.outdated ? '<span class="task-rule-chips__outdated">' + escapeHtml(window.LanaEntityLinks.PIN_OUTDATED_TEXT) + '</span>' : '');
+    }).join('') + '</div>';
+  }
+
+  function mountTaskProvenance(container) {
+    if (!container) return;
+    var hosts = container.querySelectorAll('[data-task-provenance]');
+    for (var i = 0; i < hosts.length; i++) {
+      hosts[i].setAttribute('draggable', 'false');
+      hosts[i].onmousedown = function (event) { event.stopPropagation(); };
+      hosts[i].onclick = function (event) {
+        event.stopPropagation();
+        var chip = event.target && event.target.closest && event.target.closest('[data-run-id]');
+        if (chip) openRunCausation(chip.getAttribute('data-run-kind'), chip.getAttribute('data-run-id'));
+      };
+    }
+  }
+
+  function mountTaskActions(container) {
+    mountTaskProvenance(container);
+    if (!container || !window.LanaTaskActions) return;
+    var hosts = container.querySelectorAll('[data-task-actions-for]');
+    for (var i = 0; i < hosts.length; i++) {
+      var taskId = hosts[i].getAttribute('data-task-actions-for');
+      var task = currentTasksList.find(function (t) { return String(t.id) === taskId; });
+      if (!task) continue;
+      window.LanaTaskActions.mount(hosts[i], task, {
+        client: getMakeupClient(),
+        openForm: openTaskActionForm,
+        onChanged: reloadBoardTasks,
+        scope: function (tid, actionId) {
+          var matterId = currentMatterData && currentMatterData.matter && currentMatterData.matter.matter_id;
+          return formRecoveryScope(matterId, 'task-start:' + tid + ':' + actionId);
+        },
+        notify: function (kind, message) { if (Lex.Toast && Lex.Toast[kind]) Lex.Toast[kind](message); }
+      });
+    }
   }
 
   // =========================================================================
@@ -1543,6 +1770,7 @@
     if (currentMatterData) {
       renderBanner(currentMatterData.matter);
       renderDescription(currentMatterData.matter);
+      applyMatterTabs();
       switchMatterTab(activeTab);
     }
     redactPage(false);
@@ -5054,6 +5282,7 @@
       '</div>';
 
     _attachKanbanEventListeners();
+    mountTaskActions(content);
   }
 
   function _renderKanbanColumn(status, label, tasks, bgClass, textClass) {
@@ -5140,6 +5369,9 @@
       assigneeHtml +
       dueDateHtml +
       descHtml +
+      taskRuleChipsHtml(task) +
+      (Array.isArray(task.actions) && task.actions.length ? '<div data-task-actions-for="' + escapeHtml(String(task.id)) + '" hidden></div>' : '') +
+      taskProvenanceHtml(task) +
     '</div>';
   }
 
@@ -5314,7 +5546,12 @@
       content.innerHTML = '<div id="matterNotesContainer" class="w-full h-full"></div>';
 
       if (window.initializeMatterNotes && window.MatterNotesAPIClient) {
-        window.initializeMatterNotes('matterNotesContainer', matter.matter_id);
+        var makeup = currentMatterData && currentMatterData.makeup;
+        window.initializeMatterNotes('matterNotesContainer', matter.matter_id, {
+          factLabels: makeup && makeup.fact_labels,
+          openRunCausation: openRunCausation,
+          noteActions: noteActions()
+        });
         // Notes initialized
       } else {
         content.innerHTML =
@@ -11076,6 +11313,8 @@
     // Render banner + header
     renderBanner(currentMatterData.matter);
     renderDescription(currentMatterData.matter);
+    registerBuiltInTabs();
+    applyMatterTabs();
     setupHeaderActions(currentMatterData.matter);
     wireEditMatterModal();
 
@@ -11252,6 +11491,7 @@
 
     // 12. Clear state
     currentMatterData = null;
+    matterTabs = null;
     currentTaskMatterId = null;
     currentEditingTask = null;
     currentTasksList = [];

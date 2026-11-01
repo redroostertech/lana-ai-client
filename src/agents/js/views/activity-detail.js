@@ -1627,11 +1627,51 @@
     ]), 620);
   }
 
+  // After apply the proposed tasks are on the matter's Board. Apply is the
+  // person's own step after approval (the server never applies on approve),
+  // so an approved proposal offers Apply here, where its state line points,
+  // and one whose apply stopped part way offers Apply again.
+  function renderProposalState(artifact) {
+    var line = global.LanaProposalOutline.stateLine(artifact);
+    if (!line.text) return '';
+    var href = line.state === 'applied' ? global.LanaProposalOutline.tasksHref(artifact.matter_id, '../') : '';
+    var canApply = (line.state === 'approved' || line.state === 'failed') && artifact.id;
+    return '<p class="proposal-outline__state">' + escHtml(line.text) +
+      (href ? ' <a class="proposal-outline__link" href="' + escHtml(href) + '">Open the tasks</a>' : '') +
+      (canApply ? ' <lex-btn variant="primary" size="sm" data-atd-proposal-apply="' + escHtml(artifact.id) + '" data-atd-proposal-run="' + escHtml(artifact.run_id || '') + '">' +
+        escHtml(line.state === 'failed' ? global.LanaProposalOutline.APPLY_AGAIN : 'Apply') + '</lex-btn>' : '') + '</p>';
+  }
+
+  // The server answers the artifact either way (200 applied, 409 still
+  // failed_to_apply); the run is read again so the card shows where it is.
+  function applyProposal(state, button) {
+    if (state.applyingProposal) return Promise.resolve();
+    var id = button.getAttribute('data-atd-proposal-apply');
+    var runId = button.getAttribute('data-atd-proposal-run') || state.taskId;
+    state.applyingProposal = true;
+    button.setAttribute('disabled', '');
+    var toast = window.Lex && window.Lex.Toast;
+    return window.api.post('/api/v1/agent-runs/' + encodeURIComponent(runId) + '/artifacts/' + encodeURIComponent(id) + '/apply', {})
+      .then(function () {
+        if (toast) toast.success('Applied. The tasks and notes are on the matter.');
+      }, function (err) {
+        var refused = err && err.data && err.data.artifact;
+        if (toast) toast.show(refused ? 'Applying it did not finish. Apply it again to create what is missing.' : 'Applying it did not finish. ' + ((err && err.message) || 'Try again.'), 'error');
+      })
+      .then(function () {
+        state.applyingProposal = false;
+        if (!state.destroyed) loadTask(state);
+      });
+  }
+
   function renderTypedArtifactPayload(artifact) {
     var payload = parseStructuredValue(artifact && (artifact.content_jsonb || artifact.payload || artifact.content));
     if (payload == null || payload === '') return '';
     var presentation = artifactPresentation(artifact);
     if (typeof payload !== 'object') return renderReadablePayload(payload, presentation.label, 0);
+    // Any artifact that proposes tasks and notes lists them with their rule and record chips.
+    var proposal = global.LanaProposalOutline ? global.LanaProposalOutline.outline(payload) : null;
+    if (proposal) return renderProposalState(artifact) + global.LanaProposalOutline.html(proposal, escHtml);
     var lead = artifactLeadText(artifact, payload);
     var html = '';
     if (lead) {
@@ -2267,6 +2307,11 @@
         if (pane && typeof pane.scrollIntoView === 'function') pane.scrollIntoView({ behavior: 'smooth', block: 'start' });
         return;
       }
+      var apply = event.target.closest('[data-atd-proposal-apply]');
+      if (apply) {
+        applyProposal(state, apply);
+        return;
+      }
       var filter = event.target.closest('[data-atd-outcome-filter]');
       if (filter) {
         state.activeDeliverableGroup = filter.getAttribute('data-atd-outcome-filter') || 'all';
@@ -2325,7 +2370,9 @@
       outcomeGroupCounts: outcomeGroupCounts,
       normalizeRejectionFeedback: normalizeRejectionFeedback,
       rejectionFeedbackError: rejectionFeedbackError,
-      recordArtifactApprovalDecision: recordArtifactApprovalDecision
+      recordArtifactApprovalDecision: recordArtifactApprovalDecision,
+      renderTypedArtifactPayload: renderTypedArtifactPayload,
+      applyProposal: applyProposal
     }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

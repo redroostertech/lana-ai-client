@@ -63,6 +63,11 @@
       allowedRoles: ['system_admin', 'org_admin', 'organization_admin']
     },
     {
+      value: 'admin/run-controls.html',
+      label: 'Run Controls',
+      description: 'Pause automatic agent runs, set daily limits and see agent usage'
+    },
+    {
       value: 'admin/traces.html',
       label: 'Chat Traces',
       description: 'Debug and observe AI chat interactions'

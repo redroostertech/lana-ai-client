@@ -6,6 +6,7 @@
  *
  * @requires api.js (global api instance)
  * @requires MatterNotesAPIClient
+ * @requires MatterLinksAPIClient
  * @requires NoteListComponent
  * @requires NoteEditorComponent
  */
@@ -22,8 +23,9 @@ class MatterNotesController {
       ...options
     };
 
-    // API client
+    // API clients
     this.apiClient = null;
+    this.linksClient = null;
 
     // Components
     this.noteListComponent = null;
@@ -57,6 +59,9 @@ class MatterNotesController {
 
     // Initialize API client
     this.apiClient = new window.MatterNotesAPIClient(globalApi);
+    if (window.MatterLinksAPIClient) {
+      this.linksClient = new window.MatterLinksAPIClient(globalApi, { matterId: this.currentMatterId });
+    }
 
     // Render container structure
     this.renderContainer();
@@ -89,6 +94,12 @@ class MatterNotesController {
       this.noteListComponent = new window.NoteListComponent('matterNotesList', {
         matterId: this.currentMatterId,
         apiClient: this.apiClient,
+        linksClient: this.linksClient,
+        // Until makeups ship this is undefined and the list uses the platform labels.
+        factLabels: this.options.factLabels,
+        openRunCausation: this.options.openRunCausation || null,
+        // { actionsFor(note), run(note, action, onRecorded) }: the makeup's note actions.
+        noteActions: this.options.noteActions || null,
         onNoteSelect: this.handleNoteSelect.bind(this),
         onNoteCreate: this.handleCreateNote.bind(this),
         onNoteDelete: this.handleNoteDelete.bind(this)
@@ -264,9 +275,10 @@ let matterNotesInstance = null;
  * Initialize Matter Notes for a specific matter
  * @param {string} containerId - Container element ID
  * @param {string} matterId - Matter ID
+ * @param {Object} [options] - { factLabels, openRunCausation }
  * @returns {MatterNotesController} Controller instance
  */
-function initializeMatterNotes(containerId, matterId) {
+function initializeMatterNotes(containerId, matterId, options = {}) {
   // Destroy existing instance if present
   if (matterNotesInstance) {
     matterNotesInstance.destroy();
@@ -275,6 +287,7 @@ function initializeMatterNotes(containerId, matterId) {
 
   // Create new instance
   matterNotesInstance = new MatterNotesController(containerId, {
+    ...options,
     matterId: matterId
   });
 

@@ -63,7 +63,7 @@
     },
     matter: {
       label: 'Open a matter',
-      detail: 'Start a workspace for a client or estate.',
+      detail: 'Start a workspace for a client or a case.',
       href: 'workspaces.html?action=create&type=matter',
       audience: 'all',
     },

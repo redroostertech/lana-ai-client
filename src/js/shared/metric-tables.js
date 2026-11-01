@@ -40,7 +40,7 @@
   }
 
   // Enum or slug -> "Lead management". Registry keys also use dots
-  // ("legal_firm.estate_planning"), which become spaces too.
+  // ("legal_firm.family_law"), which become spaces too.
   function humanizeLabel(value) {
     var text = value === null || value === undefined ? '' : String(value).split('.').join(' ');
     var lexUtils = utils();

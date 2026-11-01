@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Run Controls - LANA AI</title>
+
+  <!-- ── CSS + Tailwind in head — behavioral scripts at end of body ── -->
+  <link rel="stylesheet" href="../css/lex-tokens.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/admin/run-controls.css">
+  <link rel="stylesheet" href="../css/admin/admin-switcher.css">
+  <link rel="stylesheet" href="../css/tailwind-output.css">
+  <script src="../js/tailwind-loader.js"></script>
+
+  <link rel="stylesheet" href="../css/lex-chat.css">
+</head>
+<body>
+
+  <!-- Branded loader — shows once lex-loader.js upgrades the element -->
+  <lex-loader theme="light"></lex-loader>
+
+  <!-- App shell -->
+  <lex-app
+    logo-src="../img/logo-light.png"
+    logo-alt="LANA AI"
+    logo-href="../dashboard.html"
+    active-nav-id="admin"
+    page-title="Run Controls"
+  ></lex-app>
+
+  <!-- Page content as inert <template> -->
+  <template id="page-content">
+
+    <main>
+
+      <lex-banner
+        variant="light"
+        corners
+        heading="Run controls"
+        subtitle="Pause automatic agent runs, set their daily limit and see what agents used"
+        lana
+        lana-context-type="full_chat"
+      ></lex-banner>
+
+      <lex-breadcrumb items='[{"label":"Administration","href":"admin/index.html"},{"label":"Run Controls"}]'></lex-breadcrumb>
+
+      <!-- Automatic runs: the organization's run limits (GET/PUT /api/v1/admin/run-limits) -->
+      <lex-card id="runLimitsCard" heading="Automatic runs" variant="default" class="run-controls__card">
+        <div id="runLimitsBody" class="run-controls__limits">
+          <div class="run-controls__pause">
+            <lex-toggle id="runLimitsPaused" name="automatic_runs_paused" label="Pause automatic runs"></lex-toggle>
+            <lex-badge id="runLimitsStatus" label="Running" color="green"></lex-badge>
+          </div>
+          <p id="runLimitsStatusText" class="run-controls__help"></p>
+          <p class="run-controls__help">Pausing stops agents and skills that events and schedules start. People can still start runs themselves.</p>
+          <div class="run-controls__fields">
+            <div class="run-controls__field">
+              <lex-input id="runLimitsDaily" name="max_automatic_agent_runs_per_day" type="number" label="Automatic agent runs per day"
+                help="Once this many automatic runs started today, further automatic starts are skipped and recorded."></lex-input>
+              <p id="runLimitsUsedToday" class="run-controls__used"></p>
+            </div>
+            <lex-input id="runLimitsSpend" name="max_agent_spend_microdollars_per_day" label="Daily spend figure (USD)" placeholder="None"
+              help="Shown for reference beside usage. Runs are not stopped when spend passes it."></lex-input>
+          </div>
+          <div class="run-controls__actions">
+            <lex-btn id="runLimitsSave" variant="primary">Save limits</lex-btn>
+            <span id="runLimitsUpdated" class="run-controls__help"></span>
+          </div>
+          <p id="runLimitsNotice" class="run-controls__notice" hidden></p>
+          <div id="runLimitsStale" class="run-controls__stale" hidden>
+            <div class="run-controls__stale-head">
+              <lex-badge label="Not saved" color="yellow"></lex-badge>
+              <p id="runLimitsStaleText" class="run-controls__stale-text"></p>
+            </div>
+            <p id="runLimitsStaleMine" class="run-controls__help"></p>
+            <div class="run-controls__actions">
+              <lex-btn id="runLimitsReapply" variant="primary" size="sm">Save my change again</lex-btn>
+              <lex-btn id="runLimitsKeep" variant="ghost" size="sm">Keep the current values</lex-btn>
+            </div>
+          </div>
+        </div>
+        <div id="runLimitsRefused" class="run-controls__refused" hidden>
+          <lex-empty id="runLimitsRefusedEmpty" icon="lock" message="Not permitted" description=""></lex-empty>
+        </div>
+      </lex-card>
+
+      <!-- Agent usage (GET /api/v1/agents/usage) -->
+      <lex-card id="runUsageCard" heading="Agent usage" variant="default" class="run-controls__card">
+        <div id="runUsageBody">
+          <div class="run-controls__period">
+            <lex-segmented id="runUsagePeriod" name="period"></lex-segmented>
+            <span id="runUsageWindow" class="run-controls__help"></span>
+          </div>
+          <div id="runUsageTiles" class="run-controls__tiles">
+            <lex-metric id="runUsageRuns" label="Agent runs" value="-" status="blue"></lex-metric>
+            <lex-metric id="runUsageTokens" label="Tokens" value="-" status="blue"></lex-metric>
+            <lex-metric id="runUsageCost" label="Estimated cost" value="-" status="blue"></lex-metric>
+          </div>
+          <p id="runUsageTokensDetail" class="run-controls__help"></p>
+          <h3 class="run-controls__heading">By agent</h3>
+          <lex-table id="runUsageByAgent" class="lex-table--card" columns="agent,runs,tokens,cost" labels="Agent,Runs,Tokens,Estimated cost"
+            empty-text="No agent runs in this period"></lex-table>
+          <h3 class="run-controls__heading">By what started them</h3>
+          <lex-table id="runUsageByTrigger" class="lex-table--card" columns="trigger,runs,tokens,cost" labels="Started by,Runs,Tokens,Estimated cost"
+            empty-text="No agent runs in this period"></lex-table>
+          <h3 class="run-controls__heading">By matter</h3>
+          <lex-table id="runUsageByMatter" class="lex-table--card" columns="matter,runs,tokens,cost" labels="Matter,Runs,Tokens,Estimated cost"
+            empty-text="No agent runs on matters you can open in this period"></lex-table>
+        </div>
+        <div id="runUsageRefused" class="run-controls__refused" hidden>
+          <lex-empty id="runUsageRefusedEmpty" icon="lock" message="Not available" description=""></lex-empty>
+        </div>
+      </lex-card>
+
+    </main>
+
+  </template>
+
+  <noscript>
+    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,sans-serif;color:#666;">
+      Please enable JavaScript to use LANA AI.
+    </div>
+  </noscript>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       Scripts at end of body — HTML renders first, scripts load after
+       ══════════════════════════════════════════════════════════════════ -->
+
+  <!-- Universal shell scripts -->
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/time-utils.js"></script>
+  <script src="../js/shared/request-retry.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/version.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/navigation-helpers.js"></script>
+  <script src="../js/conversation-search-modal.js"></script>
+  <script src="../js/contact-search-modal.js"></script>
+  <script src="../js/notifications.js"></script>
+
+  <!-- Lex UI core -->
+  <script src="../js/lex/lex.core.js"></script>
+  <script src="../js/lex/lex.icons.js"></script>
+  <script src="../js/lex/lex.data.js"></script>
+  <script src="../js/lex/lex.forms.js"></script>
+  <script src="../js/lex/lex.state.js"></script>
+  <script src="../js/lex/lex.utils.js"></script>
+  <script src="../js/lex/lex.auth.js"></script>
+  <script src="../js/lex/lex-nav.js"></script>
+
+  <!-- Lex UI foundation + layout -->
+  <script src="../js/lex/components/foundation/lex-loader.js"></script>
+  <script src="../js/lex/components/foundation/lex-toast.js"></script>
+  <script src="../js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="../js/lex/components/foundation/lex-btn.js"></script>
+  <script src="../js/lex/components/foundation/lex-empty.js"></script>
+  <script src="../js/lex/components/form/lex-segmented.js"></script>
+  <script src="../js/lex/components/layout/lex-sidebar.js"></script>
+  <script src="../js/lex/components/layout/lex-topbar.js"></script>
+  <script src="../js/lex/components/layout/lex-conversation-item.js"></script>
+  <script src="../js/lex/components/layout/lex-notification-panel.js"></script>
+  <script src="../js/lex/components/layout/lex-app.js"></script>
+
+  <!-- Page-specific Lex components (BEFORE inject) -->
+  <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
+  <script src="../js/lex/components/foundation/lex-banner.js"></script>
+  <script src="../js/lex/components/foundation/lex-card.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/foundation/lex-metric.js"></script>
+  <script src="../js/lex/components/data/lex-table.js"></script>
+  <script src="../js/lex/components/form/lex-select.js"></script>
+  <script src="../js/lex/components/form/lex-input.js"></script>
+  <script src="../js/lex/components/form/lex-toggle.js"></script>
+
+  <!-- Inject page content + hoist modals -->
+  <script src="../js/lex/lex-page-init.js"></script>
+  <script src="../js/admin/admin-switcher.js"></script>
+
+  <!-- Page controller -->
+  <script src="../js/api/run-controls-api.client.js"></script>
+  <script src="../js/shared/run-controls.js"></script>
+  <script src="../js/admin/run-controls.js"></script>
+
+  <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>
+  <!-- LANA dock (IDE-style docked chat panel) -->
+  <script src="../js/lex/chat/lex-chat.format.js"></script>
+  <script src="../js/lex/chat/lex-chat.conversations-api.js"></script>
+  <script src="../js/lex/chat/lex-chat.source.js"></script>
+  <script src="../js/lex/chat/lex-chat.message.js"></script>
+  <script src="../js/lex/chat/lex-chat-progress-events.js"></script>
+  <script src="../js/lex/chat/lex-chat.activity.js"></script>
+  <script src="../js/lex/chat/lex-chat.documents.js"></script>
+  <script src="../js/lex/chat/lex-chat.composer-mentions.js"></script>
+  <script src="../js/services/slash-commands.service.js"></script>
+  <script src="../js/lex/chat/lex-chat.composer-slash.js"></script>
+  <script src="../js/lex/chat/lex-chat.composer.js"></script>
+  <script src="../js/lex/chat/lex-chat.thread.js"></script>
+  <script src="../js/lex/chat/lex-chat.threads.js"></script>
+  <script src="../js/lex/chat/lex-chat.js"></script>
+  <script src="../js/lex/chat/lex-dynamic-card.renderer.js"></script>
+  <script src="../js/lex/chat/lex-agentic-plan-card.js"></script>
+  <script src="../js/lex/chat/lex-chat.index.js"></script>
+  <script src="../js/lex/components/chat/lex-lana-panel.js"></script>
+  <script src="../js/lex/components/layout/lex-lana-dock.js"></script>
+
+  <!-- Auth guard + loader dismiss (MUST be last) -->
+  <script src="../js/auth-guard.js"></script>
+</body>
+</html>

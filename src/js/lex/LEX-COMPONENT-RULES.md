@@ -555,6 +555,7 @@ All form components use the `withFormField` mixin, providing: `name`, `label`, `
 - `{ disabled: true }` options and `{ divider: true }` separators cannot be chosen; arrow keys skip them.
 - Single: a `value` that matches no option shows the placeholder (the value is kept, so options loaded later still select it).
 - `multiple`: `select.value` is an array of strings; the setter takes an array, a JSON array string or a comma-separated string.
+- `multiple` pills: a long label truncates with an ellipsis inside `.lex-select-pill-label`, the remove mark always shows, and the pill's `title` is the full label. The trigger carries `.lex-select-trigger--multiple`, so a page's CSS can let pills wrap (`height: auto`) and widen them.
 - `.options` / `.value` assigned before the element upgrades are kept.
 - `select.focus()` focuses the trigger. Inside a native `<form>`, the form's `reset` restores the value the select had when it first connected.
 - Option, clear and pill-remove clicks call `preventDefault`, so a lex-select inside a `<label>` does not reopen.

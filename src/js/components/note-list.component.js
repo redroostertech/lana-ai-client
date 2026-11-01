@@ -10,7 +10,15 @@
  * - Auto-refresh on updates
  *
  * @requires MatterNotesAPIClient
+ * @requires MatterLinksAPIClient (link chips; optional)
+ * @requires LanaNoteLabels (shared/note-labels.js)
+ * @requires LanaEntityLinks (shared/entity-links.js)
  */
+
+function noteListModule(globalName, path) {
+  if (typeof window !== 'undefined' && window[globalName]) return window[globalName];
+  return require(path);
+}
 
 class NoteListComponent {
   constructor(containerId, options = {}) {
@@ -22,6 +30,10 @@ class NoteListComponent {
     this.options = {
       matterId: options.matterId,
       apiClient: options.apiClient,
+      linksClient: options.linksClient || null,
+      factLabels: options.factLabels || null,
+      openRunCausation: options.openRunCausation || null, // (runKind, runId) for produced_by chips
+      noteActions: options.noteActions || null, // { actionsFor(note), run(note, action, onRecorded) }: the makeup's note actions
       onNoteSelect: options.onNoteSelect || (() => {}),
       onNoteCreate: options.onNoteCreate || (() => {}),
       onNoteDelete: options.onNoteDelete || (() => {}),
@@ -38,6 +50,9 @@ class NoteListComponent {
     this.isSearching = false;
     this.focusModeEditor = null; // Tiptap editor instance for focus mode
     this.editingNoteId = null; // Track which note is being edited
+    this.filters = { label: '', unlinked: false };
+    this.linkLabelIndex = {}; // kind:id -> readable label for link chips
+    this.loadedLinkKinds = {};
 
     // Virtual scrolling state
     this.virtualScroll = {
@@ -82,6 +97,25 @@ class NoteListComponent {
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => func.apply(this, args), delay);
     };
+  }
+
+  labels() {
+    return noteListModule('LanaNoteLabels', '../shared/note-labels.js');
+  }
+
+  entityLinks() {
+    return noteListModule('LanaEntityLinks', '../shared/entity-links.js');
+  }
+
+  factLabels() {
+    return this.labels().factLabels(this.options && this.options.factLabels);
+  }
+
+  /**
+   * Escape text for a double-quoted HTML attribute.
+   */
+  escapeAttr(text) {
+    return this.escapeHtml(text == null ? '' : String(text)).split('"').join('&quot;');
   }
 
   /**
@@ -129,6 +163,12 @@ class NoteListComponent {
           </button>
         </div>
 
+        <!-- Filters: fact label and unlinked -->
+        <div class="notes-filters flex-shrink-0">
+          <lex-select id="notesLabelFilter" class="notes-filters__label" size="sm" aria-label="Filter by label"></lex-select>
+          <lex-checkbox id="notesUnlinkedFilter" label="Unlinked only"></lex-checkbox>
+        </div>
+
         <!-- Notes List - Scrollable -->
         <div class="flex-1 overflow-y-auto">
           <div id="notesList" class="space-y-4 pr-2">
@@ -163,6 +203,7 @@ class NoteListComponent {
     viewModal.innerHTML = `
       <div id="notesViewMeta" class="mb-4 flex items-center gap-2 text-xs text-gray-500"></div>
       <div id="notesViewContent" class="prose max-w-none text-gray-700 leading-relaxed"></div>
+      <div id="notesViewLinks" class="note-links"></div>
       <button type="button" data-slot="footer" id="notesViewEditBtn" class="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50">Edit</button>
     `;
 
@@ -173,12 +214,14 @@ class NoteListComponent {
     focusModal.setAttribute('hide-actions', '');
     focusModal.innerHTML = `
       <div class="max-w-4xl mx-auto px-8 py-8">
-        <input
-          type="text"
+        <textarea
           id="notesFocusTitleInput"
-          class="w-full text-4xl font-bold text-gray-900 border-none outline-none mb-4 placeholder-gray-300"
+          rows="1"
+          class="notes-focus-title w-full text-4xl font-bold text-gray-900 border-none outline-none mb-4 placeholder-gray-300"
           placeholder="Untitled"
-        />
+        ></textarea>
+        <lex-select id="notesFocusLabelSelect" class="notes-focus-label" label="Label" size="sm"></lex-select>
+        <div id="notesFocusLinks" class="note-links notes-focus-links" hidden></div>
         <div
           id="notesFocusEditorContainer"
           contenteditable="true"
@@ -194,11 +237,43 @@ class NoteListComponent {
     document.body.appendChild(focusModal);
 
     viewModal.addEventListener('click', (e) => {
+      const removeBtn = e.target.closest && e.target.closest('.note-link-chip__remove');
+      if (removeBtn) {
+        this.handleRemoveLink(removeBtn.getAttribute('data-note-id'), removeBtn.getAttribute('data-link-id'));
+        return;
+      }
+      const repinBtn = e.target.closest && e.target.closest('.note-link-chip__repin');
+      if (repinBtn) {
+        this.openLinkPicker(repinBtn.getAttribute('data-note-id'), 'document', {
+          documentId: repinBtn.getAttribute('data-document-id'),
+          releaseId: repinBtn.getAttribute('data-release-id') || ''
+        });
+        return;
+      }
+      const actionBtn = e.target.closest && e.target.closest('.note-links__action');
+      if (actionBtn) {
+        this.runNoteAction(actionBtn.getAttribute('data-note-id'), actionBtn.getAttribute('data-note-action'));
+        return;
+      }
+      const whyBtn = e.target.closest && e.target.closest('.note-link-chip__why');
+      if (whyBtn) {
+        if (this.options.openRunCausation) this.options.openRunCausation(whyBtn.getAttribute('data-run-kind'), whyBtn.getAttribute('data-run-id'));
+        return;
+      }
       const editBtn = e.target.closest && e.target.closest('#notesViewEditBtn');
       if (!editBtn) return;
       const noteId = editBtn.getAttribute('data-note-id');
       this.closeNoteView();
       this.handleEditNote(noteId);
+    });
+    viewModal.addEventListener('lex-select', (e) => {
+      const menu = e.target.closest && e.target.closest('#notesViewAddLink');
+      if (!menu || !e.detail) return;
+      this.openLinkPicker(menu.getAttribute('data-note-id'), e.detail.value);
+    });
+    // The title wraps like a heading but stays one line of text.
+    focusModal.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.target && e.target.id === 'notesFocusTitleInput') e.preventDefault();
     });
     focusModal.addEventListener('click', (e) => {
       if (!e.target.closest) return;
@@ -238,6 +313,8 @@ class NoteListComponent {
       focusToggle.addEventListener('click', () => this.toggleFocusMode());
     }
 
+    this.initFilters();
+
     // Click on note items (delegated)
     const notesList = document.getElementById('notesList');
     if (notesList) {
@@ -272,6 +349,34 @@ class NoteListComponent {
   }
 
   /**
+   * Fill the label filter and listen for filter changes. Filtering is done
+   * by the server (?label= and ?unlinked=true).
+   */
+  initFilters() {
+    const labelFilter = document.getElementById('notesLabelFilter');
+    if (labelFilter) {
+      const filterOptions = this.labels().labelFilterOptions(this.factLabels());
+      labelFilter.options = filterOptions;
+      // lex-select shows its placeholder for an empty value, so the empty
+      // option's own text ("All labels") is the placeholder.
+      labelFilter.placeholder = filterOptions[0].label;
+      labelFilter.value = this.filters.label;
+      labelFilter.addEventListener('lex-change', (e) => {
+        this.filters.label = (e.detail && e.detail.value) || '';
+        this.loadNotes();
+      });
+    }
+
+    const unlinkedFilter = document.getElementById('notesUnlinkedFilter');
+    if (unlinkedFilter) {
+      unlinkedFilter.addEventListener('lex-change', (e) => {
+        this.filters.unlinked = !!(e.detail && e.detail.value);
+        this.loadNotes();
+      });
+    }
+  }
+
+  /**
    * Load notes from API
    */
   async loadNotes() {
@@ -288,6 +393,8 @@ class NoteListComponent {
       this.notes = await this.options.apiClient.loadAllNotes(this.options.matterId, {
         limit: 100,
         maxNotes: 1000,
+        label: this.filters.label,
+        unlinked: this.filters.unlinked,
         onProgress: (loaded, total) => {
           // Could show progress bar here
           console.log(`Loaded ${loaded}/${total} notes`);
@@ -297,12 +404,39 @@ class NoteListComponent {
       this.filteredNotes = [...this.notes];
       this.renderNotesList();
       this.updateStatistics();
+      this.loadLinkLabels();
     } catch (error) {
       console.error('[NoteList] Failed to load notes:', error);
       this.showError('Failed to load notes. Please try again.');
     } finally {
       if (loadingEl) loadingEl.style.display = 'none';
     }
+  }
+
+  /**
+   * Fetch readable names for link targets the loaded notes point at (one
+   * request per record kind, once per component), then re-render.
+   */
+  async loadLinkLabels() {
+    const linksClient = this.options.linksClient;
+    if (!linksClient) return;
+    const kinds = this.entityLinks().kindsNeedingLookup(this.notes, 'matter_note')
+      .filter((kind) => !this.loadedLinkKinds[kind]);
+    if (kinds.length === 0) return;
+
+    await Promise.all(kinds.map((kind) => this.loadLinkCandidates(kind)));
+    this.renderNotesList();
+  }
+
+  /**
+   * Existing matter records of one kind for the link picker and chip labels.
+   */
+  async loadLinkCandidates(kind) {
+    if (this.loadedLinkKinds[kind]) return this.loadedLinkKinds[kind];
+    const candidates = await this.options.linksClient.loadCandidates(kind);
+    this.loadedLinkKinds[kind] = candidates;
+    this.entityLinks().indexCandidates(this.linkLabelIndex, kind, candidates);
+    return candidates;
   }
 
   /**
@@ -336,6 +470,17 @@ class NoteListComponent {
 
     // Empty state — render a single CTA that takes the user straight into
     // the focus-mode editor via startNewNote(), same as the header button.
+    if (this.filteredNotes.length === 0 && this.labels().hasActiveFilters(this.filters)) {
+      notesList.innerHTML = `
+        <lex-empty
+          icon="filter"
+          message="No matching notes"
+          description="No notes match these filters."
+        ></lex-empty>
+      `;
+      return;
+    }
+
     if (this.filteredNotes.length === 0) {
       notesList.innerHTML = `
         <lex-empty
@@ -406,7 +551,9 @@ class NoteListComponent {
             <div class="mt-2 flex items-center gap-2 text-xs text-gray-500">
               <span>${relativeDate}</span>
               ${note.ai_generated ? '<span class="px-2 py-0.5 bg-purple-100 text-purple-700 rounded">AI Generated</span>' : ''}
+              ${this.renderFactBadges(note)}
             </div>
+            ${this.renderLinkChips(note, false)}
           </div>
           <div class="flex gap-1 flex-shrink-0">
             <button class="note-edit-btn p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded" title="Edit note" data-note-id="${note.note_id}">
@@ -419,6 +566,227 @@ class NoteListComponent {
         </div>
       </div>
     `;
+  }
+
+  /**
+   * Label badge and the "Not supported" flag. evidence_status is derived by
+   * the server from the note's cites links.
+   */
+  renderFactBadges(note) {
+    if (!note || !note.label) return '';
+    const labelText = this.labels().labelText(note.label, this.factLabels());
+    const flag = this.labels().evidenceFlag(note);
+    return `<lex-badge class="note-fact-label" color="indigo" size="sm" label="${this.escapeAttr(labelText)}"></lex-badge>` +
+      (flag
+        ? `<lex-badge class="note-fact-flag" color="yellow" size="sm" label="${this.escapeAttr(flag.text)}" title="${this.escapeAttr(flag.detail)}"></lex-badge>`
+        : '');
+  }
+
+  /**
+   * Link chips for a note. The list card shows them read-only; the note view
+   * adds a remove button on each chip a person made (server-written
+   * produced_by links stay read-only), "Change release" on document
+   * citations, and "Why did this run?" on the run that produced the note.
+   */
+  renderLinkChips(note, removable) {
+    const chips = this.entityLinks().linkChips(
+      note && note.links,
+      { kind: 'matter_note', id: note && note.note_id },
+      this.linkLabelIndex
+    );
+    if (chips.length === 0) return '';
+    return `<div class="note-links__chips">${chips.map((chip) => `
+      <span class="note-link-chip" title="${this.escapeAttr(chip.title)}">
+        <span class="note-link-chip__kind">${this.escapeHtml(chip.kindText)}</span>
+        <span class="note-link-chip__text">${this.escapeHtml(chip.text)}</span>
+        ${chip.outdated ? `<span class="note-link-chip__outdated">${this.escapeHtml(this.entityLinks().PIN_OUTDATED_TEXT)}</span>` : ''}
+        ${removable && chip.repin && this.options.linksClient ? `<lex-btn class="note-link-chip__repin" variant="ghost" size="sm" data-note-id="${this.escapeAttr(note.note_id)}" data-document-id="${this.escapeAttr(chip.repin.documentId)}" data-release-id="${this.escapeAttr(chip.repin.releaseId)}">Change release</lex-btn>` : ''}
+        ${removable && chip.run && this.options.openRunCausation ? `<lex-btn class="note-link-chip__why" variant="ghost" size="sm" data-run-kind="${this.escapeAttr(chip.run.kind)}" data-run-id="${this.escapeAttr(chip.run.id)}">Why did this run?</lex-btn>` : ''}
+        ${removable && chip.removable ? `<lex-btn class="note-link-chip__remove" variant="ghost" size="sm" icon leading-icon="x" aria-label="${this.escapeAttr('Remove link to ' + chip.title)}" data-note-id="${this.escapeAttr(note.note_id)}" data-link-id="${this.escapeAttr(chip.id)}"></lex-btn>` : ''}
+      </span>`).join('')}</div>`;
+  }
+
+  /**
+   * Links section of the note view: removable chips plus "Add link".
+   */
+  renderViewLinks(note) {
+    const container = document.getElementById('notesViewLinks');
+    if (!container) return;
+    const addLink = this.options.linksClient
+      ? `<lex-dropdown-btn id="notesViewAddLink" button-label="Add link" icon="link" variant="ghost" floating data-note-id="${this.escapeAttr(note.note_id)}"></lex-dropdown-btn>`
+      : '';
+    const evidence = this.noteActionsFor(note).map(action =>
+      `<lex-btn class="note-links__action" variant="secondary" size="sm" leading-icon="check-circle" data-note-id="${this.escapeAttr(note.note_id)}" data-note-action="${this.escapeAttr(action.id)}">${this.escapeHtml(action.label)}</lex-btn>`
+    ).join('');
+    container.innerHTML = `
+      <div class="note-links__header">
+        <span class="note-links__title">Links</span>
+        ${evidence}
+        ${addLink}
+      </div>
+      ${this.renderLinkChips(note, true) || '<p class="note-links__empty">No links yet.</p>'}
+    `;
+    const menu = document.getElementById('notesViewAddLink');
+    if (menu) menu.options = this.entityLinks().pickerKindOptions();
+  }
+
+  /**
+   * Pick a target of one kind and link the note to it. Rules are listed from
+   * the rulebook the matter applies (firm or starter); a document may also pin a retained
+   * release, which is what makes the note read Supported.
+   *
+   * With `repin` ({ documentId, releaseId }) the picker re-pins an existing
+   * citation: the document is preselected and sending it again with another
+   * release (or none) updates the link's pin (the server answers 200).
+   */
+  async openLinkPicker(noteId, kind, repin = null) {
+    const links = this.entityLinks();
+    const kindText = links.kindLabel(kind);
+    const isDocument = kind === 'document';
+    const repinning = isDocument && repin && repin.documentId ? repin : null;
+    const release = isDocument
+      ? '<lex-select data-link-picker-release label="Retained release" placeholder="Choose a document first" help="Cite a retained release so the note reads Supported. Without one it reads Linked." disabled></lex-select>'
+      : '';
+
+    const modal = window.Lex.Modal.open({
+      heading: repinning ? 'Change cited release' : 'Link ' + kindText.toLowerCase(),
+      size: 'sm',
+      content: `
+        <lex-select data-link-picker-value label="${this.escapeAttr(kindText)}" searchable placeholder="Loading..."></lex-select>
+        ${release}
+        <lex-btn data-slot="footer" variant="secondary" data-action="cancel-link">Cancel</lex-btn>
+        <lex-btn data-slot="footer" variant="primary" data-action="save-link">${repinning ? 'Save release' : 'Add link'}</lex-btn>
+      `
+    });
+    let candidates = [];
+
+    modal.addEventListener('click', async (e) => {
+      const action = e.target.closest && e.target.closest('[data-action]');
+      if (!action) return;
+      if (action.getAttribute('data-action') === 'cancel-link') {
+        modal.removeAfterClose();
+        return;
+      }
+      if (action.getAttribute('data-action') !== 'save-link') return;
+      const input = modal.querySelector('[data-link-picker-value]');
+      const value = input ? String(input.value || '') : '';
+      const picked = candidates.find((item) => item.id === value);
+      if (!picked) {
+        this.showError('Choose a ' + kindText.toLowerCase());
+        return;
+      }
+      const releaseSelect = modal.querySelector('[data-link-picker-release]');
+      const releaseId = releaseSelect ? String(releaseSelect.value || '') : '';
+      const release = releaseId ? (picked.releases || []).find((item) => item.id === releaseId) : null;
+      const target = release ? release.target : picked.target;
+      action.loading = true;
+      const linked = await this.handleAddLink(noteId, kind, target, repinning);
+      action.loading = false;
+      if (linked) modal.removeAfterClose();
+    });
+
+    if (isDocument) {
+      modal.addEventListener('lex-change', (e) => {
+        if (!e.target.hasAttribute || !e.target.hasAttribute('data-link-picker-value')) return;
+        this.showReleaseOptions(modal, candidates.find((item) => item.id === String((e.detail && e.detail.value) || '')));
+      });
+    }
+
+    candidates = await this.loadLinkCandidates(kind);
+    const select = modal.querySelector('[data-link-picker-value]');
+    if (!select || !select.isConnected) return;
+    if (repinning && !candidates.some((item) => item.id === String(repinning.documentId))) {
+      candidates = candidates.concat([{ id: String(repinning.documentId), label: links.endLabel({ kind: 'document', id: repinning.documentId }, this.linkLabelIndex), target: { kind: 'document', id: String(repinning.documentId) }, releases: [] }]);
+    }
+    select.options = candidates.map((item) => ({ value: item.id, label: item.label, description: item.description || '' }));
+    select.placeholder = candidates.length ? 'Choose...' : (this.options.linksClient.unavailableReason(kind) || this.emptyPickerText(kind, kindText));
+    if (!candidates.length) select.disabled = true;
+    if (repinning) {
+      select.value = String(repinning.documentId);
+      select.disabled = true;
+      this.showReleaseOptions(modal, candidates.find((item) => item.id === String(repinning.documentId)), repinning.releaseId);
+    }
+  }
+
+  emptyPickerText(kind, kindText) {
+    if (kind === 'rulebook_rule') return 'No rules in the rulebook this matter applies';
+    return 'No ' + kindText.toLowerCase() + ' records on this matter';
+  }
+
+  /**
+   * Fill the release select with the chosen document's retained releases
+   * (the link target lookup lists them on the document). "No release" stays
+   * first: the link is allowed without one.
+   */
+  showReleaseOptions(modal, candidate, selectedReleaseId = '') {
+    const select = modal.querySelector('[data-link-picker-release]');
+    if (!select) return;
+    const releases = (candidate && candidate.releases) || [];
+    select.value = '';
+    select.options = [{ value: '', label: 'No release' }].concat(
+      releases.map((item) => ({ value: item.id, label: item.label }))
+    );
+    select.placeholder = !candidate ? 'Choose a document first' : (releases.length ? 'No release' : 'No retained releases of this document');
+    select.disabled = releases.length === 0;
+    if (selectedReleaseId) select.value = String(selectedReleaseId);
+  }
+
+  async handleAddLink(noteId, kind, target, repin = null) {
+    try {
+      const response = await this.options.linksClient.createLink({ kind: 'matter_note', id: noteId }, kind, target);
+      await this.refreshNote(noteId);
+      this.showSuccess(repin ? this.entityLinks().repinMessage(repin.releaseId, response) : 'Link added');
+      return true;
+    } catch (error) {
+      console.error('[NoteList] Failed to add link:', error);
+      this.showError(this.entityLinks().linkErrorMessage(error, kind, 'add'));
+      return false;
+    }
+  }
+
+  async handleRemoveLink(noteId, linkId) {
+    if (!noteId || !linkId) return;
+    try {
+      await this.options.linksClient.removeLink(linkId);
+      await this.refreshNote(noteId);
+      this.showSuccess('Link removed');
+    } catch (error) {
+      console.error('[NoteList] Failed to remove link:', error);
+      this.showError(this.entityLinks().linkErrorMessage(error, null, 'remove'));
+    }
+  }
+
+  /**
+   * The makeup's note actions that apply to this note (labels from the server).
+   */
+  noteActionsFor(note) {
+    return this.options.noteActions ? this.options.noteActions.actionsFor(note) : [];
+  }
+
+  /**
+   * A note action (for example recording the note as evidence): the page opens
+   * its form for this note; once recorded the note may gain links, so re-read it.
+   */
+  runNoteAction(noteId, actionId) {
+    const note = this.notes.find(n => n.note_id === noteId);
+    const action = note && this.noteActionsFor(note).find(item => item.id === actionId);
+    if (!action) return;
+    this.options.noteActions.run(note, action, () => this.refreshNote(noteId).catch(() => {}));
+  }
+
+  /**
+   * Re-read one note so its links and evidence_status come from the server.
+   */
+  async refreshNote(noteId) {
+    const response = await this.options.apiClient.getNote(this.options.matterId, noteId);
+    const note = (response && response.note) || response;
+    if (!note) return;
+    this.updateNote(noteId, note);
+    const view = document.getElementById('notesViewModal');
+    if (view && view.open) {
+      this.renderViewMeta(this.notes.find(n => n.note_id === noteId));
+      this.renderViewLinks(this.notes.find(n => n.note_id === noteId));
+    }
   }
 
   /**
@@ -438,9 +806,22 @@ class NoteListComponent {
 
     if (!modal || !meta || !content || !editBtn) return;
 
-    const relativeDate = this.options.apiClient.formatRelativeDate(note.updated_at || note.created_at);
-
     modal.heading = note.title || 'Untitled Note';
+    this.renderViewMeta(note);
+    this.renderViewLinks(note);
+
+    content.innerHTML = this.renderNoteContent(note.content || '<p>No content</p>');
+    editBtn.setAttribute('data-note-id', note.note_id);
+    modal.open = true;
+  }
+
+  /**
+   * Date, AI flag, label badge and evidence flag in the note view.
+   */
+  renderViewMeta(note) {
+    const meta = document.getElementById('notesViewMeta');
+    if (!meta || !note) return;
+    const relativeDate = this.options.apiClient.formatRelativeDate(note.updated_at || note.created_at);
     meta.innerHTML = '';
 
     const dateEl = document.createElement('span');
@@ -454,9 +835,7 @@ class NoteListComponent {
       meta.appendChild(aiEl);
     }
 
-    content.innerHTML = this.renderNoteContent(note.content || '<p>No content</p>');
-    editBtn.setAttribute('data-note-id', note.note_id);
-    modal.open = true;
+    meta.insertAdjacentHTML('beforeend', this.renderFactBadges(note));
   }
 
   /**
@@ -683,6 +1062,14 @@ class NoteListComponent {
         content: content,
         ai_generated: false
       };
+      if (fromFocusMode) {
+        const labelSelect = document.getElementById('notesFocusLabelSelect');
+        const editing = this.editingNoteId && this.notes.find(n => n.note_id === this.editingNoteId);
+        Object.assign(noteData, this.labels().labelChange(
+          labelSelect ? labelSelect.value : '',
+          editing ? editing.label : null
+        ));
+      }
 
       // Check if we're editing an existing note
       if (this.editingNoteId) {
@@ -843,6 +1230,10 @@ class NoteListComponent {
       focusTitle.value = regularTitle.value;
     }
 
+    const editing = this.editingNoteId && this.notes.find(n => n.note_id === this.editingNoteId);
+    this.setFocusLabel(editing ? editing.label : '');
+    this.setFocusContext(editing || null);
+
     // Initialize Tiptap editor if not already created
     if (!this.focusModeEditor && window.TiptapEditor) {
       const focusEditorContainer = document.getElementById('notesFocusEditorContainer');
@@ -909,6 +1300,43 @@ class NoteListComponent {
     if (focusTitle) {
       setTimeout(() => focusTitle.focus(), 100);
     }
+  }
+
+  /**
+   * Label picker in the focus editor: the matter's labels plus the note's
+   * current label when the makeup no longer offers it.
+   */
+  setFocusLabel(currentKey) {
+    const select = document.getElementById('notesFocusLabelSelect');
+    if (!select) return;
+    const options = this.labels().labelOptions(this.factLabels(), currentKey || '');
+    select.options = options;
+    select.placeholder = options[0].label;
+    select.value = currentKey || '';
+  }
+
+  /**
+   * Heading for create or edit, and the note's links read-only while
+   * editing (links are added and removed from the note view).
+   */
+  setFocusContext(note) {
+    const modal = document.getElementById('notesFocusModal');
+    if (modal) modal.heading = note ? 'Edit note' : 'New note';
+    const container = document.getElementById('notesFocusLinks');
+    if (!container) return;
+    if (!note) {
+      container.innerHTML = '';
+      container.hidden = true;
+      return;
+    }
+    container.innerHTML = `
+      <div class="note-links__header">
+        <span class="note-links__title">Links</span>
+        <span class="note-links__empty">Add or remove links from the note view.</span>
+      </div>
+      ${this.renderLinkChips(note, false) || '<p class="note-links__empty">No links yet.</p>'}
+    `;
+    container.hidden = false;
   }
 
   /**
@@ -1102,8 +1530,6 @@ class NoteListComponent {
     if (focusTitle) {
       setTimeout(() => focusTitle.focus(), 150);
     }
-
-    this.showSuccess('Note loaded for editing');
   }
 
   /**

@@ -1,0 +1,430 @@
+/* Agents and skills drawer, run history and "Why did this run?"
+   (js/shared/matter-runnables-panel.js), the makeup switch dialog
+   (js/shared/makeup-switch-dialog.js) and provenance chips on Board cards. */
+
+/* Header menu items the matter's makeup view model does not offer. */
+.matter-banner--no-makeup #headerOptionsMakeup,
+.matter-banner--no-makeup #headerOptionsRunnables,
+.matter-banner--no-makeup-switch #headerOptionsMakeup {
+  display: none;
+}
+
+/* Rhythm: 24px between sections, 8px heading to list, 12px/16px row
+   padding, 4px inside a row. Hierarchy: section heading, list, row. */
+.matter-runnables {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-lg);
+  min-width: 0;
+}
+
+.matter-runnables__pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-xl);
+  min-width: 0;
+}
+
+.matter-runnables__pane[hidden] {
+  display: none;
+}
+
+.matter-runnables__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-md);
+  min-width: 0;
+}
+
+.matter-runnables__group-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--lex-space-md);
+  padding: 0 var(--lex-space-xs);
+}
+
+.matter-runnables__group-title {
+  margin: 0;
+  font-size: var(--lex-body-sm-size);
+  font-weight: var(--lex-weight-semibold);
+  color: var(--lex-text-primary);
+}
+
+.matter-runnables__group-count {
+  font-size: var(--lex-body-sm-size);
+  color: var(--lex-text-tertiary);
+}
+
+/* One bordered list per section; rows divided by a hairline. */
+.matter-runnables__list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--lex-border-default);
+  border-radius: var(--lex-radius-lg);
+  background: var(--lex-bg-primary);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.matter-runnables__item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--lex-space-sm);
+  padding: 0.75rem var(--lex-space-lg);
+  min-width: 0;
+}
+
+.matter-runnables__list > .matter-runnables__item + .matter-runnables__item,
+.matter-runnables__list > .matter-runnables__unavailable {
+  border-top: 1px solid var(--lex-border-subtle);
+}
+
+.matter-runnables__item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lex-space-lg);
+  width: 100%;
+  min-width: 0;
+}
+
+.matter-runnables__item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.matter-runnables__name {
+  font-size: var(--lex-body-sm-size);
+  font-weight: var(--lex-weight-semibold);
+  color: var(--lex-text-primary);
+  overflow-wrap: anywhere;
+}
+
+/* A skill's schedule or trigger, under its name. */
+.matter-runnables__trigger {
+  font-size: var(--lex-body-xs-size);
+  color: var(--lex-text-tertiary);
+}
+
+.matter-runnables__desc {
+  margin: 0;
+  font-size: var(--lex-body-xs-size);
+  color: var(--lex-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.matter-runnables__item--open .matter-runnables__desc {
+  white-space: normal;
+}
+
+.matter-runnables__controls,
+.matter-runnables__start-status {
+  display: flex;
+  align-items: center;
+  gap: var(--lex-space-md);
+  flex: 0 0 auto;
+}
+
+.matter-runnables__start-status[hidden] {
+  display: none;
+}
+
+.matter-runnables__note,
+.matter-runnables__meta {
+  margin: 0;
+  font-size: var(--lex-body-xs-size);
+  color: var(--lex-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+/* Show/hide lines (readiness, not available): quiet, chevron turns open.
+   Pulled left by the ghost button's padding so its text lines up with the
+   row text above it. */
+.matter-runnables__disclosure {
+  margin-left: -0.875rem;
+}
+
+.matter-runnables__disclosure svg {
+  transition: transform 120ms ease;
+}
+
+.matter-runnables__disclosure[aria-expanded="true"] svg {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .matter-runnables__disclosure svg {
+    transition: none;
+  }
+}
+
+/* Readiness: a progress line, then one line per check. */
+.matter-runnables__readiness {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-md);
+  width: 100%;
+  padding: 0.75rem;
+  border-radius: var(--lex-radius-md);
+  background: var(--lex-bg-secondary);
+}
+
+.matter-runnables__readiness[hidden] {
+  display: none;
+}
+
+.matter-runnables__readiness-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.matter-runnables__progress-label {
+  flex: 0 0 auto;
+  font-size: var(--lex-body-xs-size);
+  font-weight: var(--lex-weight-semibold);
+  color: var(--lex-text-primary);
+}
+
+.matter-runnables__progress {
+  flex: 1 1 auto;
+  max-width: 10rem;
+}
+
+.matter-runnables__checks {
+  display: grid;
+  grid-template-columns: 1rem minmax(0, 1fr) auto auto;
+  column-gap: 0.625rem;
+  row-gap: 0.125rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.matter-runnables__check {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+  min-height: 1.875rem;
+}
+
+.matter-runnables__check-icon {
+  display: inline-flex;
+  color: var(--lex-text-tertiary);
+}
+
+.matter-runnables__check--missing .matter-runnables__check-icon {
+  color: var(--lex-status-warning);
+}
+
+.matter-runnables__check--ready .matter-runnables__check-icon {
+  color: var(--lex-status-success);
+}
+
+.matter-runnables__check-label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.matter-runnables__check-reason {
+  font-size: var(--lex-body-xs-size);
+  color: var(--lex-text-tertiary);
+  overflow-wrap: anywhere;
+}
+
+.matter-runnables__check-text {
+  font-size: var(--lex-body-xs-size);
+  color: var(--lex-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.matter-runnables__check-count {
+  font-size: var(--lex-body-xs-size);
+  color: var(--lex-text-secondary);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.matter-runnables__fixes {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.matter-runnables__check--unknown .matter-runnables__check-text,
+.matter-runnables__check--unknown .matter-runnables__check-count {
+  color: var(--lex-text-tertiary);
+}
+
+/* The first not-checked line is set off from the checked ones. */
+.matter-runnables__check:not(.matter-runnables__check--unknown) + .matter-runnables__check--unknown {
+  margin-top: var(--lex-space-sm);
+  padding-top: var(--lex-space-sm);
+  border-top: 1px solid var(--lex-border-default);
+}
+
+/* Not available: collapsed under the section's rows. */
+.matter-runnables__unavailable {
+  display: flex;
+  flex-direction: column;
+  padding: var(--lex-space-sm) var(--lex-space-lg);
+}
+
+.matter-runnables__unavailable-list[hidden] {
+  display: none;
+}
+
+.matter-runnables__item--unavailable {
+  padding: var(--lex-space-sm) 0 0.75rem;
+}
+
+.matter-runnables__item--unavailable .matter-runnables__name {
+  font-weight: var(--lex-weight-medium);
+  color: var(--lex-text-secondary);
+}
+
+.matter-runnables__item--unavailable .matter-runnables__desc {
+  white-space: normal;
+}
+
+/* Run history: the same rows; Load more sits under the list. */
+.matter-runnables__pane > [data-runs-more] {
+  align-self: center;
+}
+
+/* "Why did this run?" */
+.matter-runnables__chain-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--lex-space-md);
+  min-width: 0;
+}
+
+.matter-runnables__chain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-md);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.matter-runnables__facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 0.75rem;
+  margin: 0;
+}
+
+.matter-runnables__fact-label {
+  font-size: var(--lex-body-sm-size);
+  color: var(--lex-text-secondary);
+}
+
+.matter-runnables__fact-value {
+  margin: 0;
+  font-size: var(--lex-body-sm-size);
+  color: var(--lex-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.matter-runnables__chain-title {
+  margin: 0.5rem 0 0;
+  font-size: var(--lex-body-sm-size);
+  font-weight: var(--lex-weight-semibold);
+  color: var(--lex-text-primary);
+}
+
+.matter-runnables__step {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0.5rem 0.75rem;
+  border-left: 2px solid var(--lex-border-default);
+}
+
+.matter-runnables__step--leaf {
+  border-left-color: var(--lex-text-accent);
+}
+
+.matter-runnables__causation {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Makeup switch dialog */
+.makeup-switch {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.makeup-switch__current,
+.makeup-switch__explain,
+.makeup-switch__plan,
+.makeup-switch__upgrade-text {
+  margin: 0;
+  font-size: var(--lex-body-sm-size);
+  color: var(--lex-text-secondary);
+}
+
+.makeup-switch__current {
+  color: var(--lex-text-primary);
+  font-weight: var(--lex-weight-semibold);
+}
+
+.makeup-switch__upgrade {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--lex-border-default);
+  border-radius: var(--lex-radius-md, 0.375rem);
+  background: var(--lex-bg-secondary);
+}
+
+.makeup-switch__upgrade[hidden] {
+  display: none;
+}
+
+/* Linked rule ids on Board cards */
+.task-rule-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+}
+
+.task-rule-chips__outdated {
+  align-self: center;
+  font-size: var(--lex-body-xs-size);
+  font-style: italic;
+  color: var(--lex-text-tertiary);
+}
+
+/* Provenance chips ("From agent run") on Board cards and notes */
+.run-provenance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+}
+
+.run-provenance[hidden] {
+  display: none;
+}

@@ -40,7 +40,6 @@
   // =========================================================================
 
   var _deepLinks = {
-    'implementation-assurance.html':          { matter_id: 'string', matter_name: 'string' },
     'action-queue.html':                      { action_type: 'string', severity: 'string' },
     'admin/alerts.html':                      { id: 'string', status: 'string', severity: 'string' },
     'admin/analytics.html':                   { tab: 'string' },
@@ -68,6 +67,7 @@
     'admin/roles.html':                       { id: 'string' },
     'admin/roles_manager.html':               { id: 'string' },
     'admin/run-books.html':                   { id: 'string' },
+    'admin/run-controls.html':                {},
     'admin/search-analytics.html':            { q: 'string' },
     'admin/session-details.html':             { sessionId: 'string' },
     'admin/sessions.html':                    { sessionId: 'string', userId: 'string' },

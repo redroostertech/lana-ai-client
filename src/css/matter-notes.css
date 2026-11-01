@@ -648,3 +648,116 @@
 .note-toast.error {
   background: #ff3b30;
 }
+
+/* Fact label and unlinked filters above the notes list */
+.notes-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.notes-filters__label {
+  min-width: 12rem;
+}
+
+/* Label picker under the focus-mode title */
+/* Focus editor title: wraps like a heading, grows with its text */
+.notes-focus-title {
+  display: block;
+  resize: none;
+  overflow: hidden;
+  field-sizing: content;
+  background: transparent;
+  line-height: 1.2;
+}
+
+.notes-focus-label {
+  display: block;
+  max-width: 16rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Read-only links while editing, between the label and the body */
+.notes-focus-links {
+  margin-bottom: 1.5rem;
+}
+
+.notes-focus-links[hidden] {
+  display: none;
+}
+
+/* Links on a note: read-only chips on cards, removable chips in the view */
+.note-links {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--lex-border-subtle);
+}
+
+.note-links__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.note-links__action {
+  margin-left: auto;
+}
+
+.note-links__title {
+  font-size: var(--lex-body-sm-size);
+  font-weight: var(--lex-weight-semibold);
+  color: var(--lex-text-secondary);
+}
+
+.note-links__empty {
+  font-size: var(--lex-body-xs-size);
+  color: var(--lex-text-tertiary);
+  margin: 0;
+}
+
+.note-links__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
+}
+
+.note-link-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  max-width: 100%;
+  padding: 0.125rem 0.5rem;
+  border: 1px solid var(--lex-border-default);
+  border-radius: var(--lex-radius-full);
+  background: var(--lex-bg-secondary);
+  font-size: var(--lex-body-xs-size);
+  color: var(--lex-text-primary);
+}
+
+.note-link-chip__kind {
+  color: var(--lex-text-tertiary);
+  font-weight: var(--lex-weight-medium);
+}
+
+.note-link-chip__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 18rem;
+}
+
+.note-link-chip__remove {
+  margin-right: -0.375rem;
+}
+
+/* A starter rule link whose shipped text has changed since it was made */
+.note-link-chip__outdated {
+  color: var(--lex-text-tertiary);
+  font-style: italic;
+  white-space: nowrap;
+}

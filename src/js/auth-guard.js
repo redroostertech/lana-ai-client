@@ -128,7 +128,9 @@
     if (!document.getElementById('lana-one-terminology-loader')) {
       var _termScript = document.createElement('script');
       _termScript.id = 'lana-one-terminology-loader';
-      _termScript.src = 'js/lana-one-terminology.js';
+      // Beside this script, so a page in a subfolder (admin/) loads it from js/ too.
+      var _guard = document.querySelector('script[src$="js/auth-guard.js"]');
+      _termScript.src = _guard ? _guard.src.replace(/auth-guard\.js$/, 'lana-one-terminology.js') : 'js/lana-one-terminology.js';
       _termScript.defer = true;
       (document.head || document.documentElement).appendChild(_termScript);
     }

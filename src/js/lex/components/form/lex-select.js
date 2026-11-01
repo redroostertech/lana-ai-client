@@ -163,11 +163,19 @@
         color: var(--lex-text-primary);
         white-space: nowrap;
         max-width: 120px;
+        min-width: 0;
+      }
+
+      /* The label truncates inside the pill; the remove mark always shows
+         and the full label is the pill's title. */
+      .lex-select-pill-label {
+        min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
       }
 
       .lex-select-pill-x {
+        flex-shrink: 0;
         cursor: pointer;
         color: var(--lex-text-tertiary);
         font-size: var(--lex-form-counter-size, 0.625rem);
@@ -513,7 +521,7 @@
 
       const options = this._getFilteredOptions();
       const sz = this.size || 'md';
-      const triggerCls = `lex-select-trigger lex-select-trigger--${sz}${this._open ? ' lex-select-trigger--open' : ''}${this.error ? ' lex-select-trigger--error' : ''}`;
+      const triggerCls = `lex-select-trigger lex-select-trigger--${sz}${this._open ? ' lex-select-trigger--open' : ''}${this.error ? ' lex-select-trigger--error' : ''}${this.multiple ? ' lex-select-trigger--multiple' : ''}`;
       const disabledAttr = this.disabled ? 'disabled' : '';
       const ariaExpanded = this._open ? 'true' : 'false';
       // aria-activedescendant points to the currently keyboard-focused option.
@@ -609,7 +617,7 @@
         for (const val of this._selectedValues) {
           const opt = allOpts.find(o => !o.divider && o.value === val);
           const label = opt ? opt.label : val;
-          pillsHtml += `<span class="lex-select-pill">${this._escHtml(label)}<span class="lex-select-pill-x" data-remove="${this._escHtml(val)}">&times;</span></span>`;
+          pillsHtml += `<span class="lex-select-pill" title="${this._escHtml(label)}"><span class="lex-select-pill-label">${this._escHtml(label)}</span><span class="lex-select-pill-x" data-remove="${this._escHtml(val)}">&times;</span></span>`;
         }
         pillsHtml += '</span>';
         return pillsHtml;

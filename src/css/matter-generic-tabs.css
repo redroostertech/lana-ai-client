@@ -1,0 +1,136 @@
+/* Generic makeup tabs (js/shared/matter-generic-tabs.js) and task actions (js/shared/task-actions.js) */
+
+.matter-generic-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.matter-generic-tab__header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.matter-generic-tab__description,
+.matter-generic-tab__notice,
+.matter-generic-tab__summary,
+.matter-generic-tab__detail,
+.matter-generic-tab__meta,
+.matter-generic-tab__citation {
+  margin: 0;
+  font-size: var(--lex-body-sm-size);
+  color: var(--lex-text-primary);
+}
+
+.matter-generic-tab__notice {
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--lex-border-default);
+  border-radius: var(--lex-radius-md, 0.375rem);
+  background: var(--lex-bg-secondary);
+}
+
+.matter-generic-tab__meta,
+.matter-generic-tab__detail {
+  color: var(--lex-text-secondary);
+}
+
+.matter-generic-tab__citation--link {
+  color: var(--lex-text-accent);
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}
+
+.matter-generic-tab__group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.matter-generic-tab__group-title {
+  margin: 0;
+  font-size: var(--lex-body-md-size, 1rem);
+  font-weight: var(--lex-weight-semibold);
+  color: var(--lex-text-primary);
+}
+
+.matter-generic-tab__ledger {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.matter-generic-tab__row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: var(--lex-radius-md, 0.375rem);
+  background: var(--lex-bg-primary);
+  min-width: 0;
+}
+
+.matter-generic-tab__row-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.matter-generic-tab__row-title {
+  flex: 1 1 12rem;
+  min-width: 0;
+  font-size: var(--lex-body-sm-size);
+  color: var(--lex-text-primary);
+}
+
+.matter-generic-tab__badges,
+.matter-generic-tab__refs,
+.matter-generic-tab__actions,
+.matter-generic-tab__citations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.matter-generic-tab__citations {
+  flex-direction: column;
+}
+
+.matter-generic-tab__download-notice {
+  font-size: var(--lex-body-xs-size);
+}
+
+.matter-generic-tab__ref {
+  padding: 0.125rem 0.5rem;
+  border: 1px solid var(--lex-border-default);
+  border-radius: var(--lex-radius-full);
+  background: var(--lex-bg-secondary);
+  font-size: var(--lex-body-xs-size);
+  color: var(--lex-text-primary);
+}
+
+/* Task actions on Board cards */
+
+.task-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--lex-border-subtle);
+}
+
+.task-actions__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.task-actions__last-run {
+  font-size: var(--lex-body-xs-size);
+  color: var(--lex-text-secondary);
+}

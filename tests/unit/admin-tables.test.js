@@ -221,6 +221,15 @@ describe('Traces table', () => {
   const win = loadPage('js/admin/admin-traces.js');
   const t = win.AdminTracesTable;
 
+  test('a deep link (trace_id, else id) names the trace to open; anything not a uuid opens nothing', () => {
+    const id = '4bf92f35-77b3-4da6-a3ce-929d0e0e4736';
+    expect(t.linkedTraceId(new URLSearchParams('trace_id=' + id))).toBe(id);
+    expect(t.linkedTraceId(new URLSearchParams('id=' + id))).toBe(id);
+    expect(t.linkedTraceId(new URLSearchParams('trace_id=not-a-trace'))).toBe('');
+    expect(t.linkedTraceId(new URLSearchParams(''))).toBe('');
+    expect(t.linkedTraceId(null)).toBe('');
+  });
+
   test('maps the query to the traces API (limit/offset, camelCase sort)', () => {
     const options = t.toApiOptions({ page: 3, limit: 20, sortBy: 'duration', sortDir: 'asc', filters: {
       status: { operator: 'in', value: ['failed'] },

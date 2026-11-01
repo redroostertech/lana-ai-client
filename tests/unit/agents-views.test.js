@@ -437,6 +437,69 @@ describe('agent-detail view: editing and teaching helpers', () => {
 // activity-detail.js
 // ---------------------------------------------------------------------------
 
+describe('activity-detail view: an artifact that proposes tasks and notes', () => {
+  const proposal = {
+    title: 'Funding follow-ups', tasks: [{ title: 'Get the IRA letter', priority: 'high',
+      about: [{ kind: 'matter_asset', id: 'a1b2c3d4-0000-4000-8000-000000000001' }], resolves: [{ kind: 'rulebook_rule', id: 'x.beneficiary.trust_primary' }] }],
+    summary: { title: 'What we found', items: [{ label: 'open_question', title: 'Is the account joint?', text: 'Confirm with the bank.', about: [] }] },
+  };
+  let testApi;
+  beforeAll(() => {
+    const ctx = createContext();
+    const escapeHtml = (value) => String(value == null ? '' : value).split('&').join('&amp;').split('<').join('&lt;').split('>').join('&gt;').split('"').join('&quot;');
+    ctx.Lex = { Utils: { escapeHtml, timeAgo: String } };
+    ['src/js/shared/note-labels.js', 'src/js/shared/entity-links.js', 'src/js/shared/proposal-outline.js', 'src/agents/js/views/activity-detail.js']
+      .forEach((rel) => loadView(rel, ctx));
+    testApi = ctx.window.LanaAgentsApp.Views.activityDetail.__test;
+  });
+
+  test('lists the proposed tasks with their chips and the labeled summary notes, whatever the kind', () => {
+    const html = testApi.renderTypedArtifactPayload({ kind: 'any_new_kind', status: 'proposed', payload: proposal });
+    expect(html).toContain('Proposed tasks');
+    expect(html).toContain('Get the IRA letter');
+    expect(html).toContain('label="Resolves x.beneficiary.trust_primary"');
+    expect(html).toContain('label="Asset a1b2c3d4"');
+    expect(html).toContain('label="Open question"');
+    expect(html).toContain('What we found');
+    expect(html).not.toContain('Open the tasks');
+  });
+
+  test('after apply it links to the matter Board; control: an approved one says to apply', () => {
+    const applied = testApi.renderTypedArtifactPayload({ kind: 'any_new_kind', status: 'applied', matter_id: 'MATT-1', payload: proposal });
+    expect(applied).toContain('href="../workspace-details.html?id=MATT-1&amp;tab=tasks"');
+    const approved = testApi.renderTypedArtifactPayload({ kind: 'any_new_kind', status: 'approved', matter_id: 'MATT-1', payload: proposal });
+    expect(approved).toContain('Apply it from the agent run');
+    expect(approved).not.toContain('tab=tasks');
+  });
+
+  test('an approved proposal offers Apply and a stopped apply offers Apply again; control: proposed and applied offer none', () => {
+    const card = (status) => testApi.renderTypedArtifactPayload({ id: 'art-1', run_id: 'run-1', kind: 'any_new_kind', status, matter_id: 'MATT-1', payload: proposal });
+    expect(card('approved')).toMatch(/data-atd-proposal-apply="art-1" data-atd-proposal-run="run-1">Apply<\/lex-btn>/);
+    expect(card('failed_to_apply')).toMatch(/data-atd-proposal-apply="art-1"[^>]*>Apply again<\/lex-btn>/);
+    expect(card('proposed')).not.toContain('data-atd-proposal-apply');
+    expect(card('applied')).not.toContain('data-atd-proposal-apply');
+  });
+
+  test('pressing Apply posts the artifact apply and reads the run again, refused or not', async () => {
+    const ctx = createContext();
+    ctx.Lex = { Utils: { escapeHtml: String, timeAgo: String }, Toast: { success: jest.fn(), show: jest.fn() } };
+    ['src/js/shared/note-labels.js', 'src/js/shared/entity-links.js', 'src/js/shared/proposal-outline.js', 'src/agents/js/views/activity-detail.js']
+      .forEach((rel) => loadView(rel, ctx));
+    const api = ctx.window.LanaAgentsApp.Views.activityDetail.__test;
+    ctx.api = { post: jest.fn(async () => ({ artifact: { status: 'applied' } })), get: jest.fn(() => new Promise(() => {})) };
+    const button = { attrs: { 'data-atd-proposal-apply': 'art-1', 'data-atd-proposal-run': 'run-1' }, getAttribute(k) { return this.attrs[k] || null; }, setAttribute: jest.fn() };
+    const state = { taskId: 'run-1', destroyed: false };
+    await api.applyProposal(state, button);
+    expect(ctx.api.post).toHaveBeenCalledWith('/api/v1/agent-runs/run-1/artifacts/art-1/apply', {});
+    expect(ctx.Lex.Toast.success).toHaveBeenCalled();
+    expect(ctx.api.get).toHaveBeenCalledWith('/api/v1/agentic-tasks/run-1');
+    ctx.api.post.mockImplementation(async () => { throw Object.assign(new Error('x'), { status: 409, data: { artifact: { status: 'failed_to_apply' } } }); });
+    await api.applyProposal(state, button);
+    expect(ctx.Lex.Toast.show).toHaveBeenCalledWith(expect.stringContaining('Apply it again'), 'error');
+    expect(ctx.api.get).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('activity-detail view: verification and deliverable helpers', () => {
   let testApi;
 

@@ -19,6 +19,11 @@ class MatterNotesAPIClient {
     this.api = apiClient;
   }
 
+  noteLabels() {
+    if (typeof window !== 'undefined' && window.LanaNoteLabels) return window.LanaNoteLabels;
+    return require('../shared/note-labels.js');
+  }
+
   /**
    * Wrap request with timeout
    * @param {Promise} promise - API request promise
@@ -62,6 +67,8 @@ class MatterNotesAPIClient {
    * @param {string} options.cursor - Pagination cursor from previous response
    * @param {string} options.sort_by - Sort field (created_at, updated_at, title)
    * @param {string} options.sort_order - Sort order (asc, desc)
+   * @param {string} options.label - Only notes with this fact label
+   * @param {boolean} options.unlinked - Only notes with no links
    * @returns {Promise<Object>} { notes: Note[], pagination: { next_cursor, has_more, total } }
    */
   async listNotes(matterId, options = {}) {
@@ -72,6 +79,8 @@ class MatterNotesAPIClient {
       if (options.cursor) params.append('cursor', options.cursor);
       if (options.sort_by) params.append('sort_by', options.sort_by);
       if (options.sort_order) params.append('sort_order', options.sort_order);
+      const filterParams = this.noteLabels().listFilterParams(options);
+      Object.keys(filterParams).forEach((key) => params.append(key, filterParams[key]));
 
       const queryString = params.toString();
       const endpoint = `/api/v1/matters/${matterId}/notes${queryString ? '?' + queryString : ''}`;
@@ -272,6 +281,8 @@ class MatterNotesAPIClient {
    * @param {number} options.limit - Notes per request (default: 100)
    * @param {number} options.maxNotes - Max total notes to load (default: 1000)
    * @param {Function} options.onProgress - Progress callback (loaded, total)
+   * @param {string} options.label - Only notes with this fact label
+   * @param {boolean} options.unlinked - Only notes with no links
    * @returns {Promise<Array<Note>>} All notes for the matter
    */
   async loadAllNotes(matterId, options = {}) {
@@ -288,7 +299,9 @@ class MatterNotesAPIClient {
         limit,
         cursor,
         sort_by: options.sort_by || 'updated_at',
-        sort_order: options.sort_order || 'desc'
+        sort_order: options.sort_order || 'desc',
+        label: options.label,
+        unlinked: options.unlinked
       });
 
       if (response.notes && response.notes.length > 0) {

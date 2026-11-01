@@ -73,6 +73,7 @@ describe('NoteListComponent create affordance', () => {
       showSuccess: jest.fn(),
       showError: jest.fn(),
       updateNote: jest.fn(),
+      labels: NoteListComponent.prototype.labels,
     };
     const elements = {
       notesFocusTitleInput: { value: 'My title' },
@@ -108,6 +109,7 @@ describe('NoteListComponent create affordance', () => {
       showSuccess: jest.fn(),
       showError: jest.fn(),
       updateNote: jest.fn(),
+      labels: NoteListComponent.prototype.labels,
     };
     const elements = {
       notesFocusTitleInput: { value: 'T2' },
@@ -123,5 +125,59 @@ describe('NoteListComponent create affordance', () => {
     });
     expect(apiClient.createNote).not.toHaveBeenCalled();
     expect(fakeThis.editingNoteId).toBeNull();
+  });
+
+  describe('fact label on save', () => {
+    function saveWith({ editingNoteId = null, notes = [], selected }) {
+      const apiClient = {
+        createNote: jest.fn(async () => ({ note: { id: 'new-1', title: 'T' } })),
+        updateNote: jest.fn(async () => ({ note: { id: editingNoteId, title: 'T' } })),
+      };
+      const fakeThis = {
+        editingNoteId,
+        focusModeEditor: null,
+        options: { apiClient, matterId: 'MATT-1' },
+        notes,
+        filteredNotes: [],
+        renderNotesList: jest.fn(),
+        resetFocusSaveButton: jest.fn(),
+        closeFocusMode: jest.fn(),
+        showSuccess: jest.fn(),
+        showError: jest.fn(),
+        updateNote: jest.fn(),
+        labels: NoteListComponent.prototype.labels,
+      };
+      const elements = {
+        notesFocusTitleInput: { value: 'T' },
+        notesFocusEditorContainer: { innerHTML: '<p>b</p>', textContent: 'b' },
+        notesFocusLabelSelect: { value: selected },
+      };
+      return withDocumentStub(elements, () =>
+        NoteListComponent.prototype.handleSaveNote.call(fakeThis, true)
+      ).then(() => apiClient);
+    }
+
+    test('create sends the picked label', async () => {
+      const apiClient = await saveWith({ selected: 'client_instruction' });
+      expect(apiClient.createNote).toHaveBeenCalledWith('MATT-1', {
+        title: 'T', content: '<p>b</p>', ai_generated: false, label: 'client_instruction',
+      });
+    });
+
+    test('edit that clears a label sends label null', async () => {
+      const apiClient = await saveWith({
+        editingNoteId: 'n1', notes: [{ note_id: 'n1', label: 'fact' }], selected: '',
+      });
+      expect(apiClient.updateNote).toHaveBeenCalledWith('MATT-1', 'n1', {
+        title: 'T', content: '<p>b</p>', ai_generated: false, label: null,
+      });
+    });
+
+    test('edit that keeps the label leaves it out of the update', async () => {
+      const apiClient = await saveWith({
+        editingNoteId: 'n1', notes: [{ note_id: 'n1', label: 'fact' }], selected: 'fact',
+      });
+      expect(apiClient.updateNote.mock.calls[0][2]).not.toHaveProperty('label');
+    });
   });
 });

@@ -21,8 +21,8 @@
     if (node) node.textContent = value == null || value === '' ? '-' : String(value);
   }
 
-  // Snake/dot-case identifiers (`legal_operations`, `department_legal_estate_planning`,
-  // `legal_firm.estate_planning.upcoming_poa_deed_design_meetings`) must never
+  // Snake/dot-case identifiers (`legal_operations`, `department_legal_family_law`,
+  // `legal_firm.family_law.upcoming_custody_hearings`) must never
   // appear as plain text to users. Apply this anywhere a registry key is
   // rendered as a label, status, audience, or section.
   function humanize(value) {
@@ -254,7 +254,7 @@
       var current = payload.current || {};
       var movement = payload.movement || null;
       // Title falls through to humanized key so the page never shows
-      // `legal_firm.estate_planning.upcoming_poa_deed_design_meetings` as a heading.
+      // `legal_firm.family_law.upcoming_custody_hearings` as a heading.
       var rawTitle = current.title || metric.title || metric.name || metric.key || metricKey;
       var titleLooksLikeKey = rawTitle && rawTitle === (metric.key || metric.metric_key || metricKey);
       var title = titleLooksLikeKey ? humanize(rawTitle) : rawTitle;

@@ -10,6 +10,9 @@
   <link rel="stylesheet" href="css/components/matter-documents-view.css">
   <link rel="stylesheet" href="css/document-create-modal.css">
   <link rel="stylesheet" href="css/matter-notes.css">
+  <link rel="stylesheet" href="css/server-form.css">
+  <link rel="stylesheet" href="css/matter-generic-tabs.css">
+  <link rel="stylesheet" href="css/matter-runnables.css">
   <link rel="stylesheet" href="css/workspace-summary.css">
   <link rel="stylesheet" href="css/workspace-details.css">
   <link rel="stylesheet" href="css/workspace-billable-hours.css">
@@ -39,6 +42,7 @@
       <!-- Banner -->
       <lex-banner
         id="matterBanner"
+        class="matter-banner--no-makeup"
         variant="light"
         heading="Loading..."
         subtitle=""
@@ -46,7 +50,8 @@
         lana
         lana-context-type="full_chat"
       >
-        <button id="headerOptionsAssurance">Implementation assurance</button>
+        <button id="headerOptionsRunnables">Agents and skills</button>
+        <button id="headerOptionsMakeup">Makeup</button>
         <button id="headerOptionsEdit">Edit Matter</button>
         <button id="headerOptionsStatus">Change Status</button>
         <button id="headerOptionsDelete" style="color: var(--lex-color-danger-600);">Delete</button>
@@ -70,15 +75,15 @@
       <div class="flex-1 flex flex-col min-h-0">
         <!-- Tab bar -->
         <div class="matter-tabbar flex flex-shrink-0 px-6">
-          <!-- Narrow layouts swap the tabs for this dropdown (options built from #tabBar) -->
+          <!-- Narrow layouts swap the tabs for this dropdown (options set with #tabBar) -->
           <lex-select id="tabSelect" class="matter-tabbar__select" variant="outlined" aria-label="Section"></lex-select>
           <lex-tabs
             id="tabBar"
             class="matter-tabbar__tabs flex-1"
             active="summary"
             variant="underline"
-            tabs='[{"id":"summary","label":"Summary"},{"id":"notes","label":"Notes"},{"id":"tasks","label":"Board"},{"id":"comments","label":"Discussions"},{"id":"documents","label":"Documents"},{"id":"billableHours","label":"Billable Hours"}]'
           ></lex-tabs>
+          <!-- Tabs come from the matter's makeup (js/shared/matter-tab-registry.js) -->
         </div>
 
         <!-- Tab content (single column, scrollable) -->
@@ -1142,6 +1147,7 @@
   <script src="js/lex/components/form/lex-select.js"></script>
   <script src="js/lex/components/form/lex-dropdown-btn.js"></script>
   <script src="js/lex/components/form/lex-checkbox.js"></script>
+  <script src="js/lex/components/form/lex-toggle.js"></script>
   <script src="js/lex/components/form/lex-textarea.js"></script>
   <script src="js/lex/components/data/lex-table.js"></script>
   <script src="js/lex/components/data/lex-pagination.js"></script>
@@ -1166,6 +1172,23 @@
   <script src="js/components/document-metadata-viewer.js"></script>
   <script src="js/tiptap-bundle-built.js"></script>
   <script src="js/api/matter-notes-api.client.js"></script>
+  <script src="js/api/matter-links-api.client.js"></script>
+  <script src="js/shared/note-labels.js"></script>
+  <script src="js/shared/entity-links.js"></script>
+  <script src="js/shared/note-actions.js"></script>
+  <script src="js/api/matter-makeup-api.client.js"></script>
+  <script src="js/shared/form-values.js"></script>
+  <script src="js/shared/pending-submit.js"></script>
+  <script src="js/shared/server-form-fields.js"></script>
+  <script src="js/shared/server-form.js"></script>
+  <script src="js/shared/matter-tab-registry.js"></script>
+  <script src="js/shared/matter-generic-tabs.js"></script>
+  <script src="js/shared/task-actions.js"></script>
+  <script src="js/shared/run-history.js"></script>
+  <script src="js/shared/matter-runnables.js"></script>
+  <script src="js/shared/makeup-switch.js"></script>
+  <script src="js/shared/matter-runnables-panel.js"></script>
+  <script src="js/shared/makeup-switch-dialog.js"></script>
   <script src="js/components/note-list.component.js"></script>
   <script src="js/components/note-editor.component.js"></script>
   <script src="js/matter-notes.js"></script>

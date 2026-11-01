@@ -864,6 +864,82 @@
     return html + '</div>';
   }
 
+  // The proposal's artifact as the run holds it now, read for its status
+  // (applied, failed_to_apply); the proposal itself is the approval's content.
+  function _loadProposalArtifact(payload) {
+    if (!payload.run_id) return Promise.resolve(null);
+    return api.get('/api/v1/agent-runs/' + encodeURIComponent(payload.run_id)).then(function (res) {
+      var artifacts = (res && res.artifacts) || (res && res.run && res.run.artifacts) || [];
+      for (var i = 0; i < artifacts.length; i++) {
+        if (artifacts[i] && String(artifacts[i].id) === String(payload.artifact_id)) return artifacts[i];
+      }
+      return null;
+    }).catch(function () { return null; });
+  }
+
+  function _proposalStateHtml(approval, payload, artifact) {
+    var outline = window.LanaProposalOutline;
+    var line = outline.stateLine(artifact);
+    if (line.state === 'applied') {
+      var href = outline.tasksHref(approval.matter_id || (artifact && artifact.matter_id), '');
+      return '<p class="proposal-outline__state">' + escHtml(line.text) +
+        (href ? ' <a class="proposal-outline__link" href="' + escHtml(href) + '">Open the tasks</a>' : '') + '</p>';
+    }
+    if (line.state === 'failed') {
+      return '<p class="proposal-outline__state">' + escHtml(line.text) +
+        ' <lex-btn variant="primary" size="sm" data-proposal-apply>' + escHtml(outline.APPLY_AGAIN) + '</lex-btn></p>';
+    }
+    if (line.state === 'approved' || (approval.status === 'approved' && !artifact)) {
+      return '<p class="proposal-outline__state">' + escHtml(outline.stateLine({ status: 'approved' }).text) +
+        ' <a class="proposal-outline__link" href="agents/index.html#run/' + encodeURIComponent(payload.run_id || '') + '">Open the agent run</a></p>';
+    }
+    return '';
+  }
+
+  // Apply a proposal again after its apply stopped part way. The server
+  // answers the artifact either way (200 applied, 409 still failed_to_apply).
+  function _applyProposalAgain(payload) {
+    var path = '/api/v1/agent-runs/' + encodeURIComponent(payload.run_id) + '/artifacts/' + encodeURIComponent(payload.artifact_id) + '/apply';
+    return api.post(path, {}).then(function (res) {
+      return (res && res.artifact) || { status: 'applied' };
+    }, function (err) {
+      var artifact = err && err.data && err.data.artifact;
+      if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.error('Applying it did not finish. ' + (artifact ? 'Try again in a moment.' : (err && err.message) || 'Try again.'));
+      return artifact || null;
+    });
+  }
+
+  // The approval's content is the parsed proposal (agent-artifact.service
+  // createApproval stores the normalized content); the run is read only for
+  // the artifact's status.
+  function _renderProposal(approval, container, payload) {
+    var outline = window.LanaProposalOutline;
+    var view = outline.outline(payload.content);
+    if (!view) return;
+    var heading = el('apdPayloadCard') && el('apdPayloadCard').querySelector('.apd-section-heading');
+    if (heading) heading.textContent = 'Proposal';
+    var raw = '';
+    try { raw = JSON.stringify(payload, null, 2); } catch (e) { raw = ''; }
+    var draw = function (artifact) {
+      container.innerHTML = '<div class="apd-proposal">' + _proposalStateHtml(approval, payload, artifact) +
+        outline.html(view, escHtml) +
+        (raw ? '<details class="proposal-outline__raw"><summary>Raw payload</summary><pre class="apd-payload">' + escHtml(raw) + '</pre></details>' : '') +
+        '</div>';
+      var again = container.querySelector('[data-proposal-apply]');
+      if (again) {
+        again.addEventListener('click', function () {
+          again.loading = true;
+          _applyProposalAgain(payload).then(function (next) {
+            if (next && next.status === 'applied' && typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.success('Applied. The tasks and notes are on the matter.');
+            draw(next || artifact);
+          });
+        });
+      }
+    };
+    draw(null);
+    _loadProposalArtifact(payload).then(function (artifact) { if (artifact) draw(artifact); });
+  }
+
   function _renderPayload(approval) {
     var container = el('apdPayloadContent');
     var card      = el('apdPayloadCard');
@@ -883,6 +959,14 @@
       return;
     }
 
+    _renderGenericPayload(container, payload);
+    // An agent artifact that proposes tasks and notes (any kind) lists them instead.
+    if (typeof payload === 'object' && !Array.isArray(payload) && payload.artifact_id && window.LanaProposalOutline) {
+      _renderProposal(approval, container, payload);
+    }
+  }
+
+  function _renderGenericPayload(container, payload) {
     // Try to render as key-value pairs if it's a flat object
     if (typeof payload === 'object' && !Array.isArray(payload)) {
       var keys = Object.keys(payload);
