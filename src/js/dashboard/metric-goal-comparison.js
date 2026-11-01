@@ -8,7 +8,7 @@
  * render nothing extra (graceful degrade).
  *
  * Pure functions only so they can be unit-tested without a DOM. Renderers
- * (metric-card.widget.js, dashboard-detail.js) own the markup; this module
+ * (dashboard-detail.js) own the markup; this module
  * owns the value/label shaping so attainment, pacing, and delta semantics are
  * defined once and never recomputed per surface.
  *

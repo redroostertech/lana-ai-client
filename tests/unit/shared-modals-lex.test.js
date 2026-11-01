@@ -2,7 +2,7 @@
 
 /**
  * Shared imperative modals render in lex-modal (docs/TABLE-STANDARD.md
- * section 11): widget config, search result JSON editor, event browser,
+ * section 11): search result JSON editor, event browser,
  * conversation actions + rename, and the session-expired notice. No
  * hand-built backdrop; the component owns close, Escape and focus.
  */
@@ -44,55 +44,6 @@ function innerButton(lexBtn) {
 
 // Legacy hand-built overlay markers (lex-modal's own classes are lex-modal-*).
 const HAND_BUILT = /fixed inset-0|bg-opacity-50|event-browser-backdrop|search-result-editor-backdrop/;
-
-describe('WidgetConfigModal', () => {
-  function load() {
-    const window = boot();
-    window.api = {
-      getDashboardWidgetTypes: jest.fn(async () => ({ data: [{ type: 'chart', label: 'Chart' }] })),
-      createDashboardWidget: jest.fn(async () => ({}))
-    };
-    window.eval(read('dashboard/widget-config-modal.js') + '\n;window.WidgetConfigModal = WidgetConfigModal;');
-    return window;
-  }
-
-  test('opens a lex-modal with the legacy ids and footer buttons', async () => {
-    const window = load();
-    await window.WidgetConfigModal.open();
-    const modal = window.document.getElementById('widgetConfigModal');
-    expect(modal.tagName).toBe('LEX-MODAL');
-    expect(modal.open).toBe(true);
-    expect(modal.heading).toBe('Add Widget');
-    const typeSelect = modal.querySelector('#widgetTypeSelect');
-    expect(typeSelect.tagName).toBe('LEX-SELECT');
-    expect(typeSelect.options.map((o) => o.value)).toContain('chart');
-    const footer = modal.querySelector('.lex-modal-footer');
-    expect(footer.querySelector('#saveWidgetBtn')).not.toBeNull();
-    expect(footer.querySelector('#cancelWidgetBtn')).not.toBeNull();
-    expect(footer.querySelector('[data-action="confirm"]')).toBeNull();
-    expect(modal.outerHTML).not.toMatch(HAND_BUILT);
-  });
-
-  test('cancel and Escape close it; save posts the widget and closes', async () => {
-    const window = load();
-    await window.WidgetConfigModal.open();
-    const modal = window.document.getElementById('widgetConfigModal');
-    click(window, innerButton(modal.querySelector('#cancelWidgetBtn')));
-    expect(modal.open).toBeFalsy();
-
-    await window.WidgetConfigModal.open();
-    await tick(window);
-    pressEscape(window);
-    expect(modal.open).toBeFalsy();
-
-    await window.WidgetConfigModal.open();
-    modal.querySelector('#widgetTypeSelect').value = 'chart';
-    click(window, innerButton(modal.querySelector('#saveWidgetBtn')));
-    await tick(window);
-    expect(window.api.createDashboardWidget).toHaveBeenCalledWith(expect.objectContaining({ widget_type: 'chart', title: 'Chart' }));
-    expect(modal.open).toBeFalsy();
-  });
-});
 
 describe('search result JSON editor', () => {
   test('Edit Object opens a lex-modal editor; Cancel removes it', async () => {

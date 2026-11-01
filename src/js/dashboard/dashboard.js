@@ -3032,17 +3032,6 @@
     // ── 7. Admin activity filter ──────────────────────────────────────────
     initializeActivityUserFilter();
 
-    // ── 8. Legacy Widget system (kept for backward-compat) ─────────────────
-    // /api/v1/dashboard-widgets requires dashboard:read, so for a non-admin this
-    // only ever produced a 403 into an already-hidden #widgetGrid.
-    if (showAdminSections) {
-      _timeouts.push(setTimeout(function () {
-        if (typeof WidgetRenderer !== 'undefined') {
-          WidgetRenderer.init();
-        }
-      }, 500));
-    }
-
     // ── 9. Heartbeat indicator in topbar ──────────────────────────────────
     _timeouts.push(setTimeout(function () {
       if (heartbeatAppEnabled() && typeof LanaHeartbeat !== 'undefined') {
@@ -3334,10 +3323,10 @@
       });
     }
 
-    // Add button → navigate to connectors page
-    var addWidgetBtn = el('addWidgetBtn');
-    if (addWidgetBtn) {
-      addWidgetBtn.addEventListener('click', function () {
+    // Data Pulse Add button: opens the connectors page
+    var addConnectorBtn = el('addConnectorBtn');
+    if (addConnectorBtn) {
+      addConnectorBtn.addEventListener('click', function () {
         Lex.Nav.go('data-connectors.html');
       });
     }

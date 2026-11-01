@@ -4,7 +4,6 @@
  * that never resolve.
  *
  * Observed against the live API with a plain "User" role token:
- *   403 /api/v1/dashboard-widgets              Permission required: dashboard:read
  *   403 /api/v1/admin/health/storage           One of the following permissions
  *                                              required: admin:access, org:manage
  *   403 /api/v1/activity/organization/*        Only admins can view organization-wide ...
@@ -73,6 +72,17 @@ describe('dashboard admin section gate', () => {
     // Non-admins still see the Workspaces tile, so the fetch must always run.
     expect(source).toContain('renderZoneE(),              // 1 — pipeline stats');
     expect(source).not.toMatch(/showAdminSections \? renderZoneE\(\)/);
+  });
+
+  test('no longer boots the retired widget system', () => {
+    // /api/v1/dashboard-widgets is unmounted on the backend; BI cards replace it.
+    expect(source).not.toContain('WidgetRenderer');
+    expect(source).not.toContain('addWidgetBtn');
+  });
+
+  test('keeps the Data Pulse Add button, which opens the connectors page', () => {
+    expect(read('src/dashboard.html')).toContain('id="addConnectorBtn"');
+    expect(source).toMatch(/el\('addConnectorBtn'\)[\s\S]{0,200}Lex\.Nav\.go\('data-connectors\.html'\)/);
   });
 });
 

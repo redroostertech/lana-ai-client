@@ -74,31 +74,5 @@
       "execution_status": "completed",
       "created_at": "2026-04-29T16:30:00Z"
     }
-  ],
-  "dashboardWidgets": [
-    {
-      "id": "wid-001",
-      "widget_type": "metric_card",
-      "title": "Active Matters",
-      "config": { "value": 5 }
-    },
-    {
-      "id": "wid-002",
-      "widget_type": "activity_feed",
-      "title": "Recent Activity",
-      "config": {}
-    }
-  ],
-  "dashboardWidgetTypes": [
-    {
-      "id": "metric_card",
-      "name": "Metric Card",
-      "description": "Single KPI value card"
-    },
-    {
-      "id": "activity_feed",
-      "name": "Activity Feed",
-      "description": "Recent cross-system activity"
-    }
   ]
 }

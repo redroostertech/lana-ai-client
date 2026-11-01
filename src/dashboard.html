@@ -294,7 +294,7 @@
                 <div class="cc-section-title">Data Pulse</div>
                 <div class="cc-section-subtitle">Connected integrations</div>
               </div>
-              <lex-btn id="addWidgetBtn" variant="ghost" size="sm">
+              <lex-btn id="addConnectorBtn" variant="ghost" size="sm">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M12 5v14M5 12h14"/>
                 </svg>
@@ -318,8 +318,6 @@
             </div>
 
             <div id="ccZoneFRightContent" class="hidden"></div>
-
-            <div id="widgetGrid" class="hidden mt-4 grid grid-cols-1 gap-4"></div>
           </lex-card>
         </div>
 
@@ -358,8 +356,6 @@
         <input type="text" id="globalSearchInput" autocomplete="off">
         <button type="button" id="globalSearchBtn"></button>
       </div>
-
-      <section id="commandCenterWidgets" class="hidden" aria-hidden="true"></section>
 
       <div id="activity-heatmap-tooltip" style="position:absolute;display:none;background-color:rgba(0,0,0,0.9);color:white;padding:8px 12px;border-radius:6px;font-size:12px;pointer-events:none;z-index:1000;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.15);"></div>
 
@@ -497,18 +493,7 @@
   <script src="js/activity.js"></script>
   <script src="js/activity-heatmap.js"></script>
   <script src="js/vendor/chart.js"></script>
-  <script src="js/dashboard/widget-renderer.js"></script>
   <script src="js/dashboard/metric-goal-comparison.js"></script>
-  <script src="js/dashboard/widget-config-modal.js"></script>
-  <script src="js/dashboard/widgets/metric-card.widget.js"></script>
-  <script src="js/dashboard/widgets/data-table.widget.js"></script>
-  <script src="js/dashboard/widgets/chart.widget.js"></script>
-  <script src="js/dashboard/widgets/activity-feed.widget.js"></script>
-  <script src="js/dashboard/widgets/matter-summary.widget.js"></script>
-  <script src="js/dashboard/widgets/connector-status.widget.js"></script>
-  <script src="js/dashboard/widgets/module-metric.widget.js"></script>
-  <script src="js/dashboard/widgets/alert-list.widget.js"></script>
-  <script src="js/dashboard/widgets/billable-hours.widget.js"></script>
   <script src="js/services/session-tracking-service.js"></script>
 
   <!-- Heartbeat indicator (topbar button + modal) -->
