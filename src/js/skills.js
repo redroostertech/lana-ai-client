@@ -3098,7 +3098,7 @@
 
   function getAuthToken() {
     if (window.api && window.api.token) return window.api.token;
-    return localStorage.getItem('token') || '';
+    return window.lanaAuthToken?.get() || '';
   }
 
   function debounce(func, wait) {

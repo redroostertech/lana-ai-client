@@ -4,7 +4,8 @@ const { test, expect } = require('@playwright/test');
 
 async function installMockSession(page) {
   await page.addInitScript(() => {
-    localStorage.setItem('token', 'scope-ui-token');
+    // The app's preload provides this; the browser harness stands in for it.
+    window.lanaAuthToken = (() => { let held = 'scope-ui-token'; return { get: () => held, set: (t) => { held = t; }, clear: () => { held = null; } }; })();
     localStorage.setItem('user', JSON.stringify({ id: 'user-1', organization_id: 'org-1', role: 'member' }));
   });
   await page.route('**/js/config.js', async (route) => {

@@ -1021,7 +1021,7 @@
    * Get auth token
    */
   function getAuthToken() {
-    return localStorage.getItem('lana_auth_token') || '';
+    return window.lanaAuthToken?.get() || '';
   }
 
   /**

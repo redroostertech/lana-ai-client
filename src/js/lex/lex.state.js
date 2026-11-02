@@ -150,7 +150,7 @@
         window.api.user = user;
       }
       if (token) {
-        localStorage.setItem('token', token);
+        window.lanaAuthToken?.set(token);
         localStorage.setItem('user', JSON.stringify(user));
       }
 
@@ -170,7 +170,7 @@
         window.api.token = null;
         window.api.user = null;
       }
-      localStorage.removeItem('token');
+      window.lanaAuthToken?.clear();
       localStorage.removeItem('user');
 
       if (had) {
@@ -247,7 +247,7 @@
         this._user = window.api.user || null;
         this._baseUrl = window.api.baseUrl || '';
       } else {
-        this._token = localStorage.getItem('token') || null;
+        this._token = window.lanaAuthToken?.get() || null;
         try {
           this._user = JSON.parse(localStorage.getItem('user') || 'null');
         } catch (e) {

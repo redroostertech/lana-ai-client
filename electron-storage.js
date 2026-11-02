@@ -424,7 +424,18 @@ function getConnectionHistory() {
   }
 }
 
+// Ciphertext of the login token (Electron safeStorage output, base64). The
+// plain token never reaches this store; see electron-token-store.js.
+const AUTH_TOKEN_KEY = 'authTokenEncrypted';
+
+const authTokenPersistence = {
+  read: () => store.get(AUTH_TOKEN_KEY) || null,
+  write: (ciphertext) => store.set(AUTH_TOKEN_KEY, ciphertext),
+  remove: () => store.delete(AUTH_TOKEN_KEY)
+};
+
 module.exports = {
+  authTokenPersistence,
   saveServerConnection,
   getSavedServer,
   updateLastVerified,

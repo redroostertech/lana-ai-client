@@ -295,7 +295,8 @@ async function installBrowserAuth(page, auth) {
     });
   });
   await page.addInitScript(({ token, user }) => {
-    localStorage.setItem('token', token);
+    // The app's preload provides this; the browser harness stands in for it.
+    window.lanaAuthToken = (() => { let held = token; return { get: () => held, set: (t) => { held = t; }, clear: () => { held = null; } }; })();
     localStorage.setItem('user', JSON.stringify(user || {}));
   }, auth);
 }

@@ -1224,7 +1224,7 @@
           const formData = new FormData();
           formData.append('connector_zip', file);
 
-          const token = localStorage.getItem('lana_token');
+          const token = window.lanaAuthToken?.get();
           fetch('/api/v1/generic-connectors/import', {
             method: 'POST',
             headers: { 'Authorization': 'Bearer ' + token },
@@ -1923,7 +1923,7 @@
         const response = await fetch(uploadUrl, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            'Authorization': `Bearer ${window.lanaAuthToken?.get()}`
           },
           body: formData
         });

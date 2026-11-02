@@ -35,7 +35,7 @@ class RelevanceLabeling {
       // Fetch next unlabeled query
       const response = await fetch('/api/analytics/search/unlabeled-queries?limit=1', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${window.lanaAuthToken?.get()}`
         }
       });
 
@@ -221,7 +221,7 @@ class RelevanceLabeling {
       const response = await fetch('/api/analytics/search/label-relevance', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${window.lanaAuthToken?.get()}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(payload)

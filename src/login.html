@@ -230,7 +230,7 @@
           const savedServer = await window.electronAPI.getSavedServer();
           if (!savedServer) {
             console.log('[Login] No saved server in Electron storage, clearing stale auth data');
-            localStorage.removeItem('token');
+            window.lanaAuthToken?.clear();
             localStorage.removeItem('user');
             localStorage.removeItem('lana_saved_server');
             api.token = null;
@@ -247,7 +247,7 @@
       } else if (api.isAuthenticated() && api.isTokenExpired()) {
         // Token exists but is expired - clear stale auth data and stay on login
         console.log('[Login] Token expired, clearing stale auth data');
-        localStorage.removeItem('token');
+        window.lanaAuthToken?.clear();
         localStorage.removeItem('user');
         localStorage.removeItem('lana_saved_server');
         api.token = null;

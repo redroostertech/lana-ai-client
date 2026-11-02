@@ -9223,7 +9223,7 @@
           if (window.api && typeof window.api.showSessionExpiredModal === 'function') {
             window.api.showSessionExpiredModal();
           } else {
-            localStorage.removeItem('token');
+            window.lanaAuthToken?.clear();
             localStorage.removeItem('user');
             Lex.Toast.error('Session expired. Redirecting to login...');
             trackTimeout(setTimeout(function () { window.location.href = 'login.html'; }, 1500));
@@ -9301,7 +9301,7 @@
           if (window.api && typeof window.api.showSessionExpiredModal === 'function') {
             window.api.showSessionExpiredModal();
           } else {
-            localStorage.removeItem('token');
+            window.lanaAuthToken?.clear();
             localStorage.removeItem('user');
             Lex.Toast.error('Session expired. Redirecting to login...');
             trackTimeout(setTimeout(function () { window.location.href = 'login.html'; }, 1500));
@@ -9406,7 +9406,7 @@
           if (window.api && typeof window.api.showSessionExpiredModal === 'function') {
             window.api.showSessionExpiredModal();
           } else {
-            localStorage.removeItem('token');
+            window.lanaAuthToken?.clear();
             localStorage.removeItem('user');
             Lex.Toast.error('Session expired. Redirecting to login...');
             trackTimeout(setTimeout(function () { window.location.href = 'login.html'; }, 1500));

@@ -1398,9 +1398,7 @@
       // shows "No matches".
       const apiClient = (typeof window !== 'undefined') ? window.api : null;
       const baseUrl = apiClient && apiClient.baseUrl ? apiClient.baseUrl : '';
-      const token = (apiClient && apiClient.token) || (typeof localStorage !== 'undefined'
-                                                       ? localStorage.getItem('token')
-                                                       : '') || '';
+      const token = (apiClient && apiClient.token) || window.lanaAuthToken?.get() || '';
       const seq = ++this._mentionFetchSeq;
       try {
         // When the chat is matter-scoped, forward the matter id so the

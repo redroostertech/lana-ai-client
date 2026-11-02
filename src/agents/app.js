@@ -463,7 +463,7 @@
       }
       try {
         if (typeof localStorage !== 'undefined') {
-          localStorage.removeItem('token');
+          window.lanaAuthToken?.clear();
         }
       } catch (_e) {}
       window.location.href = '../login.html';

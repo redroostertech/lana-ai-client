@@ -1164,7 +1164,7 @@
 
   function revokeAllSessions() {
     Lex.Modal.confirm('Revoke All Sessions', 'This will log you out of all other devices. Continue?', function () {
-      var currentToken = localStorage.getItem('token');
+      var currentToken = window.lanaAuthToken?.get();
       api.delete('/api/v1/auth/session/', { revoke_all_except: currentToken }).then(function () {
         Lex.Toast.success('All other sessions revoked');
         loadSessions({ force: true });

@@ -54,7 +54,7 @@
 
         document.addEventListener('DOMContentLoaded', function() {
             // Clear all stored authentication data
-            localStorage.removeItem('token');
+            window.lanaAuthToken?.clear();
             localStorage.removeItem('user');
             localStorage.removeItem('refreshToken');
 

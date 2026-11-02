@@ -21,6 +21,39 @@ contextBridge.exposeInMainWorld('lanaBrand', { flavor: brandFlavor, name: brandF
 applyBrandToDocument(document, brandFlavor);
 
 /**
+ * Login token. It lives in the main process (electron-token-store.js), OS
+ * keychain encrypted at rest; this page only holds a copy in memory. The calls
+ * are synchronous so the many synchronous readers keep working and a set or
+ * clear is persisted before the page navigates.
+ *
+ * Older builds kept the token in localStorage. Hand any such token to the main
+ * process once and delete it here, so it is never left in plain text.
+ */
+let authTokenCache = null;
+try {
+  const legacyToken = window.localStorage.getItem('token');
+  if (legacyToken) {
+    window.localStorage.removeItem('token');
+    authTokenCache = ipcRenderer.sendSync('auth-token:migrate', legacyToken);
+  } else {
+    authTokenCache = ipcRenderer.sendSync('auth-token:get');
+  }
+} catch (_) {
+  authTokenCache = null;
+}
+contextBridge.exposeInMainWorld('lanaAuthToken', {
+  get: () => authTokenCache || null,
+  set: (token) => {
+    authTokenCache = ipcRenderer.sendSync('auth-token:set', typeof token === 'string' ? token : null) || null;
+    return Boolean(authTokenCache);
+  },
+  clear: () => {
+    authTokenCache = null;
+    ipcRenderer.sendSync('auth-token:clear');
+  }
+});
+
+/**
  * Expose protected methods that allow the renderer process to use
  * ipcRenderer without exposing the entire object
  */

@@ -255,7 +255,7 @@ function escapeHtml(value) {
 }
 
 function authHeaders() {
-  const token = (window.api && window.api.token) || localStorage.getItem('token') || '';
+  const token = (window.api && window.api.token) || window.lanaAuthToken?.get() || '';
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -2415,7 +2415,7 @@ function onSidebarUserAction(event) {
   if (!detail) return;
   if (detail.action === 'signout') {
     try {
-      localStorage.removeItem('token');
+      window.lanaAuthToken?.clear();
       localStorage.removeItem('user');
       if (window.api) {
         window.api.token = null;

@@ -355,7 +355,7 @@
       if (!messageId) return; // Can't submit without a message ID
 
       const endpoint = this._options.feedbackEndpoint || '/api/v1/feedback/';
-      const getToken = this._options.getToken || (() => localStorage.getItem('token') || '');
+      const getToken = this._options.getToken || (() => window.lanaAuthToken?.get() || '');
       const getBaseUrl = this._options.getBaseUrl || (() => {
         const api = global.api;
         return api?.baseUrl || '';

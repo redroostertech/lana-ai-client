@@ -83,7 +83,7 @@ function openWorkspaceResourceUrl(resourceUrl) {
 function readCanonicalToken() {
   if (window.api && window.api.token) return window.api.token;
   if (typeof localStorage === 'undefined') return '';
-  return localStorage.getItem('token') || '';
+  return window.lanaAuthToken?.get() || '';
 }
 
 function readCanonicalUser() {
@@ -1084,7 +1084,7 @@ async function onLogout() {
     console.warn(error);
   }
 
-  localStorage.removeItem(STORAGE_KEYS.token);
+  window.lanaAuthToken?.clear();
   localStorage.removeItem(STORAGE_KEYS.user);
   window.clearTimeout(state._onboardingSaveTimer);
   stopAuthLifecycle();
@@ -1114,7 +1114,7 @@ async function tryResumeSession() {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(state.user));
       if (state.token) {
-        localStorage.setItem(STORAGE_KEYS.token, state.token);
+        window.lanaAuthToken?.set(state.token);
       }
     }
 
@@ -3210,7 +3210,7 @@ async function refreshAuthToken() {
     const nextToken = payload?.token;
     if (nextToken && nextToken !== state.token) {
       state.token = nextToken;
-      localStorage.setItem(STORAGE_KEYS.token, state.token);
+      window.lanaAuthToken?.set(state.token);
     }
   } catch (_error) {
     // Let existing 401/logout handling own terminal auth failures.

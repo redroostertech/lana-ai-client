@@ -266,7 +266,7 @@
 
       try {
         // Get auth token from localStorage (or wherever it's stored)
-        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        const token = window.lanaAuthToken?.get() || sessionStorage.getItem('token');
 
         // Use sendBeacon for best-effort delivery on page unload
         const endpoint = window.api?.baseUrl

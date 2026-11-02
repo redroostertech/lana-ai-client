@@ -149,7 +149,7 @@ class MetadataService {
       ? await window.electronAPI.config.getBackendUrl()
       : 'http://localhost:8080';
 
-    const token = localStorage.getItem('token');
+    const token = window.lanaAuthToken?.get();
     if (!token) {
       throw new Error('Authentication token not found. Please log in.');
     }
@@ -199,7 +199,7 @@ class MetadataService {
       ? await window.electronAPI.config.getBackendUrl()
       : 'http://localhost:8080';
 
-    const token = localStorage.getItem('token');
+    const token = window.lanaAuthToken?.get();
     if (!token) {
       throw new Error('Authentication token not found. Please log in.');
     }
@@ -240,7 +240,7 @@ class MetadataService {
       ? await window.electronAPI.config.getBackendUrl()
       : 'http://localhost:8080';
 
-    const token = localStorage.getItem('token');
+    const token = window.lanaAuthToken?.get();
     if (!token) {
       throw new Error('Authentication token not found. Please log in.');
     }

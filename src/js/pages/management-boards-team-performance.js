@@ -36,7 +36,7 @@ class TeamPerformanceBoard {
         // Fetch user profile
         const response = await fetch('/api/auth/me', {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            'Authorization': `Bearer ${window.lanaAuthToken?.get()}`
           }
         });
         if (response.ok) {

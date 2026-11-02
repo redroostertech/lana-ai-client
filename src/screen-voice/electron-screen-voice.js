@@ -133,6 +133,7 @@ class ElectronScreenVoice {
     this.sleep = options.sleep || ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     this.entitlementEnabled = Boolean(options.entitlementEnabled);
     this.authenticated = Boolean(options.authenticated);
+    this.readAuthToken = options.getAuthToken || (() => null);
     this.controller.on('state', (snapshot) => {
       const mode = snapshot.session?.mode ? ` mode=${snapshot.session.mode}` : '';
       const error = snapshot.session?.error?.code ? ` error=${snapshot.session.error.code}` : '';
@@ -141,14 +142,10 @@ class ElectronScreenVoice {
     });
   }
 
+  // The login token is held by the main-process token store
+  // (electron-token-store.js), never read back out of renderer storage.
   async getAuthToken() {
-    const window = this.getMainWindow();
-    if (!window || window.isDestroyed()) return null;
-    try {
-      return await window.webContents.executeJavaScript(
-        "(() => { try { return localStorage.getItem('token'); } catch (_) { return null; } })()", true
-      );
-    } catch (_) { return null; }
+    try { return (await this.readAuthToken()) || null; } catch (_) { return null; }
   }
 
   createOverlay() {

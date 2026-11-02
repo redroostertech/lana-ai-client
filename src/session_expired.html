@@ -57,7 +57,7 @@
 
         document.addEventListener('DOMContentLoaded', function() {
             // Clear any stored tokens
-            localStorage.removeItem('token');
+            window.lanaAuthToken?.clear();
             localStorage.removeItem('user');
 
             // Get intended destination from URL

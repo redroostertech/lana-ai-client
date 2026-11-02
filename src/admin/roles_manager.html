@@ -236,7 +236,7 @@
         });
 
         function checkAuth() {
-            const token = localStorage.getItem('token');
+            const token = window.lanaAuthToken?.get();
             if (!token) {
                 window.location.href = '/login.html';
             }

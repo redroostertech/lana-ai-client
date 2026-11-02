@@ -536,7 +536,7 @@
         this._bridge = new global.Lex.ActionBridge();
         this._bridge.attach(this, {
           feedbackEndpoint: '/api/v1/feedback/',
-          getToken: () => localStorage.getItem('token') || '',
+          getToken: () => window.lanaAuthToken?.get() || '',
           getBaseUrl: () => {
             const api = global.api;
             return api?.baseUrl || '';

@@ -439,7 +439,7 @@ class ChunkedUploader {
    */
   getAuthToken() {
     // Try to get token from localStorage (adjust based on your auth implementation)
-    const token = localStorage.getItem('token') || localStorage.getItem('auth_token');
+    const token = window.lanaAuthToken?.get();
     if (!token) {
       throw new Error('No authentication token found');
     }

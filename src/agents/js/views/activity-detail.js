@@ -1840,7 +1840,7 @@
   function exportRunFile(state, format) {
     if (!state.taskId) return;
     var fmt = format === 'html' ? 'html' : 'json';
-    var token = localStorage.getItem('token') || '';
+    var token = window.lanaAuthToken?.get() || '';
     var baseUrl = (window.api && window.api.baseUrl) ? window.api.baseUrl : '';
     var url = baseUrl + '/api/v1/agent-runs/' + encodeURIComponent(state.taskId) + '/export?format=' + fmt;
     fetch(url, { headers: token ? { Authorization: 'Bearer ' + token } : {} })
@@ -1931,7 +1931,7 @@
     if (isTerminal(state.currentStatus)) return;
     if (state.destroyed) return;
 
-    var token = localStorage.getItem('token') || '';
+    var token = window.lanaAuthToken?.get() || '';
     var baseUrl = (window.api && window.api.baseUrl) ? window.api.baseUrl : '';
     var url = baseUrl + '/api/v1/agentic-tasks/' + state.taskId + '/stream';
     if (token) url += '?token=' + encodeURIComponent(token);

@@ -2357,7 +2357,7 @@
       if (client && client.token) return true;
       if (window.Lex && window.Lex.state && window.Lex.state.isAuthenticated) return true;
       try {
-        return !!localStorage.getItem('token');
+        return !!window.lanaAuthToken?.get();
       } catch (_) {
         return false;
       }

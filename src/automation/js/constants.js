@@ -1,5 +1,4 @@
 export const STORAGE_KEYS = {
-  token: 'token',
   user: 'user',
   connectorsChecklistHidden: 'lana_automation_connectors_checklist_hidden',
   selectedConnectorId: 'lana_automation_selected_connector_id',

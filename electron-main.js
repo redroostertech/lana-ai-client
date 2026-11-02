@@ -7,7 +7,7 @@
  * This is the THIN CLIENT version - connects to a remote backend server.
  */
 
-const { app, BrowserWindow, ipcMain, dialog, Menu, session, nativeImage, Notification, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, session, nativeImage, Notification, shell, safeStorage } = require('electron');
 const path = require('path');
 const url = require('url');
 const crypto = require('crypto');
@@ -86,7 +86,11 @@ if (process.env.NODE_ENV === 'development') {
 
 // Import thin client modules
 const { refreshHostedDiscovery, verifyServer } = require('./electron-discovery');
-const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified, saveBrainchildLink, getBrainchildLink, clearBrainchildLink, setBrainchildAutoBindDisabled, isBrainchildAutoBindDisabled } = require('./electron-storage');
+const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified, saveBrainchildLink, getBrainchildLink, clearBrainchildLink, setBrainchildAutoBindDisabled, isBrainchildAutoBindDisabled, authTokenPersistence } = require('./electron-storage');
+const { createTokenStore, registerTokenIpc, hasLiveSession } = require('./electron-token-store');
+
+// The login token: OS-keychain encrypted at rest, memory only when no keychain.
+const authTokenStore = createTokenStore({ safeStorage, persistence: authTokenPersistence });
 const { checkForUpdates, downloadAndInstallUpdate, showOptionalUpdateDialog, showForceUpdateDialog, shouldCheckForUpdates, configureAutoUpdater } = require('./electron-updater-custom');
 const { logInfo, logError, exportLogs, getLogFilePath } = require('./electron-logger');
 const SessionTracker = require('./js/session/session-tracker');
@@ -316,19 +320,7 @@ async function syncScreenVoiceAuthentication(window = mainWindow) {
   if (!screenVoice || !window || window.isDestroyed()) return false;
   let authenticated = false;
   try {
-    // Return only a boolean across the process boundary. The bearer token is
-    // never copied into main-process state or logs.
-    authenticated = await window.webContents.executeJavaScript(`(() => {
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) return false;
-        if (token.indexOf('demo-token-') === 0) return true;
-        const parts = token.split('.');
-        if (parts.length !== 3) return false;
-        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-        return !payload.exp || payload.exp * 1000 > Date.now();
-      } catch (_) { return false; }
-    })()`, true);
+    authenticated = hasLiveSession(authTokenStore.get(), Date.now());
   } catch (_) {
     authenticated = false;
   }
@@ -1290,6 +1282,9 @@ ipcMain.handle('verify-server', async (event, serverUrl) => {
   }
 });
 
+// Login token get/set/clear/migrate for the preload (synchronous channels).
+registerTokenIpc(ipcMain, authTokenStore, () => { syncScreenVoiceAuthentication().catch(() => {}); });
+
 // Get saved server
 ipcMain.handle('get-saved-server', async () => {
   try {
@@ -2128,6 +2123,7 @@ app.whenReady().then(async () => {
         rootDir: __dirname,
         brandFlavor: BRAND_FLAVOR,
         getMainWindow: () => mainWindow,
+        getAuthToken: () => authTokenStore.get(),
         getSavedServer: () => getSavedServer(),
         openClientSettings: openScreenVoiceSettings,
         navigateClient: navigateScreenVoiceClient,
@@ -2151,23 +2147,12 @@ app.whenReady().then(async () => {
 
   // Start the PAC bridge (loopback HTTP server on 127.0.0.1:7890). Wire
   // identifier is still `lana-companion` for compat with already-granted
-  // consents. The bridge reads the renderer's localStorage for the bearer
-  // token and user id on demand — it never caches the token and never logs it.
+  // consents. The bridge asks the token store for the bearer token and reads
+  // the user id from the renderer on demand; it never caches or logs the token.
   try {
     companionBridge.start({
-      getToken: async () => {
-        if (!mainWindow || mainWindow.isDestroyed()) return null;
-        try {
-          // executeJavaScript returns a Promise resolving to the evaluated value.
-          const value = await mainWindow.webContents.executeJavaScript(
-            "(() => { try { return window.localStorage.getItem('token'); } catch (_) { return null; } })()",
-            true
-          );
-          return value || null;
-        } catch (_err) {
-          return null;
-        }
-      },
+      // The token comes from the main-process token store, never renderer storage.
+      getToken: async () => authTokenStore.get() || null,
       getCurrentUserId: async () => {
         if (!mainWindow || mainWindow.isDestroyed()) return null;
         try {

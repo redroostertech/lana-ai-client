@@ -12,7 +12,7 @@ const GUARD = fs.readFileSync(path.resolve(__dirname, '../../src/js/auth-guard.j
 // The guard on a page at pageUrl whose <script src> resolved to guardUrl (what the DOM's .src reports).
 function overlaySrc(pageUrl, guardUrl) {
   const appended = [];
-  const store = { token: 'token', user: JSON.stringify({ id: 'u1', roles: ['org_admin'] }) };
+  const store = { user: JSON.stringify({ id: 'u1', roles: ['org_admin'] }) };
   const document = {
     getElementById: () => null,
     querySelector: (selector) => (selector === 'script[src$="js/auth-guard.js"]' && guardUrl ? { src: guardUrl } : null),
@@ -20,7 +20,7 @@ function overlaySrc(pageUrl, guardUrl) {
     head: { appendChild: (el) => appended.push(el) },
     addEventListener: () => {}
   };
-  const window = { location: new URL(pageUrl) };
+  const window = { location: new URL(pageUrl), lanaAuthToken: { get: () => 'token' } };
   const localStorage = { getItem: (key) => (key in store ? store[key] : null) };
   // eslint-disable-next-line no-new-func
   new Function('window', 'document', 'localStorage', 'setTimeout', GUARD)(window, document, localStorage, () => {});

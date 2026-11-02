@@ -44,7 +44,7 @@
   }
 
   function checkAuth(retries) {
-    var token = localStorage.getItem('token');
+    var token = window.lanaAuthToken?.get();
     if (!token) {
       if (retries > 0) { setTimeout(function () { checkAuth(retries - 1); }, 100); return; }
       window.location.href = loginPath();

@@ -198,10 +198,7 @@ function buildConfigScript({
   const resolvedApiBase = resolveAutomationApiBaseUrl((lanaConfig && lanaConfig.API_BASE_URL) || '');
   const effectiveToken = String(
     token
-    || localStorage.getItem('token')
-    || localStorage.getItem('authToken')
-    || localStorage.getItem('lana_token')
-    || localStorage.getItem('lana_automation_token')
+    || window.lanaAuthToken?.get()
     || ''
   );
   const injectedConfig = { ...(lanaConfig || {}) };
@@ -240,10 +237,8 @@ function buildConfigScript({
         source: 'blob-injection'
       };
       window.api = { token: ${safeToken}, baseUrl: ${safeApiBase} };
-      try { localStorage.setItem('lana_token', ${safeToken}); } catch (_e) {}
-      try { localStorage.setItem('token', ${safeToken}); } catch (_e) {}
-      try { localStorage.setItem('authToken', ${safeToken}); } catch (_e) {}
-      try { localStorage.setItem('lana_automation_token', ${safeToken}); } catch (_e) {}
+      // The token reaches the custom UI only as window.lanaAuth / window.api.
+      // It is never written to storage, which this frame shares with the app.
       (function () {
         var originalFetch = window.fetch;
         window.fetch = function (input, init) {
@@ -280,10 +275,6 @@ function buildConfigScript({
                 token: data.token,
                 baseUrl: (window.lanaAuth && window.lanaAuth.apiBaseUrl) || ''
               };
-              localStorage.setItem('lana_token', data.token);
-              localStorage.setItem('token', data.token);
-              localStorage.setItem('authToken', data.token);
-              localStorage.setItem('lana_automation_token', data.token);
             }
           } catch (_e) {}
           try {
@@ -322,10 +313,7 @@ function installPostMessageBridge(iframe) {
       if (!iframe || event.source !== iframe.contentWindow) return;
 
       const freshToken = String(
-        localStorage.getItem('token')
-        || localStorage.getItem('authToken')
-        || localStorage.getItem('lana_token')
-        || localStorage.getItem('lana_automation_token')
+        window.lanaAuthToken?.get()
         || ''
       );
       let freshUser = null;

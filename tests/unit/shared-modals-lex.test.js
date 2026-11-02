@@ -200,7 +200,8 @@ describe('ApiClient session-expired notice', () => {
 
   test('shows a lex-modal without a close button', async () => {
     const window = load(true);
-    window.localStorage.setItem('token', 't');
+    let heldToken = 't';
+    window.lanaAuthToken = { get: () => heldToken, set: (t) => { heldToken = t; }, clear: () => { heldToken = null; } };
     window.api.showSessionExpiredModal();
     await tick(window);
     const modal = window.document.getElementById('sessionExpiredModal');
@@ -208,7 +209,7 @@ describe('ApiClient session-expired notice', () => {
     expect(modal.heading).toBe('Session Expired');
     expect(modal.querySelector('.lex-modal-close').hidden).toBe(true);
     expect(modal.querySelector('#sessionCountdown').textContent).toBe('3');
-    expect(window.localStorage.getItem('token')).toBeNull();
+    expect(heldToken).toBeNull();
     // A second 401 does not stack another notice.
     window.api.showSessionExpiredModal();
     expect(window.document.querySelectorAll('lex-modal').length).toBe(1);

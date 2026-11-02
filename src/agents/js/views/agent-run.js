@@ -986,7 +986,7 @@
 
   function _getToken() {
     if (window.Lex && window.Lex.state && window.Lex.state.token) return window.Lex.state.token;
-    return localStorage.getItem('token') || localStorage.getItem('access_token') || '';
+    return window.lanaAuthToken?.get() || '';
   }
 
   function dispatchEvent(state, eventName, data) {

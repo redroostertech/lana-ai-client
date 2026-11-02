@@ -254,7 +254,7 @@ async function run() {
     const catalogResponse = await page.evaluate(async function () {
       try {
         var resp = await fetch('/api/v1/analytics/catalog', {
-          headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('token') || sessionStorage.getItem('token') || '') }
+          headers: { 'Authorization': 'Bearer ' + ((window.lanaAuthToken && window.lanaAuthToken.get()) || '') }
         });
         if (!resp.ok) return { status: resp.status, ok: false };
         var data = await resp.json();

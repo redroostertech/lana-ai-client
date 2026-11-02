@@ -27,7 +27,7 @@
     if (retries === undefined) retries = 3;
 
     // Re-read from localStorage in case it wasn't ready when api.js loaded
-    var token = localStorage.getItem('token');
+    var token = window.lanaAuthToken?.get();
     if (token && api) {
       api.token = token;
       api.user = JSON.parse(localStorage.getItem('user') || 'null');

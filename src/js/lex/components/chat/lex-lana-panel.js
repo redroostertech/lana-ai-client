@@ -830,7 +830,7 @@
       }
 
       if (artifactType === 'download' || !artifactType) {
-        var token = localStorage.getItem('token') || '';
+        var token = window.lanaAuthToken?.get() || '';
         var helpers = window.Lex && window.Lex.Chat && window.Lex.Chat.ArtifactPromotion;
         var matterId = detail.matterId || this.matterId || '';
         var downloadUrl = helpers && typeof helpers.getPromotedDocumentDownloadUrl === 'function'
@@ -1350,7 +1350,7 @@
       container.addEventListener('lex-chat-error', function (e) {
         var detail = e.detail || {};
         if (detail.status !== 401) return;
-        try { localStorage.removeItem('token'); } catch (_) {}
+        try { window.lanaAuthToken?.clear(); } catch (_) {}
         self._toast('error', 'Your session has expired. Please log in again.');
         setTimeout(function () {
           window.location.href = 'index.html';

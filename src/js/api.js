@@ -181,15 +181,15 @@ class ApiClient {
       // In demo mode, set up fake authentication
       this.token = 'demo-token-' + LanaTime.nowMs();
       this.user = this.config.DEMO_USER || { id: 'demo', email: 'demo@lana.ai' };
-      localStorage.setItem('token', this.token);
+      window.lanaAuthToken?.set(this.token);
       localStorage.setItem('user', JSON.stringify(this.user));
       this.log('Demo mode enabled - using mock data');
     } else {
-      // Load from localStorage, but invalidate demo tokens when not in demo mode
-      const storedToken = localStorage.getItem('token');
+      // Load from the main-process token store, but invalidate demo tokens when not in demo mode
+      const storedToken = window.lanaAuthToken?.get();
       if (storedToken && storedToken.startsWith('demo-token-')) {
         // Clear demo credentials when switching to live mode
-        localStorage.removeItem('token');
+        window.lanaAuthToken?.clear();
         localStorage.removeItem('user');
         this.token = null;
         this.user = null;
@@ -468,7 +468,7 @@ class ApiClient {
     if (document.getElementById('sessionExpiredModal')) return;
 
     // Clear local storage
-    localStorage.removeItem('token');
+    window.lanaAuthToken?.clear();
     localStorage.removeItem('user');
     this.token = null;
     this.user = null;
@@ -1692,7 +1692,7 @@ class ApiClient {
       // Demo mode: accept any credentials
       this.token = 'demo-token-' + LanaTime.nowMs();
       this.user = this.config.DEMO_USER;
-      localStorage.setItem('token', this.token);
+      window.lanaAuthToken?.set(this.token);
       localStorage.setItem('user', JSON.stringify(this.user));
       return { token: this.token, user: this.user };
     }
@@ -1702,7 +1702,7 @@ class ApiClient {
     const result = await this.post('/api/v1/auth/login', data);
     this.token = result.token;
     this.user = result.user;
-    localStorage.setItem('token', result.token);
+    window.lanaAuthToken?.set(result.token);
     localStorage.setItem('user', JSON.stringify(result.user));
 
     // Start automatic token refresh and activity monitoring after login
@@ -1737,7 +1737,7 @@ class ApiClient {
 
       this.token = null;
       this.user = null;
-      localStorage.removeItem('token');
+      window.lanaAuthToken?.clear();
       localStorage.removeItem('user');
     }
   }
@@ -1748,7 +1748,7 @@ class ApiClient {
     }
     const result = await this.get('/api/v1/auth/refresh');
     this.token = result.token;
-    localStorage.setItem('token', result.token);
+    window.lanaAuthToken?.set(result.token);
     return result;
   }
 

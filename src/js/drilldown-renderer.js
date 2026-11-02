@@ -1927,7 +1927,7 @@ createModalStructure() {
    * Get authentication token from localStorage or session
    */
   getAuthToken() {
-    return localStorage.getItem('authToken') || sessionStorage.getItem('authToken') || '';
+    return window.lanaAuthToken?.get() || '';
   }
 
   /**

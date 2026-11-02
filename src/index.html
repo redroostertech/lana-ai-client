@@ -493,7 +493,7 @@
           const savedServer = await window.electronAPI.getSavedServer();
           if (!savedServer) {
             console.log('[Index] No saved server in Electron storage, clearing stale session');
-            localStorage.removeItem('token');
+            window.lanaAuthToken?.clear();
             localStorage.removeItem('user');
             localStorage.removeItem('lana_saved_server');
             api.token = null;
@@ -507,7 +507,7 @@
       }
 
       // Re-read from localStorage in case it wasn't ready when api.js loaded
-      const token = localStorage.getItem('token');
+      const token = window.lanaAuthToken?.get();
       if (token) {
         api.token = token;
         api.user = JSON.parse(localStorage.getItem('user') || 'null');

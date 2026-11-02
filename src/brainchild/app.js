@@ -92,7 +92,7 @@
 
   function authToken() {
     try {
-      return localStorage.getItem('token') || '';
+      return window.lanaAuthToken?.get() || '';
     } catch (_error) {
       return '';
     }

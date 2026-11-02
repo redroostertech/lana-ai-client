@@ -33,7 +33,8 @@ function fakeJwt() {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2, colorScheme: 'light', timezoneId: 'America/Indiana/Indianapolis' });
     await context.addInitScript(({ token, user, origin }) => {
       try {
-        localStorage.setItem('token', token);
+        // The app's preload provides this; the browser harness stands in for it.
+        window.lanaAuthToken = (() => { let held = token; return { get: () => held, set: (t) => { held = t; }, clear: () => { held = null; } }; })();
         localStorage.setItem('user', JSON.stringify(user));
         localStorage.setItem('lana_saved_server', JSON.stringify({ url: origin, name: 'Fixture' }));
         localStorage.setItem('lex-theme', 'light');

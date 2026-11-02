@@ -15,7 +15,8 @@ function json(route, body, status = 200) {
 
 async function installMockSession(page) {
   await page.addInitScript(() => {
-    localStorage.setItem('token', 'closeout-token');
+    // The app's preload provides this; the browser harness stands in for it.
+    window.lanaAuthToken = (() => { let held = 'closeout-token'; return { get: () => held, set: (t) => { held = t; }, clear: () => { held = null; } }; })();
     localStorage.setItem('user', JSON.stringify({
       id: 'user-closeout',
       organization_id: 'org-closeout',
