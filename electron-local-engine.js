@@ -18,6 +18,7 @@ const childProcess = require('child_process');
 const { createEngineSupervisor, LOOPBACK_HOST } = require('./electron-engine-supervisor');
 const { createEngineControlClient } = require('./electron-engine-control');
 const { resolveEngineConfig, resolveApiBase, presentServer, toStoredServer, isEngineInUse } = require('./electron-api-base');
+const localModels = require('./electron-local-models');
 
 const CHANNELS = Object.freeze({
   apiBaseSync: 'engine:api-base-sync',
@@ -31,8 +32,11 @@ const CHANNELS = Object.freeze({
 
 // Engine settings passed through from the client's environment (phase 8d):
 // the tier the engine's chat runtime needs to start, and the local model
-// endpoints it may use for background jobs. Nothing else.
-const ENGINE_MODEL_ENV = Object.freeze(['LANA_TIER', 'EMBEDDING_MODEL', 'EMBEDDING_VERSION', 'LANA_ENGINE_EMBEDDING_URL', 'LANA_ENGINE_CHAT_URL', 'LANA_FORGE_URL']);
+// endpoints it may use for background jobs. Nothing else. Phase 8h: the
+// embedding model file too (the engine hashes it to verify its identity);
+// when the environment names none, the catalog's verified R2 download fills
+// the embedding settings (electron-local-models.js).
+const ENGINE_MODEL_ENV = Object.freeze(['LANA_TIER', 'EMBEDDING_MODEL', 'EMBEDDING_VERSION', 'LANA_ENGINE_EMBEDDING_URL', 'LANA_ENGINE_EMBEDDING_MODEL_FILE', 'LANA_ENGINE_CHAT_URL', 'LANA_FORGE_URL']);
 
 // A sleep or quit waits this long for the engine to hand running jobs off.
 const HANDOFF_WAIT_MS = 12000;
@@ -134,8 +138,12 @@ function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = proces
     return fresh;
   }
 
+  // The verified catalog embedding model, read before each (re)configure.
+  let catalogEmbeddingEnv = {};
+
   function engineEnv() {
     const extra = { LANA_ENGINE_ID: engineId() };
+    if (!env.LANA_ENGINE_EMBEDDING_MODEL_FILE) {Object.assign(extra, catalogEmbeddingEnv);}
     for (const name of ENGINE_MODEL_ENV) {
       if (typeof env[name] === 'string' && env[name]) {extra[name] = env[name];}
     }
@@ -233,6 +241,12 @@ function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = proces
   /** Re-read settings and the saved server; start, restart or stop the engine. */
   async function sync() {
     config = resolveEngineConfig(env, storage.getLocalEnginePreferences());
+    try {
+      catalogEmbeddingEnv = await localModels.embeddingEngineEnv(localModels.modelsDir(env, app.getPath('userData')));
+    } catch (error) {
+      catalogEmbeddingEnv = {};
+      log.warn('[LocalEngine] Could not check the local embedding model', { message: error && error.message });
+    }
     await supervisor.configure(config, chefUrl());
     return status();
   }
