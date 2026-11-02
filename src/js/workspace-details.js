@@ -1208,6 +1208,9 @@
     }
     html += '</lex-card>';
 
+    // AI policy section (matter-ai-policy.js): where this matter's AI requests may go
+    html += '<div id="aiPolicySection"></div>';
+
     // Custom Fields section
     html += '<div id="customFieldsSection"></div>';
 
@@ -1228,6 +1231,9 @@
 
     // Render sub-sections
     renderCustomFieldsSection(matter);
+    if (window.MatterAiPolicy && matter && matter.matter_id) {
+      window.MatterAiPolicy.render(document.getElementById('aiPolicySection'), matter.matter_id, api);
+    }
   }
 
   function renderDockContextPanel(matter) {

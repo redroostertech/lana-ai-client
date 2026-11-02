@@ -1,0 +1,47 @@
+/* The "AI policy" card in a matter's details panel (js/matter-ai-policy.js). */
+.matter-ai-policy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-2, 0.5rem);
+}
+
+.matter-ai-policy__current {
+  display: flex;
+  align-items: center;
+}
+
+.matter-ai-policy__description {
+  margin: 0;
+  font-size: var(--lex-form-font-size, 0.8125rem);
+  color: var(--lex-text-secondary, #4b5563);
+  line-height: 1.4;
+}
+
+.matter-ai-policy__note {
+  margin: 0;
+  font-size: var(--lex-form-help-size, 0.6875rem);
+  color: var(--lex-text-tertiary, #6b7280);
+  line-height: 1.4;
+}
+
+/* Dark theme ([data-lex-theme="dark"], with lex-card bg="dark"): the card's own text and badge tones. */
+[data-lex-theme="dark"] .matter-ai-policy {
+  --lex-text-primary: var(--lex-chat-dark-50, #ffffff);
+  --lex-text-secondary: var(--lex-chat-dark-300, #c9c9d1);
+  --lex-text-tertiary: var(--lex-chat-dark-400, #9a9aa5);
+  --lex-color-gray-200: var(--lex-chat-dark-600, #3a3a44);
+  --lex-status-neutral-bg: rgba(255, 255, 255, 0.12);
+  --lex-status-neutral-text: #e5e5ea;
+  --lex-status-warning-bg: rgba(234, 179, 8, 0.2);
+  --lex-status-warning-text: #fcd34d;
+  --lex-status-danger-bg: rgba(239, 68, 68, 0.2);
+  --lex-status-danger-text: #fca5a5;
+}
+
+[data-lex-theme="dark"] .matter-ai-policy__description {
+  color: var(--lex-chat-dark-300, #c9c9d1);
+}
+
+[data-lex-theme="dark"] .matter-ai-policy__note {
+  color: var(--lex-chat-dark-400, #9a9aa5);
+}
