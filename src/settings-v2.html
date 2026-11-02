@@ -248,6 +248,24 @@
             <p id="sv2-capabilities-status" class="sv2-capabilities-status" role="status">Loading capabilities...</p>
           </lex-card>
         </section>
+        <section id="sv2-section-local-engine" class="sv2-local-engine" aria-busy="true" hidden>
+          <lex-card heading="Local AI service" subtitle="LANA's AI runs on this computer and reaches your organization's server for everything else">
+            <div class="sv2-local-engine-head">
+              <lex-badge id="sv2-local-engine-badge" label="Checking" color="gray"></lex-badge>
+              <lex-btn id="sv2-local-engine-restart" variant="ghost" size="sm">Restart</lex-btn>
+            </div>
+            <p id="sv2-local-engine-message" class="sv2-local-engine-message" role="status" hidden></p>
+            <div id="sv2-local-engine-rows" class="sv2-local-engine-rows"></div>
+            <div class="sv2-local-engine-option">
+              <div class="sv2-local-engine-option-copy">
+                <span class="sv2-local-engine-option-name">Use local AI engine</span>
+                <span class="sv2-local-engine-option-description">When off, LANA talks to your organization's server directly.</span>
+              </div>
+              <lex-toggle id="sv2-local-engine-toggle" name="local_engine_enabled" aria-label="Use local AI engine"></lex-toggle>
+            </div>
+            <p id="sv2-local-engine-note" class="sv2-local-engine-note"></p>
+          </lex-card>
+        </section>
       </div><!-- /sv2-panel-capabilities -->
 
       <!-- ╔══════════════════════ PLUGINS PANEL ══════════════════════╗ -->
@@ -606,6 +624,8 @@
   <script src="js/pages/settings-personalization.js"></script>
   <script src="js/pages/settings-usage.js"></script>
   <script src="js/pages/settings-capabilities.js"></script>
+  <script src="js/engine-status.js"></script>
+  <script src="js/pages/settings-local-engine.js"></script>
   <script src="js/pages/settings-v2-nav.js"></script>
 
   <!-- PAC bridge consent handler (Lex modal for token requests) -->

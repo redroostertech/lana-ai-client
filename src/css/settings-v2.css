@@ -1584,3 +1584,109 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+/* ── Local AI service (settings-local-engine.js) ─────────────────── */
+
+.sv2-local-engine {
+  margin-top: 16px;
+}
+
+.sv2-local-engine[hidden] {
+  display: none;
+}
+
+.sv2-local-engine-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sv2-local-engine-message,
+.sv2-local-engine-note,
+.sv2-local-engine-option-description {
+  margin: 0;
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-sm-size);
+  line-height: var(--lex-body-sm-height);
+}
+
+.sv2-local-engine-message {
+  margin-top: 12px;
+  padding: 8px 12px;
+  border-radius: var(--lex-radius-md);
+  background: var(--lex-status-warning-bg);
+  color: var(--lex-status-warning-text);
+}
+
+.sv2-local-engine-message[data-tone="red"] {
+  background: var(--lex-status-danger-bg);
+  color: var(--lex-status-danger-text);
+}
+
+.sv2-local-engine-message[data-tone="blue"] {
+  background: var(--lex-status-info-bg);
+  color: var(--lex-status-info-text);
+}
+
+.sv2-local-engine-message[hidden] {
+  display: none;
+}
+
+.sv2-local-engine-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.sv2-local-engine-rows:empty {
+  display: none;
+}
+
+.sv2-local-engine-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--lex-border-subtle);
+}
+
+.sv2-local-engine-option-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sv2-local-engine-option-name {
+  color: var(--lex-text-primary);
+  font-size: var(--lex-body-size, 0.9375rem);
+  font-weight: var(--lex-weight-medium, 500);
+}
+
+.sv2-local-engine-note {
+  margin-top: 12px;
+}
+
+.sv2-local-engine-note:empty {
+  display: none;
+}
+
+[data-lex-theme="dark"] .sv2-local-engine-message {
+  background: var(--lex-color-warning-700);
+  color: var(--lex-color-warning-50);
+}
+
+[data-lex-theme="dark"] .sv2-local-engine-message[data-tone="red"] {
+  background: var(--lex-color-danger-700);
+  color: var(--lex-color-danger-50);
+}
+
+[data-lex-theme="dark"] .sv2-local-engine-message[data-tone="blue"] {
+  background: var(--lex-color-info-700);
+  color: var(--lex-color-info-50);
+}
