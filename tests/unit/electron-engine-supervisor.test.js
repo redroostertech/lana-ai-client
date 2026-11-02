@@ -134,6 +134,33 @@ describe('spawn', () => {
   });
 });
 
+describe('control channel secret (phase 8d)', () => {
+  test('every engine process gets its own fresh secret in its environment; it never appears in the state shown to renderers', async () => {
+    const h = harness();
+    await h.supervisor.configure(spawnConfig, CHEF);
+    const first = h.calls[0].options.env.LANA_ENGINE_CONTROL_SECRET;
+    expect(first).toMatch(/^[0-9a-f]{64}$/);
+    expect(h.supervisor.getControlSecret()).toBe(first);
+    expect(JSON.stringify(h.supervisor.getState())).not.toContain(first);
+    expect(JSON.stringify(h.states)).not.toContain(first);
+    const restarting = h.supervisor.restart();
+    await jest.advanceTimersByTimeAsync(0);
+    await restarting;
+    const second = h.calls[1].options.env.LANA_ENGINE_CONTROL_SECRET;
+    expect(second).toMatch(/^[0-9a-f]{64}$/);
+    expect(second).not.toBe(first);
+    expect(h.supervisor.getControlSecret()).toBe(second);
+    await h.supervisor.stop();
+    expect(h.supervisor.getControlSecret()).toBeNull();
+  });
+
+  test('an engine started elsewhere (attach mode) has no secret from this client', async () => {
+    const h = harness();
+    await h.supervisor.configure({ mode: 'attach', attachUrl: 'http://127.0.0.1:46180' }, CHEF);
+    expect(h.supervisor.getControlSecret()).toBeNull();
+  });
+});
+
 describe('health', () => {
   test('polls the health endpoint and reports running once it answers', async () => {
     const { supervisor } = harness();

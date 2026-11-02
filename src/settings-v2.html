@@ -263,6 +263,21 @@
               </div>
               <lex-toggle id="sv2-local-engine-toggle" name="local_engine_enabled" aria-label="Use local AI engine"></lex-toggle>
             </div>
+            <div class="sv2-local-engine-option">
+              <div class="sv2-local-engine-option-copy">
+                <span class="sv2-local-engine-option-name">Run my background jobs on this computer when possible</span>
+                <span class="sv2-local-engine-option-description">Your own agent runs and document indexing start here. When this computer sleeps, closes or goes offline, they move to your organization's cloud.</span>
+              </div>
+              <lex-toggle id="sv2-local-engine-bg-toggle" name="local_engine_background_jobs" aria-label="Run my background jobs on this computer when possible"></lex-toggle>
+            </div>
+            <div class="sv2-local-engine-jobs">
+              <div class="sv2-local-engine-jobs-head">
+                <span class="sv2-local-engine-option-name">Background jobs</span>
+                <lex-badge id="sv2-local-engine-jobs-badge" label="Checking" color="gray"></lex-badge>
+              </div>
+              <div id="sv2-local-engine-jobs-list" class="sv2-local-engine-jobs-list" role="list"></div>
+              <p id="sv2-local-engine-jobs-empty" class="sv2-local-engine-note" hidden></p>
+            </div>
             <p id="sv2-local-engine-note" class="sv2-local-engine-note"></p>
           </lex-card>
         </section>
@@ -625,6 +640,7 @@
   <script src="js/pages/settings-usage.js"></script>
   <script src="js/pages/settings-capabilities.js"></script>
   <script src="js/engine-status.js"></script>
+  <script src="js/engine-background-jobs.js"></script>
   <script src="js/pages/settings-local-engine.js"></script>
   <script src="js/pages/settings-v2-nav.js"></script>
 

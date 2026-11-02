@@ -13,8 +13,10 @@
 const fs = require('fs');
 const net = require('net');
 const path = require('path');
+const crypto = require('crypto');
 const childProcess = require('child_process');
 const { createEngineSupervisor, LOOPBACK_HOST } = require('./electron-engine-supervisor');
+const { createEngineControlClient } = require('./electron-engine-control');
 const { resolveEngineConfig, resolveApiBase, presentServer, toStoredServer, isEngineInUse } = require('./electron-api-base');
 
 const CHANNELS = Object.freeze({
@@ -22,8 +24,28 @@ const CHANNELS = Object.freeze({
   status: 'engine:status',
   restart: 'engine:restart',
   setEnabled: 'engine:set-enabled',
+  setBackgroundJobs: 'engine:set-background-jobs',
+  backgroundJobs: 'engine:background-jobs',
   state: 'engine:state'
 });
+
+// Engine settings passed through from the client's environment (phase 8d):
+// the tier the engine's chat runtime needs to start, and the local model
+// endpoints it may use for background jobs. Nothing else.
+const ENGINE_MODEL_ENV = Object.freeze(['LANA_TIER', 'EMBEDDING_MODEL', 'EMBEDDING_VERSION', 'LANA_ENGINE_EMBEDDING_URL', 'LANA_ENGINE_CHAT_URL', 'LANA_FORGE_URL']);
+
+// A sleep or quit waits this long for the engine to hand running jobs off.
+const HANDOFF_WAIT_MS = 12000;
+
+/**
+ * "Run my background jobs on this computer when possible": the saved choice,
+ * or by default on whenever the local engine is on (the server still checks
+ * that this computer can run the job's models before offering it).
+ */
+function backgroundJobsEnabled(preferences, config) {
+  if (typeof preferences.backgroundJobs === 'boolean') {return preferences.backgroundJobs && Boolean(config.enabled);}
+  return Boolean(config.enabled);
+}
 
 function listenOn(port) {
   return new Promise((resolve, reject) => {
@@ -49,12 +71,13 @@ async function fetchWithTimeout(url, { timeoutMs = 3000, ...init } = {}) {
   return fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
 }
 
-/** What the renderer is shown: no process details beyond what Settings needs. */
-function statusView(state, config, apiBase) {
+/** What the renderer is shown: no process details beyond what Settings needs (never the control secret). */
+function statusView(state, config, apiBase, backgroundJobs = { enabled: false, setting: null }) {
   const health = state.health || null;
   return {
     configured: config.configured,
     enabled: config.enabled,
+    backgroundJobs,
     mode: state.mode,
     reason: state.reason,
     process: state.process,
@@ -89,8 +112,9 @@ function statusView(state, config, apiBase) {
  * @param {Function} deps.getWindows - () => BrowserWindow[]
  * @param {Object} [deps.env]
  * @param {Object} deps.log - { info, warn, error }
+ * @param {Function} [deps.getAuthToken] - () => the signed-in person's session token or null
  */
-function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = process.env, log }) {
+function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = process.env, log, getAuthToken = () => null }) {
   const cwd = path.join(app.getPath('userData'), 'local-engine');
   try { fs.mkdirSync(cwd, { recursive: true }); } catch (_error) { /* spawn reports it */ }
 
@@ -99,9 +123,33 @@ function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = proces
   const nodeEnv = !env.LANA_ENGINE_NODE && app.isPackaged ? { ELECTRON_RUN_AS_NODE: '1' } : {};
 
   let config = resolveEngineConfig(env, storage.getLocalEnginePreferences());
+  let osSignals = null;
+  let pushedFor = null; // the engine process (pid) and token the session was last pushed for
+
+  function engineId() {
+    const saved = storage.getLocalEnginePreferences().engineId;
+    if (saved) {return saved;}
+    const fresh = `engine-${crypto.randomUUID()}`;
+    storage.updateLocalEnginePreferences({ engineId: fresh });
+    return fresh;
+  }
+
+  function engineEnv() {
+    const extra = { LANA_ENGINE_ID: engineId() };
+    for (const name of ENGINE_MODEL_ENV) {
+      if (typeof env[name] === 'string' && env[name]) {extra[name] = env[name];}
+    }
+    return extra;
+  }
+
+  function backgroundJobsView() {
+    const preferences = storage.getLocalEnginePreferences();
+    return { enabled: backgroundJobsEnabled(preferences, config), setting: typeof preferences.backgroundJobs === 'boolean' ? preferences.backgroundJobs : null };
+  }
 
   function broadcast(state) {
-    const payload = statusView(state, config, currentApiBase(state));
+    pushControl(state);
+    const payload = statusView(state, config, currentApiBase(state), backgroundJobsView());
     for (const win of getWindows()) {
       if (win && !win.isDestroyed() && win.webContents && !win.webContents.isDestroyed()) {
         win.webContents.send(CHANNELS.state, payload);
@@ -120,8 +168,58 @@ function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = proces
     nodePath,
     nodeEnv,
     cwd,
-    log
+    log,
+    engineEnv
   });
+
+  const control = createEngineControlClient({
+    fetch: fetchWithTimeout,
+    getBaseUrl: () => supervisor.getState().url,
+    getSecret: () => supervisor.getControlSecret()
+  });
+
+  function signalsPayload() {
+    return { ...(osSignals ? osSignals.snapshot() : {}), opt_in: backgroundJobsView().enabled };
+  }
+
+  /** Give a (re)started engine the person's session and the current signals. */
+  function pushControl(state = supervisor.getState()) {
+    if (!state.healthy || !supervisor.getControlSecret()) {return;}
+    const token = getAuthToken() || null;
+    const key = `${state.pid}:${token ? crypto.createHash('sha256').update(token).digest('hex') : 'none'}`;
+    if (key === pushedFor) {return;}
+    pushedFor = key;
+    control.sendSignals(signalsPayload())
+      .then(() => control.setSession(token))
+      .then((answer) => { if (!answer.ok) {pushedFor = null;} })
+      .catch(() => { pushedFor = null; });
+  }
+
+  /** Sign-in, sign-out or a user switch in this app. */
+  function sessionChanged() {
+    pushedFor = null;
+    pushControl();
+  }
+
+  /**
+   * Start passing OS signals (call once the app is ready). Sleep and quit are
+   * urgent: the engine hands its running jobs off before answering.
+   * @param {Object} signals - createOsSignals(...) without onChange wired
+   */
+  function attachOsSignals(createSignals) {
+    osSignals = createSignals((_snapshot, { urgent }) => {
+      control.sendSignals(signalsPayload(), urgent ? { waitMs: HANDOFF_WAIT_MS } : {}).catch(() => {});
+    });
+    return osSignals;
+  }
+
+  /** The app is quitting: hand running jobs off (up to HANDOFF_WAIT_MS), then stop the engine. */
+  async function prepareQuit() {
+    if (osSignals) {osSignals.markQuitting();}
+    await control.sendSignals({ ...signalsPayload(), app_quitting: true }, { waitMs: HANDOFF_WAIT_MS }).catch(() => null);
+    if (osSignals) {osSignals.stop();}
+    await supervisor.stop();
+  }
 
   function chefUrl() {
     const server = storage.getSavedServer();
@@ -141,7 +239,7 @@ function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = proces
 
   function status() {
     const state = supervisor.getState();
-    return statusView(state, config, currentApiBase(state));
+    return statusView(state, config, currentApiBase(state), backgroundJobsView());
   }
 
   function registerIpc() {
@@ -160,6 +258,18 @@ function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = proces
       storage.updateLocalEnginePreferences({ enabled: payload.enabled });
       return { success: true, status: await sync() };
     });
+    ipcMain.handle(CHANNELS.setBackgroundJobs, async (_event, payload) => {
+      if (typeof payload?.enabled !== 'boolean') {return { success: false, error: 'Invalid setting.' };}
+      if (!config.configured) {return { success: false, error: 'No local AI service is installed on this computer.' };}
+      storage.updateLocalEnginePreferences({ backgroundJobs: payload.enabled });
+      await control.sendSignals(signalsPayload()).catch(() => null);
+      return { success: true, status: status() };
+    });
+    ipcMain.handle(CHANNELS.backgroundJobs, async () => {
+      const answer = await control.backgroundJobs();
+      if (!answer.ok) {return { success: false, error: answer.error };}
+      return { success: true, jobs: answer.body };
+    });
   }
 
   return {
@@ -170,8 +280,12 @@ function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = proces
     apiBase: () => currentApiBase(),
     present: (server) => presentServer(server, supervisor.getState()),
     toStored: (server) => toStoredServer(server, { engineUrl: supervisor.getState().url, storedUrl: chefUrl() }),
-    stop: () => supervisor.stop()
+    stop: () => supervisor.stop(),
+    prepareQuit,
+    attachOsSignals,
+    sessionChanged,
+    control
   };
 }
 
-module.exports = { createLocalEngineHost, statusView, pickLoopbackPort, CHANNELS };
+module.exports = { createLocalEngineHost, statusView, pickLoopbackPort, backgroundJobsEnabled, CHANNELS, ENGINE_MODEL_ENV };

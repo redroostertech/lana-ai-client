@@ -39,18 +39,18 @@ describe('electron-storage localEngine settings', () => {
   beforeEach(() => storage.clearAllData());
 
   test('defaults: enabled unset (on when configured), no root, no port', () => {
-    expect(storage.getLocalEnginePreferences()).toEqual({ enabled: null, root: null, port: null });
+    expect(storage.getLocalEnginePreferences()).toEqual({ enabled: null, root: null, port: null, backgroundJobs: null, engineId: null });
   });
 
   test('saves and reads back the setting, root and port', () => {
     storage.updateLocalEnginePreferences({ enabled: false });
     storage.updateLocalEnginePreferences({ root: ' /opt/engine ', port: 48123 });
-    expect(storage.getLocalEnginePreferences()).toEqual({ enabled: false, root: '/opt/engine', port: 48123 });
+    expect(storage.getLocalEnginePreferences()).toEqual({ enabled: false, root: '/opt/engine', port: 48123, backgroundJobs: null, engineId: null });
   });
 
   test('invalid values are not stored', () => {
-    storage.updateLocalEnginePreferences({ enabled: 'yes', root: '', port: 99999 });
-    expect(storage.getLocalEnginePreferences()).toEqual({ enabled: null, root: null, port: null });
+    storage.updateLocalEnginePreferences({ enabled: 'yes', root: '', port: 99999, backgroundJobs: 'on', engineId: 'x y' });
+    expect(storage.getLocalEnginePreferences()).toEqual({ enabled: null, root: null, port: null, backgroundJobs: null, engineId: null });
   });
 
   test('logging out (clearing the saved server) keeps the setting', () => {
@@ -112,5 +112,23 @@ describe('local engine host', () => {
 
   test('a non-boolean setting is refused', async () => {
     expect((await ipc.invoke(CHANNELS.setEnabled, { enabled: 'off' })).success).toBe(false);
+  });
+
+  test('"Run my background jobs on this computer" is on by default while the engine is on, saved when changed, and off whenever the engine is off', async () => {
+    await host.sync();
+    expect(host.status().backgroundJobs).toEqual({ enabled: true, setting: null });
+    const off = await ipc.invoke(CHANNELS.setBackgroundJobs, { enabled: false });
+    expect(off).toMatchObject({ success: true, status: { backgroundJobs: { enabled: false, setting: false } } });
+    expect(storage.getLocalEnginePreferences().backgroundJobs).toBe(false);
+    const on = await ipc.invoke(CHANNELS.setBackgroundJobs, { enabled: true });
+    expect(on.status.backgroundJobs).toEqual({ enabled: true, setting: true });
+    await ipc.invoke(CHANNELS.setEnabled, { enabled: false });
+    expect(host.status().backgroundJobs).toEqual({ enabled: false, setting: true });
+    expect((await ipc.invoke(CHANNELS.setBackgroundJobs, { enabled: 'yes' })).success).toBe(false);
+  });
+
+  test('the background jobs status says when the engine cannot be asked (attach mode has no control secret)', async () => {
+    await host.sync();
+    expect(await ipc.invoke(CHANNELS.backgroundJobs)).toEqual({ success: false, error: 'not_running' });
   });
 });

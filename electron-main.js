@@ -104,9 +104,12 @@ const localEngine = createLocalEngineHost({
   app,
   storage: { getSavedServer, getLocalEnginePreferences, updateLocalEnginePreferences },
   getWindows: () => BrowserWindow.getAllWindows(),
-  log: { info: logInfo, warn: logWarn, error: (message) => logError(message) }
+  log: { info: logInfo, warn: logWarn, error: (message) => logError(message) },
+  // Phase 8d: the engine runs this person's own background jobs with their own session.
+  getAuthToken: () => authTokenStore.get()
 });
 localEngine.registerIpc();
+const { createOsSignals } = require('./electron-os-signals');
 const SessionTracker = require('./js/session/session-tracker');
 const companionBridge = require('./electron-bridge');
 const { redactUrlForLog } = require('./electron-log-redaction');
@@ -1302,7 +1305,11 @@ ipcMain.handle('verify-server', async (event, serverUrl) => {
 });
 
 // Login token get/set/clear/migrate for the preload (synchronous channels).
-registerTokenIpc(ipcMain, authTokenStore, () => { syncScreenVoiceAuthentication().catch(() => {}); });
+registerTokenIpc(ipcMain, authTokenStore, () => {
+  syncScreenVoiceAuthentication().catch(() => {});
+  // Sign-in, sign-out or a user switch: the engine follows this app's session.
+  localEngine.sessionChanged();
+});
 
 // Get saved server
 ipcMain.handle('get-saved-server', async () => {
@@ -2074,6 +2081,19 @@ if (!gotTheLock) {
 
 // This method will be called when Electron has finished initialization
 app.whenReady().then(async () => {
+  // OS power, sleep, lid and network signals for the local engine (phase 8d).
+  try {
+    const { powerMonitor, net } = require('electron');
+    const { execFile } = require('child_process');
+    const run = (command, args) => new Promise((resolve, reject) => {
+      execFile(command, args, { timeout: 3000 }, (error, stdout) => (error ? reject(error) : resolve(String(stdout))));
+    });
+    const readFile = (file) => require('fs').promises.readFile(file, 'utf8');
+    localEngine.attachOsSignals((onChange) => createOsSignals({ powerMonitor, net, run, readFile, onChange })).start();
+  } catch (error) {
+    logError('[electron-main] OS signals for the local AI engine are not available', error);
+  }
+
   logInfo('App ready, starting thin client initialization...');
 
   // macOS dock icon. On packaged builds Electron reads from the .app bundle's
@@ -2261,12 +2281,21 @@ app.on('window-all-closed', () => {
 });
 
 // Handle application quit
-app.on('before-quit', async () => {
+let localEngineQuitPrepared = false;
+app.on('before-quit', async (event) => {
+  // The local AI engine first hands its running background jobs off to the
+  // organization's cloud (up to 12 s), then stops; the quit then continues.
+  if (!localEngineQuitPrepared) {
+    event.preventDefault();
+    localEngineQuitPrepared = true;
+    localEngine.prepareQuit()
+      .catch((error) => logError('[electron-main] Failed to stop the local AI engine', error))
+      .finally(() => app.quit());
+    return;
+  }
+
   // Cleanup operations before quitting
   console.log('[electron-main] Application is quitting...');
-
-  // Stop the local AI engine (SIGTERM is sent synchronously).
-  localEngine.stop().catch((error) => logError('[electron-main] Failed to stop the local AI engine', error));
 
   // Stop the PAC bridge HTTP server
   try {

@@ -1690,3 +1690,78 @@
   background: var(--lex-color-info-700);
   color: var(--lex-color-info-50);
 }
+
+/* Background jobs on this computer (settings-local-engine.js, phase 8d) */
+
+.sv2-local-engine-jobs {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--lex-border-subtle);
+}
+
+.sv2-local-engine-jobs-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sv2-local-engine-jobs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.sv2-local-engine-jobs-list:empty {
+  display: none;
+}
+
+.sv2-local-engine-job {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 12px;
+  border-radius: var(--lex-radius-md);
+  background: var(--lex-bg-secondary);
+}
+
+.sv2-local-engine-job[data-moved="true"] {
+  background: var(--lex-status-info-bg);
+}
+
+.sv2-local-engine-job-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sv2-local-engine-job-title {
+  color: var(--lex-text-primary);
+  font-size: var(--lex-body-sm-size);
+  font-weight: var(--lex-weight-medium, 500);
+}
+
+.sv2-local-engine-job-detail {
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-sm-size);
+  line-height: var(--lex-body-sm-height);
+}
+
+.sv2-local-engine-job[data-moved="true"] .sv2-local-engine-job-detail {
+  color: var(--lex-status-info-text);
+}
+
+[data-lex-theme="dark"] .sv2-local-engine-job {
+  background: var(--lex-color-gray-800);
+}
+
+[data-lex-theme="dark"] .sv2-local-engine-job[data-moved="true"] {
+  background: color-mix(in srgb, var(--lex-color-info-700) 28%, transparent);
+}
+
+[data-lex-theme="dark"] .sv2-local-engine-job[data-moved="true"] .sv2-local-engine-job-detail {
+  color: var(--lex-color-info-100, var(--lex-color-info-50));
+}

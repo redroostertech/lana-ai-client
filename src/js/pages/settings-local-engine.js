@@ -5,6 +5,11 @@
  * reachable, data API versions), the "Use local AI engine" setting and a
  * restart button. All state comes from window.electronAPI.engine; the view
  * model is LanaEngineStatus.settingsView (src/js/engine-status.js).
+ *
+ * Phase 8d: "Run my background jobs on this computer when possible" and the
+ * "Background jobs" status (running here, moved to the cloud, recent history
+ * from the organization's server); view model LanaEngineBackgroundJobs
+ * (src/js/engine-background-jobs.js).
  */
 (function () {
   'use strict';
@@ -21,8 +26,56 @@
     var toggle = document.getElementById('sv2-local-engine-toggle');
     var restartBtn = document.getElementById('sv2-local-engine-restart');
     var note = document.getElementById('sv2-local-engine-note');
+    var bgToggle = document.getElementById('sv2-local-engine-bg-toggle');
+    var jobsBadge = document.getElementById('sv2-local-engine-jobs-badge');
+    var jobsList = document.getElementById('sv2-local-engine-jobs-list');
+    var jobsEmpty = document.getElementById('sv2-local-engine-jobs-empty');
+    var jobs = window.LanaEngineBackgroundJobs;
     var busy = false;
     var last = null;
+    var lastJobs = null;
+    var jobsTimer = null;
+
+    function renderJobs(data) {
+      if (!jobs || !jobsList) return;
+      lastJobs = data;
+      var view = jobs.jobsView(data, last);
+      jobsBadge.setAttribute('label', view.summary);
+      jobsBadge.setAttribute('color', view.tone);
+      while (jobsList.firstChild) jobsList.removeChild(jobsList.firstChild);
+      view.rows.forEach(function (row) {
+        var item = document.createElement('div');
+        item.className = 'sv2-local-engine-job';
+        item.setAttribute('role', 'listitem');
+        item.setAttribute('data-moved', row.movedToCloud ? 'true' : 'false');
+        var copy = document.createElement('div');
+        copy.className = 'sv2-local-engine-job-copy';
+        var title = document.createElement('span');
+        title.className = 'sv2-local-engine-job-title';
+        title.textContent = row.title;
+        var detail = document.createElement('span');
+        detail.className = 'sv2-local-engine-job-detail';
+        detail.textContent = row.detail;
+        copy.appendChild(title);
+        copy.appendChild(detail);
+        var badgeEl = document.createElement('lex-badge');
+        badgeEl.setAttribute('label', row.badge);
+        badgeEl.setAttribute('color', row.tone);
+        item.appendChild(copy);
+        item.appendChild(badgeEl);
+        jobsList.appendChild(item);
+      });
+      jobsEmpty.textContent = view.empty || '';
+      jobsEmpty.hidden = !view.empty;
+    }
+
+    function refreshJobs() {
+      if (!jobs || typeof engineApi.getBackgroundJobs !== 'function') return;
+      if (!last || !last.inUse) { renderJobs(null); return; }
+      engineApi.getBackgroundJobs().then(function (result) {
+        renderJobs(result && result.success ? result.jobs : null);
+      }).catch(function () { renderJobs(null); });
+    }
 
     function notify(kind, text) {
       if (window.Lex && window.Lex.Toast && typeof window.Lex.Toast[kind] === 'function') window.Lex.Toast[kind](text);
@@ -68,6 +121,16 @@
       var canRestart = Boolean(engineStatus && engineStatus.inUse) && !busy;
       if (canRestart) restartBtn.removeAttribute('disabled');
       else restartBtn.setAttribute('disabled', '');
+
+      if (jobs && bgToggle) {
+        var bg = jobs.toggleView(engineStatus);
+        if (bg.checked) bgToggle.setAttribute('checked', '');
+        else bgToggle.removeAttribute('checked');
+        bgToggle.checked = bg.checked;
+        if (bg.disabled || busy) bgToggle.setAttribute('disabled', '');
+        else bgToggle.removeAttribute('disabled');
+        renderJobs(lastJobs);
+      }
     }
 
     function run(action, failure) {
@@ -93,6 +156,18 @@
       });
     });
 
+    if (bgToggle && typeof engineApi.setBackgroundJobs === 'function') {
+      bgToggle.addEventListener('lex-change', function (event) {
+        var value = Boolean(event.detail && event.detail.value);
+        run(function () { return engineApi.setBackgroundJobs(value); }, 'The setting could not be saved.').then(function () {
+          if (last && last.backgroundJobs && last.backgroundJobs.enabled === value) {
+            notify('success', value ? 'Your background jobs run on this computer when possible.' : 'Your background jobs run in your organization\'s cloud.');
+          }
+          refreshJobs();
+        });
+      });
+    }
+
     restartBtn.addEventListener('click', function () {
       if (restartBtn.hasAttribute('disabled')) return;
       run(function () { return engineApi.restart(); }, 'The local AI service could not be restarted.');
@@ -103,6 +178,8 @@
     }
     engineApi.getStatus().then(function (result) {
       if (result && result.success) render(result.status);
+      refreshJobs();
+      if (!jobsTimer) jobsTimer = setInterval(refreshJobs, 15000);
     }).catch(function () {
       section.setAttribute('aria-busy', 'false');
     });

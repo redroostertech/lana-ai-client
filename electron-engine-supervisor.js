@@ -21,6 +21,7 @@
  */
 
 const path = require('path');
+const { generateControlSecret } = require('./electron-engine-control');
 
 const HEALTH_PATH = '/api/engine/v1/health';
 const LOOPBACK_HOST = '127.0.0.1';
@@ -89,6 +90,8 @@ function engineEntry(root) {
  * @param {Function} [deps.now]
  * @param {Object} [deps.log] - { info, warn, error }
  * @param {Object} [deps.options] - overrides for DEFAULTS
+ * @param {Function} [deps.makeSecret] - () => a fresh control secret (one per engine process)
+ * @param {Function} [deps.engineEnv] - () => extra engine settings (engine id, local model endpoints)
  */
 function createEngineSupervisor(deps) {
   const {
@@ -104,7 +107,9 @@ function createEngineSupervisor(deps) {
     cwd,
     timers = { setTimeout, clearTimeout },
     now = () => Date.now(),
-    log = { info() {}, warn() {}, error() {} }
+    log = { info() {}, warn() {}, error() {} },
+    makeSecret = generateControlSecret,
+    engineEnv = () => ({})
   } = deps;
   const opts = { ...DEFAULTS, ...(deps.options || {}) };
 
@@ -135,6 +140,9 @@ function createEngineSupervisor(deps) {
   let wanted = false; // should an engine be running now
   let generation = 0; // bumps on every configure/stop so stale callbacks are ignored
   let preferredPort = null;
+  // The control channel secret of the running engine process (phase 8d). Never
+  // part of getState(), which is broadcast to renderers.
+  let controlSecret = null;
 
   function emit() {
     try { onState(getState()); } catch (_error) { /* listener errors are not ours */ }
@@ -263,7 +271,8 @@ function createEngineSupervisor(deps) {
     state.healthy = false;
     healthFailures = 0;
     wasHealthy = false;
-    const env = buildEngineEnv(baseEnv, { chefUrl: state.chefUrl, port: state.port, extra: nodeEnv });
+    controlSecret = makeSecret();
+    const env = buildEngineEnv(baseEnv, { chefUrl: state.chefUrl, port: state.port, extra: { ...nodeEnv, ...engineEnv(), LANA_ENGINE_CONTROL_SECRET: controlSecret } });
     let spawned;
     try {
       spawned = spawn(nodePath, [engineEntry(state.root)], { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
@@ -414,7 +423,12 @@ function createEngineSupervisor(deps) {
     }
   }
 
-  return { configure, restart, stop, getState };
+  /** The secret of the engine process this supervisor started (null when none, or in attach mode). */
+  function getControlSecret() {
+    return state.mode === 'spawn' && child ? controlSecret : null;
+  }
+
+  return { configure, restart, stop, getState, getControlSecret };
 }
 
 module.exports = {

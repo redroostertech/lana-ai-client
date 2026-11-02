@@ -429,8 +429,11 @@ function getConnectionHistory() {
 //   enabled: null (default: on when an engine is configured) | true | false
 //   root:    engine checkout or packaged engine folder (LANA_ENGINE_ROOT wins)
 //   port:    last loopback port the engine used, reused when still free
+//   backgroundJobs: null (default: on when the engine is on) | true | false,
+//            "Run my background jobs on this computer when possible" (phase 8d)
+//   engineId: this computer's engine id, generated once and kept
 const LOCAL_ENGINE_KEY = 'localEngine';
-const LOCAL_ENGINE_DEFAULTS = Object.freeze({ enabled: null, root: null, port: null });
+const LOCAL_ENGINE_DEFAULTS = Object.freeze({ enabled: null, root: null, port: null, backgroundJobs: null, engineId: null });
 
 function getLocalEnginePreferences() {
   try {
@@ -443,7 +446,7 @@ function getLocalEnginePreferences() {
 }
 
 /**
- * @param {{ enabled?: boolean|null, root?: string|null, port?: number|null }} changes
+ * @param {{ enabled?: boolean|null, root?: string|null, port?: number|null, backgroundJobs?: boolean|null, engineId?: string|null }} changes
  * @returns {Object} the saved settings
  */
 function updateLocalEnginePreferences(changes = {}) {
@@ -453,6 +456,12 @@ function updateLocalEnginePreferences(changes = {}) {
   }
   if (Object.prototype.hasOwnProperty.call(changes, 'root')) {
     next.root = typeof changes.root === 'string' && changes.root.trim() ? changes.root.trim() : null;
+  }
+  if (Object.prototype.hasOwnProperty.call(changes, 'backgroundJobs')) {
+    next.backgroundJobs = typeof changes.backgroundJobs === 'boolean' ? changes.backgroundJobs : null;
+  }
+  if (Object.prototype.hasOwnProperty.call(changes, 'engineId')) {
+    next.engineId = typeof changes.engineId === 'string' && /^[A-Za-z0-9-]{8,100}$/.test(changes.engineId) ? changes.engineId : null;
   }
   if (Object.prototype.hasOwnProperty.call(changes, 'port')) {
     next.port = Number.isInteger(changes.port) && changes.port > 0 && changes.port < 65536 ? changes.port : null;

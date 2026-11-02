@@ -112,6 +112,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getStatus: () => ipcRenderer.invoke('engine:status'),
     restart: () => ipcRenderer.invoke('engine:restart'),
     setEnabled: (enabled) => ipcRenderer.invoke('engine:set-enabled', { enabled }),
+    // "Run my background jobs on this computer when possible" and its status (phase 8d).
+    setBackgroundJobs: (enabled) => ipcRenderer.invoke('engine:set-background-jobs', { enabled }),
+    getBackgroundJobs: () => ipcRenderer.invoke('engine:background-jobs'),
     onState: (callback) => {
       const handler = (_event, status) => callback(status);
       ipcRenderer.on('engine:state', handler);
