@@ -1,0 +1,109 @@
+/* Local AI engine status banner (src/js/engine-status.js).
+   Fixed at the top of the shell like lex-app's reachability banner; shown
+   only while the engine is restarting, the organization's server is not
+   reachable, or the data API version is refused. */
+
+.lana-engine-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: var(--lex-z-loader, 9999);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-family: var(--lex-font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  font-weight: var(--lex-weight-medium, 500);
+  background: var(--lex-status-warning-bg);
+  color: var(--lex-status-warning-text);
+  border-bottom: 1px solid var(--lex-color-warning-100);
+  transform: translateY(-100%);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease, visibility 0s 0.4s;
+}
+
+.lana-engine-banner--visible {
+  transform: translateY(0);
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease, visibility 0s;
+}
+
+.lana-engine-banner__indicator {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--lex-radius-full, 9999px);
+  background: var(--lex-status-warning);
+}
+
+.lana-engine-banner[data-state="restarting"] .lana-engine-banner__indicator,
+.lana-engine-banner[data-state="chef_unavailable"] .lana-engine-banner__indicator {
+  animation: lana-engine-pulse 1.4s ease-in-out infinite;
+}
+
+.lana-engine-banner[data-state="restarting"] {
+  background: var(--lex-status-info-bg);
+  color: var(--lex-status-info-text);
+  border-bottom-color: var(--lex-color-info-100);
+}
+
+.lana-engine-banner[data-state="restarting"] .lana-engine-banner__indicator {
+  background: var(--lex-status-info);
+}
+
+.lana-engine-banner[data-state="version_refused"] {
+  background: var(--lex-status-danger-bg);
+  color: var(--lex-status-danger-text);
+  border-bottom-color: var(--lex-color-danger-100);
+}
+
+.lana-engine-banner[data-state="version_refused"] .lana-engine-banner__indicator {
+  background: var(--lex-status-danger);
+}
+
+@keyframes lana-engine-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lana-engine-banner,
+  .lana-engine-banner--visible { transition: none; }
+  .lana-engine-banner__indicator { animation: none !important; }
+}
+
+/* Dark surfaces */
+[data-lex-theme="dark"] .lana-engine-banner {
+  background: var(--lex-color-warning-700);
+  color: var(--lex-color-warning-50);
+  border-bottom-color: var(--lex-color-warning-600);
+}
+
+[data-lex-theme="dark"] .lana-engine-banner[data-state="restarting"] {
+  background: var(--lex-color-info-700);
+  color: var(--lex-color-info-50);
+  border-bottom-color: var(--lex-color-info-600);
+}
+
+[data-lex-theme="dark"] .lana-engine-banner[data-state="version_refused"] {
+  background: var(--lex-color-danger-700);
+  color: var(--lex-color-danger-50);
+  border-bottom-color: var(--lex-color-danger-600);
+}
+
+[data-lex-theme="dark"] .lana-engine-banner__indicator {
+  background: currentColor;
+}
+
+/* While this banner explains the state, lex-app's generic reachability
+   banner (which probes through the engine) stays out of the way. */
+html[data-lana-engine-banner] .lex-app-offline-banner {
+  display: none;
+}

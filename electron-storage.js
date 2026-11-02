@@ -424,6 +424,43 @@ function getConnectionHistory() {
   }
 }
 
+// Local AI engine settings (local-ai-engine plan, phase 6). Kept apart from
+// the saved server so logging out does not reset them.
+//   enabled: null (default: on when an engine is configured) | true | false
+//   root:    engine checkout or packaged engine folder (LANA_ENGINE_ROOT wins)
+//   port:    last loopback port the engine used, reused when still free
+const LOCAL_ENGINE_KEY = 'localEngine';
+const LOCAL_ENGINE_DEFAULTS = Object.freeze({ enabled: null, root: null, port: null });
+
+function getLocalEnginePreferences() {
+  try {
+    const value = store.get(LOCAL_ENGINE_KEY, null);
+    return { ...LOCAL_ENGINE_DEFAULTS, ...(value && typeof value === 'object' ? value : {}) };
+  } catch (error) {
+    logError('[electron-storage] Failed to read local engine settings', error);
+    return { ...LOCAL_ENGINE_DEFAULTS };
+  }
+}
+
+/**
+ * @param {{ enabled?: boolean|null, root?: string|null, port?: number|null }} changes
+ * @returns {Object} the saved settings
+ */
+function updateLocalEnginePreferences(changes = {}) {
+  const next = { ...getLocalEnginePreferences() };
+  if (Object.prototype.hasOwnProperty.call(changes, 'enabled')) {
+    next.enabled = typeof changes.enabled === 'boolean' ? changes.enabled : null;
+  }
+  if (Object.prototype.hasOwnProperty.call(changes, 'root')) {
+    next.root = typeof changes.root === 'string' && changes.root.trim() ? changes.root.trim() : null;
+  }
+  if (Object.prototype.hasOwnProperty.call(changes, 'port')) {
+    next.port = Number.isInteger(changes.port) && changes.port > 0 && changes.port < 65536 ? changes.port : null;
+  }
+  store.set(LOCAL_ENGINE_KEY, next);
+  return next;
+}
+
 // Ciphertext of the login token (Electron safeStorage output, base64). The
 // plain token never reaches this store; see electron-token-store.js.
 const AUTH_TOKEN_KEY = 'authTokenEncrypted';
@@ -447,6 +484,8 @@ module.exports = {
   isBrainchildAutoBindDisabled,
   getPreferences,
   updatePreferences,
+  getLocalEnginePreferences,
+  updateLocalEnginePreferences,
   getAllData,
   clearAllData,
   addToConnectionHistory,

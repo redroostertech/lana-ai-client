@@ -135,6 +135,16 @@ class ApiClient {
       console.error('[LanaAPI] Failed to pre-load server URL from localStorage:', err);
     }
 
+    // The API base from the main process, synchronously: the local AI
+    // engine's address when it is in use (electron-api-base.js), so the first
+    // request of a page never goes around an enabled engine.
+    this._applyApiBase(window.electronAPI && typeof window.electronAPI.getApiBaseSync === 'function'
+      ? window.electronAPI.getApiBaseSync()
+      : null);
+    if (window.electronAPI && window.electronAPI.engine && typeof window.electronAPI.engine.onState === 'function') {
+      window.electronAPI.engine.onState((status) => this._applyApiBase(status && status.apiBase));
+    }
+
     if (window.electronAPI) {
       // Async confirm/update from Electron storage (source of truth in the parent)
       this._readyPromise = window.electronAPI.getSavedServer().then(result => {
@@ -218,6 +228,25 @@ class ApiClient {
         }
       }
     }
+  }
+
+  /**
+   * Follow the API base the main process decided (engine on or off). Keeps
+   * localStorage in step for iframes and modules that read it directly. The
+   * login page manages its own base (it talks to the organization's server).
+   */
+  _applyApiBase(apiBase) {
+    if (!apiBase || typeof apiBase !== 'string' || this.isInvalidUrl(apiBase)) return;
+    if (window.location && String(window.location.pathname || '').endsWith('login.html')) return;
+    if (this.baseUrl === apiBase) return;
+    this.baseUrl = apiBase;
+    try {
+      const saved = JSON.parse(localStorage.getItem('lana_saved_server') || 'null');
+      if (saved && typeof saved === 'object') {
+        saved.url = apiBase;
+        localStorage.setItem('lana_saved_server', JSON.stringify(saved));
+      }
+    } catch (_error) { /* storage is best effort */ }
   }
 
   log(...args) {
@@ -660,6 +689,11 @@ class ApiClient {
       }
 
       if (!response.ok) {
+        // Local AI engine refusals (426 version, 503 server not connected):
+        // show the state; never retried here.
+        if (typeof window !== 'undefined' && window.LanaEngineStatus && typeof window.LanaEngineStatus.reportProblem === 'function') {
+          window.LanaEngineStatus.reportProblem(response.status, result);
+        }
         // Check for authentication/session errors - redirect to login
         const errorCode = result.error?.code;
         // Support both error formats: {error: {message: ...}} and {detail: ...}

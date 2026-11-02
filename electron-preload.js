@@ -98,6 +98,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSavedServer: () => ipcRenderer.invoke('get-saved-server'),
   clearSavedServer: () => ipcRenderer.invoke('clear-saved-server'),
 
+  /**
+   * The API base, synchronously, so a page's first request already uses it:
+   * the local AI engine's loopback address when it is in use, otherwise the
+   * organization's server. Null before an organization is connected.
+   */
+  getApiBaseSync: () => {
+    try { return ipcRenderer.sendSync('engine:api-base-sync') || null; } catch (_) { return null; }
+  },
+
+  /** Local AI engine status and controls (Settings, status banner). */
+  engine: {
+    getStatus: () => ipcRenderer.invoke('engine:status'),
+    restart: () => ipcRenderer.invoke('engine:restart'),
+    setEnabled: (enabled) => ipcRenderer.invoke('engine:set-enabled', { enabled }),
+    onState: (callback) => {
+      const handler = (_event, status) => callback(status);
+      ipcRenderer.on('engine:state', handler);
+      return () => ipcRenderer.removeListener('engine:state', handler);
+    }
+  },
+
   /** Discovery-entitled native/background capabilities. */
   capabilities: {
     list: () => ipcRenderer.invoke('capabilities:list'),

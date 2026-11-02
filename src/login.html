@@ -390,6 +390,14 @@
       try {
         const savedServer = JSON.parse(savedServerJson);
         if (savedServer && savedServer.url && savedServer.orgId) {
+          // Sign-in talks to the organization's server directly. When the
+          // app last ran through the local AI engine, url is the engine's
+          // address and chefUrl is the server's.
+          if (savedServer.chefUrl) {
+            savedServer.url = savedServer.chefUrl;
+            delete savedServer.chefUrl;
+            delete savedServer.localEngine;
+          }
           savedServer.enabledApps = normalizeEnabledApps(savedServer.enabledApps);
           localStorage.setItem('lana_saved_server', JSON.stringify(savedServer));
           console.log('[Login] Found saved server, skipping to Step 2:', savedServer.orgName || savedServer.orgId);

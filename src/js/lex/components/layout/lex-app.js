@@ -1186,6 +1186,7 @@
 
       // Build the banner element (hidden by default via CSS transform)
       this._buildOfflineBanner();
+      this._mountEngineStatus();
 
       // Initial check after a short delay (let the first page load)
       var self = this;
@@ -1197,6 +1198,26 @@
           self._checkReachability();
         }, 30000);
       }, 5000);
+    }
+
+    /**
+     * Desktop app with the local AI engine: load the engine status banner
+     * (src/js/engine-status.js + css/engine-status.css) once and let it follow
+     * the main process's engine state.
+     */
+    _mountEngineStatus() {
+      var engineApi = window.electronAPI && window.electronAPI.engine;
+      if (!engineApi) return;
+      var base = docStudioAssetBase();
+      if (!base) return;
+      Promise.all([
+        loadAssetOnce('link', base.replace(/\/js\/$/, '/css/') + 'engine-status.css'),
+        window.LanaEngineStatus ? Promise.resolve() : loadAssetOnce('script', base + 'engine-status.js')
+      ]).then(function () {
+        if (window.LanaEngineStatus) window.LanaEngineStatus.mount(engineApi);
+      }).catch(function (error) {
+        console.warn('[LexApp] Engine status banner could not load:', error && error.message);
+      });
     }
 
     /**

@@ -301,14 +301,19 @@
             ? Number(response.headers.get('Retry-After'))
             : NaN;
           const responseDetails = responseError?.details || null;
+          // problem+json from the local AI engine (426 version refused, 503
+          // server not connected): a person-readable detail and a code.
+          const engineProblem = global.LanaEngineStatus && typeof global.LanaEngineStatus.reportProblem === 'function'
+            ? global.LanaEngineStatus.reportProblem(response.status, payload)
+            : null;
           yield {
             type: 'error',
-            error: responseError?.message || responseError?.code || responseError || `HTTP ${response.status}`,
-            code: responseError?.code || null,
+            error: responseError?.message || responseError?.code || responseError || engineProblem?.message || `HTTP ${response.status}`,
+            code: responseError?.code || engineProblem?.code || null,
             field: responseError?.field || null,
             details: {
               ...(responseDetails && typeof responseDetails === 'object' ? responseDetails : {}),
-              ...((response.status === 429 || response.status >= 500) ? { retryable: true } : {}),
+              ...((response.status === 429 || response.status >= 500) && !(engineProblem && engineProblem.retry === false) ? { retryable: true } : {}),
               ...(Number.isInteger(retryAfterHeader) && retryAfterHeader >= 0
                 ? { retryAfterSeconds: Math.min(retryAfterHeader, 86400) }
                 : {})

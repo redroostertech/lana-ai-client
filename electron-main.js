@@ -86,13 +86,27 @@ if (process.env.NODE_ENV === 'development') {
 
 // Import thin client modules
 const { refreshHostedDiscovery, verifyServer } = require('./electron-discovery');
-const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified, saveBrainchildLink, getBrainchildLink, clearBrainchildLink, setBrainchildAutoBindDisabled, isBrainchildAutoBindDisabled, authTokenPersistence } = require('./electron-storage');
+const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified, saveBrainchildLink, getBrainchildLink, clearBrainchildLink, setBrainchildAutoBindDisabled, isBrainchildAutoBindDisabled, authTokenPersistence, getLocalEnginePreferences, updateLocalEnginePreferences } = require('./electron-storage');
+const { createLocalEngineHost } = require('./electron-local-engine');
 const { createTokenStore, registerTokenIpc, hasLiveSession } = require('./electron-token-store');
 
 // The login token: OS-keychain encrypted at rest, memory only when no keychain.
 const authTokenStore = createTokenStore({ safeStorage, persistence: authTokenPersistence });
 const { checkForUpdates, downloadAndInstallUpdate, showOptionalUpdateDialog, showForceUpdateDialog, shouldCheckForUpdates, configureAutoUpdater } = require('./electron-updater-custom');
-const { logInfo, logError, exportLogs, getLogFilePath } = require('./electron-logger');
+const { logInfo, logError, logWarn, exportLogs, getLogFilePath } = require('./electron-logger');
+
+// Local AI engine (local-ai-engine plan, phase 6). When an engine is
+// configured the client's API base is the engine's loopback address and the
+// engine forwards everything it does not serve to the organization's server.
+// electron-api-base.js holds the rule; getSavedServer() below stays Chef's.
+const localEngine = createLocalEngineHost({
+  ipcMain,
+  app,
+  storage: { getSavedServer, getLocalEnginePreferences, updateLocalEnginePreferences },
+  getWindows: () => BrowserWindow.getAllWindows(),
+  log: { info: logInfo, warn: logWarn, error: (message) => logError(message) }
+});
+localEngine.registerIpc();
 const SessionTracker = require('./js/session/session-tracker');
 const companionBridge = require('./electron-bridge');
 const { redactUrlForLog } = require('./electron-log-redaction');
@@ -1233,15 +1247,17 @@ ipcMain.handle('get-config', async () => {
 
 // Handle secure storage operations
 ipcMain.handle('save-settings', async (event, settings) => {
-  const { saveServerConnection } = require('./electron-storage');
-  const success = saveServerConnection(settings);
-  if (success) syncScreenVoiceEntitlement(settings);
+  const stored = localEngine.toStored(settings);
+  const success = saveServerConnection(stored);
+  if (success) {
+    syncScreenVoiceEntitlement(stored);
+    await localEngine.sync().catch((error) => logError('[electron-main] Local AI engine did not start', error));
+  }
   return { success };
 });
 
 ipcMain.handle('load-settings', async () => {
-  const { getSavedServer } = require('./electron-storage');
-  return getSavedServer();
+  return localEngine.present(getSavedServer());
 });
 
 // Get app version - use centralized version system
@@ -1253,9 +1269,12 @@ ipcMain.handle('get-version', async () => {
 ipcMain.handle('connect-to-server', async (event, server) => {
   logInfo(`IPC: connect-to-server requested for ${server.orgName || server.orgId}`);
   try {
-    // Save server connection
-    saveServerConnection(server);
-    syncScreenVoiceEntitlement(server);
+    // Save server connection (Chef's address, never the engine's), then
+    // start or retarget the local engine at it.
+    const stored = localEngine.toStored(server);
+    saveServerConnection(stored);
+    syncScreenVoiceEntitlement(stored);
+    await localEngine.sync().catch((error) => logError('[electron-main] Local AI engine did not start', error));
 
     // Resize window for main app view
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -1288,7 +1307,9 @@ registerTokenIpc(ipcMain, authTokenStore, () => { syncScreenVoiceAuthentication(
 // Get saved server
 ipcMain.handle('get-saved-server', async () => {
   try {
-    const server = getSavedServer();
+    // url is the API base (the local engine when in use); chefUrl is the
+    // organization's server.
+    const server = localEngine.present(getSavedServer());
     return { success: true, server };
   } catch (error) {
     logError('IPC: get-saved-server failed', error);
@@ -1396,6 +1417,7 @@ ipcMain.handle('clear-saved-server', async () => {
   try {
     clearSavedServer();
     syncScreenVoiceEntitlement(null);
+    await localEngine.sync().catch((error) => logError('[electron-main] Local AI engine did not stop', error));
     return { success: true };
   } catch (error) {
     logError('IPC: clear-saved-server failed', error);
@@ -2124,7 +2146,7 @@ app.whenReady().then(async () => {
         brandFlavor: BRAND_FLAVOR,
         getMainWindow: () => mainWindow,
         getAuthToken: () => authTokenStore.get(),
-        getSavedServer: () => getSavedServer(),
+        getSavedServer: () => localEngine.present(getSavedServer()),
         openClientSettings: openScreenVoiceSettings,
         navigateClient: navigateScreenVoiceClient,
         openExternalUrl: openScreenVoiceResearchUrl,
@@ -2203,6 +2225,7 @@ app.whenReady().then(async () => {
     if (isReachable) {
       logInfo('[electron-main] Saved server is reachable, loading main app...');
       updateLastVerified();
+      await localEngine.sync().catch((error) => logError('[electron-main] Local AI engine did not start', error));
       createWindow(effectiveServer.url);
       return;
     } else {
@@ -2241,6 +2264,9 @@ app.on('window-all-closed', () => {
 app.on('before-quit', async () => {
   // Cleanup operations before quitting
   console.log('[electron-main] Application is quitting...');
+
+  // Stop the local AI engine (SIGTERM is sent synchronously).
+  localEngine.stop().catch((error) => logError('[electron-main] Failed to stop the local AI engine', error));
 
   // Stop the PAC bridge HTTP server
   try {
