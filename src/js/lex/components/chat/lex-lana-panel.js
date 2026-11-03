@@ -421,6 +421,11 @@
         if (!thread.thread_id) thread.thread_id = threadId;
         if (matterId && !thread.matter_id) thread.matter_id = matterId;
         if (opts.matterName && !thread.subtitle) thread.subtitle = opts.matterName;
+        // The conversation's own matter name when the answer carries one (the
+        // offline copy names it), so the header does not say "Add to workspace".
+        if (!thread.subtitle && (thread.matter_name || (thread.scope && thread.scope.matterName))) {
+          thread.subtitle = thread.matter_name || thread.scope.matterName;
+        }
 
         if (thread.matter_id) {
           self._props.matterId = thread.matter_id;
