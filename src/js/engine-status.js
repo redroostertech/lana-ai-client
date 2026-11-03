@@ -74,7 +74,9 @@
     if (health.version && health.version.status === 'unsupported') {
       return { state: 'version_refused', message: health.version.detail || MESSAGES.version_refused };
     }
-    if (!health.chef || health.chef.status !== 'ready') {
+    // reachable_now (phase 10): the engine's link stays ready after its first
+    // handshake, so a server that went away later shows here.
+    if (!health.chef || health.chef.status !== 'ready' || health.chef.reachable_now === false) {
       return { state: 'chef_unavailable', message: MESSAGES.chef_unavailable };
     }
     return { state: 'ok', message: '' };

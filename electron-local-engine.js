@@ -98,6 +98,8 @@ function statusView(state, config, apiBase, backgroundJobs = { enabled: false, s
         origin: health.chef.origin,
         status: health.chef.status,
         reachable: health.chef.reachable,
+        // Phase 10: false when the engine's last request to the server could not connect.
+        reachable_now: health.chef.reachable_now !== false,
         api: health.chef.api,
         min_client: health.chef.min_client,
         next_retry_at: health.chef.next_retry_at
@@ -106,6 +108,16 @@ function statusView(state, config, apiBase, backgroundJobs = { enabled: false, s
       version: health.version || null
     } : null
   };
+}
+
+/**
+ * Phase 10: may the app open while the organization's server cannot be
+ * reached? Only when the local engine is on (it holds the offline copy and
+ * answers from it), this computer has a keychain for the copy's key, and the
+ * person is still signed in. Otherwise the app goes to sign-in as before.
+ */
+function canOpenOffline({ config, offlineKey, signedIn }) {
+  return Boolean(config && config.mode !== 'off' && offlineKey && offlineKey.canEncrypt() && signedIn);
 }
 
 /**
@@ -328,8 +340,9 @@ function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = proces
     prepareQuit,
     attachOsSignals,
     sessionChanged,
+    canOpenOffline: () => canOpenOffline({ config, offlineKey, signedIn: Boolean(getAuthToken()) }),
     control
   };
 }
 
-module.exports = { createLocalEngineHost, statusView, pickLoopbackPort, backgroundJobsEnabled, CHANNELS, ENGINE_MODEL_ENV, pushOfflineKeyFor };
+module.exports = { createLocalEngineHost, statusView, pickLoopbackPort, backgroundJobsEnabled, CHANNELS, ENGINE_MODEL_ENV, pushOfflineKeyFor, canOpenOffline };

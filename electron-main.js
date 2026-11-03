@@ -2252,6 +2252,14 @@ app.whenReady().then(async () => {
       await localEngine.sync().catch((error) => logError('[electron-main] Local AI engine did not start', error));
       createWindow(effectiveServer.url);
       return;
+    } else if (localEngine.canOpenOffline() && hasLiveSession(authTokenStore.get(), Date.now())) {
+      // Phase 10: offline. Keep the saved server and open with the local
+      // engine, which answers the person's own chats and documents from the
+      // offline copy until the server is back.
+      logInfo('[electron-main] Saved server is not reachable; opening with the local engine and its offline copy');
+      await localEngine.sync().catch((error) => logError('[electron-main] Local AI engine did not start', error));
+      createWindow(effectiveServer.url);
+      return;
     } else {
       logInfo('[electron-main] Saved server is not reachable, clearing saved server and showing login...');
       clearSavedServer();

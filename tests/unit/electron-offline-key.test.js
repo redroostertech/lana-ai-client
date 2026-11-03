@@ -71,3 +71,16 @@ describe('the offline key follows the session', () => {
     expect(persistence.peek()).toBeNull();
   });
 });
+
+describe('opening the app while the server cannot be reached', () => {
+  const { canOpenOffline } = require('../../electron-local-engine');
+  const keyStore = (available) => createOfflineKeyStore({ safeStorage: fakeSafeStorage(available), persistence: memoryPersistence() });
+  test.each([
+    [{ mode: 'spawn' }, true, true, true],
+    [{ mode: 'off' }, true, true, false],
+    [{ mode: 'spawn' }, false, true, false],
+    [{ mode: 'spawn' }, true, false, false]
+  ])('engine %j, keychain %s, signed in %s: opens offline %s', (config, keychain, signedIn, expected) => {
+    expect(canOpenOffline({ config, offlineKey: keyStore(keychain), signedIn })).toBe(expected);
+  });
+});

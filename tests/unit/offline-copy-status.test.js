@@ -62,3 +62,12 @@ describe('offline banner', () => {
     expect(engineStatus.withOfflineCopy({ state: 'ok', message: '', visible: false }).state).toBe('ok');
   });
 });
+
+describe('server gone after the engine connected', () => {
+  const status = (reachableNow) => ({ inUse: true, process: 'running', healthy: true, health: { version: { status: 'ok' }, chef: { status: 'ready', reachable_now: reachableNow } } });
+  test('reachable_now false is chef_unavailable; true or absent is ok (control)', () => {
+    expect(engineStatus.describeEngineStatus(status(false)).state).toBe('chef_unavailable');
+    expect(engineStatus.describeEngineStatus(status(true)).state).toBe('ok');
+    expect(engineStatus.describeEngineStatus(status(undefined)).state).toBe('ok');
+  });
+});
