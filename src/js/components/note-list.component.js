@@ -551,6 +551,7 @@ class NoteListComponent {
             <div class="mt-2 flex items-center gap-2 text-xs text-gray-500">
               <span>${relativeDate}</span>
               ${note.ai_generated ? '<span class="px-2 py-0.5 bg-purple-100 text-purple-700 rounded">AI Generated</span>' : ''}
+              ${window.LanaOfflineCopy ? window.LanaOfflineCopy.waitingBadgeHtml(note) : ''}
               ${this.renderFactBadges(note)}
             </div>
             ${this.renderLinkChips(note, false)}

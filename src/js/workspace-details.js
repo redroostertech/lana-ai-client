@@ -5371,6 +5371,7 @@
         '<h5 class="text-sm font-medium text-gray-900 flex-1 line-clamp-2">' + title + '</h5>' +
         externalBadge +
       '</div>' +
+      (window.LanaOfflineCopy ? LanaOfflineCopy.waitingBadgeHtml(task) : '') +
       '<div class="mb-2">' + getPriorityBadge(task.priority) + '</div>' +
       assigneeHtml +
       dueDateHtml +

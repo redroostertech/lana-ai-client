@@ -1194,8 +1194,9 @@
 
   function cellRenderers() {
     return {
-      title: function (val) {
-        return '<div class="my-task-table__title" title="' + esc(val || '') + '">' + esc(val || '') + '</div>';
+      title: function (val, row) {
+        var waiting = window.LanaOfflineCopy ? LanaOfflineCopy.waitingBadgeHtml(row && row._raw) : '';
+        return '<div class="my-task-table__title" title="' + esc(val || '') + '">' + esc(val || '') + '</div>' + waiting;
       },
       workspace_matter: function (val, row) {
         var task = row && row._raw;

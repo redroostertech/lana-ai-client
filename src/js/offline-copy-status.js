@@ -50,6 +50,29 @@
     return parts.length ? parts.join(', ') : 'Nothing yet';
   }
 
+  var FIELD_LABELS = { status: 'Status', priority: 'Priority', due_date: 'Due date', content: 'Text', description: 'Description' };
+
+  function fieldValue(field, value) {
+    if (value === null || value === undefined || value === '') return 'none';
+    if (field === 'due_date') return formatAsOf(value) || String(value);
+    if (field === 'status' || field === 'priority') return String(value).split('_').join(' ');
+    return String(value);
+  }
+
+  /**
+   * Each side of a conflict in the person's own words: the title when they
+   * changed it, otherwise the first field they changed (Status: in progress)
+   * and the server's value of the same field.
+   */
+  function conflictSides(conflict) {
+    var fields = conflict.fields || {};
+    var current = conflict.current || {};
+    if (fields.title) return { mine: fields.title, theirs: current.title || 'The server\'s version' };
+    var field = Object.keys(fields).filter(function (f) { return FIELD_LABELS[f]; })[0];
+    if (!field) return { mine: 'Your offline change', theirs: current.title || 'The server\'s version' };
+    return { mine: FIELD_LABELS[field] + ': ' + fieldValue(field, fields[field]), theirs: FIELD_LABELS[field] + ': ' + fieldValue(field, current[field]) + (current.title ? ' (' + current.title + ')' : '') };
+  }
+
   function conflictTitle(conflict) {
     var fields = conflict.fields || {};
     var current = conflict.current || {};
@@ -88,8 +111,8 @@
           opId: c.op_id,
           title: conflictTitle(c),
           detail: (KIND_LABELS[c.kind] || 'Change') + ': someone changed this on your organization\'s server while you were offline.',
-          mine: c.fields && c.fields.title ? c.fields.title : 'Your offline change',
-          theirs: c.current && c.current.title ? c.current.title : 'The server\'s version'
+          mine: conflictSides(c).mine,
+          theirs: conflictSides(c).theirs
         };
       }),
       refused: (status.refused || []).map(function (r) {
@@ -119,7 +142,18 @@
     };
   }
 
-  var api = { STATES: STATES, asOfLabel: asOfLabel, formatAsOf: formatAsOf, settingsView: settingsView, bannerMessage: bannerMessage, adminView: adminView, countsLine: countsLine, lastStatus: null };
+  /**
+   * The "Waiting to sync" badge for a task or note the person changed while
+   * offline (the engine marks it pending_offline until the organization's
+   * server has it). Empty for anything else.
+   */
+  function waitingBadgeHtml(item) {
+    return item && item.pending_offline === true
+      ? '<lex-badge class="lana-offline-waiting" label="Waiting to sync" color="blue" size="sm"></lex-badge>'
+      : '';
+  }
+
+  var api = { STATES: STATES, asOfLabel: asOfLabel, waitingBadgeHtml: waitingBadgeHtml, formatAsOf: formatAsOf, settingsView: settingsView, bannerMessage: bannerMessage, adminView: adminView, countsLine: countsLine, lastStatus: null };
 
   global.LanaOfflineCopy = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

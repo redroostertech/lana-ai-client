@@ -71,3 +71,20 @@ describe('server gone after the engine connected', () => {
     expect(engineStatus.describeEngineStatus(status(undefined)).state).toBe('ok');
   });
 });
+
+describe('waiting to sync badge', () => {
+  test('a task or note changed offline shows it; Chef\'s rows and anything else do not (control)', () => {
+    expect(offline.waitingBadgeHtml({ id: 't1', pending_offline: true })).toContain('Waiting to sync');
+    expect(offline.waitingBadgeHtml({ id: 't1' })).toBe('');
+    expect(offline.waitingBadgeHtml({ id: 't1', pending_offline: 'yes' })).toBe('');
+    expect(offline.waitingBadgeHtml(null)).toBe('');
+  });
+});
+
+describe('conflict sides', () => {
+  test('a status change shows the status on both sides; a title change shows the titles (control)', () => {
+    const view = (fields, current) => offline.settingsView({ state: 'ready', as_of: null, counts: {}, conflicts: [{ op_id: 'o', kind: 'task.update', fields, current }], refused: [] }).conflicts[0];
+    expect(view({ status: 'in_progress' }, { status: 'pending', title: 'Collect logs (admin)' })).toMatchObject({ mine: 'Status: in progress', theirs: 'Status: pending (Collect logs (admin))' });
+    expect(view({ title: 'Mine' }, { title: 'Theirs' })).toMatchObject({ mine: 'Mine', theirs: 'Theirs' });
+  });
+});
