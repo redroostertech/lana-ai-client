@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/settings-v2.css">
   <link rel="stylesheet" href="css/settings-offline-copy.css">
+  <link rel="stylesheet" href="css/settings-embedding-reembed.css">
   <link rel="stylesheet" href="css/tailwind-output.css">
   <link rel="stylesheet" href="css/companion-bridge-consent.css">
   <script src="js/tailwind-loader.js"></script>
@@ -302,6 +303,25 @@
               </div>
               <lex-toggle id="sv2-offline-copy-admin-toggle" name="offline_copies_enabled" aria-label="Let people keep an offline copy"></lex-toggle>
             </div>
+          </lex-card>
+        </section>
+        <section id="sv2-section-reembed" class="sv2-reembed" aria-busy="true" hidden>
+          <lex-card heading="Search re-indexing for your organization" subtitle="For organization admins">
+            <div class="sv2-reembed-head">
+              <span class="sv2-reembed-name">Documents moved to the current search model</span>
+              <lex-badge id="sv2-reembed-badge" label="Checking" color="gray"></lex-badge>
+            </div>
+            <lex-progress-bar id="sv2-reembed-bar" class="sv2-reembed-bar" value="0" size="sm" hidden></lex-progress-bar>
+            <dl id="sv2-reembed-rows" class="sv2-reembed-rows" hidden></dl>
+            <div id="sv2-reembed-excluded" class="sv2-reembed-callout" hidden>
+              <span id="sv2-reembed-excluded-title" class="sv2-reembed-callout-title"></span>
+              <span id="sv2-reembed-excluded-reason" class="sv2-reembed-callout-detail"></span>
+            </div>
+            <div id="sv2-reembed-error" class="sv2-reembed-callout" data-tone="red" role="status" hidden>
+              <span id="sv2-reembed-error-when" class="sv2-reembed-callout-title"></span>
+              <span id="sv2-reembed-error-label" class="sv2-reembed-callout-detail"></span>
+            </div>
+            <p id="sv2-reembed-note" class="sv2-reembed-note" hidden></p>
           </lex-card>
         </section>
       </div><!-- /sv2-panel-capabilities -->
@@ -667,6 +687,8 @@
   <script src="js/pages/settings-local-engine.js"></script>
   <script src="js/offline-copy-status.js"></script>
   <script src="js/pages/settings-offline-copy.js"></script>
+  <script src="js/embedding-reembed-status.js"></script>
+  <script src="js/pages/settings-embedding-reembed.js"></script>
   <script src="js/pages/settings-v2-nav.js"></script>
 
   <!-- PAC bridge consent handler (Lex modal for token requests) -->
