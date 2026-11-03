@@ -1754,6 +1754,18 @@
   color: var(--lex-status-info-text);
 }
 
+.sv2-local-engine-job[data-parked="true"] {
+  background: var(--lex-status-warning-bg);
+}
+
+.sv2-local-engine-job-link {
+  color: var(--lex-text-link);
+  font-size: var(--lex-body-sm-size);
+  font-weight: var(--lex-weight-medium, 500);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 [data-lex-theme="dark"] .sv2-local-engine-job {
   background: var(--lex-color-gray-800);
 }
@@ -1764,4 +1776,8 @@
 
 [data-lex-theme="dark"] .sv2-local-engine-job[data-moved="true"] .sv2-local-engine-job-detail {
   color: var(--lex-color-info-100, var(--lex-color-info-50));
+}
+
+[data-lex-theme="dark"] .sv2-local-engine-job[data-parked="true"] {
+  background: color-mix(in srgb, var(--lex-color-warning-700) 28%, transparent);
 }

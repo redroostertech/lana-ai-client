@@ -16,6 +16,9 @@
   }
 
   var MOVED_TO_CLOUD = 'This run moved to the cloud';
+  var WAITING_FOR_APPROVAL = 'Waiting for your approval';
+  // The approvals surface this client already has (approvals.js handles approval-detail.html).
+  var APPROVAL_PAGE = 'approval-detail.html';
 
   var KIND_LABELS = {
     document_embedding: 'Document indexing',
@@ -40,9 +43,28 @@
     return KIND_LABELS[kind] || 'Background job';
   }
 
+  /** The link to the approval a parked run waits on, or null when the server did not name one. */
+  function approvalLink(approvalId) {
+    if (typeof approvalId !== 'string' || !approvalId) return null;
+    return { href: APPROVAL_PAGE + '?id=' + encodeURIComponent(approvalId), label: 'Review the approval' };
+  }
+
   /** One history entry from the server, seen from this computer. */
   function historyRow(job, engineId, recentByJob) {
     var local = recentByJob[job.job_id] || null;
+    if (job.where === 'parked' || job.status === 'parked') {
+      // The run gave up its executor until its owner decides; it resumes on its own after the decision.
+      return {
+        id: job.job_id,
+        title: kindLabel(job.kind),
+        detail: WAITING_FOR_APPROVAL + '. It goes on by itself once you decide.',
+        badge: WAITING_FOR_APPROVAL,
+        tone: 'yellow',
+        movedToCloud: false,
+        parked: true,
+        link: approvalLink(job.approval_id)
+      };
+    }
     var here = Boolean(job.engine_id && engineId && job.engine_id === engineId);
     if (job.moved_to_cloud || (local && (local.outcome === 'handed_off' || local.outcome === 'moved_to_cloud'))) {
       var there = job.where === 'ended' ? (job.status === 'completed' ? 'and finished there' : 'and ended there') : 'and is still running there';
@@ -132,7 +154,7 @@
     };
   }
 
-  var api = { MOVED_TO_CLOUD: MOVED_TO_CLOUD, jobsView: jobsView, toggleView: toggleView, kindLabel: kindLabel };
+  var api = { MOVED_TO_CLOUD: MOVED_TO_CLOUD, WAITING_FOR_APPROVAL: WAITING_FOR_APPROVAL, jobsView: jobsView, toggleView: toggleView, kindLabel: kindLabel };
   global.LanaEngineBackgroundJobs = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

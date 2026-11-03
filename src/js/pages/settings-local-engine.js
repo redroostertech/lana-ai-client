@@ -48,6 +48,7 @@
         item.className = 'sv2-local-engine-job';
         item.setAttribute('role', 'listitem');
         item.setAttribute('data-moved', row.movedToCloud ? 'true' : 'false');
+        item.setAttribute('data-parked', row.parked ? 'true' : 'false');
         var copy = document.createElement('div');
         copy.className = 'sv2-local-engine-job-copy';
         var title = document.createElement('span');
@@ -58,6 +59,13 @@
         detail.textContent = row.detail;
         copy.appendChild(title);
         copy.appendChild(detail);
+        if (row.link) {
+          var link = document.createElement('a');
+          link.className = 'sv2-local-engine-job-link';
+          link.href = row.link.href;
+          link.textContent = row.link.label;
+          copy.appendChild(link);
+        }
         var badgeEl = document.createElement('lex-badge');
         badgeEl.setAttribute('label', row.badge);
         badgeEl.setAttribute('color', row.tone);

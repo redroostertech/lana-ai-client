@@ -37,6 +37,21 @@ describe('background jobs view', () => {
     expect(out.rows[0].detail.startsWith(view.MOVED_TO_CLOUD)).toBe(true);
   });
 
+  test.each([
+    ['parked on Railway (it had left this computer)', history({ status: 'parked', placement_state: 'parked', where: 'parked', moved_to_cloud: true, engine_id: ENGINE, approval_id: 'a-1/2' })],
+    ['parked, the server names where only', history({ status: 'queued', where: 'parked', approval_id: 'a-1/2' })]
+  ])('a run waiting for its owner\'s approval: %s', (_label, job) => {
+    const out = view.jobsView({ engine_id: ENGINE, running: [], recent: [], history: [job] }, on);
+    expect(out.rows[0]).toMatchObject({ badge: view.WAITING_FOR_APPROVAL, tone: 'yellow', parked: true, movedToCloud: false });
+    expect(out.rows[0].detail.startsWith(view.WAITING_FOR_APPROVAL)).toBe(true);
+    expect(out.rows[0].link).toEqual({ href: 'approval-detail.html?id=a-1%2F2', label: 'Review the approval' });
+  });
+
+  test('a parked run without an approval id has no link (control: the waiting label stays)', () => {
+    const out = view.jobsView({ engine_id: ENGINE, running: [], recent: [], history: [history({ status: 'parked', where: 'parked', approval_id: null })] }, on);
+    expect(out.rows[0]).toMatchObject({ badge: view.WAITING_FOR_APPROVAL, link: null });
+  });
+
   test('a lease lost offline is shown as moved even before the server lists the cloud attempt', () => {
     const out = view.jobsView({ engine_id: ENGINE, running: [], recent: [{ job_id: 'j1', outcome: 'moved_to_cloud' }], history: [history({ status: 'claimed', where: 'cloud', engine_id: ENGINE })] }, on);
     expect(out.rows[0].movedToCloud).toBe(true);
