@@ -1,0 +1,132 @@
+/* Settings V2: Offline copy cards (local AI engine plan, phase 10). */
+
+.sv2-offline-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.sv2-offline-copy[hidden] {
+  display: none;
+}
+
+.sv2-offline-copy-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sv2-offline-copy-message,
+.sv2-offline-copy-note,
+.sv2-offline-copy-option-description,
+.sv2-offline-copy-item-detail {
+  margin: 0;
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-sm-size);
+  line-height: var(--lex-body-sm-height);
+}
+
+.sv2-offline-copy-message {
+  margin-top: 12px;
+  padding: 8px 12px;
+  border-radius: var(--lex-radius-md);
+  background: var(--lex-status-info-bg);
+  color: var(--lex-status-info-text);
+}
+
+.sv2-offline-copy-message[data-tone="red"] {
+  background: var(--lex-status-danger-bg);
+  color: var(--lex-status-danger-text);
+}
+
+.sv2-offline-copy-message[hidden],
+.sv2-offline-copy-list[hidden] {
+  display: none;
+}
+
+.sv2-offline-copy-rows {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 24px;
+  margin: 16px 0 0;
+}
+
+.sv2-offline-copy-rows dt {
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-sm-size);
+}
+
+.sv2-offline-copy-rows dd {
+  margin: 0;
+  color: var(--lex-text-primary);
+  font-size: var(--lex-body-sm-size);
+}
+
+.sv2-offline-copy-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--lex-border-subtle);
+}
+
+.sv2-offline-copy-list-head,
+.sv2-offline-copy-option-name,
+.sv2-offline-copy-item-title {
+  margin: 0;
+  color: var(--lex-text-primary);
+  font-size: var(--lex-body-sm-size);
+  font-weight: 600;
+}
+
+.sv2-offline-copy-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: var(--lex-radius-md);
+  background: var(--lex-color-gray-50);
+}
+
+.sv2-offline-copy-item-copy,
+.sv2-offline-copy-option-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sv2-offline-copy-item-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.sv2-offline-copy-note {
+  margin-top: 16px;
+}
+
+.sv2-offline-copy-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+[data-lex-theme="dark"] .sv2-offline-copy-message {
+  background: var(--lex-color-info-700);
+  color: var(--lex-color-info-50);
+}
+
+[data-lex-theme="dark"] .sv2-offline-copy-message[data-tone="red"] {
+  background: var(--lex-color-danger-700);
+  color: var(--lex-color-danger-50);
+}
+
+/* Dark: the Settings cards stay light surfaces (lex-card has no dark theme on
+   this page), so the items inside them keep the card's colors. */

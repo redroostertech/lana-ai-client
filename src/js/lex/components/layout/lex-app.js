@@ -1212,7 +1212,9 @@
       if (!base) return;
       Promise.all([
         loadAssetOnce('link', base.replace(/\/js\/$/, '/css/') + 'engine-status.css'),
-        window.LanaEngineStatus ? Promise.resolve() : loadAssetOnce('script', base + 'engine-status.js')
+        window.LanaEngineStatus ? Promise.resolve() : loadAssetOnce('script', base + 'engine-status.js'),
+        // Phase 10: the offline banner's words and the answers' "as of" label.
+        window.LanaOfflineCopy ? Promise.resolve() : loadAssetOnce('script', base + 'offline-copy-status.js')
       ]).then(function () {
         if (window.LanaEngineStatus) window.LanaEngineStatus.mount(engineApi);
       }).catch(function (error) {

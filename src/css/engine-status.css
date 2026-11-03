@@ -68,6 +68,17 @@
   background: var(--lex-status-danger);
 }
 
+/* Phase 10: offline, answering from this computer's offline copy. */
+.lana-engine-banner[data-state="offline_copy"] {
+  background: var(--lex-status-info-bg);
+  color: var(--lex-status-info-text);
+  border-bottom-color: var(--lex-color-info-100);
+}
+
+.lana-engine-banner[data-state="offline_copy"] .lana-engine-banner__indicator {
+  background: var(--lex-status-info);
+}
+
 @keyframes lana-engine-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
@@ -106,4 +117,10 @@
    banner (which probes through the engine) stays out of the way. */
 html[data-lana-engine-banner] .lex-app-offline-banner {
   display: none;
+}
+
+[data-lex-theme="dark"] .lana-engine-banner[data-state="offline_copy"] {
+  background: var(--lex-color-info-700);
+  color: var(--lex-color-info-50);
+  border-bottom-color: var(--lex-color-info-600);
 }

@@ -172,6 +172,15 @@ describe('SSEChatSource contract', () => {
     expect(source._mapEvent('tool_start', { tool_name: 'search' })).toEqual(expect.objectContaining({ callId: null, iteration: null, startedAt: null }));
   });
 
+  test('phase 10: an answer from the offline copy carries its as-of time on the label event and on done', () => {
+    const { Source } = loadSource(jest.fn(), { api: canonicalApi() });
+    const source = new Source();
+    expect(source._mapEvent('offline_copy', { as_of: '2026-11-02T20:04:00.000Z', source: 'offline_copy' })).toEqual({ type: 'offline_copy', asOf: '2026-11-02T20:04:00.000Z' });
+    expect(source._mapEvent('done', { message_id: 'm1', thread_id: 't1', offline_copy: { as_of: '2026-11-02T20:04:00.000Z', queued: true } })).toEqual(expect.objectContaining({ type: 'done', messageId: 'm1', offlineAsOf: '2026-11-02T20:04:00.000Z' }));
+    // Control: an online answer has no offline label.
+    expect(source._mapEvent('done', { message_id: 'm2', thread_id: 't1' }).offlineAsOf).toBeNull();
+  });
+
   test('creates a canonical conversation before first-message streaming', async () => {
     const fetchMock = jest.fn()
       .mockResolvedValueOnce(responseFromChunks([

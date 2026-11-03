@@ -109,6 +109,21 @@ function statusView(state, config, apiBase, backgroundJobs = { enabled: false, s
 }
 
 /**
+ * Phase 10: hand the engine the offline copy key for a signed-in session, or
+ * close the copy and remove the key on sign-out.
+ * @returns {Promise|null}
+ */
+function pushOfflineKeyFor({ token, offlineKey, control }) {
+  if (!offlineKey || !control || typeof control.setOfflineKey !== 'function') {return null;}
+  if (!token) {
+    offlineKey.clear();
+    return control.setOfflineKey(null);
+  }
+  const key = offlineKey.get();
+  return key ? control.setOfflineKey(key.toString('base64')) : null;
+}
+
+/**
  * @param {Object} deps
  * @param {Object} deps.ipcMain
  * @param {Object} deps.app - for isPackaged, getPath, execPath
@@ -117,8 +132,9 @@ function statusView(state, config, apiBase, backgroundJobs = { enabled: false, s
  * @param {Object} [deps.env]
  * @param {Object} deps.log - { info, warn, error }
  * @param {Function} [deps.getAuthToken] - () => the signed-in person's session token or null
+ * @param {Object} [deps.offlineKey] - electron-offline-key.js store (phase 10); none means no offline copy
  */
-function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = process.env, log, getAuthToken = () => null }) {
+function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = process.env, log, getAuthToken = () => null, offlineKey = null }) {
   const cwd = path.join(app.getPath('userData'), 'local-engine');
   try { fs.mkdirSync(cwd, { recursive: true }); } catch (_error) { /* spawn reports it */ }
 
@@ -143,6 +159,8 @@ function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = proces
 
   function engineEnv() {
     const extra = { LANA_ENGINE_ID: engineId() };
+    // Phase 10: the engine's offline copy folder, in this app's own data folder.
+    if (offlineKey) {extra.LANA_ENGINE_OFFLINE_DIR = path.join(cwd, 'offline');}
     if (!env.LANA_ENGINE_EMBEDDING_MODEL_FILE) {Object.assign(extra, catalogEmbeddingEnv);}
     for (const name of ENGINE_MODEL_ENV) {
       if (typeof env[name] === 'string' && env[name]) {extra[name] = env[name];}
@@ -199,8 +217,20 @@ function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = proces
     pushedFor = key;
     control.sendSignals(signalsPayload())
       .then(() => control.setSession(token))
-      .then((answer) => { if (!answer.ok) {pushedFor = null;} })
+      .then((answer) => {
+        if (!answer.ok) {pushedFor = null;}
+        return pushOfflineKey(token);
+      })
       .catch(() => { pushedFor = null; });
+  }
+
+  /**
+   * Phase 10: the offline copy key follows the session. Signed in: the key from
+   * the keychain; signed out: the engine closes (and has wiped) the copy and
+   * the key is removed, so nothing left on disk can be opened.
+   */
+  function pushOfflineKey(token) {
+    return pushOfflineKeyFor({ token, offlineKey, control });
   }
 
   /** Sign-in, sign-out or a user switch in this app. */
@@ -302,4 +332,4 @@ function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = proces
   };
 }
 
-module.exports = { createLocalEngineHost, statusView, pickLoopbackPort, backgroundJobsEnabled, CHANNELS, ENGINE_MODEL_ENV };
+module.exports = { createLocalEngineHost, statusView, pickLoopbackPort, backgroundJobsEnabled, CHANNELS, ENGINE_MODEL_ENV, pushOfflineKeyFor };

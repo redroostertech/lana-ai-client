@@ -69,7 +69,9 @@ function createEngineControlClient({ fetch, getBaseUrl, getSecret, timeoutMs = 5
     setSession: (sessionToken) => request('PUT', 'session', { session_token: sessionToken || null }),
     // A sleep or quit waits for the engine's handoff (it gives each run up to 10 s).
     sendSignals: (signals, { waitMs } = {}) => request('PUT', 'signals', signals, waitMs || timeoutMs),
-    backgroundJobs: () => request('GET', 'background-jobs')
+    backgroundJobs: () => request('GET', 'background-jobs'),
+    // Phase 10: the offline copy key (base64 of 32 bytes), or null to close the copy.
+    setOfflineKey: (keyBase64) => request('PUT', 'offline-key', { key: keyBase64 || null })
   };
 }
 

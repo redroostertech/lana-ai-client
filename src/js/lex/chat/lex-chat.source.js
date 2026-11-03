@@ -655,6 +655,10 @@
           if (data.content) return { type: 'content', text: data.content };
           return null;
 
+        // Phase 10: the answer comes from the offline copy on this computer.
+        case 'offline_copy':
+          return { type: 'offline_copy', asOf: data.as_of || null };
+
         case 'citations':
           return { type: 'citations', citations: data.citations || data.sources || [] };
 
@@ -852,7 +856,8 @@
             tokenCount: data.token_count || data.total_tokens || null,
             processingTimeMs: data.processing_time_ms || data.generation_time_ms || null,
             matterId: data.matter_id || null,
-            references: data.references || []
+            references: data.references || [],
+            offlineAsOf: data.offline_copy && data.offline_copy.as_of ? data.offline_copy.as_of : null
           };
 
         case 'block_hints':

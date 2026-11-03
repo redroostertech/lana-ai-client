@@ -225,13 +225,45 @@
    * Mount the banner on this page and follow the main process's engine state.
    * @param {Object} engineApi - window.electronAPI.engine
    */
+  /**
+   * Phase 10: while the organization's server cannot be reached, say that
+   * LANA answers from this computer's offline copy (and as of when), from the
+   * engine's GET /api/engine/v1/offline/status. Without a copy the banner
+   * keeps its own words.
+   */
+  var OFFLINE_STATUS_PATH = '/api/engine/v1/offline/status';
+  var OFFLINE_REFRESH_MS = 30000;
+  var offlineFetchedAt = 0;
+
+  function withOfflineCopy(view) {
+    var offline = global.LanaOfflineCopy;
+    if (view.state !== 'chef_unavailable' || !offline) return view;
+    var sentence = offline.bannerMessage(offline.lastStatus);
+    return sentence ? { state: 'offline_copy', message: sentence, visible: true } : view;
+  }
+
+  function refreshOfflineCopy(done) {
+    var offline = global.LanaOfflineCopy;
+    var client = global.api;
+    if (!offline || !client || typeof client.get !== 'function') return;
+    if (Date.now() - offlineFetchedAt < OFFLINE_REFRESH_MS) return;
+    offlineFetchedAt = Date.now();
+    client.get(OFFLINE_STATUS_PATH).then(function (status) {
+      offline.lastStatus = status;
+      done();
+    }).catch(function () {});
+  }
+
   function mount(engineApi) {
     if (controller || !engineApi || typeof document === 'undefined') return controller;
     var doc = document;
     controller = createController({
       render: function (view) {
         if (!doc.body) return;
-        renderBanner(doc, view);
+        renderBanner(doc, withOfflineCopy(view));
+        if (view.state === 'chef_unavailable') {
+          refreshOfflineCopy(function () { renderBanner(doc, withOfflineCopy(view)); });
+        }
       }
     });
     api.reportProblem = controller.reportProblem;
@@ -252,6 +284,7 @@
     describeEngineStatus: describeEngineStatus,
     settingsView: settingsView,
     createController: createController,
+    withOfflineCopy: withOfflineCopy,
     mount: mount,
     // Before mount (or outside Electron): classify only, nothing drawn.
     reportProblem: classifyProblem

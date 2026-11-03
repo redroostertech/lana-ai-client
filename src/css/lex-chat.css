@@ -633,3 +633,9 @@
   font-size: var(--lex-form-help-size);
   color: var(--lex-status-warning-text);
 }
+
+/* Phase 10: an answer from this computer's offline copy, with its as-of time. */
+.lex-chat-msg-offline {
+  display: inline-flex;
+  margin-bottom: var(--lex-space-2, 8px);
+}

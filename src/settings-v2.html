@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="css/lex-tokens.css">
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/settings-v2.css">
+  <link rel="stylesheet" href="css/settings-offline-copy.css">
   <link rel="stylesheet" href="css/tailwind-output.css">
   <link rel="stylesheet" href="css/companion-bridge-consent.css">
   <script src="js/tailwind-loader.js"></script>
@@ -279,6 +280,28 @@
               <p id="sv2-local-engine-jobs-empty" class="sv2-local-engine-note" hidden></p>
             </div>
             <p id="sv2-local-engine-note" class="sv2-local-engine-note"></p>
+          </lex-card>
+        </section>
+        <section id="sv2-section-offline-copy" class="sv2-offline-copy" aria-busy="true" hidden>
+          <lex-card heading="Offline copy" subtitle="Your own matters, tasks, contacts, notes, recent chats and documents, encrypted on this computer">
+            <div class="sv2-offline-copy-head">
+              <lex-badge id="sv2-offline-copy-badge" label="Checking" color="gray"></lex-badge>
+              <lex-btn id="sv2-offline-copy-sync" variant="ghost" size="sm">Sync now</lex-btn>
+            </div>
+            <p id="sv2-offline-copy-message" class="sv2-offline-copy-message" role="status" hidden></p>
+            <dl id="sv2-offline-copy-rows" class="sv2-offline-copy-rows"></dl>
+            <div id="sv2-offline-copy-conflicts" class="sv2-offline-copy-list" role="list" aria-label="Changes to review" hidden></div>
+            <div id="sv2-offline-copy-refused" class="sv2-offline-copy-list" role="list" aria-label="Changes not saved" hidden></div>
+            <p class="sv2-offline-copy-note">Answers from the offline copy are labelled with the time of the last sync. Changes you make offline sync when you are back online; chat cannot make changes while offline.</p>
+          </lex-card>
+          <lex-card id="sv2-offline-copy-admin" heading="Offline copies for your organization" subtitle="For organization admins" hidden>
+            <div class="sv2-offline-copy-option">
+              <div class="sv2-offline-copy-option-copy">
+                <span class="sv2-offline-copy-option-name">Let people keep an offline copy</span>
+                <span id="sv2-offline-copy-admin-description" class="sv2-offline-copy-option-description"></span>
+              </div>
+              <lex-toggle id="sv2-offline-copy-admin-toggle" name="offline_copies_enabled" aria-label="Let people keep an offline copy"></lex-toggle>
+            </div>
           </lex-card>
         </section>
       </div><!-- /sv2-panel-capabilities -->
@@ -642,6 +665,8 @@
   <script src="js/engine-status.js"></script>
   <script src="js/engine-background-jobs.js"></script>
   <script src="js/pages/settings-local-engine.js"></script>
+  <script src="js/offline-copy-status.js"></script>
+  <script src="js/pages/settings-offline-copy.js"></script>
   <script src="js/pages/settings-v2-nav.js"></script>
 
   <!-- PAC bridge consent handler (Lex modal for token requests) -->

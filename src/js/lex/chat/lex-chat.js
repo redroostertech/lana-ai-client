@@ -1832,6 +1832,11 @@
           });
           break;
 
+        case 'offline_copy':
+          // Phase 10: answered from this computer's offline copy; labelled on done.
+          this._offlineAsOf = event.asOf || null;
+          break;
+
         case 'content': {
           // First content chunk — hide activity, start streaming message
           if (!responseStarted && this._streamingContent === '') {
@@ -2063,9 +2068,11 @@
               citations: this._citations.length > 0 ? this._citations : undefined,
               references: this._references.length > 0 ? this._references : undefined,
               artifacts: this._artifacts.length > 0 ? this._artifacts : undefined,
-              grounding: this._groundingContext || undefined
+              grounding: this._groundingContext || undefined,
+              offlineAsOf: event.offlineAsOf || this._offlineAsOf || undefined
             });
           }
+          this._offlineAsOf = null;
 
           // Capture conversation ID from done event (fallback)
           if (event.threadId && !this.conversationId) {

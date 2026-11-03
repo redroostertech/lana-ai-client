@@ -480,8 +480,17 @@ const authTokenPersistence = {
   remove: () => store.delete(AUTH_TOKEN_KEY)
 };
 
+// Phase 10: the offline copy key, as safeStorage ciphertext only (electron-offline-key.js).
+const OFFLINE_KEY_KEY = 'offlineCopyKeyEncrypted';
+const offlineKeyPersistence = {
+  read: () => store.get(OFFLINE_KEY_KEY) || null,
+  write: (ciphertext) => store.set(OFFLINE_KEY_KEY, ciphertext),
+  remove: () => store.delete(OFFLINE_KEY_KEY)
+};
+
 module.exports = {
   authTokenPersistence,
+  offlineKeyPersistence,
   saveServerConnection,
   getSavedServer,
   updateLastVerified,

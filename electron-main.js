@@ -86,12 +86,15 @@ if (process.env.NODE_ENV === 'development') {
 
 // Import thin client modules
 const { refreshHostedDiscovery, verifyServer } = require('./electron-discovery');
-const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified, saveBrainchildLink, getBrainchildLink, clearBrainchildLink, setBrainchildAutoBindDisabled, isBrainchildAutoBindDisabled, authTokenPersistence, getLocalEnginePreferences, updateLocalEnginePreferences } = require('./electron-storage');
+const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified, saveBrainchildLink, getBrainchildLink, clearBrainchildLink, setBrainchildAutoBindDisabled, isBrainchildAutoBindDisabled, authTokenPersistence, offlineKeyPersistence, getLocalEnginePreferences, updateLocalEnginePreferences } = require('./electron-storage');
 const { createLocalEngineHost } = require('./electron-local-engine');
 const { createTokenStore, registerTokenIpc, hasLiveSession } = require('./electron-token-store');
 
 // The login token: OS-keychain encrypted at rest, memory only when no keychain.
 const authTokenStore = createTokenStore({ safeStorage, persistence: authTokenPersistence });
+// Phase 10: the offline copy key, OS-keychain encrypted; none without a keychain.
+const { createOfflineKeyStore } = require('./electron-offline-key');
+const offlineKeyStore = createOfflineKeyStore({ safeStorage, persistence: offlineKeyPersistence });
 const { checkForUpdates, downloadAndInstallUpdate, showOptionalUpdateDialog, showForceUpdateDialog, shouldCheckForUpdates, configureAutoUpdater } = require('./electron-updater-custom');
 const { logInfo, logError, logWarn, exportLogs, getLogFilePath } = require('./electron-logger');
 
@@ -106,7 +109,8 @@ const localEngine = createLocalEngineHost({
   getWindows: () => BrowserWindow.getAllWindows(),
   log: { info: logInfo, warn: logWarn, error: (message) => logError(message) },
   // Phase 8d: the engine runs this person's own background jobs with their own session.
-  getAuthToken: () => authTokenStore.get()
+  getAuthToken: () => authTokenStore.get(),
+  offlineKey: offlineKeyStore
 });
 localEngine.registerIpc();
 const { createOsSignals } = require('./electron-os-signals');

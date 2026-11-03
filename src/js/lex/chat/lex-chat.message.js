@@ -719,6 +719,7 @@
 
     updated() {
       this._contentEl = this.querySelector('[data-content-body]');
+      if (this._props.offlineAsOf) this._renderOfflineLabel(this._props.offlineAsOf);
 
       this.delegate('click', '[data-chat-retry]', (e, target) => {
         e.preventDefault();
@@ -923,6 +924,25 @@
      * Finalize the message after streaming completes.
      * @param {Object} metadata - { messageId, citations, artifacts, timestamp }
      */
+    /**
+     * Phase 10: "From your offline copy as of <time>" above an answer the
+     * local engine gave from this computer's offline copy.
+     */
+    _renderOfflineLabel(asOf) {
+      if (this.querySelector('.lex-chat-msg-offline')) return;
+      var offline = global.LanaOfflineCopy;
+      var label = offline && typeof offline.asOfLabel === 'function'
+        ? offline.asOfLabel(asOf)
+        : 'From your offline copy as of ' + new Date(asOf).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+      var badge = document.createElement('lex-badge');
+      badge.className = 'lex-chat-msg-offline';
+      badge.setAttribute('color', 'blue');
+      badge.setAttribute('label', label);
+      var anchor = this._contentEl || this.firstChild;
+      if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(badge, anchor);
+      else this.appendChild(badge);
+    }
+
     finalize(metadata = {}) {
       this.streaming = false;
       if (metadata.messageId) this._props.messageId = metadata.messageId;
@@ -936,6 +956,10 @@
       if (metadata.artifacts) this._props.artifacts = metadata.artifacts;
       if (metadata.duration != null) this._props.duration = metadata.duration;
       if (metadata.tokenCount != null) this._props.tokenCount = metadata.tokenCount;
+      if (metadata.offlineAsOf) {
+        this._props.offlineAsOf = metadata.offlineAsOf;
+        this._renderOfflineLabel(metadata.offlineAsOf);
+      }
 
       // Update displayed timestamp (with duration + token count if available)
       const tsEl = this.querySelector('.lex-chat-msg-timestamp');
