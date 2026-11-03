@@ -53,9 +53,16 @@
   --lex-chat-accent:         var(--lex-bg-accent);
   --lex-chat-accent-soft:    var(--lex-bg-accent-soft);
   --lex-chat-accent-text:    var(--lex-text-on-accent);
+
+  /* ── Links and citation chips ─────────────────────────────── */
+  --lex-chat-link:           var(--lex-color-info-600);
+  --lex-chat-chip-bg:        var(--lex-color-info-50);
 }
 
 [data-lex-theme="dark"] {
+  --lex-chat-link:           var(--lex-color-info-100);
+  --lex-chat-chip-bg:        var(--lex-chat-dark-700);
+
   --lex-chat-bg:             var(--lex-chat-dark-900);
   --lex-chat-bg-surface:     var(--lex-chat-dark-800);
   --lex-chat-bg-elevated:    var(--lex-chat-dark-700);
@@ -638,4 +645,53 @@
 .lex-chat-msg-offline {
   display: inline-flex;
   margin-bottom: var(--lex-space-2, 8px);
+}
+
+/* ── Dark answers (phase 10c) ───────────────────────────────────
+   The answer formatter (lex-chat.format.js) emits Tailwind colour
+   utilities picked for a light surface (text-gray-800 paragraphs, list
+   items and table cells, bg-gray-50 table rows, bg-gray-200 inline code,
+   indigo and blue citation links). On the dark chat theme they map to the
+   chat tokens, so answers, lists, tables, quotes, inline code and citation
+   links stay readable. Fenced code blocks already use dark colours. */
+[data-lex-theme="dark"] .lex-chat-narrative .text-gray-900,
+[data-lex-theme="dark"] .lex-chat-narrative .text-gray-800,
+[data-lex-theme="dark"] .lex-chat-narrative .text-gray-700 {
+  color: var(--lex-chat-text);
+}
+
+[data-lex-theme="dark"] .lex-chat-narrative .text-gray-600,
+[data-lex-theme="dark"] .lex-chat-narrative .text-gray-400 {
+  color: var(--lex-chat-text-muted);
+}
+
+[data-lex-theme="dark"] .lex-chat-narrative .bg-gray-50,
+[data-lex-theme="dark"] .lex-chat-narrative .hover\:bg-gray-50:hover {
+  background-color: var(--lex-chat-bg-surface);
+}
+
+[data-lex-theme="dark"] .lex-chat-narrative .bg-gray-200 {
+  background-color: var(--lex-chat-bg-elevated);
+  color: var(--lex-chat-text);
+}
+
+[data-lex-theme="dark"] .lex-chat-narrative .border-gray-100,
+[data-lex-theme="dark"] .lex-chat-narrative .border-gray-200,
+[data-lex-theme="dark"] .lex-chat-narrative .border-gray-300 {
+  border-color: var(--lex-chat-border);
+}
+
+[data-lex-theme="dark"] .lex-chat-narrative .text-indigo-600,
+[data-lex-theme="dark"] .lex-chat-narrative .text-indigo-800,
+[data-lex-theme="dark"] .lex-chat-narrative .hover\:text-indigo-800:hover,
+[data-lex-theme="dark"] .lex-chat-narrative .text-blue-600,
+[data-lex-theme="dark"] .lex-chat-narrative .text-blue-800,
+[data-lex-theme="dark"] .lex-chat-narrative .hover\:text-blue-800:hover {
+  color: var(--lex-chat-link);
+}
+
+[data-lex-theme="dark"] .lex-chat-narrative .bg-indigo-100,
+[data-lex-theme="dark"] .lex-chat-narrative .bg-blue-100,
+[data-lex-theme="dark"] .lex-chat-narrative .hover\:bg-blue-200:hover {
+  background-color: var(--lex-chat-chip-bg);
 }
