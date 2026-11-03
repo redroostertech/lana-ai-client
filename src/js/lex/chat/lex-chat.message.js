@@ -609,7 +609,8 @@
         artifacts:  { type: Array, default: [] },
         attachments: { type: Array, default: [] },
         grounding:   { type: Object, default: null },
-        recovery:    { type: Object, default: null }
+        recovery:    { type: Object, default: null },
+        offlineDrafts: { type: Array, default: null }
       };
     }
 
@@ -719,8 +720,9 @@
 
     updated() {
       this._contentEl = this.querySelector('[data-content-body]');
-      if (this._props.offlineAsOf) this._renderOfflineLabel(this._props.offlineAsOf);
-      if (this._props.offlineDrafts) this._renderOfflineDrafts(this._props.offlineDrafts);
+      const props = this._props || {};
+      if (props.offlineAsOf) this._renderOfflineLabel(props.offlineAsOf);
+      if (props.offlineDrafts) this._renderOfflineDrafts(props.offlineDrafts);
 
       this.delegate('click', '[data-chat-retry]', (e, target) => {
         e.preventDefault();

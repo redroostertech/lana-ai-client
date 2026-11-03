@@ -197,6 +197,8 @@
       if (meta.recovery) msg.recovery = meta.recovery;
       if (meta.duration != null) msg.duration = meta.duration;
       if (meta.tokenCount != null) msg.tokenCount = meta.tokenCount;
+      // Phase 10d: the changes an offline answer drafted, shown again on reload.
+      if (meta.offlineDrafts) msg.offlineDrafts = meta.offlineDrafts;
 
       this._container.appendChild(msg);
       this._messages.push(msg);
