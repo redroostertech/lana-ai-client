@@ -26,7 +26,7 @@ const APP_ERRORS = 'src/shared/errors/app.error.js';
 const VALIDATION = 'src/shared/utils/validation.utils.js';
 const USAGE_SERVICE = '@agents/src/services/agent-stats.service.js';
 const MATTER_IDENTITY = '@agents/src/repositories/matter-identity.repository.js';
-const USAGE_MODELS = '@agents/src/routes/agents.models.js';
+const USAGE_MODELS = '@agents/src/routes/agents-request.contract.js';
 
 const checkout = findBackend([RUN_MODELS, LIMITS_SERVICE, LIMITS_REPOSITORY, ERROR_HANDLER, VALIDATION, USAGE_SERVICE, MATTER_IDENTITY, USAGE_MODELS]);
 const backend = checkout.require;
