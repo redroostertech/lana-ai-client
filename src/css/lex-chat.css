@@ -647,6 +647,38 @@
   margin-bottom: var(--lex-space-2, 8px);
 }
 
+/* Phase 10d: a change the offline answer drafted (made only after the
+   organization's server checks it, often with the person's approval). */
+.lex-chat-msg-drafts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-2, 8px);
+  margin-top: var(--lex-space-3, 12px);
+}
+
+.lex-chat-msg-draft {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--lex-space-1, 4px);
+  padding: var(--lex-space-3, 12px);
+  border: 1px dashed var(--lex-chat-border);
+  border-radius: var(--lex-radius-lg, 8px);
+  background: var(--lex-chat-bg-elevated);
+  color: var(--lex-chat-text);
+}
+
+.lex-chat-msg-draft__summary {
+  font-weight: 600;
+  color: var(--lex-chat-text);
+}
+
+.lex-chat-msg-draft__detail {
+  margin: 0;
+  font-size: var(--lex-form-help-size, 0.8125rem);
+  color: var(--lex-chat-text-muted);
+}
+
 /* ── Dark answers (phase 10c) ───────────────────────────────────
    The answer formatter (lex-chat.format.js) emits Tailwind colour
    utilities picked for a light surface (text-gray-800 paragraphs, list

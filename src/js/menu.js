@@ -1037,7 +1037,7 @@ class MenuSystem {
         var doLogout = function () {
           if (window.api && typeof window.api.logout === 'function') {
             window.api.logout()
-              .then(function () { window.location.href = resolveHref('/login.html'); })
+              .then(function (result) { if (!(result && result.cancelled)) window.location.href = resolveHref('/login.html'); })
               .catch(function () { window.location.href = resolveHref('/login.html'); });
           } else {
             window.location.href = resolveHref('/login.html');

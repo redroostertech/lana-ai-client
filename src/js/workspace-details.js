@@ -666,6 +666,7 @@
       '<span class="opacity-40">&middot;</span>' +
       '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ' + statusColor + '">' + escapeHtml(statusLabel) + '</span>' +
       (editText ? '<span class="opacity-40">&middot;</span><span class="text-xs">' + escapeHtml(editText) + '</span>' : '');
+    if (window.LanaOfflineKeep) LanaOfflineKeep.mount(metaRow, matter.matter_id, api);
   }
 
 

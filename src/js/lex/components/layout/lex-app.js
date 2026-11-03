@@ -1163,7 +1163,7 @@
       var loginHref = resolveLoginHref();
       if (window.api && typeof window.api.logout === 'function') {
         window.api.logout()
-          .then(function () { window.location.href = loginHref; })
+          .then(function (result) { if (!(result && result.cancelled)) window.location.href = loginHref; })
           .catch(function () { window.location.href = loginHref; });
       } else {
         window.location.href = loginHref;

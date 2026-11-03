@@ -88,3 +88,51 @@ describe('conflict sides', () => {
     expect(view({ title: 'Mine' }, { title: 'Theirs' })).toMatchObject({ mine: 'Mine', theirs: 'Theirs' });
   });
 });
+
+describe('signing out with changes not yet synced', () => {
+  const client = (first, afterSync) => {
+    const calls = [];
+    return {
+      calls,
+      get: async (p) => { calls.push(`GET ${p}`); return first; },
+      post: async (p) => { calls.push(`POST ${p}`); if (afterSync instanceof Error) {throw afterSync;} return afterSync; }
+    };
+  };
+  test('no waiting changes: sign out at once, nothing sent, no question (control)', async () => {
+    const c = client({ queued: 0 });
+    const ask = jest.fn();
+    await expect(offline.beforeSignOut(c, ask)).resolves.toBe(true);
+    expect(c.calls).toEqual(['GET /api/engine/v1/offline/status']);
+    expect(ask).not.toHaveBeenCalled();
+  });
+  test('online: the waiting changes are sent first, then sign out without a question', async () => {
+    const c = client({ queued: 3 }, { queued: 0 });
+    const ask = jest.fn();
+    await expect(offline.beforeSignOut(c, ask)).resolves.toBe(true);
+    expect(c.calls).toEqual(['GET /api/engine/v1/offline/status', 'POST /api/engine/v1/offline/sync']);
+    expect(ask).not.toHaveBeenCalled();
+  });
+  test.each([[true], [false]])('offline: the person is warned and their answer (%s) decides', async (answer) => {
+    const c = client({ queued: 3 }, { queued: 3 });
+    const ask = jest.fn(async () => answer);
+    await expect(offline.beforeSignOut(c, ask)).resolves.toBe(answer);
+    expect(ask.mock.calls[0][1]).toBe('You have 3 changes not yet synced. Signing out will discard them.');
+  });
+  test('no way to ask: changes are never discarded silently', async () => {
+    await expect(offline.beforeSignOut(client({ queued: 1 }, new Error('offline')), null)).resolves.toBe(false);
+  });
+});
+
+describe('offline draft card', () => {
+  test.each([
+    [{ summary: 'New task: Call Rosa', needs_approval: true }, 'waiting', "Waiting until you're back online", /approve/],
+    [{ summary: 'x', outcome: 'approval' }, 'approval', 'Waiting for your approval', /approvals/],
+    [{ summary: 'x', outcome: 'done' }, 'done', 'Done when you were back online', /made the change/],
+    [{ summary: 'x', outcome: 'refused' }, 'refused', 'Not made', /nothing changed/],
+    [{ summary: 'x', outcome: 'something new' }, 'waiting', "Waiting until you're back online", /Nothing has changed yet/]
+  ])('%j shows %s', (draft, state, label, detail) => {
+    const view = offline.draftCardView(draft);
+    expect(view).toMatchObject({ state, label });
+    expect(view.detail).toMatch(detail);
+  });
+});

@@ -1759,7 +1759,19 @@ class ApiClient {
     return result;
   }
 
+  /**
+   * Sign out. On the desktop app with an offline copy, changes still waiting
+   * to sync are sent first; if they cannot be (offline), the person is asked
+   * before they are discarded (LanaOfflineCopy.beforeSignOut).
+   * @returns {Promise<{ cancelled: boolean }>} cancelled when the person chose to stay signed in
+   */
   async logout() {
+    var offline = typeof window !== 'undefined' ? window.LanaOfflineCopy : null;
+    if (!this.demoMode && offline && typeof offline.beforeSignOut === 'function') {
+      var modal = window.Lex && window.Lex.Modal;
+      var proceed = await offline.beforeSignOut(this, modal && typeof modal.confirmAsync === 'function' ? modal.confirmAsync.bind(modal) : null);
+      if (!proceed) return { cancelled: true };
+    }
     try {
       if (!this.demoMode) {
         await this.post('/api/v1/auth/logout');
@@ -1774,6 +1786,7 @@ class ApiClient {
       window.lanaAuthToken?.clear();
       localStorage.removeItem('user');
     }
+    return { cancelled: false };
   }
 
   async refreshToken() {

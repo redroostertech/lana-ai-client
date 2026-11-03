@@ -720,6 +720,7 @@
     updated() {
       this._contentEl = this.querySelector('[data-content-body]');
       if (this._props.offlineAsOf) this._renderOfflineLabel(this._props.offlineAsOf);
+      if (this._props.offlineDrafts) this._renderOfflineDrafts(this._props.offlineDrafts);
 
       this.delegate('click', '[data-chat-retry]', (e, target) => {
         e.preventDefault();
@@ -943,6 +944,41 @@
       else this.appendChild(badge);
     }
 
+    /**
+     * Phase 10d: the changes an offline answer drafted, one card each, under
+     * the answer. Nothing was changed on this computer; the card says what
+     * the organization's server will do or did (LanaOfflineCopy.draftCardView).
+     */
+    _renderOfflineDrafts(drafts) {
+      var offline = global.LanaOfflineCopy;
+      if (!offline || typeof offline.draftCardView !== 'function' || !Array.isArray(drafts) || !drafts.length) return;
+      var old = this.querySelector('.lex-chat-msg-drafts');
+      if (old) old.remove();
+      var list = document.createElement('div');
+      list.className = 'lex-chat-msg-drafts';
+      drafts.forEach(function (draft) {
+        var view = offline.draftCardView(draft);
+        var card = document.createElement('div');
+        card.className = 'lex-chat-msg-draft lex-chat-msg-draft--' + view.state;
+        var title = document.createElement('div');
+        title.className = 'lex-chat-msg-draft__summary';
+        title.textContent = view.summary;
+        var badge = document.createElement('lex-badge');
+        badge.setAttribute('color', view.color);
+        badge.setAttribute('size', 'sm');
+        badge.setAttribute('label', view.label);
+        var detail = document.createElement('p');
+        detail.className = 'lex-chat-msg-draft__detail';
+        detail.textContent = view.detail;
+        card.appendChild(title);
+        card.appendChild(badge);
+        card.appendChild(detail);
+        list.appendChild(card);
+      });
+      var body = this.querySelector('.lex-chat-msg-agent-body') || this;
+      body.appendChild(list);
+    }
+
     finalize(metadata = {}) {
       this.streaming = false;
       if (metadata.messageId) this._props.messageId = metadata.messageId;
@@ -959,6 +995,10 @@
       if (metadata.offlineAsOf) {
         this._props.offlineAsOf = metadata.offlineAsOf;
         this._renderOfflineLabel(metadata.offlineAsOf);
+      }
+      if (metadata.offlineDrafts) {
+        this._props.offlineDrafts = metadata.offlineDrafts;
+        this._renderOfflineDrafts(metadata.offlineDrafts);
       }
 
       // Update displayed timestamp (with duration + token count if available)

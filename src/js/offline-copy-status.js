@@ -153,7 +153,59 @@
       : '';
   }
 
-  var api = { STATES: STATES, asOfLabel: asOfLabel, waitingBadgeHtml: waitingBadgeHtml, formatAsOf: formatAsOf, settingsView: settingsView, bannerMessage: bannerMessage, adminView: adminView, countsLine: countsLine, lastStatus: null };
+  var DRAFT_STATES = {
+    waiting: { label: 'Waiting until you\'re back online', color: 'blue' },
+    approval: { label: 'Waiting for your approval', color: 'yellow' },
+    done: { label: 'Done when you were back online', color: 'green' },
+    refused: { label: 'Not made', color: 'red' }
+  };
+
+  /**
+   * A change offline chat drafted, as its card shows it. The organization's
+   * server decided what became of it (outcome); before it has, it waits.
+   */
+  function draftCardView(draft) {
+    var d = draft || {};
+    var state = DRAFT_STATES[d.outcome] ? d.outcome : 'waiting';
+    var detail = {
+      waiting: d.needs_approval === false
+        ? 'Nothing has changed yet. Your organization\'s server checks it when you are back online.'
+        : 'Nothing has changed yet. When you are back online it goes to your approvals, and it is made only if you approve it.',
+      approval: 'It is in your approvals. Nothing changes until you approve it.',
+      done: 'Your organization\'s server checked it and made the change.',
+      refused: 'Your organization\'s server did not accept it, so nothing changed.'
+    }[state];
+    return { summary: d.summary || 'Change drafted offline', label: DRAFT_STATES[state].label, color: DRAFT_STATES[state].color, detail: detail, state: state };
+  }
+
+  /** "You have 3 changes not yet synced. Signing out will discard them." */
+  function discardWarning(count) {
+    return 'You have ' + plural(count, 'change', 'changes') + ' not yet synced. Signing out will discard them.';
+  }
+
+  /**
+   * Before signing out (decision O5): with no waiting changes, go. Otherwise
+   * try to send them now; if some are still waiting (this computer is
+   * offline), ask the person, and go only when they confirm. The copy itself
+   * is removed by the engine when the session ends.
+   * @param {Object} client - the API client (get, post)
+   * @param {Function} confirmFn - (title, message, options) => Promise<boolean>
+   * @returns {Promise<boolean>} true to sign out
+   */
+  function beforeSignOut(client, confirmFn) {
+    var read = function () { return client.get('/api/engine/v1/offline/status').catch(function () { return null; }); };
+    return read().then(function (status) {
+      if (!status || !status.queued) return true;
+      return client.post('/api/engine/v1/offline/sync', {}).catch(function () { return null; }).then(function (after) {
+        var waiting = after && typeof after.queued === 'number' ? after.queued : status.queued;
+        if (!waiting) return true;
+        if (typeof confirmFn !== 'function') return false;
+        return confirmFn('Sign out and discard changes?', discardWarning(waiting), { confirmText: 'Sign out and discard', cancelText: 'Stay signed in', variant: 'danger' });
+      });
+    });
+  }
+
+  var api = { STATES: STATES, asOfLabel: asOfLabel, waitingBadgeHtml: waitingBadgeHtml, discardWarning: discardWarning, beforeSignOut: beforeSignOut, draftCardView: draftCardView, formatAsOf: formatAsOf, settingsView: settingsView, bannerMessage: bannerMessage, adminView: adminView, countsLine: countsLine, lastStatus: null };
 
   global.LanaOfflineCopy = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

@@ -1385,7 +1385,8 @@
                 artifacts: m.artifacts && m.artifacts.length > 0 ? m.artifacts : undefined,
                 attachments: messageAttachments.length > 0 ? messageAttachments : undefined,
                 duration: m.duration || null,
-                tokenCount: m.tokenCount || null
+                tokenCount: m.tokenCount || null,
+                offlineDrafts: m.metadata && Array.isArray(m.metadata.offline_drafts) && m.metadata.offline_drafts.length ? m.metadata.offline_drafts : undefined
               });
 
               // Re-hydrate dynamic cards from persisted message metadata.
@@ -1837,6 +1838,11 @@
           this._offlineAsOf = event.asOf || null;
           break;
 
+        case 'offline_draft':
+          // Phase 10d: a drafted change, shown as a card on the answer.
+          (this._offlineDrafts = this._offlineDrafts || []).push(event.draft);
+          break;
+
         case 'content': {
           // First content chunk — hide activity, start streaming message
           if (!responseStarted && this._streamingContent === '') {
@@ -2069,10 +2075,12 @@
               references: this._references.length > 0 ? this._references : undefined,
               artifacts: this._artifacts.length > 0 ? this._artifacts : undefined,
               grounding: this._groundingContext || undefined,
-              offlineAsOf: event.offlineAsOf || this._offlineAsOf || undefined
+              offlineAsOf: event.offlineAsOf || this._offlineAsOf || undefined,
+              offlineDrafts: this._offlineDrafts && this._offlineDrafts.length ? this._offlineDrafts : undefined
             });
           }
           this._offlineAsOf = null;
+          this._offlineDrafts = null;
 
           // Capture conversation ID from done event (fallback)
           if (event.threadId && !this.conversationId) {

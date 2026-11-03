@@ -659,6 +659,10 @@
         case 'offline_copy':
           return { type: 'offline_copy', asOf: data.as_of || null };
 
+        // Phase 10d: a change the offline answer drafted (never made here).
+        case 'offline_draft':
+          return { type: 'offline_draft', draft: { draft_id: data.draft_id || null, tool_id: data.tool_id || null, summary: data.summary || '', needs_approval: data.needs_approval !== false, outcome: 'waiting' } };
+
         case 'citations':
           return { type: 'citations', citations: data.citations || data.sources || [] };
 

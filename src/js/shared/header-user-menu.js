@@ -36,7 +36,7 @@
     var go = function () { global.location.href = loginHref; };
     var api = global.api;
     if (api && typeof api.logout === 'function') {
-      return Promise.resolve().then(function () { return api.logout(); }).then(go, go);
+      return Promise.resolve().then(function () { return api.logout(); }).then(function (result) { if (!(result && result.cancelled)) go(); }, go);
     }
     go();
     return Promise.resolve();

@@ -1,0 +1,4 @@
+/* "Keep this matter offline" switch in the matter page header (offline-keep-matter.js). */
+.lana-keep-offline {
+  margin-left: var(--lex-space-2, 0.5rem);
+}
