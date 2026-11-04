@@ -43,6 +43,12 @@
     "!**/{.DS_Store,.git,.hg,.svn,.gitignore,.gitattributes}",
     "!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs}"
   ],
+  "extraResources": [
+    { "from": "docs/legal/THIRD_PARTY_NOTICES.md", "to": "licenses/THIRD_PARTY_NOTICES.md" },
+    { "from": "docs/legal/sbom/lana-ai-client.cdx.json", "to": "licenses/sbom.cdx.json" },
+    { "from": "node_modules/electron/dist/LICENSE", "to": "licenses/LICENSE.electron.txt" },
+    { "from": "node_modules/electron/dist/LICENSES.chromium.html", "to": "licenses/LICENSES.chromium.html" }
+  ],
   "protocols": [
     {
       "name": "Lana AI",
