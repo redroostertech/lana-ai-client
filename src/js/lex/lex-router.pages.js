@@ -373,6 +373,24 @@
       stylesheets: []
     },
 
+    'open-source-licenses.html': {
+      title: 'Open-source licenses',
+      activeNav: 'help',
+      scripts: [
+        // Lex components not globally loaded
+        'js/lex/components/foundation/lex-banner.js',
+        'js/lex/components/foundation/lex-card.js',
+        // Generated inventory (scripts/licenses/generate.js), then its pure helpers
+        'js/pages/open-source-licenses.data.js',
+        'js/pages/open-source-licenses.model.js',
+        // Page controller (MUST be last)
+        'js/pages/open-source-licenses.js'
+      ],
+      stylesheets: [
+        'css/open-source-licenses.css'
+      ]
+    },
+
     'article.html': {
       title: 'Article',
       activeNav: 'help',

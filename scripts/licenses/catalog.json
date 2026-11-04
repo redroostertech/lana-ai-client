@@ -1,0 +1,182 @@
+{
+  "note": "Hand-curated part of the LANA AI client open-source inventory: the Electron runtime, the vendored browser libraries in public_html/js/vendor, icons, CSS and fonts. npm packages bundled into electron-dist and the Tiptap bundle are found by esbuild at generation time. Licenses were checked against each project's LICENSE file at the vendored version on 2026-11-04. Run node scripts/licenses/generate.js after any change.",
+  "product": {
+    "name": "LANA AI client",
+    "description": "LANA AI desktop client (Electron) for macOS, Windows and Linux."
+  },
+  "sections": [
+    { "id": "runtime", "title": "Runtime", "detail": "The application runtime." },
+    { "id": "vendored", "title": "Bundled libraries", "detail": "Browser libraries shipped as files with the app." },
+    { "id": "fonts", "title": "Fonts", "detail": "Typefaces bundled with the app." },
+    { "id": "npm", "title": "JavaScript packages", "detail": "npm packages compiled into the app's main process and editor bundles, or shipped in its node_modules." }
+  ],
+  "components": [
+    {
+      "id": "electron",
+      "section": "runtime",
+      "name": "Electron",
+      "version": { "npm": "electron" },
+      "license": "MIT",
+      "copyright": "Copyright (c) Electron contributors; Copyright (c) 2013-2020 GitHub Inc.",
+      "attribution": "The LANA AI client runs on Electron (https://www.electronjs.org), MIT License.",
+      "source": "https://github.com/electron/electron",
+      "purl": "pkg:npm/electron",
+      "texts": [{ "title": "Electron, MIT License", "file": "node_modules/electron/dist/LICENSE" }]
+    },
+    {
+      "id": "chromium",
+      "section": "runtime",
+      "name": "Chromium, Node.js and V8 (inside Electron)",
+      "version": { "npm": "electron", "suffix": " (Electron build)" },
+      "license": "BSD-3-Clause AND MIT AND LGPL-2.1-or-later AND MPL-2.0 AND Apache-2.0",
+      "licenseName": "Several (BSD-3-Clause for Chromium; MIT for Node.js; LGPL-2.1 for FFmpeg and parts of Blink; others)",
+      "copyright": "The Chromium Authors; Node.js contributors; FFmpeg developers; and others",
+      "attribution": "Electron includes Chromium, Node.js, V8 and FFmpeg (libffmpeg, LGPL-2.1, loaded as a separate dynamic library). Their complete notices ship with the app as LICENSES.chromium.html in its resources/licenses folder.",
+      "source": "https://www.chromium.org/",
+      "notes": "The Chromium notices file is about 19 MB, so it ships as a file next to the app instead of inside this page.",
+      "texts": []
+    },
+    {
+      "id": "chart.js",
+      "section": "vendored",
+      "name": "Chart.js",
+      "version": "4.4.1",
+      "file": "public_html/js/vendor/chart.js",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2014-2022 Chart.js Contributors",
+      "source": "https://github.com/chartjs/Chart.js",
+      "purl": "pkg:npm/chart.js",
+      "texts": [{ "title": "Chart.js, MIT License", "file": "scripts/licenses/texts/chart.js-MIT.txt" }]
+    },
+    {
+      "id": "jspdf",
+      "section": "vendored",
+      "name": "jsPDF",
+      "version": "2.5.1",
+      "file": "public_html/js/vendor/jspdf.umd.min.js",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2010-2021 James Hall; (c) 2015-2021 yWorks GmbH",
+      "source": "https://github.com/parallax/jsPDF",
+      "purl": "pkg:npm/jspdf",
+      "texts": [{ "title": "jsPDF, MIT License", "file": "scripts/licenses/texts/jspdf-MIT.txt" }]
+    },
+    {
+      "id": "jspdf-autotable",
+      "section": "vendored",
+      "name": "jsPDF-AutoTable",
+      "version": "3.5.31",
+      "file": "public_html/js/vendor/jspdf.plugin.autotable.min.js",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2014 Simon Bengtsson",
+      "source": "https://github.com/simonbengtsson/jsPDF-AutoTable",
+      "purl": "pkg:npm/jspdf-autotable",
+      "texts": [{ "title": "jsPDF-AutoTable, MIT License", "file": "scripts/licenses/texts/jspdf-autotable-MIT.txt" }]
+    },
+    {
+      "id": "mammoth",
+      "section": "vendored",
+      "name": "Mammoth",
+      "version": "not recorded in the vendored file",
+      "file": "public_html/js/vendor/mammoth.min.js",
+      "license": "BSD-2-Clause",
+      "copyright": "Copyright (c) 2013, Michael Williamson",
+      "source": "https://github.com/mwilliamson/mammoth.js",
+      "notes": "The vendored minified file carries no license header; this page supplies the notice BSD-2-Clause requires.",
+      "texts": [{ "title": "Mammoth, BSD 2-Clause License", "file": "scripts/licenses/texts/mammoth-BSD-2-Clause.txt" }]
+    },
+    {
+      "id": "marked",
+      "section": "vendored",
+      "name": "marked",
+      "version": "17.0.1",
+      "file": "public_html/js/vendor/marked.min.js",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2018-2025, MarkedJS; Copyright (c) 2011-2018, Christopher Jeffrey",
+      "source": "https://github.com/markedjs/marked",
+      "purl": "pkg:npm/marked",
+      "texts": [{ "title": "marked, license information", "file": "scripts/licenses/texts/marked-MIT.txt" }]
+    },
+    {
+      "id": "mermaid",
+      "section": "vendored",
+      "name": "Mermaid",
+      "version": "11.12.3",
+      "file": "public_html/js/vendor/mermaid.min.js",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2014 - 2022 Knut Sveidqvist",
+      "source": "https://github.com/mermaid-js/mermaid",
+      "purl": "pkg:npm/mermaid",
+      "notes": "The Mermaid bundle includes its own dependencies, among them DOMPurify 3.2.6 (Cure53, MPL-2.0 or Apache-2.0, used here under Apache-2.0).",
+      "texts": [
+        { "title": "Mermaid, MIT License", "file": "scripts/licenses/texts/mermaid-MIT.txt" },
+        { "title": "DOMPurify, license (MPL-2.0 or Apache-2.0)", "file": "scripts/licenses/texts/dompurify-LICENSE.txt" }
+      ]
+    },
+    {
+      "id": "pdf.js",
+      "section": "vendored",
+      "name": "PDF.js",
+      "version": "3.11.174",
+      "file": "public_html/js/vendor/pdf.min.js",
+      "license": "Apache-2.0",
+      "copyright": "Copyright 2023 Mozilla Foundation",
+      "source": "https://github.com/mozilla/pdf.js",
+      "purl": "pkg:npm/pdfjs-dist",
+      "texts": [{ "title": "PDF.js, Apache License 2.0", "file": "scripts/licenses/texts/pdf.js-Apache-2.0.txt" }]
+    },
+    {
+      "id": "lucide",
+      "section": "vendored",
+      "name": "Lucide icons",
+      "version": "0.574.0",
+      "file": "public_html/js/lex/lex.icons.js",
+      "license": "ISC",
+      "copyright": "Lucide Contributors; portions Copyright (c) 2013 Cole Bemis (Feather, MIT)",
+      "source": "https://github.com/lucide-icons/lucide",
+      "notes": "Compiled into Lex icons (js/lex/lex.icons.js) from lucide-static.",
+      "texts": [{ "title": "Lucide, ISC License", "file": "scripts/licenses/texts/lucide-ISC.txt" }]
+    },
+    {
+      "id": "tailwindcss",
+      "section": "vendored",
+      "name": "Tailwind CSS (compiled stylesheet)",
+      "version": { "npm": "tailwindcss" },
+      "license": "MIT",
+      "copyright": "Copyright (c) Tailwind Labs, Inc.",
+      "source": "https://github.com/tailwindlabs/tailwindcss",
+      "purl": "pkg:npm/tailwindcss",
+      "notes": "css/tailwind-output.css and css/tailwind.min.css are generated by Tailwind CSS and include its base styles.",
+      "texts": [{ "title": "Tailwind CSS, MIT License", "file": "node_modules/tailwindcss/LICENSE" }]
+    },
+    {
+      "id": "font-inter",
+      "section": "fonts",
+      "name": "Inter",
+      "version": "woff2",
+      "license": "OFL-1.1",
+      "copyright": "Copyright (c) 2016 The Inter Project Authors",
+      "source": "https://github.com/rsms/inter",
+      "texts": [{ "title": "Inter, SIL Open Font License 1.1", "file": "scripts/licenses/texts/inter-OFL-1.1.txt" }]
+    },
+    {
+      "id": "font-montserrat",
+      "section": "fonts",
+      "name": "Montserrat",
+      "version": "variable",
+      "license": "OFL-1.1",
+      "copyright": "Copyright 2024 The Montserrat.Git Project Authors",
+      "source": "https://github.com/JulietaUla/Montserrat",
+      "texts": [{ "title": "Montserrat, SIL Open Font License 1.1", "file": "public_html/fonts/lana/Montserrat-LICENSE.txt" }]
+    },
+    {
+      "id": "font-playfair",
+      "section": "fonts",
+      "name": "Playfair Display Italic",
+      "version": "variable",
+      "license": "OFL-1.1",
+      "copyright": "Copyright 2017 The Playfair Display Project Authors, with Reserved Font Name Playfair Display",
+      "source": "https://github.com/clauseggers/Playfair-Display",
+      "texts": [{ "title": "Playfair Display, SIL Open Font License 1.1", "file": "public_html/fonts/lana/PlayfairDisplay-LICENSE.txt" }]
+    }
+  ]
+}

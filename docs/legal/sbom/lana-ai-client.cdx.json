@@ -1,0 +1,2314 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "tools": {
+      "components": [
+        {
+          "type": "application",
+          "name": "lana-ai-client scripts/licenses/generate.js"
+        }
+      ]
+    },
+    "component": {
+      "type": "application",
+      "bom-ref": "lana:lana-ai-client",
+      "name": "LANA AI client",
+      "version": "4.1.0",
+      "description": "LANA AI desktop client (Electron) for macOS, Windows and Linux.",
+      "supplier": {
+        "name": "RedRooster Technologies Inc."
+      }
+    }
+  },
+  "components": [
+    {
+      "type": "framework",
+      "bom-ref": "lana:electron",
+      "name": "Electron",
+      "version": "44.7.0",
+      "purl": "pkg:npm/electron@44.7.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) Electron contributors; Copyright (c) 2013-2020 GitHub Inc.",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/electron/electron"
+        }
+      ]
+    },
+    {
+      "type": "framework",
+      "bom-ref": "lana:chromium",
+      "name": "Chromium, Node.js and V8 (inside Electron)",
+      "version": "44.7.0 (Electron build)",
+      "licenses": [
+        {
+          "expression": "BSD-3-Clause AND MIT AND LGPL-2.1-or-later AND MPL-2.0 AND Apache-2.0"
+        }
+      ],
+      "copyright": "The Chromium Authors; Node.js contributors; FFmpeg developers; and others",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.chromium.org/"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana:chart.js",
+      "name": "Chart.js",
+      "version": "4.4.1",
+      "purl": "pkg:npm/chart.js@4.4.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2014-2022 Chart.js Contributors",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/chartjs/Chart.js"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "public_html/js/vendor/chart.js"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana:jspdf",
+      "name": "jsPDF",
+      "version": "2.5.1",
+      "purl": "pkg:npm/jspdf@2.5.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2010-2021 James Hall; (c) 2015-2021 yWorks GmbH",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/parallax/jsPDF"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "public_html/js/vendor/jspdf.umd.min.js"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana:jspdf-autotable",
+      "name": "jsPDF-AutoTable",
+      "version": "3.5.31",
+      "purl": "pkg:npm/jspdf-autotable@3.5.31",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2014 Simon Bengtsson",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/simonbengtsson/jsPDF-AutoTable"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "public_html/js/vendor/jspdf.plugin.autotable.min.js"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana:mammoth",
+      "name": "Mammoth",
+      "version": "not recorded in the vendored file",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-2-Clause"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2013, Michael Williamson",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/mwilliamson/mammoth.js"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "public_html/js/vendor/mammoth.min.js"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana:marked",
+      "name": "marked",
+      "version": "17.0.1",
+      "purl": "pkg:npm/marked@17.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2018-2025, MarkedJS; Copyright (c) 2011-2018, Christopher Jeffrey",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/markedjs/marked"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "public_html/js/vendor/marked.min.js"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana:mermaid",
+      "name": "Mermaid",
+      "version": "11.12.3",
+      "purl": "pkg:npm/mermaid@11.12.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2014 - 2022 Knut Sveidqvist",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/mermaid-js/mermaid"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "public_html/js/vendor/mermaid.min.js"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana:pdf.js",
+      "name": "PDF.js",
+      "version": "3.11.174",
+      "purl": "pkg:npm/pdfjs-dist@3.11.174",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "copyright": "Copyright 2023 Mozilla Foundation",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/mozilla/pdf.js"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "public_html/js/vendor/pdf.min.js"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana:lucide",
+      "name": "Lucide icons",
+      "version": "0.574.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "ISC"
+          }
+        }
+      ],
+      "copyright": "Lucide Contributors; portions Copyright (c) 2013 Cole Bemis (Feather, MIT)",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/lucide-icons/lucide"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "public_html/js/lex/lex.icons.js"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana:tailwindcss",
+      "name": "Tailwind CSS (compiled stylesheet)",
+      "version": "3.4.19",
+      "purl": "pkg:npm/tailwindcss@3.4.19",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) Tailwind Labs, Inc.",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/tailwindlabs/tailwindcss"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "bom-ref": "lana:font-inter",
+      "name": "Inter",
+      "version": "woff2",
+      "licenses": [
+        {
+          "license": {
+            "id": "OFL-1.1"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2016 The Inter Project Authors",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/rsms/inter"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "bom-ref": "lana:font-montserrat",
+      "name": "Montserrat",
+      "version": "variable",
+      "licenses": [
+        {
+          "license": {
+            "id": "OFL-1.1"
+          }
+        }
+      ],
+      "copyright": "Copyright 2024 The Montserrat.Git Project Authors",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/JulietaUla/Montserrat"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "bom-ref": "lana:font-playfair",
+      "name": "Playfair Display Italic",
+      "version": "variable",
+      "licenses": [
+        {
+          "license": {
+            "id": "OFL-1.1"
+          }
+        }
+      ],
+      "copyright": "Copyright 2017 The Playfair Display Project Authors, with Reserved Font Name Playfair Display",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/clauseggers/Playfair-Display"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40tiptap/core@3.31.4",
+      "name": "@tiptap/core",
+      "version": "3.31.4",
+      "purl": "pkg:npm/%40tiptap/core@3.31.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2025, Tiptap GmbH",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://tiptap.dev"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40tiptap/extension-blockquote@3.31.4",
+      "name": "@tiptap/extension-blockquote",
+      "version": "3.31.4",
+      "purl": "pkg:npm/%40tiptap/extension-blockquote@3.31.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2025, Tiptap GmbH",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://tiptap.dev"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40tiptap/extension-bold@3.31.4",
+      "name": "@tiptap/extension-bold",
+      "version": "3.31.4",
+      "purl": "pkg:npm/%40tiptap/extension-bold@3.31.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2025, Tiptap GmbH",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://tiptap.dev"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40tiptap/extension-code-block@3.31.4",
+      "name": "@tiptap/extension-code-block",
+      "version": "3.31.4",
+      "purl": "pkg:npm/%40tiptap/extension-code-block@3.31.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2025, Tiptap GmbH",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://tiptap.dev"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40tiptap/extension-code@3.31.4",
+      "name": "@tiptap/extension-code",
+      "version": "3.31.4",
+      "purl": "pkg:npm/%40tiptap/extension-code@3.31.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2025, Tiptap GmbH",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://tiptap.dev"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40tiptap/extension-document@3.31.4",
+      "name": "@tiptap/extension-document",
+      "version": "3.31.4",
+      "purl": "pkg:npm/%40tiptap/extension-document@3.31.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2025, Tiptap GmbH",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://tiptap.dev"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40tiptap/extension-hard-break@3.31.4",
+      "name": "@tiptap/extension-hard-break",
+      "version": "3.31.4",
+      "purl": "pkg:npm/%40tiptap/extension-hard-break@3.31.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2025, Tiptap GmbH",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://tiptap.dev"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40tiptap/extension-heading@3.31.4",
+      "name": "@tiptap/extension-heading",
+      "version": "3.31.4",
+      "purl": "pkg:npm/%40tiptap/extension-heading@3.31.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2025, Tiptap GmbH",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://tiptap.dev"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40tiptap/extension-horizontal-rule@3.31.4",
+      "name": "@tiptap/extension-horizontal-rule",
+      "version": "3.31.4",
+      "purl": "pkg:npm/%40tiptap/extension-horizontal-rule@3.31.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2025, Tiptap GmbH",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://tiptap.dev"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40tiptap/extension-italic@3.31.4",
+      "name": "@tiptap/extension-italic",
+      "version": "3.31.4",
+      "purl": "pkg:npm/%40tiptap/extension-italic@3.31.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2025, Tiptap GmbH",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://tiptap.dev"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40tiptap/extension-link@3.31.4",
+      "name": "@tiptap/extension-link",
+      "version": "3.31.4",
+      "purl": "pkg:npm/%40tiptap/extension-link@3.31.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2025, Tiptap GmbH",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://tiptap.dev"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40tiptap/extension-list@3.31.4",
+      "name": "@tiptap/extension-list",
+      "version": "3.31.4",
+      "purl": "pkg:npm/%40tiptap/extension-list@3.31.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2025, Tiptap GmbH",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://tiptap.dev"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40tiptap/extension-paragraph@3.31.4",
+      "name": "@tiptap/extension-paragraph",
+      "version": "3.31.4",
+      "purl": "pkg:npm/%40tiptap/extension-paragraph@3.31.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2025, Tiptap GmbH",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://tiptap.dev"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40tiptap/extension-placeholder@3.31.4",
+      "name": "@tiptap/extension-placeholder",
+      "version": "3.31.4",
+      "purl": "pkg:npm/%40tiptap/extension-placeholder@3.31.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2025, Tiptap GmbH",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://tiptap.dev"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40tiptap/extension-strike@3.31.4",
+      "name": "@tiptap/extension-strike",
+      "version": "3.31.4",
+      "purl": "pkg:npm/%40tiptap/extension-strike@3.31.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2025, Tiptap GmbH",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://tiptap.dev"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40tiptap/extension-table-cell@3.31.4",
+      "name": "@tiptap/extension-table-cell",
+      "version": "3.31.4",
+      "purl": "pkg:npm/%40tiptap/extension-table-cell@3.31.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2025, Tiptap GmbH",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://tiptap.dev"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40tiptap/extension-table-header@3.31.4",
+      "name": "@tiptap/extension-table-header",
+      "version": "3.31.4",
+      "purl": "pkg:npm/%40tiptap/extension-table-header@3.31.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2025, Tiptap GmbH",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://tiptap.dev"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40tiptap/extension-table-row@3.31.4",
+      "name": "@tiptap/extension-table-row",
+      "version": "3.31.4",
+      "purl": "pkg:npm/%40tiptap/extension-table-row@3.31.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2025, Tiptap GmbH",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://tiptap.dev"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40tiptap/extension-table@3.31.4",
+      "name": "@tiptap/extension-table",
+      "version": "3.31.4",
+      "purl": "pkg:npm/%40tiptap/extension-table@3.31.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2025, Tiptap GmbH",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://tiptap.dev"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40tiptap/extension-text-align@3.31.4",
+      "name": "@tiptap/extension-text-align",
+      "version": "3.31.4",
+      "purl": "pkg:npm/%40tiptap/extension-text-align@3.31.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2025, Tiptap GmbH",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://tiptap.dev"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40tiptap/extension-text@3.31.4",
+      "name": "@tiptap/extension-text",
+      "version": "3.31.4",
+      "purl": "pkg:npm/%40tiptap/extension-text@3.31.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2025, Tiptap GmbH",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://tiptap.dev"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40tiptap/extension-typography@3.31.4",
+      "name": "@tiptap/extension-typography",
+      "version": "3.31.4",
+      "purl": "pkg:npm/%40tiptap/extension-typography@3.31.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2025, Tiptap GmbH",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://tiptap.dev"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40tiptap/extension-underline@3.31.4",
+      "name": "@tiptap/extension-underline",
+      "version": "3.31.4",
+      "purl": "pkg:npm/%40tiptap/extension-underline@3.31.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2025, Tiptap GmbH",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://tiptap.dev"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40tiptap/extensions@3.31.4",
+      "name": "@tiptap/extensions",
+      "version": "3.31.4",
+      "purl": "pkg:npm/%40tiptap/extensions@3.31.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2025, Tiptap GmbH",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://tiptap.dev"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40tiptap/pm@3.31.4",
+      "name": "@tiptap/pm",
+      "version": "3.31.4",
+      "purl": "pkg:npm/%40tiptap/pm@3.31.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2025, Tiptap GmbH",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://tiptap.dev"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40tiptap/starter-kit@3.31.4",
+      "name": "@tiptap/starter-kit",
+      "version": "3.31.4",
+      "purl": "pkg:npm/%40tiptap/starter-kit@3.31.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2025, Tiptap GmbH",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://tiptap.dev"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/agent-base@6.0.2",
+      "name": "agent-base",
+      "version": "6.0.2",
+      "purl": "pkg:npm/agent-base@6.0.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Nathan Rajlich <nathan@tootallnate.net> (http://n8.io/)",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "git://github.com/TooTallNate/node-agent-base"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/ajv-formats@2.1.1",
+      "name": "ajv-formats",
+      "version": "2.1.1",
+      "purl": "pkg:npm/ajv-formats@2.1.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2020 Evgeny Poberezkin",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/ajv-validator/ajv-formats#readme"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/ajv@8.20.0",
+      "name": "ajv",
+      "version": "8.20.0",
+      "purl": "pkg:npm/ajv@8.20.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2015-2021 Evgeny Poberezkin",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://ajv.js.org"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/asynckit@0.4.0",
+      "name": "asynckit",
+      "version": "0.4.0",
+      "purl": "pkg:npm/asynckit@0.4.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2016 Alex Indigo",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/alexindigo/asynckit#readme"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/atomically@1.7.0",
+      "name": "atomically",
+      "version": "1.7.0",
+      "purl": "pkg:npm/atomically@1.7.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2020-present Fabio Spampinato",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/fabiospampinato/atomically"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/axios@1.20.0",
+      "name": "axios",
+      "version": "1.20.0",
+      "purl": "pkg:npm/axios@1.20.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Matt Zabriskie",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://axios-http.com"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/builder-util-runtime@9.7.0",
+      "name": "builder-util-runtime",
+      "version": "9.7.0",
+      "purl": "pkg:npm/builder-util-runtime@9.7.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2015 Loopline Systems",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/electron-userland/electron-builder"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/call-bind-apply-helpers@1.0.2",
+      "name": "call-bind-apply-helpers",
+      "version": "1.0.2",
+      "purl": "pkg:npm/call-bind-apply-helpers@1.0.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2024 Jordan Harband",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/ljharb/call-bind-apply-helpers#readme"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/combined-stream@1.0.8",
+      "name": "combined-stream",
+      "version": "1.0.8",
+      "purl": "pkg:npm/combined-stream@1.0.8",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2011 Debuggable Limited <felix@debuggable.com>",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/felixge/node-combined-stream"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/conf@10.2.0",
+      "name": "conf",
+      "version": "10.2.0",
+      "purl": "pkg:npm/conf@10.2.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "sindresorhus/conf"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/debug@4.4.3",
+      "name": "debug",
+      "version": "4.4.3",
+      "purl": "pkg:npm/debug@4.4.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2014-2017 TJ Holowaychuk <tj@vision-media.ca>; Copyright (c) 2018-2021 Josh Junon",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "git://github.com/debug-js/debug"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/delayed-stream@1.0.0",
+      "name": "delayed-stream",
+      "version": "1.0.0",
+      "purl": "pkg:npm/delayed-stream@1.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2011 Debuggable Limited <felix@debuggable.com>",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/felixge/node-delayed-stream"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/dot-prop@6.0.1",
+      "name": "dot-prop",
+      "version": "6.0.1",
+      "purl": "pkg:npm/dot-prop@6.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "sindresorhus/dot-prop"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/dunder-proto@1.0.1",
+      "name": "dunder-proto",
+      "version": "1.0.1",
+      "purl": "pkg:npm/dunder-proto@1.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2024 ECMAScript Shims",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/es-shims/dunder-proto#readme"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/electron-store@8.2.0",
+      "name": "electron-store",
+      "version": "8.2.0",
+      "purl": "pkg:npm/electron-store@8.2.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "sindresorhus/electron-store"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/electron-updater@6.8.9",
+      "name": "electron-updater",
+      "version": "6.8.9",
+      "purl": "pkg:npm/electron-updater@6.8.9",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2015 Loopline Systems",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/electron-userland/electron-builder"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/env-paths@2.2.1",
+      "name": "env-paths",
+      "version": "2.2.1",
+      "purl": "pkg:npm/env-paths@2.2.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com)",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "sindresorhus/env-paths"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/es-define-property@1.0.1",
+      "name": "es-define-property",
+      "version": "1.0.1",
+      "purl": "pkg:npm/es-define-property@1.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2024 Jordan Harband",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/ljharb/es-define-property#readme"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/es-errors@1.3.0",
+      "name": "es-errors",
+      "version": "1.3.0",
+      "purl": "pkg:npm/es-errors@1.3.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2024 Jordan Harband",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/ljharb/es-errors#readme"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/es-object-atoms@1.1.1",
+      "name": "es-object-atoms",
+      "version": "1.1.1",
+      "purl": "pkg:npm/es-object-atoms@1.1.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2024 Jordan Harband",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/ljharb/es-object-atoms#readme"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/es-set-tostringtag@2.1.0",
+      "name": "es-set-tostringtag",
+      "version": "2.1.0",
+      "purl": "pkg:npm/es-set-tostringtag@2.1.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2022 ECMAScript Shims",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/es-shims/es-set-tostringtag#readme"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/fast-deep-equal@3.1.3",
+      "name": "fast-deep-equal",
+      "version": "3.1.3",
+      "purl": "pkg:npm/fast-deep-equal@3.1.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2017 Evgeny Poberezkin",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/epoberezkin/fast-deep-equal#readme"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/follow-redirects@1.16.1",
+      "name": "follow-redirects",
+      "version": "1.16.1",
+      "purl": "pkg:npm/follow-redirects@1.16.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright 2014–present Olivier Lalonde <olalonde@gmail.com>, James Talmage <james@talmage.io>, Ruben Verborgh",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/follow-redirects/follow-redirects"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/form-data@4.0.6",
+      "name": "form-data",
+      "version": "4.0.6",
+      "purl": "pkg:npm/form-data@4.0.6",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2012 Felix Geisendörfer (felix@debuggable.com) and contributors",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "git://github.com/form-data/form-data"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/fs-extra@10.1.0",
+      "name": "fs-extra",
+      "version": "10.1.0",
+      "purl": "pkg:npm/fs-extra@10.1.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2011-2017 JP Richardson",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/jprichardson/node-fs-extra"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/function-bind@1.1.2",
+      "name": "function-bind",
+      "version": "1.1.2",
+      "purl": "pkg:npm/function-bind@1.1.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2013 Raynos.",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/Raynos/function-bind"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/get-intrinsic@1.3.0",
+      "name": "get-intrinsic",
+      "version": "1.3.0",
+      "purl": "pkg:npm/get-intrinsic@1.3.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2020 Jordan Harband",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/ljharb/get-intrinsic#readme"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/get-proto@1.0.1",
+      "name": "get-proto",
+      "version": "1.0.1",
+      "purl": "pkg:npm/get-proto@1.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2025 Jordan Harband",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/ljharb/get-proto#readme"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/gopd@1.2.0",
+      "name": "gopd",
+      "version": "1.2.0",
+      "purl": "pkg:npm/gopd@1.2.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2022 Jordan Harband",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/ljharb/gopd#readme"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/graceful-fs@4.2.11",
+      "name": "graceful-fs",
+      "version": "4.2.11",
+      "purl": "pkg:npm/graceful-fs@4.2.11",
+      "licenses": [
+        {
+          "license": {
+            "id": "ISC"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2011-2022 Isaac Z. Schlueter, Ben Noordhuis, and Contributors",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/isaacs/node-graceful-fs"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/has-flag@4.0.0",
+      "name": "has-flag",
+      "version": "4.0.0",
+      "purl": "pkg:npm/has-flag@4.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com)",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "sindresorhus/has-flag"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/has-symbols@1.1.0",
+      "name": "has-symbols",
+      "version": "1.1.0",
+      "purl": "pkg:npm/has-symbols@1.1.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2016 Jordan Harband",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/ljharb/has-symbols#readme"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/has-tostringtag@1.0.2",
+      "name": "has-tostringtag",
+      "version": "1.0.2",
+      "purl": "pkg:npm/has-tostringtag@1.0.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2021 Inspect JS",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/inspect-js/has-tostringtag#readme"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/hasown@2.0.4",
+      "name": "hasown",
+      "version": "2.0.4",
+      "purl": "pkg:npm/hasown@2.0.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) Jordan Harband and contributors",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/inspect-js/hasOwn#readme"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/https-proxy-agent@5.0.1",
+      "name": "https-proxy-agent",
+      "version": "5.0.1",
+      "purl": "pkg:npm/https-proxy-agent@5.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Nathan Rajlich <nathan@tootallnate.net> (http://n8.io/)",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "git://github.com/TooTallNate/node-https-proxy-agent"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/js-yaml@4.3.2",
+      "name": "js-yaml",
+      "version": "4.3.2",
+      "purl": "pkg:npm/js-yaml@4.3.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (C) 2011-2015 by Vitaly Puzrin",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "nodeca/js-yaml"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/json-schema-traverse@1.0.0",
+      "name": "json-schema-traverse",
+      "version": "1.0.0",
+      "purl": "pkg:npm/json-schema-traverse@1.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2017 Evgeny Poberezkin",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/epoberezkin/json-schema-traverse#readme"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/json-schema-typed@7.0.3",
+      "name": "json-schema-typed",
+      "version": "7.0.3",
+      "purl": "pkg:npm/json-schema-typed@7.0.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-2-Clause"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2018 IETF Trust, Austin Wright, Henry Andrews, Geraint Luff,",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/typeslick/json-schema-typed"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/jsonfile@6.2.1",
+      "name": "jsonfile",
+      "version": "6.2.1",
+      "purl": "pkg:npm/jsonfile@6.2.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2012-2015, JP Richardson <jprichardson@gmail.com>",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "git@github.com:jprichardson/node-jsonfile"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/lazy-val@1.0.5",
+      "name": "lazy-val",
+      "version": "1.0.5",
+      "purl": "pkg:npm/lazy-val@1.0.5",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Vladimir Krivosheev",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/develar/lazy-val"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/linkifyjs@4.3.3",
+      "name": "linkifyjs",
+      "version": "4.3.3",
+      "purl": "pkg:npm/linkifyjs@4.3.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2024 Nick Frasser",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://linkify.js.org"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/lodash.escaperegexp@4.1.2",
+      "name": "lodash.escaperegexp",
+      "version": "4.1.2",
+      "purl": "pkg:npm/lodash.escaperegexp@4.1.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright jQuery Foundation and other contributors <https://jquery.org/>; Copyright and related rights for sample code are waived via CC0. Sample",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://lodash.com/"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/lodash.isequal@4.5.0",
+      "name": "lodash.isequal",
+      "version": "4.5.0",
+      "purl": "pkg:npm/lodash.isequal@4.5.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright JS Foundation and other contributors <https://js.foundation/>; Copyright and related rights for sample code are waived via CC0. Sample",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://lodash.com/"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/math-intrinsics@1.1.0",
+      "name": "math-intrinsics",
+      "version": "1.1.0",
+      "purl": "pkg:npm/math-intrinsics@1.1.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2024 ECMAScript Shims",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/es-shims/math-intrinsics#readme"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/mime-db@1.52.0",
+      "name": "mime-db",
+      "version": "1.52.0",
+      "purl": "pkg:npm/mime-db@1.52.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2014 Jonathan Ong <me@jongleberry.com>; Copyright (c) 2015-2022 Douglas Christopher Wilson <doug@somethingdoug.com>",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "jshttp/mime-db"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/mime-types@2.1.35",
+      "name": "mime-types",
+      "version": "2.1.35",
+      "purl": "pkg:npm/mime-types@2.1.35",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2014 Jonathan Ong <me@jongleberry.com>; Copyright (c) 2015 Douglas Christopher Wilson <doug@somethingdoug.com>",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "jshttp/mime-types"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/ms@2.1.3",
+      "name": "ms",
+      "version": "2.1.3",
+      "purl": "pkg:npm/ms@2.1.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2020 Vercel, Inc.",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "vercel/ms"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/orderedmap@2.1.1",
+      "name": "orderedmap",
+      "version": "2.1.1",
+      "purl": "pkg:npm/orderedmap@2.1.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (C) 2016 by Marijn Haverbeke <marijn@haverbeke.berlin> and others",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/marijnh/orderedmap#readme"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/prosemirror-commands@1.7.2",
+      "name": "prosemirror-commands",
+      "version": "1.7.2",
+      "purl": "pkg:npm/prosemirror-commands@1.7.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (C) 2015-2017 by Marijn Haverbeke <marijn@haverbeke.berlin> and others",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://code.haverbeke.berlin/prosemirror/prosemirror-commands"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/prosemirror-dropcursor@1.8.2",
+      "name": "prosemirror-dropcursor",
+      "version": "1.8.2",
+      "purl": "pkg:npm/prosemirror-dropcursor@1.8.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (C) 2015-2017 by Marijn Haverbeke <marijn@haverbeke.berlin> and others",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "git://github.com/prosemirror/prosemirror-dropcursor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/prosemirror-gapcursor@1.4.1",
+      "name": "prosemirror-gapcursor",
+      "version": "1.4.1",
+      "purl": "pkg:npm/prosemirror-gapcursor@1.4.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (C) 2015-2017 by Marijn Haverbeke <marijn@haverbeke.berlin> and others",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "git://github.com/prosemirror/prosemirror-gapcursor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/prosemirror-history@1.5.1",
+      "name": "prosemirror-history",
+      "version": "1.5.1",
+      "purl": "pkg:npm/prosemirror-history@1.5.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (C) 2015-2017 by Marijn Haverbeke <marijn@haverbeke.berlin> and others",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://code.haverbeke.berlin/prosemirror/prosemirror-history"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/prosemirror-keymap@1.2.3",
+      "name": "prosemirror-keymap",
+      "version": "1.2.3",
+      "purl": "pkg:npm/prosemirror-keymap@1.2.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (C) 2015-2017 by Marijn Haverbeke <marijn@haverbeke.berlin> and others",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "git://github.com/prosemirror/prosemirror-keymap"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/prosemirror-model@1.25.12",
+      "name": "prosemirror-model",
+      "version": "1.25.12",
+      "purl": "pkg:npm/prosemirror-model@1.25.12",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (C) 2015-2017 by Marijn Haverbeke <marijn@haverbeke.berlin> and others",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://code.haverbeke.berlin/prosemirror/prosemirror-model"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/prosemirror-schema-list@1.5.1",
+      "name": "prosemirror-schema-list",
+      "version": "1.5.1",
+      "purl": "pkg:npm/prosemirror-schema-list@1.5.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (C) 2015-2017 by Marijn Haverbeke <marijn@haverbeke.berlin> and others",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "git://github.com/prosemirror/prosemirror-schema-list"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/prosemirror-state@1.4.4",
+      "name": "prosemirror-state",
+      "version": "1.4.4",
+      "purl": "pkg:npm/prosemirror-state@1.4.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (C) 2015-2017 by Marijn Haverbeke <marijn@haverbeke.berlin> and others",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "git://github.com/prosemirror/prosemirror-state"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/prosemirror-tables@1.8.5",
+      "name": "prosemirror-tables",
+      "version": "1.8.5",
+      "purl": "pkg:npm/prosemirror-tables@1.8.5",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (C) 2015-2016 by Marijn Haverbeke <marijnh@gmail.com> and others",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/ProseMirror/prosemirror-tables"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/prosemirror-transform@1.12.2",
+      "name": "prosemirror-transform",
+      "version": "1.12.2",
+      "purl": "pkg:npm/prosemirror-transform@1.12.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (C) 2015-2017 by Marijn Haverbeke <marijn@haverbeke.berlin> and others",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://code.haverbeke.berlin/prosemirror/prosemirror-transform"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/prosemirror-view@1.42.6",
+      "name": "prosemirror-view",
+      "version": "1.42.6",
+      "purl": "pkg:npm/prosemirror-view@1.42.6",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (C) 2015-2017 by Marijn Haverbeke <marijn@haverbeke.berlin> and others",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://code.haverbeke.berlin/prosemirror/prosemirror-view"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/require-from-string@2.0.2",
+      "name": "require-from-string",
+      "version": "2.0.2",
+      "purl": "pkg:npm/require-from-string@2.0.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) Vsevolod Strukchinsky <floatdrop@gmail.com> (github.com/floatdrop)",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "floatdrop/require-from-string"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/rope-sequence@1.3.4",
+      "name": "rope-sequence",
+      "version": "1.3.4",
+      "purl": "pkg:npm/rope-sequence@1.3.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (C) 2016 by Marijn Haverbeke <marijn@haverbeke.berlin>",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/marijnh/rope-sequence"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/sax@1.6.1",
+      "name": "sax",
+      "version": "1.6.1",
+      "purl": "pkg:npm/sax@1.6.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "BlueOak-1.0.0"
+          }
+        }
+      ],
+      "copyright": "copyright in it.",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "ssh://git@github.com/isaacs/sax-js"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/semver@7.7.3",
+      "name": "semver",
+      "version": "7.7.3",
+      "purl": "pkg:npm/semver@7.7.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "ISC"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) Isaac Z. Schlueter and Contributors",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/npm/node-semver"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/supports-color@7.2.0",
+      "name": "supports-color",
+      "version": "7.2.0",
+      "purl": "pkg:npm/supports-color@7.2.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com)",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "chalk/supports-color"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/universalify@2.0.1",
+      "name": "universalify",
+      "version": "2.0.1",
+      "purl": "pkg:npm/universalify@2.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2017, Ryan Zimmerman <opensrc@ryanzim.com>",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/RyanZim/universalify#readme"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/w3c-keyname@2.2.8",
+      "name": "w3c-keyname",
+      "version": "2.2.8",
+      "purl": "pkg:npm/w3c-keyname@2.2.8",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (C) 2016 by Marijn Haverbeke <marijn@haverbeke.berlin> and others",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/marijnh/w3c-keyname#readme"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/zod@3.25.76",
+      "name": "zod",
+      "version": "3.25.76",
+      "purl": "pkg:npm/zod@3.25.76",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2025 Colin McDonnell",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://zod.dev"
+        }
+      ]
+    }
+  ]
+}
