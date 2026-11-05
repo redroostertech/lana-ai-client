@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BACKGROUND_UPDATE_KEYS } from "@lana/core/gateway";
 import type { PlatformInfo, VoiceDownload } from "../src/shared/api.js";
 import { BleWakeAdvertiser, type BleHelperProcess } from "../src/main/services/bleWake/bleWakeAdvertiser.js";
-import { bleHelperPath } from "../src/main/services/bleWake/bleHelperProcess.js";
 import { PreferencesService } from "../src/main/services/preferencesService.js";
 import { openRealRig, RecordingLog, type RealRig } from "./support/realRig.js";
 
@@ -110,7 +109,6 @@ describe("BleWakeAdvertiser", () => {
     const none = new BleWakeAdvertiser({ uuids: () => ["A"], onWakeChanged: () => () => undefined, spawn: () => null, log: new RecordingLog() });
     none.start();
     expect(none.status()).toEqual({ text: "Not available on this computer", tone: "neutral" });
-    expect(bleHelperPath({ platform: "win32", isPackaged: true, resourcesPath: "/x", appPath: "/y" })).toBeNull();
   });
 });
 

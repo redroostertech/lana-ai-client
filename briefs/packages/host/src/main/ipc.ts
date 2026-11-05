@@ -37,7 +37,9 @@ export function registerServices(services: AllLanaServices, isTrustedSender: (ev
 export class EventHub {
   private readonly targets = new Set<WebContents>();
 
+  /** Adding a window twice is a no-op. */
   add(contents: WebContents): void {
+    if (this.targets.has(contents)) return;
     this.targets.add(contents);
     contents.once("destroyed", () => this.targets.delete(contents));
   }

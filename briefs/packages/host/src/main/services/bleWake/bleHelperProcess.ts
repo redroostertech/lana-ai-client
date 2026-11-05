@@ -1,22 +1,9 @@
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
 import { createInterface } from "node:readline";
 import type { BleHelperProcess } from "./bleWakeAdvertiser.js";
 
-export const BLE_HELPER_NAME = "LanaBleWake";
-
-/**
- * Where the helper lives: next to the app's resources when packaged (electron-builder
- * `extraResources`), or the local Swift build in development. Null off macOS (Windows helper: P5).
- */
-export function bleHelperPath(input: { readonly platform: NodeJS.Platform; readonly isPackaged: boolean; readonly resourcesPath: string; readonly appPath: string }): string | null {
-  if (input.platform !== "darwin") return null;
-  const path = input.isPackaged
-    ? join(input.resourcesPath, BLE_HELPER_NAME)
-    : join(input.appPath, "..", "native", "macos", "ble-wake-helper", ".build", "release", BLE_HELPER_NAME);
-  return existsSync(path) ? path : null;
-}
+// Where the helper lives is the client's to say (electron-briefs.js): resources/briefs in the
+// packaged app, build/briefs in development.
 
 /** Starts the helper at `path` with piped stdio. Its stderr is ignored (it logs nothing sensitive, ids only). */
 export function spawnBleHelper(path: string): BleHelperProcess {

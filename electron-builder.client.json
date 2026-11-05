@@ -61,6 +61,7 @@
       "schemes": ["lana-ai"]
     }
   ],
+  "beforePack": "scripts/briefs-before-pack.js",
   "asar": true,
   "asarUnpack": [
     "node_modules/sherpa-onnx-node/**/*",
@@ -79,7 +80,8 @@
     "entitlementsInherit": "build/entitlements.mac.plist",
     "notarize": true,
     "binaries": [
-      "Contents/Resources/screen-voice/lana-screen-voice"
+      "Contents/Resources/screen-voice/lana-screen-voice",
+      "Contents/Resources/briefs/LanaBleWake"
     ],
     "extendInfo": {
       "NSMicrophoneUsageDescription": "LANA uses the microphone when you dictate, talk with LANA, or record a meeting.",

@@ -119,8 +119,11 @@ localEngine.registerIpc();
 const { createBriefs, registerBriefsSchemes } = require('./electron-briefs');
 const { isEngineInUse } = require('./electron-api-base');
 const BRIEFS_DIST = path.join(__dirname, 'briefs', 'dist');
-const loadBriefsHost = () => require('./briefs/dist/briefs-host.cjs');
-registerBriefsSchemes(protocol, loadBriefsHost);
+// Loaded only when Briefs starts. A computed path keeps the client's bundler from
+// inlining it: the host ships as its own file in briefs/dist.
+const BRIEFS_HOST_FILE = path.join(BRIEFS_DIST, 'briefs-host.cjs');
+const loadBriefsHost = () => require(BRIEFS_HOST_FILE);
+registerBriefsSchemes(protocol);
 const briefs = createBriefs({
   electron: { app, session, protocol, desktopCapturer, systemPreferences, shell, dialog, safeStorage, nativeTheme },
   loadHost: loadBriefsHost,
@@ -890,7 +893,6 @@ function createWindow(serverUrl = null) {
     },
     show: false // Don't show until ready (prevents flash of white screen)
   });
-  briefs.addWindow(mainWindow);
   watchScreenVoiceAuthentication(mainWindow);
 
   // Load the v2 dashboard as the entry point

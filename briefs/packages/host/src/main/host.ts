@@ -24,10 +24,8 @@ import { spawnBleHelper } from "./services/bleWake/bleHelperProcess.js";
 import { WorkerTranscription } from "./services/recording/workerTranscription.js";
 import { SHUTDOWN_DRAIN_MS, ShutdownGate } from "./shutdownGate.js";
 
-/** Must run before the app is ready: replay audio is read through this scheme (streamed, seekable). */
-export function registerBriefsSchemes(protocol: Pick<Protocol, "registerSchemesAsPrivileged">): void {
-  protocol.registerSchemesAsPrivileged([{ scheme: AUDIO_SCHEME, privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true } }]);
-}
+// The replay audio scheme (AUDIO_SCHEME) is registered by the client before the app is ready
+// (electron-briefs.js registerBriefsSchemes), without loading this module.
 
 export interface BriefsHostOptions {
   readonly electron: {
@@ -143,110 +141,139 @@ export async function startBriefsHost(options: BriefsHostOptions): Promise<Brief
       await electron.shell.openExternal("ms-settings:privacy-microphone");
     }
   };
-  // The client had no permission handler: Electron's default grants everything. These keep
-  // that for every permission but media, and grant media (the microphone for dictation, Talk
-  // and recording) only to the client's own pages.
-  electron.session.setPermissionRequestHandler((_contents, permission, callback, details) => {
-    if (permission !== "media") return callback(true);
-    const media = details as { requestingUrl?: string };
-    callback(options.isTrustedURL(media.requestingUrl ?? ""));
-  });
-  electron.session.setPermissionCheckHandler((_contents, permission, origin) => (permission === "media" ? options.isTrustedURL(origin) : true));
-  // Meeting audio (everyone else in the call): display-media capture with loopback audio, only
-  // for the client's own pages and only while a recording is starting. The page stops the
-  // screen's video track at once and keeps the audio.
-  electron.session.setDisplayMediaRequestHandler((request, callback) => {
-    const deny = () => callback({});
-    if (!meetingAudioArmed || !options.isTrustedURL(request.frame?.url ?? "")) return deny();
-    electron.desktopCapturer.getSources({ types: ["screen"], thumbnailSize: { width: 0, height: 0 } }).then(
-      (sources) => (sources[0] === undefined ? deny() : callback({ video: sources[0], audio: "loopback" })),
-      () => deny(),
-    );
-  });
-
-  // MARK: - Services
-
-  const created = createRealServices({
-    runtime,
-    lanaRuntime: options.lanaRuntime,
-    platform,
-    // Clio and Microsoft are not connected from Briefs: LANA's connectors carry actions out.
-    configuration: { clioClientID: null, microsoftClientID: null },
-    emit: (event) => emit(event),
-    log,
-    applyTheme: options.applyTheme,
-    pickSavePath: async (suggestedName) => {
-      const result = await electron.dialog.showSaveDialog({ title: "Export audit log", defaultPath: join(options.documentsPath, suggestedName), filters: [{ name: "JSON Lines", extensions: ["jsonl"] }] });
-      return result.canceled || !result.filePath ? null : result.filePath;
-    },
-    openExternal: async (url) => electron.shell.openExternal(url),
-    showWindow: options.showWindow,
-    quit: options.quit,
-    legacyWalkthroughFile: null,
-    rendered: () => undefined,
-    modelsDirectory: join(options.directory, "Models"),
-    requestMicrophone,
-    recording: {
-      permissions: recordingPermissions,
-      openPrivacySettings,
-      armMeetingAudio: (armed) => {
-        meetingAudioArmed = armed;
-      },
-      transcription: new WorkerTranscription(pathToFileURL(options.transcriptionWorker)),
-    },
-    bleHelper: () => (options.bleHelper === null ? null : spawnBleHelper(options.bleHelper)),
-  });
-
-  const isTrustedSender = (event: { readonly senderFrame?: { readonly url: string } | null }): boolean => options.isTrustedURL(event.senderFrame?.url ?? "");
-  const onRecordingFrame = (event: IpcMainEvent, frame: RecordingFrame): void => {
-    if (isTrustedSender(event) && typeof frame === "object" && frame !== null) created.recording.frame(frame);
-  };
-  const onTalkFrame = (event: IpcMainEvent, frame: unknown): void => {
-    if (isTrustedSender(event) && frame instanceof Float32Array) created.talkAudio.frame(frame);
-  };
-  ipcMain.on(RECORDING_FRAME_CHANNEL, onRecordingFrame);
-  ipcMain.on(TALK_FRAME_CHANNEL, onTalkFrame);
-  derive = (event) => {
-    if (event.type === "meetingReceived") {
-      const { inbox } = created.services;
-      void derived(async () => ({ pending: await inbox.pendingCount(), unread: await inbox.unreadCount() }), (counts) => emit({ type: "inbox", ...counts }));
+  // Everything installed below is undone in reverse order: by stop(), or at once when the
+  // start fails partway, so a failed start never leaves a gateway, handler or channel behind.
+  const undo: Array<() => void> = [];
+  const undoAll = (): void => {
+    for (const step of undo.splice(0).reverse()) {
+      try {
+        step();
+      } catch {
+        log.error("shutdown.undo_failed");
+      }
     }
-    if (event.type === "gateway") void derived(() => created.services.preferences.get(), (preferences) => emit({ type: "preferences", preferences }));
   };
-  electron.protocol.handle(AUDIO_SCHEME, (request) => created.audio.handle(request.url, request.headers.get("range")));
-  const unregister = registerServices(created.services, isTrustedSender, gate);
-  created.start();
-  log.info("startup.host_ready");
 
-  let stopped: Promise<void> | null = null;
-  return {
-    addWebContents: (contents) => hub.add(contents),
-    focused: () => runtime.recheckAccess(),
-    blurred: () => created.talk.appResignedActive(),
-    restore: () => runtime.restore(),
-    stop() {
-      stopped ??= (async () => {
-        log.info("shutdown.closing");
-        gate.close();
-        derive = null;
-        unregister();
-        ipcMain.removeListener(RECORDING_FRAME_CHANNEL, onRecordingFrame);
-        ipcMain.removeListener(TALK_FRAME_CHANNEL, onTalkFrame);
-        electron.protocol.unhandle(AUDIO_SCHEME);
-        // Back to the client's own behavior: no handlers (Electron's defaults).
-        electron.session.setPermissionRequestHandler(null);
-        electron.session.setPermissionCheckHandler(null);
-        electron.session.setDisplayMediaRequestHandler(null);
-        void created.talk.end();
-        created.stop();
-        try {
-          await gate.drain(SHUTDOWN_DRAIN_MS);
-          await runtime.close();
-        } catch {
-          log.error("shutdown.close_failed");
-        }
-      })();
-      return stopped;
-    },
-  };
+  try {
+    // The client had no permission handler: Electron's default grants everything. These keep
+    // that for every permission but media, and grant media (the microphone for dictation, Talk
+    // and recording) only to the client's own pages.
+    electron.session.setPermissionRequestHandler((_contents, permission, callback, details) => {
+      if (permission !== "media") return callback(true);
+      const media = details as { requestingUrl?: string };
+      callback(options.isTrustedURL(media.requestingUrl ?? ""));
+    });
+    electron.session.setPermissionCheckHandler((_contents, permission, origin) => (permission === "media" ? options.isTrustedURL(origin) : true));
+    // Meeting audio (everyone else in the call): display-media capture with loopback audio, only
+    // for the client's own pages and only while a recording is starting. The page stops the
+    // screen's video track at once and keeps the audio.
+    electron.session.setDisplayMediaRequestHandler((request, callback) => {
+      const deny = () => callback({});
+      if (!meetingAudioArmed || !options.isTrustedURL(request.frame?.url ?? "")) return deny();
+      electron.desktopCapturer.getSources({ types: ["screen"], thumbnailSize: { width: 0, height: 0 } }).then(
+        (sources) => (sources[0] === undefined ? deny() : callback({ video: sources[0], audio: "loopback" })),
+        () => deny(),
+      );
+    });
+    // Back to the client's own behavior: no handlers (Electron's defaults).
+    undo.push(() => {
+      electron.session.setPermissionRequestHandler(null);
+      electron.session.setPermissionCheckHandler(null);
+      electron.session.setDisplayMediaRequestHandler(null);
+    });
+
+    // MARK: - Services
+
+    const created = createRealServices({
+      runtime,
+      lanaRuntime: options.lanaRuntime,
+      platform,
+      // Clio and Microsoft are not connected from Briefs: LANA's connectors carry actions out.
+      configuration: { clioClientID: null, microsoftClientID: null },
+      emit: (event) => emit(event),
+      log,
+      applyTheme: options.applyTheme,
+      pickSavePath: async (suggestedName) => {
+        const result = await electron.dialog.showSaveDialog({ title: "Export audit log", defaultPath: join(options.documentsPath, suggestedName), filters: [{ name: "JSON Lines", extensions: ["jsonl"] }] });
+        return result.canceled || !result.filePath ? null : result.filePath;
+      },
+      openExternal: async (url) => electron.shell.openExternal(url),
+      showWindow: options.showWindow,
+      quit: options.quit,
+      legacyWalkthroughFile: null,
+      rendered: () => undefined,
+      modelsDirectory: join(options.directory, "Models"),
+      requestMicrophone,
+      recording: {
+        permissions: recordingPermissions,
+        openPrivacySettings,
+        armMeetingAudio: (armed) => {
+          meetingAudioArmed = armed;
+        },
+        transcription: new WorkerTranscription(pathToFileURL(options.transcriptionWorker)),
+      },
+      bleHelper: () => (options.bleHelper === null ? null : spawnBleHelper(options.bleHelper)),
+    });
+    undo.push(() => {
+      void created.talk.end();
+      created.stop();
+    });
+
+    const isTrustedSender = (event: { readonly senderFrame?: { readonly url: string } | null }): boolean => options.isTrustedURL(event.senderFrame?.url ?? "");
+    const onRecordingFrame = (event: IpcMainEvent, frame: RecordingFrame): void => {
+      if (isTrustedSender(event) && typeof frame === "object" && frame !== null) created.recording.frame(frame);
+    };
+    const onTalkFrame = (event: IpcMainEvent, frame: unknown): void => {
+      if (isTrustedSender(event) && frame instanceof Float32Array) created.talkAudio.frame(frame);
+    };
+    ipcMain.on(RECORDING_FRAME_CHANNEL, onRecordingFrame);
+    ipcMain.on(TALK_FRAME_CHANNEL, onTalkFrame);
+    undo.push(() => {
+      ipcMain.removeListener(RECORDING_FRAME_CHANNEL, onRecordingFrame);
+      ipcMain.removeListener(TALK_FRAME_CHANNEL, onTalkFrame);
+    });
+    derive = (event) => {
+      if (event.type === "meetingReceived") {
+        const { inbox } = created.services;
+        void derived(async () => ({ pending: await inbox.pendingCount(), unread: await inbox.unreadCount() }), (counts) => emit({ type: "inbox", ...counts }));
+      }
+      if (event.type === "gateway") void derived(() => created.services.preferences.get(), (preferences) => emit({ type: "preferences", preferences }));
+    };
+    undo.push(() => {
+      derive = null;
+    });
+    electron.protocol.handle(AUDIO_SCHEME, (request) => created.audio.handle(request.url, request.headers.get("range")));
+    undo.push(() => electron.protocol.unhandle(AUDIO_SCHEME));
+    undo.push(registerServices(created.services, isTrustedSender, gate));
+    created.start();
+    log.info("startup.host_ready");
+
+    let stopped: Promise<void> | null = null;
+    return {
+      addWebContents: (contents) => hub.add(contents),
+      focused: () => runtime.recheckAccess(),
+      blurred: () => created.talk.appResignedActive(),
+      restore: () => runtime.restore(),
+      stop() {
+        stopped ??= (async () => {
+          log.info("shutdown.closing");
+          gate.close();
+          undoAll();
+          try {
+            await gate.drain(SHUTDOWN_DRAIN_MS);
+            await runtime.close();
+          } catch {
+            log.error("shutdown.close_failed");
+          }
+        })();
+        return stopped;
+      },
+    };
+  } catch (error) {
+    log.error("startup.failed", { error: error instanceof Error ? error.name : "unknown", stage: "services" });
+    gate.close();
+    undoAll();
+    await runtime.close().catch(() => log.error("shutdown.close_failed"));
+    throw new BriefsHostStartupError("LANA Briefs could not start its services on this computer.");
+  }
 }

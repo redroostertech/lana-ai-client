@@ -1,38 +1,73 @@
 'use strict';
 
-// LANA Briefs runs only while discovery lists lana-notes and someone is signed in
-// (electron-briefs.js): the host starts and stops with the saved server, never twice,
-// and stops on sign-out.
+// LANA Briefs in the client's main process (electron-briefs.js): it runs only while
+// discovery lists lana-notes and someone is signed in, one start or stop at a time, in a
+// folder per person, restores only once a window has loaded, and every window gets its
+// events. Each test names the review finding it guards.
 
-const { createBriefs, isBriefsEnabled, isClientPage } = require('../../electron-briefs');
+const fs = require('fs');
+const path = require('path');
+const { EventEmitter } = require('events');
+const { createBriefs, isBriefsEnabled, isClientPage, personKey, registerBriefsSchemes, BRIEFS_AUDIO_SCHEME } = require('../../electron-briefs');
+const beforePack = require('../../scripts/briefs-before-pack');
 
-function fakeWindow() {
-  const handlers = {};
-  return { webContents: { id: Math.random() }, isDestroyed: () => false, on: (name, fn) => { handlers[name] = fn; }, handlers };
+function token(claims) {
+  const part = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
+  return `${part({ alg: 'HS256' })}.${part(claims)}.sig`;
+}
+const ALICE = token({ userId: 'u-alice', organizationId: 'org-1' });
+const BOB = token({ userId: 'u-bob', organizationId: 'org-1' });
+
+function fakeWindow({ loaded = true } = {}) {
+  const contents = new EventEmitter();
+  contents.isLoading = () => !loaded;
+  contents.getURL = () => (loaded ? 'file:///app/public_html/dashboard.html' : '');
+  contents.finishLoad = () => { loaded = true; contents.emit('did-finish-load'); };
+  return { webContents: contents, isDestroyed: () => false };
 }
 
-function setup({ token = 'tok' } = {}) {
-  const calls = { started: 0, stopped: 0, added: 0, options: null };
-  let release = null;
-  const host = {
-    addWebContents: () => { calls.added += 1; },
-    focused: jest.fn(),
-    blurred: jest.fn(),
-    restore: async () => {},
-    stop: async () => { calls.stopped += 1; }
-  };
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
+}
+
+function setup({ windows = [fakeWindow()], startGate = null, stopGate = null, restoreError = null } = {}) {
+  const app = new EventEmitter();
+  Object.assign(app, { getPath: (name) => `/tmp/${name}`, isPackaged: false, quit: jest.fn() });
+  const state = { token: ALICE, windows };
+  const log = { info: jest.fn(), warn: jest.fn(), error: jest.fn() };
+  const hosts = [];
   const module = {
     startBriefsHost: jest.fn(async (options) => {
-      calls.started += 1;
-      calls.options = options;
-      if (release) await release;
+      if (startGate) await startGate;
+      const host = {
+        options,
+        added: [],
+        restored: 0,
+        stopped: 0,
+        stopDone: false,
+        addWebContents: (contents) => host.added.push(contents),
+        focused: jest.fn(),
+        blurred: jest.fn(),
+        restore: async () => {
+          host.restored += 1;
+          if (restoreError) throw restoreError;
+        },
+        stop: async () => {
+          host.stopped += 1;
+          if (stopGate) await stopGate;
+          host.stopDone = true;
+        }
+      };
+      hosts.push(host);
       return host;
     })
   };
-  const state = { token };
   const briefs = createBriefs({
     electron: {
-      app: { getPath: (name) => `/tmp/${name}`, isPackaged: false, quit: jest.fn() },
+      app,
       session: { defaultSession: {} },
       protocol: {}, desktopCapturer: {}, systemPreferences: {}, shell: {}, dialog: {}, safeStorage: {}, nativeTheme: {}
     },
@@ -40,15 +75,16 @@ function setup({ token = 'tok' } = {}) {
     distDir: '/app/briefs/dist',
     engineBase: () => 'http://127.0.0.1:8079',
     getToken: () => state.token,
-    getWindows: () => [fakeWindow()],
+    getWindows: () => state.windows,
     showWindow: jest.fn(),
-    log: { info: jest.fn(), warn: jest.fn(), error: jest.fn() }
+    log
   });
-  return { briefs, calls, host, module, state, hold: (promise) => { release = promise; } };
+  return { briefs, app, state, hosts, module, log };
 }
 
 const enabled = { orgId: 'org', enabledApps: [{ id: 'lana-works' }, { id: 'lana-notes', label: 'LANA Briefs' }] };
 const without = { orgId: 'org', enabledApps: [{ id: 'lana-works' }] };
+const flush = () => new Promise((resolve) => setImmediate(resolve));
 
 describe('LANA Briefs in the client', () => {
   test('reads lana-notes from discovery as an object or a plain id; anything else is off (control)', () => {
@@ -65,68 +101,147 @@ describe('LANA Briefs in the client', () => {
     expect(isClientPage('')).toBe(false);
   });
 
-  test('starts once when enabled, with Briefs\' own folder and LANA\'s runtime; stops when discovery drops it', async () => {
-    const { briefs, calls } = setup();
+  test('starts once with LANA\'s runtime, restores after a window has loaded, and stops when discovery drops it', async () => {
+    const { briefs, hosts } = setup();
     await briefs.sync(enabled);
     await briefs.sync(enabled);
-    expect(calls.started).toBe(1);
-    expect(calls.added).toBe(1);
-    expect(calls.options.directory).toBe('/tmp/userData/briefs');
-    expect(calls.options.lanaRuntime.engineBase()).toBe('http://127.0.0.1:8079');
-    expect(calls.options.lanaRuntime.token()).toBe('tok');
-    expect(calls.options.transcriptionWorker).toBe('/app/briefs/dist/briefs-transcription-worker.cjs');
+    expect(hosts).toHaveLength(1);
+    const [host] = hosts;
+    expect(host.restored).toBe(1);
+    expect(host.options.lanaRuntime.engineBase()).toBe('http://127.0.0.1:8079');
+    expect(host.options.lanaRuntime.token()).toBe(ALICE);
+    expect(host.options.transcriptionWorker).toBe('/app/briefs/dist/briefs-transcription-worker.cjs');
     expect(briefs.isRunning()).toBe(true);
     await briefs.sync(without);
-    expect(calls.stopped).toBe(1);
+    expect(host.stopped).toBe(1);
     expect(briefs.isRunning()).toBe(false);
+  });
+
+  test('finding: shared computer. Each person has their own folder, and another person signing in stops the previous host first', async () => {
+    const { briefs, hosts, state } = setup();
+    await briefs.sync(enabled);
+    state.token = BOB;
+    await briefs.sync(enabled);
+    expect(hosts).toHaveLength(2);
+    expect(hosts[0].stopDone).toBe(true);
+    const [alice, bob] = hosts.map((host) => host.options.directory);
+    expect(alice).not.toBe(bob);
+    expect(alice).toBe(path.join('/tmp/userData', 'briefs', 'people', personKey(ALICE)));
+    expect(alice).not.toContain('u-alice');
+    expect(personKey('not-a-jwt')).toBeNull();
+    expect(personKey(token({ organizationId: 'org-1' }))).toBeNull();
   });
 
   test('never starts without a session, and stops on sign-out', async () => {
-    const signedOut = setup({ token: null });
+    const signedOut = setup();
+    signedOut.state.token = null;
     await signedOut.briefs.sync(enabled);
-    expect(signedOut.calls.started).toBe(0);
-    const { briefs, calls } = setup();
+    expect(signedOut.hosts).toHaveLength(0);
+    const { briefs, hosts } = setup();
     await briefs.sync(enabled);
     await briefs.sync(null);
-    expect(calls.stopped).toBe(1);
+    expect(hosts[0].stopped).toBe(1);
   });
 
-  test('a stop asked for while it is starting stops it once the start finishes', async () => {
-    const { briefs, calls, hold } = setup();
-    let release;
-    hold(new Promise((resolve) => { release = resolve; }));
-    const first = briefs.sync(enabled);
-    const second = briefs.sync(without);
-    release();
-    await Promise.all([first, second]);
-    expect(calls.started).toBe(1);
-    expect(calls.stopped).toBe(1);
-    expect(briefs.isRunning()).toBe(false);
+  test('finding: restore before a window. The host waits for a loaded page before it restores', async () => {
+    const pending = fakeWindow({ loaded: false });
+    const { briefs, hosts } = setup({ windows: [pending] });
+    const started = briefs.sync(enabled);
+    await flush();
+    expect(hosts).toHaveLength(1);
+    expect(hosts[0].restored).toBe(0);
+    pending.webContents.finishLoad();
+    await started;
+    expect(hosts[0].restored).toBe(1);
   });
 
-  test('a start that fails leaves Briefs off and logs only the error name', async () => {
-    const { briefs, module } = setup();
-    module.startBriefsHost.mockRejectedValueOnce(Object.assign(new Error('secret path /Users/x'), { name: 'BriefsHostStartupError' }));
-    const log = { info: jest.fn(), warn: jest.fn(), error: jest.fn() };
-    const failing = createBriefs({
-      electron: { app: { getPath: () => '/tmp', isPackaged: false }, session: { defaultSession: {} } },
-      loadHost: () => module, distDir: '/d', engineBase: () => null, getToken: () => 't', getWindows: () => [], showWindow: () => {}, log
-    });
-    await failing.sync(enabled);
-    expect(failing.isRunning()).toBe(false);
-    expect(log.error).toHaveBeenCalledWith('[briefs] did not start: BriefsHostStartupError');
-    expect(JSON.stringify(log.error.mock.calls)).not.toContain('/Users/x');
-    expect(briefs.isRunning()).toBe(false);
-  });
-
-  test('windows get Briefs events while it runs and tell it about focus and blur', async () => {
-    const { briefs, host } = setup();
+  test('finding: windows. Every window, including ones made later and the login window, gets events, focus and blur', async () => {
+    const { briefs, hosts, app } = setup();
     await briefs.sync(enabled);
-    const window = fakeWindow();
-    briefs.addWindow(window);
-    window.handlers.focus();
-    window.handlers.blur();
+    const later = fakeWindow();
+    app.emit('browser-window-created', {}, later);
+    app.emit('browser-window-focus');
+    app.emit('browser-window-blur');
+    const [host] = hosts;
+    expect(host.added).toContain(later.webContents);
     expect(host.focused).toHaveBeenCalledTimes(1);
     expect(host.blurred).toHaveBeenCalledTimes(1);
+  });
+
+  test('finding: partial start. A restore that fails stops the host it started, and the next sync starts cleanly', async () => {
+    const error = Object.assign(new Error('secret path /Users/x'), { name: 'BriefsHostStartupError' });
+    const { briefs, hosts, log } = setup({ restoreError: error });
+    await briefs.sync(enabled);
+    expect(hosts[0].stopped).toBe(1);
+    expect(briefs.isRunning()).toBe(false);
+    expect(log.error).toHaveBeenCalledWith('[briefs] did not start: BriefsHostStartupError');
+    expect(JSON.stringify(log.error.mock.calls)).not.toContain('/Users/x');
+  });
+
+  test('finding: quit during a stop. stop() waits for a stop already in progress', async () => {
+    const gate = deferred();
+    const { briefs, hosts } = setup({ stopGate: gate.promise });
+    await briefs.sync(enabled);
+    const signOut = briefs.sync(null);
+    let quitDone = false;
+    const quit = briefs.stop().then(() => { quitDone = true; });
+    await flush();
+    expect(quitDone).toBe(false);
+    gate.resolve();
+    await Promise.all([signOut, quit]);
+    expect(hosts[0].stopDone).toBe(true);
+    expect(quitDone).toBe(true);
+  });
+
+  test('a stop asked for while a start waits for a window ends the wait and stops the host; a token refresh for the same person does not', async () => {
+    const pending = fakeWindow({ loaded: false });
+    const { briefs, hosts } = setup({ windows: [pending] });
+    const start = briefs.sync(enabled);
+    await flush();
+    const refresh = briefs.sync(enabled);
+    await flush();
+    expect(hosts[0].stopped).toBe(0);
+    pending.webContents.finishLoad();
+    await Promise.all([start, refresh]);
+    expect(hosts[0].restored).toBe(1);
+
+    const second = setup({ windows: [fakeWindow({ loaded: false })] });
+    const waiting = second.briefs.sync(enabled);
+    await flush();
+    await second.briefs.stop();
+    await waiting;
+    expect(second.hosts[0].restored).toBe(0);
+    expect(second.hosts[0].stopDone).toBe(true);
+  });
+
+  test('finding: cost while off. The scheme registers without loading Briefs, and matches the host\'s', () => {
+    const registered = [];
+    registerBriefsSchemes({ registerSchemesAsPrivileged: (schemes) => registered.push(...schemes) });
+    expect(registered.map((scheme) => scheme.scheme)).toEqual([BRIEFS_AUDIO_SCHEME]);
+    const source = fs.readFileSync(path.join(__dirname, '../../briefs/packages/host/src/main/services/meetingAudio.ts'), 'utf8');
+    expect(source).toContain(`export const AUDIO_SCHEME = "${BRIEFS_AUDIO_SCHEME}";`);
+  });
+});
+
+describe('packaging: the Briefs speech engine for each target', () => {
+  test('finding: cross builds. Each target needs its own sherpa platform package', () => {
+    expect(beforePack.requiredPackages('darwin', 3)).toEqual(['sherpa-onnx-darwin-arm64']);
+    expect(beforePack.requiredPackages('darwin', 1)).toEqual(['sherpa-onnx-darwin-x64']);
+    expect(beforePack.requiredPackages('win32', 1)).toEqual(['sherpa-onnx-win-x64']);
+    expect(beforePack.requiredPackages('darwin', 4)).toEqual(['sherpa-onnx-darwin-arm64', 'sherpa-onnx-darwin-x64']);
+  });
+
+  test('refuses a build whose platform package is missing; one that is installed passes (control)', async () => {
+    const root = fs.mkdtempSync(path.join(require('os').tmpdir(), 'briefs-pack-'));
+    try {
+      fs.mkdirSync(path.join(root, 'node_modules', 'sherpa-onnx-darwin-arm64'), { recursive: true });
+      fs.writeFileSync(path.join(root, 'node_modules', 'sherpa-onnx-darwin-arm64', 'package.json'), '{}');
+      expect(beforePack.missingPackages(root, 'darwin', 3)).toEqual([]);
+      expect(beforePack.missingPackages(root, 'darwin', 1)).toEqual(['sherpa-onnx-darwin-x64']);
+      expect(beforePack.missingPackages(root, 'win32', 1)).toEqual(['sherpa-onnx-win-x64']);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+    await expect(beforePack({ electronPlatformName: 'win32', arch: 6 })).rejects.toThrow(/speech engine missing/);
   });
 });
