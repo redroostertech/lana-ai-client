@@ -9,7 +9,6 @@ export * as handoff from "./handoff/index.js";
 export * as store from "./store/index.js";
 export * as keys from "./keys/index.js";
 export * as gateway from "./gateway/index.js";
-export * as account from "./account/index.js";
 export * as executors from "./executors/index.js";
 export * as connectors from "./connectors/index.js";
 export * as ask from "./ask/index.js";

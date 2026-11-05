@@ -3,31 +3,26 @@ import {
   LANA_ERROR_MESSAGES, LanaActionExecutor, LanaClient, LanaError, LanaUndoClosedError, fetchLanaTransport, lanaLedgerKey, lanaMarker,
   type LanaActionInput, type LanaErrorKind, type LanaTransport,
 } from "../../src/lana/index.js";
-import { FakeLanaServer, sessionAccess, signedInAccount, type SeenRequest } from "../support/fakeLanaServer.js";
+import { clientSession, FakeLanaServer, type SeenRequest } from "../support/fakeLanaServer.js";
 import { openRig, type StoreRig } from "../support/storeRig.js";
 
 const MATTER = "4f6c1d2e-0000-4000-8000-000000000042";
 const OTHER_MATTER = "4f6c1d2e-0000-4000-8000-000000000043";
 
 let server: FakeLanaServer;
-let disposers: Array<() => void> = [];
-
 beforeEach(async () => {
   server = new FakeLanaServer();
   await server.start();
-  disposers = [];
 });
 
 afterEach(async () => {
-  for (const dispose of disposers) dispose();
   await server.stop();
 });
 
-async function client(options: { token?: string; refreshTo?: string | null; transport?: LanaTransport; readTimeoutMs?: number; writeTimeoutMs?: number } = {}) {
-  const account = await signedInAccount(server.baseURL, options);
-  disposers.push(() => account.manager.dispose());
+async function client(options: { token?: string; transport?: LanaTransport; readTimeoutMs?: number; writeTimeoutMs?: number } = {}) {
+  const account = clientSession(server.baseURL, options.token);
   const lana = new LanaClient({
-    session: sessionAccess(account.manager),
+    session: account.session,
     transport: options.transport ?? fetchLanaTransport,
     sleep: async () => undefined,
     ...(options.readTimeoutMs === undefined ? {} : { readTimeoutMs: options.readTimeoutMs }),
@@ -67,24 +62,20 @@ describe("LanaClient", () => {
     expect(server.seen).toHaveLength(0);
   });
 
-  it("refreshes once on a 401 and retries with the new token", async () => {
-    const { lana, account } = await client({ token: "stale", refreshTo: "token-1" });
-    expect(await lana.searchMatters("lease")).toHaveLength(1);
-    expect(account.refreshes()).toBe(1);
-    expect(server.seen.map((r) => r.token)).toEqual(["stale", "token-1"]);
-  });
-
-  it("maps a 401 that survives the refresh to signedOut and signs out", async () => {
-    const { lana, account } = await client({ token: "stale", refreshTo: "also-stale" });
+  it("maps a 401 to signedOut and does not retry: the client's one session ended", async () => {
+    const { lana } = await client({ token: "stale" });
     const error = await failure(lana.searchMatters("lease"));
     expect(error.kind).toBe("signedOut");
     expect(error.message).toBe(LANA_ERROR_MESSAGES.signedOut);
-    expect(account.manager.isSignedIn).toBe(false);
+    expect(server.seen.filter(searches)).toHaveLength(1);
   });
 
-  it("maps a refused refresh to signedOut", async () => {
-    const { lana } = await client({ token: "stale", refreshTo: null });
+  it("calls nothing once the client signed out; signed in, it calls with the client's token (control)", async () => {
+    const { lana, account } = await client();
+    expect(await lana.searchMatters("lease")).toHaveLength(1);
+    account.signOut();
     expect((await failure(lana.searchMatters("lease"))).kind).toBe("signedOut");
+    expect(server.seen.filter(searches)).toHaveLength(1);
   });
 
   it.each<[number, LanaErrorKind]>([[403, "noAccess"], [404, "notFound"], [400, "rejected"], [422, "rejected"], [429, "busy"], [500, "server"], [503, "server"]])(

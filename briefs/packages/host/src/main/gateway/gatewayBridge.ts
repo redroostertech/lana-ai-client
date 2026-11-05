@@ -1,11 +1,9 @@
-import type { AccountManager } from "@lana/core/account";
 import type { GatewayStatus as CoreStatus, HandoffEvent, HandoffGateway, PairingState as CorePairing, ToneBridge } from "@lana/core/gateway";
 import { parseLanaId } from "@lana/core/ids";
 import type {
   DevicesApi, GatewayStatus, HandoffApi, HandoffView, LanaEvent, PairedDevice, PairingState, Result, ToneApi,
 } from "../../shared/api.js";
 import type { MainLog } from "../log.js";
-import { NOT_ENTITLED_MESSAGE, type AccessBridge } from "./accessBridge.js";
 
 /** How long a finished or failed handoff stays on screen before the prompt closes itself. */
 const OUTCOME_VISIBLE_MS = 6_000;
@@ -48,8 +46,8 @@ export function toApiGatewayStatus(status: CoreStatus, signedIn: boolean): Gatew
 
 /**
  * Devices, pairing, handoff prompts and the tone bridge over the real `HandoffGateway`,
- * plus the sign-in gate: the gateway listens only while someone is signed in, and
- * signing out stops it at once (Swift `GatewayDependencies` observing `AccountManager`).
+ * plus the sign-in gate: the gateway listens only while someone is signed in to the LANA
+ * client, and signing out stops it at once.
  */
 export class GatewayBridge implements DevicesApi {
   private view: HandoffView = { kind: "idle" };
@@ -60,8 +58,8 @@ export class GatewayBridge implements DevicesApi {
 
   constructor(
     private readonly gateway: HandoffGateway,
-    private readonly manager: AccountManager,
-    private readonly access: Pick<AccessBridge, "isOpen" | "onChange">,
+    /** The client's session (the only one): the gateway listens only while it is signed in. */
+    private readonly session: { readonly isSignedIn: boolean; addObserver(observer: (signedIn: boolean) => void): () => void },
     private readonly toneBridge: ToneBridge,
     private readonly emit: (event: LanaEvent) => void,
     private readonly log: MainLog,
@@ -83,7 +81,7 @@ export class GatewayBridge implements DevicesApi {
       this.log.info("gateway.records_changed", { phone: change.phoneDeviceId, reason: change.reason, meetings: change.meetingIds.length });
       for (const meetingID of change.meetingIds) this.emit({ type: "recordsChanged", meetingID });
     });
-    access.onChange((open) => this.applyGate(open));
+    session.addObserver((signedIn) => void this.applyGate(signedIn));
 
     this.handoff = {
       state: async () => this.view,
@@ -109,15 +107,15 @@ export class GatewayBridge implements DevicesApi {
   }
 
   /**
-   * Starts or stops the listener to match the access gate (signed in, and LANA Briefs on for
-   * the organization). Calls run one after another.
+   * Starts or stops the listener to match the session (the client runs Briefs only while the
+   * firm has it). Calls run one after another.
    */
   applyGate(open: boolean): Promise<void> {
     this.gate = this.gate.then(async () => {
-      if (open && this.access.isOpen) {
+      if (open && this.session.isSignedIn) {
         const status = await this.gateway.start();
         this.log.info("gateway.gate_open", { state: status.state });
-      } else if (!this.access.isOpen) {
+      } else if (!this.session.isSignedIn) {
         this.toneBridge.cancelAll();
         await this.gateway.stop();
         this.setView({ kind: "idle" });
@@ -162,8 +160,7 @@ export class GatewayBridge implements DevicesApi {
   }
 
   async startPairing(): Promise<PairingState> {
-    if (!this.manager.isSignedIn) return { kind: "failed", message: "Sign in to LANA before pairing a phone." };
-    if (!this.access.isOpen) return { kind: "failed", message: NOT_ENTITLED_MESSAGE };
+    if (!this.session.isSignedIn) return { kind: "failed", message: "Sign in to LANA before pairing a phone." };
     this.log.info("pairing.start");
     return toApiPairing(this.gateway.beginPairing());
   }
@@ -184,13 +181,13 @@ export class GatewayBridge implements DevicesApi {
   }
 
   async gatewayStatus(): Promise<GatewayStatus> {
-    return toApiGatewayStatus(this.gateway.status, this.manager.isSignedIn);
+    return toApiGatewayStatus(this.gateway.status, this.session.isSignedIn);
   }
 
   // Private
 
   private emitStatus(): void {
-    this.emit({ type: "gateway", status: toApiGatewayStatus(this.gateway.status, this.manager.isSignedIn) });
+    this.emit({ type: "gateway", status: toApiGatewayStatus(this.gateway.status, this.session.isSignedIn) });
   }
 
   private onHandoff(event: HandoffEvent): void {

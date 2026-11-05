@@ -1,6 +1,5 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
-import { AccountManager, MemoryAccountSessionStore, type LanaAccountService, type LanaAccountSession } from "../../src/account/index.js";
 import type { LanaSessionAccess } from "../../src/lana/index.js";
 
 /** One request as the fake server saw it. */
@@ -159,41 +158,22 @@ export class FakeLanaServer {
   }
 }
 
-/** A signed-in `AccountManager` on `baseURL` whose refresh hands out `refreshTo` (or fails). */
-export async function signedInAccount(baseURL: string, options: { token?: string; refreshTo?: string | null } = {}): Promise<{ manager: AccountManager; refreshes: () => number }> {
-  let refreshes = 0;
-  const session: LanaAccountSession = {
-    token: options.token ?? "token-1",
-    sessionID: null,
-    expiresAt: new Date(Date.now() + 24 * 3_600_000),
-    server: { baseURL, organizationID: "mwestbrooks", organizationName: null },
-    user: { id: "user-1", email: "person@example.com", firstName: null, lastName: null, organizationID: null, timezone: null, mustChangePassword: false },
-  };
-  const service = {
-    async refresh(current: LanaAccountSession): Promise<LanaAccountSession> {
-      refreshes += 1;
-      if (options.refreshTo === null || options.refreshTo === undefined) {
-        const { LanaAccountError } = await import("../../src/account/index.js");
-        throw new LanaAccountError("sessionExpired");
-      }
-      return { ...current, token: options.refreshTo };
-    },
-    async signOut(): Promise<void> {},
-  } as unknown as LanaAccountService;
-  const store = new MemoryAccountSessionStore();
-  store.session = session;
-  const manager = new AccountManager({ service, sessions: store, sleep: () => new Promise(() => undefined) });
-  await manager.restore();
-  return { manager, refreshes: () => refreshes };
-}
-
-/** `AccountManager` as the client's session access, the way main wires it. */
-export function sessionAccess(manager: AccountManager): LanaSessionAccess {
+/**
+ * The LANA client's session on `baseURL` with a fixed token, the way the host reads it: one
+ * session, owned by the client. `signedOut()` ends it.
+ */
+export function clientSession(baseURL: string, token = "token-1"): { session: LanaSessionAccess; signOut: () => void } {
+  let current: string | null = token;
   return {
-    authorized: (call) => manager.authorized((token) => {
-      const server = manager.session?.server;
-      if (server === undefined) throw new Error("signed out");
-      return call({ baseURL: server.baseURL, token });
-    }),
+    session: {
+      authorized: async (call) => {
+        const { LanaError } = await import("../../src/lana/index.js");
+        if (current === null) throw new LanaError("signedOut", 401);
+        return call({ baseURL, token: current });
+      },
+    },
+    signOut: () => {
+      current = null;
+    },
   };
 }

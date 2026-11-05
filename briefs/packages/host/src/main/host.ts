@@ -19,7 +19,7 @@ import { EventHub, registerServices } from "./ipc.js";
 import { createMainLog, type MainLog } from "./log.js";
 import { AUDIO_SCHEME } from "./services/meetingAudio.js";
 import { createRealServices } from "./services/realServices.js";
-import type { LanaRuntimeAccess } from "./services/models/modelService.js";
+import type { ClientSessionSnapshot } from "./gateway/clientSession.js";
 import { spawnBleHelper } from "./services/bleWake/bleHelperProcess.js";
 import { WorkerTranscription } from "./services/recording/workerTranscription.js";
 import { SHUTDOWN_DRAIN_MS, ShutdownGate } from "./shutdownGate.js";
@@ -42,8 +42,10 @@ export interface BriefsHostOptions {
   readonly directory: string;
   /** The client's own pages: only they may call Briefs, open the microphone or record meeting audio. */
   readonly isTrustedURL: (url: string) => boolean;
-  /** LANA's runtime: the local AI engine's address and the person's session. */
-  readonly lanaRuntime: LanaRuntimeAccess;
+  /** The local AI engine's address while it is in use, else null: every language model call goes to its runtime route. */
+  readonly engineBase: () => string | null;
+  /** The LANA client's session, read when needed. There is one session: Briefs has no sign-in of its own. */
+  readonly session: () => ClientSessionSnapshot | null;
   /** The bundled transcription worker script (a file path). */
   readonly transcriptionWorker: string;
   /** The macOS Bluetooth wake helper, or null where there is none. */
@@ -58,11 +60,15 @@ export interface BriefsHostOptions {
 export interface BriefsHost {
   /** A client window that shows Briefs pages: it gets Briefs' events. */
   addWebContents(contents: WebContents): void;
-  /** The window came forward: asks again whether Briefs is on (at most every few minutes). */
+  /** The window came forward. */
   focused(): void;
+  /** The client's session changed (sign-in, a refreshed token): read it again. */
+  sessionChanged(): void;
+  /** The person's session ended (sign-out, another person): revokes the phones' background leases. Call before stop. */
+  endSession(): Promise<void>;
   /** A window went to the background: Talk ends there only when Settings says so. */
   blurred(): void;
-  /** Reads the saved session and opens the phone gateway. Call once a client window has loaded. */
+  /** Reads the client's session and opens the phone gateway. Call once a client window has loaded. */
   restore(): Promise<void>;
   /** Stops IPC, drains calls in flight and closes the store. */
   stop(): Promise<void>;
@@ -105,7 +111,7 @@ export async function startBriefsHost(options: BriefsHostOptions): Promise<Brief
   let runtime: GatewayRuntime;
   try {
     log.info("startup.host", { version: platform.appVersion, os: process.platform });
-    runtime = await openGatewayRuntime({ userData: options.directory, safeStorage: electron.safeStorage, emit: (event) => emit(event), log });
+    runtime = await openGatewayRuntime({ userData: options.directory, safeStorage: electron.safeStorage, emit: (event) => emit(event), log, session: options.session });
   } catch (error) {
     if (error instanceof StartupError) throw new BriefsHostStartupError(error.message);
     log.error("startup.failed", { error: error instanceof Error ? error.name : "unknown" });
@@ -186,7 +192,8 @@ export async function startBriefsHost(options: BriefsHostOptions): Promise<Brief
 
     const created = createRealServices({
       runtime,
-      lanaRuntime: options.lanaRuntime,
+      // LANA's runtime, with the one session's token.
+      lanaRuntime: { engineBase: () => options.engineBase(), token: () => options.session()?.token ?? null },
       platform,
       // Clio and Microsoft are not connected from Briefs: LANA's connectors carry actions out.
       configuration: { clioClientID: null, microsoftClientID: null },
@@ -251,7 +258,9 @@ export async function startBriefsHost(options: BriefsHostOptions): Promise<Brief
     let stopped: Promise<void> | null = null;
     return {
       addWebContents: (contents) => hub.add(contents),
-      focused: () => runtime.recheckAccess(),
+      focused: () => runtime.sessionChanged(),
+      sessionChanged: () => runtime.sessionChanged(),
+      endSession: () => runtime.endSession(),
       blurred: () => created.talk.appResignedActive(),
       restore: () => runtime.restore(),
       stop() {

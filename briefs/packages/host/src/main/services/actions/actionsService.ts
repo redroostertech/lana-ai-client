@@ -9,7 +9,7 @@ import type {
   RecipientRow, RecipientState, Result, TargetChoice, TargetState,
 } from "../../../shared/api.js";
 import type { MainLog } from "../../log.js";
-import { NOT_ENTITLED_MESSAGE } from "../../gateway/accessBridge.js";
+import { NOT_ENTITLED_MESSAGE } from "../../gateway/accessMessages.js";
 import { toApiMethod } from "../../gateway/meetingsBridge.js";
 import {
   ActionServiceError, connectorNameFor, executorFor,

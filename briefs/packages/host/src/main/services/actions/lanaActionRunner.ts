@@ -6,7 +6,7 @@ import {
 } from "@lana/core/lana";
 import { AUDIT_EVENTS, StoreError, type GatewayStore, type StoredAction } from "@lana/core/store";
 import type { ActionPhase, Result } from "../../../shared/api.js";
-import { NOT_ENTITLED_MESSAGE } from "../../gateway/accessBridge.js";
+import { NOT_ENTITLED_MESSAGE } from "../../gateway/accessMessages.js";
 import type { MainLog } from "../../log.js";
 import type { ActionRunner, RunGate } from "./actionPagesService.js";
 import type { ExecutionResult } from "./actionService.js";

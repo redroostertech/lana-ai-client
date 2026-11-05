@@ -14,6 +14,12 @@
  * person never opens the previous person's meetings, phone pairing or session. A different
  * person signing in stops the previous host first.
  *
+ * There is one session, the client's. Briefs has no sign-in, token or sign-out of its own: it
+ * reads the client's session when it needs it, is told when it changes (sign-in, a refreshed
+ * token), and when the person's session ends (sign-out, or another person signing in) it
+ * revokes the phones' background access before it stops. Turning Briefs off for the firm
+ * only stops it.
+ *
  * Starts and stops run one at a time, in order. A start that fails is cleaned up by the
  * host itself; a restore that fails stops the host it started.
  *
@@ -53,24 +59,55 @@ function isClientPage(url) {
   }
 }
 
-/**
- * The person a session token belongs to, as a folder name: a hash of the organization and
- * user ids in its claims (read, not verified: it only picks a folder; LANA checks the token).
- * Null when the token names no person.
- */
-function personKey(token) {
+/** The claims of a session token (read, not verified: LANA checks the token), or null. */
+function claimsOf(token) {
   if (typeof token !== 'string') return null;
   const parts = token.split('.');
   if (parts.length !== 3) return null;
   try {
-    const claims = JSON.parse(Buffer.from(parts[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'));
-    const user = claims.userId || claims.user_id || claims.sub;
-    const org = claims.organizationId || claims.organization_id || claims.org || '';
-    if (!user) return null;
-    return crypto.createHash('sha256').update(`${org}:${user}`).digest('hex').slice(0, 24);
+    return JSON.parse(Buffer.from(parts[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'));
   } catch (_) {
     return null;
   }
+}
+
+function text(value) {
+  return typeof value === 'string' || typeof value === 'number' ? String(value) : '';
+}
+
+/** Who a token belongs to: organization and user ids, email and name when the token carries them. */
+function personOf(token) {
+  const claims = claimsOf(token);
+  if (!claims) return null;
+  const id = text(claims.userId || claims.user_id || claims.sub);
+  if (!id) return null;
+  return {
+    id,
+    organizationID: text(claims.organizationId || claims.organization_id || claims.org),
+    email: text(claims.email),
+    firstName: text(claims.firstName || claims.first_name),
+    lastName: text(claims.lastName || claims.last_name)
+  };
+}
+
+/** The person a session token belongs to, as a folder name: a hash of their organization and user ids. Null when it names no person. */
+function personKey(token) {
+  const person = personOf(token);
+  return person ? crypto.createHash('sha256').update(`${person.organizationID}:${person.id}`).digest('hex').slice(0, 24) : null;
+}
+
+/**
+ * The client's one session as Briefs reads it, or null when signed out: the token, where
+ * LANA calls go (the client's API base) and who is signed in. Never logged.
+ */
+function sessionSnapshot(token, apiBase, server) {
+  const person = personOf(token);
+  if (!person || !apiBase) return null;
+  return {
+    token,
+    apiBase,
+    user: { ...person, organizationName: text(server && server.orgName) }
+  };
 }
 
 /** Where the packaged app keeps files unpacked from asar (the transcription worker loads sherpa from there). */
@@ -89,6 +126,8 @@ function isLoaded(window) {
  * @param {function} deps.loadHost - () => the built host module (briefs/dist/briefs-host.cjs)
  * @param {string} deps.distDir - the folder holding the built bundles
  * @param {function} deps.engineBase - () => the local AI engine's URL while it is in use, else null
+ * @param {function} deps.apiBase - () => the client's API base (the engine, which forwards to the firm's server, or the server)
+ * @param {function} deps.getServer - () => the saved server (discovery), or null
  * @param {function} deps.getToken - () => the person's LANA session token, or null
  * @param {function} deps.getWindows - () => the open BrowserWindows
  * @param {function} deps.showWindow
@@ -173,7 +212,8 @@ function createBriefs(deps) {
       },
       directory: path.join(electron.app.getPath('userData'), 'briefs', 'people', key),
       isTrustedURL: isClientPage,
-      lanaRuntime: { engineBase: () => deps.engineBase(), token: () => deps.getToken() || null },
+      engineBase: () => deps.engineBase(),
+      session: () => sessionSnapshot(deps.getToken() || null, deps.apiBase(), deps.getServer()),
       transcriptionWorker: unpacked(path.join(deps.distDir, 'briefs-transcription-worker.cjs')),
       bleHelper: bleHelperPath(),
       showWindow: deps.showWindow,
@@ -198,9 +238,11 @@ function createBriefs(deps) {
     }
   }
 
-  async function stopHost() {
+  /** `ended`: the person's session ended (sign-out, another person), so the phones' background access goes first. */
+  async function stopHost(ended = false) {
     const running = host;
     if (!running) return;
+    if (ended) await running.endSession().catch(() => log.error('[briefs] session end failed'));
     await running.stop();
     if (host === running) {
       host = null;
@@ -226,9 +268,17 @@ function createBriefs(deps) {
     if (cancelWait && wantedKey(server) !== startingKey) cancelWait();
     return enqueue(async () => {
       const key = wantedKey(server);
+      if (host && hostKey === key) {
+        // Same person: a sign-in event or a refreshed token. Briefs reads the session again.
+        host.sessionChanged();
+        return;
+      }
       if (host && hostKey !== key) {
+        // Signed out, or another person signed in: their session ended. Turned off for the firm: it only stops.
+        const token = deps.getToken();
+        const ended = !token || personKey(token) !== hostKey;
         try {
-          await stopHost();
+          await stopHost(ended);
           log.info('[briefs] stopped');
         } catch (_) {
           log.error('[briefs] stop failed');
@@ -261,4 +311,4 @@ function registerBriefsSchemes(protocol) {
   protocol.registerSchemesAsPrivileged([{ scheme: BRIEFS_AUDIO_SCHEME, privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true } }]);
 }
 
-module.exports = { createBriefs, registerBriefsSchemes, isBriefsEnabled, isClientPage, personKey, BRIEFS_APP_ID, BRIEFS_AUDIO_SCHEME };
+module.exports = { createBriefs, registerBriefsSchemes, isBriefsEnabled, isClientPage, personKey, sessionSnapshot, BRIEFS_APP_ID, BRIEFS_AUDIO_SCHEME };

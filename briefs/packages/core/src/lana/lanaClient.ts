@@ -1,4 +1,3 @@
-import { isAccountError, LanaAccountError } from "../account/lanaAccountError.js";
 import { LanaError, lanaErrorForStatus } from "./lanaError.js";
 import type { LanaReply, LanaRequest, LanaTransport } from "./lanaTransport.js";
 
@@ -9,9 +8,9 @@ export interface LanaSessionCredentials {
 }
 
 /**
- * The account session as the client needs it (`AccountManager.authorized`): runs `call`
- * with the current credentials; when it throws `LanaAccountError("sessionExpired")` the
- * session is refreshed once and `call` runs again. A second 401 signs out.
+ * The LANA client's session as this client needs it: runs `call` with the current
+ * credentials. There is one session, the client's; a 401 means it ended or expired, and
+ * the client (not Briefs) signs in again.
  */
 export interface LanaSessionAccess {
   authorized<T>(call: (session: LanaSessionCredentials) => Promise<T>): Promise<T>;
@@ -198,27 +197,21 @@ export class LanaClient {
 
   /** One exchange with the session's token; 2xx returns the reply, anything else throws `LanaError`. */
   private async send(method: LanaRequest["method"], path: string, body: string | undefined, timeoutMs: number): Promise<LanaReply> {
-    try {
-      return await this.options.session.authorized(async ({ baseURL, token }) => {
-        const headers: Record<string, string> = { Accept: "application/json", Authorization: `Bearer ${token}` };
-        if (body !== undefined) headers["Content-Type"] = "application/json";
-        let reply: LanaReply;
-        try {
-          reply = await this.options.transport.send({ method, url: `${trimSlash(baseURL)}${path}`, headers, body, timeoutMs });
-        } catch (error) {
-          if (error instanceof Error && error.name === "AbortError" && !isTimeout(error)) throw error;
-          throw new LanaError("offline");
-        }
-        // A 401 is refused before anything is written, so the session refreshes and the call runs once more.
-        if (reply.status === 401) throw new LanaAccountError("sessionExpired");
-        if (reply.status < 200 || reply.status > 299) throw lanaErrorForStatus(reply.status);
-        return reply;
-      });
-    } catch (error) {
-      if (isAccountError(error, "sessionExpired")) throw new LanaError("signedOut", 401);
-      if (isAccountError(error)) throw new LanaError("offline");
-      throw error;
-    }
+    return this.options.session.authorized(async ({ baseURL, token }) => {
+      const headers: Record<string, string> = { Accept: "application/json", Authorization: `Bearer ${token}` };
+      if (body !== undefined) headers["Content-Type"] = "application/json";
+      let reply: LanaReply;
+      try {
+        reply = await this.options.transport.send({ method, url: `${trimSlash(baseURL)}${path}`, headers, body, timeoutMs });
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError" && !isTimeout(error)) throw error;
+        throw new LanaError("offline");
+      }
+      // A 401 is refused before anything is written: the session ended or expired.
+      if (reply.status === 401) throw new LanaError("signedOut", 401);
+      if (reply.status < 200 || reply.status > 299) throw lanaErrorForStatus(reply.status);
+      return reply;
+    });
   }
 }
 

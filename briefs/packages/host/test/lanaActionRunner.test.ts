@@ -6,7 +6,7 @@ import { resolutionWithMatter } from "../src/main/services/actions/actionPagesSe
 import { EMAIL_STAYS_DRAFT, LanaActionRunner, UNDO_CLOSED, lanaDeletePath, runFailureMessage } from "../src/main/services/actions/lanaActionRunner.js";
 import { decodeStoredResolution } from "../src/main/services/actions/storedResolution.js";
 import { MattersService } from "../src/main/services/mattersService.js";
-import { FakeLanaServer, sessionAccess, signedInAccount } from "../../core/test/support/fakeLanaServer.js";
+import { clientSession, FakeLanaServer } from "../../core/test/support/fakeLanaServer.js";
 import { openRealRig, receiveGoldenMeeting, type RealRig } from "./support/realRig.js";
 
 const MATTER = { id: "4f6c1d2e-0000-4000-8000-000000000042", label: "00042 Acme Logistics", detail: null };
@@ -23,9 +23,9 @@ beforeEach(async () => {
   rig = await openRealRig();
   server = new FakeLanaServer();
   await server.start();
-  const account = await signedInAccount(server.baseURL);
-  dispose = () => account.manager.dispose();
-  client = new LanaClient({ session: sessionAccess(account.manager), transport: fetchLanaTransport, sleep: async () => undefined });
+  const account = clientSession(server.baseURL);
+  dispose = () => account.signOut();
+  client = new LanaClient({ session: account.session, transport: fetchLanaTransport, sleep: async () => undefined });
   signedIn = true;
   entitled = true;
   runner = new LanaActionRunner({

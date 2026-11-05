@@ -15,7 +15,6 @@
     "./store": "./src/store/index.ts",
     "./keys": "./src/keys/index.ts",
     "./gateway": "./src/gateway/index.ts",
-    "./account": "./src/account/index.ts",
     "./executors": "./src/executors/index.ts",
     "./connectors": "./src/connectors/index.ts",
     "./ask": "./src/ask/index.ts",

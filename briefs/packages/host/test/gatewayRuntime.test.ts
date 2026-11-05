@@ -2,20 +2,19 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { HttpRequest, HttpResponse, HttpTransport } from "@lana/core/account";
 import { parseInvitationQr, pairingPsk, SoftwareIdentity, transportPsk } from "@lana/core/crypto";
 import { connectHandoff, HANDOFF_TLS, issueRecordDecline } from "@lana/core/handoff";
 import type { SafeStorageLike } from "@lana/core/keys";
 import type { GatewayStatus, HandoffView, LanaEvent, PairingState } from "../src/shared/api.js";
 import { openGatewayRuntime, StartupError, type GatewayRuntime } from "../src/main/gateway/gatewayRuntime.js";
+import type { ClientSessionSnapshot } from "../src/main/gateway/clientSession.js";
 import type { LogFields, MainLog } from "../src/main/log.js";
 import { sealTestBundle } from "../../core/test/support/bundleSealer.js";
 import { Air, FakePresenter, runScriptedPhone, runScriptedPhonePairing } from "../../core/test/support/handoffFakes.js";
 
 const HOST = "127.0.0.1";
-const PASSWORD = "correct horse battery";
 const EMAIL = "person@firm.test";
-const TOKEN = "stub-token-1";
+const TOKEN = "client-token-1";
 
 /** safeStorage stand-in: reversible, and records that it was used. */
 function fakeSafeStorage(available = true): SafeStorageLike & { sealed: number } {
@@ -35,41 +34,16 @@ function fakeSafeStorage(available = true): SafeStorageLike & { sealed: number }
   return store;
 }
 
-/**
- * The LANA directory and the local LANA server: discovery for organization "harlow" points
- * at localhost:8080 and lists the organization's apps; the server accepts one account,
- * refreshes and logs out.
- */
-class StubLana implements HttpTransport {
-  readonly paths: string[] = [];
-  /** The organization's `enabled_apps`, as the directory sends them. */
-  apps: unknown[] = [{ id: "lana-works", label: "LanaWorks" }, { id: "lana-notes", label: "LANA Briefs" }];
-  directoryDown = false;
-  async send(request: HttpRequest): Promise<HttpResponse> {
-    const path = new URL(request.url).pathname;
-    this.paths.push(path);
-    const body = JSON.parse(request.body) as Record<string, string>;
-    if (path.endsWith("/v1/discovery")) {
-      if (this.directoryDown) throw new TypeError("fetch failed");
-      if (body["org_id"] !== "harlow") return { status: 404, body: JSON.stringify({ status: "not_found", error: "Organization not found or inactive" }) };
-      return {
-        status: 200,
-        body: JSON.stringify({
-          status: "healthy", server: { org_id: "harlow", org_name: "Harlow Reyes LLP" }, domain: "harlow.lanaai.io",
-          discovery: { static_ip: "localhost", port: 8080, is_secure_ssl: false }, enabled_apps: this.apps,
-        }),
-      };
-    }
-    if (path === "/api/v1/auth/login") {
-      if (body["email"] !== EMAIL || body["password"] !== PASSWORD) return { status: 401, body: JSON.stringify({ error: { message: "Invalid credentials" } }) };
-      return {
-        status: 200,
-        body: JSON.stringify({ token: TOKEN, user: { id: 7, email: EMAIL, firstName: "Alicia", lastName: "Reyes" }, session: { id: 1, expiresAt: new Date(Date.now() + 3_600_000).toISOString() } }),
-      };
-    }
-    if (path === "/api/v1/auth/logout") return { status: 200, body: "{}" };
-    return { status: 404, body: "{}" };
-  }
+/** The LANA client's one session, as the client hands it to Briefs. */
+const SIGNED_IN: ClientSessionSnapshot = {
+  token: TOKEN,
+  apiBase: "http://localhost:8080",
+  user: { id: "7", organizationID: "harlow", organizationName: "Harlow Reyes LLP", email: EMAIL, firstName: "Alicia", lastName: "Reyes" },
+};
+
+/** Stands in for the client's token store: Briefs reads it, never writes it. */
+class ClientSessionHolder {
+  current: ClientSessionSnapshot | null = null;
 }
 
 class RecordingLog implements MainLog {
@@ -96,16 +70,16 @@ interface Rig {
   events: LanaEvent[];
   log: RecordingLog;
   air: Air;
-  stub: StubLana;
+  client: ClientSessionHolder;
   next<T extends LanaEvent["type"]>(type: T, match?: (event: Extract<LanaEvent, { type: T }>) => boolean): Promise<Extract<LanaEvent, { type: T }>>;
 }
 
-async function open(userData: string, options: { playTone?: boolean } = {}): Promise<Rig> {
+async function open(userData: string, options: { playTone?: boolean; client?: ClientSessionHolder } = {}): Promise<Rig> {
   const events: LanaEvent[] = [];
   const waiters: ((event: LanaEvent) => void)[] = [];
   const air = new Air();
   const log = new RecordingLog();
-  const stub = new StubLana();
+  const client = options.client ?? new ClientSessionHolder();
   let runtime: GatewayRuntime | null = null;
   const emit = (event: LanaEvent): void => {
     events.push(event);
@@ -115,7 +89,7 @@ async function open(userData: string, options: { playTone?: boolean } = {}): Pro
       void air.play(event.request.samples, event.request.sampleRate).then(() => runtime?.tone.played(event.request.id));
     }
   };
-  runtime = await openGatewayRuntime({ userData, safeStorage: fakeSafeStorage(), emit, log, transport: stub, listen: { host: HOST, bonjour: false } });
+  runtime = await openGatewayRuntime({ userData, safeStorage: fakeSafeStorage(), emit, log, session: () => client.current, listen: { host: HOST, bonjour: false } });
   const live = runtime;
   cleanups.push(() => live.close());
   await runtime.restore();
@@ -130,18 +104,20 @@ async function open(userData: string, options: { playTone?: boolean } = {}): Pro
       };
       waiters.push(waiter);
     });
-  return { runtime, events, log, air, stub, next };
+  return { runtime, events, log, air, client, next };
 }
 
+/** Signing in happens in the client; Briefs is told its session changed and reads it. */
 async function signIn(rig: Rig): Promise<void> {
-  const server = await rig.runtime.account.discover({ organizationID: "harlow", domain: "" });
-  if (!server.ok) throw new Error("discovery refused");
   const listening = rig.next("gateway", (event) => event.status.listener.kind === "waitingForPairing" || event.status.listener.kind === "listening");
-  const outcome = await rig.runtime.account.signIn({ server: server.value, email: EMAIL, password: PASSWORD });
-  expect(outcome).toEqual({ ok: true, value: { kind: "signedIn", user: { id: "7", email: EMAIL, firstName: "Alicia", lastName: "Reyes", mustChangePassword: false } } });
-  const completed = await rig.runtime.account.completeSignIn();
-  expect(completed.ok && completed.value.kind).toBe("signedIn");
+  rig.client.current = SIGNED_IN;
+  rig.runtime.sessionChanged();
   await listening;
+  expect(await rig.runtime.account.state()).toEqual({
+    kind: "signedIn",
+    user: { id: "7", email: EMAIL, firstName: "Alicia", lastName: "Reyes", mustChangePassword: false },
+    server: { baseURL: "http://localhost:8080", host: "localhost:8080", organizationID: "harlow", organizationName: "Harlow Reyes LLP", domain: "", isSecure: true },
+  });
 }
 
 function portOf(status: GatewayStatus, log: RecordingLog): number {
@@ -154,52 +130,24 @@ function portOf(status: GatewayStatus, log: RecordingLog): number {
 describe("Gateway runtime (main process services)", () => {
   it("refuses to start without the OS keystore", async () => {
     await expect(
-      openGatewayRuntime({ userData: profile(), safeStorage: fakeSafeStorage(false), emit: () => undefined, log: new RecordingLog() }),
+      openGatewayRuntime({ userData: profile(), safeStorage: fakeSafeStorage(false), emit: () => undefined, log: new RecordingLog(), session: () => null }),
     ).rejects.toBeInstanceOf(StartupError);
   });
 
-  it("opens nothing while LANA Briefs is not turned on for the organization, and audits each change by id", async () => {
+  it("there is one session, the client's: Briefs signs nothing in or out and keeps no token", async () => {
     const rig = await open(profile());
-    rig.stub.apps = [{ id: "lana-works", label: "LanaWorks" }];
-    const server = await rig.runtime.account.discover({ organizationID: "harlow", domain: "" });
-    if (!server.ok) throw new Error("discovery refused");
-    expect(server.value).toMatchObject({ organizationID: "harlow", organizationName: "Harlow Reyes LLP", domain: "harlow.lanaai.io" });
-    await rig.runtime.account.signIn({ server: server.value, email: EMAIL, password: PASSWORD });
-    const off = rig.next("access", (event) => event.state.kind === "notEntitled");
-    await rig.runtime.account.completeSignIn();
-    expect((await off).state).toEqual({ kind: "notEntitled", organizationName: "Harlow Reyes LLP (harlow)" });
-    expect(rig.runtime.hasAccess()).toBe(false);
-    expect(await rig.runtime.devices.gatewayStatus()).toMatchObject({ listener: { kind: "stopped" } });
-    expect(await rig.runtime.devices.startPairing()).toEqual({ kind: "failed", message: "LANA Briefs is not turned on for your firm. Ask your firm admin to enable it in LANA." });
-
-    // Turned on in LANA: Check again opens the gate and the listener starts.
-    rig.stub.apps.push({ id: "lana-notes", label: "LANA Briefs" });
-    const listening = rig.next("gateway", (event) => event.status.listener.kind === "waitingForPairing");
-    expect(await rig.runtime.access.checkAgain()).toEqual({ kind: "entitled", offline: false });
-    await listening;
-    expect(rig.runtime.hasAccess()).toBe(true);
-
-    // The directory cannot be reached: the confirmed answer keeps working (inside 7 days).
-    rig.stub.directoryDown = true;
-    expect(await rig.runtime.access.checkAgain()).toEqual({ kind: "entitled", offline: true });
-
-    const entries = await rig.runtime.store.auditEntries();
-    expect(entries.filter((entry) => entry.event === "entitlement.changed").map((entry) => [entry.subject, entry.detail])).toEqual([
-      ["harlow", '{"state":"disabled"}'],
-      ["harlow", '{"state":"enabled"}'],
-    ]);
-    expect((await rig.runtime.store.verifyAudit()).isIntact).toBe(true);
-  });
-
-  it("cannot check a session signed in with a server address and no Organization ID", async () => {
-    const rig = await open(profile());
-    const server = await rig.runtime.account.useServerAddress("http://localhost:8080");
-    if (!server.ok) throw new Error("server address refused");
-    await rig.runtime.account.signIn({ server: server.value, email: EMAIL, password: PASSWORD });
-    await rig.runtime.account.completeSignIn();
-    expect(await rig.runtime.access.state()).toEqual({ kind: "noOrganization" });
-    expect(rig.runtime.hasAccess()).toBe(false);
-    expect(rig.stub.paths.some((path) => path.endsWith("/v1/discovery"))).toBe(false);
+    expect(Object.keys(rig.runtime.account)).toEqual(["state"]);
+    expect(await rig.runtime.access.state()).toEqual({ kind: "signedOut" });
+    await signIn(rig);
+    expect(await rig.runtime.access.state()).toEqual({ kind: "entitled", offline: false });
+    // A refreshed token in the client is used on the next call, with no sign-in here.
+    rig.client.current = { ...SIGNED_IN, token: "client-token-2" };
+    rig.runtime.sessionChanged();
+    const seen: string[] = [];
+    await rig.runtime.lanaSession?.authorized(async ({ token }) => void seen.push(token));
+    expect(seen).toEqual(["client-token-2"]);
+    // Nothing of the session is written to Briefs' vault.
+    for (const key of ["lana.session", "lana.entitlement"]) expect(await rig.runtime.vault.secret(key)).toBeNull();
   });
 
   it("gates the listener on sign in, pairs, receives a meeting by tone, restores the session, and stops on sign out", async () => {
@@ -210,15 +158,6 @@ describe("Gateway runtime (main process services)", () => {
     expect(await rig.runtime.account.state()).toEqual({ kind: "signedOut", reason: "notSignedIn", lastServer: null });
     expect(await rig.runtime.devices.gatewayStatus()).toEqual({ listener: { kind: "signedOut" }, receiving: false });
     expect(await rig.runtime.devices.startPairing()).toMatchObject({ kind: "failed" });
-
-    // Wrong password: the Mac app's copy, nothing stored.
-    const server = await rig.runtime.account.useServerAddress("http://localhost:8080/");
-    expect(server).toEqual({ ok: true, value: { baseURL: "http://localhost:8080", host: "localhost:8080", organizationID: "", organizationName: "", domain: "", isSecure: false } });
-    if (!server.ok) return;
-    expect(await rig.runtime.account.signIn({ server: server.value, email: EMAIL, password: "nope" })).toEqual({
-      ok: false, error: { code: "invalidCredentials", message: "That email and password do not match a LANA account." },
-    });
-    expect(await rig.runtime.account.useServerAddress("not a url")).toMatchObject({ ok: false, error: { code: "invalidServerAddress" } });
 
     await signIn(rig);
     const status = await rig.runtime.devices.gatewayStatus();
@@ -271,29 +210,28 @@ describe("Gateway runtime (main process services)", () => {
     expect(await rig.runtime.meetings.get("mtg_nope")).toMatchObject({ ok: false, error: { code: "notFound" } });
     expect(await rig.runtime.handoff.dismiss()).toEqual({ kind: "idle" });
 
-    // Quit and relaunch: the session comes back from the vault and the gateway listens again.
+    // Quit and relaunch: the client is still signed in, so the gateway listens again.
     await rig.runtime.close();
-    const relaunched = await open(userData);
-    expect(await relaunched.runtime.account.state()).toMatchObject({ kind: "signedIn", user: { id: "7" }, server: { baseURL: "http://localhost:8080", organizationID: "harlow", domain: "harlow.lanaai.io" } });
-    await relaunched.next("gateway", (event) => event.status.listener.kind === "listening").catch(() => undefined);
+    const relaunched = await open(userData, { client: rig.client });
+    expect(await relaunched.runtime.account.state()).toMatchObject({ kind: "signedIn", user: { id: "7" }, server: { baseURL: "http://localhost:8080", organizationID: "harlow" } });
+    // restore() opened the gate before it returned, so the listener is already up.
     expect(await relaunched.runtime.devices.gatewayStatus()).toEqual({ listener: { kind: "listening" }, receiving: false });
     const relaunchedMeetings = await relaunched.runtime.meetings.list();
     expect(relaunchedMeetings.ok && relaunchedMeetings.value).toHaveLength(1);
 
-    // Sign out: the listener closes at once, the phone's key no longer opens a connection.
-    const signedOut = await relaunched.runtime.account.signOut();
-    expect(signedOut).toEqual({
-      kind: "signedOut", reason: "signedOut",
-      lastServer: { baseURL: "http://localhost:8080", host: "localhost:8080", organizationID: "harlow", organizationName: "Harlow Reyes LLP", domain: "harlow.lanaai.io", isSecure: false },
-    });
-    expect(relaunched.stub.paths).toContain("/api/v1/auth/logout");
+    // Signing out of the client: the listener closes at once, the phone's key no longer opens a connection.
+    const closed = relaunched.next("gateway", (event) => event.status.listener.kind === "signedOut");
+    relaunched.client.current = null;
+    relaunched.runtime.sessionChanged();
+    await closed;
+    expect(await relaunched.runtime.account.state()).toEqual({ kind: "signedOut", reason: "notSignedIn", lastServer: null });
     expect(await relaunched.runtime.devices.gatewayStatus()).toEqual({ listener: { kind: "signedOut" }, receiving: false });
     const newPort = portOf({ listener: { kind: "listening" }, receiving: false }, relaunched.log);
     await expect(connectHandoff({ host: HOST, port: newPort, identity: phone.publicKeys.deviceID, key: psk })).rejects.toBeDefined();
 
     // Logs carry ids and states only.
     for (const line of [...rig.log.lines, ...relaunched.log.lines]) {
-      for (const secret of [PASSWORD, EMAIL, TOKEN, "Alicia", "Test iPhone", code]) expect(line).not.toContain(secret);
+      for (const secret of [EMAIL, TOKEN, "Alicia", "Test iPhone", code]) expect(line).not.toContain(secret);
     }
   });
 

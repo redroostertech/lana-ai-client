@@ -8,14 +8,14 @@
 const fs = require('fs');
 const path = require('path');
 const { EventEmitter } = require('events');
-const { createBriefs, isBriefsEnabled, isClientPage, personKey, registerBriefsSchemes, BRIEFS_AUDIO_SCHEME } = require('../../electron-briefs');
+const { createBriefs, isBriefsEnabled, isClientPage, personKey, sessionSnapshot, registerBriefsSchemes, BRIEFS_AUDIO_SCHEME } = require('../../electron-briefs');
 const beforePack = require('../../scripts/briefs-before-pack');
 
 function token(claims) {
   const part = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
   return `${part({ alg: 'HS256' })}.${part(claims)}.sig`;
 }
-const ALICE = token({ userId: 'u-alice', organizationId: 'org-1' });
+const ALICE = token({ userId: 'u-alice', organizationId: 'org-1', email: 'alice@firm.test' });
 const BOB = token({ userId: 'u-bob', organizationId: 'org-1' });
 
 function fakeWindow({ loaded = true } = {}) {
@@ -48,6 +48,9 @@ function setup({ windows = [fakeWindow()], startGate = null, stopGate = null, re
         restored: 0,
         stopped: 0,
         stopDone: false,
+        steps: [],
+        sessionChanged: jest.fn(() => host.steps.push('sessionChanged')),
+        endSession: jest.fn(async () => { host.steps.push('endSession'); }),
         addWebContents: (contents) => host.added.push(contents),
         focused: jest.fn(),
         blurred: jest.fn(),
@@ -56,6 +59,7 @@ function setup({ windows = [fakeWindow()], startGate = null, stopGate = null, re
           if (restoreError) throw restoreError;
         },
         stop: async () => {
+          host.steps.push('stop');
           host.stopped += 1;
           if (stopGate) await stopGate;
           host.stopDone = true;
@@ -74,6 +78,8 @@ function setup({ windows = [fakeWindow()], startGate = null, stopGate = null, re
     loadHost: () => module,
     distDir: '/app/briefs/dist',
     engineBase: () => 'http://127.0.0.1:8079',
+    apiBase: () => 'http://127.0.0.1:8079',
+    getServer: () => ({ orgId: 'org', orgName: 'Harlow Reyes LLP' }),
     getToken: () => state.token,
     getWindows: () => state.windows,
     showWindow: jest.fn(),
@@ -108,8 +114,8 @@ describe('LANA Briefs in the client', () => {
     expect(hosts).toHaveLength(1);
     const [host] = hosts;
     expect(host.restored).toBe(1);
-    expect(host.options.lanaRuntime.engineBase()).toBe('http://127.0.0.1:8079');
-    expect(host.options.lanaRuntime.token()).toBe(ALICE);
+    expect(host.options.engineBase()).toBe('http://127.0.0.1:8079');
+    expect(host.options.session().token).toBe(ALICE);
     expect(host.options.transcriptionWorker).toBe('/app/briefs/dist/briefs-transcription-worker.cjs');
     expect(briefs.isRunning()).toBe(true);
     await briefs.sync(without);
@@ -130,6 +136,48 @@ describe('LANA Briefs in the client', () => {
     expect(alice).not.toContain('u-alice');
     expect(personKey('not-a-jwt')).toBeNull();
     expect(personKey(token({ organizationId: 'org-1' }))).toBeNull();
+  });
+
+  test('one session: Briefs reads the client\'s session (token, API base, who), nothing else', () => {
+    expect(sessionSnapshot(ALICE, 'http://127.0.0.1:8079', { orgName: 'Harlow Reyes LLP' })).toEqual({
+      token: ALICE,
+      apiBase: 'http://127.0.0.1:8079',
+      user: { id: 'u-alice', organizationID: 'org-1', organizationName: 'Harlow Reyes LLP', email: 'alice@firm.test', firstName: '', lastName: '' }
+    });
+    expect(sessionSnapshot(null, 'http://127.0.0.1:8079', null)).toBeNull();
+    expect(sessionSnapshot('not-a-jwt', 'http://127.0.0.1:8079', null)).toBeNull();
+    expect(sessionSnapshot(ALICE, null, null)).toBeNull();
+  });
+
+  test('a refreshed token for the same person tells Briefs to read the session again, with no restart', async () => {
+    const { briefs, hosts, state } = setup();
+    await briefs.sync(enabled);
+    state.token = token({ userId: 'u-alice', organizationId: 'org-1', exp: 9999999999 });
+    await briefs.sync(enabled);
+    expect(hosts).toHaveLength(1);
+    expect(hosts[0].sessionChanged).toHaveBeenCalledTimes(1);
+    expect(hosts[0].stopped).toBe(0);
+  });
+
+  test('signing out ends the person\'s session (phones lose background access) before Briefs stops', async () => {
+    const { briefs, hosts, state } = setup();
+    await briefs.sync(enabled);
+    state.token = null;
+    await briefs.sync(null);
+    expect(hosts[0].steps).toEqual(['endSession', 'stop']);
+  });
+
+  test('another person signing in ends the first person\'s session; turning Briefs off only stops it (control)', async () => {
+    const switched = setup();
+    await switched.briefs.sync(enabled);
+    switched.state.token = BOB;
+    await switched.briefs.sync(enabled);
+    expect(switched.hosts[0].steps).toEqual(['endSession', 'stop']);
+
+    const disabled = setup();
+    await disabled.briefs.sync(enabled);
+    await disabled.briefs.sync(without);
+    expect(disabled.hosts[0].steps).toEqual(['stop']);
   });
 
   test('never starts without a session, and stops on sign-out', async () => {

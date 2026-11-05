@@ -14,10 +14,6 @@ import { InMemorySecretBackend, SealedFileSecretBackend, type SecretBackend, typ
 /** Small secrets the gateway keeps (Swift `SecretAccount`). Never in the store, settings or logs. */
 export const SECRET_ACCOUNTS = {
   clioClientSecret: "clio.client_secret",
-  /** The signed-in LANA session: token, server and the person. */
-  lanaSession: "lana.session",
-  /** The last answer about LANA Briefs being on for the organization (`EntitlementRecord`). */
-  entitlement: "lana.entitlement",
 } as const;
 
 /** Item names, one per Keychain item the Mac app keeps. */

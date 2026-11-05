@@ -62,21 +62,12 @@ export type AccountState =
   | { kind: "signedOut"; reason: SignedOutReason; lastServer: LanaServer | null }
   | { kind: "signedIn"; user: LanaUser; server: LanaServer };
 
-export type SignInOutcome = { kind: "mfaRequired" } | { kind: "signedIn"; user: LanaUser };
-
+/**
+ * The LANA client's session, read only. There is one session, the client's: signing in and
+ * out happen in the client, never in Briefs.
+ */
 export interface AccountApi {
   state(): Promise<AccountState>;
-  /** Finds the firm's LANA server from its Organization ID and domain. */
-  discover(input: { organizationID: string; domain: string }): Promise<Result<LanaServer>>;
-  /** Advanced: a full server address. */
-  useServerAddress(address: string): Promise<Result<LanaServer>>;
-  signIn(input: { server: LanaServer; email: string; password: string; mfaCode?: string }): Promise<Result<SignInOutcome>>;
-  /** After the success mark: the session becomes the app's. */
-  completeSignIn(): Promise<Result<AccountState>>;
-  activate(input: { server: LanaServer; code: string; password: string }): Promise<Result<null>>;
-  /** Always resolves to the same neutral confirmation unless the server cannot be reached. */
-  requestPasswordReset(input: { server: LanaServer; email: string }): Promise<Result<null>>;
-  signOut(): Promise<AccountState>;
 }
 
 // MARK: - Access
@@ -468,7 +459,7 @@ export interface LanaBridge extends LanaServices, LanaGatewayServices {
 /** Every invocable method, by namespace. The preload and main build channels from this. */
 export const API_METHODS = {
   app: ["platform", "showWindow", "quit"],
-  account: ["state", "discover", "useServerAddress", "signIn", "completeSignIn", "activate", "requestPasswordReset", "signOut"],
+  account: ["state"],
   access: ["state", "checkAgain"],
   devices: ["list", "revoke", "pairingState", "startPairing", "cancelPairing", "answerPairing", "resetPairing", "gatewayStatus"],
   meetings: ["list", "get", "audio"],

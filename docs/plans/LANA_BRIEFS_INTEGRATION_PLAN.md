@@ -346,9 +346,10 @@ Decided 2026-11-05:
    - Expose `window.lanaBriefs` from the preload, keeping the `api.ts` contract.
    - Port its permission handlers, merged with the client's own: microphone audio only for the app's own pages, and meeting audio through display media loopback while a recording starts.
    - Port the Bluetooth wake helper (`native/macos/ble-wake-helper`).
-2. **1c: one sign-in.** It also has to close the last review item: signing out of the client must sign Briefs' session out and revoke the phone background leases (today the host only stops). The review fixes (`git log`) already give each person their own Briefs folder.
-   - Replace `packages/core/src/account/*` and the `lana.session` vault entry with the client's token store and `electron-discovery.js`.
-   - Give `LanaRuntimeTextModel` the engine base from `electron-local-engine.js`.
+2. **1c: one session.**
+   - **Done:** there is one session, the client's. Briefs' sign-in, saved session, sign-out and entitlement checker are removed. Briefs reads the client's session through `ClientSession`, which provides the token, the API base and who is signed in.
+   - **On a change:** a sign-in or a refreshed token means Briefs reads the session again. Signing out, or another person signing in, ends that person's session, which revokes the phones' background access, before Briefs stops. Turning Briefs off for the firm only stops it.
+   - **Still to do:** remove the Clio and Microsoft executors and their tokens.
 3. **1d: one model catalog.**
    - Move the speech packages into `electron-local-models.js`, with the same R2, size and sha256 rules.
    - Retire `briefsMirror` and `briefsManifest` once nothing reads them.
