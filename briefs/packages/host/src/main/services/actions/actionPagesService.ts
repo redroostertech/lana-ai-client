@@ -11,7 +11,7 @@ import type {
   ActionDetail, ActionFields, ActionListRequest, ActionPage, ActionPhase, ActionsApi, InboxApi, MatterHit, NewActionDraft, ProposedAction, Result,
 } from "../../../shared/api.js";
 import type { MainLog } from "../../log.js";
-import type { ResolvedTarget } from "./actionService.js";
+import type { ResolvedTarget } from "./actionRecords.js";
 import { decodeStoredResolution, encodeStoredResolution } from "./storedResolution.js";
 
 const QUOTE_LIMIT = 600;

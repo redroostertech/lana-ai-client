@@ -832,7 +832,6 @@ export interface Preferences {
     /** "240 MB". */
     downloadSizeText: string;
   };
-  hasClioSecret: boolean;
   pendingOutbox: number;
   version: string;
 }
@@ -860,43 +859,8 @@ export interface PreferencesApi {
   setEndTalkWhenInactive(value: boolean): Promise<PreferencesUpdate>;
   downloadVoice(): Promise<PreferencesUpdate>;
   removeVoiceDownload(): Promise<PreferencesUpdate>;
-  saveClioSecret(secret: string): Promise<PreferencesUpdate>;
-  removeClioSecret(): Promise<PreferencesUpdate>;
 }
 
-export type ConnectorID = "clio" | "microsoft";
-export type ClioRegion = "us" | "ca" | "eu" | "au";
-
-export type ConnectorStatus = { kind: "connected"; account: string } | { kind: "disconnected" } | { kind: "notConfigured"; reason: string };
-
-export interface ConnectorSnapshot {
-  id: ConnectorID;
-  /** "Clio Manage", "Microsoft 365". */
-  name: string;
-  /** "Clio", "Microsoft 365". */
-  shortName: string;
-  summary: string;
-  status: ConnectorStatus;
-  lastSync: string | null;
-  mirroredRecords: number | null;
-  /** The last connect, sync or disconnect outcome, in plain words. */
-  message: string | null;
-  /** True when that outcome is a failure. */
-  messageIsError: boolean;
-}
-
-export interface ConnectionsState {
-  region: ClioRegion;
-  connectors: ConnectorSnapshot[];
-}
-
-export interface ConnectionsApi {
-  state(): Promise<ConnectionsState>;
-  connect(id: ConnectorID): Promise<ConnectionsState>;
-  disconnect(id: ConnectorID): Promise<ConnectionsState>;
-  syncNow(): Promise<ConnectionsState>;
-  setRegion(region: ClioRegion): Promise<ConnectionsState>;
-}
 
 export type AskScope = { kind: "all" } | { kind: "meeting"; meetingID: string };
 
@@ -1042,7 +1006,6 @@ export interface LanaScreenServices {
   matters: MattersApi;
   auditLog: AuditLogApi;
   preferences: PreferencesApi;
-  connections: ConnectionsApi;
   ask: AskApi;
   talk: TalkApi;
   userNotes: UserNotesApi;
@@ -1065,10 +1028,7 @@ export function screenApiMethods() {
     "setEndTalkWhenInactive",
     "downloadVoice",
     "removeVoiceDownload",
-    "saveClioSecret",
-    "removeClioSecret",
   ],
-  connections: ["state", "connect", "disconnect", "syncNow", "setRegion"],
   ask: ["conversation", "setScope", "send", "newConversation", "openThread", "threads", "deleteThread", "cancel", "pinClip"],
   talk: ["session", "start", "acceptIntro", "toggleMute", "end"],
   userNotes: ["save"],

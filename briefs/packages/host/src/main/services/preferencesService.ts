@@ -1,5 +1,4 @@
 import { LEASE_HOUR_CHOICES, loadBackgroundUpdates, loadHandoffSettings, RETENTION_DAYS, saveBackgroundUpdates, saveHandoffSettings } from "@lana/core/gateway";
-import { SECRET_ACCOUNTS, type KeyVault } from "@lana/core/keys";
 import type { GatewayStore, SettingsRepository } from "@lana/core/store";
 import type { GatewayStatus, ListenerStatus, PlatformInfo, Preferences, PreferencesApi, PreferencesUpdate, StatusText, VoiceDownload, VoiceOption } from "../../shared/api.js";
 import type { MainLog } from "../log.js";
@@ -23,7 +22,6 @@ const DAY_MS = 86_400_000;
 
 export interface PreferencesServiceOptions {
   readonly store: GatewayStore;
-  readonly vault: KeyVault;
   readonly platform: PlatformInfo;
   readonly gatewayStatus: () => Promise<GatewayStatus>;
   readonly pairedPhones: () => Promise<number>;
@@ -47,7 +45,7 @@ export interface VoicePort {
 /**
  * Settings that live in the store (Swift `SettingsViewModel`): the handoff policy toggles
  * (the gateway reads them at every connection), audio retention (with the daily purge),
- * Ask history, the voice choice and the Clio client secret in the KeyVault.
+ * Ask history and the voice choice.
  */
 export class PreferencesService implements PreferencesApi {
   private purgeTimer: NodeJS.Timeout | null = null;
@@ -90,7 +88,6 @@ export class PreferencesService implements PreferencesApi {
         download: this.options.voice.download(),
         downloadSizeText: this.options.voice.sizeText(),
       },
-      hasClioSecret: (await this.options.vault.secret(SECRET_ACCOUNTS.clioClientSecret)) !== null,
       pendingOutbox: store.outbox.pendingCount(),
       version: platform.appVersion,
     };
@@ -158,20 +155,6 @@ export class PreferencesService implements PreferencesApi {
   async removeVoiceDownload(): Promise<PreferencesUpdate> {
     await this.options.voice.remove();
     return this.update(null);
-  }
-
-  async saveClioSecret(secret: string): Promise<PreferencesUpdate> {
-    const trimmed = String(secret).trim();
-    if (trimmed === "") return this.update(null);
-    await this.options.vault.setSecret(SECRET_ACCOUNTS.clioClientSecret, new Uint8Array(Buffer.from(trimmed, "utf8")));
-    this.options.log.info("settings.clio_secret_saved");
-    return this.update("Clio client secret saved in this computer's secure storage.");
-  }
-
-  async removeClioSecret(): Promise<PreferencesUpdate> {
-    await this.options.vault.setSecret(SECRET_ACCOUNTS.clioClientSecret, null);
-    this.options.log.info("settings.clio_secret_removed");
-    return this.update("Clio client secret removed.");
   }
 
   /** Pushes fresh preferences (for example after the listener changed). */

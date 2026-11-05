@@ -349,7 +349,7 @@ Decided 2026-11-05:
 2. **1c: one session.**
    - **Done:** there is one session, the client's. Briefs' sign-in, saved session, sign-out and entitlement checker are removed. Briefs reads the client's session through `ClientSession`, which provides the token, the API base and who is signed in.
    - **On a change:** a sign-in or a refreshed token means Briefs reads the session again. Signing out, or another person signing in, ends that person's session, which revokes the phones' background access, before Briefs stops. Turning Briefs off for the firm only stops it.
-   - **Still to do:** remove the Clio and Microsoft executors and their tokens.
+   - **Done:** the Clio and Microsoft executors, OAuth, the Clio mirror sync, the Connections section and the old action cards are removed. Actions run only on LANA, and LANA's connectors carry them on. The vault now holds only this computer's identity and the store key.
 3. **1d: one model catalog.**
    - Move the speech packages into `electron-local-models.js`, with the same R2, size and sha256 rules.
    - Retire `briefsMirror` and `briefsManifest` once nothing reads them.

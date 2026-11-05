@@ -1,14 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { StoredAction } from "@lana/core/store";
+import type { ActionDetail, ActionListRequest, Result } from "../src/shared/api.js";
+import { ActionPagesService, type ActionRunner, type RunGate } from "../src/main/services/actions/actionPagesService.js";
 import type { CandidateIntent, TranscriptSegment } from "@lana/core/intent";
 import type { OpenedBundle } from "@lana/core/handoff";
 import type { LanaEvent } from "../src/shared/api.js";
 import { RecordsService } from "../src/main/gateway/recordsService.js";
-import { ActionsService } from "../src/main/services/actions/actionsService.js";
 import type { ClipDrafting } from "../src/main/gateway/clipDraftQueue.js";
 import { MeetingsBridge } from "../src/main/gateway/meetingsBridge.js";
-import { ConnectorHub } from "@lana/core/connectors";
-import { vaultTokenStore } from "@lana/core/executors";
-import { ExecutorActionService } from "../src/main/services/actions/executorActionService.js";
 import { openRealRig, receiveGoldenMeeting, type RealRig } from "./support/realRig.js";
 import { DraftDiagnostics, type DraftOutcome } from "../src/main/services/draftDiagnostics.js";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -50,17 +49,34 @@ let inboxChanges: number;
 let service: RecordsService;
 let drafter: HandDrafter;
 
-/** The Inbox over the same store, with nothing connected. */
-function inbox(): ActionsService {
-  const hub = new ConnectorHub({
-    configuration: { clioClientID: "clio-client", microsoftClientID: "ms-client" },
-    secrets: rig.vault,
-    tokens: vaultTokenStore(rig.vault),
-    transport: { send: () => Promise.reject(new Error("no network in this test")) },
-    store: rig.store,
-  });
-  const executors = new ExecutorActionService(hub, rig.store.mirror, "computer", rig.log);
-  return new ActionsService({ store: rig.store, drafts: service.drafting, service: () => executors, isSignedIn: () => true, isEntitled: () => true, deviceNoun: "computer", onChange: () => undefined, log: rig.log });
+/** A runner that runs nothing: these tests only read the Inbox. */
+class IdleRunner implements ActionRunner {
+  async run(): Promise<Result<null>> {
+    return { ok: true, value: null };
+  }
+  async undo(): Promise<Result<null>> {
+    return { ok: true, value: null };
+  }
+  gate(_action: StoredAction): RunGate {
+    return { phase: { kind: "review" }, canRun: false, runTitle: "Create task", runBlockReason: null, canUndo: false, lanaURL: null, actionError: null };
+  }
+}
+
+/** The Inbox (the LANA action pages) over the same store. */
+function inbox(): ActionPagesService {
+  const runner = new IdleRunner();
+  return new ActionPagesService({ store: rig.store, runner: () => runner, drafts: service.drafting, deviceNoun: "computer", onChange: () => undefined, log: rig.log });
+}
+
+const LIST: ActionListRequest = { query: "", filters: { status: [], kind: [] }, sort: { by: "created", dir: "desc" }, page: 1, pageSize: 50 };
+
+/** The Inbox's detail for the action with this title, if it is there. */
+async function actionTitled(actions: ActionPagesService, title: string): Promise<ActionDetail | undefined> {
+  const page = await actions.list(LIST);
+  const row = page.ok ? page.value.rows.find((item) => item.title === title && item.origin !== "draft") : undefined;
+  if (row === undefined) return undefined;
+  const detail = await actions.get(row.id);
+  return detail.ok ? detail.value : undefined;
 }
 
 function records(store = rig.store): RecordsService {
@@ -110,9 +126,9 @@ describe("background drafts (clip.draft.v1 in the main process)", () => {
     await service.drafting.idle();
 
     expect((await service.drafts(id)).ok && (await service.drafts(id) as { value: unknown[] }).value).toEqual([]);
-    const sections = await actions.sections();
-    const card = sections.ok ? sections.value.find((section) => section.id === id)?.cards.find((item) => item.draft.title === "Research the exhibit rules") : undefined;
-    expect(card).toMatchObject({ type: "task", startingPoint: false, phase: { kind: "review" } });
+    const card = await actionTitled(actions, "Research the exhibit rules");
+    expect(card).toMatchObject({ kind: "task", startingPoint: false, status: "review" });
+    expect(card?.meetingID).toBe(id);
     expect(actions.pendingCount()).toBe(before);
     // The meeting shows it as ready, not made, until the person confirms it.
     const shown = await new MeetingsBridge(rig.store, rig.log).get(id);
@@ -139,8 +155,7 @@ describe("background drafts (clip.draft.v1 in the main process)", () => {
     drafter.calls[0]!.answer(undefined);
     await service.drafting.idle();
     const actions = inbox();
-    const sections = await actions.sections();
-    const card = sections.ok ? sections.value.flatMap((section) => section.cards).find((item) => item.draft.title === `Follow up: ${QUESTION}`) : undefined;
+    const card = await actionTitled(actions, `Follow up: ${QUESTION}`);
     expect(card?.startingPoint).toBe(true);
     const ready = rig.store.audit.entries().find((entry) => entry.event === "draft.ready");
     expect(JSON.parse(ready!.detail)).toMatchObject({ drafted: "false", kind: "question" });

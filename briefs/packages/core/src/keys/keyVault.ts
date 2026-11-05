@@ -8,38 +8,24 @@ import { parseJson } from "../json/parse.js";
 import { asBytes, asObject, asString, field } from "../json/read.js";
 import type { DataKeyProvider } from "./dataKeyProvider.js";
 import { KeyVaultError } from "./keyVaultError.js";
-import { decodeOAuthTokens, encodeOAuthTokens, type OAuthTokens } from "./oauthTokens.js";
 import { InMemorySecretBackend, SealedFileSecretBackend, type SecretBackend, type SecretSealer } from "./secretBackend.js";
-
-/** Small secrets the gateway keeps (Swift `SecretAccount`). Never in the store, settings or logs. */
-export const SECRET_ACCOUNTS = {
-  clioClientSecret: "clio.client_secret",
-} as const;
 
 /** Item names, one per Keychain item the Mac app keeps. */
 export const VAULT_ITEMS = {
   macIdentity: "identity.mac",
   dataKey: "datakey.gateway",
-  secret: (account: string) => `secret.${account}`,
-  oauth: (account: string) => `oauth.${account}`,
 } as const;
 
 /**
- * Everything the gateway keeps in the OS keystore: the Mac identity keys
- * (`MacIdentityStore`), the store data key (`KeychainDataKeyProvider`), small secrets
- * (`SecretStoring`) and OAuth tokens (`TokenStore`).
+ * Everything the gateway keeps in the OS keystore: this computer's identity keys
+ * (`MacIdentityStore`) and the store data key (`KeychainDataKeyProvider`). Sign-in tokens
+ * are the LANA client's; Briefs keeps none.
  */
 export interface KeyVault extends DataKeyProvider {
   /** Loads the Mac's identity, creating it once. */
   macIdentity(displayName: string): Promise<SoftwareIdentity>;
   /** The store data key, created on first use. */
   dataKey(): Promise<Uint8Array>;
-  secret(account: string): Promise<Uint8Array | null>;
-  /** Stores a secret, or deletes it when `data` is null. */
-  setSecret(account: string, data: Uint8Array | null): Promise<void>;
-  oauthTokens(account: string): Promise<OAuthTokens | null>;
-  saveOAuthTokens(tokens: OAuthTokens, account: string): Promise<void>;
-  deleteOAuthTokens(account: string): Promise<void>;
 }
 
 /** The vault over any secret backend. */
@@ -63,33 +49,6 @@ export class SecretKeyVault implements KeyVault {
       throw error;
     });
     return (await this.pendingDataKey).slice();
-  }
-
-  secret(account: string): Promise<Uint8Array | null> {
-    return this.backend.read(VAULT_ITEMS.secret(account));
-  }
-
-  setSecret(account: string, data: Uint8Array | null): Promise<void> {
-    return this.backend.write(VAULT_ITEMS.secret(account), data);
-  }
-
-  async oauthTokens(account: string): Promise<OAuthTokens | null> {
-    const name = VAULT_ITEMS.oauth(account);
-    const data = await this.backend.read(name);
-    if (data === null) return null;
-    try {
-      return decodeOAuthTokens(parseJson(data));
-    } catch {
-      throw new KeyVaultError("corrupt", name);
-    }
-  }
-
-  saveOAuthTokens(tokens: OAuthTokens, account: string): Promise<void> {
-    return this.backend.write(VAULT_ITEMS.oauth(account), canonicalEncode(encodeOAuthTokens(tokens)));
-  }
-
-  deleteOAuthTokens(account: string): Promise<void> {
-    return this.backend.write(VAULT_ITEMS.oauth(account), null);
   }
 
   private async loadOrCreateDataKey(): Promise<Uint8Array> {

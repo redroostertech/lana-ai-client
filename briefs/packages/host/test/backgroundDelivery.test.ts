@@ -123,7 +123,6 @@ describe("Background updates preference (real store)", () => {
     return new PreferencesService({
       voice: { download: () => ({ kind: "needed" }) as VoiceDownload, sizeText: () => "", start: () => undefined, remove: async () => undefined },
       store: rig.store,
-      vault: rig.vault,
       platform,
       gatewayStatus: async () => ({ listener: { kind: "listening" }, receiving: false }),
       pairedPhones: async () => 1,

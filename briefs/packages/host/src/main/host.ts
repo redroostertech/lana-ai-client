@@ -195,8 +195,6 @@ export async function startBriefsHost(options: BriefsHostOptions): Promise<Brief
       // LANA's runtime, with the one session's token.
       lanaRuntime: { engineBase: () => options.engineBase(), token: () => options.session()?.token ?? null },
       platform,
-      // Clio and Microsoft are not connected from Briefs: LANA's connectors carry actions out.
-      configuration: { clioClientID: null, microsoftClientID: null },
       emit: (event) => emit(event),
       log,
       applyTheme: options.applyTheme,
@@ -204,7 +202,6 @@ export async function startBriefsHost(options: BriefsHostOptions): Promise<Brief
         const result = await electron.dialog.showSaveDialog({ title: "Export audit log", defaultPath: join(options.documentsPath, suggestedName), filters: [{ name: "JSON Lines", extensions: ["jsonl"] }] });
         return result.canceled || !result.filePath ? null : result.filePath;
       },
-      openExternal: async (url) => electron.shell.openExternal(url),
       showWindow: options.showWindow,
       quit: options.quit,
       legacyWalkthroughFile: null,

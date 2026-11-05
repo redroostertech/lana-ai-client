@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { toHex } from "../../src/bytes/index.js";
 import { verifyDeviceSignature } from "../../src/crypto/index.js";
 import {
-  createInMemoryKeyVault, createSealedFileKeyVault, KeyVaultError, safeStorageSealer, SECRET_ACCOUNTS, type SafeStorageLike,
+  createInMemoryKeyVault, createSealedFileKeyVault, KeyVaultError, InMemorySecretBackend, safeStorageSealer, type SafeStorageLike,
 } from "../../src/keys/index.js";
 import { GatewayStore } from "../../src/store/index.js";
 import { temporaryDirectory } from "../support/storeRig.js";
@@ -31,7 +31,7 @@ function fakeSafeStorage(osKey: Buffer = randomBytes(32), options: { available?:
 }
 
 describe("in-memory key vault", () => {
-  it("creates the data key and identity once and keeps secrets and tokens", async () => {
+  it("creates the data key and identity once, and keeps nothing else", async () => {
     const vault = createInMemoryKeyVault();
     const [first, second] = await Promise.all([vault.dataKey(), vault.dataKey()]);
     expect(first).toHaveLength(32);
@@ -39,23 +39,10 @@ describe("in-memory key vault", () => {
     const identity = await vault.macIdentity("Office Mac");
     expect((await vault.macIdentity("ignored")).publicKeys).toEqual(identity.publicKeys);
     expect(identity.publicKeys.displayName).toBe("Office Mac");
-
-    expect(await vault.secret(SECRET_ACCOUNTS.clioClientSecret)).toBeNull();
-    await vault.setSecret(SECRET_ACCOUNTS.clioClientSecret, Buffer.from("clio-secret"));
-    expect(Buffer.from((await vault.secret(SECRET_ACCOUNTS.clioClientSecret)) as Uint8Array).toString()).toBe("clio-secret");
-    await vault.setSecret(SECRET_ACCOUNTS.clioClientSecret, null);
-    expect(await vault.secret(SECRET_ACCOUNTS.clioClientSecret)).toBeNull();
-
-    const tokens = { accessToken: "at", refreshToken: "rt", expiresAt: new Date("2027-01-01T00:00:00.000Z"), region: "us" };
-    await vault.saveOAuthTokens(tokens, "clio");
-    expect(await vault.oauthTokens("clio")).toEqual({ ...tokens, scope: undefined });
-    await vault.deleteOAuthTokens("clio");
-    expect(await vault.oauthTokens("clio")).toBeNull();
   });
 
   it("rejects item names that could escape the vault folder", async () => {
-    const vault = createInMemoryKeyVault();
-    await expect(vault.setSecret("../x", Buffer.from("x"))).rejects.toThrow(KeyVaultError);
+    await expect(new InMemorySecretBackend().write("../x", Buffer.from("x"))).rejects.toThrow(KeyVaultError);
   });
 });
 
@@ -66,18 +53,16 @@ describe("safeStorage file vault", () => {
   });
   afterEach(() => folder.cleanup());
 
-  it("round trips identity, data key, secrets and tokens across restarts, sealed on disk", async () => {
+  it("round trips identity and data key across restarts, sealed on disk, and holds no sign-in or connector tokens", async () => {
     const osKey = randomBytes(32);
     const vault = createSealedFileKeyVault({ directory: folder.path, sealer: safeStorageSealer(fakeSafeStorage(osKey)) });
     const identity = await vault.macIdentity("Office Mac");
     const dataKey = await vault.dataKey();
-    await vault.setSecret(SECRET_ACCOUNTS.clioClientSecret, Buffer.from("client-secret-value"));
-    await vault.saveOAuthTokens({ accessToken: "access-token-value", expiresAt: new Date("2027-01-01T00:00:00.000Z") }, "graph");
 
     const names = readdirSync(folder.path).sort();
-    expect(names).toEqual(["datakey.gateway.sealed", "identity.mac.sealed", "oauth.graph.sealed", "secret.clio.client_secret.sealed"]);
+    expect(names).toEqual(["datakey.gateway.sealed", "identity.mac.sealed"]);
     const onDisk = Buffer.concat(names.map((name) => readFileSync(join(folder.path, name))));
-    for (const secret of ["client-secret-value", "access-token-value", Buffer.from(dataKey).toString("base64"), identity.publicKeys.deviceID]) {
+    for (const secret of [Buffer.from(dataKey).toString("base64"), identity.publicKeys.deviceID]) {
       expect(onDisk.includes(Buffer.from(secret))).toBe(false);
     }
     expect(onDisk.includes(Buffer.from(dataKey))).toBe(false);
@@ -89,8 +74,6 @@ describe("safeStorage file vault", () => {
     const message = Buffer.from("receipt bytes");
     expect(verifyDeviceSignature(identity.publicKeys, reloaded.sign(message), message)).toBe(true);
     expect(toHex(await restarted.dataKey())).toBe(toHex(dataKey));
-    expect(Buffer.from((await restarted.secret(SECRET_ACCOUNTS.clioClientSecret)) as Uint8Array).toString()).toBe("client-secret-value");
-    expect((await restarted.oauthTokens("graph"))?.accessToken).toBe("access-token-value");
   });
 
   it("cannot read the folder with another OS keystore, or after tampering", async () => {
@@ -100,13 +83,15 @@ describe("safeStorage file vault", () => {
     await expect(elsewhere.dataKey()).rejects.toThrow(expect.objectContaining({ kind: "corrupt", subject: "datakey.gateway" }));
 
     const osKey = randomBytes(32);
-    const owner = createSealedFileKeyVault({ directory: folder.path, sealer: safeStorageSealer(fakeSafeStorage(osKey)) });
-    await owner.setSecret("probe", Buffer.from("x"));
-    const path = join(folder.path, "secret.probe.sealed");
+    const tampered = join(folder.path, "tampered");
+    const owner = createSealedFileKeyVault({ directory: tampered, sealer: safeStorageSealer(fakeSafeStorage(osKey)) });
+    await owner.macIdentity("Office Mac");
+    const path = join(tampered, "identity.mac.sealed");
     const bytes = readFileSync(path);
     bytes[bytes.length - 1] = (bytes[bytes.length - 1] ?? 0) ^ 1;
     writeFileSync(path, bytes);
-    await expect(owner.secret("probe")).rejects.toThrow(expect.objectContaining({ kind: "corrupt" }));
+    const reopened = createSealedFileKeyVault({ directory: tampered, sealer: safeStorageSealer(fakeSafeStorage(osKey)) });
+    await expect(reopened.macIdentity("Office Mac")).rejects.toThrow(expect.objectContaining({ kind: "corrupt" }));
   });
 
   it("refuses to run without a real OS keystore", () => {

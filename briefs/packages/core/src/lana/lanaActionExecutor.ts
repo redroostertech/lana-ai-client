@@ -1,6 +1,5 @@
 import { sha256Hex } from "../crypto/digest.js";
-import { ClioMarker } from "../executors/clio/clioMarker.js";
-import { UNDO_WINDOW } from "../executors/execution/executionResult.js";
+import { ActionMarker, UNDO_WINDOW } from "./actionMarker.js";
 import { canonicalEncode, canonicalString } from "../json/canonical.js";
 import { LanaDate } from "../json/lanaDate.js";
 import type { LedgerRecord } from "../store/types.js";
@@ -62,7 +61,7 @@ export function lanaLedgerKey(idempotencyKey: string): string {
 
 /** `Lana:<action id>`, the last line of the task description or note, found again by a retry. */
 export function lanaMarker(actionID: string): string {
-  return ClioMarker.make(actionID);
+  return ActionMarker.make(actionID);
 }
 
 /** The LANA app's page for the record: the matter workspace on its Tasks or Notes tab. */
@@ -73,7 +72,7 @@ export function lanaRecordLink(kind: "task" | "note", matterID: string, id: stri
 
 /**
  * Runs confirmed tasks and notes on the firm's LANA server and undoes them. LANA's task and
- * note routes take no idempotency key, so a run is made safe the way the connectors are:
+ * note routes take no idempotency key, so a run is made safe this way:
  *
  * 1. The ledger row (`lana:<idempotency key>`) is written before the request. A key that
  *    already completed returns its record without calling LANA.
@@ -93,7 +92,7 @@ export class LanaActionExecutor {
     const kind = input.type === "task.create" ? "task" : "note";
     const marker = lanaMarker(input.actionID);
     const key = lanaLedgerKey(input.idempotencyKey);
-    const text = kind === "task" ? taskDescription(marker, input.body) : ClioMarker.append(marker, input.body);
+    const text = kind === "task" ? taskDescription(marker, input.body) : ActionMarker.append(marker, input.body);
     const planHash = sha256Hex(canonicalEncode({ type: input.type, matter: input.matterID, title: input.title, text, due: input.dueDate ?? null }));
 
     const entry = ledger.begin(key, planHash);
@@ -150,7 +149,7 @@ export class LanaActionExecutor {
 
   private async find(kind: "task" | "note", matterID: string, marker: string): Promise<string | undefined> {
     const found: LanaRecordText[] = kind === "task" ? await this.client.searchTasks(matterID, marker) : await this.client.recentNotes(matterID);
-    return found.find((item) => ClioMarker.endsWithMarker(item.text, marker))?.id;
+    return found.find((item) => ActionMarker.endsWithMarker(item.text, marker))?.id;
   }
 }
 
@@ -158,7 +157,7 @@ export class LanaActionExecutor {
 function taskDescription(marker: string, body: string): string {
   const room = LANA_TASK_DESCRIPTION_MAX - [...marker].length - 2;
   const characters = [...body];
-  return ClioMarker.append(marker, characters.length <= room ? body : characters.slice(0, room).join(""));
+  return ActionMarker.append(marker, characters.length <= room ? body : characters.slice(0, room).join(""));
 }
 
 function encodeOutcome(outcome: LanaRunOutcome): string {

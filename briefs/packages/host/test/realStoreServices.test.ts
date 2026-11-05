@@ -2,7 +2,6 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { HANDOFF_SETTING_KEYS, loadHandoffSettings } from "@lana/core/gateway";
-import { SECRET_ACCOUNTS } from "@lana/core/keys";
 import type { GatewayStatus, LanaEvent, PlatformInfo, Preferences, ThemePreference, VoiceDownload } from "../src/shared/api.js";
 import { AuditService, exportFileName } from "../src/main/services/auditService.js";
 import { PreferencesService } from "../src/main/services/preferencesService.js";
@@ -108,7 +107,7 @@ describe("SettingsService (store settings)", () => {
   });
 });
 
-describe("PreferencesService (store settings and vault)", () => {
+describe("PreferencesService (store settings)", () => {
   const voice = { download: { kind: "needed" } as VoiceDownload, started: 0, removed: 0, cleared: 0 };
   function preferences(status: GatewayStatus = { listener: { kind: "listening" }, receiving: false }, pushed: Preferences[] = []) {
     return new PreferencesService({
@@ -120,7 +119,6 @@ describe("PreferencesService (store settings and vault)", () => {
       },
       onAskHistoryCleared: () => void voice.cleared++,
       store: rig.store,
-      vault: rig.vault,
       platform,
       gatewayStatus: async () => status,
       pairedPhones: async () => 1,
@@ -146,15 +144,6 @@ describe("PreferencesService (store settings and vault)", () => {
     expect((await service.setRetentionDays(99_999)).preferences.retentionDays).toBe(3650);
     expect((await service.setRetentionDays(30.4)).preferences.retentionDays).toBe(30);
     expect(rig.store.settings.get(HANDOFF_SETTING_KEYS.retentionDays)).toBe("30");
-  });
-
-  it("keeps the Clio client secret in the vault, never in settings or logs", async () => {
-    const service = preferences();
-    const saved = await service.saveClioSecret("  s3cret-value  ");
-    expect(saved).toMatchObject({ message: "Clio client secret saved in this computer's secure storage.", preferences: { hasClioSecret: true } });
-    expect(Buffer.from((await rig.vault.secret(SECRET_ACCOUNTS.clioClientSecret)) ?? []).toString()).toBe("s3cret-value");
-    expect((await service.removeClioSecret()).preferences.hasClioSecret).toBe(false);
-    expect(rig.log.lines.join("\n")).not.toContain("s3cret");
   });
 
   it("counts the outbox and Ask threads, clears Ask history and reports the LANA voice download", async () => {

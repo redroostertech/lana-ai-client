@@ -1,5 +1,4 @@
 import { kindOfType, matterBlockReason, runTitleOf } from "@lana/core/actions";
-import { failureMessage } from "@lana/core/connectors";
 import {
   LANA_ERROR_KINDS, LANA_ERROR_MESSAGES, LanaError, LanaUndoClosedError,
   type LanaActionExecutor, type LanaActionInput, type LanaErrorKind,
@@ -9,7 +8,7 @@ import type { ActionPhase, Result } from "../../../shared/api.js";
 import { NOT_ENTITLED_MESSAGE } from "../../gateway/accessMessages.js";
 import type { MainLog } from "../../log.js";
 import type { ActionRunner, RunGate } from "./actionPagesService.js";
-import type { ExecutionResult } from "./actionService.js";
+import type { ExecutionResult } from "./actionRecords.js";
 import { decodeStoredResolution, encodeStoredResolution, type StoredResolution } from "./storedResolution.js";
 
 /** Email drafts are not sent to LANA: it has no email path yet. */
@@ -30,8 +29,8 @@ export interface LanaActionRunnerDependencies {
 }
 
 /**
- * Runs confirmed actions on the firm's LANA server (the default route; the Clio and
- * Microsoft executors stay in the code, unrouted). A task becomes a LANA task and a note a
+ * Runs confirmed actions on the firm's LANA server; LANA's connectors carry them on to
+ * other systems. A task becomes a LANA task and a note a
  * LANA matter note on the matter the person chose; an email stays a draft here.
  *
  * Run: resolved, then confirmed, then the executor (idempotent: ledger plus marker), then
@@ -192,10 +191,10 @@ export class LanaActionRunner implements ActionRunner {
   }
 }
 
-/** The message for a stored failure code: LANA's kinds, or the connectors' older codes. */
+/** The message for a stored failure code: LANA's kinds, else a plain retry message. */
 export function runFailureMessage(code: string | undefined): string {
   if (code !== undefined && (LANA_ERROR_KINDS as readonly string[]).includes(code)) return LANA_ERROR_MESSAGES[code as LanaErrorKind];
-  return failureMessage(code);
+  return "The action did not finish. Retry checks for an earlier copy before sending.";
 }
 
 /** The LANA call undo makes, kept with the result for reference (the bearer token goes only to the signed-in server). */

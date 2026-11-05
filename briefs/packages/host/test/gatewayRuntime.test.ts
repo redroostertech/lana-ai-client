@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -71,6 +71,7 @@ interface Rig {
   log: RecordingLog;
   air: Air;
   client: ClientSessionHolder;
+  userData: string;
   next<T extends LanaEvent["type"]>(type: T, match?: (event: Extract<LanaEvent, { type: T }>) => boolean): Promise<Extract<LanaEvent, { type: T }>>;
 }
 
@@ -104,7 +105,7 @@ async function open(userData: string, options: { playTone?: boolean; client?: Cl
       };
       waiters.push(waiter);
     });
-  return { runtime, events, log, air, client, next };
+  return { runtime, events, log, air, client, userData, next };
 }
 
 /** Signing in happens in the client; Briefs is told its session changed and reads it. */
@@ -146,8 +147,8 @@ describe("Gateway runtime (main process services)", () => {
     const seen: string[] = [];
     await rig.runtime.lanaSession?.authorized(async ({ token }) => void seen.push(token));
     expect(seen).toEqual(["client-token-2"]);
-    // Nothing of the session is written to Briefs' vault.
-    for (const key of ["lana.session", "lana.entitlement"]) expect(await rig.runtime.vault.secret(key)).toBeNull();
+    // Nothing of the session is written to Briefs' vault: it holds the computer's identity and the store key only.
+    expect(readdirSync(join(rig.userData, "keys")).sort()).toEqual(["datakey.gateway.sealed", "identity.mac.sealed"]);
   });
 
   it("gates the listener on sign in, pairs, receives a meeting by tone, restores the session, and stops on sign out", async () => {

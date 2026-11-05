@@ -1,6 +1,6 @@
 import { decodeEntityHint, encodeEntityHint } from "@lana/core/intent";
 import { arrayOf, asBool, asDate, asObject, asString, canonicalEncode, field, LanaDate, optional, parseJson, type JsonObject, type JsonValue } from "@lana/core/json";
-import type { ExecutionResult, ExecutorKind, ResolvedEntity, ResolvedRecipient, ResolvedTarget } from "./actionService.js";
+import type { ExecutionResult, ExecutorKind, ResolvedEntity, ResolvedRecipient, ResolvedTarget } from "./actionRecords.js";
 
 /**
  * What the gateway keeps in `intent.resolution` (Swift `StoredResolution`): the confirmed

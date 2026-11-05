@@ -10,3 +10,4 @@ export {
   type LanaActionInput, type LanaActionType, type LanaRecord, type LanaRunLedger, type LanaRunOutcome,
 } from "./lanaActionExecutor.js";
 export { matterHitOf, type LanaMatterHit } from "./matterHit.js";
+export { ActionMarker, UNDO_WINDOW } from "./actionMarker.js";
