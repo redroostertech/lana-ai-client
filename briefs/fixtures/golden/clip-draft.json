@@ -1,0 +1,1034 @@
+{
+  "decisions" : [
+    {
+      "clip_id" : "clip-many_long",
+      "key_point" : "{\"id\":\"kp-clip-clip-many_long\",\"kind\":\"decision\",\"precision\":\"exact\",\"sources\":[{\"end\":162,\"start\":100}],\"text\":\"Dana files on Friday.\"}",
+      "lines" : "many_long",
+      "text" : "  Dana files on Friday.\n"
+    },
+    {
+      "clip_id" : "clip-one_speaker",
+      "key_point" : "{\"id\":\"kp-clip-clip-one_speaker\",\"kind\":\"decision\",\"precision\":\"exact\",\"sources\":[{\"end\":70,\"speaker\":\"S3\",\"start\":61.25}],\"text\":\"Dana files on Friday.\"}",
+      "lines" : "one_speaker",
+      "text" : "  Dana files on Friday.\n"
+    },
+    {
+      "clip_id" : "clip-two_speakers",
+      "key_point" : "{\"id\":\"kp-clip-clip-two_speakers\",\"kind\":\"decision\",\"precision\":\"exact\",\"sources\":[{\"end\":15.5,\"start\":4}],\"text\":\"Dana files on Friday.\"}",
+      "lines" : "two_speakers",
+      "text" : "  Dana files on Friday.\n"
+    }
+  ],
+  "fallbacks" : {
+    "many_long" : {
+      "action" : {
+        "assignee_hint" : null,
+        "body" : "Line 0 about the deposition schedule. Line 1 about the deposition schedule. Line 2 about the deposition schedule. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton fi",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Follow up",
+        "type" : "task.create"
+      },
+      "intent" : "{\"confidence\":1,\"created_at\":\"2026-10-26T07:33:20.000Z\",\"evidence\":[{\"quote\":\"Line 0 about the deposition schedule.\",\"speaker\":\"S1\",\"t_end\":106,\"t_start\":100},{\"quote\":\"Line 1 about the deposition schedule.\",\"speaker\":\"S2\",\"t_end\":113,\"t_start\":107},{\"quote\":\"Line 2 about the deposition schedule.\",\"speaker\":\"S1\",\"t_end\":120,\"t_start\":114},{\"quote\":\"Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café \",\"speaker\":\"S2\",\"t_end\":127,\"t_start\":121},{\"quote\":\"Line 4 about the deposition schedule.\",\"speaker\":\"S1\",\"t_end\":134,\"t_start\":128},{\"quote\":\"Line 5 about the deposition schedule.\",\"speaker\":\"S2\",\"t_end\":141,\"t_start\":135},{\"quote\":\"Line 6 about the deposition schedule.\",\"speaker\":\"S1\",\"t_end\":148,\"t_start\":142},{\"quote\":\"Line 7 about the deposition schedule.\",\"speaker\":\"S2\",\"t_end\":155,\"t_start\":149}],\"id\":\"int_01M5VJ1JG0NH8ZERFMKA8J2JM2\",\"idempotency_key\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM:task.create:follow-up\",\"meeting_id\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM\",\"params\":{\"detail\":\"Line 0 about the deposition schedule. Line 1 about the deposition schedule. Line 2 about the deposition schedule. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton fi\",\"title\":\"Follow up\"},\"schema\":\"lana.intent/v1\",\"status\":\"proposed\",\"type\":\"task.create\"}",
+      "question_action" : {
+        "assignee_hint" : null,
+        "body" : "Line 0 about the deposition schedule. Line 1 about the deposition schedule. Line 2 about the deposition schedule. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton fi",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Follow up: The meeting also touched on the government's perception of social work and the need for advocacy.",
+        "type" : "task.create"
+      }
+    },
+    "one_speaker" : {
+      "action" : {
+        "assignee_hint" : null,
+        "body" : "  We agreed to mediation in December.  ",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Follow up",
+        "type" : "task.create"
+      },
+      "intent" : "{\"confidence\":1,\"created_at\":\"2026-10-26T07:33:20.000Z\",\"evidence\":[{\"quote\":\"  We agreed to mediation in December.  \",\"speaker\":\"S3\",\"t_end\":70,\"t_start\":61.25}],\"id\":\"int_01M5VJ1JG0CTS81XJ23M48FB4G\",\"idempotency_key\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM:task.create:follow-up\",\"meeting_id\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM\",\"params\":{\"detail\":\"We agreed to mediation in December.\",\"title\":\"Follow up\"},\"schema\":\"lana.intent/v1\",\"status\":\"proposed\",\"type\":\"task.create\"}",
+      "question_action" : {
+        "assignee_hint" : null,
+        "body" : "  We agreed to mediation in December.  ",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Follow up: The meeting also touched on the government's perception of social work and the need for advocacy.",
+        "type" : "task.create"
+      }
+    },
+    "two_speakers" : {
+      "action" : {
+        "assignee_hint" : null,
+        "body" : "Can you file the motion to compel by Friday? Yes, I will draft it tonight and file it Friday.",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Follow up",
+        "type" : "task.create"
+      },
+      "intent" : "{\"confidence\":1,\"created_at\":\"2026-10-26T07:33:20.000Z\",\"evidence\":[{\"quote\":\"Can you file the motion to compel by Friday?\",\"speaker\":\"S2\",\"t_end\":9,\"t_start\":4},{\"quote\":\"Yes, I will draft it tonight and file it Friday.\",\"speaker\":\"S1\",\"t_end\":15.5,\"t_start\":9}],\"id\":\"int_01M5VJ1JG0N3X8D17VG2GS3QRC\",\"idempotency_key\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM:task.create:follow-up\",\"meeting_id\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM\",\"params\":{\"detail\":\"Can you file the motion to compel by Friday? Yes, I will draft it tonight and file it Friday.\",\"title\":\"Follow up\"},\"schema\":\"lana.intent/v1\",\"status\":\"proposed\",\"type\":\"task.create\"}",
+      "question_action" : {
+        "assignee_hint" : null,
+        "body" : "Can you file the motion to compel by Friday? Yes, I will draft it tonight and file it Friday.",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Follow up: The meeting also touched on the government's perception of social work and the need for advocacy.",
+        "type" : "task.create"
+      }
+    }
+  },
+  "instructions" : {
+    "action" : "You turn a few lines from a meeting the person recorded into one follow-up action for their records. Use only what the lines say. Reply with exactly one line and nothing else:\nACTION: task | Short title | One sentence of detail | YYYY-MM-DD, or none | who, or none | client, matter or company, or none\nThe first field is task (someone must do something), note (something to record in the file) or email (an email to send). Write a date only if a specific calendar date was said; otherwise write none.",
+    "decision" : "You turn a few lines from a meeting the person recorded into one decision for their records. Use only what the lines say. Reply with exactly one line and nothing else:\nDECISION: one plain sentence stating what was decided, and by whom when it is said.",
+    "question" : "You turn an open question from a meeting the person recorded into one follow-up task for them, so the question gets answered. Use only what the question and the lines say. Reply with exactly one line and nothing else:\nTASK: a short title of at most 8 words that starts with a verb, such as Research, Find out or Follow up with | one sentence on what to find out and why"
+  },
+  "line_sets" : {
+    "many_long" : [
+      {
+        "end" : 106,
+        "speaker" : "S1",
+        "start" : 100,
+        "text" : "Line 0 about the deposition schedule."
+      },
+      {
+        "end" : 113,
+        "speaker" : "S2",
+        "start" : 107,
+        "text" : "Line 1 about the deposition schedule."
+      },
+      {
+        "end" : 120,
+        "speaker" : "S1",
+        "start" : 114,
+        "text" : "Line 2 about the deposition schedule."
+      },
+      {
+        "end" : 127,
+        "speaker" : "S2",
+        "start" : 121,
+        "text" : "Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. "
+      },
+      {
+        "end" : 134,
+        "speaker" : "S1",
+        "start" : 128,
+        "text" : "Line 4 about the deposition schedule."
+      },
+      {
+        "end" : 141,
+        "speaker" : "S2",
+        "start" : 135,
+        "text" : "Line 5 about the deposition schedule."
+      },
+      {
+        "end" : 148,
+        "speaker" : "S1",
+        "start" : 142,
+        "text" : "Line 6 about the deposition schedule."
+      },
+      {
+        "end" : 155,
+        "speaker" : "S2",
+        "start" : 149,
+        "text" : "Line 7 about the deposition schedule."
+      },
+      {
+        "end" : 162,
+        "speaker" : "S1",
+        "start" : 156,
+        "text" : "Line 8 about the deposition schedule."
+      }
+    ],
+    "one_speaker" : [
+      {
+        "end" : 70,
+        "speaker" : "S3",
+        "start" : 61.25,
+        "text" : "  We agreed to mediation in December.  "
+      }
+    ],
+    "two_speakers" : [
+      {
+        "end" : 9,
+        "speaker" : "S2",
+        "start" : 4,
+        "text" : "Can you file the motion to compel by Friday?"
+      },
+      {
+        "end" : 15.5,
+        "speaker" : "S1",
+        "start" : 9,
+        "text" : "Yes, I will draft it tonight and file it Friday."
+      }
+    ]
+  },
+  "maximum_response_tokens" : 120,
+  "meeting_id" : "mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM",
+  "now" : "2026-10-26T07:33:20.000Z",
+  "prompts" : {
+    "many_long" : "Lines:\nDana Reyes: Line 0 about the deposition schedule.\nSofia Marin: Line 1 about the deposition schedule.\nDana Reyes: Line 2 about the deposition schedule.\nSofia Marin: Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. \nDana Reyes: Line 4 about the deposition schedule.\nSofia Marin: Line 5 about the deposition schedule.\nDana Reyes: Line 6 about the deposition schedule.\nSofia Marin: Line 7 about the deposition schedule.\nDana Reyes: Line 8 about the deposition schedule.",
+    "one_speaker" : "Lines:\nS3:   We agreed to mediation in December.  ",
+    "two_speakers" : "Lines:\nSofia Marin: Can you file the motion to compel by Friday?\nDana Reyes: Yes, I will draft it tonight and file it Friday."
+  },
+  "question" : "  The meeting also touched on the government's perception of social work and the need for advocacy. ",
+  "question_prompts" : {
+    "many_long" : "Open question: The meeting also touched on the government's perception of social work and the need for advocacy.\nLines:\nDana Reyes: Line 0 about the deposition schedule.\nSofia Marin: Line 1 about the deposition schedule.\nDana Reyes: Line 2 about the deposition schedule.\nSofia Marin: Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. \nDana Reyes: Line 4 about the deposition schedule.\nSofia Marin: Line 5 about the deposition schedule.\nDana Reyes: Line 6 about the deposition schedule.\nSofia Marin: Line 7 about the deposition schedule.\nDana Reyes: Line 8 about the deposition schedule.\nDo not answer the question. Write the one TASK: line for the follow-up.",
+    "one_speaker" : "Open question: The meeting also touched on the government's perception of social work and the need for advocacy.\nLines:\nS3:   We agreed to mediation in December.  \nDo not answer the question. Write the one TASK: line for the follow-up.",
+    "two_speakers" : "Open question: The meeting also touched on the government's perception of social work and the need for advocacy.\nLines:\nSofia Marin: Can you file the motion to compel by Friday?\nDana Reyes: Yes, I will draft it tonight and file it Friday.\nDo not answer the question. Write the one TASK: line for the follow-up."
+  },
+  "replies" : [
+    {
+      "action" : {
+        "assignee_hint" : "Dana Reyes",
+        "body" : "Dana drafts tonight and files Friday",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : "Pemberton",
+        "title" : "File the motion to compel",
+        "type" : "task.create"
+      },
+      "decision" : null,
+      "intent" : "{\"confidence\":1,\"created_at\":\"2026-10-26T07:33:20.000Z\",\"evidence\":[{\"quote\":\"Can you file the motion to compel by Friday?\",\"speaker\":\"S2\",\"t_end\":9,\"t_start\":4},{\"quote\":\"Yes, I will draft it tonight and file it Friday.\",\"speaker\":\"S1\",\"t_end\":15.5,\"t_start\":9}],\"id\":\"int_01M5VJ1JG0JEZ0VWYGXN7YY1XR\",\"idempotency_key\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM:task.create:pemberton-file-the-motion-to-compel\",\"meeting_id\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM\",\"params\":{\"assignee_hint\":\"Dana Reyes\",\"detail\":\"Dana drafts tonight and files Friday\",\"regarding\":{\"kind\":\"matter\",\"name\":\"Pemberton\"},\"title\":\"File the motion to compel\"},\"schema\":\"lana.intent/v1\",\"status\":\"proposed\",\"type\":\"task.create\"}",
+      "lines" : "two_speakers",
+      "question" : {
+        "assignee_hint" : null,
+        "body" : "Dana drafts tonight and files Friday",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "File the motion to compel",
+        "type" : "task.create"
+      },
+      "reason" : "no_draft_line",
+      "reply" : "ACTION: task | File the motion to compel | Dana drafts tonight and files Friday | none | Dana Reyes | Pemberton",
+      "valid_action" : true,
+      "valid_decision" : false,
+      "valid_question" : true
+    },
+    {
+      "action" : {
+        "assignee_hint" : null,
+        "body" : "Email Sofia the motion draft",
+        "confidence" : 1,
+        "due_date" : "2026-11-14",
+        "recipients" : [
+          "Dana"
+        ],
+        "regarding_name" : null,
+        "title" : "Send the draft",
+        "type" : "email.draft"
+      },
+      "decision" : null,
+      "intent" : "{\"confidence\":1,\"created_at\":\"2026-10-26T07:33:20.000Z\",\"evidence\":[{\"quote\":\"Can you file the motion to compel by Friday?\",\"speaker\":\"S2\",\"t_end\":9,\"t_start\":4},{\"quote\":\"Yes, I will draft it tonight and file it Friday.\",\"speaker\":\"S1\",\"t_end\":15.5,\"t_start\":9}],\"id\":\"int_01M5VJ1JG0NKC5JRMNRBWZSVXY\",\"idempotency_key\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM:email.draft:send-the-draft\",\"meeting_id\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM\",\"params\":{\"body\":\"Email Sofia the motion draft\",\"subject\":\"Send the draft\",\"to\":[{\"kind\":\"contact\",\"name\":\"Dana\"}]},\"schema\":\"lana.intent/v1\",\"status\":\"proposed\",\"type\":\"email.draft\"}",
+      "lines" : "two_speakers",
+      "question" : {
+        "assignee_hint" : null,
+        "body" : "Email Sofia the motion draft",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Send the draft",
+        "type" : "task.create"
+      },
+      "reason" : "no_draft_line",
+      "reply" : "**ACTION:** email | Send the draft | Email Sofia the motion draft | 2026-11-14 | Dana | none",
+      "valid_action" : true,
+      "valid_decision" : false,
+      "valid_question" : true
+    },
+    {
+      "action" : {
+        "assignee_hint" : null,
+        "body" : "",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : "Acme Corp",
+        "title" : "Client agreed to mediation",
+        "type" : "note.log"
+      },
+      "decision" : null,
+      "intent" : "{\"confidence\":1,\"created_at\":\"2026-10-26T07:33:20.000Z\",\"evidence\":[{\"quote\":\"  We agreed to mediation in December.  \",\"speaker\":\"S3\",\"t_end\":70,\"t_start\":61.25}],\"id\":\"int_01M5VJ1JG0Y4ZCCQ1WV5KVTRQA\",\"idempotency_key\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM:note.log:acme-corp-client-agreed-to-mediation\",\"meeting_id\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM\",\"params\":{\"body\":\"Client agreed to mediation\",\"regarding\":{\"kind\":\"matter\",\"name\":\"Acme Corp\"},\"subject\":\"Client agreed to mediation\"},\"schema\":\"lana.intent/v1\",\"status\":\"proposed\",\"type\":\"note.log\"}",
+      "lines" : "one_speaker",
+      "question" : {
+        "assignee_hint" : null,
+        "body" : "",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Client agreed to mediation",
+        "type" : "task.create"
+      },
+      "reason" : "no_draft_line",
+      "reply" : "- action: note | Client agreed to mediation |  | none | none | Acme Corp",
+      "valid_action" : true,
+      "valid_decision" : false,
+      "valid_question" : true
+    },
+    {
+      "action" : {
+        "assignee_hint" : null,
+        "body" : "Ask about the hearing",
+        "confidence" : 1,
+        "due_date" : "next Friday",
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Call the court clerk",
+        "type" : "task.create"
+      },
+      "decision" : null,
+      "intent" : "{\"confidence\":1,\"created_at\":\"2026-10-26T07:33:20.000Z\",\"evidence\":[{\"quote\":\"Can you file the motion to compel by Friday?\",\"speaker\":\"S2\",\"t_end\":9,\"t_start\":4},{\"quote\":\"Yes, I will draft it tonight and file it Friday.\",\"speaker\":\"S1\",\"t_end\":15.5,\"t_start\":9}],\"id\":\"int_01M5VJ1JG0Q18D593P8DRNE9KW\",\"idempotency_key\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM:task.create:call-the-court-clerk\",\"meeting_id\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM\",\"params\":{\"detail\":\"Ask about the hearing\\nDue: next Friday\",\"title\":\"Call the court clerk\"},\"schema\":\"lana.intent/v1\",\"status\":\"proposed\",\"type\":\"task.create\"}",
+      "lines" : "two_speakers",
+      "question" : {
+        "assignee_hint" : null,
+        "body" : "Ask about the hearing",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Call the court clerk",
+        "type" : "task.create"
+      },
+      "reason" : "no_draft_line",
+      "reply" : "ACTION: task | Call the court clerk | Ask about the hearing | next Friday | none | none",
+      "valid_action" : true,
+      "valid_decision" : false,
+      "valid_question" : true
+    },
+    {
+      "action" : {
+        "assignee_hint" : null,
+        "body" : "Email the draft",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Send the draft",
+        "type" : "email.draft"
+      },
+      "decision" : null,
+      "intent" : "{\"confidence\":1,\"created_at\":\"2026-10-26T07:33:20.000Z\",\"evidence\":[{\"quote\":\"Can you file the motion to compel by Friday?\",\"speaker\":\"S2\",\"t_end\":9,\"t_start\":4},{\"quote\":\"Yes, I will draft it tonight and file it Friday.\",\"speaker\":\"S1\",\"t_end\":15.5,\"t_start\":9}],\"id\":\"int_01M5VJ1JG0FJ17VDCEZECCVRJE\",\"idempotency_key\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM:task.create:send-the-draft\",\"meeting_id\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM\",\"params\":{\"detail\":\"Email the draft\",\"title\":\"Send the draft\"},\"schema\":\"lana.intent/v1\",\"status\":\"proposed\",\"type\":\"task.create\"}",
+      "lines" : "two_speakers",
+      "question" : {
+        "assignee_hint" : null,
+        "body" : "Email the draft",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Send the draft",
+        "type" : "task.create"
+      },
+      "reason" : "no_draft_line",
+      "reply" : "ACTION: email | Send the draft | Email the draft | none | none | none",
+      "valid_action" : true,
+      "valid_decision" : false,
+      "valid_question" : true
+    },
+    {
+      "action" : {
+        "assignee_hint" : null,
+        "body" : "Send it to the client",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+          "client@example.com"
+        ],
+        "regarding_name" : "Acme",
+        "title" : "Send engagement letter",
+        "type" : "email.draft"
+      },
+      "decision" : null,
+      "intent" : "{\"confidence\":1,\"created_at\":\"2026-10-26T07:33:20.000Z\",\"evidence\":[{\"quote\":\"  We agreed to mediation in December.  \",\"speaker\":\"S3\",\"t_end\":70,\"t_start\":61.25}],\"id\":\"int_01M5VJ1JG0APJ8THM0T494HZYS\",\"idempotency_key\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM:email.draft:acme-send-engagement-letter\",\"meeting_id\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM\",\"params\":{\"body\":\"Send it to the client\",\"regarding\":{\"kind\":\"matter\",\"name\":\"Acme\"},\"subject\":\"Send engagement letter\",\"to\":[{\"email\":\"client@example.com\",\"kind\":\"contact\",\"name\":\"client@example.com\"}]},\"schema\":\"lana.intent/v1\",\"status\":\"proposed\",\"type\":\"email.draft\"}",
+      "lines" : "one_speaker",
+      "question" : {
+        "assignee_hint" : null,
+        "body" : "Send it to the client",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Send engagement letter",
+        "type" : "task.create"
+      },
+      "reason" : "no_draft_line",
+      "reply" : "ACTION: EMAIL | Send engagement letter | Send it to the client | none | client@example.com | Acme",
+      "valid_action" : true,
+      "valid_decision" : false,
+      "valid_question" : true
+    },
+    {
+      "action" : null,
+      "decision" : null,
+      "intent" : null,
+      "lines" : "two_speakers",
+      "question" : null,
+      "reason" : "no_draft_line",
+      "reply" : "ACTION: task |  | missing title | none | none | none",
+      "valid_action" : false,
+      "valid_decision" : false,
+      "valid_question" : false
+    },
+    {
+      "action" : {
+        "assignee_hint" : null,
+        "body" : "fields",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Too few",
+        "type" : "task.create"
+      },
+      "decision" : null,
+      "intent" : "{\"confidence\":1,\"created_at\":\"2026-10-26T07:33:20.000Z\",\"evidence\":[{\"quote\":\"Can you file the motion to compel by Friday?\",\"speaker\":\"S2\",\"t_end\":9,\"t_start\":4},{\"quote\":\"Yes, I will draft it tonight and file it Friday.\",\"speaker\":\"S1\",\"t_end\":15.5,\"t_start\":9}],\"id\":\"int_01M5VJ1JG0SNPR45CXVYNPM5DQ\",\"idempotency_key\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM:task.create:too-few\",\"meeting_id\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM\",\"params\":{\"detail\":\"fields\",\"title\":\"Too few\"},\"schema\":\"lana.intent/v1\",\"status\":\"proposed\",\"type\":\"task.create\"}",
+      "lines" : "two_speakers",
+      "question" : {
+        "assignee_hint" : null,
+        "body" : "fields",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Too few",
+        "type" : "task.create"
+      },
+      "reason" : "no_draft_line",
+      "reply" : "ACTION: task | Too few | fields",
+      "valid_action" : true,
+      "valid_decision" : false,
+      "valid_question" : true
+    },
+    {
+      "action" : null,
+      "decision" : null,
+      "intent" : null,
+      "lines" : "two_speakers",
+      "question" : null,
+      "reason" : "no_draft_line",
+      "reply" : "Sure! Here you go.",
+      "valid_action" : false,
+      "valid_decision" : false,
+      "valid_question" : false
+    },
+    {
+      "action" : {
+        "assignee_hint" : "Sofia Marin",
+        "body" : "For the Pemberton deposition",
+        "confidence" : 1,
+        "due_date" : "2026-02-30",
+        "recipients" : [
+
+        ],
+        "regarding_name" : "Pemberton",
+        "title" : "Book the deposition room",
+        "type" : "task.create"
+      },
+      "decision" : null,
+      "intent" : "{\"confidence\":1,\"created_at\":\"2026-10-26T07:33:20.000Z\",\"evidence\":[{\"quote\":\"Line 0 about the deposition schedule.\",\"speaker\":\"S1\",\"t_end\":106,\"t_start\":100},{\"quote\":\"Line 1 about the deposition schedule.\",\"speaker\":\"S2\",\"t_end\":113,\"t_start\":107},{\"quote\":\"Line 2 about the deposition schedule.\",\"speaker\":\"S1\",\"t_end\":120,\"t_start\":114},{\"quote\":\"Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café \",\"speaker\":\"S2\",\"t_end\":127,\"t_start\":121},{\"quote\":\"Line 4 about the deposition schedule.\",\"speaker\":\"S1\",\"t_end\":134,\"t_start\":128},{\"quote\":\"Line 5 about the deposition schedule.\",\"speaker\":\"S2\",\"t_end\":141,\"t_start\":135},{\"quote\":\"Line 6 about the deposition schedule.\",\"speaker\":\"S1\",\"t_end\":148,\"t_start\":142},{\"quote\":\"Line 7 about the deposition schedule.\",\"speaker\":\"S2\",\"t_end\":155,\"t_start\":149}],\"id\":\"int_01M5VJ1JG0BG05WNY7JJPC7QGE\",\"idempotency_key\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM:task.create:pemberton-book-the-deposition-room\",\"meeting_id\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM\",\"params\":{\"assignee_hint\":\"Sofia Marin\",\"detail\":\"For the Pemberton deposition\\nDue: 2026-02-30\",\"regarding\":{\"kind\":\"matter\",\"name\":\"Pemberton\"},\"title\":\"Book the deposition room\"},\"schema\":\"lana.intent/v1\",\"status\":\"proposed\",\"type\":\"task.create\"}",
+      "lines" : "many_long",
+      "question" : {
+        "assignee_hint" : null,
+        "body" : "For the Pemberton deposition",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Book the deposition room",
+        "type" : "task.create"
+      },
+      "reason" : "no_draft_line",
+      "reply" : "Here is the draft:\nACTION: task | Book the deposition room | For the Pemberton deposition | 2026-02-30 | Sofia Marin | Pemberton",
+      "valid_action" : true,
+      "valid_decision" : false,
+      "valid_question" : true
+    },
+    {
+      "action" : {
+        "assignee_hint" : null,
+        "body" : "b",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : "none | extra | fields",
+        "title" : "A",
+        "type" : "task.create"
+      },
+      "decision" : null,
+      "intent" : "{\"confidence\":1,\"created_at\":\"2026-10-26T07:33:20.000Z\",\"evidence\":[{\"quote\":\"Can you file the motion to compel by Friday?\",\"speaker\":\"S2\",\"t_end\":9,\"t_start\":4},{\"quote\":\"Yes, I will draft it tonight and file it Friday.\",\"speaker\":\"S1\",\"t_end\":15.5,\"t_start\":9}],\"id\":\"int_01M5VJ1JG0DPXZ3F50QWCZGY66\",\"idempotency_key\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM:task.create:none-extra-fields-a\",\"meeting_id\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM\",\"params\":{\"detail\":\"b\",\"regarding\":{\"kind\":\"matter\",\"name\":\"none | extra | fields\"},\"title\":\"A\"},\"schema\":\"lana.intent/v1\",\"status\":\"proposed\",\"type\":\"task.create\"}",
+      "lines" : "two_speakers",
+      "question" : {
+        "assignee_hint" : null,
+        "body" : "b",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "A",
+        "type" : "task.create"
+      },
+      "reason" : "no_draft_line",
+      "reply" : "ACTION: task | A | b | none | NONE | none | extra | fields",
+      "valid_action" : true,
+      "valid_decision" : false,
+      "valid_question" : true
+    },
+    {
+      "action" : {
+        "assignee_hint" : "Sofia Marin",
+        "body" : "",
+        "confidence" : 1,
+        "due_date" : "2026-12-01",
+        "recipients" : [
+
+        ],
+        "regarding_name" : "Pemberton",
+        "title" : "Review the file",
+        "type" : "task.create"
+      },
+      "decision" : null,
+      "intent" : "{\"confidence\":1,\"created_at\":\"2026-10-26T07:33:20.000Z\",\"evidence\":[{\"quote\":\"Line 0 about the deposition schedule.\",\"speaker\":\"S1\",\"t_end\":106,\"t_start\":100},{\"quote\":\"Line 1 about the deposition schedule.\",\"speaker\":\"S2\",\"t_end\":113,\"t_start\":107},{\"quote\":\"Line 2 about the deposition schedule.\",\"speaker\":\"S1\",\"t_end\":120,\"t_start\":114},{\"quote\":\"Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café \",\"speaker\":\"S2\",\"t_end\":127,\"t_start\":121},{\"quote\":\"Line 4 about the deposition schedule.\",\"speaker\":\"S1\",\"t_end\":134,\"t_start\":128},{\"quote\":\"Line 5 about the deposition schedule.\",\"speaker\":\"S2\",\"t_end\":141,\"t_start\":135},{\"quote\":\"Line 6 about the deposition schedule.\",\"speaker\":\"S1\",\"t_end\":148,\"t_start\":142},{\"quote\":\"Line 7 about the deposition schedule.\",\"speaker\":\"S2\",\"t_end\":155,\"t_start\":149}],\"id\":\"int_01M5VJ1JG0EXM29HYRD4XK30KA\",\"idempotency_key\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM:task.create:pemberton-review-the-file\",\"meeting_id\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM\",\"params\":{\"assignee_hint\":\"Sofia Marin\",\"detail\":\"\",\"due_date\":\"2026-12-01\",\"regarding\":{\"kind\":\"matter\",\"name\":\"Pemberton\"},\"title\":\"Review the file\"},\"schema\":\"lana.intent/v1\",\"status\":\"proposed\",\"type\":\"task.create\"}",
+      "lines" : "many_long",
+      "question" : {
+        "assignee_hint" : null,
+        "body" : "",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Review the file",
+        "type" : "task.create"
+      },
+      "reason" : "no_draft_line",
+      "reply" : "ACTION: Task | Review the file | | 2026-12-01 | Sofia Marin | Pemberton",
+      "valid_action" : true,
+      "valid_decision" : false,
+      "valid_question" : true
+    },
+    {
+      "action" : null,
+      "decision" : "Dana will file the motion to compel on Friday.",
+      "intent" : null,
+      "lines" : "two_speakers",
+      "question" : null,
+      "reason" : "no_draft_line",
+      "reply" : "DECISION: Dana will file the motion to compel on Friday.",
+      "valid_action" : false,
+      "valid_decision" : true,
+      "valid_question" : false
+    },
+    {
+      "action" : null,
+      "decision" : "We settle at forty thousand.",
+      "intent" : null,
+      "lines" : "one_speaker",
+      "question" : null,
+      "reason" : "no_draft_line",
+      "reply" : "### Decision: We settle at forty thousand.",
+      "valid_action" : false,
+      "valid_decision" : true,
+      "valid_question" : false
+    },
+    {
+      "action" : null,
+      "decision" : "Mediation in December.",
+      "intent" : null,
+      "lines" : "one_speaker",
+      "question" : null,
+      "reason" : "no_draft_line",
+      "reply" : "DECISION**: Mediation in December.",
+      "valid_action" : false,
+      "valid_decision" : true,
+      "valid_question" : false
+    },
+    {
+      "action" : null,
+      "decision" : null,
+      "intent" : null,
+      "lines" : "one_speaker",
+      "question" : null,
+      "reason" : "no_draft_line",
+      "reply" : "DECISION:",
+      "valid_action" : false,
+      "valid_decision" : false,
+      "valid_question" : false
+    },
+    {
+      "action" : {
+        "assignee_hint" : null,
+        "body" : "Call today",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Tell the client",
+        "type" : "task.create"
+      },
+      "decision" : "The client keeps the house.",
+      "intent" : "{\"confidence\":1,\"created_at\":\"2026-10-26T07:33:20.000Z\",\"evidence\":[{\"quote\":\"  We agreed to mediation in December.  \",\"speaker\":\"S3\",\"t_end\":70,\"t_start\":61.25}],\"id\":\"int_01M5VJ1JG067PRMHCMB1VS0KA1\",\"idempotency_key\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM:task.create:tell-the-client\",\"meeting_id\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM\",\"params\":{\"detail\":\"Call today\",\"title\":\"Tell the client\"},\"schema\":\"lana.intent/v1\",\"status\":\"proposed\",\"type\":\"task.create\"}",
+      "lines" : "one_speaker",
+      "question" : {
+        "assignee_hint" : null,
+        "body" : "Call today",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Tell the client",
+        "type" : "task.create"
+      },
+      "reply" : "`DECISION:` The client keeps the house.\nACTION: task | Tell the client | Call today | none | none | none",
+      "valid_action" : true,
+      "valid_decision" : true,
+      "valid_question" : true
+    },
+    {
+      "action" : {
+        "assignee_hint" : null,
+        "body" : "",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Advocate for social work as a profession",
+        "type" : "task.create"
+      },
+      "decision" : null,
+      "intent" : "{\"confidence\":1,\"created_at\":\"2026-10-26T07:33:20.000Z\",\"evidence\":[{\"quote\":\"Line 0 about the deposition schedule.\",\"speaker\":\"S1\",\"t_end\":106,\"t_start\":100},{\"quote\":\"Line 1 about the deposition schedule.\",\"speaker\":\"S2\",\"t_end\":113,\"t_start\":107},{\"quote\":\"Line 2 about the deposition schedule.\",\"speaker\":\"S1\",\"t_end\":120,\"t_start\":114},{\"quote\":\"Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café \",\"speaker\":\"S2\",\"t_end\":127,\"t_start\":121},{\"quote\":\"Line 4 about the deposition schedule.\",\"speaker\":\"S1\",\"t_end\":134,\"t_start\":128},{\"quote\":\"Line 5 about the deposition schedule.\",\"speaker\":\"S2\",\"t_end\":141,\"t_start\":135},{\"quote\":\"Line 6 about the deposition schedule.\",\"speaker\":\"S1\",\"t_end\":148,\"t_start\":142},{\"quote\":\"Line 7 about the deposition schedule.\",\"speaker\":\"S2\",\"t_end\":155,\"t_start\":149}],\"id\":\"int_01M5VJ1JG032WTXEWERT6RJPKV\",\"idempotency_key\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM:task.create:advocate-for-social-work-as-a-profession\",\"meeting_id\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM\",\"params\":{\"detail\":\"\",\"title\":\"Advocate for social work as a profession\"},\"schema\":\"lana.intent/v1\",\"status\":\"proposed\",\"type\":\"task.create\"}",
+      "lines" : "many_long",
+      "question" : {
+        "assignee_hint" : null,
+        "body" : "",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Advocate for social work as a profession",
+        "type" : "task.create"
+      },
+      "reason" : "no_draft_line",
+      "reply" : "ACTION: task | Advocate for social work as a profession | none | none",
+      "valid_action" : true,
+      "valid_decision" : false,
+      "valid_question" : true
+    },
+    {
+      "action" : {
+        "assignee_hint" : null,
+        "body" : "2024-12-31",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Advocate for social work",
+        "type" : "task.create"
+      },
+      "decision" : null,
+      "intent" : "{\"confidence\":1,\"created_at\":\"2026-10-26T07:33:20.000Z\",\"evidence\":[{\"quote\":\"Line 0 about the deposition schedule.\",\"speaker\":\"S1\",\"t_end\":106,\"t_start\":100},{\"quote\":\"Line 1 about the deposition schedule.\",\"speaker\":\"S2\",\"t_end\":113,\"t_start\":107},{\"quote\":\"Line 2 about the deposition schedule.\",\"speaker\":\"S1\",\"t_end\":120,\"t_start\":114},{\"quote\":\"Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café crème and the Pemberton file. Café \",\"speaker\":\"S2\",\"t_end\":127,\"t_start\":121},{\"quote\":\"Line 4 about the deposition schedule.\",\"speaker\":\"S1\",\"t_end\":134,\"t_start\":128},{\"quote\":\"Line 5 about the deposition schedule.\",\"speaker\":\"S2\",\"t_end\":141,\"t_start\":135},{\"quote\":\"Line 6 about the deposition schedule.\",\"speaker\":\"S1\",\"t_end\":148,\"t_start\":142},{\"quote\":\"Line 7 about the deposition schedule.\",\"speaker\":\"S2\",\"t_end\":155,\"t_start\":149}],\"id\":\"int_01M5VJ1JG0QMT8S8FA3QEP83HP\",\"idempotency_key\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM:task.create:advocate-for-social-work\",\"meeting_id\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM\",\"params\":{\"detail\":\"2024-12-31\",\"title\":\"Advocate for social work\"},\"schema\":\"lana.intent/v1\",\"status\":\"proposed\",\"type\":\"task.create\"}",
+      "lines" : "many_long",
+      "question" : {
+        "assignee_hint" : null,
+        "body" : "2024-12-31",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Advocate for social work",
+        "type" : "task.create"
+      },
+      "reason" : "no_draft_line",
+      "reply" : "ACTION: task | Advocate for social work | 2024-12-31 | none | government perception",
+      "valid_action" : true,
+      "valid_decision" : false,
+      "valid_question" : true
+    },
+    {
+      "action" : {
+        "assignee_hint" : null,
+        "body" : "Find out who decides funding",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Research how the government sees social work",
+        "type" : "task.create"
+      },
+      "decision" : null,
+      "intent" : "{\"confidence\":1,\"created_at\":\"2026-10-26T07:33:20.000Z\",\"evidence\":[{\"quote\":\"Can you file the motion to compel by Friday?\",\"speaker\":\"S2\",\"t_end\":9,\"t_start\":4},{\"quote\":\"Yes, I will draft it tonight and file it Friday.\",\"speaker\":\"S1\",\"t_end\":15.5,\"t_start\":9}],\"id\":\"int_01M5VJ1JG046C0YWEB2NC94D89\",\"idempotency_key\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM:task.create:research-how-the-government-sees-social-work\",\"meeting_id\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM\",\"params\":{\"detail\":\"Find out who decides funding\",\"title\":\"Research how the government sees social work\"},\"schema\":\"lana.intent/v1\",\"status\":\"proposed\",\"type\":\"task.create\"}",
+      "lines" : "two_speakers",
+      "question" : {
+        "assignee_hint" : null,
+        "body" : "Find out who decides funding",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Research how the government sees social work",
+        "type" : "task.create"
+      },
+      "reason" : "no_draft_line",
+      "reply" : "ACTION: Research how the government sees social work | Find out who decides funding",
+      "valid_action" : true,
+      "valid_decision" : false,
+      "valid_question" : true
+    },
+    {
+      "action" : {
+        "assignee_hint" : null,
+        "body" : "",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Call the clerk",
+        "type" : "task.create"
+      },
+      "decision" : null,
+      "intent" : "{\"confidence\":1,\"created_at\":\"2026-10-26T07:33:20.000Z\",\"evidence\":[{\"quote\":\"Can you file the motion to compel by Friday?\",\"speaker\":\"S2\",\"t_end\":9,\"t_start\":4},{\"quote\":\"Yes, I will draft it tonight and file it Friday.\",\"speaker\":\"S1\",\"t_end\":15.5,\"t_start\":9}],\"id\":\"int_01M5VJ1JG08FY9AFDH4HZSJAMR\",\"idempotency_key\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM:task.create:call-the-clerk\",\"meeting_id\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM\",\"params\":{\"detail\":\"\",\"title\":\"Call the clerk\"},\"schema\":\"lana.intent/v1\",\"status\":\"proposed\",\"type\":\"task.create\"}",
+      "lines" : "two_speakers",
+      "question" : {
+        "assignee_hint" : null,
+        "body" : "",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Call the clerk",
+        "type" : "task.create"
+      },
+      "reason" : "no_draft_line",
+      "reply" : "ACTION: Call the clerk",
+      "valid_action" : true,
+      "valid_decision" : false,
+      "valid_question" : true
+    },
+    {
+      "action" : {
+        "assignee_hint" : null,
+        "body" : "The reply ran out of tok",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Cut short",
+        "type" : "task.create"
+      },
+      "decision" : null,
+      "intent" : "{\"confidence\":1,\"created_at\":\"2026-10-26T07:33:20.000Z\",\"evidence\":[{\"quote\":\"Can you file the motion to compel by Friday?\",\"speaker\":\"S2\",\"t_end\":9,\"t_start\":4},{\"quote\":\"Yes, I will draft it tonight and file it Friday.\",\"speaker\":\"S1\",\"t_end\":15.5,\"t_start\":9}],\"id\":\"int_01M5VJ1JG0R4TAPWGQE2KV59FE\",\"idempotency_key\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM:task.create:cut-short\",\"meeting_id\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM\",\"params\":{\"detail\":\"The reply ran out of tok\",\"title\":\"Cut short\"},\"schema\":\"lana.intent/v1\",\"status\":\"proposed\",\"type\":\"task.create\"}",
+      "lines" : "two_speakers",
+      "question" : {
+        "assignee_hint" : null,
+        "body" : "The reply ran out of tok",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Cut short",
+        "type" : "task.create"
+      },
+      "reason" : "no_draft_line",
+      "reply" : "ACTION: task | Cut short | The reply ran out of tok",
+      "valid_action" : true,
+      "valid_decision" : false,
+      "valid_question" : true
+    },
+    {
+      "action" : null,
+      "decision" : null,
+      "intent" : null,
+      "lines" : "two_speakers",
+      "question" : {
+        "assignee_hint" : null,
+        "body" : "Find out who to talk to about funding",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Research how the government sees social work",
+        "type" : "task.create"
+      },
+      "reason" : "no_draft_line",
+      "reply" : "TASK: Research how the government sees social work | Find out who to talk to about funding",
+      "valid_action" : false,
+      "valid_decision" : false,
+      "valid_question" : true
+    },
+    {
+      "action" : null,
+      "decision" : null,
+      "intent" : null,
+      "lines" : "one_speaker",
+      "question" : {
+        "assignee_hint" : null,
+        "body" : "",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Follow up with Dana about advocacy",
+        "type" : "task.create"
+      },
+      "reason" : "no_draft_line",
+      "reply" : "**Task:** Follow up with Dana about advocacy",
+      "valid_action" : false,
+      "valid_decision" : false,
+      "valid_question" : true
+    },
+    {
+      "action" : null,
+      "decision" : null,
+      "intent" : null,
+      "lines" : "one_speaker",
+      "question" : null,
+      "reason" : "no_draft_line",
+      "reply" : "TASK:  | no title",
+      "valid_action" : false,
+      "valid_decision" : false,
+      "valid_question" : false
+    },
+    {
+      "action" : null,
+      "decision" : null,
+      "intent" : null,
+      "lines" : "two_speakers",
+      "question" : {
+        "assignee_hint" : null,
+        "body" : "",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Find out the filing deadline",
+        "type" : "task.create"
+      },
+      "reason" : "no_draft_line",
+      "reply" : "Here is the task.\nTASK: Find out the filing deadline | none",
+      "valid_action" : false,
+      "valid_decision" : false,
+      "valid_question" : true
+    },
+    {
+      "action" : null,
+      "decision" : null,
+      "intent" : null,
+      "lines" : "two_speakers",
+      "question" : {
+        "assignee_hint" : null,
+        "body" : "Ask the clerk before Friday",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Find out whether the court will accept the motion",
+        "type" : "task.create"
+      },
+      "reason" : "no_draft_line",
+      "reply" : "Find out whether the court will accept the motion | Ask the clerk before Friday",
+      "valid_action" : false,
+      "valid_decision" : false,
+      "valid_question" : true
+    },
+    {
+      "action" : null,
+      "decision" : null,
+      "intent" : null,
+      "lines" : "one_speaker",
+      "question" : {
+        "assignee_hint" : null,
+        "body" : "Who funds it",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Follow up with Dana about advocacy",
+        "type" : "task.create"
+      },
+      "reason" : "no_draft_line",
+      "reply" : "- Follow up with Dana about advocacy | Who funds it",
+      "valid_action" : false,
+      "valid_decision" : false,
+      "valid_question" : true
+    },
+    {
+      "action" : null,
+      "decision" : null,
+      "intent" : null,
+      "lines" : "two_speakers",
+      "question" : {
+        "assignee_hint" : null,
+        "body" : "Check the local rules",
+        "confidence" : 1,
+        "due_date" : null,
+        "recipients" : [
+
+        ],
+        "regarding_name" : null,
+        "title" : "Research the filing rules",
+        "type" : "task.create"
+      },
+      "reason" : "no_draft_line",
+      "reply" : "\"TASK: Research the filing rules | Check the local rules\"",
+      "valid_action" : false,
+      "valid_decision" : false,
+      "valid_question" : true
+    },
+    {
+      "action" : null,
+      "decision" : null,
+      "intent" : null,
+      "lines" : "two_speakers",
+      "question" : null,
+      "reason" : "no_draft_line",
+      "reply" : "The court will probably accept it because the deadline was met.",
+      "valid_action" : false,
+      "valid_decision" : false,
+      "valid_question" : false
+    },
+    {
+      "action" : null,
+      "decision" : null,
+      "intent" : null,
+      "lines" : "two_speakers",
+      "question" : null,
+      "reason" : "no_draft_line",
+      "reply" : "Open question: Will the court accept the motion | yes",
+      "valid_action" : false,
+      "valid_decision" : false,
+      "valid_question" : false
+    },
+    {
+      "action" : null,
+      "decision" : null,
+      "intent" : null,
+      "lines" : "two_speakers",
+      "question" : null,
+      "reason" : "no_draft_line",
+      "reply" : "Dana should check with the clerk whether the court will accept the motion before the hearing next week | soon",
+      "valid_action" : false,
+      "valid_decision" : false,
+      "valid_question" : false
+    },
+    {
+      "action" : null,
+      "decision" : null,
+      "intent" : null,
+      "lines" : "two_speakers",
+      "question" : null,
+      "reason" : "no_draft_line",
+      "reply" : "1. Research the filing rules | Check the local rules",
+      "valid_action" : false,
+      "valid_decision" : false,
+      "valid_question" : false
+    }
+  ],
+  "schema" : "lana.clip.draft.v1",
+  "speakers" : [
+    {
+      "id" : "S1",
+      "name" : "Dana Reyes"
+    },
+    {
+      "id" : "S2",
+      "name" : "Sofia Marin"
+    },
+    {
+      "id" : "S3",
+      "name" : null
+    }
+  ]
+}

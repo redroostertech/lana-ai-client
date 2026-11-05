@@ -1,0 +1,110 @@
+{
+  "ble_uuid" : "F7E3B3F8-13F5-87AC-A4F2-ECC4A37A4E9B",
+  "ble_vectors" : [
+    {
+      "psk" : "9285717cdaa75f5aaff91eb6888eb765c74b4046656a6a22d9e7d17cdca54d01",
+      "uuid" : "F2244631-CECF-8EF7-86CC-C2028CA7B21D"
+    },
+    {
+      "psk" : "9135df767e1d483946da17f14b5a60ea32f6fbe93b4bcf1ff433b27034d1975d",
+      "uuid" : "DCED153A-A0C9-8E92-BCAA-1372C09EFF57"
+    },
+    {
+      "psk" : "e7cf98d89327300fe57c7ce55f31bc2700f7b4946e3be092194b843afa88b11f",
+      "uuid" : "168AAECD-EC16-8A1C-AD58-3BCFAB96C612"
+    },
+    {
+      "psk" : "0723c66db10449998eaf188394602c9eb98fd10f6576c054d882caa2201b0893",
+      "uuid" : "B0014960-46B1-8883-8E47-5897B0AE2301"
+    }
+  ],
+  "invitation_json" : "{\"exp\":\"2026-11-01T14:08:27.481Z\",\"mac\":{\"agreement_key\":\"BO3j6x30g2YUw6PxURuGrdSlpasodFhDDkjrrkESVo5iI9BZ1VYmki88Z606gMMhtaqNLabQ7oOxbZTqZjjRgIE=\",\"device_id\":\"dev_01JCQ8ZX9V7S5D2F4G6H8J0K1M\",\"display_name\":\"Mike's MacBook Pro\",\"signing_key\":\"BIl5uDriE1tLNXTgejYXGhpktdXKlBkVrY7X1LTEJFAS0wt1xprIxTVQ/PtrR393UQJUG3n9oy+5lmQCGJTKgEM=\"},\"secret\":\"odCbYc3mLEDf/MLNVL3sJ3ZTpdNy8Pa7/MgqF/v93NQ=\",\"svc\":\"Lana Gateway 7F3A\",\"v\":1}",
+  "pairing_psk" : "913407568d93520d23a4b28a6d982c2eefa558f74e602d130a9829ada2b9f691",
+  "phone_proof" : "8026bbdc51f84392ba2655d416ca8ee498bc34ea0ec12cd7b87f182c9009f98a",
+  "qr" : "lananotes://pair?d=eyJleHAiOiIyMDI2LTExLTAxVDE0OjA4OjI3LjQ4MVoiLCJtYWMiOnsiYWdyZWVtZW50X2tleSI6IkJPM2o2eDMwZzJZVXc2UHhVUnVHcmRTbHBhc29kRmhERGtqcnJrRVNWbzVpSTlCWjFWWW1raTg4WjYwNmdNTWh0YXFOTGFiUTdvT3hiWlRxWmpqUmdJRT0iLCJkZXZpY2VfaWQiOiJkZXZfMDFKQ1E4Wlg5VjdTNUQyRjRHNkg4SjBLMU0iLCJkaXNwbGF5X25hbWUiOiJNaWtlJ3MgTWFjQm9vayBQcm8iLCJzaWduaW5nX2tleSI6IkJJbDV1RHJpRTF0TE5YVGdlallYR2hwa3RkWEtsQmtWclk3WDFMVEVKRkFTMHd0MXhwckl4VFZRL1B0clIzOTNVUUpVRzNuOW95KzVsbVFDR0pUS2dFTT0ifSwic2VjcmV0Ijoib2RDYlljM21MRURmL01MTlZMM3NKM1pUcGROeThQYTcvTWdxRi92OTNOUT0iLCJzdmMiOiJMYW5hIEdhdGV3YXkgN0YzQSIsInYiOjF9",
+  "secret" : "a1d09b61cde62c40dffcc2cd54bdec277653a5d372f0f6bbfcc82a17fbfddcd4",
+  "short_code" : "352256",
+  "short_code_vectors" : [
+    {
+      "code" : "314219",
+      "secret" : "ee877cf9d52dc337fd89648b146f8b9d3cdae557d0ccc2988fa24652800a56ca"
+    },
+    {
+      "code" : "339243",
+      "secret" : "df184d802548f6698b168453be7fe5ebf6a2e334455bf126dcdc43bf38419dbd"
+    },
+    {
+      "code" : "669811",
+      "secret" : "bbfe9b0f0b2305e98109c43e4a82e145d4f0ce5f04ae16f0b69b536c96c31a21"
+    },
+    {
+      "code" : "849136",
+      "secret" : "c4bb3ba52ebf8fd21be4755e578d13473e850eaccacd98f87aee7df03da0fc0e"
+    },
+    {
+      "code" : "588524",
+      "secret" : "9fcd00dee868c9eae5628cf38edd67a7b74ce59be6a020e46667b0d1a446bf54"
+    },
+    {
+      "code" : "216193",
+      "secret" : "465c5bdef68c94c53a6c0d0a7964aac26532c9b908c0da07e2427cfa6ff2488f"
+    },
+    {
+      "code" : "530722",
+      "secret" : "c928f78164343fe31eed7b2912268ea1af791c7863e8869fd8689b9234cbf388"
+    },
+    {
+      "code" : "860301",
+      "secret" : "6750bf6bb664e4d56174af7cc787faa9adf067e2bceb3354279e069d33dff4ae"
+    },
+    {
+      "code" : "823135",
+      "secret" : "cec9e387edf54a4399f632e3b8d887cfb8872d16c69f59e468fe965adda3424e"
+    },
+    {
+      "code" : "354392",
+      "secret" : "24f05c922799f1b177075d8bd3592bb097849148469accac40cefc37f7211e96"
+    },
+    {
+      "code" : "636823",
+      "secret" : "efb6355081ab47c11a00a90e258813dbb05bcea98854edea0b710d8d2d716dad"
+    },
+    {
+      "code" : "724319",
+      "secret" : "8b561a37709948f5b59635e8bbc4f5a978f057976eaccfa769da28b51baf5df4"
+    },
+    {
+      "code" : "317506",
+      "secret" : "a3493f5581cfc1d98324d4956c0ce15adb44745c22acd4bad364068dfc0b9f98"
+    },
+    {
+      "code" : "605460",
+      "secret" : "7ce75f8eb7164a398ac0ceaeda3126a94c8b51afa6b54536a57ef7875cc44eff"
+    },
+    {
+      "code" : "877004",
+      "secret" : "c45bee97aa74cc50ba76a0f9b11975d948de5f6646688c646e9431da838973bc"
+    },
+    {
+      "code" : "503309",
+      "secret" : "55a14c6f26c0d3baeaff6ae752741daa0f813a262f406a73425de693a25a9e7c"
+    },
+    {
+      "code" : "556321",
+      "secret" : "a0108851ba0231545841736150f424cf28bacb5dac913773407316f1f064b218"
+    },
+    {
+      "code" : "760888",
+      "secret" : "9e447e91be64134a67e4678e326c314993c581033b8e18e65c78ddc1021860c8"
+    },
+    {
+      "code" : "097447",
+      "secret" : "0395fb2c47eeaf672e01fda8e37aac782c9b635acc209bac2e41e85442619133"
+    },
+    {
+      "code" : "585654",
+      "secret" : "af466c54da6ce24f10b43166b2df5cb3fffb5abc45a26f62fce6a94e95580461"
+    }
+  ],
+  "transport_psk" : "8f7b4d6c468bbee94dea529afddabaa32ae5f186f0b9ce39fe23997391ea088e"
+}

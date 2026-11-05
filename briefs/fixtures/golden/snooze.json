@@ -1,0 +1,22 @@
+{
+  "frames" : [
+    {
+      "frame" : "AAAAi3sicGF5bG9hZCI6eyJhcHBWZXJzaW9uIjoiMS4xICg1MSkiLCJkZXZpY2VJRCI6ImRldl8wMUpDUThaWUFCM0M0RDVFNkY3RzhIOUowSyIsIm1heFByb3RvY29sVmVyc2lvbiI6NCwicHJvdG9jb2xWZXJzaW9uIjoxfSwidHlwZSI6ImhlbGxvIn0AAAAA",
+      "header" : "{\"payload\":{\"appVersion\":\"1.1 (51)\",\"deviceID\":\"dev_01JCQ8ZYAB3C4D5E6F7G8H9J0K\",\"maxProtocolVersion\":4,\"protocolVersion\":1},\"type\":\"hello\"}",
+      "kind" : "hello"
+    },
+    {
+      "frame" : "AAAAk3sicGF5bG9hZCI6eyJtZXRob2RzIjpbImFjb3VzdGljIiwicXIiXSwibm9uY2VCeXRlcyI6MTYsInByb3RvY29sVmVyc2lvbiI6NCwic2Vzc2lvbklEIjoiM0YyNTA0RTAtNEY4OS00MUQzLTlBMEMtMDMwNUU4MkMzMzAxIn0sInR5cGUiOiJjaGFsbGVuZ2UifQAAAAA=",
+      "header" : "{\"payload\":{\"methods\":[\"acoustic\",\"qr\"],\"nonceBytes\":16,\"protocolVersion\":4,\"sessionID\":\"3F2504E0-4F89-41D3-9A0C-0305E82C3301\"},\"type\":\"challenge\"}",
+      "kind" : "challenge"
+    },
+    {
+      "frame" : "AAABiHsicGF5bG9hZCI6eyJtYWNfZGV2aWNlX2lkIjoiZGV2XzAxSkNROFpYOVY3UzVEMkY0RzZIOEowSzFNIiwicGhvbmVfZGV2aWNlX2lkIjoiZGV2XzAxSkNROFpZQUIzQzRENUU2RjdHOEg5SjBLIiwic2NoZW1hIjoibGFuYS5zeW5jLXNub296ZS92MSIsInNlc3Npb25faWQiOiIzRjI1MDRFMC00Rjg5LTQxRDMtOUEwQy0wMzA1RTgyQzMzMDEiLCJzaWduYXR1cmUiOiJidlVjTmI4SjY3SDVHRDdibXRWU1VWb3BubGJPYXVZKzhzNkJIakxHMzc2MHVONWJXTVhvQUpuQ3gycWlhR3Y3US8xckV0eGkyRG5jMGFqNXFhb2hJQT09Iiwic25vb3plZF9hdCI6IjIwMjYtMTEtMDFUMTY6MzU6MDcuNDgxWiIsIndha2Vfbm9uY2UiOiIwYTFiMmMzZDRlNWY2MDcxIn0sInR5cGUiOiJzeW5jX3Nub296ZSJ9AAAAAA==",
+      "header" : "{\"payload\":{\"mac_device_id\":\"dev_01JCQ8ZX9V7S5D2F4G6H8J0K1M\",\"phone_device_id\":\"dev_01JCQ8ZYAB3C4D5E6F7G8H9J0K\",\"schema\":\"lana.sync-snooze/v1\",\"session_id\":\"3F2504E0-4F89-41D3-9A0C-0305E82C3301\",\"signature\":\"bvUcNb8J67H5GD7bmtVSUVopnlbOauY+8s6BHjLG3760uN5bWMXoAJnCx2qiaGv7Q/1rEtxi2Dnc0aj5qaohIA==\",\"snoozed_at\":\"2026-11-01T16:35:07.481Z\",\"wake_nonce\":\"0a1b2c3d4e5f6071\"},\"type\":\"sync_snooze\"}",
+      "kind" : "sync_snooze"
+    }
+  ],
+  "session_id" : "3F2504E0-4F89-41D3-9A0C-0305E82C3301",
+  "signed_bytes" : "{\"mac_device_id\":\"dev_01JCQ8ZX9V7S5D2F4G6H8J0K1M\",\"phone_device_id\":\"dev_01JCQ8ZYAB3C4D5E6F7G8H9J0K\",\"schema\":\"lana.sync-snooze/v1\",\"session_id\":\"3F2504E0-4F89-41D3-9A0C-0305E82C3301\",\"signature\":\"\",\"snoozed_at\":\"2026-11-01T16:35:07.481Z\",\"wake_nonce\":\"0a1b2c3d4e5f6071\"}",
+  "snooze_json" : "{\"mac_device_id\":\"dev_01JCQ8ZX9V7S5D2F4G6H8J0K1M\",\"phone_device_id\":\"dev_01JCQ8ZYAB3C4D5E6F7G8H9J0K\",\"schema\":\"lana.sync-snooze/v1\",\"session_id\":\"3F2504E0-4F89-41D3-9A0C-0305E82C3301\",\"signature\":\"bvUcNb8J67H5GD7bmtVSUVopnlbOauY+8s6BHjLG3760uN5bWMXoAJnCx2qiaGv7Q/1rEtxi2Dnc0aj5qaohIA==\",\"snoozed_at\":\"2026-11-01T16:35:07.481Z\",\"wake_nonce\":\"0a1b2c3d4e5f6071\"}"
+}

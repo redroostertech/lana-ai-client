@@ -7,7 +7,7 @@ module.exports = {
   testPathIgnorePatterns: [
     '/node_modules/',
     '<rootDir>/tests/playwright/',
-    '<rootDir>/qa-evidence/',
+    '<rootDir>/qa-evidence/', '<rootDir>/briefs/',
     // This legacy suite targets a removed client-side LLM summarizer and its
     // removed Ollama adapter. Conversation summarization is backend-owned now.
     '<rootDir>/tests/integration/conversation-summarizer.test.js',

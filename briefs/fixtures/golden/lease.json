@@ -1,0 +1,59 @@
+{
+  "frames" : [
+    {
+      "frame" : "AAAAi3sicGF5bG9hZCI6eyJhcHBWZXJzaW9uIjoiMS4yICg2MCkiLCJkZXZpY2VJRCI6ImRldl8wMUpDUThaWUFCM0M0RDVFNkY3RzhIOUowSyIsIm1heFByb3RvY29sVmVyc2lvbiI6NSwicHJvdG9jb2xWZXJzaW9uIjoxfSwidHlwZSI6ImhlbGxvIn0AAAAA",
+      "header" : "{\"payload\":{\"appVersion\":\"1.2 (60)\",\"deviceID\":\"dev_01JCQ8ZYAB3C4D5E6F7G8H9J0K\",\"maxProtocolVersion\":5,\"protocolVersion\":1},\"type\":\"hello\"}",
+      "kind" : "hello"
+    },
+    {
+      "frame" : "AAAAk3sicGF5bG9hZCI6eyJtZXRob2RzIjpbImFjb3VzdGljIiwicXIiXSwibm9uY2VCeXRlcyI6MTYsInByb3RvY29sVmVyc2lvbiI6NSwic2Vzc2lvbklEIjoiN0M5RTY2NzktNzQyNS00MERFLTk0NEItRTA3RkMxRjkwQUU3In0sInR5cGUiOiJjaGFsbGVuZ2UifQAAAAA=",
+      "header" : "{\"payload\":{\"methods\":[\"acoustic\",\"qr\"],\"nonceBytes\":16,\"protocolVersion\":5,\"sessionID\":\"7C9E6679-7425-40DE-944B-E07FC1F90AE7\"},\"type\":\"challenge\"}",
+      "kind" : "challenge"
+    },
+    {
+      "frame" : "AAAC13sicGF5bG9hZCI6eyJsZWFzZSI6eyJleHBpcmVzX2F0IjoiMjAyNi0xMS0wMVQyMjowMzoyNy40ODFaIiwiaXNzdWVkX2F0IjoiMjAyNi0xMS0wMVQxNDowMzoyNy40ODFaIiwibWFjX2RldmljZV9pZCI6ImRldl8wMUpDUThaWDlWN1M1RDJGNEc2SDhKMEsxTSIsInBob25lX2RldmljZV9pZCI6ImRldl8wMUpDUThaWUFCM0M0RDVFNkY3RzhIOUowSyIsInNjaGVtYSI6ImxhbmEuYmFja2dyb3VuZC1sZWFzZS92MSIsInNjb3BlIjoicmVjZWl2ZV9zaGFyZWRfdXBkYXRlcyIsInNpZ25hdHVyZSI6IjYxdk4xZ2dVa0hkM1BydUZsRVpmdEw2WG9MLzJmakFGdFZ1eGQ2U2JsRTR5cGhyL2tscG4yUzNPNEhKQUxLL3o4dTJLZXUwUXFSaXFlbkZZeWM0VWNRPT0ifSwibWFjX2RldmljZV9pZCI6ImRldl8wMUpDUThaWDlWN1M1RDJGNEc2SDhKMEsxTSIsInBob25lX2RldmljZV9pZCI6ImRldl8wMUpDUThaWUFCM0M0RDVFNkY3RzhIOUowSyIsInByZXNlbnRlZF9hdCI6IjIwMjYtMTEtMDFUMTU6MDM6MjcuNDgxWiIsInNjaGVtYSI6ImxhbmEubGVhc2Utc2Vzc2lvbi92MSIsInNlc3Npb25faWQiOiI3QzlFNjY3OS03NDI1LTQwREUtOTQ0Qi1FMDdGQzFGOTBBRTciLCJzaWduYXR1cmUiOiI3REFhWkJTckJ4Y0pGRFhWbDQ4UlRQdTI3NGxsMmxBVVVFWmJXcDE1b0d5L2xCbFNHS0RTOWtlTHZRSjJ2VzVCMzNhZ3lvK0xwVjdGK1FOclhzZDdjQT09In0sInR5cGUiOiJsZWFzZV9zZXNzaW9uIn0AAAAA",
+      "header" : "{\"payload\":{\"lease\":{\"expires_at\":\"2026-11-01T22:03:27.481Z\",\"issued_at\":\"2026-11-01T14:03:27.481Z\",\"mac_device_id\":\"dev_01JCQ8ZX9V7S5D2F4G6H8J0K1M\",\"phone_device_id\":\"dev_01JCQ8ZYAB3C4D5E6F7G8H9J0K\",\"schema\":\"lana.background-lease/v1\",\"scope\":\"receive_shared_updates\",\"signature\":\"61vN1ggUkHd3PruFlEZftL6XoL/2fjAFtVuxd6SblE4yphr/klpn2S3O4HJALK/z8u2Keu0QqRiqenFYyc4UcQ==\"},\"mac_device_id\":\"dev_01JCQ8ZX9V7S5D2F4G6H8J0K1M\",\"phone_device_id\":\"dev_01JCQ8ZYAB3C4D5E6F7G8H9J0K\",\"presented_at\":\"2026-11-01T15:03:27.481Z\",\"schema\":\"lana.lease-session/v1\",\"session_id\":\"7C9E6679-7425-40DE-944B-E07FC1F90AE7\",\"signature\":\"7DAaZBSrBxcJFDXVl48RTPu274ll2lAUUEZbWp15oGy/lBlSGKDS9keLvQJ2vW5B33agyo+LpV7F+QNrXsd7cA==\"},\"type\":\"lease_session\"}",
+      "kind" : "lease_session"
+    },
+    {
+      "frame" : "AAAAWHsicGF5bG9hZCI6eyJzZXNzaW9uSUQiOiI3QzlFNjY3OS03NDI1LTQwREUtOTQ0Qi1FMDdGQzFGOTBBRTcifSwidHlwZSI6ImxlYXNlX2FjY2VwdGVkIn0AAAAA",
+      "header" : "{\"payload\":{\"sessionID\":\"7C9E6679-7425-40DE-944B-E07FC1F90AE7\"},\"type\":\"lease_accepted\"}",
+      "kind" : "lease_accepted"
+    },
+    {
+      "frame" : "AAABkHsicGF5bG9hZCI6eyJsZWFzZSI6eyJleHBpcmVzX2F0IjoiMjAyNi0xMS0wMVQyMjowMzoyNy40ODFaIiwiaXNzdWVkX2F0IjoiMjAyNi0xMS0wMVQxNDowMzoyNy40ODFaIiwibWFjX2RldmljZV9pZCI6ImRldl8wMUpDUThaWDlWN1M1RDJGNEc2SDhKMEsxTSIsInBob25lX2RldmljZV9pZCI6ImRldl8wMUpDUThaWUFCM0M0RDVFNkY3RzhIOUowSyIsInNjaGVtYSI6ImxhbmEuYmFja2dyb3VuZC1sZWFzZS92MSIsInNjb3BlIjoicmVjZWl2ZV9zaGFyZWRfdXBkYXRlcyIsInNpZ25hdHVyZSI6IjYxdk4xZ2dVa0hkM1BydUZsRVpmdEw2WG9MLzJmakFGdFZ1eGQ2U2JsRTR5cGhyL2tscG4yUzNPNEhKQUxLL3o4dTJLZXUwUXFSaXFlbkZZeWM0VWNRPT0ifX0sInR5cGUiOiJiYWNrZ3JvdW5kX2xlYXNlIn0AAAAA",
+      "header" : "{\"payload\":{\"lease\":{\"expires_at\":\"2026-11-01T22:03:27.481Z\",\"issued_at\":\"2026-11-01T14:03:27.481Z\",\"mac_device_id\":\"dev_01JCQ8ZX9V7S5D2F4G6H8J0K1M\",\"phone_device_id\":\"dev_01JCQ8ZYAB3C4D5E6F7G8H9J0K\",\"schema\":\"lana.background-lease/v1\",\"scope\":\"receive_shared_updates\",\"signature\":\"61vN1ggUkHd3PruFlEZftL6XoL/2fjAFtVuxd6SblE4yphr/klpn2S3O4HJALK/z8u2Keu0QqRiqenFYyc4UcQ==\"}},\"type\":\"background_lease\"}",
+      "kind" : "background_lease"
+    },
+    {
+      "frame" : "AAAAKHsicGF5bG9hZCI6e30sInR5cGUiOiJiYWNrZ3JvdW5kX2xlYXNlIn0AAAAA",
+      "header" : "{\"payload\":{},\"type\":\"background_lease\"}",
+      "kind" : "background_lease"
+    }
+  ],
+  "lease_json" : "{\"expires_at\":\"2026-11-01T22:03:27.481Z\",\"issued_at\":\"2026-11-01T14:03:27.481Z\",\"mac_device_id\":\"dev_01JCQ8ZX9V7S5D2F4G6H8J0K1M\",\"phone_device_id\":\"dev_01JCQ8ZYAB3C4D5E6F7G8H9J0K\",\"schema\":\"lana.background-lease/v1\",\"scope\":\"receive_shared_updates\",\"signature\":\"61vN1ggUkHd3PruFlEZftL6XoL/2fjAFtVuxd6SblE4yphr/klpn2S3O4HJALK/z8u2Keu0QqRiqenFYyc4UcQ==\"}",
+  "lease_signed_bytes" : "{\"expires_at\":\"2026-11-01T22:03:27.481Z\",\"issued_at\":\"2026-11-01T14:03:27.481Z\",\"mac_device_id\":\"dev_01JCQ8ZX9V7S5D2F4G6H8J0K1M\",\"phone_device_id\":\"dev_01JCQ8ZYAB3C4D5E6F7G8H9J0K\",\"schema\":\"lana.background-lease/v1\",\"scope\":\"receive_shared_updates\",\"signature\":\"\"}",
+  "presence_uuid" : "E3A8C4C8-2BF4-8B71-B472-27D48B0F2F39",
+  "session_id" : "7C9E6679-7425-40DE-944B-E07FC1F90AE7",
+  "session_json" : "{\"lease\":{\"expires_at\":\"2026-11-01T22:03:27.481Z\",\"issued_at\":\"2026-11-01T14:03:27.481Z\",\"mac_device_id\":\"dev_01JCQ8ZX9V7S5D2F4G6H8J0K1M\",\"phone_device_id\":\"dev_01JCQ8ZYAB3C4D5E6F7G8H9J0K\",\"schema\":\"lana.background-lease/v1\",\"scope\":\"receive_shared_updates\",\"signature\":\"61vN1ggUkHd3PruFlEZftL6XoL/2fjAFtVuxd6SblE4yphr/klpn2S3O4HJALK/z8u2Keu0QqRiqenFYyc4UcQ==\"},\"mac_device_id\":\"dev_01JCQ8ZX9V7S5D2F4G6H8J0K1M\",\"phone_device_id\":\"dev_01JCQ8ZYAB3C4D5E6F7G8H9J0K\",\"presented_at\":\"2026-11-01T15:03:27.481Z\",\"schema\":\"lana.lease-session/v1\",\"session_id\":\"7C9E6679-7425-40DE-944B-E07FC1F90AE7\",\"signature\":\"7DAaZBSrBxcJFDXVl48RTPu274ll2lAUUEZbWp15oGy/lBlSGKDS9keLvQJ2vW5B33agyo+LpV7F+QNrXsd7cA==\"}",
+  "session_signed_bytes" : "{\"lease\":{\"expires_at\":\"2026-11-01T22:03:27.481Z\",\"issued_at\":\"2026-11-01T14:03:27.481Z\",\"mac_device_id\":\"dev_01JCQ8ZX9V7S5D2F4G6H8J0K1M\",\"phone_device_id\":\"dev_01JCQ8ZYAB3C4D5E6F7G8H9J0K\",\"schema\":\"lana.background-lease/v1\",\"scope\":\"receive_shared_updates\",\"signature\":\"61vN1ggUkHd3PruFlEZftL6XoL/2fjAFtVuxd6SblE4yphr/klpn2S3O4HJALK/z8u2Keu0QqRiqenFYyc4UcQ==\"},\"mac_device_id\":\"dev_01JCQ8ZX9V7S5D2F4G6H8J0K1M\",\"phone_device_id\":\"dev_01JCQ8ZYAB3C4D5E6F7G8H9J0K\",\"presented_at\":\"2026-11-01T15:03:27.481Z\",\"schema\":\"lana.lease-session/v1\",\"session_id\":\"7C9E6679-7425-40DE-944B-E07FC1F90AE7\",\"signature\":\"\"}",
+  "wake" : [
+    {
+      "at" : "2026-11-01T00:00:00.000Z",
+      "uuid" : "4D4D162F-88CD-87FC-B770-2794B2B6FBB4"
+    },
+    {
+      "at" : "2026-11-01T23:59:59.999Z",
+      "uuid" : "4D4D162F-88CD-87FC-B770-2794B2B6FBB4"
+    },
+    {
+      "at" : "2026-11-02T00:00:00.000Z",
+      "uuid" : "B1A27C54-AB8D-8EC0-AE73-0B6AC944BEAC"
+    },
+    {
+      "at" : "2027-02-28T12:00:00.000Z",
+      "uuid" : "1EAB8F63-07A3-83BD-B463-A8098B1456FF"
+    }
+  ],
+  "wake_psk_hex" : "0707070707070707070707070707070707070707070707070707070707070707"
+}
