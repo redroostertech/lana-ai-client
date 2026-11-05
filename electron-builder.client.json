@@ -27,6 +27,11 @@
       "to": ".",
       "filter": ["*.js", "package.json"]
     },
+    {
+      "from": "briefs/dist",
+      "to": "briefs/dist",
+      "filter": ["*.cjs"]
+    },
     "node_modules/electron-store/**/*",
     "node_modules/conf/**/*",
     "node_modules/atomically/**/*",
@@ -59,7 +64,8 @@
   "asar": true,
   "asarUnpack": [
     "node_modules/sherpa-onnx-node/**/*",
-    "node_modules/sherpa-onnx-*/**/*"
+    "node_modules/sherpa-onnx-*/**/*",
+    "briefs/dist/briefs-transcription-worker.cjs"
   ],
   "npmRebuild": false,
   "mac": {
@@ -83,6 +89,10 @@
       {
         "from": "build/screen-voice/lana-screen-voice",
         "to": "screen-voice/lana-screen-voice"
+      },
+      {
+        "from": "build/briefs/LanaBleWake",
+        "to": "briefs/LanaBleWake"
       }
     ]
   },

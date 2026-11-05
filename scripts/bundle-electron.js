@@ -46,7 +46,8 @@ async function bundle() {
         platform: 'node',
         target: 'node20',
         outfile: outputPath,
-        external: ['electron', 'electron-store'], // Keep electron external
+        // Native and runtime-loaded modules load from node_modules (LANA Briefs: speech, phone discovery).
+        external: ['electron', 'electron-store', 'sherpa-onnx-node', 'bonjour-service'],
         minify: false,
         sourcemap: false,
       });

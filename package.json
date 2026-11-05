@@ -17,7 +17,7 @@
   "license": "Proprietary",
   "scripts": {
     "generate-version": "node scripts/generate-version.js",
-    "bundle-electron": "node scripts/build-screen-voice-helper.js && node scripts/bundle-electron.js",
+    "bundle-electron": "node scripts/build-briefs.js && node scripts/build-briefs-ble-helper.js && node scripts/build-screen-voice-helper.js && node scripts/bundle-electron.js",
     "build:tiptap": "node scripts/build-tiptap.js",
     "prestart": "npm run generate-version",
     "start": "node --max-old-space-size=2048 src/index.js",
@@ -36,9 +36,9 @@
     "lint": "eslint src/",
     "migrate": "node scripts/migrate.js",
     "migrate:phase2": "node scripts/migrate-phase2.js",
-    "preelectron": "npm run build:tiptap && npm run css:dev && node scripts/build-screen-voice-helper.js",
+    "preelectron": "npm run build:tiptap && npm run css:dev && node scripts/build-screen-voice-helper.js && node scripts/build-briefs.js && node scripts/build-briefs-ble-helper.js",
     "electron": "electron electron-main.js --disable-gpu-driver-bug-workarounds",
-    "preelectron:dev": "npm run build:tiptap && npm run css:dev && node scripts/build-screen-voice-helper.js",
+    "preelectron:dev": "npm run build:tiptap && npm run css:dev && node scripts/build-screen-voice-helper.js && node scripts/build-briefs.js && node scripts/build-briefs-ble-helper.js",
     "electron:dev": "NODE_ENV=development npx electron electron-main.js --disable-gpu-driver-bug-workarounds",
     "electron:dev:watch": "node --watch-path=electron-main.js --watch-path=electron-preload.js --watch-path=electron-storage.js --watch-path=electron-discovery.js --watch-path=electron-logger.js --watch-path=electron-updater-custom.js --watch-path=js --watch-path=public_html --watch-path=src/js/tiptap-bundle.js --watch-path=src/css scripts/electron-dev-watch.js",
     "electron:rebuild": "electron-rebuild -f -w bcrypt",
@@ -58,7 +58,8 @@
     "css:dev": "postcss src/css/tailwind-input.css -o src/css/tailwind-output.css",
     "test:briefs": "vitest run --config briefs/vitest.config.ts",
     "typecheck:briefs": "tsc --noEmit -p briefs/packages/core/tsconfig.json",
-    "check:briefs-fixtures": "node briefs/scripts/check-shared-fixtures.mjs"
+    "check:briefs-fixtures": "node briefs/scripts/check-shared-fixtures.mjs",
+    "build:briefs": "node scripts/build-briefs.js"
   },
   "keywords": [
     "ai",

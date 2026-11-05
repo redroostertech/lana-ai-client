@@ -1,0 +1,11 @@
+{
+  "name": "@lana/briefs-host",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "LANA Briefs main-process host inside the LANA client: the gateway, the store-backed services and the typed IPC contract. Dependencies install at the client root.",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

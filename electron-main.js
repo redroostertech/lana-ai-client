@@ -7,7 +7,7 @@
  * This is the THIN CLIENT version - connects to a remote backend server.
  */
 
-const { app, BrowserWindow, ipcMain, dialog, Menu, session, nativeImage, Notification, shell, safeStorage } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, session, nativeImage, Notification, shell, safeStorage, protocol, desktopCapturer, systemPreferences, nativeTheme } = require('electron');
 const path = require('path');
 const url = require('url');
 const crypto = require('crypto');
@@ -113,6 +113,36 @@ const localEngine = createLocalEngineHost({
   offlineKey: offlineKeyStore
 });
 localEngine.registerIpc();
+
+// LANA Briefs (Briefs integration plan): runs only while discovery lists lana-notes and
+// someone is signed in. Its model work goes to the local AI engine's runtime route.
+const { createBriefs, registerBriefsSchemes } = require('./electron-briefs');
+const { isEngineInUse } = require('./electron-api-base');
+const BRIEFS_DIST = path.join(__dirname, 'briefs', 'dist');
+const loadBriefsHost = () => require('./briefs/dist/briefs-host.cjs');
+registerBriefsSchemes(protocol, loadBriefsHost);
+const briefs = createBriefs({
+  electron: { app, session, protocol, desktopCapturer, systemPreferences, shell, dialog, safeStorage, nativeTheme },
+  loadHost: loadBriefsHost,
+  distDir: BRIEFS_DIST,
+  engineBase: () => {
+    const state = localEngine.supervisor.getState();
+    return isEngineInUse(state) ? state.url : null;
+  },
+  getToken: () => authTokenStore.get(),
+  getWindows: () => BrowserWindow.getAllWindows(),
+  showWindow: () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  },
+  log: { info: logInfo, warn: logWarn, error: (message) => logError(message) }
+});
+function syncBriefs(server = getSavedServer()) {
+  briefs.sync(server).catch(() => {});
+}
 const { createOsSignals } = require('./electron-os-signals');
 const SessionTracker = require('./js/session/session-tracker');
 const companionBridge = require('./electron-bridge');
@@ -860,6 +890,7 @@ function createWindow(serverUrl = null) {
     },
     show: false // Don't show until ready (prevents flash of white screen)
   });
+  briefs.addWindow(mainWindow);
   watchScreenVoiceAuthentication(mainWindow);
 
   // Load the v2 dashboard as the entry point
@@ -1258,6 +1289,7 @@ ipcMain.handle('save-settings', async (event, settings) => {
   const success = saveServerConnection(stored);
   if (success) {
     syncScreenVoiceEntitlement(stored);
+    syncBriefs(stored);
     await localEngine.sync().catch((error) => logError('[electron-main] Local AI engine did not start', error));
   }
   return { success };
@@ -1281,6 +1313,7 @@ ipcMain.handle('connect-to-server', async (event, server) => {
     const stored = localEngine.toStored(server);
     saveServerConnection(stored);
     syncScreenVoiceEntitlement(stored);
+    syncBriefs(stored);
     await localEngine.sync().catch((error) => logError('[electron-main] Local AI engine did not start', error));
 
     // Resize window for main app view
@@ -1313,6 +1346,8 @@ registerTokenIpc(ipcMain, authTokenStore, () => {
   syncScreenVoiceAuthentication().catch(() => {});
   // Sign-in, sign-out or a user switch: the engine follows this app's session.
   localEngine.sessionChanged();
+  // Briefs follows it too: it stops on sign-out and starts on sign-in when enabled.
+  syncBriefs();
 });
 
 // Get saved server
@@ -1364,6 +1399,7 @@ ipcMain.handle('capabilities:set-active', async (_event, payload) => {
 
     setCapabilityPreference(server, id, active);
     syncScreenVoiceEntitlement(server);
+    syncBriefs(server);
     return { success: true, platform: process.platform, capabilities: currentCapabilityViewModels(server) };
   } catch (error) {
     logError('[Capabilities] Failed to update capability', error);
@@ -1428,6 +1464,7 @@ ipcMain.handle('clear-saved-server', async () => {
   try {
     clearSavedServer();
     syncScreenVoiceEntitlement(null);
+    syncBriefs(null);
     await localEngine.sync().catch((error) => logError('[electron-main] Local AI engine did not stop', error));
     return { success: true };
   } catch (error) {
@@ -2244,6 +2281,7 @@ app.whenReady().then(async () => {
     if (refreshedServer) {
       saveServerConnection(refreshedServer);
       syncScreenVoiceEntitlement(refreshedServer);
+      syncBriefs(refreshedServer);
     }
 
     if (isReachable) {
@@ -2251,6 +2289,7 @@ app.whenReady().then(async () => {
       updateLastVerified();
       await localEngine.sync().catch((error) => logError('[electron-main] Local AI engine did not start', error));
       createWindow(effectiveServer.url);
+      syncBriefs(effectiveServer);
       return;
     } else if (localEngine.canOpenOffline() && hasLiveSession(authTokenStore.get(), Date.now())) {
       // Phase 10: offline. Keep the saved server and open with the local
@@ -2259,11 +2298,13 @@ app.whenReady().then(async () => {
       logInfo('[electron-main] Saved server is not reachable; opening with the local engine and its offline copy');
       await localEngine.sync().catch((error) => logError('[electron-main] Local AI engine did not start', error));
       createWindow(effectiveServer.url);
+      syncBriefs(effectiveServer);
       return;
     } else {
       logInfo('[electron-main] Saved server is not reachable, clearing saved server and showing login...');
       clearSavedServer();
       syncScreenVoiceEntitlement(null);
+      syncBriefs(null);
     }
   } else {
     logInfo('[electron-main] No saved server found, showing login...');
@@ -2300,7 +2341,10 @@ app.on('before-quit', async (event) => {
   if (!localEngineQuitPrepared) {
     event.preventDefault();
     localEngineQuitPrepared = true;
-    localEngine.prepareQuit()
+    // Briefs first drains its calls and closes its store, then the engine stops.
+    briefs.stop()
+      .catch((error) => logError('[electron-main] Failed to stop LANA Briefs', error))
+      .then(() => localEngine.prepareQuit())
       .catch((error) => logError('[electron-main] Failed to stop the local AI engine', error))
       .finally(() => app.quit());
     return;
