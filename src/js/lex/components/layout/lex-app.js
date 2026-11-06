@@ -975,11 +975,16 @@
         }, {
           id: 'briefs-meetings',
           title: 'Meetings',
+          count: this._briefsMeetingItems && this._briefsMeetingItems.length > 0 ? this._briefsMeetingItems.length : 0,
           isScrollable: true,
           items: this._briefsMeetingItems && this._briefsMeetingItems.length > 0
             ? this._briefsMeetingItems
             : [{ id: 'briefs-meetings-empty', label: this._briefsMeetingItems ? 'No meetings yet' : 'Loading meetings', icon: 'file-text', href: 'briefs/index.html' }]
-        }];
+        }].concat(this._briefsListener ? [{
+          // Whether this computer is listening for the phone (the standalone sidebar's footer line).
+          id: 'briefs-phone',
+          items: [{ id: 'briefs-phone-status', label: this._briefsListener.text, icon: this._briefsListener.tone === 'good' ? 'wifi' : 'wifi-off', href: 'settings-v2.html' }]
+        }] : []);
       }
       const mainItems = appContext === 'insights'
         ? [
@@ -1055,7 +1060,7 @@
         this._briefsEventsBound = true;
         briefs.onEvent((event) => {
           const type = event && event.type;
-          if ((type === 'meetingReceived' || type === 'meetingChanged' || type === 'inbox') && this._getAppContext() === 'briefs') {
+          if ((type === 'meetingReceived' || type === 'meetingChanged' || type === 'inbox' || type === 'preferences') && this._getAppContext() === 'briefs') {
             this._loadBriefsMeetingsForSidebar();
           }
         });
@@ -1067,11 +1072,19 @@
       } catch (_) {
         meetings = [];
       }
+      try {
+        const preferences = briefs.preferences ? await briefs.preferences.get() : null;
+        this._briefsListener = preferences && preferences.listener && preferences.listener.text ? preferences.listener : null;
+      } catch (_) {
+        this._briefsListener = null;
+      }
+      const when = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
       this._briefsMeetingItems = meetings.map((meeting) => {
         const unread = Number(meeting.unreadActions) || 0;
         return {
           id: 'briefs-meeting-' + meeting.id,
           label: meeting.title || 'Untitled meeting',
+          detail: meeting.startedAt ? when.format(new Date(meeting.startedAt)) : '',
           icon: 'file-text',
           badge: unread > 0 ? String(unread) : '',
           href: 'briefs/index.html?meeting=' + encodeURIComponent(meeting.id)

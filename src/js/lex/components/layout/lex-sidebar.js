@@ -1056,6 +1056,28 @@
         white-space: nowrap;
       }
 
+      .lex-sidebar-nav-detail {
+        display: block;
+        margin-top: 0.125rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: var(--lex-body-xs-size, 0.75rem);
+        font-weight: var(--lex-weight-normal, 400);
+        color: var(--_sb-text-muted, rgba(255, 255, 255, 0.55));
+      }
+
+      .lex-sidebar-nav-item[data-has-detail="true"] {
+        height: auto;
+        min-height: 2.75rem;
+        padding-top: 0.375rem;
+        padding-bottom: 0.375rem;
+      }
+
+      .lex-sidebar-section-count {
+        margin-left: 0.5rem;
+        opacity: 0.7;
+      }
+
       .lex-sidebar-nav-badge {
         margin-left: auto;
         padding: 0.0625rem 0.4375rem;
@@ -2070,7 +2092,9 @@
             </button>
           </div>`;
         } else {
-          html += `<div class="lex-sidebar-section-title">${this.escapeHtml(section.title)}</div>`;
+          // count: an optional number beside the title ("Meetings 3").
+          const countHtml = section.count ? `<span class="lex-sidebar-section-count">${this.escapeHtml(String(section.count))}</span>` : '';
+          html += `<div class="lex-sidebar-section-title">${this.escapeHtml(section.title)}${countHtml}</div>`;
         }
       }
       if (isCollapsible) {
@@ -2179,9 +2203,15 @@
 
       const childAttr = isChild ? ' data-child="true"' : '';
 
-      return `<${tag} class="lex-sidebar-nav-item"${hrefAttr}${typeAttr} data-active="${isActive}" data-id="${this.escapeHtml(item.id || '')}" data-tooltip="${this.escapeHtml(item.label || '')}"${onClickAttr}${hrefDataAttr}${variantAttr}${childAttr}>
+      // detail: an optional second line under the label (a date, a status).
+      const detailAttr = item.detail ? ' data-has-detail="true"' : '';
+      const labelHtml = item.detail
+        ? `<span class="lex-sidebar-nav-label">${this.escapeHtml(item.label || '')}<span class="lex-sidebar-nav-detail">${this.escapeHtml(item.detail)}</span></span>`
+        : `<span class="lex-sidebar-nav-label">${this.escapeHtml(item.label || '')}</span>`;
+
+      return `<${tag} class="lex-sidebar-nav-item"${hrefAttr}${typeAttr} data-active="${isActive}" data-id="${this.escapeHtml(item.id || '')}" data-tooltip="${this.escapeHtml(item.label || '')}"${onClickAttr}${hrefDataAttr}${variantAttr}${childAttr}${detailAttr}>
         ${iconHtml}
-        <span class="lex-sidebar-nav-label">${this.escapeHtml(item.label || '')}</span>
+        ${labelHtml}
         ${badgeHtml}
       </${tag}>`;
     }
