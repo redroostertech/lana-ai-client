@@ -6,6 +6,7 @@
 import type { ContextBridge, IpcRenderer, IpcRendererEvent } from "electron";
 import { ALL_API_METHODS, channelName, EVENT_CHANNEL, RECORDING_FRAME_CHANNEL, TALK_FRAME_CHANNEL } from "../shared/api.js";
 import type { LanaBridge, LanaEvent, RecordingFrame } from "../shared/api.js";
+import { startTonePlayer } from "./tonePlayer.js";
 
 type Namespace = keyof typeof ALL_API_METHODS;
 
@@ -38,6 +39,21 @@ export function buildBriefsBridge(ipcRenderer: Pick<IpcRenderer, "invoke" | "on"
   } as unknown as LanaBridge;
 }
 
-export function exposeBriefsBridge(contextBridge: Pick<ContextBridge, "exposeInMainWorld">, ipcRenderer: Pick<IpcRenderer, "invoke" | "on" | "removeListener" | "send">): void {
-  contextBridge.exposeInMainWorld(BRIEFS_GLOBAL, buildBriefsBridge(ipcRenderer));
+/**
+ * Exposes the bridge, and plays the phone's proximity tone from this page while Briefs runs:
+ * a paired phone checks the computer is nearby by hearing it, so some page must play it. The
+ * player switches on only when Briefs answers (it runs only for firms that have it), so pages
+ * without Briefs open no audio output.
+ */
+export function exposeBriefsBridge(
+  contextBridge: Pick<ContextBridge, "exposeInMainWorld">,
+  ipcRenderer: Pick<IpcRenderer, "invoke" | "on" | "removeListener" | "send">,
+  startTone: (bridge: LanaBridge) => void = (bridge) => void startTonePlayer(bridge),
+): void {
+  const bridge = buildBriefsBridge(ipcRenderer);
+  contextBridge.exposeInMainWorld(BRIEFS_GLOBAL, bridge);
+  bridge.access.state().then(
+    () => startTone(bridge),
+    () => undefined,
+  );
 }
