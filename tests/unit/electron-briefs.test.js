@@ -205,6 +205,28 @@ describe('LANA Briefs in the client', () => {
     expect(hosts[0].restored).toBe(1);
   });
 
+  test('a page that keeps loading background content counts as loaded once its main frame is; a missed load event is caught by the check (live run 2026-11-05)', async () => {
+    jest.useFakeTimers();
+    try {
+      const busy = fakeWindow({ loaded: false });
+      busy.webContents.isLoading = () => true;
+      let mainFrame = true;
+      busy.webContents.isLoadingMainFrame = () => mainFrame;
+      busy.webContents.getURL = () => 'file:///app/public_html/dashboard.html';
+      const { briefs, hosts } = setup({ windows: [busy] });
+      const started = briefs.sync(enabled);
+      await jest.advanceTimersByTimeAsync(10);
+      expect(hosts[0].restored).toBe(0);
+      // The main frame finishes with no event reaching the listener; subframes still load.
+      mainFrame = false;
+      await jest.advanceTimersByTimeAsync(1100);
+      await started;
+      expect(hosts[0].restored).toBe(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   test('finding: windows. Every window, including ones made later and the login window, gets events, focus and blur', async () => {
     const { briefs, hosts, app } = setup();
     await briefs.sync(enabled);

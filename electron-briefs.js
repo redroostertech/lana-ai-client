@@ -116,9 +116,15 @@ function unpacked(file) {
   return file.replace(`${path.sep}app.asar${path.sep}`, `${path.sep}app.asar.unpacked${path.sep}`);
 }
 
-/** A window that has finished loading a page (Briefs' tone and prompts need one). */
+/**
+ * A window whose page has loaded (Briefs' tone and prompts need one). Only the main frame
+ * counts: the dashboard keeps loading background content, so "anything loading" never ends.
+ */
 function isLoaded(window) {
-  return Boolean(window && !window.isDestroyed() && !window.webContents.isLoading() && window.webContents.getURL());
+  if (!window || window.isDestroyed()) return false;
+  const contents = window.webContents;
+  const mainFrameLoading = typeof contents.isLoadingMainFrame === 'function' ? contents.isLoadingMainFrame() : contents.isLoading();
+  return !mainFrameLoading && Boolean(contents.getURL());
 }
 
 /**
@@ -167,7 +173,10 @@ function createBriefs(deps) {
   function windowLoaded() {
     if (deps.getWindows().some(isLoaded)) return Promise.resolve(true);
     return new Promise((resolve) => {
+      // Load events can fire before these listeners are attached: a once-a-second check backs them up.
+      const poll = setInterval(() => check(), 1000);
       const done = (loaded) => {
+        clearInterval(poll);
         electron.app.removeListener('browser-window-created', watch);
         cancelWait = null;
         resolve(loaded);
