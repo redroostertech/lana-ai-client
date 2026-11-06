@@ -11,7 +11,10 @@
  */
 import type { App, Dialog, DesktopCapturer, IpcMainEvent, Protocol, SafeStorage, Session, Shell, SystemPreferences, WebContents } from "electron";
 import { ipcMain } from "electron";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { AUDIT_EVENTS } from "@lana/core/store";
+import { IMPORT_MARKER } from "./import/standaloneImport.js";
 import { pathToFileURL } from "node:url";
 import { RECORDING_FRAME_CHANNEL, TALK_FRAME_CHANNEL, type AccessStatus, type LanaEvent, type PlatformInfo, type RecordingFrame, type RecordingPermissions, type ThemePreference } from "../shared/api.js";
 import { openGatewayRuntime, StartupError, type GatewayRuntime } from "./gateway/gatewayRuntime.js";
@@ -77,6 +80,24 @@ export interface BriefsHost {
   stop(): Promise<void>;
 }
 
+/**
+ * The first start after an import from the standalone app records it in the audit log (no
+ * ids, no names), once: the marker says whether it was recorded.
+ */
+async function recordImport(directory: string, runtime: GatewayRuntime, log: MainLog): Promise<void> {
+  const marker = join(directory, IMPORT_MARKER);
+  if (!existsSync(marker)) return;
+  try {
+    const state = JSON.parse(readFileSync(marker, "utf8")) as { audited?: boolean };
+    if (state.audited === true) return;
+    await runtime.store.appendAudit(AUDIT_EVENTS.storeImported, "standalone");
+    writeFileSync(marker, JSON.stringify({ ...state, audited: true }), { mode: 0o600 });
+    log.info("import.recorded");
+  } catch {
+    log.error("import.record_failed");
+  }
+}
+
 export class BriefsHostStartupError extends Error {
   override readonly name = "BriefsHostStartupError";
 }
@@ -120,6 +141,8 @@ export async function startBriefsHost(options: BriefsHostOptions): Promise<Brief
     log.error("startup.failed", { error: error instanceof Error ? error.name : "unknown" });
     throw new BriefsHostStartupError("LANA Briefs could not start its services on this computer.");
   }
+
+  await recordImport(options.directory, runtime, log);
 
   // MARK: - Permissions (only while Briefs is on)
 
@@ -287,3 +310,6 @@ export async function startBriefsHost(options: BriefsHostOptions): Promise<Brief
     throw new BriefsHostStartupError("LANA Briefs could not start its services on this computer.");
   }
 }
+
+export { importStandalone, standaloneSources, type StandaloneImportOutcome } from "./import/standaloneImport.js";
+export { safeStorageSealer } from "@lana/core/keys";

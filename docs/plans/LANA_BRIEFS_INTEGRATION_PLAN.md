@@ -298,6 +298,10 @@ The client has one live user Settings page, `src/settings-v2.html`. Briefs setti
 - Draft actions that people confirm before anything is sent.
 - A meeting gets a matter once, and its suggestions show on that matter's page.
 
+## Deployment process: open questions
+
+- **Engine model downloads cannot resume.** `electron-local-models.js` `downloadModel` starts a cut-off download over, and the 9B model is 5.6 GB. Briefs' speech store resumes each file from its `.part` with a range request. To investigate as part of how the LANA client deploys its models (first run, updates, a slow or interrupted connection): one resuming download routine for every entry in the catalog.
+
 ## Risks
 
 - **Workstream R touches how chat reaches the model.** Chat E2E runs, with a review of `results.json`, are required before it is called done.
@@ -354,10 +358,20 @@ Decided 2026-11-05:
    - `electron-local-models.js` is the one list of every model the client downloads. `CATALOG` holds the engine's models. `SPEECH_CATALOG` holds Briefs' five speech packages: the same files on models.lanaai.io, pinned by size and sha256, with their license and notice files.
    - Briefs' speech store takes its packages from that list (`speechPackages()`) and still downloads them itself, because they are multi-file packages it can resume.
    - Retired: Briefs' signed model list (`briefsManifest`, `briefsMirror`), the GitHub fallback (it was off) and its archive unpacking.
-   - Follow-up: one download routine for both lists. The engine's `downloadModel` cannot resume today; the Settings work in Phase 2 can bring both onto the speech store's routine.
-4. **1e: the one-time import.**
-   - Bring the standalone app's meeting store and pairing keys into the client's data folder.
-   - Audit it with ids only, and test it on a copy.
+   - Moved to the LANA client's deployment process (see "Deployment process: open questions"): the engine's `downloadModel` cannot resume a cut-off download, while Briefs' speech store can.
+4. **1e: the one-time import.** Built.
+   - **When it runs:** before Briefs first starts for a person (their folder does not exist yet). It finds the standalone app's data (packaged `LANA Briefs`, or `@lana/app` from source).
+   - **What it moves:** this computer's identity (the phone's pairing is with it), the store key, the store (database, audio and recordings) and the speech models. The speech models are hard-linked, so they take no extra disk.
+   - **What it leaves behind:** the old sign-in, entitlement and token. There is one session, the client's.
+   - **Re-sealing:** the two key files are sealed with the old app's keychain entry. macOS asks the person to let LANA open that entry. The files are then sealed again with the client's own entry.
+   - **Safety:**
+     - It refuses while the old app is running.
+     - It imports only the person the old app was signed in as (user id or email).
+     - It never overwrites, and never changes the old folder.
+     - It stages, then moves into place in one step.
+     - It writes an audit entry (`store.imported`, no ids) on the next start.
+   - **Not verified yet:** opening a file sealed by the real old app. The tests seal with Chromium's macOS scheme themselves. Verification is the first step of 1f: Michael allows the keychain prompt, and it runs on a copy of his standalone data first.
+   - **Phase 2:** a screen that explains the keychain prompt before it appears, and a way to import later for someone who declined it.
 5. **1f: verification.**
    - A paired phone syncs with the client.
    - A test recording is transcribed and its notes are written through the runtime, on the 9B model and, once its routing lands, on Forge.

@@ -33,13 +33,16 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
-function setup({ windows = [fakeWindow()], startGate = null, stopGate = null, restoreError = null } = {}) {
+function setup({ windows = [fakeWindow()], startGate = null, stopGate = null, restoreError = null, importOutcome = 'notFound' } = {}) {
   const app = new EventEmitter();
   Object.assign(app, { getPath: (name) => `/tmp/${name}`, isPackaged: false, quit: jest.fn() });
   const state = { token: ALICE, windows };
   const log = { info: jest.fn(), warn: jest.fn(), error: jest.fn() };
   const hosts = [];
   const module = {
+    standaloneSources: (appData) => [{ directory: `${appData}/@lana/app`, keychainService: '@lana/app Safe Storage' }],
+    safeStorageSealer: () => ({ seal: (x) => x, unseal: (x) => x }),
+    importStandalone: jest.fn(async () => importOutcome),
     startBriefsHost: jest.fn(async (options) => {
       if (startGate) await startGate;
       const host = {
@@ -83,6 +86,7 @@ function setup({ windows = [fakeWindow()], startGate = null, stopGate = null, re
     getToken: () => state.token,
     getWindows: () => state.windows,
     showWindow: jest.fn(),
+    readKeychainPassword: async () => null,
     log
   });
   return { briefs, app, state, hosts, module, log };
@@ -270,6 +274,33 @@ describe('LANA Briefs in the client', () => {
     expect(registered.map((scheme) => scheme.scheme)).toEqual([BRIEFS_AUDIO_SCHEME]);
     const source = fs.readFileSync(path.join(__dirname, '../../briefs/packages/host/src/main/services/meetingAudio.ts'), 'utf8');
     expect(source).toContain(`export const AUDIO_SCHEME = "${BRIEFS_AUDIO_SCHEME}";`);
+  });
+});
+
+describe('the one-time import from the standalone LANA Briefs app', () => {
+  test('runs before the first start for a person, into their own folder, as the signed-in person', async () => {
+    const { briefs, module, hosts } = setup({ importOutcome: 'imported' });
+    await briefs.sync(enabled);
+    expect(module.importStandalone).toHaveBeenCalledTimes(1);
+    const [options] = module.importStandalone.mock.calls[0];
+    expect(options.target).toBe(hosts[0].options.directory);
+    expect(options.person).toEqual({ id: 'u-alice', email: 'alice@firm.test' });
+    expect(options.sources[0].directory).toBe('/tmp/appData/@lana/app');
+    expect(module.importStandalone.mock.invocationCallOrder[0]).toBeLessThan(module.startBriefsHost.mock.invocationCallOrder[0]);
+  });
+
+  test('logs the outcome as a state only, and an import that fails still lets Briefs start', async () => {
+    const { briefs, log, module, hosts } = setup({ importOutcome: 'running' });
+    await briefs.sync(enabled);
+    expect(log.info).toHaveBeenCalledWith('[briefs] standalone import: running');
+    expect(JSON.stringify(log.info.mock.calls)).not.toMatch(/alice|u-alice|org-1/);
+    module.importStandalone.mockRejectedValueOnce(new Error('/Users/x/secret'));
+    const second = setup();
+    second.module.importStandalone.mockRejectedValueOnce(new Error('/Users/x/secret'));
+    await second.briefs.sync(enabled);
+    expect(second.hosts).toHaveLength(1);
+    expect(JSON.stringify(second.log.error.mock.calls)).not.toContain('/Users/x');
+    expect(hosts).toHaveLength(1);
   });
 });
 

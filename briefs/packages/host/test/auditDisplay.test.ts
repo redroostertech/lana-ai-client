@@ -70,6 +70,7 @@ const STORED: Record<string, { subject: string; detail: Record<string, string>; 
   "draft.cancelled": { subject: MEETING, detail: { draft_id: "d2", kind: "decision" }, sentence: "Draft of a decision from Social Work Practice cancelled", category: "actions" },
   "draft.added": { subject: MEETING, detail: { draft_id: "d2", kind: "decision" }, sentence: "Drafted decision added to Social Work Practice", category: "actions" },
   "entitlement.changed": { subject: "mwestbrooks", detail: { state: "enabled" }, sentence: "LANA Briefs turned on for mwestbrooks", category: "security" },
+  "store.imported": { subject: "standalone", detail: {}, sentence: "Meetings and phone pairing moved from the LANA Briefs app into LANA", category: "security" },
   "audio.purged": { subject: "retention", detail: { parts: "4", days: "30" }, sentence: "Audio older than 30 days removed by retention, 4 files", category: "security" },
   "meeting.recorded": { subject: MEETING, detail: { audio_parts: "3", consent: "verbal_announced" }, sentence: "Recorded Social Work Practice on this computer", category: "meetings" },
   "meeting.notes_written": { subject: MEETING, detail: { key_points: "4", intents: "2" }, sentence: "Wrote the notes for Social Work Practice", category: "meetings" },

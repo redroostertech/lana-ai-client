@@ -40,6 +40,8 @@ export const AUDIT_EVENTS = {
   leasesRevoked: "handoff.leases_revoked",
   /** LANA Briefs turned on or off for the organization: `{state: "enabled" | "disabled"}`, subject the organization id. */
   entitlementChanged: "entitlement.changed",
+  /** Meetings and the phone pairing came over from the standalone LANA Briefs app into the LANA client. Subject `standalone`. */
+  storeImported: "store.imported",
   /** LANA drafting in the background: `{draft_id, kind}`, then `drafted` and `intent_id` when ready. Subject the meeting id. */
   draftRequested: "draft.requested",
   draftReady: "draft.ready",

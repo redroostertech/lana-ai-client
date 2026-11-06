@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // undo everything it installed (permission handlers, the audio scheme, IPC) and close the
 // gateway, so nothing keeps listening and the next start is clean.
 
-const runtime = { close: vi.fn(async () => undefined), recheckAccess: vi.fn(), restore: vi.fn(async () => undefined) };
+const runtime = { close: vi.fn(async () => undefined), recheckAccess: vi.fn(), restore: vi.fn(async () => undefined), store: { appendAudit: vi.fn(async () => undefined) } };
 let servicesFail = false;
 
 vi.mock("electron", () => ({ ipcMain: { handle: vi.fn(), removeHandler: vi.fn(), on: vi.fn(), removeListener: vi.fn() } }));
@@ -97,5 +97,20 @@ describe("Briefs host startup", () => {
     expect(electron.session.setPermissionRequestHandler).toHaveBeenLastCalledWith(null);
     expect(vi.mocked(ipcMain.removeListener)).toHaveBeenCalledTimes(2);
     expect(runtime.close).toHaveBeenCalledTimes(1);
+  });
+
+  it("records an import from the standalone app in the audit log once, with no ids; a folder not imported records nothing (control)", async () => {
+    servicesFail = false;
+    const plain = await start(electronFakes());
+    await plain.stop();
+    expect(runtime.store.appendAudit).not.toHaveBeenCalled();
+    writeFileSync(join(folder, ".imported-from-standalone.json"), JSON.stringify({ importedAt: "2026-11-05T12:00:00Z", from: "standalone", audited: false }));
+    const first = await start(electronFakes());
+    await first.stop();
+    const again = await start(electronFakes());
+    await again.stop();
+    expect(runtime.store.appendAudit).toHaveBeenCalledTimes(1);
+    expect(runtime.store.appendAudit).toHaveBeenCalledWith("store.imported", "standalone");
+    expect(JSON.parse(readFileSync(join(folder, ".imported-from-standalone.json"), "utf8")).audited).toBe(true);
   });
 });

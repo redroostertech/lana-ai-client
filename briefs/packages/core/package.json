@@ -22,7 +22,8 @@
     "./actions": "./src/actions/index.ts",
     "./lana": "./src/lana/index.ts",
     "./recording": "./src/recording/index.ts",
-    "./summarizer": "./src/summarizer/index.ts"
+    "./summarizer": "./src/summarizer/index.ts",
+    "./bytes": "./src/bytes/index.ts"
   },
   "scripts": {
     "test": "vitest run",

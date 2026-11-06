@@ -58,7 +58,7 @@ export function tidyEventKey(event: string): string {
 /** The filter an event belongs to. Unknown events go by their prefix. */
 export function auditCategory(event: string): AuditCategory {
   const prefix = event.split(".")[0] ?? "";
-  if (event === "audio.purged" || prefix === "connector" || prefix === "entitlement") return "security";
+  if (event === "audio.purged" || event === "store.imported" || prefix === "connector" || prefix === "entitlement") return "security";
   if (prefix === "bundle" || prefix === "meeting" || prefix === "record") return "meetings";
   if (prefix === "device" || prefix === "handoff") return "devices";
   if (prefix === "intent" || prefix === "action" || prefix === "draft") return "actions";
@@ -257,6 +257,8 @@ function sentence(facts: AuditFacts, names: AuditNames): string {
       const age = days === null ? "" : ` older than ${plural(days, "day", "days")}`;
       return `Audio${age} removed by retention${parts === null ? "" : `, ${plural(parts, "file", "files")}`}`;
     }
+    case "store.imported":
+      return "Meetings and phone pairing moved from the LANA Briefs app into LANA";
     case "entitlement.changed": {
       const organization = subject === "" ? "" : ` for ${subject}`;
       if (detail["state"] === "enabled") return `LANA Briefs turned on${organization}`;
