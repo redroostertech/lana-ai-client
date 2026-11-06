@@ -19,6 +19,7 @@
   const CLIP_ACTIONS = {
     highlight: { icon: 'highlighter', title: 'Highlight', hint: 'Save these lines as a clip' },
     unhighlight: { icon: 'trash-2', title: 'Unhighlight', hint: 'Remove this clip' },
+    note: { icon: 'file-text', title: 'Note', hint: 'Add a note on these lines' },
     action: { icon: 'list-checks', title: 'Action', hint: 'LANA drafts an action from these lines' },
     decision: { icon: 'scale', title: 'Decision', hint: 'LANA drafts a decision from these lines' },
     correct: { icon: 'edit-3', title: 'Correct line', hint: 'Correct this line in place' },
@@ -42,6 +43,11 @@
     followAlong: true,
     current: null,
     loadToken: 0,
+    // The person's notes on the open meeting (saved through the shared record).
+    notes: [],
+    notesDirty: false,
+    noteSave: 'idle',
+    openNoteId: null,
     // New meeting (record here or import a recording).
     mode: 'meeting',
     recording: null,
@@ -57,6 +63,9 @@
   const els = {};
   let player = null;
   let drag = null;
+  let noteTimer = null;
+  /** Edits save about a second after typing stops. */
+  const NOTE_SAVE_MS = 1000;
   /** Window listeners and the bridge subscription outlive a page visit: bound once. */
   let globalsBound = false;
 
@@ -185,6 +194,7 @@
     }
     const opening = !refresh || state.record === null;
     state.record = result.value;
+    takeSavedNotes(opening);
     if (opening) {
       resetMeetingState();
       if (player) player.close();
@@ -215,6 +225,8 @@
   function select(id) {
     if (state.mode === 'new') leaveNew();
     if (id === state.selectedId) return;
+    flushNotes();
+    closeNoteEditor(false);
     state.selectedId = id;
     state.record = null;
     markSidebar(id);
@@ -396,7 +408,7 @@
         else tick(above, kind, span.start, span.start, total, `${point.text} (${speakerName(span.speaker)} ${M.clock(span.start)})`);
       });
     });
-    record.userNotes.filter((note) => note.anchor !== null).forEach((note) => tick(below, 'briefs-tick is-note', note.anchor, note.anchor, total, 'Your note'));
+    state.notes.filter((note) => note.anchor !== null && note.text.trim() !== '').forEach((note) => tick(below, 'briefs-tick is-note', note.anchor, note.anchor, total, 'Your note'));
     (record.actions || []).forEach((action) => tick(below, 'briefs-tick is-action', action.at, action.at, total, action.title || 'Action'));
     record.clips.forEach((clip) => tick(below, 'briefs-tick is-clip is-range', clip.start, clip.end, total, `Clip ${M.clock(clip.start)} to ${M.clock(clip.end)}`));
     const span = selectionSpan();
@@ -439,6 +451,13 @@
     track.style.setProperty('--playhead', `${(position / total) * 100}%`);
     markCurrentTurn(snapshot);
     markPlayingButtons(snapshot);
+    // "Note at 5:36" follows the playhead.
+    const noteAt = els.side.querySelector('[data-note-at]');
+    if (noteAt) {
+      noteAt.textContent = `Note at ${M.clock(position)}`;
+      if (ready) noteAt.removeAttribute('disabled');
+      else noteAt.setAttribute('disabled', '');
+    }
   }
 
   function markCurrentTurn(snapshot) {
@@ -561,7 +580,7 @@
     const single = S.count(selection) === 1;
     const canPlay = player !== null && player.ready;
     const summary = M.clipSummary(S.count(selection), M.clock(span.start), M.clock(span.end));
-    const actions = [isClip ? 'unhighlight' : 'highlight', 'action', 'decision'].concat(single ? ['correct'] : [], ['play']);
+    const actions = [isClip ? 'unhighlight' : 'highlight', 'note', 'action', 'decision'].concat(single ? ['correct'] : [], ['play']);
     const body = state.drafting !== null
       ? `<div class="briefs-clipbar-drafting" role="status"><lex-spinner size="sm"></lex-spinner><span>${state.drafting === 'action' ? 'LANA is drafting the action' : 'LANA is drafting the decision'}</span></div>`
       : `<div class="briefs-clipbar-actions">${actions.map((action) => {
@@ -606,6 +625,12 @@
         setSelection(null);
         if (selection.clipID !== null) await call(() => bridge().records.removeClip(id, selection.clipID));
         return;
+      case 'note': {
+        setSelection(null);
+        const clip = await call(() => bridge().records.saveClip(id, firstLine, lastLine));
+        if (clip !== null) openNote(addNote(clip.start).id);
+        return;
+      }
       case 'action':
       case 'decision':
         state.drafting = action;
@@ -632,7 +657,7 @@
 
   function renderSide() {
     if (!state.record) return;
-    const noteCount = state.record.userNotes.filter((note) => note.text.trim() !== '').length;
+    const noteCount = state.notes.filter((note) => note.text.trim() !== '').length;
     els.sideTabs.setAttribute('tabs', JSON.stringify([
       { id: 'keyPoints', label: 'Key points' },
       { id: 'notes', label: noteCount > 0 ? `Notes (${noteCount})` : 'Notes' },
@@ -691,12 +716,202 @@
   }
 
   function notesHtml() {
-    const notes = state.record.userNotes.filter((note) => note.text.trim() !== '');
-    if (notes.length === 0) return '<p class="briefs-list-note">No notes on this meeting yet.</p>';
-    return `<ul class="briefs-notes">${notes.map((note) => `<li class="briefs-note">
-        ${note.anchor !== null ? `<button type="button" class="briefs-note-at" data-seek="${note.anchor}">${M.clock(note.anchor)}</button>` : ''}
-        <p class="briefs-note-text">${escape(note.text)}</p>
-      </li>`).join('')}</ul>`;
+    const canAnchor = player !== null && player.ready;
+    const position = player ? player.snapshot.position : 0;
+    const shown = state.notes.filter((note) => note.text.trim() !== '');
+    const buttons = `<div class="briefs-notes-buttons">
+        <lex-btn variant="secondary" size="sm" leading-icon="file-text" data-note-new>New note</lex-btn>
+        <lex-btn variant="ghost" size="sm" leading-icon="clock" data-note-at ${canAnchor ? '' : 'disabled'} aria-label="New note at the current time, ${M.clock(position)}">Note at ${M.clock(position)}</lex-btn>
+      </div>`;
+    const status = state.noteSave === 'error' ? '<p class="briefs-notes-status">Your notes could not be saved. LANA will try again as you type.</p>' : '';
+    if (shown.length === 0) {
+      return `${buttons}${status}<p class="briefs-list-note">Notes you type on your phone during the meeting appear here. Write your own on this computer, or clip lines in the transcript and add a note.</p>`;
+    }
+    const time = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
+    return `${buttons}${status}<ul class="briefs-notes">${shown.map((note) => {
+      const clip = M.clipForNote(note, state.record.clips);
+      const preview = M.notePreview(note.text);
+      const when = note.anchor === null ? time.format(new Date(note.createdAt)) : M.clock(note.anchor);
+      const origin = clip !== null
+        ? `<span class="briefs-note-row-clip">${icon('highlighter')}Clip ${M.clock(clip.start)} to ${M.clock(clip.end)}</span>`
+        : note.anchor === null ? '<span class="briefs-note-row-clip">Added after the meeting</span>' : '';
+      return `<li><button type="button" class="briefs-note-row" data-note-open="${escape(note.id)}">
+          <span class="briefs-note-row-title">${escape(M.noteTitle(note.text))}</span>
+          <span class="briefs-note-row-line"><span class="briefs-note-row-time">${escape(when)}</span><span class="briefs-note-row-preview">${escape(preview === '' ? 'No additional text' : preview)}</span></span>
+          ${origin}
+        </button></li>`;
+    }).join('')}</ul>`;
+  }
+
+  // ── Notes: saved through the shared record, so they sync to the phone ──
+
+  /** The record was (re)loaded: take its notes unless edits are waiting to save. */
+  function takeSavedNotes(opening) {
+    const saved = state.record.userNotes || [];
+    if (opening) {
+      state.notes = M.orderNotes(saved);
+      state.notesDirty = false;
+      state.noteSave = 'idle';
+      return;
+    }
+    if (state.notesDirty) return;
+    // A note just started and still empty is not saved yet: keep it.
+    const fresh = state.notes.filter((note) => note.text === '' && !saved.some((item) => item.id === note.id));
+    state.notes = M.orderNotes(saved.concat(fresh));
+  }
+
+  function addNote(anchor) {
+    const note = { id: `note-${Date.now().toString(36)}`, text: '', createdAt: new Date().toISOString(), anchor: anchor === null ? null : Math.max(0, anchor) };
+    state.notes = M.orderNotes(state.notes.concat([note]));
+    return note;
+  }
+
+  function notesChanged() {
+    state.notesDirty = true;
+    if (noteTimer) clearTimeout(noteTimer);
+    noteTimer = setTimeout(() => persistNotes(), NOTE_SAVE_MS);
+  }
+
+  async function persistNotes() {
+    if (noteTimer) clearTimeout(noteTimer);
+    noteTimer = null;
+    const meetingID = state.selectedId;
+    if (!meetingID || !state.notesDirty) return;
+    state.notesDirty = false;
+    state.noteSave = 'saving';
+    renderNoteStatus();
+    let ok = false;
+    try {
+      const result = await bridge().userNotes.save(meetingID, state.notes.filter((note) => note.text.trim().length > 0));
+      ok = Boolean(result && result.ok);
+    } catch (_) {
+      ok = false;
+    }
+    if (state.selectedId !== meetingID) return;
+    state.noteSave = ok ? 'saved' : 'error';
+    if (!ok) state.notesDirty = true;
+    renderNoteStatus();
+    if (state.openNoteId === null) renderSide();
+  }
+
+  /** Leaving a meeting saves its pending note edits now. */
+  function flushNotes() {
+    if (!state.notesDirty || !state.selectedId) return;
+    if (noteTimer) clearTimeout(noteTimer);
+    noteTimer = null;
+    state.notesDirty = false;
+    bridge().userNotes.save(state.selectedId, state.notes.filter((note) => note.text.trim().length > 0)).catch(() => {});
+  }
+
+  function renderNoteStatus() {
+    if (!els.noteStatus) return;
+    const text = state.noteSave === 'saving' ? 'Saving' : state.noteSave === 'saved' ? 'Saved on this computer' : state.noteSave === 'error' ? 'Your notes could not be saved. LANA will try again as you type.' : '';
+    els.noteStatus.textContent = text;
+    els.noteStatus.classList.toggle('is-error', state.noteSave === 'error');
+  }
+
+  function growField(field) {
+    field.style.height = '0px';
+    field.style.height = `${field.scrollHeight}px`;
+  }
+
+  /** Opens one note full size over the meeting, like Notes.app. */
+  function openNote(id) {
+    const note = state.notes.find((item) => item.id === id);
+    if (!note) return;
+    state.openNoteId = id;
+    const parts = M.splitNote(note.text);
+    const created = new Date(note.createdAt);
+    els.noteDate.textContent = `${new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).format(created)} at ${new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' }).format(created)}`;
+    const clip = M.clipForNote(note, state.record.clips);
+    els.noteMoment.classList.toggle('hidden', note.anchor === null);
+    if (note.anchor !== null) {
+      els.noteMoment.textContent = clip !== null ? `From the clip at ${M.clock(clip.start)} to ${M.clock(clip.end)}` : `At ${M.clock(note.anchor)} in the meeting`;
+      els.noteMoment.title = `Play from ${M.clock(note.anchor)}`;
+    }
+    els.noteTitle.value = parts.title;
+    els.noteBody.value = parts.body;
+    els.noteBody.placeholder = parts.title === '' ? '' : 'Write your note';
+    state.noteSave = 'idle';
+    renderNoteStatus();
+    els.detailMeeting.classList.add('hidden');
+    els.noteEditor.classList.remove('hidden');
+    growField(els.noteTitle);
+    growField(els.noteBody);
+    // A new note starts on the title; an existing one at the end of what is written.
+    const field = note.text === '' || parts.body === '' ? els.noteTitle : els.noteBody;
+    field.focus();
+    field.setSelectionRange(field.value.length, field.value.length);
+  }
+
+  /** Back to the meeting. An empty note is dropped; pending edits save now. */
+  function closeNoteEditor(show) {
+    if (state.openNoteId === null) return;
+    const note = state.notes.find((item) => item.id === state.openNoteId);
+    if (note && note.text.trim() === '') state.notes = state.notes.filter((item) => item.id !== note.id);
+    state.openNoteId = null;
+    els.noteEditor.classList.add('hidden');
+    if (show) {
+      els.detailMeeting.classList.remove('hidden');
+      if (state.notesDirty) persistNotes();
+      renderSide();
+      if (player) renderTicks();
+    }
+  }
+
+  function noteTextChanged() {
+    const id = state.openNoteId;
+    if (id === null) return;
+    const title = els.noteTitle.value.replace(/\n/g, ' ');
+    if (title !== els.noteTitle.value) els.noteTitle.value = title;
+    const text = M.limitNote(M.joinNote(title, els.noteBody.value));
+    state.notes = state.notes.map((note) => (note.id === id ? Object.assign({}, note, { text }) : note));
+    els.noteBody.placeholder = title === '' ? '' : 'Write your note';
+    growField(els.noteTitle);
+    growField(els.noteBody);
+    notesChanged();
+  }
+
+  function bindNoteEditor() {
+    els.noteBack.addEventListener('click', () => closeNoteEditor(true));
+    els.noteDone.addEventListener('click', () => closeNoteEditor(true));
+    els.noteDelete.addEventListener('click', () => {
+      const id = state.openNoteId;
+      if (id === null) return;
+      state.notes = state.notes.filter((note) => note.id !== id);
+      notesChanged();
+      closeNoteEditor(true);
+    });
+    els.noteMoment.addEventListener('click', () => {
+      const note = state.notes.find((item) => item.id === state.openNoteId);
+      if (note && note.anchor !== null && player && player.ready) player.playFrom(note.anchor);
+    });
+    els.noteTitle.addEventListener('input', noteTextChanged);
+    els.noteBody.addEventListener('input', noteTextChanged);
+    els.noteTitle.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        els.noteBody.focus();
+        els.noteBody.setSelectionRange(0, 0);
+      }
+    });
+    els.noteBody.addEventListener('keydown', (event) => {
+      if (event.key === 'Backspace' && els.noteBody.selectionStart === 0 && els.noteBody.selectionEnd === 0) {
+        event.preventDefault();
+        els.noteTitle.focus();
+        els.noteTitle.setSelectionRange(els.noteTitle.value.length, els.noteTitle.value.length);
+      }
+    });
+    els.noteScroll.addEventListener('click', (event) => {
+      if (event.target === els.noteScroll) els.noteBody.focus();
+    });
+    els.noteEditor.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        closeNoteEditor(true);
+      }
+    });
   }
 
   async function draftFromQuestion(pointID) {
@@ -728,6 +943,8 @@
   /** Shows New meeting in the content area (the sidebar's New meeting button). */
   function showNew() {
     if (!onPage()) return;
+    flushNotes();
+    closeNoteEditor(false);
     state.mode = 'new';
     if (player) player.pause();
     state.selectedId = null;
@@ -1091,6 +1308,14 @@
       if (span) player.playClip(source.dataset.clipKey, span.start, span.end);
       return;
     }
+    if (target.closest('[data-note-new]')) return openNote(addNote(null).id);
+    const noteAt = target.closest('[data-note-at]');
+    if (noteAt) {
+      if (!noteAt.hasAttribute('disabled') && player && player.ready) openNote(addNote(player.snapshot.position).id);
+      return;
+    }
+    const noteRow = target.closest('[data-note-open]');
+    if (noteRow) return openNote(noteRow.dataset.noteOpen);
     const question = target.closest('[data-question]');
     if (question) return draftFromQuestion(question.dataset.question);
     const seek = target.closest('[data-seek]');
@@ -1151,6 +1376,16 @@
     els.clipbar = byId('briefs-clipbar');
     els.sideTabs = byId('briefs-side-tabs');
     els.side = byId('briefs-side-panel');
+    els.noteEditor = byId('briefs-note-editor');
+    els.noteBack = byId('briefs-note-back');
+    els.noteDone = byId('briefs-note-done');
+    els.noteDelete = byId('briefs-note-delete');
+    els.noteStatus = byId('briefs-note-status');
+    els.noteScroll = byId('briefs-note-scroll');
+    els.noteDate = byId('briefs-note-date');
+    els.noteMoment = byId('briefs-note-moment');
+    els.noteTitle = byId('briefs-note-title');
+    els.noteBody = byId('briefs-note-body');
     els.newView = byId('briefs-new');
     els.newOverline = byId('briefs-new-overline');
     els.newTitle = byId('briefs-new-title');
@@ -1188,7 +1423,9 @@
     els.progressMessage = byId('briefs-progress-message');
     els.progressOpen = byId('briefs-progress-open');
     state.mode = 'meeting';
+    state.openNoteId = null;
     bindNew();
+    bindNoteEditor();
     // The sidebar's New meeting button calls this on this page (elsewhere it opens the page).
     window.briefsNewMeeting = showNew;
 

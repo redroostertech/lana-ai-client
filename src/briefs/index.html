@@ -119,6 +119,23 @@
             </div>
             <div id="briefs-clipbar" class="briefs-clipbar hidden" role="toolbar" aria-label="Clip actions"></div>
           </div>
+          <section id="briefs-note-editor" class="briefs-note-editor hidden" role="dialog" aria-label="Note">
+            <header class="briefs-note-toolbar">
+              <lex-btn id="briefs-note-back" variant="ghost" size="sm" leading-icon="chevron-left" aria-label="Back to the meeting">Notes</lex-btn>
+              <span class="briefs-note-spacer"></span>
+              <span id="briefs-note-status" class="briefs-note-status" role="status"></span>
+              <lex-btn id="briefs-note-delete" variant="ghost" size="sm" icon="true" leading-icon="trash-2" aria-label="Delete note"></lex-btn>
+              <lex-btn id="briefs-note-done" variant="primary" size="sm">Done</lex-btn>
+            </header>
+            <div id="briefs-note-scroll" class="briefs-note-scroll">
+              <div class="briefs-note-canvas">
+                <p id="briefs-note-date" class="briefs-note-date"></p>
+                <button type="button" id="briefs-note-moment" class="briefs-note-moment hidden"></button>
+                <textarea id="briefs-note-title" class="briefs-note-title" rows="1" placeholder="Title" aria-label="Title"></textarea>
+                <textarea id="briefs-note-body" class="briefs-note-body" rows="1" aria-label="Note"></textarea>
+              </div>
+            </div>
+          </section>
         </section>
       </section>
 

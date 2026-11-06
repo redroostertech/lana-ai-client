@@ -118,3 +118,33 @@ test('the facts line', () => {
   expect(text).toBe('2 min. Ana, Ben. Verified by tone. Recording announced.');
   expect(M.attestationText('recordedHere')).toBe('Recorded on this computer');
 });
+
+describe('the person\'s notes', () => {
+  const note = (id, anchor, createdAt, text = 'x') => ({ id, anchor, createdAt, text });
+
+  test('title, body and preview like Notes.app', () => {
+    expect(M.splitNote('Title\nline one\nline two')).toEqual({ title: 'Title', body: 'line one\nline two' });
+    expect(M.joinNote('Title', '')).toBe('Title');
+    expect(M.joinNote('Title', 'body')).toBe('Title\nbody');
+    expect(M.noteTitle('\n  \nFirst\nSecond')).toBe('First');
+    expect(M.noteTitle('')).toBe('New note');
+    expect(M.notePreview('First\n\nSecond line')).toBe('Second line');
+    expect(M.notePreview('Only')).toBe('');
+    expect(M.notePreview(`T\n${'a'.repeat(130)}`)).toMatch(/^a{120}\.\.\.$/);
+  });
+
+  test('a note made from a clip sits at its start', () => {
+    expect(M.clipForNote(note('n', 9.005, ''), [{ id: 'c', start: 9, end: 15 }])).toEqual({ id: 'c', start: 9, end: 15 });
+    expect(M.clipForNote(note('n', null, ''), [{ id: 'c', start: 9, end: 15 }])).toBeNull();
+  });
+
+  test('notes in the recording come first by time, then later notes by creation', () => {
+    const ordered = M.orderNotes([note('late2', null, '2026-11-02'), note('at30', 30, '2026-11-01'), note('late1', null, '2026-11-01'), note('at5', 5, '2026-11-01')]);
+    expect(ordered.map((item) => item.id)).toEqual(['at5', 'at30', 'late1', 'late2']);
+  });
+
+  test('a note is cut at 10,000 characters as the person sees them', () => {
+    expect(M.limitNote('a'.repeat(10005))).toHaveLength(10000);
+    expect(M.limitNote('short')).toBe('short');
+  });
+});

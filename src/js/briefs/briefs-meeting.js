@@ -243,6 +243,58 @@
     ].filter(Boolean).join('. ') + '.';
   }
 
+  // ── The person's notes ────────────────────────────────
+
+  const NOTE_PREVIEW = 120;
+  /** UserNote.maxLength, in characters as the person sees them. */
+  const NOTE_MAX_LENGTH = 10000;
+
+  /** First line is the title, the rest the body (like Notes.app). */
+  function splitNote(text) {
+    const newline = text.indexOf('\n');
+    return newline < 0 ? { title: text, body: '' } : { title: text.slice(0, newline), body: text.slice(newline + 1) };
+  }
+
+  function joinNote(title, body) {
+    return body === '' ? title : `${title}\n${body}`;
+  }
+
+  /** The row title: the first line with text, or "New note". */
+  function noteTitle(text) {
+    const line = text.split('\n').map((part) => part.trim()).find((part) => part !== '');
+    return line === undefined ? 'New note' : line;
+  }
+
+  /** The row preview: the next line with text after the title, shortened. */
+  function notePreview(text) {
+    const lines = text.split('\n').map((part) => part.trim()).filter((part) => part !== '');
+    const next = lines[1] || '';
+    return next.length > NOTE_PREVIEW ? `${next.slice(0, NOTE_PREVIEW).trimEnd()}...` : next;
+  }
+
+  /** The saved clip a note was made from: it sits at the clip's start. */
+  function clipForNote(note, clips) {
+    if (note.anchor === null || note.anchor === undefined) return null;
+    return clips.find((clip) => Math.abs(clip.start - note.anchor) <= TOLERANCE) || null;
+  }
+
+  /** Notes typed during the recording in time order, then later ones by creation. */
+  function orderNotes(notes) {
+    return notes.slice().sort((a, b) => {
+      if (a.anchor !== null && b.anchor !== null) return a.anchor === b.anchor ? a.createdAt.localeCompare(b.createdAt) : a.anchor - b.anchor;
+      if (a.anchor !== null) return -1;
+      if (b.anchor !== null) return 1;
+      return a.createdAt.localeCompare(b.createdAt);
+    });
+  }
+
+  /** Cuts a note to NOTE_MAX_LENGTH characters as the person sees them. */
+  function limitNote(text) {
+    if (typeof Intl === 'undefined' || !Intl.Segmenter) return text.slice(0, NOTE_MAX_LENGTH);
+    const parts = Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text));
+    return parts.length <= NOTE_MAX_LENGTH ? text : parts.slice(0, NOTE_MAX_LENGTH).map((part) => part.segment).join('');
+  }
+
   const api = {
     SKIP_SECONDS, SPEEDS,
     clock, duration,
@@ -252,6 +304,7 @@
     makeTimeline, clampTime, locate, currentTurn, nextSpeed,
     spanLineIndices, spanLines, questionStep,
     attestationText, facts,
+    splitNote, joinNote, noteTitle, notePreview, clipForNote, orderNotes, limitNote,
   };
   global.BriefsMeeting = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
