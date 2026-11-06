@@ -10,16 +10,16 @@ const { app } = require('electron');
 const crypto = require('crypto');
 const os = require('os');
 const { logInfo, logError } = require('./electron-logger');
+const { openSettingsStore, stableKey } = require('./electron-settings-file');
 
 // Config version - increment this when making breaking changes to storage format
 const CONFIG_VERSION = 2;
 
 /**
- * Generate a device-specific encryption key
- * Uses machine ID and home directory to create a unique key per user
- *
- * IMPORTANT: This key MUST remain stable across app updates and reinstalls.
- * If this formula ever changes, existing users will lose their saved config.
+ * The legacy settings key: host name and home folder. The host name is not stable (macOS
+ * renames the computer on a network name conflict), so the settings now use a key built
+ * from the hardware id (electron-settings-file.js stableKey); this one only reads a file
+ * written before that, once, to move it to the stable key.
  */
 function generateEncryptionKey() {
   try {
@@ -49,7 +49,6 @@ let store;
 function initializeStore() {
   const storeOptions = {
     name: 'server-config',
-    encryptionKey: generateEncryptionKey(),
     defaults: {
       server: null,
       lastConnected: null,
@@ -60,50 +59,39 @@ function initializeStore() {
     }
   };
 
+  // The stable key (hardware id), reading a file written with the old host-name key once;
+  // a file that cannot be read is set aside, never deleted (electron-settings-file.js).
   try {
-    store = new Store(storeOptions);
+    const opened = openSettingsStore({
+      Store,
+      options: storeOptions,
+      directory: app.getPath('userData'),
+      key: stableKey(),
+      legacy: generateEncryptionKey(),
+      log: { info: logInfo, error: (message) => logError(message) }
+    });
+    store = opened.store;
   } catch (error) {
-    // Config file is corrupted (common after uninstall/reinstall or version mismatch)
-    logError('Config file corrupted, resetting to defaults', error);
-
-    try {
-      // Get the config file path and delete it
-      const fs = require('fs');
-      const path = require('path');
-      const configDir = app.getPath('userData');
-      const configPath = path.join(configDir, 'server-config.json');
-
-      if (fs.existsSync(configPath)) {
-        fs.unlinkSync(configPath);
-        logInfo(`[electron-storage] Deleted corrupted config file: ${configPath}`);
+    logError('[electron-storage] Settings could not be opened; using in-memory settings for this session', error);
+    // Last resort: an in-memory store-like object. The file on disk is left as it is.
+    store = {
+      _data: storeOptions.defaults,
+      get: function(key, defaultValue) {
+        return this._data[key] !== undefined ? this._data[key] : defaultValue;
+      },
+      set: function(key, value) {
+        this._data[key] = value;
+      },
+      delete: function(key) {
+        delete this._data[key];
+      },
+      clear: function() {
+        this._data = {};
+      },
+      get store() {
+        return this._data;
       }
-
-      // Try again with fresh config
-      store = new Store(storeOptions);
-      logInfo('[electron-storage] Successfully initialized fresh config store');
-    } catch (retryError) {
-      logError('[electron-storage] Failed to recover from corrupted config', retryError);
-      // Last resort: create an in-memory store-like object
-      store = {
-        _data: storeOptions.defaults,
-        get: function(key, defaultValue) {
-          return this._data[key] !== undefined ? this._data[key] : defaultValue;
-        },
-        set: function(key, value) {
-          this._data[key] = value;
-        },
-        delete: function(key) {
-          delete this._data[key];
-        },
-        clear: function() {
-          this._data = {};
-        },
-        get store() {
-          return this._data;
-        }
-      };
-      logInfo('[electron-storage] Using in-memory fallback store');
-    }
+    };
   }
 }
 

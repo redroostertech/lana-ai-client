@@ -72,7 +72,8 @@ async function main(): Promise<number> {
   // own settings and token modules delete what they cannot read, so they are never loaded here.
   const Conf = load("conf") as ClientTokenDeps["Conf"];
   let failure = "";
-  const token = readClientToken({ userData: clientUserData, Conf, decrypt: (ciphertext) => safeStorage.decryptString(ciphertext) }, (reason) => {
+  const settingsKeys = load("./electron-settings-file.js") as { stableKey(): string; legacyKey(): string };
+  const token = readClientToken({ userData: clientUserData, Conf, keys: [settingsKeys.stableKey(), settingsKeys.legacyKey()], decrypt: (ciphertext) => safeStorage.decryptString(ciphertext) }, (reason) => {
     failure = reason;
   });
   const { personOf, personKey } = load("./electron-briefs.js") as {
