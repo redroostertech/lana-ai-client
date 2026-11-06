@@ -4,7 +4,7 @@ import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { SecretSealer } from "@lana/core/keys";
-import { chromiumMacSealer, IMPORT_MARKER, importStandalone, standaloneSources, type StandaloneImportOptions } from "../src/main/import/standaloneImport.js";
+import { chromiumMacSealer, importStandalone, standaloneSources, type StandaloneImportOptions } from "../src/standaloneImport.js";
 
 // The one-time import from the standalone LANA Briefs app (1e): it moves this computer's
 // identity, the store key and the store, re-sealed for the client, only for the same
@@ -89,8 +89,14 @@ describe("import from the standalone LANA Briefs app", () => {
     const everything = readdirSync(target, { recursive: true }).map(String);
     expect(everything.some((name) => name.includes("session") || name.includes("entitlement"))).toBe(false);
     expect(fingerprint(target)).not.toContain("old-token");
-    expect(JSON.parse(readFileSync(join(target, IMPORT_MARKER), "utf8"))).toMatchObject({ from: "standalone", audited: false });
     expect(existsSync(`${target}.importing`)).toBe(false);
+  });
+
+  it("a dry run checks everything and writes nothing", async () => {
+    expect(await importStandalone(options({ dryRun: true }))).toBe("ready");
+    expect(existsSync(target)).toBe(false);
+    expect(existsSync(`${target}.importing`)).toBe(false);
+    expect(await importStandalone(options({ dryRun: true, person: { id: "8", email: "sam@firm.test" } }))).toBe("otherPerson");
   });
 
   it("matches the person by email when the user id differs (case and spaces aside)", async () => {
@@ -135,5 +141,13 @@ describe("import from the standalone LANA Briefs app", () => {
     expect(sealer.unseal(new Uint8Array(chromiumSeal(IDENTITY)))).toEqual(IDENTITY);
     expect(() => sealer.unseal(new Uint8Array(Buffer.from("v11garbage")))).toThrow();
     expect(() => chromiumMacSealer("other").unseal(new Uint8Array(chromiumSeal(IDENTITY)))).toThrow();
+  });
+});
+
+describe("the import tool's options", () => {
+  it("reads dry run, a source copy with its keystore entry, and a scratch data folder", async () => {
+    const { parseArgs } = await import("../src/importStandaloneArgs.js");
+    expect(parseArgs(["electron", "tool", "--dry-run", "--source", "/tmp/copy", "--user-data", "/tmp/scratch"])).toEqual({ dryRun: true, source: "/tmp/copy", keychainService: "@lana/app Safe Storage", userData: "/tmp/scratch" });
+    expect(parseArgs(["electron", "tool", "--keychain-service", "LANA Briefs Safe Storage"])).toMatchObject({ dryRun: false, source: null, keychainService: "LANA Briefs Safe Storage" });
   });
 });

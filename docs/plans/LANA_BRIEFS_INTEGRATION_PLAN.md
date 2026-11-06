@@ -359,19 +359,14 @@ Decided 2026-11-05:
    - Briefs' speech store takes its packages from that list (`speechPackages()`) and still downloads them itself, because they are multi-file packages it can resume.
    - Retired: Briefs' signed model list (`briefsManifest`, `briefsMirror`), the GitHub fallback (it was off) and its archive unpacking.
    - Moved to the LANA client's deployment process (see "Deployment process: open questions"): the engine's `downloadModel` cannot resume a cut-off download, while Briefs' speech store can.
-4. **1e: the one-time import.** Built.
-   - **When it runs:** before Briefs first starts for a person (their folder does not exist yet). It finds the standalone app's data (packaged `LANA Briefs`, or `@lana/app` from source).
-   - **What it moves:** this computer's identity (the phone's pairing is with it), the store key, the store (database, audio and recordings) and the speech models. The speech models are hard-linked, so they take no extra disk.
-   - **What it leaves behind:** the old sign-in, entitlement and token. There is one session, the client's.
-   - **Re-sealing:** the two key files are sealed with the old app's keychain entry. macOS asks the person to let LANA open that entry. The files are then sealed again with the client's own entry.
-   - **Safety:**
-     - It refuses while the old app is running.
-     - It imports only the person the old app was signed in as (user id or email).
-     - It never overwrites, and never changes the old folder.
-     - It stages, then moves into place in one step.
-     - It writes an audit entry (`store.imported`, no ids) on the next start.
-   - **Not verified yet:** opening a file sealed by the real old app. The tests seal with Chromium's macOS scheme themselves. Verification is the first step of 1f: Michael allows the keychain prompt, and it runs on a copy of his standalone data first.
-   - **Phase 2:** a screen that explains the keychain prompt before it appears, and a way to import later for someone who declined it.
+4. **1e: the one-time import.** Built, as a one-time tool outside the app (decided 2026-11-05). Only one person ever had standalone Briefs data, so no customer install carries it.
+   - **Run:** `npm run briefs:import-standalone -- [--dry-run] [--source <copy> [--keychain-service <name>]] [--user-data <scratch>]`. Quit both apps first.
+   - **How it runs:** as the LANA client (the client's app name, so its keychain entry and data folder). It reads who is signed in to the client and imports into that person's Briefs folder. It then writes `store.imported` (no ids) to that store's audit log.
+   - **What it moves:** this computer's identity (the phone's pairing is with it), the store key, the store and the speech models (hard links). The old sign-in and token stay behind.
+   - **Re-sealing:** the old key files are opened with the standalone app's keychain entry (macOS asks to allow it) and sealed again with the client's own entry.
+   - **Safety:** it refuses while the old app is running. It moves only the person the old app was signed in as. It never overwrites, never changes the old folder, and stages before moving into place in one step. A dry run checks everything and writes nothing.
+   - **Platform:** the app's own secure storage is the client's Electron safeStorage on every platform (Keychain, DPAPI, libsecret). Only reading another app's entry is macOS only, and the standalone app only ever ran there.
+   - **Not verified yet:** opening a file sealed by the real standalone app. This is the first step of 1f: a dry run, then a run against a copy (`--source`, `--user-data`), then the real import, with Michael allowing the prompt.
 5. **1f: verification.**
    - A paired phone syncs with the client.
    - A test recording is transcribed and its notes are written through the runtime, on the 9B model and, once its routing lands, on Forge.

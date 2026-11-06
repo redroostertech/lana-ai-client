@@ -31,7 +31,6 @@
  */
 
 const crypto = require('crypto');
-const { execFile } = require('child_process');
 const { speechPackages } = require('./electron-local-models');
 const path = require('path');
 
@@ -112,19 +111,6 @@ function sessionSnapshot(token, apiBase, server) {
   };
 }
 
-/**
- * The password of a macOS keychain item, read with the system's `security` tool (no shell).
- * macOS asks the person to allow it. Null when they decline or there is none. Never logged.
- */
-function readKeychainPassword(service) {
-  if (process.platform !== 'darwin') return Promise.resolve(null);
-  return new Promise((resolve) => {
-    execFile('/usr/bin/security', ['find-generic-password', '-s', service, '-w'], { timeout: 120000 }, (error, stdout) => {
-      resolve(error ? null : String(stdout).replace(/\n$/, '') || null);
-    });
-  });
-}
-
 /** Where the packaged app keeps files unpacked from asar (the transcription worker loads sherpa from there). */
 function unpacked(file) {
   return file.replace(`${path.sep}app.asar${path.sep}`, `${path.sep}app.asar.unpacked${path.sep}`);
@@ -144,7 +130,6 @@ function isLoaded(window) {
  * @param {function} deps.apiBase - () => the client's API base (the engine, which forwards to the firm's server, or the server)
  * @param {function} deps.getServer - () => the saved server (discovery), or null
  * @param {function} deps.getToken - () => the person's LANA session token, or null
- * @param {function} [deps.readKeychainPassword] - tests: stands in for the macOS keychain
  * @param {function} deps.getWindows - () => the open BrowserWindows
  * @param {function} deps.showWindow
  * @param {object} deps.log - { info, warn, error }
@@ -214,33 +199,9 @@ function createBriefs(deps) {
     }
   }
 
-  /**
-   * The one-time import from the standalone LANA Briefs app (1e): only into a person folder
-   * that does not exist yet, only the person the old app was signed in as, and only while
-   * the old app is closed. macOS asks the person to allow LANA to open the old app's
-   * keystore entry. The outcome is logged as a state only.
-   */
-  async function importFromStandalone(module, directory) {
-    const person = personOf(deps.getToken());
-    if (!person || typeof module.importStandalone !== 'function') return;
-    try {
-      const outcome = await module.importStandalone({
-        sources: module.standaloneSources(electron.app.getPath('appData')),
-        target: directory,
-        person: { id: person.id, email: person.email },
-        readOldKey: deps.readKeychainPassword || readKeychainPassword,
-        sealer: module.safeStorageSealer(electron.safeStorage)
-      });
-      if (outcome !== 'targetExists' && outcome !== 'notFound' && outcome !== 'unsupported') log.info(`[briefs] standalone import: ${outcome}`);
-    } catch (_) {
-      log.error('[briefs] standalone import failed');
-    }
-  }
-
   async function open(key) {
     const module = deps.loadHost();
     const directory = path.join(electron.app.getPath('userData'), 'briefs', 'people', key);
-    await importFromStandalone(module, directory);
     const started = await module.startBriefsHost({
       electron: {
         app: electron.app,
@@ -355,4 +316,4 @@ function registerBriefsSchemes(protocol) {
   protocol.registerSchemesAsPrivileged([{ scheme: BRIEFS_AUDIO_SCHEME, privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true } }]);
 }
 
-module.exports = { createBriefs, registerBriefsSchemes, isBriefsEnabled, isClientPage, personKey, sessionSnapshot, BRIEFS_APP_ID, BRIEFS_AUDIO_SCHEME };
+module.exports = { createBriefs, registerBriefsSchemes, isBriefsEnabled, isClientPage, personKey, personOf, sessionSnapshot, BRIEFS_APP_ID, BRIEFS_AUDIO_SCHEME };

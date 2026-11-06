@@ -37,7 +37,19 @@ const entries = [
   { in: path.join(host, 'preload', 'bridge.ts'), out: 'briefs-preload.cjs' }
 ];
 
+// One-time developer tools, run by hand and never shipped (`--tools`): build/briefs-tools.
+const tools = [
+  { in: path.join(root, 'briefs', 'packages', 'tools', 'src', 'importStandaloneMain.ts'), out: path.join(root, 'build', 'briefs-tools', 'import-standalone.cjs') }
+];
+
 async function build() {
+  if (process.argv.includes('--tools')) {
+    for (const tool of tools) {
+      await esbuild.build({ entryPoints: [tool.in], outfile: tool.out, bundle: true, platform: 'node', format: 'cjs', target: 'node22', external: EXTERNAL, plugins: [coreAlias], logLevel: 'warning' });
+      console.log(`  Built ${path.relative(root, tool.out)}`);
+    }
+    return;
+  }
   for (const entry of entries) {
     await esbuild.build({
       entryPoints: [entry.in],

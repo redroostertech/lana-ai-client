@@ -323,3 +323,4 @@ build/screen-voice/
 # LANA Briefs build output
 build/briefs/
 briefs/native/macos/ble-wake-helper/.build/
+build/briefs-tools/

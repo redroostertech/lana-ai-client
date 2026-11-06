@@ -1,5 +1,7 @@
 /**
  * The one-time import from the standalone LANA Briefs app (Briefs integration plan, 1e).
+ * A developer tool run once outside the app (scripts/briefs-import-standalone.js), never
+ * shipped: only one person ever had standalone data.
  *
  * Before Briefs moved into the LANA client it ran as its own desktop app. This brings that
  * app's meetings and its phone pairing into the person's Briefs folder in the client, so the
@@ -14,9 +16,11 @@
  * session now, the client's.
  *
  * The two key files are sealed with the old app's keystore entry (Electron safeStorage),
- * which the client's own entry cannot open. On macOS the client asks the OS for the old
+ * which the client's own entry cannot open. On macOS the tool asks the OS for the old
  * entry's password (`readOldKey`; macOS asks the person to allow it), opens the two files
- * with it, and seals them again with the client's own keystore entry.
+ * with it, and seals them again with the client's own keystore entry. Every platform keeps
+ * one app's secure storage from the others, so this part is macOS only; the standalone app
+ * only ever ran there.
  *
  * Safety:
  * - the old app's folder is only read, never changed or removed;
@@ -28,7 +32,7 @@
  * - nothing is logged but the outcome and ids-free states.
  */
 import { createDecipheriv, pbkdf2Sync } from "node:crypto";
-import { cpSync, existsSync, linkSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, linkSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, renameSync, rmSync } from "node:fs";
 import { hostname } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fromBase64 } from "@lana/core/bytes";
@@ -61,12 +65,16 @@ export interface StandaloneImportOptions {
   /** The client's own sealer (its safeStorage). */
   readonly sealer: SecretSealer;
   readonly platform?: NodeJS.Platform;
+  /** Check everything (the old app closed, the keys open, the same person) and write nothing. */
+  readonly dryRun?: boolean;
   /** Tests: whether a process id is alive. */
   readonly isAlive?: (pid: number) => boolean;
 }
 
 export type StandaloneImportOutcome =
   | "imported"
+  /** Dry run: everything checks out and nothing was written. */
+  | "ready"
   /** Not macOS: the standalone app shipped only there. */
   | "unsupported"
   | "notFound"
@@ -79,9 +87,6 @@ export type StandaloneImportOutcome =
   /** The old app was signed in as someone else, or not at all. */
   | "otherPerson"
   | "failed";
-
-/** The marker an import leaves in the person's folder (no ids, no names). */
-export const IMPORT_MARKER = ".imported-from-standalone.json";
 
 const STORE_FOLDER = "Lana";
 const SPEECH_FOLDER = join("Models", "speech");
@@ -105,6 +110,7 @@ export async function importStandalone(options: StandaloneImportOptions): Promis
   if (session === null || !samePerson(session, options.person)) return "otherPerson";
   const dataKey = readSealed(join(keys, `${VAULT_ITEMS.dataKey}.sealed`), oldSealer);
   if (dataKey === null) return "failed";
+  if (options.dryRun === true) return "ready";
 
   const staging = `${options.target}.importing`;
   rmSync(staging, { recursive: true, force: true });
@@ -116,7 +122,6 @@ export async function importStandalone(options: StandaloneImportOptions): Promis
     cpSync(join(source.directory, STORE_FOLDER), join(staging, STORE_FOLDER), { recursive: true, errorOnExist: true, verbatimSymlinks: false });
     const speech = join(source.directory, SPEECH_FOLDER);
     if (existsSync(speech)) linkOrCopyTree(speech, join(staging, SPEECH_FOLDER));
-    writeFileSync(join(staging, IMPORT_MARKER), JSON.stringify({ importedAt: new Date().toISOString(), from: "standalone", audited: false }), { mode: 0o600 });
     mkdirSync(dirname(options.target), { recursive: true });
     renameSync(staging, options.target);
     return "imported";
