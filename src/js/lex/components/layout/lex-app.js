@@ -41,7 +41,7 @@
     }
 
     var path = window.location && window.location.pathname ? window.location.pathname : '';
-    var nestedPaths = ['/admin/', '/integrations/', '/workflows/', '/insights/', '/automation/', '/voice/'];
+    var nestedPaths = ['/admin/', '/integrations/', '/workflows/', '/insights/', '/automation/', '/voice/', '/briefs/'];
     for (var i = 0; i < nestedPaths.length; i += 1) {
       if (path.indexOf(nestedPaths[i]) !== -1) {
         return '../login.html';
@@ -892,6 +892,9 @@
         if (appContext === 'insights') {
           this._loadTopMoversForSidebar();
         }
+        if (appContext === 'briefs') {
+          this._loadBriefsMeetingsForSidebar();
+        }
 
         // User menu items (role-gated)
         const menuItems = [];
@@ -955,10 +958,24 @@
       ) {
         return 'insights';
       }
+      if (path.indexOf('/briefs/') !== -1 || path.indexOf('briefs/index.html') !== -1) {
+        return 'briefs';
+      }
       return 'works';
     }
 
     _buildSidebarSections(appContext) {
+      if (appContext === 'briefs') {
+        // LANA Briefs: its meetings, newest first (from the Briefs host via the preload).
+        return [{
+          id: 'briefs-meetings',
+          title: 'Meetings',
+          isScrollable: true,
+          items: this._briefsMeetingItems && this._briefsMeetingItems.length > 0
+            ? this._briefsMeetingItems
+            : [{ id: 'briefs-meetings-empty', label: this._briefsMeetingItems ? 'No meetings yet' : 'Loading meetings', icon: 'file-text', href: 'briefs/index.html' }]
+        }];
+      }
       const mainItems = appContext === 'insights'
         ? [
             { id: 'insights-create', label: 'New Dashboard', icon: 'plus', href: 'admin/dashboard-builder.html', isButton: true, variant: 'create-chat' },
@@ -1020,6 +1037,44 @@
       }
 
       return sections;
+    }
+
+    /**
+     * The LANA Briefs sidebar: one row per meeting, kept current as meetings arrive or
+     * change. Titles only; nothing is logged.
+     */
+    async _loadBriefsMeetingsForSidebar() {
+      const briefs = window.lanaBriefs;
+      if (!briefs || !briefs.meetings) return;
+      if (!this._briefsEventsBound && typeof briefs.onEvent === 'function') {
+        this._briefsEventsBound = true;
+        briefs.onEvent((event) => {
+          const type = event && event.type;
+          if ((type === 'meetingReceived' || type === 'meetingChanged' || type === 'inbox') && this._getAppContext() === 'briefs') {
+            this._loadBriefsMeetingsForSidebar();
+          }
+        });
+      }
+      let meetings = [];
+      try {
+        const result = await briefs.meetings.list();
+        meetings = result && result.ok && Array.isArray(result.value) ? result.value : [];
+      } catch (_) {
+        meetings = [];
+      }
+      this._briefsMeetingItems = meetings.map((meeting) => {
+        const unread = Number(meeting.unreadActions) || 0;
+        return {
+          id: 'briefs-meeting-' + meeting.id,
+          label: meeting.title || 'Untitled meeting',
+          icon: 'file-text',
+          badge: unread > 0 ? String(unread) : '',
+          href: 'briefs/index.html?meeting=' + encodeURIComponent(meeting.id)
+        };
+      });
+      if (this._getAppContext() === 'briefs') {
+        this.setSections(this._buildSidebarSections('briefs'));
+      }
     }
 
     _formatMoverBadge(metric) {

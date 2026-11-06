@@ -37,31 +37,20 @@ body {
 }
 
 .briefs-workspace {
-  display: grid;
-  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
-  gap: 16px;
+  display: flex;
   min-height: calc(100vh - 140px);
 }
 
-.briefs-rail,
 .briefs-detail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: 24px;
   background: var(--briefs-surface);
   border: 1px solid var(--briefs-line);
   border-radius: 12px;
   min-width: 0;
-}
-
-.briefs-rail {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.briefs-rail-head {
-  display: grid;
-  gap: 8px;
-  padding: 16px 16px 12px;
-  border-bottom: 1px solid var(--briefs-line);
 }
 
 .briefs-overline {
@@ -73,75 +62,11 @@ body {
   color: var(--briefs-muted);
 }
 
-.briefs-rail-title {
-  margin: 0 0 4px;
-  font-size: 20px;
-  font-weight: var(--lex-weight-bold);
-}
-
-.briefs-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 6px;
-}
-
-.briefs-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 10px 12px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-  font: inherit;
-  transition: background var(--lex-transition-fast);
-}
-
-.briefs-row:hover {
-  background: var(--briefs-soft);
-}
-
-.briefs-row:focus-visible {
-  outline: 2px solid var(--lex-border-focus);
-  outline-offset: 1px;
-}
-
-.briefs-row[aria-selected="true"] {
-  background: var(--briefs-selected);
-}
-
-.briefs-row-title {
-  display: block;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  font-weight: var(--lex-weight-semibold);
-}
-
-.briefs-row-meta {
-  display: block;
-  margin-top: 2px;
-  font-size: 13px;
-  color: var(--briefs-muted);
-}
-
 .briefs-list-note {
   margin: 0;
   padding: 16px 12px;
   font-size: 14px;
   color: var(--briefs-muted);
-}
-
-.briefs-detail {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
 }
 
 /* ── Meeting ─────────────────────────────────────── */
@@ -711,12 +636,6 @@ body {
   margin: 4px 0 0;
   font-size: 14px;
   white-space: pre-wrap;
-}
-
-@container briefs (max-width: 639px) {
-  .briefs-workspace {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 @container briefs-meeting (max-width: 699px) {

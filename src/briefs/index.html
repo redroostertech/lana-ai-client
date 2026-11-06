@@ -23,17 +23,8 @@
   <template id="page-content">
     <div class="briefs-scroll">
       <section class="briefs-workspace" aria-live="polite">
-        <aside class="briefs-rail" aria-label="Meetings">
-          <div class="briefs-rail-head">
-            <p class="briefs-overline">LANA Briefs</p>
-            <h1 class="briefs-rail-title">Meetings</h1>
-            <lex-input id="briefs-search" type="search" placeholder="Search meetings" leading-icon="search" clearable></lex-input>
-          </div>
-          <div id="briefs-list" class="briefs-list" role="listbox" aria-label="Meetings"></div>
-        </aside>
-
         <section id="briefs-detail" class="briefs-detail" aria-label="Meeting">
-          <lex-empty id="briefs-detail-empty" icon="file-text" message="Choose a meeting" description="Meetings from your phone and the ones you record here show up on the left."></lex-empty>
+          <lex-empty id="briefs-detail-empty" icon="file-text" message="Choose a meeting" description="Meetings from your phone and the ones you record here are listed in the sidebar."></lex-empty>
           <div id="briefs-detail-meeting" class="briefs-meeting hidden">
             <header class="briefs-meeting-head">
               <p class="briefs-overline" id="briefs-detail-when"></p>
@@ -84,7 +75,6 @@
   <script src="../js/lex/components/foundation/lex-toast.js"></script>
   <script src="../js/lex/components/foundation/lex-spinner.js"></script>
   <script src="../js/lex/components/form/lex-select.js"></script>
-  <script src="../js/lex/components/form/lex-input.js"></script>
   <script src="../js/lex/components/layout/lex-sidebar.js"></script>
   <script src="../js/lex/components/layout/lex-topbar.js"></script>
   <script src="../js/lex/components/layout/lex-notification-panel.js"></script>

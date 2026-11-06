@@ -1670,7 +1670,7 @@
 
     _getAppPrefix() {
       const path = window.location.pathname || '';
-      const nestedDirs = ['/admin/', '/automation/', '/brainchild/', '/doc-studio/', '/deck-studio/', '/integrations/', '/insights/', '/matters/', '/voice/'];
+      const nestedDirs = ['/admin/', '/automation/', '/brainchild/', '/briefs/', '/doc-studio/', '/deck-studio/', '/integrations/', '/insights/', '/matters/', '/voice/'];
       return nestedDirs.some((dir) => path.indexOf(dir) !== -1) ? '../' : '';
     }
 
@@ -1957,6 +1957,7 @@
         path.indexOf('/insights/') !== -1
       ) return byId('lana-insights') || items[0];
       if (path.indexOf('/voice/') !== -1) return byId('lana-voice') || items[0];
+      if (path.indexOf('/briefs/') !== -1) return byId('lana-notes') || items[0];
       if (path.indexOf('/agents/') !== -1) return byId('lana-agents') || items[0];
       if (path.indexOf('/brainchild/') !== -1) return byId('brainchild') || items[0];
       if (path.indexOf('/doc-studio/') !== -1 || path.indexOf('/deck-studio/') !== -1) return byId('doc-studio') || items[0];

@@ -26,7 +26,6 @@
 
   const state = {
     meetings: [],
-    query: '',
     selectedId: null,
     available: true,
     record: null,
@@ -101,36 +100,7 @@
     }
   }
 
-  // ── Meetings list ─────────────────────────────────────
-
-  function visibleMeetings() {
-    const query = state.query.trim().toLowerCase();
-    if (!query) return state.meetings;
-    return state.meetings.filter((meeting) => String(meeting.title || '').toLowerCase().includes(query));
-  }
-
-  function renderList() {
-    const meetings = visibleMeetings();
-    if (state.meetings.length === 0) {
-      els.list.innerHTML = '<p class="briefs-list-note">No meetings yet. Meetings from your phone show up here.</p>';
-      return;
-    }
-    if (meetings.length === 0) {
-      els.list.innerHTML = '<p class="briefs-list-note">No meetings match your search.</p>';
-      return;
-    }
-    els.list.innerHTML = meetings.map((meeting) => {
-      const unread = Number(meeting.unreadActions) || 0;
-      const badge = unread > 0 ? `<lex-badge variant="info" size="sm">${unread}</lex-badge>` : '';
-      return `<button type="button" class="briefs-row" role="option" aria-selected="${meeting.id === state.selectedId}" data-meeting-id="${escape(meeting.id)}">
-          <span>
-            <span class="briefs-row-title">${escape(meeting.title || 'Untitled meeting')}</span>
-            <span class="briefs-row-meta">${escape(Lex.Utils.formatDateTime(meeting.startedAt))} · ${escape(M.duration(meeting.durationSeconds))}</span>
-          </span>
-          ${badge}
-        </button>`;
-    }).join('');
-  }
+  // ── Meetings (listed in the sidebar by lex-app) ───────
 
   function renderAvailability() {
     byId('briefs-unavailable').classList.toggle('hidden', state.available);
@@ -154,7 +124,13 @@
     }
     if (state.selectedId && !state.meetings.some((meeting) => meeting.id === state.selectedId)) closeMeeting();
     renderAvailability();
-    renderList();
+    els.detailEmpty.setAttribute('message', state.meetings.length === 0 ? 'No meetings yet' : 'Choose a meeting');
+    // Open the meeting the sidebar link named, or the newest one.
+    if (state.selectedId === null && state.meetings.length > 0) {
+      const wanted = new URLSearchParams(window.location.search).get('meeting');
+      const found = state.meetings.find((meeting) => meeting.id === wanted);
+      select((found || state.meetings[0]).id);
+    }
   }
 
   // ── Meeting ───────────────────────────────────────────
@@ -228,8 +204,30 @@
     if (id === state.selectedId) return;
     state.selectedId = id;
     state.record = null;
-    renderList();
+    markSidebar(id);
     loadMeeting(id, false);
+  }
+
+  /** Marks the meeting in the sidebar and in the address, so a reload opens it again. */
+  function markSidebar(id) {
+    const shell = document.querySelector('lex-app');
+    if (shell) shell.activeNavId = `briefs-meeting-${id}`;
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('meeting', id);
+      window.history.replaceState(window.history.state, '', url.toString());
+    } catch (_) {
+      // The address stays as it was.
+    }
+  }
+
+  /** A meeting picked in the sidebar opens here without reloading the page. */
+  function onSidebarNav(event) {
+    const id = event.detail && event.detail.id;
+    if (!onPage() || typeof id !== 'string' || id.indexOf('briefs-meeting-') !== 0) return;
+    event.stopImmediatePropagation();
+    const meetingID = id.slice('briefs-meeting-'.length);
+    if (state.meetings.some((meeting) => meeting.id === meetingID)) select(meetingID);
   }
 
   function renderMeeting() {
@@ -831,13 +829,12 @@
   }
 
   function init() {
-    els.list = byId('briefs-list');
+    els.list = byId('briefs-detail');
     if (!els.list) return;
     if (player) player.close();
     player = null;
     state.selectedId = null;
     state.record = null;
-    els.search = byId('briefs-search');
     els.detail = byId('briefs-detail');
     els.detailEmpty = byId('briefs-detail-empty');
     els.detailMeeting = byId('briefs-detail-meeting');
@@ -851,14 +848,6 @@
     els.sideTabs = byId('briefs-side-tabs');
     els.side = byId('briefs-side-panel');
 
-    els.list.addEventListener('click', (event) => {
-      const row = event.target.closest('[data-meeting-id]');
-      if (row) select(row.dataset.meetingId);
-    });
-    els.search.addEventListener('lex-input', (event) => {
-      state.query = (event.detail && event.detail.value) || '';
-      renderList();
-    });
     els.detail.addEventListener('click', onDetailClick);
     els.detail.addEventListener('keydown', onInlineKey);
     els.detail.addEventListener('keydown', onTrackKey);
@@ -872,6 +861,8 @@
     });
     if (!globalsBound) {
       globalsBound = true;
+      // Capture, so it runs before the shell turns the click into a page load.
+      document.addEventListener('sidebar-nav-click', onSidebarNav, true);
       window.addEventListener('mouseup', () => {
         if (!onPage()) return;
         els.turns.classList.remove('is-dragging');
