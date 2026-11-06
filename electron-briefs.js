@@ -140,6 +140,7 @@ function isLoaded(window) {
  * @param {function} deps.getToken - () => the person's LANA session token, or null
  * @param {function} deps.getWindows - () => the open BrowserWindows
  * @param {object} [deps.ipcMain] - answers the pages' "is Briefs running" question
+ * @param {function} [deps.createCaptureWindow] - () => a hidden BrowserWindow loading briefs/capture.html with the client preload
  * @param {function} deps.showWindow
  * @param {object} deps.log - { info, warn, error }
  */
@@ -161,6 +162,22 @@ function createBriefs(deps) {
   // Pages ask whether Briefs runs before they switch its tone player on (always answered,
   // so pages without Briefs log nothing).
   if (deps.ipcMain) deps.ipcMain.handle(RUNNING_CHANNEL, () => host !== null);
+
+  // The hidden window that records while a recording is live (briefs/capture.html), so
+  // capture keeps going when the visible window changes pages. Exists only while recording,
+  // so it never keeps the app open on its own.
+  let capture = null;
+  const captureWindow = {
+    open() {
+      if (!deps.createCaptureWindow || (capture && !capture.isDestroyed())) return;
+      capture = deps.createCaptureWindow();
+      capture.once('closed', () => { capture = null; });
+    },
+    close() {
+      if (capture && !capture.isDestroyed()) capture.destroy();
+      capture = null;
+    }
+  };
 
   function bleHelperPath() {
     if (process.platform !== 'darwin') return null;
@@ -239,7 +256,8 @@ function createBriefs(deps) {
       showWindow: deps.showWindow,
       quit: () => electron.app.quit(),
       applyTheme: (theme) => { electron.nativeTheme.themeSource = theme; },
-      documentsPath: electron.app.getPath('documents')
+      documentsPath: electron.app.getPath('documents'),
+      captureWindow
     });
     host = started;
     hostKey = key;

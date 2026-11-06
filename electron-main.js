@@ -137,6 +137,26 @@ const briefs = createBriefs({
   getServer: () => getSavedServer(),
   getToken: () => authTokenStore.get(),
   getWindows: () => BrowserWindow.getAllWindows(),
+  // Records while a Briefs recording is live; never shown.
+  createCaptureWindow: () => {
+    const capture = new BrowserWindow({
+      show: false,
+      width: 320,
+      height: 240,
+      skipTaskbar: true,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        preload: path.join(__dirname, 'electron-preload.js'),
+        additionalArguments: [BRAND_ARG],
+        sandbox: false,
+        // Audio capture keeps running while the window is hidden.
+        backgroundThrottling: false
+      }
+    });
+    capture.loadURL(createFileUrl(path.join(__dirname, 'public_html', 'briefs', 'capture.html')));
+    return capture;
+  },
   showWindow: () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       if (mainWindow.isMinimized()) mainWindow.restore();

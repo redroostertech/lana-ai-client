@@ -450,6 +450,8 @@ export interface LanaServices extends LanaScreenServices {
 export interface LanaBridge extends LanaServices, LanaGatewayServices {
   /** Subscribes to pushes from the main process. Returns the unsubscribe function. */
   onEvent(listener: (event: LanaEvent) => void): () => void;
+  /** "Import a recording": the picked file's bytes, decoded and sent like a recording. */
+  importRecording(bytes: ArrayBuffer, request: RecordingStart): Promise<Result<null>>;
   /** One microphone frame for the talk in progress (`TALK_FRAME_CHANNEL`). */
   sendTalkFrame(frame: Float32Array): void;
   /** Audio for the recording in progress (`RECORDING_FRAME_CHANNEL`). */
@@ -1268,11 +1270,17 @@ export interface RecordingFrame {
 }
 
 export const RECORDING_FRAME_CHANNEL = "briefs:recording.frame";
+/** The capture window's live levels, relayed to the pages as `recordingLevels` events. */
+export const RECORDING_LEVELS_CHANNEL = "briefs:recording.levels";
+/** The hidden client page the host opens while a recording is live; it runs capture. */
+export const CAPTURE_PAGE = "briefs/capture.html";
 
 export type LanaGatewayEvent =
   | { type: "tone"; request: ToneRequest }
   | { type: "recording"; view: RecordingView }
   | { type: "recordingAudio"; command: RecordingAudioCommand }
+  /** The record screen's meters, 0 to 1 per side. Levels only, never audio. */
+  | { type: "recordingLevels"; mic: number; meeting: number }
   | { type: "talkAudio"; command: TalkAudioCommand }
   | { type: "handoff"; view: HandoffView }
   /** A meeting was stored and receipted. Ids only. */

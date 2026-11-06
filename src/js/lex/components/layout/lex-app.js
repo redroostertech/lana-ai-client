@@ -966,8 +966,13 @@
 
     _buildSidebarSections(appContext) {
       if (appContext === 'briefs') {
-        // LANA Briefs: its meetings, newest first (from the Briefs host via the preload).
+        // LANA Briefs: New meeting, then its meetings, newest first (from the Briefs host via
+        // the preload). On the Briefs page New meeting opens in place (briefsNewMeeting).
         return [{
+          id: 'main',
+          isStaticTop: true,
+          items: [{ id: 'briefs-new', label: 'New meeting', icon: 'plus', href: 'briefs/index.html?new=1', isButton: true, variant: 'create-chat', onClick: 'briefsNewMeeting' }]
+        }, {
           id: 'briefs-meetings',
           title: 'Meetings',
           isScrollable: true,

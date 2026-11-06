@@ -12,6 +12,7 @@
 
   const M = window.BriefsMeeting;
   const S = M.selection;
+  const R = window.BriefsRecording;
 
   const KIND_ORDER = ['summary', 'decision', 'openQuestion'];
   const GROUP_TITLE = { summary: 'Key points', decision: 'Decisions', openQuestion: 'Open questions' };
@@ -41,6 +42,17 @@
     followAlong: true,
     current: null,
     loadToken: 0,
+    // New meeting (record here or import a recording).
+    mode: 'meeting',
+    recording: null,
+    models: null,
+    permissions: null,
+    form: { title: '', consent: 'announced', people: '', jurisdiction: '', confirmed: false },
+    levels: { mic: [], meeting: [] },
+    scratch: [],
+    draft: '',
+    busy: false,
+    newError: null,
   };
   const els = {};
   let player = null;
@@ -126,7 +138,7 @@
     renderAvailability();
     els.detailEmpty.setAttribute('message', state.meetings.length === 0 ? 'No meetings yet' : 'Choose a meeting');
     // Open the meeting the sidebar link named, or the newest one.
-    if (state.selectedId === null && state.meetings.length > 0) {
+    if (state.mode === 'meeting' && state.selectedId === null && state.meetings.length > 0) {
       const wanted = new URLSearchParams(window.location.search).get('meeting');
       const found = state.meetings.find((meeting) => meeting.id === wanted);
       select((found || state.meetings[0]).id);
@@ -201,6 +213,7 @@
   }
 
   function select(id) {
+    if (state.mode === 'new') leaveNew();
     if (id === state.selectedId) return;
     state.selectedId = id;
     state.record = null;
@@ -224,7 +237,13 @@
   /** A meeting picked in the sidebar opens here without reloading the page. */
   function onSidebarNav(event) {
     const id = event.detail && event.detail.id;
-    if (!onPage() || typeof id !== 'string' || id.indexOf('briefs-meeting-') !== 0) return;
+    if (!onPage() || typeof id !== 'string') return;
+    if (id === 'briefs-new') {
+      event.stopImmediatePropagation();
+      showNew();
+      return;
+    }
+    if (id.indexOf('briefs-meeting-') !== 0) return;
     event.stopImmediatePropagation();
     const meetingID = id.slice('briefs-meeting-'.length);
     if (state.meetings.some((meeting) => meeting.id === meetingID)) select(meetingID);
@@ -681,6 +700,258 @@
     renderSide();
   }
 
+
+  // ── New meeting: record here or import a recording ────
+
+  function setAddress(params) {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('meeting');
+      url.searchParams.delete('new');
+      Object.keys(params).forEach((key) => url.searchParams.set(key, params[key]));
+      window.history.replaceState(window.history.state, '', url.toString());
+    } catch (_) {
+      // The address stays as it was.
+    }
+  }
+
+  /** Shows New meeting in the content area (the sidebar's New meeting button). */
+  function showNew() {
+    if (!onPage()) return;
+    state.mode = 'new';
+    if (player) player.pause();
+    state.selectedId = null;
+    state.record = null;
+    els.detailEmpty.classList.add('hidden');
+    els.detailMeeting.classList.add('hidden');
+    els.newView.classList.remove('hidden');
+    const shell = document.querySelector('lex-app');
+    if (shell) shell.activeNavId = 'briefs-new';
+    setAddress({ new: '1' });
+    refreshRecording();
+    renderNew();
+  }
+
+  function leaveNew() {
+    state.mode = 'meeting';
+    els.newView.classList.add('hidden');
+  }
+
+  async function refreshRecording() {
+    const api = bridge();
+    if (!api) return;
+    try {
+      const [view, models, permissions] = await Promise.all([api.recording.state(), api.models.status(), api.recording.permissions()]);
+      state.recording = view;
+      state.models = models;
+      state.permissions = permissions;
+    } catch (_) {
+      // Shown once Briefs answers.
+    }
+    renderNew();
+  }
+
+  function transcriptionReady() {
+    return Boolean(state.models && state.models.transcription && state.models.transcription.state && state.models.transcription.state.kind === 'ready');
+  }
+
+  function setDisabled(element, disabled) {
+    if (disabled) element.setAttribute('disabled', '');
+    else element.removeAttribute('disabled');
+  }
+
+  function renderNew() {
+    if (state.mode !== 'new') return;
+    const view = state.recording;
+    // A finished recording opens its meeting.
+    if (view && view.phase === 'done' && view.message === null && view.meetingID) {
+      const id = view.meetingID;
+      state.recording = null;
+      bridge().recording.dismiss().catch(() => {});
+      loadMeetings().then(() => select(id));
+      return;
+    }
+    const panel = R.panelFor(view);
+    els.newSetup.classList.toggle('hidden', panel !== 'setup');
+    els.newLive.classList.toggle('hidden', panel !== 'live');
+    els.newProgress.classList.toggle('hidden', panel !== 'progress');
+    if (panel === 'setup') renderSetup(view);
+    else if (panel === 'live') renderLive(view);
+    else renderProgress(view);
+  }
+
+  function renderSetup(view) {
+    els.newOverline.textContent = 'New meeting';
+    els.newTitle.textContent = 'Record a meeting here';
+    els.newSubtitle.textContent = 'Audio, transcript and notes stay on this computer.';
+    const transcription = state.models && state.models.transcription;
+    const needsModel = Boolean(transcription) && !transcriptionReady();
+    els.newModel.classList.toggle('hidden', !needsModel);
+    if (needsModel) {
+      els.newModel.textContent = transcription.state.kind === 'downloading'
+        ? `${transcription.title} is downloading (${Math.round((transcription.state.progress || 0) * 100)}%). You can record once it is ready.`
+        : `${transcription.title} is needed to record. Download it in Settings.`;
+    }
+    const allConfirmed = state.form.consent === 'allPartiesConfirmed';
+    els.newPeople.setAttribute('label', allConfirmed ? 'Who confirmed' : 'Who is in the meeting');
+    els.newPeople.setAttribute('help', allConfirmed ? '' : 'Optional.');
+    els.newPermissions.innerHTML = R.permissionNotes(state.permissions).map((note) => `<div class="briefs-new-permission">
+        <p class="briefs-new-note${note.tone === 'warning' ? ' is-warning' : ''}">${escape(note.text)}</p>
+        ${note.canOpen ? `<lex-btn variant="ghost" size="sm" data-open-privacy="${note.kind}">Open System Settings</lex-btn>` : ''}
+      </div>`).join('');
+    const failure = view && view.phase === 'failed' ? view.message : null;
+    const error = state.newError || failure;
+    els.newError.textContent = error || '';
+    els.newError.classList.toggle('hidden', !error);
+    const missing = R.missingReason(state.form, transcriptionReady());
+    setDisabled(els.newStart, missing !== null || state.busy);
+    setDisabled(els.newImport, missing !== null || state.busy);
+    if (state.busy) els.newStart.setAttribute('loading', 'true');
+    else els.newStart.removeAttribute('loading');
+    els.newHint.textContent = missing || '';
+  }
+
+  function renderLive(view) {
+    els.newOverline.textContent = view.phase === 'starting' ? 'Starting' : view.phase === 'recording' ? 'Recording' : 'Paused';
+    els.newTitle.textContent = view.title || 'New meeting';
+    els.newSubtitle.textContent = 'Audio, transcript and notes stay on this computer.';
+    els.liveTime.textContent = M.clock(view.elapsedSeconds);
+    els.liveState.textContent = R.liveState(view);
+    els.livePulse.classList.toggle('is-on', view.phase === 'recording');
+    els.livePause.classList.toggle('hidden', view.phase !== 'recording');
+    els.liveResume.classList.toggle('hidden', view.phase !== 'paused');
+    setDisabled(els.liveStop, view.phase === 'starting');
+    els.liveMessage.textContent = view.message || '';
+    els.liveMessage.classList.toggle('hidden', !view.message);
+    renderMeters();
+    setDisabled(els.liveAdd, state.draft.trim() === '');
+    els.liveNotes.innerHTML = state.scratch.map((note) => `<li class="briefs-note"><span class="briefs-note-at">${M.clock(note.anchor)}</span><p class="briefs-note-text">${escape(note.text)}</p></li>`).join('');
+  }
+
+  /** One bar per reading; the height is data, set as a custom property. */
+  function renderMeterBars(container, levels) {
+    if (container.children.length !== R.METER_BARS) {
+      container.innerHTML = '<span class="briefs-meter-bar"></span>'.repeat(R.METER_BARS);
+    }
+    const offset = R.METER_BARS - levels.length;
+    Array.prototype.forEach.call(container.children, (bar, index) => {
+      const level = index >= offset ? levels[index - offset] : 0;
+      bar.style.setProperty('--level', String(level));
+    });
+  }
+
+  function renderMeters() {
+    const view = state.recording;
+    if (!view || els.newLive.classList.contains('hidden')) return;
+    const meetingOff = view.meetingAudio === 'off';
+    renderMeterBars(els.meterMic, state.levels.mic);
+    renderMeterBars(els.meterMeeting, meetingOff ? [] : state.levels.meeting);
+    els.meterMeeting.classList.toggle('is-off', meetingOff);
+    els.meterMicStatus.textContent = R.meterStatus(state.levels.mic, false);
+    els.meterMeetingStatus.textContent = R.meterStatus(state.levels.meeting, meetingOff);
+  }
+
+  function renderProgress(view) {
+    els.newOverline.textContent = 'Writing notes';
+    els.newTitle.textContent = view.title || 'New meeting';
+    els.newSubtitle.textContent = `${M.clock(view.elapsedSeconds)} recorded. You can open other pages; LANA keeps working.`;
+    els.progressSteps.innerHTML = R.progressSteps(view).map((step) => {
+      const mark = step.state === 'done' ? icon('check') : step.state === 'active' ? '<lex-spinner size="sm"></lex-spinner>' : icon('clock');
+      const bar = step.progress === null ? '' : `<span class="briefs-progress-bar"><span class="briefs-progress-fill" data-progress="${step.progress}"></span></span>`;
+      return `<li class="briefs-progress-step is-${step.state}"><span class="briefs-progress-mark" aria-hidden="true">${mark}</span><span class="briefs-progress-text"><span>${escape(step.title)}</span>${bar}</span></li>`;
+    }).join('');
+    els.progressSteps.querySelectorAll('[data-progress]').forEach((fill) => fill.style.setProperty('--progress', fill.dataset.progress));
+    els.progressMessage.textContent = view.message || '';
+    els.progressMessage.classList.toggle('hidden', !view.message);
+    els.progressOpen.classList.toggle('hidden', !(view.message && view.meetingID));
+  }
+
+  async function startRecording() {
+    if (R.missingReason(state.form, transcriptionReady()) !== null || state.busy) return;
+    state.busy = true;
+    state.newError = null;
+    renderNew();
+    try {
+      const result = await bridge().recording.start(R.request(state.form));
+      if (!result.ok) state.newError = result.error.message;
+      else state.recording = result.value;
+    } catch (_) {
+      state.newError = 'LANA could not start recording. Try again.';
+    }
+    state.busy = false;
+    state.scratch = [];
+    state.levels = { mic: [], meeting: [] };
+    renderNew();
+  }
+
+  async function importFile(file) {
+    state.busy = true;
+    state.newError = null;
+    renderNew();
+    try {
+      const bytes = await file.arrayBuffer();
+      const result = await bridge().importRecording(bytes, R.request(state.form));
+      if (!result.ok) state.newError = result.error.message;
+    } catch (_) {
+      state.newError = 'LANA could not read that file. Pick an audio recording: m4a, mp3, wav or caf.';
+    }
+    state.busy = false;
+    renderNew();
+  }
+
+  function addScratchNote() {
+    const text = state.draft.trim();
+    if (text === '' || !state.recording) return;
+    const id = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now());
+    state.scratch = state.scratch.concat([{ id, text, anchor: state.recording.elapsedSeconds }]);
+    state.draft = '';
+    els.liveDraft.value = '';
+    bridge().recording.saveNotes(state.scratch).catch(() => {});
+    renderNew();
+  }
+
+  function bindNew() {
+    const fieldValue = (event) => (event.detail && event.detail.value) || '';
+    els.newName.addEventListener('lex-input', (event) => { state.form.title = fieldValue(event); });
+    els.newPeople.addEventListener('lex-input', (event) => { state.form.people = fieldValue(event); renderNew(); });
+    els.newJurisdiction.addEventListener('lex-input', (event) => { state.form.jurisdiction = fieldValue(event); });
+    els.newConsent.addEventListener('lex-change', (event) => { state.form.consent = fieldValue(event) || 'announced'; renderNew(); });
+    els.newConfirm.addEventListener('lex-change', (event) => { state.form.confirmed = Boolean(event.detail && event.detail.value); renderNew(); });
+    els.newStart.addEventListener('click', () => { if (!els.newStart.hasAttribute('disabled')) startRecording(); });
+    els.newImport.addEventListener('click', () => { if (!els.newImport.hasAttribute('disabled')) els.newFile.click(); });
+    els.newFile.addEventListener('change', () => {
+      const file = els.newFile.files && els.newFile.files[0];
+      els.newFile.value = '';
+      if (file) importFile(file);
+    });
+    els.newPermissions.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-open-privacy]');
+      if (button) bridge().recording.openPrivacySettings(button.dataset.openPrivacy).catch(() => {});
+    });
+    els.livePause.addEventListener('click', () => bridge().recording.pause().catch(() => {}));
+    els.liveResume.addEventListener('click', () => bridge().recording.resume().catch(() => {}));
+    els.liveStop.addEventListener('click', () => { if (!els.liveStop.hasAttribute('disabled')) bridge().recording.stop().catch(() => {}); });
+    els.liveDraft.addEventListener('lex-input', (event) => {
+      state.draft = fieldValue(event);
+      setDisabled(els.liveAdd, state.draft.trim() === '');
+    });
+    els.liveDraft.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        addScratchNote();
+      }
+    });
+    els.liveAdd.addEventListener('click', () => { if (!els.liveAdd.hasAttribute('disabled')) addScratchNote(); });
+    els.progressOpen.addEventListener('click', () => {
+      const view = state.recording;
+      if (!view || !view.meetingID) return;
+      const id = view.meetingID;
+      bridge().recording.dismiss().catch(() => {});
+      state.recording = null;
+      loadMeetings().then(() => select(id));
+    });
+  }
+
   // ── Events ────────────────────────────────────────────
 
   function onTurnsMouseDown(event) {
@@ -821,6 +1092,21 @@
 
   function onBriefsEvent(event) {
     if (!event || !onPage()) return;
+    if (event.type === 'recording') {
+      state.recording = event.view;
+      renderNew();
+      return;
+    }
+    if (event.type === 'recordingLevels') {
+      state.levels = { mic: R.pushLevel(state.levels.mic, event.mic), meeting: R.pushLevel(state.levels.meeting, event.meeting) };
+      renderMeters();
+      return;
+    }
+    if (event.type === 'models') {
+      state.models = event.status;
+      renderNew();
+      return;
+    }
     if (event.type === 'meetingReceived' || event.type === 'inbox') loadMeetings();
     if (event.type === 'meetingChanged') {
       loadMeetings();
@@ -847,6 +1133,46 @@
     els.clipbar = byId('briefs-clipbar');
     els.sideTabs = byId('briefs-side-tabs');
     els.side = byId('briefs-side-panel');
+    els.newView = byId('briefs-new');
+    els.newOverline = byId('briefs-new-overline');
+    els.newTitle = byId('briefs-new-title');
+    els.newSubtitle = byId('briefs-new-subtitle');
+    els.newSetup = byId('briefs-new-setup');
+    els.newModel = byId('briefs-new-model');
+    els.newName = byId('briefs-new-name');
+    els.newConsent = byId('briefs-new-consent');
+    els.newPeople = byId('briefs-new-people');
+    els.newJurisdiction = byId('briefs-new-jurisdiction');
+    els.newConfirm = byId('briefs-new-confirm');
+    els.newPermissions = byId('briefs-new-permissions');
+    els.newError = byId('briefs-new-error');
+    els.newImport = byId('briefs-new-import');
+    els.newStart = byId('briefs-new-start');
+    els.newHint = byId('briefs-new-hint');
+    els.newFile = byId('briefs-new-file');
+    els.newLive = byId('briefs-new-live');
+    els.livePulse = byId('briefs-live-pulse');
+    els.liveTime = byId('briefs-live-time');
+    els.liveState = byId('briefs-live-state');
+    els.meterMic = byId('briefs-meter-mic');
+    els.meterMeeting = byId('briefs-meter-meeting');
+    els.meterMicStatus = byId('briefs-meter-mic-status');
+    els.meterMeetingStatus = byId('briefs-meter-meeting-status');
+    els.liveMessage = byId('briefs-live-message');
+    els.livePause = byId('briefs-live-pause');
+    els.liveResume = byId('briefs-live-resume');
+    els.liveStop = byId('briefs-live-stop');
+    els.liveDraft = byId('briefs-live-draft');
+    els.liveAdd = byId('briefs-live-add');
+    els.liveNotes = byId('briefs-live-notes');
+    els.newProgress = byId('briefs-new-progress');
+    els.progressSteps = byId('briefs-progress-steps');
+    els.progressMessage = byId('briefs-progress-message');
+    els.progressOpen = byId('briefs-progress-open');
+    state.mode = 'meeting';
+    bindNew();
+    // The sidebar's New meeting button calls this on this page (elsewhere it opens the page).
+    window.briefsNewMeeting = showNew;
 
     els.detail.addEventListener('click', onDetailClick);
     els.detail.addEventListener('keydown', onInlineKey);
@@ -883,7 +1209,15 @@
       const api = bridge();
       if (api && typeof api.onEvent === 'function') api.onEvent(onBriefsEvent);
     }
+    // New meeting opens from its sidebar link, and while a recording is live or being written up.
+    if (new URLSearchParams(window.location.search).get('new') === '1') showNew();
     loadMeetings();
+    const api = bridge();
+    if (api && state.mode !== 'new') {
+      api.recording.state().then((view) => {
+        if (onPage() && state.mode !== 'new' && (R.isLive(view) || R.isProcessing(view))) showNew();
+      }, () => {});
+    }
   }
 
   if (window.LexRouter && typeof window.LexRouter.registerPageInit === 'function') {

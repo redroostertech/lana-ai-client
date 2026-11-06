@@ -637,6 +637,212 @@ body {
   white-space: pre-wrap;
 }
 
+/* ── New meeting ─────────────────────────────────── */
+
+.briefs-detail:has(.briefs-new:not(.hidden)) {
+  align-items: stretch;
+  padding: 0;
+}
+
+.briefs-new {
+  width: 100%;
+  min-width: 0;
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
+}
+
+.briefs-new-body {
+  display: grid;
+  gap: 16px;
+  max-width: 640px;
+  padding: 8px 24px 32px;
+}
+
+.briefs-new-note {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--briefs-soft);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.briefs-new-note.is-warning {
+  background: var(--lex-status-warning-bg);
+  color: var(--lex-status-warning-text);
+}
+
+.briefs-new-permissions {
+  display: grid;
+  gap: 8px;
+}
+
+.briefs-new-permission {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+}
+
+.briefs-new-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.briefs-new-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--briefs-muted);
+}
+
+.briefs-new-hint:empty {
+  display: none;
+}
+
+.briefs-new-how {
+  margin-top: 12px;
+}
+
+.briefs-new-steps {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding-left: 20px;
+}
+
+.briefs-new-step-title {
+  display: block;
+  font-weight: var(--lex-weight-semibold);
+}
+
+.briefs-new-step-detail {
+  display: block;
+  font-size: 14px;
+  color: var(--briefs-muted);
+}
+
+.briefs-live-clock {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.briefs-live-pulse {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--briefs-muted);
+}
+
+.briefs-live-pulse.is-on {
+  background: var(--lex-status-danger);
+  animation: briefs-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes briefs-pulse {
+  50% { opacity: 0.35; }
+}
+
+.briefs-live-time {
+  font-size: 32px;
+  font-weight: var(--lex-weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+.briefs-live-state {
+  color: var(--briefs-muted);
+}
+
+.briefs-meters {
+  display: grid;
+  gap: 12px;
+}
+
+.briefs-meter-label {
+  display: flex;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: var(--lex-weight-medium);
+}
+
+.briefs-meter-status {
+  font-weight: var(--lex-weight-normal, 400);
+  color: var(--briefs-muted);
+}
+
+.briefs-meter-bars {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 36px;
+  margin-top: 6px;
+}
+
+.briefs-meter-bar {
+  flex: 1;
+  min-height: 2px;
+  height: calc(var(--level, 0) * 100%);
+  border-radius: 1px;
+  background: var(--briefs-accent);
+}
+
+.briefs-meter-bars.is-off .briefs-meter-bar {
+  background: var(--briefs-soft);
+}
+
+.briefs-live-compose {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.briefs-progress {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.briefs-progress-step {
+  display: flex;
+  gap: 10px;
+  color: var(--briefs-muted);
+}
+
+.briefs-progress-step.is-active,
+.briefs-progress-step.is-done {
+  color: var(--briefs-ink);
+}
+
+.briefs-progress-mark {
+  display: inline-flex;
+  width: 20px;
+  justify-content: center;
+}
+
+.briefs-progress-text {
+  display: grid;
+  flex: 1;
+  gap: 6px;
+}
+
+.briefs-progress-bar {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--briefs-soft);
+  overflow: hidden;
+}
+
+.briefs-progress-fill {
+  display: block;
+  height: 100%;
+  width: calc(var(--progress, 0) * 100%);
+  background: var(--briefs-accent);
+}
+
 @container briefs-meeting (max-width: 699px) {
   .briefs-meeting-body {
     grid-template-columns: minmax(0, 1fr);

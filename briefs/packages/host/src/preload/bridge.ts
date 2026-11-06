@@ -4,8 +4,10 @@
  * calls only from the client's own pages and only while Briefs is on for the firm.
  */
 import type { ContextBridge, IpcRenderer, IpcRendererEvent } from "electron";
-import { ALL_API_METHODS, channelName, EVENT_CHANNEL, RECORDING_FRAME_CHANNEL, TALK_FRAME_CHANNEL } from "../shared/api.js";
-import type { LanaBridge, LanaEvent, RecordingFrame } from "../shared/api.js";
+import { ALL_API_METHODS, CAPTURE_PAGE, channelName, EVENT_CHANNEL, RECORDING_FRAME_CHANNEL, RECORDING_LEVELS_CHANNEL, TALK_FRAME_CHANNEL } from "../shared/api.js";
+import type { LanaBridge, LanaEvent, RecordingFrame, RecordingStart } from "../shared/api.js";
+import { importRecording } from "./recording/importAudio.js";
+import { startRecordingAudio } from "./recording/recordingAudio.js";
 import { startTonePlayer } from "./tonePlayer.js";
 
 type Namespace = keyof typeof ALL_API_METHODS;
@@ -25,7 +27,7 @@ export function buildBriefsBridge(ipcRenderer: Pick<IpcRenderer, "invoke" | "on"
       return [namespace, Object.freeze(methods)];
     }),
   );
-  return {
+  const bridge = {
     ...namespaces,
     onEvent(listener: (event: LanaEvent) => void): () => void {
       const handler = (_event: IpcRendererEvent, payload: LanaEvent) => listener(payload);
@@ -38,7 +40,17 @@ export function buildBriefsBridge(ipcRenderer: Pick<IpcRenderer, "invoke" | "on"
     sendRecordingFrame(frame: RecordingFrame): void {
       if (frame.mic instanceof Float32Array && frame.system instanceof Float32Array) ipcRenderer.send(RECORDING_FRAME_CHANNEL, frame);
     },
+    importRecording(bytes: ArrayBuffer, request: RecordingStart) {
+      if (!(bytes instanceof ArrayBuffer)) return Promise.resolve({ ok: false, error: { code: "unreadable", message: "LANA could not read that file." } });
+      return importRecording(bridge, bytes, request);
+    },
   } as unknown as LanaBridge;
+  return bridge;
+}
+
+/** Whether this page is the hidden capture page the host opens while a recording is live. */
+export function isCapturePage(pathname: string): boolean {
+  return pathname.endsWith(`/${CAPTURE_PAGE}`);
 }
 
 /**
@@ -51,8 +63,16 @@ export function exposeBriefsBridge(
   contextBridge: Pick<ContextBridge, "exposeInMainWorld">,
   ipcRenderer: Pick<IpcRenderer, "invoke" | "on" | "removeListener" | "send">,
   startTone: (bridge: LanaBridge) => void = (bridge) => void startTonePlayer(bridge),
+  pathname: string = typeof location === "undefined" ? "" : location.pathname,
+  startCapture: (bridge: LanaBridge, publish: (levels: { mic: number; meeting: number }) => void) => void = (bridge, publish) => void startRecordingAudio(bridge, publish),
 ): void {
   const bridge = buildBriefsBridge(ipcRenderer);
+  if (isCapturePage(pathname)) {
+    // The capture page shows nothing and exposes nothing: it records, and sends the levels
+    // for the pages' meters. It plays no tone (the visible pages do).
+    startCapture(bridge, (levels) => ipcRenderer.send(RECORDING_LEVELS_CHANNEL, levels));
+    return;
+  }
   contextBridge.exposeInMainWorld(BRIEFS_GLOBAL, bridge);
   ipcRenderer.invoke(RUNNING_CHANNEL).then(
     (running: unknown) => {

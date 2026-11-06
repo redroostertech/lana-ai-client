@@ -29,8 +29,9 @@ vi.mock("../src/main/services/realServices.js", () => ({
     };
   }),
 }));
+const hubEvents: unknown[] = [];
 vi.mock("../src/main/ipc.js", () => ({
-  EventHub: class { add() {} emit() {} },
+  EventHub: class { add() {} emit(event: unknown) { hubEvents.push(event); } },
   registerServices: vi.fn(() => vi.fn()),
 }));
 
@@ -57,8 +58,9 @@ beforeEach(() => {
 });
 afterEach(() => rmSync(folder, { recursive: true, force: true }));
 
-function start(electron: ReturnType<typeof electronFakes>) {
+function start(electron: ReturnType<typeof electronFakes>, captureWindow?: { open(): void; close(): void }) {
   return startBriefsHost({
+    ...(captureWindow ? { captureWindow } : {}),
     electron: electron as never,
     directory: folder,
     isTrustedURL: () => true,
@@ -95,7 +97,32 @@ describe("Briefs host startup", () => {
     await host.stop();
     expect(electron.protocol.unhandle).toHaveBeenCalledTimes(1);
     expect(electron.session.setPermissionRequestHandler).toHaveBeenLastCalledWith(null);
-    expect(vi.mocked(ipcMain.removeListener)).toHaveBeenCalledTimes(2);
+    // Recording frames, recording levels (the capture window's meters) and Talk frames.
+    expect(vi.mocked(ipcMain.removeListener).mock.calls.map(([channel]) => channel)).toEqual(["briefs:recording.frame", "briefs:recording.levels", "briefs:talk.frame"]);
     expect(runtime.close).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens the capture window while a recording is live, closes it once saved, and relays levels", async () => {
+    servicesFail = false;
+    hubEvents.length = 0;
+    const capture = { open: vi.fn(), close: vi.fn() };
+    const host = await start(electronFakes(), capture);
+    const { createRealServices } = await import("../src/main/services/realServices.js");
+    const emit = vi.mocked(createRealServices).mock.calls.at(-1)![0].emit;
+    const view = (phase: string) => ({ type: "recording", view: { phase, meetingID: null, title: "", elapsedSeconds: 0, meetingAudio: "pending", progress: 0, message: null } }) as never;
+    emit(view("starting"));
+    emit(view("recording"));
+    expect(capture.open).toHaveBeenCalledTimes(2);
+    expect(capture.close).not.toHaveBeenCalled();
+    emit(view("saving"));
+    expect(capture.close).toHaveBeenCalledTimes(1);
+
+    const levels = vi.mocked(ipcMain.on).mock.calls.find(([channel]) => channel === "briefs:recording.levels")![1] as (event: unknown, value: unknown) => void;
+    levels({ senderFrame: { url: "file:///app/briefs/capture.html" } }, { mic: 0.5, meeting: 0 });
+    levels({ senderFrame: { url: "file:///app/briefs/capture.html" } }, { mic: "loud" });
+    expect(hubEvents.filter((event) => (event as { type: string }).type === "recordingLevels")).toEqual([{ type: "recordingLevels", mic: 0.5, meeting: 0 }]);
+
+    await host.stop();
+    expect(capture.close).toHaveBeenCalledTimes(2);
   });
 });

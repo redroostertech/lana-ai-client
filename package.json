@@ -57,7 +57,7 @@
     "css:watch": "postcss src/css/tailwind-input.css -o src/css/tailwind-output.css --watch",
     "css:dev": "postcss src/css/tailwind-input.css -o src/css/tailwind-output.css",
     "test:briefs": "vitest run --config briefs/vitest.config.ts",
-    "typecheck:briefs": "tsc --noEmit -p briefs/packages/core/tsconfig.json",
+    "typecheck:briefs": "tsc --noEmit -p briefs/packages/core/tsconfig.json && tsc --noEmit -p briefs/packages/host/tsconfig.json",
     "check:briefs-fixtures": "node briefs/scripts/check-shared-fixtures.mjs",
     "build:briefs": "node scripts/build-briefs.js",
     "briefs:import-standalone": "node scripts/build-briefs.js --tools && electron build/briefs-tools/import-standalone.cjs"

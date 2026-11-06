@@ -13,7 +13,7 @@ import type { App, Dialog, DesktopCapturer, IpcMainEvent, Protocol, SafeStorage,
 import { ipcMain } from "electron";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { RECORDING_FRAME_CHANNEL, TALK_FRAME_CHANNEL, type AccessStatus, type LanaEvent, type PlatformInfo, type RecordingFrame, type RecordingPermissions, type ThemePreference } from "../shared/api.js";
+import { RECORDING_FRAME_CHANNEL, RECORDING_LEVELS_CHANNEL, TALK_FRAME_CHANNEL, type AccessStatus, type LanaEvent, type PlatformInfo, type RecordingFrame, type RecordingPermissions, type ThemePreference } from "../shared/api.js";
 import { openGatewayRuntime, StartupError, type GatewayRuntime } from "./gateway/gatewayRuntime.js";
 import { EventHub, registerServices } from "./ipc.js";
 import { createMainLog, type MainLog } from "./log.js";
@@ -58,6 +58,11 @@ export interface BriefsHostOptions {
   readonly applyTheme: (theme: ThemePreference) => void;
   /** For the Phone settings: the documents folder the audit export suggests. */
   readonly documentsPath: string;
+  /**
+   * The hidden client window that records while a recording is live (`CAPTURE_PAGE`), so
+   * capture outlives page changes. Opened when a recording starts, closed once it is saved.
+   */
+  readonly captureWindow?: { open(): void; close(): void };
 }
 
 export interface BriefsHost {
@@ -234,11 +239,20 @@ export async function startBriefsHost(options: BriefsHostOptions): Promise<Brief
     const onTalkFrame = (event: IpcMainEvent, frame: unknown): void => {
       if (isTrustedSender(event) && frame instanceof Float32Array) created.talkAudio.frame(frame);
     };
+    // The capture window's meters go to the pages as events. Two numbers, never audio.
+    const onRecordingLevels = (event: IpcMainEvent, levels: unknown): void => {
+      if (!isTrustedSender(event) || typeof levels !== "object" || levels === null) return;
+      const { mic, meeting } = levels as { mic?: unknown; meeting?: unknown };
+      if (typeof mic === "number" && typeof meeting === "number") hub.emit({ type: "recordingLevels", mic, meeting });
+    };
     ipcMain.on(RECORDING_FRAME_CHANNEL, onRecordingFrame);
+    ipcMain.on(RECORDING_LEVELS_CHANNEL, onRecordingLevels);
     ipcMain.on(TALK_FRAME_CHANNEL, onTalkFrame);
     undo.push(() => {
       ipcMain.removeListener(RECORDING_FRAME_CHANNEL, onRecordingFrame);
+      ipcMain.removeListener(RECORDING_LEVELS_CHANNEL, onRecordingLevels);
       ipcMain.removeListener(TALK_FRAME_CHANNEL, onTalkFrame);
+      options.captureWindow?.close();
     });
     derive = (event) => {
       if (event.type === "meetingReceived") {
@@ -246,6 +260,12 @@ export async function startBriefsHost(options: BriefsHostOptions): Promise<Brief
         void derived(async () => ({ pending: await inbox.pendingCount(), unread: await inbox.unreadCount() }), (counts) => emit({ type: "inbox", ...counts }));
       }
       if (event.type === "gateway") void derived(() => created.services.preferences.get(), (preferences) => emit({ type: "preferences", preferences }));
+      if (event.type === "recording") {
+        // Capture runs in the hidden window from Start until the recording is saved.
+        const live = event.view.phase === "starting" || event.view.phase === "recording" || event.view.phase === "paused";
+        if (live) options.captureWindow?.open();
+        else options.captureWindow?.close();
+      }
     };
     undo.push(() => {
       derive = null;

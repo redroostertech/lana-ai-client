@@ -25,6 +25,77 @@
       <section class="briefs-workspace" aria-live="polite">
         <section id="briefs-detail" class="briefs-detail" aria-label="Meeting">
           <lex-empty id="briefs-detail-empty" icon="file-text" message="Choose a meeting" description="Meetings from your phone and the ones you record here are listed in the sidebar."></lex-empty>
+          <div id="briefs-new" class="briefs-new hidden">
+            <header class="briefs-meeting-head">
+              <p class="briefs-overline" id="briefs-new-overline">New meeting</p>
+              <h2 id="briefs-new-title" class="briefs-meeting-title">Record a meeting here</h2>
+              <p id="briefs-new-subtitle" class="briefs-meeting-facts">Audio, transcript and notes stay on this computer.</p>
+            </header>
+
+            <section id="briefs-new-setup" class="briefs-new-body" aria-label="Before you record">
+              <p class="briefs-overline">Before you record</p>
+              <p id="briefs-new-model" class="briefs-new-note is-warning hidden"></p>
+              <p class="briefs-new-note">Let everyone know this meeting is being recorded. Some states require every person's agreement.</p>
+              <lex-input id="briefs-new-name" label="Meeting title" placeholder="For example, Client intake" maxlength="200"></lex-input>
+              <lex-radio id="briefs-new-consent" label="How consent was given" value="announced" options='[{"value":"announced","label":"I announced the recording","description":"Shown on the meeting as Recording announced."},{"value":"allPartiesConfirmed","label":"Every participant confirmed","description":"Shown on the meeting as All parties confirmed."}]'></lex-radio>
+              <lex-input id="briefs-new-people" label="Who is in the meeting" placeholder="Names, separated by commas" help="Optional."></lex-input>
+              <lex-input id="briefs-new-jurisdiction" label="Jurisdiction note" placeholder="Optional" help="For example, California: all parties must agree." maxlength="280"></lex-input>
+              <lex-checkbox id="briefs-new-confirm" label="Everyone in this meeting knows it is being recorded and agreed where the law requires it."></lex-checkbox>
+              <div id="briefs-new-permissions" class="briefs-new-permissions"></div>
+              <p id="briefs-new-error" class="briefs-meeting-error hidden" role="alert"></p>
+              <div class="briefs-new-actions">
+                <lex-btn id="briefs-new-import" variant="secondary" leading-icon="upload">Import a recording</lex-btn>
+                <lex-btn id="briefs-new-start" variant="primary" leading-icon="mic">Start recording</lex-btn>
+              </div>
+              <p id="briefs-new-hint" class="briefs-new-hint"></p>
+              <input id="briefs-new-file" class="hidden" type="file" tabindex="-1" aria-hidden="true" accept=".m4a,.mp3,.wav,.caf,.aac,audio/mp4,audio/mpeg,audio/wav,audio/x-caf,audio/aac">
+
+              <p class="briefs-overline briefs-new-how">How it works</p>
+              <ol class="briefs-new-steps">
+                <li><span class="briefs-new-step-title">Announce the recording</span><span class="briefs-new-step-detail">Let everyone know this meeting is being recorded, and confirm how they agreed.</span></li>
+                <li><span class="briefs-new-step-title">Record</span><span class="briefs-new-step-detail">LANA records your microphone and the meeting audio, with a live level for each, so you can see both sides are heard.</span></li>
+                <li><span class="briefs-new-step-title">Stop and review</span><span class="briefs-new-step-detail">LANA transcribes the meeting, tells the speakers apart and writes the notes. Proposed actions wait for your review.</span></li>
+              </ol>
+            </section>
+
+            <section id="briefs-new-live" class="briefs-new-body hidden" aria-label="Recording">
+              <div class="briefs-live-clock" role="timer" aria-live="off">
+                <span id="briefs-live-pulse" class="briefs-live-pulse" aria-hidden="true"></span>
+                <span id="briefs-live-time" class="briefs-live-time">0:00</span>
+                <span id="briefs-live-state" class="briefs-live-state"></span>
+              </div>
+              <div class="briefs-meters">
+                <div class="briefs-meter">
+                  <span class="briefs-meter-label">Your microphone <span id="briefs-meter-mic-status" class="briefs-meter-status"></span></span>
+                  <div id="briefs-meter-mic" class="briefs-meter-bars" aria-hidden="true"></div>
+                </div>
+                <div class="briefs-meter">
+                  <span class="briefs-meter-label">Meeting audio <span id="briefs-meter-meeting-status" class="briefs-meter-status"></span></span>
+                  <div id="briefs-meter-meeting" class="briefs-meter-bars" aria-hidden="true"></div>
+                </div>
+              </div>
+              <p id="briefs-live-message" class="briefs-new-note is-warning hidden"></p>
+              <div class="briefs-new-actions">
+                <lex-btn id="briefs-live-pause" variant="secondary" leading-icon="pause">Pause</lex-btn>
+                <lex-btn id="briefs-live-resume" variant="secondary" leading-icon="mic">Resume</lex-btn>
+                <lex-btn id="briefs-live-stop" variant="danger" leading-icon="square">Stop</lex-btn>
+              </div>
+              <p class="briefs-new-hint">The transcript is made on this computer when you stop. You can open other pages while you record.</p>
+              <p class="briefs-overline briefs-new-how">Notes</p>
+              <div class="briefs-live-compose">
+                <lex-input id="briefs-live-draft" placeholder="Jot a note to mark this moment" maxlength="10000"></lex-input>
+                <lex-btn id="briefs-live-add" variant="secondary" leading-icon="plus">Add</lex-btn>
+              </div>
+              <ul id="briefs-live-notes" class="briefs-notes"></ul>
+            </section>
+
+            <section id="briefs-new-progress" class="briefs-new-body hidden" aria-label="Writing notes">
+              <ol id="briefs-progress-steps" class="briefs-progress"></ol>
+              <p id="briefs-progress-message" class="briefs-new-note is-warning hidden"></p>
+              <lex-btn id="briefs-progress-open" class="hidden" variant="primary" trailing-icon="chevron-right">Open the meeting</lex-btn>
+            </section>
+          </div>
+
           <div id="briefs-detail-meeting" class="briefs-meeting hidden">
             <header class="briefs-meeting-head">
               <p class="briefs-overline" id="briefs-detail-when"></p>
@@ -75,6 +146,9 @@
   <script src="../js/lex/components/foundation/lex-toast.js"></script>
   <script src="../js/lex/components/foundation/lex-spinner.js"></script>
   <script src="../js/lex/components/form/lex-select.js"></script>
+  <script src="../js/lex/components/form/lex-input.js"></script>
+  <script src="../js/lex/components/form/lex-checkbox.js"></script>
+  <script src="../js/lex/components/form/lex-radio.js"></script>
   <script src="../js/lex/components/layout/lex-sidebar.js"></script>
   <script src="../js/lex/components/layout/lex-topbar.js"></script>
   <script src="../js/lex/components/layout/lex-notification-panel.js"></script>
