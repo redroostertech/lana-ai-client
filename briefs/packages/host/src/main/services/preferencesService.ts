@@ -191,7 +191,7 @@ export function listenerText(status: ListenerStatus): StatusText {
     case "listening":
       return { text: "Listening for your phone", tone: "good" };
     case "waitingForPairing":
-      return { text: "Waiting for a paired phone", tone: "warning" };
+      return { text: "No phone paired", tone: "warning" };
     case "starting":
       return { text: "Starting", tone: "warning" };
     case "signedOut":

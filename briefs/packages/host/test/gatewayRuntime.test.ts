@@ -161,12 +161,13 @@ describe("Gateway runtime (main process services)", () => {
     expect(await rig.runtime.devices.startPairing()).toMatchObject({ kind: "failed" });
 
     await signIn(rig);
-    const status = await rig.runtime.devices.gatewayStatus();
-    expect(status).toEqual({ listener: { kind: "waitingForPairing" }, receiving: false });
-    const port = portOf(status, rig.log);
+    // Signed in with no phone paired: nothing listens on the network until pairing starts.
+    expect(await rig.runtime.devices.gatewayStatus()).toEqual({ listener: { kind: "waitingForPairing" }, receiving: false });
+    expect(rig.log.lines.some((line) => (JSON.parse(line) as { event: string }).event === "gateway.listening")).toBe(false);
 
-    // Pairing through the bridge: QR, the phone connects, both show the same code, confirm.
+    // Pairing through the bridge opens the listener: QR, the phone connects, both show the same code, confirm.
     const waiting = await rig.runtime.devices.startPairing();
+    const port = portOf(await rig.runtime.devices.gatewayStatus(), rig.log);
     if (waiting.kind !== "showingCode") throw new Error(`pairing did not start: ${waiting.kind}`);
     expect(waiting.serviceName).toMatch(/^Lana-Pair-/);
     const invitation = parseInvitationQr(waiting.qrText);
@@ -239,8 +240,8 @@ describe("Gateway runtime (main process services)", () => {
   it("tells the window when the phone declines a meeting sent to it, and Cancel send after that is quiet", async () => {
     const rig = await open(profile());
     await signIn(rig);
-    const port = portOf(await rig.runtime.devices.gatewayStatus(), rig.log);
     const waiting = await rig.runtime.devices.startPairing();
+    const port = portOf(await rig.runtime.devices.gatewayStatus(), rig.log);
     if (waiting.kind !== "showingCode") throw new Error(`pairing did not start: ${waiting.kind}`);
     const invitation = parseInvitationQr(waiting.qrText);
     const phone = SoftwareIdentity.generate("Test iPhone");
@@ -277,8 +278,8 @@ describe("Gateway runtime (main process services)", () => {
   it("shows the QR fallback and the approval prompt, and declines when the person denies", async () => {
     const rig = await open(profile(), { playTone: true });
     await signIn(rig);
-    const port = portOf(await rig.runtime.devices.gatewayStatus(), rig.log);
     const waiting = await rig.runtime.devices.startPairing();
+    const port = portOf(await rig.runtime.devices.gatewayStatus(), rig.log);
     if (waiting.kind !== "showingCode") throw new Error("pairing did not start");
     const invitation = parseInvitationQr(waiting.qrText);
     const phone = SoftwareIdentity.generate("Second iPhone");
@@ -320,5 +321,43 @@ describe("Gateway runtime (main process services)", () => {
     expect((await failed).view).toMatchObject({ kind: "failed", message: "The phone was not approved, so the meeting stayed on it." });
     const meetings = await rig.runtime.meetings.list();
     expect(meetings.ok && meetings.value.map((meeting) => meeting.attestationMethod)).toEqual(["qr"]);
+  });
+  it("listens only while a phone is paired or a pairing is under way", async () => {
+    const rig = await open(profile());
+    await signIn(rig);
+    const listeningLines = () => rig.log.lines.filter((line) => (JSON.parse(line) as { event: string }).event === "gateway.listening").length;
+    expect(listeningLines()).toBe(0);
+
+    // Cancelling the first pairing closes the listener again.
+    const opened = await rig.runtime.devices.startPairing();
+    expect(opened.kind).toBe("showingCode");
+    expect(listeningLines()).toBe(1);
+    const closed = rig.next("gateway", (event) => event.status.listener.kind === "waitingForPairing");
+    await rig.runtime.devices.cancelPairing();
+    await closed;
+    expect(await rig.runtime.devices.gatewayStatus()).toEqual({ listener: { kind: "waitingForPairing" }, receiving: false });
+
+    // Pair a phone: it keeps listening after the pairing finishes.
+    const waiting = await rig.runtime.devices.startPairing();
+    const port = portOf(await rig.runtime.devices.gatewayStatus(), rig.log);
+    if (waiting.kind !== "showingCode") throw new Error(`pairing did not start: ${waiting.kind}`);
+    const invitation = parseInvitationQr(waiting.qrText);
+    const phone = SoftwareIdentity.generate("Test iPhone");
+    const confirming = rig.next("pairing", (event) => event.state.kind === "confirming");
+    const paired = rig.next("pairing", (event) => event.state.kind === "paired");
+    const phoneSide = runScriptedPhonePairing(await connectHandoff({ host: HOST, port, identity: HANDOFF_TLS.pairingIdentity, key: pairingPsk(invitation) }), phone, invitation, true);
+    await confirming;
+    await rig.runtime.devices.answerPairing(true);
+    await phoneSide;
+    await paired;
+    await rig.runtime.devices.resetPairing();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(await rig.runtime.devices.gatewayStatus()).toEqual({ listener: { kind: "listening" }, receiving: false });
+
+    // Revoking the last phone stops listening.
+    const stopped = rig.next("gateway", (event) => event.status.listener.kind === "waitingForPairing");
+    expect(await rig.runtime.devices.revoke(phone.publicKeys.deviceID)).toEqual({ ok: true, value: null });
+    await stopped;
+    expect(await rig.runtime.devices.gatewayStatus()).toEqual({ listener: { kind: "waitingForPairing" }, receiving: false });
   });
 });

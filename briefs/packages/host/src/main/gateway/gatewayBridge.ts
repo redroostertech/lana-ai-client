@@ -30,11 +30,15 @@ export function toApiPairing(state: CorePairing): PairingState {
   }
 }
 
-export function toApiGatewayStatus(status: CoreStatus, signedIn: boolean): GatewayStatus {
+/**
+ * `unpaired` is true while the listener is off because no phone is paired: this computer
+ * listens only while a phone is paired or a pairing is under way.
+ */
+export function toApiGatewayStatus(status: CoreStatus, signedIn: boolean, unpaired = false): GatewayStatus {
   if (!signedIn) return { listener: { kind: "signedOut" }, receiving: false };
   switch (status.state) {
     case "stopped":
-      return { listener: { kind: "stopped" }, receiving: false };
+      return { listener: unpaired ? { kind: "waitingForPairing" } : { kind: "stopped" }, receiving: false };
     case "starting":
       return { listener: { kind: "starting" }, receiving: false };
     case "failed":
@@ -44,15 +48,23 @@ export function toApiGatewayStatus(status: CoreStatus, signedIn: boolean): Gatew
   }
 }
 
+/** A pairing under way keeps the listener open; a finished or abandoned one does not. */
+function pairingUnderWay(state: CorePairing): boolean {
+  return state.state === "waiting" || state.state === "confirming" || state.state === "saving";
+}
+
 /**
  * Devices, pairing, handoff prompts and the tone bridge over the real `HandoffGateway`,
- * plus the sign-in gate: the gateway listens only while someone is signed in to the LANA
- * client, and signing out stops it at once.
+ * plus the gate: the gateway listens only while someone is signed in to the LANA client
+ * AND a phone is paired or a pairing is under way. With no phone paired nothing listens on
+ * the network until the person starts pairing; signing out stops it at once.
  */
 export class GatewayBridge implements DevicesApi {
   private view: HandoffView = { kind: "idle" };
   private outcomeTimer: NodeJS.Timeout | null = null;
   private gate: Promise<void> = Promise.resolve();
+  /** The listener is off because no phone is paired (not stopped by sign out or a failure). */
+  private unpaired = false;
   readonly handoff: HandoffApi;
   readonly tone: ToneApi;
 
@@ -65,7 +77,12 @@ export class GatewayBridge implements DevicesApi {
     private readonly log: MainLog,
   ) {
     gateway.on("gatewayStatus", () => this.emitStatus());
-    gateway.on("pairing", (state) => this.emit({ type: "pairing", state: toApiPairing(state) }));
+    gateway.on("pairing", (state) => {
+      this.emit({ type: "pairing", state: toApiPairing(state) });
+      // Pairing ended (cancelled, expired, failed): with no phone paired, stop listening.
+      // Only while listening: stopping cancels the pairing, which must not gate again.
+      if (!pairingUnderWay(state) && state.state !== "paired" && this.session.isSignedIn && this.gateway.status.state !== "stopped") void this.applyGate(true);
+    });
     gateway.on("handoff", (event) => this.onHandoff(event));
     gateway.on("meetingReceived", (meeting) => {
       this.log.info("gateway.meeting_received", {
@@ -110,12 +127,20 @@ export class GatewayBridge implements DevicesApi {
    * Starts or stops the listener to match the session (the client runs Briefs only while the
    * firm has it). Calls run one after another.
    */
-  applyGate(open: boolean): Promise<void> {
+  applyGate(open: boolean, forPairing = false): Promise<void> {
     this.gate = this.gate.then(async () => {
       if (open && this.session.isSignedIn) {
-        const status = await this.gateway.start();
-        this.log.info("gateway.gate_open", { state: status.state });
+        if (forPairing || pairingUnderWay(this.gateway.pairing) || (await this.pairedCount()) > 0) {
+          this.unpaired = false;
+          const status = await this.gateway.start();
+          this.log.info("gateway.gate_open", { state: status.state });
+        } else {
+          this.unpaired = true;
+          await this.gateway.stop();
+          this.log.info("gateway.gate_idle_unpaired");
+        }
       } else if (!this.session.isSignedIn) {
+        this.unpaired = false;
         this.toneBridge.cancelAll();
         await this.gateway.stop();
         this.setView({ kind: "idle" });
@@ -149,6 +174,8 @@ export class GatewayBridge implements DevicesApi {
     try {
       await this.gateway.revokeDevice(deviceID);
       this.log.info("devices.revoked", { device: deviceID });
+      // The last phone revoked: stop listening.
+      await this.applyGate(true);
       return { ok: true, value: null };
     } catch {
       return { ok: false, error: { code: "notFound", message: "That phone is no longer paired." } };
@@ -162,6 +189,8 @@ export class GatewayBridge implements DevicesApi {
   async startPairing(): Promise<PairingState> {
     if (!this.session.isSignedIn) return { kind: "failed", message: "Sign in to LANA before pairing a phone." };
     this.log.info("pairing.start");
+    // Pairing opens the listener (it is off while no phone is paired).
+    await this.applyGate(true, true);
     return toApiPairing(this.gateway.beginPairing());
   }
 
@@ -181,13 +210,21 @@ export class GatewayBridge implements DevicesApi {
   }
 
   async gatewayStatus(): Promise<GatewayStatus> {
-    return toApiGatewayStatus(this.gateway.status, this.session.isSignedIn);
+    return toApiGatewayStatus(this.gateway.status, this.session.isSignedIn, this.unpaired);
   }
 
   // Private
 
   private emitStatus(): void {
-    this.emit({ type: "gateway", status: toApiGatewayStatus(this.gateway.status, this.session.isSignedIn) });
+    this.emit({ type: "gateway", status: toApiGatewayStatus(this.gateway.status, this.session.isSignedIn, this.unpaired) });
+  }
+
+  private async pairedCount(): Promise<number> {
+    try {
+      return (await this.gateway.store.pairedDevices()).length;
+    } catch {
+      return 0;
+    }
   }
 
   private onHandoff(event: HandoffEvent): void {
