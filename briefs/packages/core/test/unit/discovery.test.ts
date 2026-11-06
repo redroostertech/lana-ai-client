@@ -1,6 +1,6 @@
 import BonjourService from "bonjour-service";
 import { describe, expect, it } from "vitest";
-import { BonjourAdvertiser, bonjourServiceParts, gatewayServiceName, HANDOFF_SERVICE_TYPE, pairingServiceName, type MdnsResponder } from "../../src/handoff/index.js";
+import { advertisedHost, BonjourAdvertiser, bonjourServiceParts, gatewayServiceName, HANDOFF_SERVICE_TYPE, pairingServiceName, type MdnsResponder } from "../../src/handoff/index.js";
 import { makeLanaId, type LanaId } from "../../src/ids/index.js";
 
 describe("Bonjour discovery", () => {
@@ -28,10 +28,21 @@ describe("Bonjour discovery", () => {
     };
     const advertiser = new BonjourAdvertiser(() => fake);
     const advertisement = advertiser.advertise("Lana-01JCQ8", 52_000);
-    expect(published).toEqual([{ name: "Lana-01JCQ8", type: "lananotes", protocol: "tcp", port: 52_000 }]);
+    expect(published).toEqual([{ name: "Lana-01JCQ8", host: "Lana-01JCQ8.local", type: "lananotes", protocol: "tcp", port: 52_000 }]);
     await advertisement.stop();
     await advertiser.stop();
     expect(destroyed).toBe(true);
+  });
+
+  it("never answers for the computer's own name: the operating system owns it and renames the computer on a clash (2026-11-05)", () => {
+    const { hostname } = require("node:os") as typeof import("node:os");
+    for (const name of ["Lana-01JCQ8", "Lana-Pair-RSTVWX", hostname().replace(/\.local$/i, "")]) {
+      const host = advertisedHost(name === hostname().replace(/\.local$/i, "") ? "Lana-01JCQ8" : name);
+      expect(host).not.toBe(hostname());
+      expect(host).toMatch(/^[A-Za-z0-9-]{1,63}\.local$/);
+    }
+    expect(advertisedHost("Lana Pair: odd")).toBe("Lana-Pair--odd.local");
+    expect(advertisedHost("")).toBe("Lana.local");
   });
 
   // Real multicast on this machine's interfaces. Opt in: some CI sandboxes block mDNS.

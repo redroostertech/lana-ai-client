@@ -8,6 +8,11 @@ import { SILENT_LOG, type HandoffLog } from "./log.js";
  * `PairingViewModel.pairingServiceName`). Uses `bonjour-service`, a pure JavaScript
  * responder on `multicast-dns`, so it runs the same on macOS and Windows with no
  * native add-on and no dependency on Apple's Bonjour service being installed.
+ *
+ * Each advertisement names its own host (`<service name>.local`), never the computer's.
+ * By default bonjour-service answers for `os.hostname()`, the name the operating system's
+ * own responder owns; macOS treats that as a conflict and renames the computer (for
+ * example `...-5066.local` to `...-5117.local`), which also broke settings keyed on it.
  */
 export const HANDOFF_SERVICE_TYPE = "_lananotes._tcp";
 
@@ -34,9 +39,18 @@ export function bonjourServiceParts(serviceType: string = HANDOFF_SERVICE_TYPE):
 
 /** What the advertiser needs from an mDNS responder; injectable for tests. */
 export interface MdnsResponder {
-  publish(config: { name: string; type: string; protocol: "tcp" | "udp"; port: number; txt?: Record<string, string> }): BonjourService.Service;
+  publish(config: { name: string; host: string; type: string; protocol: "tcp" | "udp"; port: number; txt?: Record<string, string> }): BonjourService.Service;
   unpublishAll(callback?: () => void): void;
   destroy(callback?: () => void): void;
+}
+
+/**
+ * The advertisement's own host name: the service name as a DNS label plus `.local`. Never the
+ * computer's name, so the operating system never sees a conflict and never renames it.
+ */
+export function advertisedHost(serviceName: string): string {
+  const label = serviceName.replace(/[^A-Za-z0-9-]/g, "-").replace(/^-+|-+$/g, "").slice(0, 63) || "Lana";
+  return `${label}.local`;
 }
 
 /** One live advertisement. */
@@ -58,7 +72,7 @@ export class BonjourAdvertiser {
   /** `txt` becomes the service's TXT record (for example the wake flags). */
   advertise(name: string, port: number, txt?: Record<string, string>): Advertisement {
     this.responder ??= this.makeResponder();
-    const service = this.responder.publish({ name, ...bonjourServiceParts(), port, ...(txt === undefined || Object.keys(txt).length === 0 ? {} : { txt }) });
+    const service = this.responder.publish({ name, host: advertisedHost(name), ...bonjourServiceParts(), port, ...(txt === undefined || Object.keys(txt).length === 0 ? {} : { txt }) });
     service.on("error", (error: unknown) => this.log.notice("handoff.bonjour.error", { reason: error instanceof Error ? error.name : "unknown" }));
     this.log.info("handoff.bonjour.advertising", { port });
     return {
