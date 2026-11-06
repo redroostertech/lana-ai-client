@@ -129,6 +129,8 @@ export class FakeLanaServer {
         if (title === "") return { status: 400, body: { error: { message: "Title cannot be empty" } } };
         const record = { id: this.nextID(), matter, title, text: String(body[store === this.tasks ? "description" : "content"] ?? ""), deleted: false };
         store.push(record);
+        // As LANA answers: the matter tasks route returns { success, task }, notes { success, data }.
+        if (store === this.tasks) return { status: 201, body: { success: true, task: { id: record.id, title } } };
         return { status: 201, body: { status: "success", data: { id: record.id, title } } };
       }
       if (request.method === "GET" && parts.length === 5) {
@@ -136,7 +138,9 @@ export class FakeLanaServer {
         const rows = store.filter((r) => r.matter === matter && !r.deleted && (search === null || r.text.includes(search) || r.title.includes(search))).reverse();
         const key = store === this.tasks ? "tasks" : "notes";
         const textKey = store === this.tasks ? "description" : "content";
-        return { status: 200, body: { status: "success", data: { [key]: rows.map((r) => ({ id: r.id, title: r.title, [textKey]: r.text })), total: rows.length } } };
+        const list = rows.map((r) => ({ id: r.id, title: r.title, [textKey]: r.text }));
+        if (store === this.tasks) return { status: 200, body: { success: true, matter_id: matter, tasks: list, pagination: { total: rows.length } } };
+        return { status: 200, body: { status: "success", data: { [key]: list, total: rows.length } } };
       }
       if (request.method === "DELETE" && parts.length === 6 && store === this.notes) return this.softDelete(store, parts[5]!, matter);
     }

@@ -132,7 +132,8 @@ export class LanaClient {
   /** Tasks on the matter whose title or description contains `text` (an ILIKE search). */
   async searchTasks(matterID: string, text: string): Promise<LanaRecordText[]> {
     const object = await this.read(`/api/v1/matters/${segment(matterID)}/tasks?search=${encodeURIComponent(text)}&limit=${TASK_SCAN_LIMIT}`);
-    return records(asRecord(object["data"])?.["tasks"], "description");
+    // The matter tasks route answers `{ success, tasks }`; older servers nested them under data.
+    return records(asRecord(object["data"])?.["tasks"] ?? object["tasks"], "description");
   }
 
   /** Soft deletes the task (LANA sets `deleted_at`). A task already gone counts as deleted. */
@@ -236,9 +237,12 @@ function json(reply: LanaReply): Record<string, unknown> {
   return object;
 }
 
-/** `{ status: "success", data: { id } }` from a create. */
+/**
+ * The new record's id from a create: notes answer `{ data: { id } }`, the matter
+ * tasks route answers `{ success, task: { id } }`.
+ */
 function createdID(object: Record<string, unknown>): string {
-  const id = looseString(asRecord(object["data"])?.["id"]);
+  const id = looseString(asRecord(object["data"])?.["id"]) ?? looseString(asRecord(object["task"])?.["id"]);
   if (id === null || id === "") throw new LanaError("invalidResponse");
   return id;
 }

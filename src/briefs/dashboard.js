@@ -104,7 +104,7 @@
       return;
     }
     els.attention.innerHTML = items.map((item, index) => `<li class="lex-entrance lex-entrance-step-${Math.min(index + 1, 5)}">
-        <button type="button" class="briefs-dashboard-row" data-meeting="${escape(item.meetingID)}">
+        <button type="button" class="briefs-dashboard-row" data-action-id="${escape(item.id)}">
           <span class="briefs-dashboard-row-icon is-${item.tone}" aria-hidden="true">${icon(item.kind === 'email' ? 'mail' : item.kind === 'task' ? 'list-checks' : 'file-text')}</span>
           <span class="briefs-dashboard-row-text">
             <span class="briefs-dashboard-row-title">${escape(item.title)}</span>
@@ -158,14 +158,20 @@
 
   function onClick(event) {
     const target = event.target;
+    const action = target.closest('[data-action-id]');
+    if (action) {
+      // Review it, pick the matter, confirm: nothing reaches LANA before that.
+      window.BriefsActionUI.open(action.dataset.actionId, load);
+      return;
+    }
     const meeting = target.closest('[data-meeting]');
     if (meeting) {
       go(`briefs/index.html?meeting=${encodeURIComponent(meeting.dataset.meeting)}`);
       return;
     }
-    const action = target.closest('[data-dashboard]');
-    if (!action) return;
-    const what = action.dataset.dashboard;
+    const control = target.closest('[data-dashboard]');
+    if (!control) return;
+    const what = control.dataset.dashboard;
     if (what === 'new' || what === 'live') {
       event.preventDefault();
       go('briefs/index.html?new=1');
@@ -214,6 +220,7 @@
       });
     }
     Phones.attach(document.querySelector('.briefs-dashboard'));
+    window.BriefsActionUI.attach(document.querySelector('.briefs-dashboard'));
     load();
   }
 
