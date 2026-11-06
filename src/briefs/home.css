@@ -1,0 +1,323 @@
+/* LANA Briefs Home: the dashboard (src/briefs/home.html). Uses the Briefs tokens in
+   styles.css and the shared motion classes in css/lex-motion.css. */
+
+.briefs-home-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* A recording under way: opens it. */
+.briefs-home-live {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--lex-status-danger, #c2410c);
+  border-radius: var(--lex-radius-xl);
+  background: var(--briefs-surface);
+  color: var(--briefs-ink);
+  text-decoration: none;
+}
+
+.briefs-home-live.is-writing {
+  border-color: var(--briefs-pick-edge);
+}
+
+.briefs-home-live-pulse {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--lex-status-danger, #c2410c);
+  animation: briefs-home-pulse 1.6s ease-in-out infinite;
+}
+
+.briefs-home-live.is-writing .briefs-home-live-pulse {
+  background: var(--bt-accent);
+}
+
+@keyframes briefs-home-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.8); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .briefs-home-live-pulse { animation: none; }
+}
+
+.briefs-home-live-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.briefs-home-live-title {
+  font-weight: 600;
+}
+
+.briefs-home-live-detail {
+  color: var(--briefs-muted);
+  font-size: 13px;
+}
+
+.briefs-home-live-open {
+  color: var(--bt-accent);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.briefs-home-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.briefs-home-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.briefs-home-main,
+.briefs-home-side {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.briefs-home-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--briefs-line);
+  border-radius: var(--lex-radius-xl);
+  background: var(--briefs-surface);
+}
+
+.briefs-home-panel-head .briefs-overline {
+  margin: 0;
+}
+
+.briefs-home-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.briefs-home-list > li + li {
+  border-top: 1px solid var(--briefs-line);
+}
+
+.briefs-home-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 4px;
+  border: 0;
+  border-radius: var(--lex-radius-lg);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 150ms ease-out;
+}
+
+.briefs-home-row:hover {
+  background: var(--briefs-soft);
+}
+
+.briefs-home-row:focus-visible {
+  outline: 2px solid var(--lex-border-focus);
+  outline-offset: 1px;
+}
+
+.briefs-home-row-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--lex-radius-lg);
+  background: var(--briefs-soft);
+  color: var(--briefs-ink);
+}
+
+.briefs-home-row-icon.is-good {
+  color: var(--bt-accent);
+}
+
+.briefs-home-row-icon.is-warning {
+  color: var(--lex-status-warning-text);
+  background: var(--lex-status-warning-bg);
+}
+
+.briefs-home-row-icon.is-danger {
+  color: var(--lex-status-danger-text);
+  background: var(--lex-status-danger-bg);
+}
+
+.briefs-home-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.briefs-home-row-title {
+  overflow: hidden;
+  color: var(--briefs-ink);
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.briefs-home-row-detail {
+  overflow: hidden;
+  color: var(--briefs-muted);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.briefs-home-pill {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  color: var(--briefs-muted);
+  font-size: 12px;
+  white-space: nowrap;
+  box-shadow: inset 0 0 0 1px var(--briefs-line);
+}
+
+.briefs-home-pill.is-good {
+  color: var(--bt-accent);
+  box-shadow: inset 0 0 0 1px var(--bt-accent);
+}
+
+.briefs-home-pill.is-warning {
+  color: var(--lex-status-warning-text);
+  background: var(--lex-status-warning-bg);
+  box-shadow: none;
+}
+
+.briefs-home-pill.is-danger {
+  color: var(--lex-status-danger-text);
+  background: var(--lex-status-danger-bg);
+  box-shadow: none;
+}
+
+.briefs-home-count {
+  flex: none;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 9999px;
+  background: var(--bt-accent);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+  text-align: center;
+}
+
+.briefs-home-empty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 4px;
+  color: var(--briefs-muted);
+  font-size: 14px;
+}
+
+.briefs-home-empty svg {
+  flex: none;
+  color: var(--bt-accent);
+}
+
+.briefs-home-empty.is-large {
+  flex-direction: column;
+  padding: 24px;
+  text-align: center;
+}
+
+.briefs-home-phone-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--briefs-ink);
+  font-weight: 600;
+}
+
+.briefs-home-phone-icon {
+  display: grid;
+  place-items: center;
+  color: var(--bt-accent);
+}
+
+.briefs-home-phone-status.is-warning .briefs-home-phone-icon {
+  color: var(--lex-status-warning);
+}
+
+.briefs-home-phone-summary {
+  margin: 0;
+  color: var(--briefs-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.briefs-home-phone-rows {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  margin: 4px 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--briefs-line);
+  font-size: 13px;
+}
+
+.briefs-home-phone-rows dt {
+  color: var(--briefs-muted);
+}
+
+.briefs-home-phone-rows dd {
+  margin: 0;
+  color: var(--briefs-ink);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.briefs-home-phone lex-btn {
+  align-self: flex-start;
+}
+
+@media (max-width: 960px) {
+  .briefs-home-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .briefs-home-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .briefs-home-body {
+    padding: 16px;
+  }
+
+  .briefs-home-metrics {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

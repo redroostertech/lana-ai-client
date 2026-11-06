@@ -14,8 +14,8 @@
   const S = M.selection;
   const R = window.BriefsRecording;
   const B = window.BriefsShare;
-  const P = window.BriefsStatus;
-  const W = window.BriefsWalkthrough;
+  /** The top bar's phone status, Phones and the walkthrough (shared with the Home page). */
+  const Phones = window.BriefsPhonesUI;
   /** How copy names this device (platform neutral). */
   const DEVICE_NOUN = 'computer';
 
@@ -58,8 +58,6 @@
     shareOpen: false,
     shareNotice: null,
     mergeEdit: null,
-    // Paired phones and pairing (the top bar's status icon and the Phones dialog).
-    phone: { gateway: null, preferences: null, phones: null, pairing: { kind: 'idle' }, removing: null, error: null },
     // New meeting (record here or import a recording).
     mode: 'meeting',
     recording: null,
@@ -581,273 +579,6 @@
         closeShare(true);
       }
     });
-  }
-
-  // ── Phone status (top bar) and the Phones dialog ──────
-  // The top bar's icon says whether this computer listens for the phone; its hover card
-  // gives the details and opens Phones, where a phone is paired (QR code, then the six
-  // digits confirmed on both screens) or removed. The rules are in briefs-status.js.
-
-  let pairingTimer = null;
-  let phoneLoad = 0;
-
-  async function loadPhoneStatus() {
-    const api = bridge();
-    if (!api || !api.devices) return;
-    const token = ++phoneLoad;
-    const settle = (work) => Promise.resolve().then(work).catch(() => null);
-    const [gateway, preferences, phones] = await Promise.all([
-      settle(() => api.devices.gatewayStatus()),
-      settle(() => (api.preferences ? api.preferences.get() : null)),
-      settle(() => api.devices.list()),
-    ]);
-    if (token !== phoneLoad) return;
-    state.phone.gateway = gateway;
-    state.phone.preferences = preferences;
-    state.phone.phones = phones && phones.ok ? phones.value : state.phone.phones;
-    renderPhoneStatus();
-    if (phonesOpen()) renderPhones();
-  }
-
-  function renderPhoneStatus() {
-    const topbar = document.querySelector('lex-topbar');
-    if (!topbar || !onPage()) return;
-    const card = P.statusCard(state.phone.gateway, state.phone.preferences, state.phone.phones || []);
-    topbar.statusIcon = card.icon;
-    topbar.statusLabel = card.label;
-    topbar.statusTone = card.tone;
-    topbar.statusSummary = card.summary;
-    topbar.statusRows = card.rows;
-    topbar.statusAction = card.action;
-  }
-
-  function phonesOpen() {
-    return Boolean(els.phones && els.phones.open);
-  }
-
-  async function openPhones() {
-    if (!onPage()) return;
-    state.phone.removing = null;
-    state.phone.error = null;
-    try {
-      state.phone.pairing = await bridge().devices.pairingState();
-    } catch (_) {
-      state.phone.pairing = { kind: 'idle' };
-    }
-    els.phones.open = true;
-    renderPhones();
-    // No phone yet: go straight to the code, which is why the person came.
-    if ((state.phone.phones || []).length === 0 && state.phone.pairing.kind === 'idle') startPairing();
-  }
-
-  /** Closing Phones mid pairing cancels it, so the listener closes again. */
-  function onPhonesClosed() {
-    stopPairingTimer();
-    if (P.pairingActive(state.phone.pairing)) bridge().devices.cancelPairing().catch(() => {});
-    else if (state.phone.pairing.kind !== 'idle') bridge().devices.resetPairing().catch(() => {});
-    state.phone.pairing = { kind: 'idle' };
-  }
-
-  async function startPairing() {
-    state.phone.error = null;
-    state.phone.pairing = { kind: 'starting' };
-    renderPhones();
-    try {
-      setPairing(await bridge().devices.startPairing());
-    } catch (_) {
-      setPairing({ kind: 'failed', message: 'LANA could not start pairing. Try again.' });
-    }
-  }
-
-  function setPairing(next) {
-    state.phone.pairing = P.pairingShown(next, state.phone.pairing);
-    if (next && next.kind === 'paired') loadPhoneStatus();
-    if (phonesOpen()) renderPhones();
-  }
-
-  function stopPairingTimer() {
-    if (pairingTimer) clearInterval(pairingTimer);
-    pairingTimer = null;
-  }
-
-  function codeLeft(expiresAt) {
-    return P.countdown((Date.parse(expiresAt) - Date.now()) / 1000);
-  }
-
-  function pairingHtml(pairing) {
-    switch (pairing.kind) {
-      case 'starting':
-        return '<div class="briefs-pair-panel briefs-pair-busy" role="status"><lex-spinner size="sm"></lex-spinner><span>Preparing a pairing code</span></div>';
-      case 'saving':
-        return '<div class="briefs-pair-panel briefs-pair-busy" role="status"><lex-spinner size="sm"></lex-spinner><span>Saving the pairing</span></div>';
-      case 'showingCode':
-        return `<div class="briefs-pair-panel briefs-pair-qr">
-            <div class="briefs-pair-code" data-pair-qr aria-label="Pairing code to scan" role="img"></div>
-            <div class="briefs-pair-text">
-              <p class="briefs-overline">Pair a phone</p>
-              <p class="briefs-pair-title">Open LANA Briefs on your phone and scan this code.</p>
-              <p class="briefs-pair-note">The code works once and expires in <span data-pair-left>${codeLeft(pairing.expiresAt)}</span>.</p>
-              <p class="briefs-pair-waiting"><lex-spinner size="sm"></lex-spinner>Waiting for the phone</p>
-              <div><lex-btn variant="secondary" size="sm" data-pair="cancel">Cancel</lex-btn></div>
-            </div>
-          </div>`;
-      case 'confirming':
-        return `<div class="briefs-pair-panel briefs-pair-confirm">
-            <p class="briefs-overline">Confirm the code</p>
-            <p class="briefs-pair-title">Does ${escape(pairing.phoneName || 'your phone')} show this code?</p>
-            <div class="briefs-pair-digits" role="img" aria-label="Code ${escape(String(pairing.code || '').split('').join(' '))}">${String(pairing.code || '').split('').map((digit, index) => `<span class="briefs-pair-digit${index === 3 ? ' is-group-start' : ''}">${escape(digit)}</span>`).join('')}</div>
-            <p class="briefs-pair-note">Both screens must show the same six digits. If they differ, cancel: someone may be in between.</p>
-            <div class="briefs-pair-buttons">
-              <lex-btn variant="secondary" size="sm" data-pair="reject">Cancel</lex-btn>
-              <lex-btn variant="primary" size="sm" leading-icon="check" data-pair="accept">Codes match, pair</lex-btn>
-            </div>
-          </div>`;
-      case 'paired':
-        return `<div class="briefs-pair-panel briefs-pair-outcome is-good" role="status">
-            <span class="briefs-pair-mark">${icon('check')}</span>
-            <p class="briefs-pair-title">${escape(pairing.phoneName || 'Your phone')} is paired. It can now send meetings to this computer.</p>
-            <lex-btn variant="secondary" size="sm" data-pair="done">Done</lex-btn>
-          </div>`;
-      case 'expired':
-        return `<div class="briefs-pair-panel briefs-pair-outcome is-warning" role="status">
-            <p class="briefs-pair-title">The pairing code expired. Show a new one when your phone is ready.</p>
-            <lex-btn variant="secondary" size="sm" leading-icon="refresh-cw" data-pair="start">New code</lex-btn>
-          </div>`;
-      case 'failed':
-        return `<div class="briefs-pair-panel briefs-pair-outcome is-warning" role="alert">
-            <p class="briefs-pair-title">${escape(pairing.message || 'Pairing did not work.')}</p>
-            <lex-btn variant="secondary" size="sm" data-pair="start">Try again</lex-btn>
-          </div>`;
-      default:
-        return '';
-    }
-  }
-
-  function phoneListHtml() {
-    const phones = state.phone.phones || [];
-    if (phones.length === 0) return '<p class="briefs-list-note">No phone paired yet.</p>';
-    const when = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
-    return `<p class="briefs-overline">Paired</p><ul class="briefs-phone-list">${phones.map((phone) => {
-      const name = escape(phone.displayName || 'Phone');
-      const removing = state.phone.removing === phone.id;
-      const date = phone.pairedAt && !Number.isNaN(Date.parse(phone.pairedAt)) ? `Paired ${when.format(new Date(phone.pairedAt))}` : 'Paired';
-      return `<li class="briefs-phone-row${removing ? ' is-removing' : ''}">
-          <span class="briefs-share-phone" aria-hidden="true">${icon('smartphone')}</span>
-          <span class="briefs-share-text"><span class="briefs-share-name">${name}</span><span class="briefs-share-status">${escape(date)}</span></span>
-          ${removing
-            ? `<span class="briefs-phone-confirm"><lex-btn variant="ghost" size="sm" data-phone-keep>Keep</lex-btn><lex-btn variant="danger" size="sm" data-phone-remove-yes="${escape(phone.id)}">Remove</lex-btn></span>`
-            : `<lex-btn variant="secondary" size="sm" data-phone-remove="${escape(phone.id)}">Remove</lex-btn>`}
-        </li>${removing ? `<li class="briefs-phone-warning">${name} will no longer be able to send meetings here. Meetings already received stay. To use it again, pair it again.</li>` : ''}`;
-    }).join('')}</ul>`;
-  }
-
-  function renderPhones() {
-    if (!els.phonesBody) return;
-    const pairing = state.phone.pairing || { kind: 'idle' };
-    const busy = pairing.kind !== 'idle';
-    els.phonesBody.innerHTML = `
-      <p class="briefs-phones-lead">Only paired phones can send meetings to this computer. It listens on your network only while a phone is paired, or while you pair one.</p>
-      ${busy ? pairingHtml(pairing) : '<div><lex-btn variant="primary" size="sm" leading-icon="smartphone" data-pair="start">Pair a phone</lex-btn></div>'}
-      ${state.phone.error ? `<p class="briefs-meeting-error briefs-phones-error" role="alert">${escape(state.phone.error)}</p>` : ''}
-      <section class="briefs-phones-paired" aria-label="Paired phones">${phoneListHtml()}</section>`;
-    stopPairingTimer();
-    if (pairing.kind === 'showingCode') {
-      drawQr(pairing.qrText);
-      pairingTimer = setInterval(() => {
-        const left = els.phonesBody.querySelector('[data-pair-left]');
-        if (left) left.textContent = codeLeft(pairing.expiresAt);
-      }, 1000);
-    }
-  }
-
-  function drawQr(text) {
-    const box = els.phonesBody.querySelector('[data-pair-qr]');
-    if (!box || !window.QRCode) return;
-    window.QRCode.toString(text, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }).then((svg) => {
-      if (box.isConnected) box.innerHTML = svg;
-    }, () => {
-      if (box.isConnected) box.textContent = 'The code could not be drawn. Cancel and try again.';
-    });
-  }
-
-  async function removePhone(id) {
-    state.phone.removing = null;
-    let result = null;
-    try {
-      result = await bridge().devices.revoke(id);
-    } catch (_) {
-      result = null;
-    }
-    state.phone.error = result && result.ok ? null : ((result && result.error && result.error.message) || 'LANA could not remove that phone. Try again.');
-    await loadPhoneStatus();
-    renderPhones();
-  }
-
-  function onPhonesClick(event) {
-    const target = event.target;
-    const pair = target.closest('[data-pair]');
-    if (pair) {
-      const what = pair.dataset.pair;
-      const devices = bridge().devices;
-      if (what === 'start') startPairing();
-      else if (what === 'cancel') devices.cancelPairing().then(setPairing, () => {});
-      else if (what === 'reject') devices.answerPairing(false).then(setPairing, () => {});
-      else if (what === 'accept') devices.answerPairing(true).then(setPairing, () => {});
-      else if (what === 'done') devices.resetPairing().then(() => setPairing({ kind: 'idle' }), () => {});
-      return;
-    }
-    const remove = target.closest('[data-phone-remove]');
-    if (remove) {
-      state.phone.removing = remove.dataset.phoneRemove;
-      renderPhones();
-      return;
-    }
-    if (target.closest('[data-phone-keep]')) {
-      state.phone.removing = null;
-      renderPhones();
-      return;
-    }
-    const yes = target.closest('[data-phone-remove-yes]');
-    if (yes) removePhone(yes.dataset.phoneRemoveYes);
-  }
-
-  // ── Walkthrough (first run, and from the gear menu) ───
-  // The host remembers per person that it was seen (settings.walkthroughCompleted).
-
-  async function signedInUserID() {
-    try {
-      const account = await bridge().account.state();
-      return account && account.kind === 'signedIn' && account.user ? String(account.user.id) : null;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  async function maybeShowWalkthrough() {
-    const api = bridge();
-    if (!api || !api.settings || !W) return;
-    const userID = await signedInUserID();
-    if (userID === null || !onPage()) return;
-    let seen = true;
-    try {
-      seen = await api.settings.walkthroughCompleted(userID);
-    } catch (_) {
-      seen = true;
-    }
-    if (!seen && onPage()) showWalkthrough(userID);
-  }
-
-  function showWalkthrough(userID) {
-    if (document.querySelector('lex-walkthrough')) return;
-    const tour = document.createElement('lex-walkthrough');
-    tour.className = 'briefs-tour';
-    tour.brand = 'BRIEFS.';
-    tour.pages = W.pages(icon, DEVICE_NOUN);
-    tour.addEventListener('lex-walkthrough-done', (event) => {
-      if (userID) bridge().settings.setWalkthroughCompleted(userID).catch(() => {});
-      if (event.detail && event.detail.action === 'pair') openPhones();
-    });
-    document.body.appendChild(tour);
   }
 
   // ── Inline edit ───────────────────────────────────────
@@ -1510,7 +1241,12 @@
 
   /** Shows New meeting in the content area (the sidebar's New meeting button). */
   function showNew() {
-    if (!onPage()) return;
+    // Called by the sidebar's New meeting from another Briefs page (Home): open this page on it.
+    if (!onPage()) {
+      if (window.Lex && Lex.Nav && typeof Lex.Nav.go === 'function') Lex.Nav.go('briefs/index.html?new=1');
+      else window.location.href = './index.html?new=1';
+      return;
+    }
     flushNotes();
     closeNoteEditor(false);
     state.mode = 'new';
@@ -1921,8 +1657,6 @@
     }
     if (event.type === 'meetingReceived' || event.type === 'inbox') loadMeetings();
     if (event.type === 'recordsChanged' && event.meetingID === state.selectedId) loadShared(state.selectedId);
-    if (event.type === 'pairing') setPairing(event.state);
-    if (event.type === 'gateway' || event.type === 'preferences' || event.type === 'pairing') loadPhoneStatus();
     if (event.type === 'meetingChanged') {
       loadMeetings();
       if (event.meetingID === state.selectedId) loadMeeting(state.selectedId, true);
@@ -1948,8 +1682,6 @@
     els.shareButton = byId('briefs-share-button');
     els.sharePopover = byId('briefs-share-popover');
     els.review = byId('briefs-review');
-    els.phones = byId('briefs-phones');
-    els.phonesBody = byId('briefs-phones-body');
     els.turns = byId('briefs-turns');
     els.clipbar = byId('briefs-clipbar');
     els.sideTabs = byId('briefs-side-tabs');
@@ -2005,9 +1737,6 @@
     bindNew();
     bindNoteEditor();
     bindReview();
-    els.phonesBody.addEventListener('click', onPhonesClick);
-    els.phones.addEventListener('lex-close', onPhonesClosed);
-    els.phones.addEventListener('lex-cancel', onPhonesClosed);
     // The sidebar's New meeting button calls this on this page (elsewhere it opens the page).
     window.briefsNewMeeting = showNew;
 
@@ -2026,15 +1755,6 @@
       globalsBound = true;
       // Capture, so it runs before the shell turns the click into a page load.
       document.addEventListener('sidebar-nav-click', onSidebarNav, true);
-      // The gear menu's LANA Briefs walkthrough (Briefs pages only).
-      document.addEventListener('topbar-menu-action', (event) => {
-        if (!onPage() || !event.detail || event.detail.actionId !== 'briefs-walkthrough') return;
-        signedInUserID().then(showWalkthrough);
-      });
-      // The top bar's phone status card: Pair a phone or Manage phones.
-      document.addEventListener('topbar-status-action', () => {
-        if (onPage()) openPhones();
-      });
       // A click anywhere outside Share closes it, leaving focus where the click put it.
       document.addEventListener('pointerdown', (event) => {
         if (!onPage() || !state.shareOpen) return;
@@ -2063,8 +1783,7 @@
     // New meeting opens from its sidebar link, and while a recording is live or being written up.
     if (new URLSearchParams(window.location.search).get('new') === '1') showNew();
     loadMeetings();
-    loadPhoneStatus();
-    maybeShowWalkthrough();
+    Phones.attach(document.querySelector('.briefs-scroll'));
     const api = bridge();
     if (api && state.mode !== 'new') {
       api.recording.state().then((view) => {

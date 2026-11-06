@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LANA Briefs</title>
+  <link rel="stylesheet" href="../css/tailwind-output.css">
+  <script src="../js/tailwind-loader.js"></script>
+  <link rel="stylesheet" href="../css/lex-tokens.css">
+  <link rel="stylesheet" href="../css/lex-chat.css">
+  <link rel="stylesheet" href="../css/lex-motion.css">
+  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./home.css">
+</head>
+<body>
+  <lex-app
+    id="briefs-shell"
+    logo-src="../img/logo-light.png"
+    logo-alt="LANA AI"
+    logo-href="./home.html"
+    active-nav-id="briefs-home"
+    page-title="LANA Briefs"
+  ></lex-app>
+
+  <template id="page-content">
+    <div class="briefs-scroll briefs-home">
+      <section class="briefs-home-body" aria-live="polite">
+        <lex-banner id="briefs-home-banner" class="lex-entrance" variant="light" heading="LANA Briefs" subtitle="Your meetings, kept close." status="none">
+          <lex-btn variant="primary" leading-icon="plus" data-home="new">New meeting</lex-btn>
+          <lex-btn variant="secondary" leading-icon="play" data-home="walkthrough">Take the walkthrough</lex-btn>
+        </lex-banner>
+
+        <a id="briefs-home-live" class="briefs-home-live lex-rise hidden" href="./index.html?new=1" data-home="live">
+          <span class="briefs-home-live-pulse" aria-hidden="true"></span>
+          <span class="briefs-home-live-text"><span id="briefs-home-live-title" class="briefs-home-live-title"></span><span id="briefs-home-live-detail" class="briefs-home-live-detail"></span></span>
+          <span class="briefs-home-live-open">Open</span>
+        </a>
+
+        <section class="briefs-home-metrics lex-entrance lex-entrance-step-1" aria-label="The last seven days">
+          <lex-metric id="briefs-home-metric-meetings" label="Meetings, last 7 days" value="0" status="green"></lex-metric>
+          <lex-metric id="briefs-home-metric-recorded" label="Recorded, last 7 days" value="0 min" status="blue"></lex-metric>
+          <lex-metric id="briefs-home-metric-waiting" label="Actions waiting" value="0" status="gray"></lex-metric>
+          <lex-metric id="briefs-home-metric-open" label="Meetings with open items" value="0" status="gray"></lex-metric>
+        </section>
+
+        <div class="briefs-home-grid">
+          <div class="briefs-home-main">
+            <section class="briefs-home-panel lex-entrance lex-entrance-step-2" aria-labelledby="briefs-home-attention-title">
+              <header class="briefs-home-panel-head">
+                <h2 id="briefs-home-attention-title" class="briefs-overline">Needs your attention</h2>
+              </header>
+              <ul id="briefs-home-attention" class="briefs-home-list"></ul>
+            </section>
+            <section class="briefs-home-panel lex-entrance lex-entrance-step-3" aria-labelledby="briefs-home-recent-title">
+              <header class="briefs-home-panel-head">
+                <h2 id="briefs-home-recent-title" class="briefs-overline">Recent meetings</h2>
+              </header>
+              <ul id="briefs-home-recent" class="briefs-home-list"></ul>
+            </section>
+          </div>
+          <aside class="briefs-home-side">
+            <section id="briefs-home-phone" class="briefs-home-panel briefs-home-phone lex-entrance lex-entrance-step-3" aria-labelledby="briefs-home-phone-title">
+              <header class="briefs-home-panel-head">
+                <h2 id="briefs-home-phone-title" class="briefs-overline">Your phone</h2>
+              </header>
+              <div id="briefs-home-phone-body"></div>
+            </section>
+          </aside>
+        </div>
+      </section>
+
+      <lex-empty id="briefs-unavailable" class="hidden" icon="lock" message="LANA Briefs is not available right now" description="It runs while you are signed in and LANA Briefs is on for your firm. Sign in to LANA, or ask your firm admin to turn it on."></lex-empty>
+    </div>
+  </template>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/version.js"></script>
+  <script src="../js/time-utils.js"></script>
+  <script src="../js/shared/request-retry.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/lex/lex.core.js"></script>
+  <script src="../js/lex/lex.utils.js"></script>
+  <script src="../js/lex/lex.icons.js"></script>
+  <script src="../js/lex/lex.state.js"></script>
+  <script src="../js/lex/lex-nav.js"></script>
+  <script src="../js/lex/lex.forms.js"></script>
+  <script src="../js/lex/components/foundation/lex-btn.js"></script>
+  <script src="../js/lex/components/foundation/lex-card.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/foundation/lex-banner.js"></script>
+  <script src="../js/lex/components/foundation/lex-metric.js"></script>
+  <script src="../js/lex/components/foundation/lex-empty.js"></script>
+  <script src="../js/lex/components/foundation/lex-modal.js"></script>
+  <script src="../js/lex/components/foundation/lex-tabs.js"></script>
+  <script src="../js/lex/components/foundation/lex-toast.js"></script>
+  <script src="../js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="../js/vendor/lottie_light.min.js"></script>
+  <script src="../js/lex/brand/lex-brand-animations.js"></script>
+  <script src="../js/lex/components/foundation/lex-brand-mark.js"></script>
+  <script src="../js/lex/components/form/lex-select.js"></script>
+  <script src="../js/lex/components/form/lex-input.js"></script>
+  <script src="../js/lex/components/form/lex-checkbox.js"></script>
+  <script src="../js/lex/components/form/lex-radio.js"></script>
+  <script src="../js/lex/components/layout/lex-sidebar.js"></script>
+  <script src="../js/lex/components/layout/lex-topbar.js"></script>
+  <script src="../js/lex/components/layout/lex-notification-panel.js"></script>
+  <script src="../js/lex/components/layout/lex-app.js"></script>
+  <script src="../js/lex/components/layout/lex-walkthrough.js"></script>
+  <script src="../js/lex/index.js"></script>
+  <script src="../js/lex/lex-page-init.js"></script>
+  <script src="../js/sidebar-footer-hydrate.js"></script>
+  <lex-lana-dock page-scope="briefs" context-type="full_chat" placeholder="Ask LANA..." thread-title="LANA Chat"></lex-lana-dock>
+  <!-- LANA dock (IDE-style docked chat panel) -->
+  <script src="../js/lex/chat/lex-chat.format.js"></script>
+  <script src="../js/lex/chat/lex-chat.conversations-api.js"></script>
+  <script src="../js/lex/chat/lex-chat.source.js"></script>
+  <script src="../js/lex/chat/lex-chat.message.js"></script>
+  <script src="../js/lex/chat/lex-chat-progress-events.js"></script>
+  <script src="../js/lex/chat/lex-chat.activity.js"></script>
+  <script src="../js/lex/chat/lex-chat.documents.js"></script>
+  <script src="../js/lex/chat/lex-chat.composer-mentions.js"></script>
+  <script src="../js/services/slash-commands.service.js"></script>
+  <script src="../js/lex/chat/lex-chat.composer-slash.js"></script>
+  <script src="../js/lex/chat/lex-chat.composer.js"></script>
+  <script src="../js/lex/chat/lex-chat.thread.js"></script>
+  <script src="../js/lex/chat/lex-chat.threads.js"></script>
+  <script src="../js/lex/chat/lex-chat.js"></script>
+  <script src="../js/lex/chat/lex-dynamic-card.renderer.js"></script>
+  <script src="../js/lex/chat/lex-agentic-plan-card.js"></script>
+  <script src="../js/lex/chat/lex-chat.index.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/lex/components/chat/lex-lana-panel.js"></script>
+  <script src="../js/lex/components/layout/lex-lana-dock.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script src="../js/briefs/briefs-meeting.js"></script>
+  <script src="../js/briefs/briefs-recording.js"></script>
+  <script src="../js/briefs/briefs-status.js"></script>
+  <script src="../js/briefs/briefs-walkthrough.js"></script>
+  <script src="../js/briefs/briefs-phones-ui.js"></script>
+  <script src="../js/vendor/qrcode.min.js"></script>
+  <script src="../js/briefs/briefs-home.js"></script>
+  <script src="./home.js"></script>
+</body>
+</html>

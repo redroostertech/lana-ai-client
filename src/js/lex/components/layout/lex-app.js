@@ -928,10 +928,6 @@
         }
         topbarMenuItems.push({ id: 'settings', label: 'Settings', icon: 'settings' });
         topbarMenuItems.push({ id: 'help', label: 'Help & Support', icon: 'help-circle' });
-        if (appContext === 'briefs') {
-          // Handled by the Briefs page (src/briefs/app.js): replays its walkthrough.
-          topbarMenuItems.push({ id: 'briefs-walkthrough', label: 'LANA Briefs walkthrough', icon: 'play' });
-        }
         topbarMenuItems.push({ divider: true });
         topbarMenuItems.push({ id: 'logout', label: 'Sign out', icon: 'log-out', variant: 'danger' });
         this.setTopbarMenuItems(topbarMenuItems);
@@ -971,12 +967,15 @@
 
     _buildSidebarSections(appContext) {
       if (appContext === 'briefs') {
-        // LANA Briefs: New meeting, then its meetings, newest first (from the Briefs host via
+        // LANA Briefs: New meeting and Home, then its meetings, newest first (from the Briefs host via
         // the preload). On the Briefs page New meeting opens in place (briefsNewMeeting).
         return [{
           id: 'main',
           isStaticTop: true,
-          items: [{ id: 'briefs-new', label: 'New meeting', icon: 'plus', href: 'briefs/index.html?new=1', isButton: true, variant: 'create-chat', onClick: 'briefsNewMeeting' }]
+          items: [
+            { id: 'briefs-new', label: 'New meeting', icon: 'plus', href: 'briefs/index.html?new=1', isButton: true, variant: 'create-chat', onClick: 'briefsNewMeeting' },
+            { id: 'briefs-home', label: 'Home', icon: 'home', href: 'briefs/home.html' }
+          ]
         }, {
           id: 'briefs-meetings',
           title: 'Meetings',

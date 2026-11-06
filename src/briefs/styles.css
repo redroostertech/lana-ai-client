@@ -1581,13 +1581,7 @@ body {
 }
 
 .briefs-pair-mark {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--bt-accent);
-  color: #ffffff;
+  flex: none;
 }
 
 .briefs-phones-paired {

@@ -1758,7 +1758,7 @@
           id: 'lana-notes',
           label: 'LANA Briefs',
           description: 'Meetings recorded on your phone or this computer, with notes and actions',
-          route: 'briefs/index.html',
+          route: 'briefs/home.html',
           colors: ['#7dd3a8', '#2f9e6e', '#155e46', '#0b1f17']
         },
         'brainchild': {
