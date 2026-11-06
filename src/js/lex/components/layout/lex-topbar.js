@@ -184,6 +184,31 @@
         display: block;
       }
 
+      /* ── Status icon (a page's state, not a control; label on hover) ── */
+
+      .lex-topbar-status {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.5rem;
+        color: var(--lex-topbar-icon-color);
+        border-radius: var(--lex-radius-md);
+        cursor: default;
+      }
+
+      .lex-topbar-status[data-tone="warning"] {
+        color: var(--lex-status-warning);
+      }
+
+      .lex-topbar-status:focus-visible {
+        outline: 2px solid var(--lex-border-focus);
+        outline-offset: 1px;
+      }
+
+      .lex-topbar-status svg {
+        display: block;
+      }
+
       /* ── Notification badge ─────────────────────────────── */
 
       .lex-topbar-badge {
@@ -351,7 +376,11 @@
         suppressAutoBack:  { type: Boolean, default: false },
         backLabel:         { type: String,  default: 'Back' },
         backHref:          { type: String,  default: '' },
-        menuItems:         { type: Array,   default: [] }
+        menuItems:         { type: Array,   default: [] },
+        // An optional status icon before Refresh (e.g. LANA Briefs: listening for the phone).
+        statusIcon:        { type: String,  default: '' },
+        statusLabel:       { type: String,  default: '' },
+        statusTone:        { type: String,  default: '' }
       };
     }
 
@@ -375,6 +404,34 @@
       } catch (e) {
         return false;
       }
+    }
+
+    /** The status icon's markup, or '' when there is none. */
+    _statusHtml() {
+      if (!this.statusIcon || !this.statusLabel) return '';
+      const label = this.escapeHtml(this.statusLabel);
+      const tone = this.statusTone === 'warning' ? 'warning' : 'good';
+      return `<span class="lex-topbar-status" data-topbar-status data-tone="${tone}" role="img" tabindex="0" aria-label="${label}" title="${label}">${icon(this.statusIcon, 'normal')}</span>`;
+    }
+
+    /** Puts the status icon in place, changes it, or removes it, without a full render. */
+    _syncStatus(root) {
+      const right = root.querySelector('.lex-topbar-right');
+      if (!right) return;
+      const current = right.querySelector('[data-topbar-status]');
+      const html = this._statusHtml();
+      if (html === '') {
+        if (current) current.remove();
+        return;
+      }
+      const tone = this.statusTone === 'warning' ? 'warning' : 'good';
+      if (current && current.dataset.icon === this.statusIcon && current.getAttribute('aria-label') === this.statusLabel && current.dataset.tone === tone) return;
+      const holder = document.createElement('div');
+      holder.innerHTML = html;
+      const next = holder.firstElementChild;
+      next.dataset.icon = this.statusIcon;
+      if (current) current.replaceWith(next);
+      else right.insertBefore(next, right.firstChild);
     }
 
     render() {
@@ -409,6 +466,7 @@
           }
         }
 
+        this._syncStatus(root);
         return null; // preserve injected DOM (e.g. sticky toggle)
       }
 
@@ -442,6 +500,8 @@
 
       // ── Right ──
       html += `<div class="lex-topbar-right">`;
+
+      html += this._statusHtml().replace('data-topbar-status', `data-topbar-status data-icon="${this.escapeHtml(this.statusIcon)}"`);
 
       // Refresh button (always present)
       html += `<lex-btn data-action="refresh" class="lex-topbar-refresh" variant="primary" leading-icon="refresh-cw" size="sm" title="Refresh">Refresh</lex-btn>`;

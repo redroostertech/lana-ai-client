@@ -895,6 +895,7 @@
         if (appContext === 'briefs') {
           this._loadBriefsMeetingsForSidebar();
         }
+        this._applyBriefsStatus();
 
         // User menu items (role-gated)
         const menuItems = [];
@@ -980,11 +981,7 @@
           items: this._briefsMeetingItems && this._briefsMeetingItems.length > 0
             ? this._briefsMeetingItems
             : [{ id: 'briefs-meetings-empty', label: this._briefsMeetingItems ? 'No meetings yet' : 'Loading meetings', icon: 'file-text', href: 'briefs/index.html' }]
-        }].concat(this._briefsListener ? [{
-          // Whether this computer is listening for the phone (the standalone sidebar's footer line).
-          id: 'briefs-phone',
-          items: [{ id: 'briefs-phone-status', label: this._briefsListener.text, icon: this._briefsListener.tone === 'good' ? 'wifi' : 'wifi-off', href: 'settings-v2.html' }]
-        }] : []);
+        }];
       }
       const mainItems = appContext === 'insights'
         ? [
@@ -1093,6 +1090,21 @@
       if (this._getAppContext() === 'briefs') {
         this.setSections(this._buildSidebarSections('briefs'));
       }
+      this._applyBriefsStatus();
+    }
+
+    /**
+     * LANA Briefs pages show whether this computer is listening for the phone as an icon in
+     * the top bar (the standalone app's sidebar footer line); the words are its label.
+     * Other pages show none.
+     */
+    _applyBriefsStatus() {
+      const topbar = this.$('lex-topbar');
+      if (!topbar) return;
+      const listener = this._getAppContext() === 'briefs' ? this._briefsListener : null;
+      topbar.statusIcon = listener ? (listener.tone === 'good' ? 'wifi' : 'wifi-off') : '';
+      topbar.statusLabel = listener ? listener.text : '';
+      topbar.statusTone = listener ? listener.tone : '';
     }
 
     _formatMoverBadge(metric) {
