@@ -974,7 +974,7 @@
           isStaticTop: true,
           items: [
             { id: 'briefs-new', label: 'New meeting', icon: 'plus', href: 'briefs/index.html?new=1', isButton: true, variant: 'create-chat', onClick: 'briefsNewMeeting' },
-            { id: 'briefs-dashboard', label: 'Dashboard', icon: 'home', href: 'briefs/dashboard.html' }
+            { id: 'briefs-dashboard', label: 'Dashboard', icon: 'layout-dashboard', href: 'briefs/dashboard.html' }
           ]
         }, {
           id: 'briefs-meetings',
