@@ -31,6 +31,7 @@
  */
 
 const crypto = require('crypto');
+const { speechPackages } = require('./electron-local-models');
 const path = require('path');
 
 const BRIEFS_APP_ID = 'lana-notes';
@@ -214,6 +215,8 @@ function createBriefs(deps) {
       isTrustedURL: isClientPage,
       engineBase: () => deps.engineBase(),
       session: () => sessionSnapshot(deps.getToken() || null, deps.apiBase(), deps.getServer()),
+      // The one model catalog: Briefs downloads its speech models from the client's pinned list.
+      speechPackages: speechPackages(),
       transcriptionWorker: unpacked(path.join(deps.distDir, 'briefs-transcription-worker.cjs')),
       bleHelper: bleHelperPath(),
       showWindow: deps.showWindow,

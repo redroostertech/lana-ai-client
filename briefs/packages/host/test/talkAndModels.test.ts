@@ -1,5 +1,9 @@
 import { AVAILABLE, type AskAnswer, type Passage } from "@lana/core/ask";
 import { LanaRuntimeTextModel, SpeechModelStore, type FetchLike, type SpeechModelPackage } from "@lana/core/model";
+import { createRequire } from "node:module";
+
+// The LANA client's catalog: the one list of every model the client downloads.
+const CATALOG_SPEECH = (createRequire(import.meta.url)("../../../../electron-local-models.js") as { speechPackages(): SpeechModelPackage[] }).speechPackages();
 import type { TalkAnswerer, TalkHearing, TalkListener, TalkSpeaker } from "@lana/core/talk";
 import { MeetingAskService, storeAskSource, decodeSavedAskTurns } from "@lana/core/ask";
 import { RuntimeAnswerBackend } from "@lana/core/runtime";
@@ -47,7 +51,8 @@ function models(options: { fetch?: FetchLike; speech?: SpeechModelPackage[]; eng
     emit: (status) => pushed.push(status),
     log,
     runtime: { engineBase: () => runtime.engine, token: () => runtime.token },
-    speech: new SpeechModelStore({ directory: join(folder, "speech"), fetch, ...(options.speech === undefined ? {} : { packages: options.speech }) }),
+    speechPackages: options.speech ?? CATALOG_SPEECH,
+    speech: new SpeechModelStore({ directory: join(folder, "speech"), fetch, packages: options.speech ?? CATALOG_SPEECH }),
   });
   return { service, pushed, log, runtime };
 }
@@ -88,7 +93,7 @@ describe("ModelService", () => {
     const voice = new TextEncoder().encode("voice-model");
     const files: Record<string, Uint8Array> = { "https://example.test/vad": vad, "https://example.test/voice": voice };
     const pkg = (id: "vad" | "kokoro", url: string, data: Uint8Array): SpeechModelPackage => ({
-      id, url: `${url}-upstream`, downloadBytes: data.length, format: "file", target: `${id}.onnx`, files: [{ path: `${id}.onnx`, bytes: data.length, sha256: sha(data), url }],
+      id, target: `${id}.onnx`, files: [{ path: `${id}.onnx`, bytes: data.length, sha256: sha(data), url }],
     });
     const parakeet: SpeechModelPackage = { ...pkg("vad", "https://example.test/vad", vad), id: "parakeet" };
     const { service } = models({
@@ -116,7 +121,7 @@ describe("ModelService", () => {
     files["https://models.test/kokoro"] = data("kokoro");
     const speech = (["vad", "parakeet", "segmentation", "embedding", "kokoro"] as const).map((id): SpeechModelPackage => {
       const bytes = files[`https://models.test/${id}`]!;
-      return { id, url: `https://upstream.test/${id}`, downloadBytes: bytes.length, format: "file", target: `${id}.onnx`, files: [{ path: `${id}.onnx`, bytes: bytes.length, sha256: sha(bytes), url: `https://models.test/${id}` }] };
+      return { id, target: `${id}.onnx`, files: [{ path: `${id}.onnx`, bytes: bytes.length, sha256: sha(bytes), url: `https://models.test/${id}` }] };
     });
     const { service, pushed } = models({
       fetch: async (url) => {
@@ -138,7 +143,7 @@ describe("ModelService", () => {
   it("resumes cut-off speech downloads at launch from their .part files", async () => {
     const voice = new TextEncoder().encode("voice-model-bytes");
     const speech: SpeechModelPackage[] = (["vad", "parakeet", "segmentation", "embedding", "kokoro"] as const).map((id) => ({
-      id, url: `https://upstream.test/${id}`, downloadBytes: voice.length, format: "file", target: `${id}.onnx`,
+      id, target: `${id}.onnx`,
       files: [{ path: `${id}.onnx`, bytes: voice.length, sha256: sha(voice), url: `https://models.test/${id}` }],
     }));
     const ranges: Record<string, string> = {};
@@ -161,7 +166,7 @@ describe("ModelService", () => {
   it("says plainly when a speech download fails, and resumes it at the next launch", async () => {
     const data = new TextEncoder().encode("voice");
     const speech: SpeechModelPackage[] = (["vad", "parakeet", "segmentation", "embedding", "kokoro"] as const).map((id) => ({
-      id, url: `https://upstream.test/${id}`, downloadBytes: data.length, format: "file", target: `${id}.onnx`,
+      id, target: `${id}.onnx`,
       files: [{ path: `${id}.onnx`, bytes: data.length, sha256: sha(data), url: `https://models.test/${id}` }],
     }));
     const { service: before, pushed } = models({ fetch: async () => ({ status: 503, body: null }), speech });

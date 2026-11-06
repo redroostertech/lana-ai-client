@@ -1,6 +1,6 @@
 import { parseLanaId } from "@lana/core/ids";
 import { MeetingAskService, storeAskSource } from "@lana/core/ask";
-import type { RuntimePurpose } from "@lana/core/model";
+import type { RuntimePurpose, SpeechModelPackage } from "@lana/core/model";
 import { ClipDrafter, RuntimeAnswerBackend, type TextModel } from "@lana/core/runtime";
 import type { AllLanaServices, LanaEvent, ModelState, PlatformInfo, ThemePreference, VoiceDownload } from "../../shared/api.js";
 import type { GatewayRuntime } from "../gateway/gatewayRuntime.js";
@@ -38,6 +38,8 @@ export interface RealServicesOptions {
   readonly rendered: () => void;
   /** `userData/Models`: the speech models. */
   readonly modelsDirectory: string;
+  /** The speech packages from the LANA client's model catalog. */
+  readonly speechPackages: readonly SpeechModelPackage[];
   /** LANA's runtime (the local AI engine and the person's session): every language model call goes there. */
   readonly lanaRuntime: LanaRuntimeAccess;
   /** The OS microphone permission, asked before a talk starts. */
@@ -100,6 +102,7 @@ export function createRealServices(options: RealServicesOptions): RealServices {
   const models = options.models ?? new ModelService({
     directory: options.modelsDirectory,
     runtime: options.lanaRuntime,
+    speechPackages: options.speechPackages,
     platform,
     emit: (status) => {
       emit({ type: "models", status });

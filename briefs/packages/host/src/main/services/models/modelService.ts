@@ -1,4 +1,4 @@
-import { LanaRuntimeTextModel, SPEECH_GROUPS, SpeechModelStore, type RuntimePurpose, type SpeechPackageID } from "@lana/core/model";
+import { LanaRuntimeTextModel, SPEECH_GROUPS, SpeechModelStore, type RuntimePurpose, type SpeechModelPackage, type SpeechPackageID } from "@lana/core/model";
 import { transcriptionModelPaths, type TranscriptionModelPaths } from "@lana/core/recording";
 import type { TextModel } from "@lana/core/runtime";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
@@ -49,6 +49,9 @@ export interface ModelServiceOptions {
   readonly log: MainLog;
   /** Where Briefs' language model work goes: LANA's runtime (Workstream R). */
   readonly runtime: LanaRuntimeAccess;
+  /** The speech packages from the LANA client's model catalog (the one list of every model it downloads). */
+  readonly speechPackages: readonly SpeechModelPackage[];
+  /** Tests: a store over a fake server. */
   readonly speech?: SpeechModelStore;
 }
 
@@ -70,7 +73,7 @@ export class ModelService implements ModelsApi {
   private readonly running = new Map<SpeechModelID, { controller: AbortController; done: Promise<void> }>();
 
   constructor(private readonly options: ModelServiceOptions) {
-    this.speech = options.speech ?? new SpeechModelStore({ directory: join(options.directory, "speech"), log: options.log });
+    this.speech = options.speech ?? new SpeechModelStore({ directory: join(options.directory, "speech"), packages: options.speechPackages, log: options.log });
   }
 
   // MARK: - ModelsApi

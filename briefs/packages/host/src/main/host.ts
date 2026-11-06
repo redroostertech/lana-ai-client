@@ -20,6 +20,7 @@ import { createMainLog, type MainLog } from "./log.js";
 import { AUDIO_SCHEME } from "./services/meetingAudio.js";
 import { createRealServices } from "./services/realServices.js";
 import type { ClientSessionSnapshot } from "./gateway/clientSession.js";
+import type { SpeechModelPackage } from "@lana/core/model";
 import { spawnBleHelper } from "./services/bleWake/bleHelperProcess.js";
 import { WorkerTranscription } from "./services/recording/workerTranscription.js";
 import { SHUTDOWN_DRAIN_MS, ShutdownGate } from "./shutdownGate.js";
@@ -46,6 +47,8 @@ export interface BriefsHostOptions {
   readonly engineBase: () => string | null;
   /** The LANA client's session, read when needed. There is one session: Briefs has no sign-in of its own. */
   readonly session: () => ClientSessionSnapshot | null;
+  /** The speech packages from the LANA client's model catalog (electron-local-models.js speechPackages()). */
+  readonly speechPackages: readonly SpeechModelPackage[];
   /** The bundled transcription worker script (a file path). */
   readonly transcriptionWorker: string;
   /** The macOS Bluetooth wake helper, or null where there is none. */
@@ -207,6 +210,7 @@ export async function startBriefsHost(options: BriefsHostOptions): Promise<Brief
       legacyWalkthroughFile: null,
       rendered: () => undefined,
       modelsDirectory: join(options.directory, "Models"),
+      speechPackages: options.speechPackages,
       requestMicrophone,
       recording: {
         permissions: recordingPermissions,

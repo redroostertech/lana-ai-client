@@ -1,5 +1,6 @@
 import { MeetingAskService, storeAskSource } from "@lana/core/ask";
-import { SpeechModelStore } from "@lana/core/model";
+import { SpeechModelStore, type SpeechModelPackage } from "@lana/core/model";
+import { createRequire } from "node:module";
 import { RuntimeAnswerBackend } from "@lana/core/runtime";
 import { KokoroSpeaker, resample, speechModelPaths, STT_SAMPLE_RATE } from "@lana/core/talk";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -22,6 +23,8 @@ import { openRealRig, receiveMeeting, type RealRig } from "./support/realRig.js"
  * silero_vad.onnx, the Parakeet folder and the Kokoro folder> npx vitest run app/test/askTalk.integration.test.ts`.
  * Both folders are adopted as installed (every file's size and SHA-256 checked); nothing is downloaded.
  */
+// The LANA client's catalog: the one list of every model the client downloads.
+const catalogSpeech = (createRequire(import.meta.url)("../../../../electron-local-models.js") as { speechPackages(): SpeechModelPackage[] }).speechPackages();
 const RUN = process.env["LANA_RUN_MODEL_TESTS"] === "1";
 const platform: PlatformInfo = { os: "mac", deviceNoun: "computer", appVersion: "0.1.0", isDemo: false, features: { ask: true, talk: true } };
 
@@ -43,7 +46,8 @@ describe.skipIf(!RUN)("Ask and Talk with the real models (opt in)", () => {
       emit: (status) => events.push({ type: "models", status }),
       log: rig.log,
       runtime: { engineBase: () => process.env["LANA_ENGINE_URL"] ?? null, token: () => process.env["LANA_TOKEN"] ?? null },
-      speech: new SpeechModelStore({ directory: process.env["LANA_SPEECH_MODELS_DIR"] ?? "", log: rig.log }),
+      speechPackages: catalogSpeech,
+      speech: new SpeechModelStore({ directory: process.env["LANA_SPEECH_MODELS_DIR"] ?? "", packages: catalogSpeech, log: rig.log }),
     });
     expect(models.isReady("ask")).toBe(true);
     await models.ensure("listener");

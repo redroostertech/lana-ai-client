@@ -1,10 +1,14 @@
-import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { isSafeEntry, SPEECH_PACKAGES, SpeechModelStore, type FetchLike, type SpeechModelPackage } from "../../src/model/index.js";
+import { SpeechModelStore, type FetchLike, type SpeechModelPackage } from "../../src/model/index.js";
+
+// The LANA client's catalog: the one list of every model the client downloads.
+const catalog = createRequire(import.meta.url)("../../../../../electron-local-models.js") as { speechPackages(): SpeechModelPackage[] };
+const SPEECH_PACKAGES = catalog.speechPackages();
 
 const sha = (data: Uint8Array | string): string => createHash("sha256").update(data).digest("hex");
 const MIRROR = "https://models.lanaai.io/briefs/speech";
@@ -34,36 +38,20 @@ function serve(files: Record<string, Uint8Array>): { fetch: FetchLike; fetched: 
   };
 }
 
-/** The mirror is unreachable; upstream serves `files`. */
-function upstreamOnly(files: Record<string, Uint8Array>): FetchLike {
-  const upstream = serve(files);
-  return async (url, init) => {
-    if (url.startsWith(MIRROR)) return { status: 503, body: null };
-    return upstream.fetch(url, init);
-  };
-}
-
-/** A tar.bz2 of `folder` made with the system tar, plus extra arguments (for hostile archives). */
-function archive(source: string, entries: string[], extra: string[] = []): Uint8Array {
-  const out = join(root, `a-${Math.random().toString(16).slice(2)}.tar.bz2`);
-  execFileSync("tar", ["-cjf", out, ...extra, "-C", source, ...entries]);
-  return new Uint8Array(readFileSync(out));
-}
-
 function sourceFolder(): { source: string; pkg: SpeechModelPackage; vad: SpeechModelPackage; files: Record<string, string> } {
   const source = join(root, "src");
   mkdirSync(join(source, "tiny-model", "sub"), { recursive: true });
   const files = { "tiny-model/model.onnx": "weights ".repeat(500), "tiny-model/tokens.txt": "a 0\nb 1\n", "tiny-model/sub/extra.txt": "extra" };
   for (const [path, text] of Object.entries(files)) writeFileSync(join(source, path), text);
   const pkg: SpeechModelPackage = {
-    id: "parakeet", url: "https://example.test/tiny-model.tar.bz2", downloadBytes: 0, format: "tar.bz2", target: "tiny-model",
+    id: "parakeet", target: "tiny-model",
     files: ["tiny-model/model.onnx", "tiny-model/tokens.txt"].map((path) => ({
       path, bytes: Buffer.byteLength(files[path as keyof typeof files]), sha256: sha(files[path as keyof typeof files]), url: `${MIRROR}/parakeet/v1/${path}`,
     })),
   };
   const vadText = "silero";
   const vad: SpeechModelPackage = {
-    id: "vad", url: "https://example.test/vad.onnx", downloadBytes: vadText.length, format: "file", target: "vad.onnx",
+    id: "vad", target: "vad.onnx",
     files: [{ path: "vad.onnx", bytes: vadText.length, sha256: sha(vadText), url: `${MIRROR}/vad/v1/vad.onnx` }],
   };
   return { source, pkg, vad, files };
@@ -190,28 +178,6 @@ describe("SpeechModelStore", () => {
     expect(server.fetched).toHaveLength(1);
   });
 
-  it("falls back to the upstream archive only when told to and the mirror is unreachable, unpacking in a staging folder of its own", async () => {
-    const { source, pkg: base } = sourceFolder();
-    const bytes = archive(source, ["tiny-model"]);
-    const pkg = { ...base, downloadBytes: bytes.length };
-    const upstream = serve({ [pkg.url]: bytes });
-    const offline: FetchLike = async (url, init) => {
-      if (url.startsWith(MIRROR)) throw new TypeError("fetch failed");
-      return upstream.fetch(url, init);
-    };
-    const directory = join(root, "models");
-    await expect(new SpeechModelStore({ directory, packages: [pkg], fetch: offline }).install("parakeet")).rejects.toBeInstanceOf(TypeError);
-    expect(upstream.fetched).toEqual([]);
-
-    const store = new SpeechModelStore({ directory, packages: [pkg], fetch: offline, fallback: true });
-    await store.install("parakeet");
-    expect(store.isInstalled("parakeet")).toBe(true);
-    expect(upstream.fetched).toEqual([pkg.url]);
-    expect(readFileSync(join(directory, "tiny-model/sub/extra.txt"), "utf8")).toBe("extra");
-    expect(readdirSync(directory).filter((name) => name.startsWith(".staging"))).toEqual([]);
-    expect(existsSync(join(directory, ".downloads", "parakeet.tar.bz2"))).toBe(false);
-  });
-
   it("adopts a complete copy already in the folder without any network call", async () => {
     const { source, pkg } = sourceFolder();
     const server = serve({});
@@ -221,53 +187,27 @@ describe("SpeechModelStore", () => {
     expect(server.fetched).toEqual([]);
   });
 
-  it("refuses an archive that climbs out of its folder and leaves nothing outside", async () => {
-    const { source, pkg: base } = sourceFolder();
-    writeFileSync(join(root, "outside.txt"), "escape");
-    // -P keeps the `..` in the stored name.
-    const bytes = archive(join(source, "tiny-model"), ["../../outside.txt"], ["-P"]);
-    const pkg = { ...base, downloadBytes: bytes.length };
-    const directory = join(root, "models");
-    const store = new SpeechModelStore({ directory, packages: [pkg], fetch: upstreamOnly({ [pkg.url]: bytes }), fallback: true });
-    await expect(store.install("parakeet")).rejects.toMatchObject({ code: "unsafe_archive" });
-    expect(existsSync(join(root, "models", "..", "outside.txt"))).toBe(true);
-    // Only the empty folder the mirror attempt made: nothing was unpacked into place.
-    expect(existsSync(join(directory, "tiny-model", "model.onnx"))).toBe(false);
-    expect(store.isInstalled("parakeet")).toBe(false);
-  });
-
-  it("refuses an archive with a link in it", async () => {
-    const { source, pkg: base } = sourceFolder();
-    symlinkSync("/etc/hosts", join(source, "tiny-model", "link"));
-    const bytes = archive(source, ["tiny-model"]);
-    const pkg = { ...base, downloadBytes: bytes.length };
-    const store = new SpeechModelStore({ directory: join(root, "models"), packages: [pkg], fetch: upstreamOnly({ [pkg.url]: bytes }), fallback: true });
-    await expect(store.install("parakeet")).rejects.toMatchObject({ code: "unsafe_archive" });
-    expect(existsSync(join(root, "models", "tiny-model", "link"))).toBe(false);
-    expect(existsSync(join(root, "models", "tiny-model", "model.onnx"))).toBe(false);
-  });
-
-  it("does not mark a package installed when a file does not match its hash", async () => {
-    const { source, pkg: base } = sourceFolder();
-    const bytes = archive(source, ["tiny-model"]);
-    const pkg = { ...base, downloadBytes: bytes.length, files: [{ ...base.files[0]!, sha256: "0".repeat(64) }] };
-    const store = new SpeechModelStore({ directory: join(root, "models"), packages: [pkg], fetch: upstreamOnly({ [pkg.url]: bytes }), fallback: true });
-    await expect(store.install("parakeet")).rejects.toMatchObject({ code: "incomplete" });
-    expect(store.isInstalled("parakeet")).toBe(false);
-  });
-
-  it("accepts only relative entries inside the top folder", () => {
-    expect(isSafeEntry("kokoro/model.onnx", "kokoro")).toBe(true);
-    expect(isSafeEntry("./kokoro/dict/", "kokoro")).toBe(true);
-    for (const name of ["/etc/passwd", "kokoro/../../x", "..\\x", "C:\\x", "other/model.onnx", "\\\\server\\x", "kokoro/a\0b"]) {
-      expect(isSafeEntry(name, "kokoro"), name).toBe(false);
+  it("refuses a package with a file the catalog does not pin, and fetches nothing; a pinned one installs (control)", async () => {
+    const { vad } = sourceFolder();
+    const server = serve(mirrorOf(vad, { "vad.onnx": "silero" }));
+    for (const file of [{ ...vad.files[0]!, url: "http://models.lanaai.io/briefs/speech/vad/v1/vad.onnx" }, { ...vad.files[0]!, sha256: "" }]) {
+      const store = new SpeechModelStore({ directory: join(root, "unpinned"), packages: [{ ...vad, files: [file] }], fetch: server.fetch });
+      await expect(store.install("vad")).rejects.toMatchObject({ code: "unpinned" });
     }
+    expect(server.fetched).toEqual([]);
+    await new SpeechModelStore({ directory: join(root, "models"), packages: [vad], fetch: server.fetch }).install("vad");
+    expect(server.fetched).toHaveLength(1);
   });
 
-  it("downloads from models.lanaai.io, with the official sherpa-onnx release files as the upstream", () => {
+  it("the client's catalog pins every speech file on models.lanaai.io with its size and SHA-256", () => {
+    expect(SPEECH_PACKAGES.map((pkg) => pkg.id).sort()).toEqual(["embedding", "kokoro", "parakeet", "segmentation", "vad"]);
     for (const pkg of SPEECH_PACKAGES) {
-      expect(pkg.url.startsWith("https://github.com/k2-fsa/sherpa-onnx/releases/download/")).toBe(true);
-      for (const file of pkg.files) expect(file.url.startsWith(`https://models.lanaai.io/briefs/speech/${pkg.id}/`)).toBe(true);
+      for (const file of pkg.files) {
+        expect(file.url.startsWith(`https://models.lanaai.io/briefs/speech/${pkg.id}/`)).toBe(true);
+        expect(file.sha256).toMatch(/^[a-f0-9]{64}$/);
+        expect(file.bytes).toBeGreaterThan(0);
+        expect(file.path === pkg.target || file.path.startsWith(`${pkg.target}/`)).toBe(true);
+      }
     }
   });
 });
@@ -279,7 +219,7 @@ describe("SpeechModelStore", () => {
 describe.skipIf(process.env["LANA_RUN_SPEECH_TESTS"] !== "1")("SpeechModelStore with the real models (opt in)", () => {
   it("adopts the unpacked release files", async () => {
     const source = process.env["LANA_SPEECH_MODELS_DIR"] ?? "";
-    const store = new SpeechModelStore({ directory: source, fetch: async () => { throw new Error("no network in this test"); } });
+    const store = new SpeechModelStore({ directory: source, packages: SPEECH_PACKAGES, fetch: async () => { throw new Error("no network in this test"); } });
     for (const pkg of SPEECH_PACKAGES) expect(await store.verify(pkg), pkg.id).toBe(true);
   }, 120_000);
 });

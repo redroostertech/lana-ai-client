@@ -117,6 +117,8 @@ describe('LANA Briefs in the client', () => {
     expect(host.options.engineBase()).toBe('http://127.0.0.1:8079');
     expect(host.options.session().token).toBe(ALICE);
     expect(host.options.transcriptionWorker).toBe('/app/briefs/dist/briefs-transcription-worker.cjs');
+    // One model catalog: Briefs' speech packages come from the client's pinned list.
+    expect(host.options.speechPackages.map((pkg) => pkg.id).sort()).toEqual(['embedding', 'kokoro', 'parakeet', 'segmentation', 'vad']);
     expect(briefs.isRunning()).toBe(true);
     await briefs.sync(without);
     expect(host.stopped).toBe(1);

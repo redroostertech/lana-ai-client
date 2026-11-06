@@ -350,9 +350,11 @@ Decided 2026-11-05:
    - **Done:** there is one session, the client's. Briefs' sign-in, saved session, sign-out and entitlement checker are removed. Briefs reads the client's session through `ClientSession`, which provides the token, the API base and who is signed in.
    - **On a change:** a sign-in or a refreshed token means Briefs reads the session again. Signing out, or another person signing in, ends that person's session, which revokes the phones' background access, before Briefs stops. Turning Briefs off for the firm only stops it.
    - **Done:** the Clio and Microsoft executors, OAuth, the Clio mirror sync, the Connections section and the old action cards are removed. Actions run only on LANA, and LANA's connectors carry them on. The vault now holds only this computer's identity and the store key.
-3. **1d: one model catalog.**
-   - Move the speech packages into `electron-local-models.js`, with the same R2, size and sha256 rules.
-   - Retire `briefsMirror` and `briefsManifest` once nothing reads them.
+3. **1d: one model catalog.** Done.
+   - `electron-local-models.js` is the one list of every model the client downloads. `CATALOG` holds the engine's models. `SPEECH_CATALOG` holds Briefs' five speech packages: the same files on models.lanaai.io, pinned by size and sha256, with their license and notice files.
+   - Briefs' speech store takes its packages from that list (`speechPackages()`) and still downloads them itself, because they are multi-file packages it can resume.
+   - Retired: Briefs' signed model list (`briefsManifest`, `briefsMirror`), the GitHub fallback (it was off) and its archive unpacking.
+   - Follow-up: one download routine for both lists. The engine's `downloadModel` cannot resume today; the Settings work in Phase 2 can bring both onto the speech store's routine.
 4. **1e: the one-time import.**
    - Bring the standalone app's meeting store and pairing keys into the client's data folder.
    - Audit it with ids only, and test it on a copy.

@@ -1,19 +1,17 @@
-import { spawn } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
-import { lstat, mkdir, mkdtemp, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { SILENT_LOG, type HandoffLog } from "../handoff/log.js";
-import { BRIEFS_MANIFEST } from "./briefsManifest.js";
-import { isMirrorUnreachable, isTrustedManifest, manifestPackage, trustedURL, UntrustedManifestError, UPSTREAM_FALLBACK, type BriefsManifest } from "./briefsMirror.js";
 import { downloadFile, fileSha256, type FetchLike } from "./modelDownloader.js";
 
 /**
- * The speech models Talk and meeting transcription use, downloaded once on request from
- * RedRooster's mirror (models.lanaai.io, the sherpa-onnx release files unpacked and checked
- * against the pinned manifest) into the app's models folder: Silero voice detection
- * and Parakeet TDT (the listener), Kokoro multi-lang v1.0 with its lexicon (the LANA voice),
- * and for meetings recorded here the pyannote segmentation 3.0 and TitaNet small speaker
- * models that tell voices apart (LANA transcription, with the listener's two).
+ * The speech models Talk and meeting transcription use, downloaded once on request into the
+ * app's models folder: voice detection and speech to text (the listener), the LANA voice,
+ * and for meetings recorded here the two speaker models that tell voices apart (LANA
+ * transcription, with the listener's two). The packages, their files and their pins come
+ * from the LANA client's model catalog (electron-local-models.js SPEECH_CATALOG): one list
+ * for every model the client downloads, each file on models.lanaai.io with its size and
+ * SHA-256.
  */
 export type SpeechPackageID = "vad" | "parakeet" | "kokoro" | "segmentation" | "embedding";
 
@@ -29,38 +27,10 @@ export interface SpeechModelFile {
 
 export interface SpeechModelPackage {
   readonly id: SpeechPackageID;
-  /** The upstream download (GitHub releases), used only by the fallback. */
-  readonly url: string;
-  /** Size of the upstream download (the file itself, or the archive). */
-  readonly downloadBytes: number;
-  /** Upstream `file`: the download is the model file. `tar.bz2`: an archive with one top-level folder. */
-  readonly format: "file" | "tar.bz2";
-  /** The file name, or the archive's top-level folder, in the models folder. */
+  /** The file, or the folder its files live in, in the models folder. */
   readonly target: string;
   readonly files: readonly SpeechModelFile[];
 }
-
-const SPEECH_IDS: readonly SpeechPackageID[] = ["vad", "parakeet", "kokoro", "segmentation", "embedding"];
-
-/**
- * A speech package from the pinned manifest: its files come one by one from the mirror. The
- * manifest's signature is checked first; when it does not verify, every URL is empty and the
- * store refuses to download.
- */
-export function speechPackage(manifest: BriefsManifest, id: SpeechPackageID): SpeechModelPackage {
-  const entry = manifestPackage(manifest, id);
-  if (entry.kind !== "speech") throw new Error(`briefs_manifest_kind(${id})`);
-  return {
-    id,
-    url: isTrustedManifest(manifest) ? entry.upstream.url : "",
-    downloadBytes: entry.upstream.bytes,
-    format: entry.upstream.format,
-    target: entry.target,
-    files: entry.files.map((file) => ({ path: file.path, bytes: file.bytes, sha256: file.sha256, url: trustedURL(manifest, file.key) })),
-  };
-}
-
-export const SPEECH_PACKAGES: readonly SpeechModelPackage[] = SPEECH_IDS.map((id) => speechPackage(BRIEFS_MANIFEST, id));
 
 /**
  * The listener (voice detection and speech to text), the LANA voice, and LANA transcription
@@ -75,7 +45,7 @@ export const SPEECH_GROUPS = {
 export type SpeechGroup = keyof typeof SPEECH_GROUPS;
 
 export class SpeechModelError extends Error {
-  constructor(readonly code: "unsafe_archive" | "extract_failed" | "incomplete" | "unknown_package") {
+  constructor(readonly code: "incomplete" | "unknown_package" | "unpinned") {
     super(code);
     this.name = "SpeechModelError";
   }
@@ -84,13 +54,10 @@ export class SpeechModelError extends Error {
 export interface SpeechModelStoreOptions {
   /** The models folder (the app passes `userData/Models/speech`). */
   readonly directory: string;
-  readonly packages?: readonly SpeechModelPackage[];
+  /** The client's catalog (`speechPackages()` in electron-local-models.js). */
+  readonly packages: readonly SpeechModelPackage[];
   readonly fetch?: FetchLike;
-  /** The system `tar` (bsdtar on macOS and Windows 10 and later), for the upstream fallback. */
-  readonly tar?: string;
   readonly log?: HandoffLog;
-  /** Fetch the upstream archive when the mirror is unreachable (default `UPSTREAM_FALLBACK`, off). */
-  readonly fallback?: boolean;
 }
 
 export interface InstallOptions {
@@ -114,27 +81,20 @@ interface Flight {
  * downloaded on its own from the mirror into `<file>.part`, which a later attempt resumes.
  * One install per package runs at a time: a second request for a package already on its way
  * (LANA listening and LANA transcription both need Parakeet) waits on the first, and the
- * download stops only when every caller has cancelled. With the fallback on, archives from
- * upstream are listed before they are unpacked, refused if any entry is absolute, climbs
- * out with `..`, leaves the archive's one top-level folder or is a link, unpacked into a
- * staging folder of the attempt's own, checked, and only then moved into place.
+ * download stops only when every caller has cancelled.
  */
 export class SpeechModelStore {
   readonly directory: string;
   private readonly packages: readonly SpeechModelPackage[];
   private readonly fetcher: FetchLike | undefined;
-  private readonly tar: string;
   private readonly log: HandoffLog;
-  private readonly fallback: boolean;
   private readonly flights = new Map<SpeechPackageID, Flight>();
 
   constructor(options: SpeechModelStoreOptions) {
     this.directory = options.directory;
-    this.packages = options.packages ?? SPEECH_PACKAGES;
+    this.packages = options.packages;
     this.fetcher = options.fetch;
-    this.tar = options.tar ?? systemTar();
     this.log = options.log ?? SILENT_LOG;
-    this.fallback = options.fallback ?? UPSTREAM_FALLBACK;
   }
 
   package(id: SpeechPackageID): SpeechModelPackage {
@@ -169,7 +129,7 @@ export class SpeechModelStore {
   hasPartial(id: SpeechPackageID): boolean {
     if (!this.knows(id) || this.isInstalled(id)) return false;
     const pkg = this.package(id);
-    return pkg.files.some((file) => existsSync(join(this.directory, `${file.path}.part`))) || existsSync(join(this.directory, ".downloads", `${id}.tar.bz2.part`));
+    return pkg.files.some((file) => existsSync(join(this.directory, `${file.path}.part`)));
   }
 
   /** Installs every package in `ids` that is missing; progress runs 0 to 1 over their download sizes. */
@@ -237,11 +197,6 @@ export class SpeechModelStore {
     await rm(this.markerPath(id), { force: true });
     await rm(join(this.directory, pkg.target), { recursive: true, force: true });
     await rm(join(this.directory, `${pkg.target}.part`), { force: true });
-    await rm(join(this.directory, ".downloads", `${pkg.id}.tar.bz2.part`), { force: true });
-    await rm(join(this.directory, ".downloads", `${pkg.id}.tar.bz2`), { force: true });
-    for (const name of await readdir(this.directory).catch(() => [] as string[])) {
-      if (name === `.staging-${pkg.id}` || name.startsWith(`.staging-${pkg.id}-`)) await rm(join(this.directory, name), { recursive: true, force: true });
-    }
   }
 
   /** True when every file of the package is in place with its size and SHA-256. */
@@ -313,31 +268,23 @@ export class SpeechModelStore {
     }
     const capped = (fraction: number): void => report(Math.min(fraction, 0.99));
     try {
-      try {
-        await this.fromMirror(pkg, capped, signal);
-      } catch (error) {
-        if (!this.fallback || signal.aborted || !isMirrorUnreachable(error)) throw error;
-        this.log.notice("speech_model.mirror_unreachable", { model: id });
-        await this.fromUpstream(pkg, capped, signal);
-      }
+      await this.download(pkg, capped, signal);
       if (!(await this.verify(pkg, signal))) throw new SpeechModelError("incomplete");
     } catch (error) {
       this.log.error("speech_model.install_failed", { model: id, reason: error instanceof Error ? error.message.slice(0, 40) : "unknown" });
       throw error;
     }
     await writeFile(this.markerPath(id), "");
-    // An archive an earlier version was fetching is not needed any more.
-    await rm(join(this.directory, ".downloads", `${id}.tar.bz2.part`), { force: true });
-    await rm(join(this.directory, ".downloads", `${id}.tar.bz2`), { force: true });
     report(1);
     this.log.info("speech_model.installed", { model: id });
   }
 
-  /** Each file on its own from the mirror, resuming its `.part`, checked for size and SHA-256. */
-  private async fromMirror(pkg: SpeechModelPackage, report: (fraction: number) => void, signal: AbortSignal): Promise<void> {
+  /** Each file on its own from models.lanaai.io, resuming its `.part`, checked for size and SHA-256. */
+  private async download(pkg: SpeechModelPackage, report: (fraction: number) => void, signal: AbortSignal): Promise<void> {
     const total = Math.max(filesBytes(pkg), 1);
     let done = 0;
-    if (pkg.files.some((file) => file.url === "")) throw new UntrustedManifestError();
+    // Only files the catalog pins (an https URL, a size and a SHA-256) are fetched.
+    if (!pkg.files.every(isPinned)) throw new SpeechModelError("unpinned");
     for (const file of pkg.files) {
       const path = join(this.directory, file.path);
       await mkdir(dirname(path), { recursive: true });
@@ -349,80 +296,18 @@ export class SpeechModelStore {
       done += file.bytes;
     }
   }
-
-  /** The fallback: the upstream file or archive, as before the mirror. */
-  private async fromUpstream(pkg: SpeechModelPackage, report: (fraction: number) => void, signal: AbortSignal): Promise<void> {
-    if (pkg.url === "") throw new UntrustedManifestError();
-    const shared = { ...(this.fetcher === undefined ? {} : { fetch: this.fetcher }), signal, progress: report };
-    if (pkg.format === "file") {
-      const file = pkg.files[0]!;
-      await downloadFile({ url: pkg.url, path: join(this.directory, file.path), bytes: file.bytes, sha256: file.sha256 }, shared);
-      return;
-    }
-    const downloads = join(this.directory, ".downloads");
-    await mkdir(downloads, { recursive: true });
-    const archive = join(downloads, `${pkg.id}.tar.bz2`);
-    await downloadFile({ url: pkg.url, path: archive, bytes: pkg.downloadBytes }, shared);
-    await this.unpack(pkg, archive);
-    await rm(archive, { force: true });
-  }
-
-  private async unpack(pkg: SpeechModelPackage, archive: string): Promise<void> {
-    const names = (await run(this.tar, ["-tjf", archive])).split("\n").filter((line) => line.length > 0);
-    const verbose = (await run(this.tar, ["-tvjf", archive])).split("\n").filter((line) => line.length > 0);
-    if (names.length === 0 || !names.every((name) => isSafeEntry(name, pkg.target))) throw new SpeechModelError("unsafe_archive");
-    // Regular files and folders only: no symbolic or hard links, devices or fifos.
-    if (!verbose.every((line) => line.startsWith("-") || line.startsWith("d"))) throw new SpeechModelError("unsafe_archive");
-    // A staging folder of this attempt's own.
-    const staging = await mkdtemp(join(this.directory, `.staging-${pkg.id}-`));
-    try {
-      await run(this.tar, ["-xjf", archive, "-C", staging]);
-      if (await containsLink(staging)) throw new SpeechModelError("unsafe_archive");
-      const destination = join(this.directory, pkg.target);
-      await rm(destination, { recursive: true, force: true });
-      await rename(join(staging, pkg.target), destination);
-    } finally {
-      await rm(staging, { recursive: true, force: true });
-    }
-  }
 }
 
 function filesBytes(pkg: SpeechModelPackage): number {
   return pkg.files.reduce((sum, file) => sum + file.bytes, 0);
 }
 
-/** An archive entry that stays inside `top`: relative, no `..`, no drive letters or backslash roots. */
-export function isSafeEntry(name: string, top: string): boolean {
-  if (name.includes("\0")) return false;
-  if (name.startsWith("/") || name.startsWith("\\") || /^[A-Za-z]:/.test(name)) return false;
-  const parts = name.split(/[\\/]+/).filter((part) => part.length > 0 && part !== ".");
-  if (parts.length === 0 || parts.some((part) => part === "..")) return false;
-  return parts[0] === top;
-}
-
-async function containsLink(folder: string): Promise<boolean> {
-  for (const entry of await readdir(folder, { withFileTypes: true })) {
-    const path = join(folder, entry.name);
-    const info = await lstat(path);
-    if (info.isSymbolicLink()) return true;
-    if (info.isDirectory() && (await containsLink(path))) return true;
+/** A file the catalog pins: an https URL, a size and a SHA-256 (the client's catalog is in its signed code). */
+function isPinned(file: SpeechModelFile): boolean {
+  try {
+    const url = new URL(file.url);
+    return url.protocol === "https:" && /^[a-f0-9]{64}$/.test(file.sha256) && file.bytes > 0;
+  } catch {
+    return false;
   }
-  return false;
-}
-
-function systemTar(): string {
-  if (process.platform === "win32") return join(process.env["SystemRoot"] ?? "C:\\Windows", "System32", "tar.exe");
-  return existsSync("/usr/bin/tar") ? "/usr/bin/tar" : "tar";
-}
-
-/** Runs a program with arguments (no shell) and returns its standard output. */
-function run(command: string, args: readonly string[]): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
-    const out: Buffer[] = [];
-    child.stdout.on("data", (chunk: Buffer) => out.push(chunk));
-    child.stderr.resume();
-    child.on("error", () => reject(new SpeechModelError("extract_failed")));
-    child.on("close", (code) => (code === 0 ? resolve(Buffer.concat(out).toString("utf8")) : reject(new SpeechModelError("extract_failed"))));
-  });
 }

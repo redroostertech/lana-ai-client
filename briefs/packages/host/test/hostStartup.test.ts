@@ -64,6 +64,7 @@ function start(electron: ReturnType<typeof electronFakes>) {
     isTrustedURL: () => true,
     engineBase: () => null,
     session: () => null,
+    speechPackages: [],
     transcriptionWorker: join(folder, "worker.cjs"),
     bleHelper: null,
     showWindow: () => undefined,
