@@ -23,7 +23,7 @@
  */
 import { execFile } from "node:child_process";
 import { createRequire } from "node:module";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { app, safeStorage } from "electron";
@@ -70,8 +70,11 @@ async function main(): Promise<number> {
 
   // Read only: the client's sign-in from a temporary copy of its settings file. The client's
   // own settings and token modules delete what they cannot read, so they are never loaded here.
-  const Store = (load("electron-store") as { default?: unknown }).default ?? load("electron-store");
-  const token = readClientToken({ userData: clientUserData, Store: Store as ClientTokenDeps["Store"], decrypt: (ciphertext) => safeStorage.decryptString(ciphertext) });
+  const Conf = load("conf") as ClientTokenDeps["Conf"];
+  let failure = "";
+  const token = readClientToken({ userData: clientUserData, Conf, decrypt: (ciphertext) => safeStorage.decryptString(ciphertext) }, (reason) => {
+    failure = reason;
+  });
   const { personOf, personKey } = load("./electron-briefs.js") as {
     personOf(token: string | null): { id: string; email: string } | null;
     personKey(token: string | null): string | null;
@@ -79,7 +82,7 @@ async function main(): Promise<number> {
   const person = personOf(token);
   const key = personKey(token);
   if (person === null || key === null) {
-    process.stdout.write("Could not read your LANA sign-in. Open LANA, sign in, quit it, then run this again.\n");
+    process.stdout.write(`Could not read your LANA sign-in (${failure || "noPerson"}). Open LANA, sign in, quit it, then run this again.\n`);
     return 1;
   }
 
@@ -99,13 +102,25 @@ async function main(): Promise<number> {
     dryRun: args.dryRun,
   });
   if (outcome === "imported") {
-    // The audit log of the store that just arrived records the import (no ids, no names).
-    const store = await GatewayStore.open({ directory: join(target, "Lana"), keys: createSealedFileKeyVault({ directory: join(target, "keys"), sealer }) });
+    // Proof the moved key works: every meeting is decrypted and the paired phones are read
+    // with the re-sealed key. On any failure the folder this run made is removed (nothing
+    // else is touched) and the import reports failed. Then the store's audit log records the
+    // import (no ids, no names). Only counts are printed.
+    let counts: { meetings: number; phones: number };
     try {
-      await store.appendAudit(AUDIT_EVENTS.storeImported, "standalone");
-    } finally {
-      store.close();
+      const store = await GatewayStore.open({ directory: join(target, "Lana"), keys: createSealedFileKeyVault({ directory: join(target, "keys"), sealer }) });
+      try {
+        counts = { meetings: store.meetings.list().length, phones: (await store.pairedDevices()).length };
+        await store.appendAudit(AUDIT_EVENTS.storeImported, "standalone");
+      } finally {
+        store.close();
+      }
+    } catch {
+      rmSync(target, { recursive: true, force: true });
+      process.stdout.write(`${MESSAGES.failed}\n`);
+      return 1;
     }
+    process.stdout.write(`Checked: ${counts.meetings} meetings opened with the moved key, ${counts.phones} paired phones.\n`);
   }
   process.stdout.write(`${MESSAGES[outcome]}\n`);
   return outcome === "imported" || outcome === "ready" || outcome === "notFound" || outcome === "targetExists" || outcome === "unsupported" ? 0 : 1;

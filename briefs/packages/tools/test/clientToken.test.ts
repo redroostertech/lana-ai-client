@@ -18,8 +18,8 @@ const digest = () => createHash("sha256").update(readFileSync(original())).diges
 /** electron-store stand-in: reads `<cwd>/<name>.json`, and like a careless store, wipes it when it cannot parse it. */
 class FakeStore {
   private readonly data: Record<string, unknown>;
-  constructor(options: { name: string; cwd: string }) {
-    const path = join(options.cwd, `${options.name}.json`);
+  constructor(options: { configName: string; cwd: string }) {
+    const path = join(options.cwd, `${options.configName}.json`);
     try {
       this.data = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
     } catch (error) {
@@ -34,7 +34,7 @@ class FakeStore {
 
 const deps = (change: Partial<ClientTokenDeps> = {}): ClientTokenDeps => ({
   userData,
-  Store: FakeStore,
+  Conf: FakeStore,
   decrypt: (ciphertext) => ciphertext.toString("utf8").replace(/^sealed:/, ""),
   tempRoot,
   ...change,

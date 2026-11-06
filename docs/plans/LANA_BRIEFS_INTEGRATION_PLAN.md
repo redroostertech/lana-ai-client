@@ -366,7 +366,9 @@ Decided 2026-11-05:
    - **Re-sealing:** the old key files are opened with the standalone app's keychain entry (macOS asks to allow it) and sealed again with the client's own entry.
    - **Safety:** it refuses while the old app is running. It moves only the person the old app was signed in as. It never overwrites, never changes the old folder, and stages before moving into place in one step. A dry run checks everything and writes nothing.
    - **Platform:** the app's own secure storage is the client's Electron safeStorage on every platform (Keychain, DPAPI, libsecret). Only reading another app's entry is macOS only, and the standalone app only ever ran there.
-   - **Not verified yet:** opening a file sealed by the real standalone app. This is the first step of 1f: a dry run, then a run against a copy (`--source`, `--user-data`), then the real import, with Michael allowing the prompt.
+   - **Ran on 2026-11-05:** a dry run, then a copy (APFS clone), then the real import. All three succeeded: 2 meetings were decrypted with the moved key and 1 paired phone carried over. The data is in `Lana AI/briefs/people/<key>`, and the client's settings file was unchanged throughout (same sha256).
+   - **Incident on the first dry run:** loading the client's `electron-storage.js` deleted `server-config.json`, because its module load deletes the file when it cannot read it. There was no backup. Michael signed in again. The tool now reads a copy with `conf` and never loads the client's settings or token modules.
+   - **From now on:** do not open the standalone Briefs app again. It would advertise the same computer identity as the client.
 5. **1f: verification.**
    - A paired phone syncs with the client.
    - A test recording is transcribed and its notes are written through the runtime, on the 9B model and, once its routing lands, on Forge.
