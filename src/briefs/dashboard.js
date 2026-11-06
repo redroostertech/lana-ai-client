@@ -1,13 +1,13 @@
 /**
- * LANA Briefs Home: the dashboard Briefs opens on. A banner (New meeting, the
+ * LANA Briefs Dashboard: the dashboard Briefs opens on. A banner (New meeting, the
  * walkthrough), a live recording strip, the last seven days, actions waiting for the
  * person, recent meetings, and the phone's status. Data comes from window.lanaBriefs;
- * the rules are in src/js/briefs/briefs-home.js. Nothing here logs titles or names.
+ * the rules are in src/js/briefs/briefs-dashboard.js. Nothing here logs titles or names.
  */
 (function () {
   'use strict';
 
-  const H = window.BriefsHome;
+  const H = window.BriefsDashboard;
   const M = window.BriefsMeeting;
   const R = window.BriefsRecording;
   const Phones = window.BriefsPhonesUI;
@@ -100,24 +100,24 @@
 
   function renderAttention(items) {
     if (items.length === 0) {
-      els.attention.innerHTML = `<li class="briefs-home-empty">${icon('check')}<span>Nothing is waiting. Actions LANA drafts from your meetings appear here for you to confirm.</span></li>`;
+      els.attention.innerHTML = `<li class="briefs-dashboard-empty">${icon('check')}<span>Nothing is waiting. Actions LANA drafts from your meetings appear here for you to confirm.</span></li>`;
       return;
     }
     els.attention.innerHTML = items.map((item, index) => `<li class="lex-entrance lex-entrance-step-${Math.min(index + 1, 5)}">
-        <button type="button" class="briefs-home-row" data-meeting="${escape(item.meetingID)}">
-          <span class="briefs-home-row-icon is-${item.tone}" aria-hidden="true">${icon(item.kind === 'email' ? 'mail' : item.kind === 'task' ? 'list-checks' : 'file-text')}</span>
-          <span class="briefs-home-row-text">
-            <span class="briefs-home-row-title">${escape(item.title)}</span>
-            <span class="briefs-home-row-detail">${escape(item.kindText)} for ${escape(item.destination)}. From ${escape(item.meetingTitle || 'a meeting')}.</span>
+        <button type="button" class="briefs-dashboard-row" data-meeting="${escape(item.meetingID)}">
+          <span class="briefs-dashboard-row-icon is-${item.tone}" aria-hidden="true">${icon(item.kind === 'email' ? 'mail' : item.kind === 'task' ? 'list-checks' : 'file-text')}</span>
+          <span class="briefs-dashboard-row-text">
+            <span class="briefs-dashboard-row-title">${escape(item.title)}</span>
+            <span class="briefs-dashboard-row-detail">${escape(item.kindText)} for ${escape(item.destination)}. From ${escape(item.meetingTitle || 'a meeting')}.</span>
           </span>
-          <span class="briefs-home-pill is-${item.tone}">${escape(item.statusText)}</span>
+          <span class="briefs-dashboard-pill is-${item.tone}">${escape(item.statusText)}</span>
         </button>
       </li>`).join('');
   }
 
   function renderRecent(items, total) {
     if (total === 0) {
-      els.recent.innerHTML = `<li class="briefs-home-empty is-large">
+      els.recent.innerHTML = `<li class="briefs-dashboard-empty is-large">
           <lex-brand-mark animation="idle" size="96"></lex-brand-mark>
           <span>No meetings yet. Record one here with New meeting, or send one from LANA Briefs on your phone.</span>
         </li>`;
@@ -129,14 +129,14 @@
       const open = Number(meeting.openIntents) || 0;
       const facts = [M.duration(meeting.durationSeconds), M.attestationText(meeting.attestationMethod)].filter(Boolean).join('. ');
       return `<li class="lex-entrance lex-entrance-step-${Math.min(index + 1, 5)}">
-          <button type="button" class="briefs-home-row" data-meeting="${escape(meeting.id)}">
-            <span class="briefs-home-row-icon" aria-hidden="true">${icon('file-text')}</span>
-            <span class="briefs-home-row-text">
-              <span class="briefs-home-row-title">${escape(meeting.title || 'Untitled meeting')}</span>
-              <span class="briefs-home-row-detail">${escape(H.whenText(meeting.startedAt, now))}. ${escape(facts)}.</span>
+          <button type="button" class="briefs-dashboard-row" data-meeting="${escape(meeting.id)}">
+            <span class="briefs-dashboard-row-icon" aria-hidden="true">${icon('file-text')}</span>
+            <span class="briefs-dashboard-row-text">
+              <span class="briefs-dashboard-row-title">${escape(meeting.title || 'Untitled meeting')}</span>
+              <span class="briefs-dashboard-row-detail">${escape(H.whenText(meeting.startedAt, now))}. ${escape(facts)}.</span>
             </span>
-            ${open > 0 ? `<span class="briefs-home-pill">${open} open</span>` : ''}
-            ${unread > 0 ? `<span class="briefs-home-count" aria-label="${unread} unread actions">${unread}</span>` : ''}
+            ${open > 0 ? `<span class="briefs-dashboard-pill">${open} open</span>` : ''}
+            ${unread > 0 ? `<span class="briefs-dashboard-count" aria-label="${unread} unread actions">${unread}</span>` : ''}
           </button>
         </li>`;
     }).join('');
@@ -147,10 +147,10 @@
     if (!onPage()) return;
     const rows = card.rows.map((row) => `<dt>${escape(row.label)}</dt><dd>${escape(row.value)}</dd>`).join('');
     els.phoneBody.innerHTML = `
-      <p class="briefs-home-phone-status is-${card.tone}"><span class="briefs-home-phone-icon">${icon(card.icon)}</span>${escape(card.label)}</p>
-      <p class="briefs-home-phone-summary">${escape(card.summary)}</p>
-      ${rows ? `<dl class="briefs-home-phone-rows">${rows}</dl>` : ''}
-      ${card.action ? `<lex-btn variant="${card.action === 'Pair a phone' ? 'primary' : 'secondary'}" size="sm" leading-icon="smartphone" data-home="phones">${escape(card.action)}</lex-btn>` : ''}`;
+      <p class="briefs-dashboard-phone-status is-${card.tone}"><span class="briefs-dashboard-phone-icon">${icon(card.icon)}</span>${escape(card.label)}</p>
+      <p class="briefs-dashboard-phone-summary">${escape(card.summary)}</p>
+      ${rows ? `<dl class="briefs-dashboard-phone-rows">${rows}</dl>` : ''}
+      ${card.action ? `<lex-btn variant="${card.action === 'Pair a phone' ? 'primary' : 'secondary'}" size="sm" leading-icon="smartphone" data-dashboard="phones">${escape(card.action)}</lex-btn>` : ''}`;
     els.banner.setAttribute('status', card.tone === 'good' ? 'connected' : 'warning');
   }
 
@@ -163,9 +163,9 @@
       go(`briefs/index.html?meeting=${encodeURIComponent(meeting.dataset.meeting)}`);
       return;
     }
-    const action = target.closest('[data-home]');
+    const action = target.closest('[data-dashboard]');
     if (!action) return;
-    const what = action.dataset.home;
+    const what = action.dataset.dashboard;
     if (what === 'new' || what === 'live') {
       event.preventDefault();
       go('briefs/index.html?new=1');
@@ -184,28 +184,28 @@
   }
 
   function init() {
-    els.body = document.querySelector('.briefs-home-body');
+    els.body = document.querySelector('.briefs-dashboard-body');
     if (!els.body) return;
     els.unavailable = byId('briefs-unavailable');
-    els.banner = byId('briefs-home-banner');
-    els.live = byId('briefs-home-live');
-    els.liveTitle = byId('briefs-home-live-title');
-    els.liveDetail = byId('briefs-home-live-detail');
-    els.metricMeetings = byId('briefs-home-metric-meetings');
-    els.metricRecorded = byId('briefs-home-metric-recorded');
-    els.metricWaiting = byId('briefs-home-metric-waiting');
-    els.metricOpen = byId('briefs-home-metric-open');
-    els.attention = byId('briefs-home-attention');
-    els.recent = byId('briefs-home-recent');
-    els.phoneBody = byId('briefs-home-phone-body');
-    document.querySelector('.briefs-home').addEventListener('click', onClick);
+    els.banner = byId('briefs-dashboard-banner');
+    els.live = byId('briefs-dashboard-live');
+    els.liveTitle = byId('briefs-dashboard-live-title');
+    els.liveDetail = byId('briefs-dashboard-live-detail');
+    els.metricMeetings = byId('briefs-dashboard-metric-meetings');
+    els.metricRecorded = byId('briefs-dashboard-metric-recorded');
+    els.metricWaiting = byId('briefs-dashboard-metric-waiting');
+    els.metricOpen = byId('briefs-dashboard-metric-open');
+    els.attention = byId('briefs-dashboard-attention');
+    els.recent = byId('briefs-dashboard-recent');
+    els.phoneBody = byId('briefs-dashboard-phone-body');
+    document.querySelector('.briefs-dashboard').addEventListener('click', onClick);
     if (unsubscribe) unsubscribe();
     unsubscribe = Phones.subscribe(renderPhone);
     if (!globalsBound) {
       globalsBound = true;
       const api = bridge();
       if (api && typeof api.onEvent === 'function') api.onEvent(onBriefsEvent);
-      // The shell's Refresh reloads Home in place.
+      // The shell's Refresh reloads the Dashboard in place.
       document.addEventListener('lex-refresh', (event) => {
         if (!onPage()) return;
         event.preventDefault();
@@ -213,12 +213,12 @@
         Phones.refresh();
       });
     }
-    Phones.attach(document.querySelector('.briefs-home'));
+    Phones.attach(document.querySelector('.briefs-dashboard'));
     load();
   }
 
   if (window.LexRouter && typeof window.LexRouter.registerPageInit === 'function') {
-    window.LexRouter.registerPageInit('briefs/home.html', init);
+    window.LexRouter.registerPageInit('briefs/dashboard.html', init);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();

@@ -10,60 +10,60 @@
   <link rel="stylesheet" href="../css/lex-chat.css">
   <link rel="stylesheet" href="../css/lex-motion.css">
   <link rel="stylesheet" href="./styles.css">
-  <link rel="stylesheet" href="./home.css">
+  <link rel="stylesheet" href="./dashboard.css">
 </head>
 <body>
   <lex-app
     id="briefs-shell"
     logo-src="../img/logo-light.png"
     logo-alt="LANA AI"
-    logo-href="./home.html"
-    active-nav-id="briefs-home"
+    logo-href="./dashboard.html"
+    active-nav-id="briefs-dashboard"
     page-title="LANA Briefs"
   ></lex-app>
 
   <template id="page-content">
-    <div class="briefs-scroll briefs-home">
-      <section class="briefs-home-body" aria-live="polite">
-        <lex-banner id="briefs-home-banner" class="lex-entrance" variant="light" heading="LANA Briefs" subtitle="Your meetings, kept close." status="none">
-          <lex-btn variant="primary" leading-icon="plus" data-home="new">New meeting</lex-btn>
-          <lex-btn variant="secondary" leading-icon="play" data-home="walkthrough">Take the walkthrough</lex-btn>
+    <div class="briefs-scroll briefs-dashboard">
+      <section class="briefs-dashboard-body" aria-live="polite">
+        <lex-banner id="briefs-dashboard-banner" class="lex-entrance" variant="light" heading="LANA Briefs" subtitle="Your meetings, kept close." status="none">
+          <lex-btn variant="primary" leading-icon="plus" data-dashboard="new">New meeting</lex-btn>
+          <lex-btn variant="secondary" leading-icon="play" data-dashboard="walkthrough">Take the walkthrough</lex-btn>
         </lex-banner>
 
-        <a id="briefs-home-live" class="briefs-home-live lex-rise hidden" href="./index.html?new=1" data-home="live">
-          <span class="briefs-home-live-pulse" aria-hidden="true"></span>
-          <span class="briefs-home-live-text"><span id="briefs-home-live-title" class="briefs-home-live-title"></span><span id="briefs-home-live-detail" class="briefs-home-live-detail"></span></span>
-          <span class="briefs-home-live-open">Open</span>
+        <a id="briefs-dashboard-live" class="briefs-dashboard-live lex-rise hidden" href="./index.html?new=1" data-dashboard="live">
+          <span class="briefs-dashboard-live-pulse" aria-hidden="true"></span>
+          <span class="briefs-dashboard-live-text"><span id="briefs-dashboard-live-title" class="briefs-dashboard-live-title"></span><span id="briefs-dashboard-live-detail" class="briefs-dashboard-live-detail"></span></span>
+          <span class="briefs-dashboard-live-open">Open</span>
         </a>
 
-        <section class="briefs-home-metrics lex-entrance lex-entrance-step-1" aria-label="The last seven days">
-          <lex-metric id="briefs-home-metric-meetings" label="Meetings, last 7 days" value="0" status="green"></lex-metric>
-          <lex-metric id="briefs-home-metric-recorded" label="Recorded, last 7 days" value="0 min" status="blue"></lex-metric>
-          <lex-metric id="briefs-home-metric-waiting" label="Actions waiting" value="0" status="gray"></lex-metric>
-          <lex-metric id="briefs-home-metric-open" label="Meetings with open items" value="0" status="gray"></lex-metric>
+        <section class="briefs-dashboard-metrics lex-entrance lex-entrance-step-1" aria-label="The last seven days">
+          <lex-metric id="briefs-dashboard-metric-meetings" label="Meetings, last 7 days" value="0" status="green"></lex-metric>
+          <lex-metric id="briefs-dashboard-metric-recorded" label="Recorded, last 7 days" value="0 min" status="blue"></lex-metric>
+          <lex-metric id="briefs-dashboard-metric-waiting" label="Actions waiting" value="0" status="gray"></lex-metric>
+          <lex-metric id="briefs-dashboard-metric-open" label="Meetings with open items" value="0" status="gray"></lex-metric>
         </section>
 
-        <div class="briefs-home-grid">
-          <div class="briefs-home-main">
-            <section class="briefs-home-panel lex-entrance lex-entrance-step-2" aria-labelledby="briefs-home-attention-title">
-              <header class="briefs-home-panel-head">
-                <h2 id="briefs-home-attention-title" class="briefs-overline">Needs your attention</h2>
+        <div class="briefs-dashboard-grid">
+          <div class="briefs-dashboard-main">
+            <section class="briefs-dashboard-panel lex-entrance lex-entrance-step-2" aria-labelledby="briefs-dashboard-attention-title">
+              <header class="briefs-dashboard-panel-head">
+                <h2 id="briefs-dashboard-attention-title" class="briefs-overline">Needs your attention</h2>
               </header>
-              <ul id="briefs-home-attention" class="briefs-home-list"></ul>
+              <ul id="briefs-dashboard-attention" class="briefs-dashboard-list"></ul>
             </section>
-            <section class="briefs-home-panel lex-entrance lex-entrance-step-3" aria-labelledby="briefs-home-recent-title">
-              <header class="briefs-home-panel-head">
-                <h2 id="briefs-home-recent-title" class="briefs-overline">Recent meetings</h2>
+            <section class="briefs-dashboard-panel lex-entrance lex-entrance-step-3" aria-labelledby="briefs-dashboard-recent-title">
+              <header class="briefs-dashboard-panel-head">
+                <h2 id="briefs-dashboard-recent-title" class="briefs-overline">Recent meetings</h2>
               </header>
-              <ul id="briefs-home-recent" class="briefs-home-list"></ul>
+              <ul id="briefs-dashboard-recent" class="briefs-dashboard-list"></ul>
             </section>
           </div>
-          <aside class="briefs-home-side">
-            <section id="briefs-home-phone" class="briefs-home-panel briefs-home-phone lex-entrance lex-entrance-step-3" aria-labelledby="briefs-home-phone-title">
-              <header class="briefs-home-panel-head">
-                <h2 id="briefs-home-phone-title" class="briefs-overline">Your phone</h2>
+          <aside class="briefs-dashboard-side">
+            <section id="briefs-dashboard-phone" class="briefs-dashboard-panel briefs-dashboard-phone lex-entrance lex-entrance-step-3" aria-labelledby="briefs-dashboard-phone-title">
+              <header class="briefs-dashboard-panel-head">
+                <h2 id="briefs-dashboard-phone-title" class="briefs-overline">Your phone</h2>
               </header>
-              <div id="briefs-home-phone-body"></div>
+              <div id="briefs-dashboard-phone-body"></div>
             </section>
           </aside>
         </div>
@@ -138,7 +138,7 @@
   <script src="../js/briefs/briefs-walkthrough.js"></script>
   <script src="../js/briefs/briefs-phones-ui.js"></script>
   <script src="../js/vendor/qrcode.min.js"></script>
-  <script src="../js/briefs/briefs-home.js"></script>
-  <script src="./home.js"></script>
+  <script src="../js/briefs/briefs-dashboard.js"></script>
+  <script src="./dashboard.js"></script>
 </body>
 </html>

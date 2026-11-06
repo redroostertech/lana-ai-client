@@ -14,7 +14,7 @@
   const S = M.selection;
   const R = window.BriefsRecording;
   const B = window.BriefsShare;
-  /** The top bar's phone status, Phones and the walkthrough (shared with the Home page). */
+  /** The top bar's phone status, Phones and the walkthrough (shared with the Dashboard). */
   const Phones = window.BriefsPhonesUI;
   /** How copy names this device (platform neutral). */
   const DEVICE_NOUN = 'computer';
@@ -1241,7 +1241,7 @@
 
   /** Shows New meeting in the content area (the sidebar's New meeting button). */
   function showNew() {
-    // Called by the sidebar's New meeting from another Briefs page (Home): open this page on it.
+    // Called by the sidebar's New meeting from another Briefs page (Dashboard): open this page on it.
     if (!onPage()) {
       if (window.Lex && Lex.Nav && typeof Lex.Nav.go === 'function') Lex.Nav.go('briefs/index.html?new=1');
       else window.location.href = './index.html?new=1';

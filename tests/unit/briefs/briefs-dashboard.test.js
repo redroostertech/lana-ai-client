@@ -1,7 +1,7 @@
 'use strict';
 
-/** LANA Briefs Home rules (src/js/briefs/briefs-home.js). */
-const H = require('../../../src/js/briefs/briefs-home');
+/** LANA Briefs Dashboard rules (src/js/briefs/briefs-dashboard.js). */
+const H = require('../../../src/js/briefs/briefs-dashboard');
 
 const NOW = Date.parse('2026-11-06T15:00:00');
 const meeting = (id, iso, minutes, openIntents = 0) => ({ id, title: id, startedAt: new Date(iso).toISOString(), durationSeconds: minutes * 60, openIntents, unreadActions: 0, attestationMethod: 'acoustic' });
@@ -13,7 +13,7 @@ const meetings = [
 const action = (id, status, kind = 'note') => ({ id, meetingID: 'a', meetingTitle: 'a', kind, title: id, destination: 'Clio', status });
 const actions = [action('r', 'ready'), action('x', 'executed'), action('f', 'failed', 'email'), action('n', 'needsChoice', 'task')];
 
-describe('Briefs Home', () => {
+describe('Briefs Dashboard', () => {
   test('the week: meetings and minutes in the last seven days, waiting actions, meetings with open items', () => {
     expect(H.weekStats(meetings, actions, NOW)).toEqual({ meetings: 2, minutes: 75, waiting: 3, openItems: 2 });
     expect(H.weekStats(null, null, NOW)).toEqual({ meetings: 0, minutes: 0, waiting: 0, openItems: 0 });

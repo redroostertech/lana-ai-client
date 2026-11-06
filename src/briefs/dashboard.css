@@ -1,7 +1,7 @@
-/* LANA Briefs Home: the dashboard (src/briefs/home.html). Uses the Briefs tokens in
+/* LANA Briefs Dashboard: the dashboard (src/briefs/dashboard.html). Uses the Briefs tokens in
    styles.css and the shared motion classes in css/lex-motion.css. */
 
-.briefs-home-body {
+.briefs-dashboard-body {
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -11,7 +11,7 @@
 }
 
 /* A recording under way: opens it. */
-.briefs-home-live {
+.briefs-dashboard-live {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -23,76 +23,76 @@
   text-decoration: none;
 }
 
-.briefs-home-live.is-writing {
+.briefs-dashboard-live.is-writing {
   border-color: var(--briefs-pick-edge);
 }
 
-.briefs-home-live-pulse {
+.briefs-dashboard-live-pulse {
   flex: none;
   width: 10px;
   height: 10px;
   border-radius: 50%;
   background: var(--lex-status-danger, #c2410c);
-  animation: briefs-home-pulse 1.6s ease-in-out infinite;
+  animation: briefs-dashboard-pulse 1.6s ease-in-out infinite;
 }
 
-.briefs-home-live.is-writing .briefs-home-live-pulse {
+.briefs-dashboard-live.is-writing .briefs-dashboard-live-pulse {
   background: var(--bt-accent);
 }
 
-@keyframes briefs-home-pulse {
+@keyframes briefs-dashboard-pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.45; transform: scale(0.8); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .briefs-home-live-pulse { animation: none; }
+  .briefs-dashboard-live-pulse { animation: none; }
 }
 
-.briefs-home-live-text {
+.briefs-dashboard-live-text {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
 }
 
-.briefs-home-live-title {
+.briefs-dashboard-live-title {
   font-weight: 600;
 }
 
-.briefs-home-live-detail {
+.briefs-dashboard-live-detail {
   color: var(--briefs-muted);
   font-size: 13px;
 }
 
-.briefs-home-live-open {
+.briefs-dashboard-live-open {
   color: var(--bt-accent);
   font-size: 14px;
   font-weight: 600;
 }
 
-.briefs-home-metrics {
+.briefs-dashboard-metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
 
-.briefs-home-grid {
+.briefs-dashboard-grid {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
   gap: 20px;
   align-items: start;
 }
 
-.briefs-home-main,
-.briefs-home-side {
+.briefs-dashboard-main,
+.briefs-dashboard-side {
   display: flex;
   flex-direction: column;
   gap: 20px;
   min-width: 0;
 }
 
-.briefs-home-panel {
+.briefs-dashboard-panel {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -102,21 +102,21 @@
   background: var(--briefs-surface);
 }
 
-.briefs-home-panel-head .briefs-overline {
+.briefs-dashboard-panel-head .briefs-overline {
   margin: 0;
 }
 
-.briefs-home-list {
+.briefs-dashboard-list {
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.briefs-home-list > li + li {
+.briefs-dashboard-list > li + li {
   border-top: 1px solid var(--briefs-line);
 }
 
-.briefs-home-row {
+.briefs-dashboard-row {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -132,16 +132,16 @@
   transition: background-color 150ms ease-out;
 }
 
-.briefs-home-row:hover {
+.briefs-dashboard-row:hover {
   background: var(--briefs-soft);
 }
 
-.briefs-home-row:focus-visible {
+.briefs-dashboard-row:focus-visible {
   outline: 2px solid var(--lex-border-focus);
   outline-offset: 1px;
 }
 
-.briefs-home-row-icon {
+.briefs-dashboard-row-icon {
   flex: none;
   display: grid;
   place-items: center;
@@ -152,28 +152,28 @@
   color: var(--briefs-ink);
 }
 
-.briefs-home-row-icon.is-good {
+.briefs-dashboard-row-icon.is-good {
   color: var(--bt-accent);
 }
 
-.briefs-home-row-icon.is-warning {
+.briefs-dashboard-row-icon.is-warning {
   color: var(--lex-status-warning-text);
   background: var(--lex-status-warning-bg);
 }
 
-.briefs-home-row-icon.is-danger {
+.briefs-dashboard-row-icon.is-danger {
   color: var(--lex-status-danger-text);
   background: var(--lex-status-danger-bg);
 }
 
-.briefs-home-row-text {
+.briefs-dashboard-row-text {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
 }
 
-.briefs-home-row-title {
+.briefs-dashboard-row-title {
   overflow: hidden;
   color: var(--briefs-ink);
   font-size: 14px;
@@ -182,7 +182,7 @@
   white-space: nowrap;
 }
 
-.briefs-home-row-detail {
+.briefs-dashboard-row-detail {
   overflow: hidden;
   color: var(--briefs-muted);
   font-size: 13px;
@@ -190,7 +190,7 @@
   white-space: nowrap;
 }
 
-.briefs-home-pill {
+.briefs-dashboard-pill {
   flex: none;
   padding: 2px 8px;
   border-radius: 9999px;
@@ -200,24 +200,24 @@
   box-shadow: inset 0 0 0 1px var(--briefs-line);
 }
 
-.briefs-home-pill.is-good {
+.briefs-dashboard-pill.is-good {
   color: var(--bt-accent);
   box-shadow: inset 0 0 0 1px var(--bt-accent);
 }
 
-.briefs-home-pill.is-warning {
+.briefs-dashboard-pill.is-warning {
   color: var(--lex-status-warning-text);
   background: var(--lex-status-warning-bg);
   box-shadow: none;
 }
 
-.briefs-home-pill.is-danger {
+.briefs-dashboard-pill.is-danger {
   color: var(--lex-status-danger-text);
   background: var(--lex-status-danger-bg);
   box-shadow: none;
 }
 
-.briefs-home-count {
+.briefs-dashboard-count {
   flex: none;
   min-width: 20px;
   height: 20px;
@@ -231,7 +231,7 @@
   text-align: center;
 }
 
-.briefs-home-empty {
+.briefs-dashboard-empty {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -240,18 +240,18 @@
   font-size: 14px;
 }
 
-.briefs-home-empty svg {
+.briefs-dashboard-empty svg {
   flex: none;
   color: var(--bt-accent);
 }
 
-.briefs-home-empty.is-large {
+.briefs-dashboard-empty.is-large {
   flex-direction: column;
   padding: 24px;
   text-align: center;
 }
 
-.briefs-home-phone-status {
+.briefs-dashboard-phone-status {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -260,24 +260,24 @@
   font-weight: 600;
 }
 
-.briefs-home-phone-icon {
+.briefs-dashboard-phone-icon {
   display: grid;
   place-items: center;
   color: var(--bt-accent);
 }
 
-.briefs-home-phone-status.is-warning .briefs-home-phone-icon {
+.briefs-dashboard-phone-status.is-warning .briefs-dashboard-phone-icon {
   color: var(--lex-status-warning);
 }
 
-.briefs-home-phone-summary {
+.briefs-dashboard-phone-summary {
   margin: 0;
   color: var(--briefs-muted);
   font-size: 13px;
   line-height: 1.45;
 }
 
-.briefs-home-phone-rows {
+.briefs-dashboard-phone-rows {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 6px 12px;
@@ -287,37 +287,37 @@
   font-size: 13px;
 }
 
-.briefs-home-phone-rows dt {
+.briefs-dashboard-phone-rows dt {
   color: var(--briefs-muted);
 }
 
-.briefs-home-phone-rows dd {
+.briefs-dashboard-phone-rows dd {
   margin: 0;
   color: var(--briefs-ink);
   white-space: pre-line;
   overflow-wrap: anywhere;
 }
 
-.briefs-home-phone lex-btn {
+.briefs-dashboard-phone lex-btn {
   align-self: flex-start;
 }
 
 @media (max-width: 960px) {
-  .briefs-home-metrics {
+  .briefs-dashboard-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .briefs-home-grid {
+  .briefs-dashboard-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 
 @media (max-width: 560px) {
-  .briefs-home-body {
+  .briefs-dashboard-body {
     padding: 16px;
   }
 
-  .briefs-home-metrics {
+  .briefs-dashboard-metrics {
     grid-template-columns: minmax(0, 1fr);
   }
 }

@@ -1,7 +1,7 @@
 /**
- * LANA Briefs Home: what the dashboard shows, from the meetings list (meetings.list) and
+ * LANA Briefs Dashboard: what the dashboard shows, from the meetings list (meetings.list) and
  * the proposed actions (inbox.list). Plain functions; no DOM. The page
- * (src/briefs/home.js) renders with them; tests/unit/briefs/briefs-home.test.js covers it.
+ * (src/briefs/dashboard.js) renders with them; tests/unit/briefs/briefs-dashboard.test.js covers it.
  */
 (function (global) {
   'use strict';
@@ -94,6 +94,6 @@
   }
 
   const api = { weekStats, recordedText, recentMeetings, attention, bannerSubtitle, whenText };
-  global.BriefsHome = api;
+  global.BriefsDashboard = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

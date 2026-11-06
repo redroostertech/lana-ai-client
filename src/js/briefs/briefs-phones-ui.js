@@ -1,6 +1,6 @@
 /**
- * LANA Briefs pages' shared phone and first-run pieces, used by the Home page
- * (src/briefs/home.js) and the meeting page (src/briefs/app.js):
+ * LANA Briefs pages' shared phone and first-run pieces, used by the Dashboard
+ * (src/briefs/dashboard.js) and the meeting page (src/briefs/app.js):
  * - the top bar's phone status icon and its hover card (lex-topbar statusIcon and friends);
  * - Phones: paired phones, pairing (QR code, then the six digits confirmed on both
  *   screens) and removing a phone, in a lex-modal this module adds to the page;
@@ -62,7 +62,7 @@
     listeners.forEach((listener) => listener(card()));
   }
 
-  /** The status card as briefs-status.js shapes it, for the top bar and the Home page. */
+  /** The status card as briefs-status.js shapes it, for the top bar and the Dashboard. */
   function card() {
     return P.statusCard(phone.gateway, phone.preferences, phone.phones || []);
   }
@@ -297,7 +297,7 @@
     if (!seen && onPage()) showWalkthrough(userID);
   }
 
-  /** Shows the walkthrough now (the Home page's button). */
+  /** Shows the walkthrough now (the Dashboard's button). */
   async function showWalkthrough(knownUserID) {
     if (!W || document.querySelector('lex-walkthrough')) return;
     const userID = knownUserID || await signedInUserID();
@@ -356,7 +356,7 @@
     maybeShowWalkthrough();
   }
 
-  /** Called with the status card whenever it changes (the Home page's phone card). */
+  /** Called with the status card whenever it changes (the Dashboard's phone card). */
   function subscribe(listener) {
     listeners.add(listener);
     return () => listeners.delete(listener);
