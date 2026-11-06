@@ -1223,3 +1223,204 @@ body {
     border-bottom: 1px solid var(--briefs-line);
   }
 }
+
+/* Share (Send to phone) beside the meeting title, and Needs review under the header. */
+
+.briefs-meeting-head-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.briefs-meeting-head-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.briefs-share {
+  position: relative;
+  flex: none;
+  padding-top: 4px;
+}
+
+.briefs-share-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  padding: 12px 14px;
+  border: 1px solid var(--briefs-line);
+  border-radius: var(--lex-radius-xl);
+  background: var(--briefs-surface);
+  box-shadow: var(--lex-shadow-lg);
+}
+
+.briefs-share-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.briefs-share-section h3 {
+  margin: 0;
+}
+
+.briefs-share-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.briefs-share-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 4px 0;
+}
+
+.briefs-share-row + .briefs-share-row {
+  border-top: 1px solid var(--briefs-line);
+}
+
+.briefs-share-phone {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--lex-radius-lg);
+  background: var(--briefs-soft);
+  color: var(--briefs-ink);
+}
+
+.briefs-share-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.briefs-share-name {
+  overflow: hidden;
+  color: var(--briefs-ink);
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.briefs-share-status,
+.briefs-share-note,
+.briefs-share-empty {
+  margin: 0;
+  color: var(--briefs-muted);
+  font-size: 13px;
+}
+
+.briefs-share-note.is-warning {
+  padding: 6px 10px;
+  border-radius: var(--lex-radius-lg);
+  background: var(--lex-status-warning-bg);
+  color: var(--lex-status-warning-text);
+}
+
+.briefs-share-note.is-error {
+  padding: 6px 10px;
+  border-radius: var(--lex-radius-lg);
+  background: var(--lex-status-danger-bg);
+  color: var(--lex-status-danger-text);
+}
+
+.briefs-share-sent {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--bt-accent);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.briefs-share-sent:focus-visible {
+  outline: 2px solid var(--lex-border-focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.briefs-review {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 8px 24px 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--briefs-flag);
+  border-radius: var(--lex-radius-xl);
+  background: var(--briefs-surface);
+}
+
+.briefs-review-overline,
+.briefs-review-lead,
+.briefs-review-hint {
+  margin: 0;
+}
+
+.briefs-review-lead,
+.briefs-review-hint {
+  color: var(--briefs-muted);
+  font-size: 13px;
+}
+
+.briefs-review-conflict {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--briefs-line);
+}
+
+.briefs-review-label {
+  color: var(--briefs-ink);
+  font-weight: 600;
+}
+
+.briefs-review-versions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.briefs-review-version .briefs-overline {
+  margin: 0;
+}
+
+.briefs-review-text {
+  margin: 4px 0 0;
+  color: var(--briefs-ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.briefs-review-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.briefs-review-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.briefs-review-field {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--lex-border-focus);
+  border-radius: var(--lex-radius-md);
+  background: var(--briefs-surface);
+  color: var(--briefs-ink);
+  font: inherit;
+  resize: vertical;
+}

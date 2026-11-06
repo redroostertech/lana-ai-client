@@ -13,6 +13,9 @@
   const M = window.BriefsMeeting;
   const S = M.selection;
   const R = window.BriefsRecording;
+  const B = window.BriefsShare;
+  /** How copy names this device (platform neutral). */
+  const DEVICE_NOUN = 'computer';
 
   const KIND_ORDER = ['summary', 'decision', 'openQuestion'];
   const GROUP_TITLE = { summary: 'Key points', decision: 'Decisions', openQuestion: 'Open questions' };
@@ -48,6 +51,11 @@
     notesDirty: false,
     noteSave: 'idle',
     openNoteId: null,
+    // The meeting as a record shared with the phone: paired phones and Needs review.
+    shared: null,
+    shareOpen: false,
+    shareNotice: null,
+    mergeEdit: null,
     // New meeting (record here or import a recording).
     mode: 'meeting',
     recording: null,
@@ -175,6 +183,9 @@
     state.asked = new Set();
     state.drafts = [];
     state.current = null;
+    state.shared = null;
+    state.mergeEdit = null;
+    closeShare(false);
   }
 
   /** Loads the meeting. `refresh` keeps the page state (a change from the phone or an edit). */
@@ -205,6 +216,7 @@
       state.selection = null;
     }
     loadDrafts(id);
+    loadShared(id);
     els.detailEmpty.classList.add('hidden');
     els.detailMeeting.classList.remove('hidden');
     renderMeeting();
@@ -264,6 +276,8 @@
 
   function renderMeeting() {
     renderHeader();
+    renderShare();
+    renderReview();
     renderReplay();
     renderTranscript();
     renderClipBar();
@@ -280,6 +294,289 @@
     } else {
       els.title.innerHTML = `<button type="button" class="briefs-editable briefs-title-button" data-edit-title title="Rename this meeting">${escape(record.title || 'Untitled meeting')}</button>`;
     }
+  }
+
+  // ── Share (Send to phone) and Needs review ────────────
+  // The shared record (records.state) lists the paired phones and the changes both the
+  // phone and this computer made to the same thing. The rules are in briefs-share.js.
+
+  async function loadShared(id) {
+    let result;
+    try {
+      result = await bridge().records.state(id);
+    } catch (_) {
+      result = null;
+    }
+    if (state.selectedId !== id) return;
+    if (result && result.ok) {
+      state.shared = result.value;
+      if (state.mergeEdit && !state.shared.conflicts.some((item) => item.unit === state.mergeEdit.unit)) state.mergeEdit = null;
+    }
+    renderShare();
+    renderReview();
+  }
+
+  function renderShare() {
+    const view = state.shared;
+    els.share.classList.toggle('hidden', view === null);
+    const toggle = els.shareButton.querySelector('button');
+    if (toggle) {
+      toggle.setAttribute('aria-haspopup', 'dialog');
+      toggle.setAttribute('aria-expanded', String(state.shareOpen));
+      toggle.setAttribute('aria-controls', 'briefs-share-popover');
+    }
+    els.sharePopover.classList.toggle('hidden', view === null || !state.shareOpen);
+    if (view === null || !state.shareOpen) {
+      els.sharePopover.innerHTML = '';
+      return;
+    }
+    const rows = view.phones.length === 0
+      ? '<p class="briefs-share-empty">No phone paired yet. Pair one in LANA Briefs on your phone.</p>'
+      : `<ul class="briefs-share-rows">${view.phones.map((phone) => phoneRowHtml(phone)).join('')}</ul>`;
+    const footnote = B.shareFootnote(view.phones);
+    const notice = state.shareNotice;
+    els.sharePopover.innerHTML = `
+      <section class="briefs-share-section" aria-labelledby="briefs-share-heading">
+        <h3 id="briefs-share-heading" class="briefs-overline">Phones</h3>
+        ${rows}
+        ${footnote === null ? '' : `<p class="briefs-share-note">${escape(footnote)}</p>`}
+        ${notice === null ? '' : `<p class="briefs-share-note${notice.tone === 'quiet' ? '' : ` is-${notice.tone}`}" role="status">${escape(notice.text)}</p>`}
+      </section>`;
+  }
+
+  function phoneRowHtml(phone) {
+    const row = B.phoneRow(phone);
+    let control;
+    if (row.action === 'send') {
+      control = `<lex-btn variant="secondary" size="sm" data-share-item data-share-send="${escape(phone.id)}">Send</lex-btn>`;
+    } else if (row.action === 'cancel') {
+      control = `<lex-btn variant="ghost" size="sm" data-share-item data-share-cancel="${escape(phone.id)}">Cancel send</lex-btn>`;
+    } else {
+      control = `<span class="briefs-share-sent" tabindex="-1" data-share-item aria-label="Sent to ${escape(row.title)}. ${escape(row.status)}">${icon('check')}Sent</span>`;
+    }
+    return `<li class="briefs-share-row" data-share-row="${escape(phone.id)}">
+        <span class="briefs-share-phone" aria-hidden="true">${icon('smartphone')}</span>
+        <span class="briefs-share-text"><span class="briefs-share-name">${escape(row.title)}</span><span class="briefs-share-status">${escape(row.status)}</span></span>
+        ${control}
+      </li>`;
+  }
+
+  /** A lex-btn draws its own <button>: focus goes there. */
+  function focusControl(node) {
+    if (!node) return;
+    const inner = node.querySelector && node.querySelector('button');
+    (inner || node).focus();
+  }
+
+  function shareItems() {
+    return Array.from(els.sharePopover.querySelectorAll('[data-share-item]'));
+  }
+
+  function openShare() {
+    state.shareOpen = true;
+    state.shareNotice = null;
+    renderShare();
+    focusControl(shareItems()[0]);
+  }
+
+  function closeShare(refocus) {
+    if (!state.shareOpen) return;
+    state.shareOpen = false;
+    state.shareNotice = null;
+    if (els.share) renderShare();
+    if (refocus && els.shareButton) focusControl(els.shareButton);
+  }
+
+  /** Send and Cancel send swap the row's control: focus stays on the row. */
+  function refocusRow(phoneID) {
+    focusControl(els.sharePopover.querySelector(`[data-share-row="${CSS.escape(phoneID)}"] [data-share-item]`));
+  }
+
+  async function sendToPhone(phoneID) {
+    const id = state.selectedId;
+    state.shareNotice = null;
+    let result;
+    try {
+      result = await bridge().records.sendToPhone(id, phoneID);
+    } catch (_) {
+      result = null;
+    }
+    if (state.selectedId !== id) return;
+    if (result && result.ok) state.shared = result.value;
+    else state.shareNotice = { text: (result && result.error && result.error.message) || 'LANA could not send it. Try again.', tone: 'error' };
+    renderShare();
+    refocusRow(phoneID);
+  }
+
+  async function cancelSend(phoneID) {
+    const id = state.selectedId;
+    state.shareNotice = null;
+    let result;
+    try {
+      result = await bridge().records.cancelSend(id, phoneID);
+    } catch (_) {
+      result = null;
+    }
+    if (state.selectedId !== id) return;
+    if (!result || !result.ok) {
+      state.shareNotice = { text: (result && result.error && result.error.message) || 'LANA could not cancel it. Try again.', tone: 'error' };
+    } else {
+      state.shared = result.value.record;
+      const updated = state.shared.phones.find((item) => item.id === phoneID);
+      state.shareNotice = updated ? B.cancelSendNotice(result.value.status, updated) : null;
+    }
+    renderShare();
+    refocusRow(phoneID);
+  }
+
+  function onShareKey(event) {
+    if (!state.shareOpen) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      closeShare(true);
+      return;
+    }
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    const list = shareItems();
+    if (list.length === 0) return;
+    event.preventDefault();
+    const at = list.indexOf(document.activeElement && document.activeElement.closest('[data-share-item]'));
+    const step = event.key === 'ArrowDown' ? 1 : -1;
+    focusControl(list[(at + step + list.length) % list.length]);
+  }
+
+  function renderReview() {
+    const view = state.shared;
+    const conflicts = view ? view.conflicts : [];
+    els.review.classList.toggle('hidden', conflicts.length === 0);
+    if (conflicts.length === 0) {
+      els.review.innerHTML = '';
+      return;
+    }
+    els.review.innerHTML = `
+      <p class="briefs-overline briefs-review-overline">Needs review</p>
+      <p class="briefs-review-lead">${escape(B.reviewLead(conflicts.length, DEVICE_NOUN))}</p>
+      ${conflicts.map((conflict) => conflictHtml(conflict)).join('')}`;
+    const field = els.review.querySelector('[data-merge-field]');
+    if (field) {
+      field.focus();
+      field.setSelectionRange(field.value.length, field.value.length);
+    }
+  }
+
+  function conflictHtml(conflict) {
+    const unit = escape(conflict.unit);
+    const editing = state.mergeEdit !== null && state.mergeEdit.unit === conflict.unit;
+    const choices = editing
+      ? `<div class="briefs-review-edit">
+          <textarea class="briefs-review-field" rows="2" data-merge-field aria-label="Merged version">${escape(state.mergeEdit.text)}</textarea>
+          <div class="briefs-review-choices">
+            <lex-btn variant="primary" size="sm" data-merge-keep="${unit}" ${state.mergeEdit.text.trim() === '' ? 'disabled' : ''}>Keep this</lex-btn>
+            <lex-btn variant="ghost" size="sm" data-merge-cancel>Cancel</lex-btn>
+          </div>
+        </div>`
+      : `<div class="briefs-review-choices">
+          <lex-btn variant="secondary" size="sm" data-resolve="${unit}" data-choice="phone" ${conflict.phoneAllowed ? '' : 'disabled'}>Keep your phone's</lex-btn>
+          <lex-btn variant="secondary" size="sm" data-resolve="${unit}" data-choice="desktop">Keep this ${DEVICE_NOUN}'s</lex-btn>
+          ${conflict.editable ? `<lex-btn variant="ghost" size="sm" leading-icon="edit-3" data-merge-edit="${unit}">Edit</lex-btn>` : ''}
+        </div>`;
+    return `<div class="briefs-review-conflict">
+        <span class="briefs-review-label">${escape(conflict.label)}</span>
+        <div class="briefs-review-versions">
+          <div class="briefs-review-version"><p class="briefs-overline">On your phone</p><p class="briefs-review-text">${escape(B.versionText(conflict.phone))}</p></div>
+          <div class="briefs-review-version"><p class="briefs-overline">On this ${DEVICE_NOUN}</p><p class="briefs-review-text">${escape(B.versionText(conflict.desktop))}</p></div>
+        </div>
+        ${choices}
+        ${conflict.phoneAllowed ? '' : `<p class="briefs-review-hint">This action already ran or was dismissed on this ${DEVICE_NOUN}, so only this version can be kept.</p>`}
+      </div>`;
+  }
+
+  /** Keeps one version (or a merged edit). The choice syncs to the phone. */
+  async function resolveConflict(unit, choice) {
+    const id = state.selectedId;
+    state.mergeEdit = null;
+    const view = await call(() => bridge().records.resolve(id, unit, choice));
+    if (state.selectedId !== id) return;
+    if (view !== null) {
+      state.shared = view;
+      // The kept version changes the meeting itself (a title, a line, a note).
+      loadMeeting(id, true);
+    }
+    renderReview();
+  }
+
+  /** Clicks in the Share popover and Needs review. True when handled. */
+  function onShareOrReviewClick(target) {
+    if (target.closest('#briefs-share-button')) {
+      if (state.shareOpen) closeShare(false);
+      else openShare();
+      return true;
+    }
+    const send = target.closest('[data-share-send]');
+    if (send) {
+      sendToPhone(send.dataset.shareSend);
+      return true;
+    }
+    const cancel = target.closest('[data-share-cancel]');
+    if (cancel) {
+      cancelSend(cancel.dataset.shareCancel);
+      return true;
+    }
+    if (target.closest('.briefs-share-popover')) return true;
+    const resolve = target.closest('[data-resolve]');
+    if (resolve) {
+      if (!resolve.hasAttribute('disabled')) resolveConflict(resolve.dataset.resolve, { kind: resolve.dataset.choice });
+      return true;
+    }
+    const edit = target.closest('[data-merge-edit]');
+    if (edit) {
+      const conflict = state.shared.conflicts.find((item) => item.unit === edit.dataset.mergeEdit);
+      if (conflict) {
+        state.mergeEdit = { unit: conflict.unit, text: B.mergeStart(conflict) };
+        renderReview();
+      }
+      return true;
+    }
+    const keep = target.closest('[data-merge-keep]');
+    if (keep) {
+      if (state.mergeEdit && state.mergeEdit.text.trim() !== '') resolveConflict(state.mergeEdit.unit, { kind: 'edited', text: state.mergeEdit.text });
+      return true;
+    }
+    if (target.closest('[data-merge-cancel]')) {
+      state.mergeEdit = null;
+      renderReview();
+      return true;
+    }
+    return target.closest('#briefs-review') !== null;
+  }
+
+  function bindReview() {
+    els.review.addEventListener('input', (event) => {
+      if (!event.target.matches('[data-merge-field]') || state.mergeEdit === null) return;
+      state.mergeEdit.text = event.target.value;
+      const keep = els.review.querySelector('[data-merge-keep]');
+      if (keep) setDisabled(keep, state.mergeEdit.text.trim() === '');
+    });
+    els.review.addEventListener('keydown', (event) => {
+      if (!event.target.matches('[data-merge-field]')) return;
+      event.stopPropagation();
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        state.mergeEdit = null;
+        renderReview();
+      } else if (event.key === 'Enter' && !event.shiftKey && state.mergeEdit && state.mergeEdit.text.trim() !== '') {
+        event.preventDefault();
+        resolveConflict(state.mergeEdit.unit, { kind: 'edited', text: state.mergeEdit.text });
+      }
+    });
+    els.sharePopover.addEventListener('keydown', onShareKey);
+    els.shareButton.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && state.shareOpen) {
+        event.preventDefault();
+        closeShare(true);
+      }
+    });
   }
 
   // ── Inline edit ───────────────────────────────────────
@@ -1258,6 +1555,7 @@
 
   function onDetailClick(event) {
     const target = event.target;
+    if (onShareOrReviewClick(target)) return;
     if (target.closest('[data-inline-save]')) return finishInline(target, true);
     if (target.closest('[data-inline-cancel]')) return finishInline(target, false);
     if (target.closest('[data-edit-title]')) {
@@ -1351,6 +1649,7 @@
       return;
     }
     if (event.type === 'meetingReceived' || event.type === 'inbox') loadMeetings();
+    if (event.type === 'recordsChanged' && event.meetingID === state.selectedId) loadShared(state.selectedId);
     if (event.type === 'meetingChanged') {
       loadMeetings();
       if (event.meetingID === state.selectedId) loadMeeting(state.selectedId, true);
@@ -1372,6 +1671,10 @@
     els.facts = byId('briefs-detail-meta');
     els.replay = byId('briefs-replay');
     els.error = byId('briefs-meeting-error');
+    els.share = byId('briefs-share');
+    els.shareButton = byId('briefs-share-button');
+    els.sharePopover = byId('briefs-share-popover');
+    els.review = byId('briefs-review');
     els.turns = byId('briefs-turns');
     els.clipbar = byId('briefs-clipbar');
     els.sideTabs = byId('briefs-side-tabs');
@@ -1426,6 +1729,7 @@
     state.openNoteId = null;
     bindNew();
     bindNoteEditor();
+    bindReview();
     // The sidebar's New meeting button calls this on this page (elsewhere it opens the page).
     window.briefsNewMeeting = showNew;
 
@@ -1444,6 +1748,11 @@
       globalsBound = true;
       // Capture, so it runs before the shell turns the click into a page load.
       document.addEventListener('sidebar-nav-click', onSidebarNav, true);
+      // A click anywhere outside Share closes it, leaving focus where the click put it.
+      document.addEventListener('pointerdown', (event) => {
+        if (!onPage() || !state.shareOpen) return;
+        if (!els.share.contains(event.target)) closeShare(false);
+      });
       window.addEventListener('mouseup', () => {
         if (!onPage()) return;
         els.turns.classList.remove('is-dragging');

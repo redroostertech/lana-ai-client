@@ -97,11 +97,18 @@
           </div>
 
           <div id="briefs-detail-meeting" class="briefs-meeting hidden">
-            <header class="briefs-meeting-head">
-              <p class="briefs-overline" id="briefs-detail-when"></p>
-              <h2 id="briefs-detail-title" class="briefs-meeting-title"></h2>
-              <p id="briefs-detail-meta" class="briefs-meeting-facts"></p>
+            <header class="briefs-meeting-head briefs-meeting-head-row">
+              <div class="briefs-meeting-head-text">
+                <p class="briefs-overline" id="briefs-detail-when"></p>
+                <h2 id="briefs-detail-title" class="briefs-meeting-title"></h2>
+                <p id="briefs-detail-meta" class="briefs-meeting-facts"></p>
+              </div>
+              <div id="briefs-share" class="briefs-share hidden">
+                <lex-btn id="briefs-share-button" variant="secondary" size="sm" leading-icon="share">Share</lex-btn>
+                <div id="briefs-share-popover" class="briefs-share-popover hidden" role="dialog" aria-label="Share this meeting"></div>
+              </div>
             </header>
+            <section id="briefs-review" class="briefs-review hidden" aria-label="Needs review"></section>
             <div id="briefs-replay" class="briefs-replay" aria-label="Meeting audio"></div>
             <p id="briefs-meeting-error" class="briefs-meeting-error hidden" role="alert"></p>
             <div class="briefs-meeting-body">
@@ -199,6 +206,7 @@
   <script src="../js/briefs/briefs-meeting.js"></script>
   <script src="../js/briefs/briefs-replay.js"></script>
   <script src="../js/briefs/briefs-recording.js"></script>
+  <script src="../js/briefs/briefs-share.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>
