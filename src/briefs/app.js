@@ -227,6 +227,7 @@
     if (shell) shell.activeNavId = `briefs-meeting-${id}`;
     try {
       const url = new URL(window.location.href);
+      url.searchParams.delete('new');
       url.searchParams.set('meeting', id);
       window.history.replaceState(window.history.state, '', url.toString());
     } catch (_) {
@@ -353,7 +354,16 @@
         <div class="briefs-track-lane briefs-track-above"></div>
         <div class="briefs-track-line"><span class="briefs-track-knob"></span></div>
         <div class="briefs-track-lane briefs-track-below"></div>
-      </div>`;
+      </div>
+      <ul class="briefs-legend" aria-label="Timeline key">
+        <li><span class="briefs-swatch is-summary"></span>Key point</li>
+        <li><span class="briefs-swatch is-decision"></span>Decision</li>
+        <li><span class="briefs-swatch is-openQuestion"></span>Open question</li>
+        ${state.record.keyPoints.some((point) => point.precision === 'approximate') ? '<li><span class="briefs-swatch is-summary is-soft"></span>Approximate</li>' : ''}
+        <li><span class="briefs-swatch is-note"></span>Your note</li>
+        <li><span class="briefs-swatch is-action"></span>Action</li>
+        <li><span class="briefs-swatch is-clip is-soft"></span>Clip</li>
+      </ul>`;
     renderTicks();
     onPlayback(player ? player.snapshot : null);
   }
@@ -561,7 +571,7 @@
         }).join('')}</div>`;
     els.clipbar.innerHTML = `
       <div class="briefs-clipbar-head">
-        <div>
+        <div class="briefs-clipbar-what">
           <span class="briefs-clipbar-summary">${escape(summary)}</span>
           <span class="briefs-clipbar-hint">${isClip ? 'A saved clip.' : 'Shift click or drag to add lines. Esc to clear.'}</span>
         </div>
@@ -956,7 +966,15 @@
 
   function onTurnsMouseDown(event) {
     const line = event.target.closest('[data-turn]');
-    if (!line || event.button !== 0 || event.shiftKey || event.metaKey || event.ctrlKey) return;
+    if (!line || event.button !== 0) return;
+    if (event.shiftKey || event.metaKey || event.ctrlKey) {
+      // Shift or Command click adds lines; it must not stretch a text selection instead.
+      if (!event.target.closest('[data-inline]')) {
+        event.preventDefault();
+        window.getSelection().removeAllRanges();
+      }
+      return;
+    }
     if (event.target.closest('button, [data-inline]')) return;
     drag = { start: Number(line.dataset.turn), moved: false };
   }

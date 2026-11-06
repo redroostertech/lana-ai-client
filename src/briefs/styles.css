@@ -14,6 +14,21 @@
   --briefs-clip-edge: var(--lex-color-warning-500);
   --briefs-pick: var(--lex-bg-accent-soft);
   --briefs-pick-edge: var(--lex-border-accent);
+
+  /* The transcript work area keeps LANA Briefs' own look (selection, clips, markers):
+     the standalone app's tokens (lana-notes packages/ui tokens.css). */
+  --bt-accent: #2f7d5f;
+  --bt-accent-strong: #3d9a75;
+  --bt-flag: #a86a17;
+  --bt-ink: #14110f;
+  --bt-muted: #5f5a54;
+  --bt-faint: #8c867f;
+  --bt-hairline: rgb(20 17 15 / 0.12);
+  --bt-surface: #ffffff;
+  --bt-surface-raised: #efece7;
+  --bt-radius-s: 4px;
+  --bt-radius-m: 8px;
+  --bt-radius-xl: 16px;
 }
 
 html,
@@ -240,7 +255,7 @@ body {
 
 .briefs-track {
   position: relative;
-  margin-top: 10px;
+  margin-top: 12px;
   padding: 0 6px;
   outline: none;
 }
@@ -250,21 +265,21 @@ body {
 }
 
 .briefs-track:focus-visible {
-  outline: 2px solid var(--lex-border-focus);
+  outline: 2px solid var(--bt-accent);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: var(--bt-radius-s);
 }
 
 .briefs-track-lane {
   position: relative;
-  height: 12px;
+  height: 22px;
 }
 
 .briefs-track-line {
   position: relative;
   height: 4px;
   border-radius: 2px;
-  background: var(--briefs-soft);
+  background: var(--bt-hairline);
 }
 
 .briefs-track-knob {
@@ -274,7 +289,7 @@ body {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: var(--lex-bg-accent);
+  background: var(--bt-accent);
 }
 
 .briefs-tick {
@@ -283,29 +298,71 @@ body {
   width: 3px;
   height: 10px;
   border-radius: 2px;
-  background: var(--briefs-muted);
+  background: var(--bt-muted);
 }
 
 .briefs-track-above .briefs-tick {
-  bottom: 1px;
+  bottom: 2px;
 }
 
 .briefs-track-below .briefs-tick {
-  top: 1px;
+  top: 2px;
 }
 
 .briefs-tick.is-range {
   width: max(6px, var(--span, 0%));
 }
 
-.briefs-tick.is-summary { background: var(--briefs-accent); }
-.briefs-tick.is-decision { background: var(--briefs-accent-strong); }
-.briefs-tick.is-openQuestion { background: var(--briefs-flag); }
-.briefs-tick.is-soft { opacity: 0.35; }
-.briefs-tick.is-note { background: var(--briefs-muted); }
-.briefs-tick.is-action { background: var(--lex-text-tertiary); }
-.briefs-tick.is-clip { background: var(--briefs-clip-edge); opacity: 0.7; }
-.briefs-tick.is-selected { background: var(--briefs-pick-edge); }
+.briefs-tick.is-summary { background: var(--bt-accent); }
+.briefs-tick.is-decision { background: var(--bt-accent-strong); }
+.briefs-tick.is-openQuestion { background: var(--bt-flag); }
+.briefs-tick.is-soft { height: 18px; opacity: 1; background: color-mix(in srgb, var(--bt-accent) 18%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bt-accent) 40%, transparent); border-radius: var(--bt-radius-s); }
+.briefs-tick.is-note { background: var(--bt-ink); }
+.briefs-tick.is-action { background: var(--bt-faint); }
+.briefs-tick.is-clip { height: 5px; background: color-mix(in srgb, var(--bt-flag) 70%, transparent); }
+.briefs-tick.is-selected {
+  height: 10px;
+  border-radius: var(--bt-radius-s);
+  background: color-mix(in srgb, var(--bt-accent) 22%, transparent);
+  box-shadow: inset 0 0 0 1px var(--bt-accent);
+}
+
+.briefs-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--bt-muted);
+}
+
+.briefs-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.briefs-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--swatch);
+}
+
+.briefs-swatch.is-soft {
+  width: 16px;
+  background: color-mix(in srgb, var(--swatch) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--swatch) 50%, transparent);
+}
+
+.briefs-swatch.is-summary { --swatch: var(--bt-accent); }
+.briefs-swatch.is-decision { --swatch: var(--bt-accent-strong); }
+.briefs-swatch.is-openQuestion { --swatch: var(--bt-flag); }
+.briefs-swatch.is-note { --swatch: var(--bt-ink); }
+.briefs-swatch.is-action { --swatch: var(--bt-faint); }
+.briefs-swatch.is-clip { --swatch: var(--bt-flag); }
 
 /* Transcript and side panel */
 
@@ -326,163 +383,278 @@ body {
 
 .briefs-transcript-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px 24px 6px;
+  gap: 4px 16px;
+  padding: 16px 32px 8px 48px;
 }
 
 .briefs-transcript-tip {
   font-size: 12px;
-  color: var(--briefs-muted);
+  color: var(--bt-faint);
 }
 
 .briefs-turns {
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   margin: 0;
-  padding: 4px 16px 16px;
+  padding: 4px 32px 24px;
   list-style: none;
   outline: none;
+  color: var(--bt-ink);
 }
 
-.briefs-turns.is-dragging {
+.briefs-turns.is-dragging,
+.briefs-turns.is-dragging .briefs-turn-text {
   user-select: none;
 }
 
 .briefs-turn {
-  padding: 8px 10px;
-  border-left: 3px solid transparent;
-  cursor: pointer;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 16px;
+  border-radius: var(--bt-radius-s);
+  cursor: default;
 }
 
-.briefs-turn:hover {
-  background: var(--briefs-soft);
+.briefs-turn:hover:not(.is-selected) {
+  background: color-mix(in srgb, var(--bt-ink) 4%, transparent);
 }
 
-.briefs-turn.is-clipped {
-  background: var(--briefs-clip);
-  border-left-color: var(--briefs-clip-edge);
-}
-
-.briefs-turn.clip-single,
-.briefs-turn.clip-first { border-top-left-radius: 6px; border-top-right-radius: 6px; }
-.briefs-turn.clip-single,
-.briefs-turn.clip-last { border-bottom-left-radius: 6px; border-bottom-right-radius: 6px; margin-bottom: 4px; }
-
+/* A source line of the key point picked in the side panel. */
 .briefs-turn.is-highlighted {
-  box-shadow: inset 0 0 0 1px var(--briefs-accent);
+  background: color-mix(in srgb, var(--bt-accent) 14%, transparent);
 }
 
+/* The turn under the playhead while the audio plays (follow along). */
+.briefs-turn.is-current {
+  box-shadow: inset 3px 0 0 var(--bt-accent);
+  background: color-mix(in srgb, var(--bt-accent) 7%, transparent);
+}
+
+/* A clip reads as one block: a soft amber tint through the gaps between its lines and a
+   thin bar in the gutter. */
+.briefs-turn.is-clipped::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: color-mix(in srgb, var(--bt-flag) 16%, transparent);
+  border-radius: var(--bt-radius-s);
+}
+
+.briefs-turn.is-clipped::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -8px;
+  width: 2px;
+  background: color-mix(in srgb, var(--bt-flag) 70%, transparent);
+}
+
+.briefs-turn.clip-first::before,
+.briefs-turn.clip-middle::before,
+.briefs-turn.clip-first::after,
+.briefs-turn.clip-middle::after {
+  bottom: -16px;
+}
+
+.briefs-turn.clip-first::before { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.briefs-turn.clip-middle::before { border-radius: 0; }
+.briefs-turn.clip-last::before { border-top-left-radius: 0; border-top-right-radius: 0; }
+
+/* Picked lines: a green tint inside one outline around the whole run. */
 .briefs-turn.is-selected {
-  background: var(--briefs-pick);
-  border-left-color: var(--briefs-pick-edge);
+  background: color-mix(in srgb, var(--bt-accent) 16%, transparent);
+  box-shadow: inset 1px 0 0 var(--bt-accent), inset -1px 0 0 var(--bt-accent);
+  border-radius: 0;
 }
 
-.briefs-turn.is-current .briefs-turn-text {
-  color: var(--briefs-ink);
-  font-weight: var(--lex-weight-medium);
+.briefs-turn.is-selected.is-selection-first {
+  box-shadow: inset 1px 0 0 var(--bt-accent), inset -1px 0 0 var(--bt-accent), inset 0 1px 0 var(--bt-accent);
+  border-top-left-radius: var(--bt-radius-s);
+  border-top-right-radius: var(--bt-radius-s);
+}
+
+.briefs-turn.is-selected.is-selection-last {
+  box-shadow: inset 1px 0 0 var(--bt-accent), inset -1px 0 0 var(--bt-accent), inset 0 -1px 0 var(--bt-accent);
+  border-bottom-left-radius: var(--bt-radius-s);
+  border-bottom-right-radius: var(--bt-radius-s);
+}
+
+.briefs-turn.is-selected.is-selection-first.is-selection-last {
+  box-shadow: inset 0 0 0 1px var(--bt-accent);
+}
+
+.briefs-turns:focus-visible .briefs-turn.is-selected {
+  background: color-mix(in srgb, var(--bt-accent) 22%, transparent);
 }
 
 .briefs-turn-head {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 8px;
 }
 
 .briefs-turn-speaker {
-  font-size: 13px;
-  font-weight: var(--lex-weight-semibold);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.briefs-turn .briefs-editable {
+  border-radius: 2px;
+  text-decoration: underline dotted transparent;
+  text-underline-offset: 4px;
+}
+
+.briefs-turn .briefs-editable:hover {
+  background: transparent;
+  text-decoration-color: var(--bt-faint);
 }
 
 .briefs-turn-time {
   font-size: 12px;
+  color: var(--bt-faint);
   font-variant-numeric: tabular-nums;
-  color: var(--briefs-muted);
 }
 
+/* A circled play button, always shown, like the standalone app. */
 .briefs-turn-play {
   margin-left: auto;
+  align-self: center;
   width: 24px;
   height: 24px;
-  opacity: 0;
+  border-radius: 50%;
+  color: var(--bt-ink);
+  box-shadow: inset 0 0 0 1.5px currentColor;
 }
 
-.briefs-turn:hover .briefs-turn-play,
-.briefs-turn-play:focus-visible,
+.briefs-turn-play:hover {
+  background: color-mix(in srgb, var(--bt-ink) 6%, transparent);
+  color: var(--bt-ink);
+}
+
+.briefs-turn-play .briefs-play-icon {
+  color: inherit;
+}
+
+.briefs-turn-play .briefs-play-icon svg {
+  width: 11px;
+  height: 11px;
+  margin-left: 1px;
+}
+
 .briefs-turn-play[data-playing="true"] {
-  opacity: 1;
+  color: var(--bt-accent);
 }
 
 .briefs-turn-text {
-  margin: 2px 0 0;
+  margin: 0;
   font-size: 15px;
-  line-height: 1.5;
-  color: var(--briefs-ink);
+  line-height: 1.33;
+  color: var(--bt-ink);
   white-space: pre-wrap;
+  user-select: text;
 }
 
+/* The clip bar: the meeting container's footer while lines are picked. */
 .briefs-clipbar {
   flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
   padding: 12px 24px 14px;
   border-top: 1px solid var(--briefs-line);
   border-radius: 0 0 12px 12px;
-  background: var(--briefs-surface);
+  background: var(--bt-surface);
+  color: var(--bt-ink);
 }
 
 .briefs-clipbar-head {
+  flex: 1 1 100%;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
 }
 
+.briefs-clipbar-what {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+}
+
 .briefs-clipbar-summary {
-  display: block;
-  font-weight: var(--lex-weight-semibold);
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .briefs-clipbar-hint {
-  display: block;
   font-size: 12px;
-  color: var(--briefs-muted);
+  color: var(--bt-muted);
 }
 
 .briefs-clipbar-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin-top: 8px;
 }
 
 .briefs-clipbar-action {
   display: inline-flex;
-  flex-direction: column;
   align-items: center;
-  gap: 2px;
-  min-width: 64px;
-  padding: 6px 8px;
+  gap: 4px;
+  height: 32px;
+  padding: 0 8px;
   border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--briefs-ink);
+  border-radius: var(--bt-radius-m);
+  background: var(--bt-surface-raised);
+  color: var(--bt-ink);
   font: inherit;
-  font-size: 12px;
-  cursor: pointer;
+  font-size: 13px;
+  cursor: default;
+}
+
+.briefs-clipbar-action svg {
+  color: var(--bt-accent);
+}
+
+.briefs-clipbar-action[data-clip-action="unhighlight"] svg {
+  color: var(--bt-muted);
 }
 
 .briefs-clipbar-action:hover {
-  background: var(--briefs-soft);
+  background: color-mix(in srgb, var(--bt-accent) 12%, var(--bt-surface-raised));
+}
+
+.briefs-clipbar-action:focus-visible {
+  outline: 2px solid var(--bt-accent);
+  outline-offset: 1px;
+}
+
+.briefs-clipbar-action[aria-disabled="true"] {
+  opacity: 0.45;
 }
 
 .briefs-clipbar-drafting {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 8px;
-  font-size: 14px;
-  color: var(--briefs-muted);
+  min-height: 32px;
+  font-size: 13px;
+  color: var(--bt-muted);
 }
 
 .briefs-side {
@@ -510,60 +682,74 @@ body {
 }
 
 .briefs-point {
-  padding: 8px 10px 8px 12px;
-  border-left: 3px solid var(--briefs-accent);
-  border-radius: 4px;
+  padding: 4px 0 4px 14px;
+  border-left: 3px solid var(--bt-accent);
+  border-radius: 0;
 }
 
-.briefs-point.is-decision { border-left-color: var(--briefs-accent-strong); }
-.briefs-point.is-openQuestion { border-left-color: var(--briefs-flag); }
-.briefs-point.is-selected { background: var(--briefs-soft); }
+.briefs-point.is-decision { border-left-color: var(--bt-accent-strong); }
+.briefs-point.is-openQuestion { border-left-color: var(--bt-flag); }
+.briefs-point.is-selected { background: color-mix(in srgb, var(--bt-accent) 8%, transparent); }
 
 .briefs-point-text {
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--briefs-ink);
+  color: var(--bt-ink);
   font: inherit;
-  font-size: 14px;
-  line-height: 1.45;
+  font-size: 15px;
+  line-height: 1.4;
   text-align: left;
   cursor: pointer;
 }
 
 .briefs-point-sources {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 6px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 8px;
 }
 
 .briefs-source {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border: 1px solid var(--briefs-line);
-  border-radius: var(--lex-radius-full);
-  background: transparent;
-  color: var(--briefs-muted);
+  gap: 6px;
+  padding: 3px 10px 3px 6px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--bt-surface);
+  box-shadow: inset 0 0 0 1px var(--bt-hairline);
+  color: var(--bt-ink);
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   cursor: pointer;
 }
 
 .briefs-source.is-approximate {
-  border-style: dashed;
+  box-shadow: inset 0 0 0 1px var(--bt-hairline);
+  border: 1px dashed var(--bt-hairline);
 }
 
 .briefs-play-icon {
   display: inline-flex;
-  color: var(--briefs-accent);
+  align-items: center;
+  justify-content: center;
+  color: var(--bt-accent);
+}
+
+/* The source chip's circled play. */
+.briefs-source .briefs-play-icon {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.25px currentColor;
 }
 
 .briefs-play-icon svg {
-  width: 14px;
-  height: 14px;
+  width: 9px;
+  height: 9px;
+  margin-left: 1px;
 }
 
 .briefs-point-question {
