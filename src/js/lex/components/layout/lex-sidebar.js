@@ -1732,6 +1732,13 @@
           route: 'voice/index.html',
           colors: ['#fcd34d', '#f59e0b', '#b45309', '#1c1917']
         },
+        'lana-notes': {
+          id: 'lana-notes',
+          label: 'LANA Briefs',
+          description: 'Meetings recorded on your phone or this computer, with notes and actions',
+          route: 'briefs/index.html',
+          colors: ['#7dd3a8', '#2f9e6e', '#155e46', '#0b1f17']
+        },
         'brainchild': {
           id: 'brainchild',
           label: 'Brainchild',
@@ -1790,6 +1797,9 @@
         'lana-office': 'document-library',
         'lana-office-suite': 'document-library',
         'document-library': 'document-library',
+        'lana-notes': 'lana-notes',
+        briefs: 'lana-notes',
+        'lana-briefs': 'lana-notes',
         brainchild: 'brainchild',
         brain: 'brainchild',
         knowledge: 'brainchild'

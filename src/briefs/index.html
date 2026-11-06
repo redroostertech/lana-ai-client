@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LANA Briefs</title>
+  <link rel="stylesheet" href="../css/tailwind-output.css">
+  <script src="../js/tailwind-loader.js"></script>
+  <link rel="stylesheet" href="../css/lex-tokens.css">
+  <link rel="stylesheet" href="../css/lex-chat.css">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <lex-app
+    id="briefs-shell"
+    logo-src="../img/logo-light.png"
+    logo-alt="LANA AI"
+    logo-href="./index.html"
+    active-nav-id="briefs-meetings"
+    page-title="LANA Briefs"
+  ></lex-app>
+
+  <template id="page-content">
+    <div class="briefs-scroll">
+      <section class="briefs-workspace" aria-live="polite">
+        <aside class="briefs-rail" aria-label="Meetings">
+          <div class="briefs-rail-head">
+            <p class="briefs-overline">LANA Briefs</p>
+            <h1 class="briefs-rail-title">Meetings</h1>
+            <lex-input id="briefs-search" type="search" placeholder="Search meetings" leading-icon="search" clearable></lex-input>
+          </div>
+          <div id="briefs-list" class="briefs-list" role="listbox" aria-label="Meetings"></div>
+        </aside>
+
+        <section id="briefs-detail" class="briefs-detail" aria-label="Meeting">
+          <lex-empty id="briefs-detail-empty" icon="file-text" message="Choose a meeting" description="Meetings from your phone and the ones you record here show up on the left."></lex-empty>
+          <div id="briefs-detail-meeting" class="briefs-detail-meeting hidden">
+            <p class="briefs-overline" id="briefs-detail-when"></p>
+            <h2 id="briefs-detail-title" class="briefs-detail-title"></h2>
+            <p id="briefs-detail-meta" class="briefs-detail-meta"></p>
+          </div>
+        </section>
+      </section>
+
+      <lex-empty id="briefs-unavailable" class="hidden" icon="lock" message="LANA Briefs is not available right now" description="It runs while you are signed in and LANA Briefs is on for your firm. Sign in to LANA, or ask your firm admin to turn it on."></lex-empty>
+    </div>
+  </template>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/version.js"></script>
+  <script src="../js/time-utils.js"></script>
+  <script src="../js/shared/request-retry.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/lex/lex.core.js"></script>
+  <script src="../js/lex/lex.icons.js"></script>
+  <script src="../js/lex/lex.state.js"></script>
+  <script src="../js/lex/lex-nav.js"></script>
+  <script src="../js/lex/lex.forms.js"></script>
+  <script src="../js/lex/components/foundation/lex-btn.js"></script>
+  <script src="../js/lex/components/foundation/lex-card.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/foundation/lex-empty.js"></script>
+  <script src="../js/lex/components/foundation/lex-modal.js"></script>
+  <script src="../js/lex/components/foundation/lex-tabs.js"></script>
+  <script src="../js/lex/components/form/lex-select.js"></script>
+  <script src="../js/lex/components/form/lex-input.js"></script>
+  <script src="../js/lex/components/layout/lex-sidebar.js"></script>
+  <script src="../js/lex/components/layout/lex-topbar.js"></script>
+  <script src="../js/lex/components/layout/lex-notification-panel.js"></script>
+  <script src="../js/lex/components/layout/lex-app.js"></script>
+  <script src="../js/lex/index.js"></script>
+  <script src="../js/lex/lex-page-init.js"></script>
+  <script src="../js/sidebar-footer-hydrate.js"></script>
+  <lex-lana-dock page-scope="briefs" context-type="full_chat" placeholder="Ask LANA..." thread-title="LANA Chat"></lex-lana-dock>
+  <!-- LANA dock (IDE-style docked chat panel) -->
+  <script src="../js/lex/chat/lex-chat.format.js"></script>
+  <script src="../js/lex/chat/lex-chat.conversations-api.js"></script>
+  <script src="../js/lex/chat/lex-chat.source.js"></script>
+  <script src="../js/lex/chat/lex-chat.message.js"></script>
+  <script src="../js/lex/chat/lex-chat-progress-events.js"></script>
+  <script src="../js/lex/chat/lex-chat.activity.js"></script>
+  <script src="../js/lex/chat/lex-chat.documents.js"></script>
+  <script src="../js/lex/chat/lex-chat.composer-mentions.js"></script>
+  <script src="../js/services/slash-commands.service.js"></script>
+  <script src="../js/lex/chat/lex-chat.composer-slash.js"></script>
+  <script src="../js/lex/chat/lex-chat.composer.js"></script>
+  <script src="../js/lex/chat/lex-chat.thread.js"></script>
+  <script src="../js/lex/chat/lex-chat.threads.js"></script>
+  <script src="../js/lex/chat/lex-chat.js"></script>
+  <script src="../js/lex/chat/lex-dynamic-card.renderer.js"></script>
+  <script src="../js/lex/chat/lex-agentic-plan-card.js"></script>
+  <script src="../js/lex/chat/lex-chat.index.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/lex/components/chat/lex-lana-panel.js"></script>
+  <script src="../js/lex/components/layout/lex-lana-dock.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
