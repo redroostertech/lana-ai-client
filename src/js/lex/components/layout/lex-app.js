@@ -1057,7 +1057,7 @@
         this._briefsEventsBound = true;
         briefs.onEvent((event) => {
           const type = event && event.type;
-          if ((type === 'meetingReceived' || type === 'meetingChanged' || type === 'inbox' || type === 'preferences') && this._getAppContext() === 'briefs') {
+          if ((type === 'meetingReceived' || type === 'meetingChanged' || type === 'inbox') && this._getAppContext() === 'briefs') {
             this._loadBriefsMeetingsForSidebar();
           }
         });
@@ -1068,12 +1068,6 @@
         meetings = result && result.ok && Array.isArray(result.value) ? result.value : [];
       } catch (_) {
         meetings = [];
-      }
-      try {
-        const preferences = briefs.preferences ? await briefs.preferences.get() : null;
-        this._briefsListener = preferences && preferences.listener && preferences.listener.text ? preferences.listener : null;
-      } catch (_) {
-        this._briefsListener = null;
       }
       const when = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
       this._briefsMeetingItems = meetings.map((meeting) => {
@@ -1090,21 +1084,21 @@
       if (this._getAppContext() === 'briefs') {
         this.setSections(this._buildSidebarSections('briefs'));
       }
-      this._applyBriefsStatus();
     }
 
     /**
-     * LANA Briefs pages show whether this computer is listening for the phone as an icon in
-     * the top bar (the standalone app's sidebar footer line); the words are its label.
-     * Other pages show none.
+     * The top bar's status icon belongs to the page that sets it (LANA Briefs: the phone
+     * listening status, src/briefs/app.js). Leaving that page's app clears it.
      */
     _applyBriefsStatus() {
+      if (this._getAppContext() === 'briefs') return;
       const topbar = this.$('lex-topbar');
-      if (!topbar) return;
-      const listener = this._getAppContext() === 'briefs' ? this._briefsListener : null;
-      topbar.statusIcon = listener ? (listener.tone === 'good' ? 'wifi' : 'wifi-off') : '';
-      topbar.statusLabel = listener ? listener.text : '';
-      topbar.statusTone = listener ? listener.tone : '';
+      if (!topbar || !topbar.statusIcon) return;
+      topbar.statusIcon = '';
+      topbar.statusLabel = '';
+      topbar.statusSummary = '';
+      topbar.statusRows = [];
+      topbar.statusAction = '';
     }
 
     _formatMoverBadge(metric) {

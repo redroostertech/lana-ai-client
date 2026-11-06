@@ -30,27 +30,41 @@ describe('lex-topbar status icon', () => {
     expect(status()).toBeNull();
   });
 
-  test('appears before Refresh with its label, then changes and goes away in place', async () => {
+  test('appears before Refresh with a hover card, then changes and goes away in place', async () => {
     const bar = document.querySelector('lex-topbar');
     const root = bar.querySelector('.lex-topbar-root');
     bar.statusIcon = 'wifi';
     bar.statusLabel = 'Listening for your phone';
     bar.statusTone = 'good';
+    bar.statusSummary = 'Ready to receive meetings.';
+    bar.statusRows = [{ label: 'Paired phones', value: 'iPhone' }];
+    bar.statusAction = 'Manage phones';
     await tick();
     expect(bar.querySelector('.lex-topbar-root')).toBe(root);
-    expect(status().getAttribute('aria-label')).toBe('Listening for your phone');
-    expect(status().getAttribute('title')).toBe('Listening for your phone');
-    expect(status().dataset.tone).toBe('good');
+    const button = status().querySelector('.lex-topbar-status');
+    expect(button.getAttribute('aria-label')).toBe('Listening for your phone');
+    expect(button.dataset.tone).toBe('good');
+    const card = status().querySelector('[role="tooltip"]');
+    expect(button.getAttribute('aria-describedby')).toBe(card.id);
+    expect(card.textContent).toContain('Ready to receive meetings.');
+    expect(Array.from(card.querySelectorAll('dt, dd')).map((n) => n.textContent)).toEqual(['Paired phones', 'iPhone']);
     expect(status().nextElementSibling.getAttribute('data-action')).toBe('refresh');
 
+    // The card's button asks the page to act.
+    let asked = 0;
+    bar.addEventListener('topbar-status-action', () => { asked += 1; });
+    card.querySelector('[data-action="status-action"] button').click();
+    expect(asked).toBe(1);
+
     bar.statusIcon = 'wifi-off';
-    bar.statusLabel = 'Signed out';
+    bar.statusLabel = 'No phone paired';
     bar.statusTone = 'warning';
+    bar.statusAction = 'Pair a phone';
     await tick();
     expect(document.querySelectorAll('[data-topbar-status]')).toHaveLength(1);
-    expect(status().getAttribute('aria-label')).toBe('Signed out');
-    expect(status().dataset.tone).toBe('warning');
-    expect(status().dataset.icon).toBe('wifi-off');
+    expect(status().querySelector('.lex-topbar-status').getAttribute('aria-label')).toBe('No phone paired');
+    expect(status().querySelector('.lex-topbar-status').dataset.tone).toBe('warning');
+    expect(status().textContent).toContain('Pair a phone');
 
     bar.statusIcon = '';
     bar.statusLabel = '';
