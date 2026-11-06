@@ -11,6 +11,8 @@ import { startTonePlayer } from "./tonePlayer.js";
 type Namespace = keyof typeof ALL_API_METHODS;
 
 export const BRIEFS_GLOBAL = "lanaBriefs";
+/** Answered by the client (electron-briefs.js) whether or not Briefs runs. */
+export const RUNNING_CHANNEL = "briefs:running";
 
 export function buildBriefsBridge(ipcRenderer: Pick<IpcRenderer, "invoke" | "on" | "removeListener" | "send">): LanaBridge {
   const namespaces = Object.fromEntries(
@@ -52,8 +54,10 @@ export function exposeBriefsBridge(
 ): void {
   const bridge = buildBriefsBridge(ipcRenderer);
   contextBridge.exposeInMainWorld(BRIEFS_GLOBAL, bridge);
-  bridge.access.state().then(
-    () => startTone(bridge),
+  ipcRenderer.invoke(RUNNING_CHANNEL).then(
+    (running: unknown) => {
+      if (running === true) startTone(bridge);
+    },
     () => undefined,
   );
 }

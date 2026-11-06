@@ -326,3 +326,24 @@ describe('the standalone import is not part of the app', () => {
     expect(host).not.toMatch(/standaloneImport|importStandalone/);
   });
 });
+
+describe('pages asking whether Briefs runs', () => {
+  test('the client always answers, false until Briefs starts and true while it runs', async () => {
+    const handlers = {};
+    const { briefs } = setup();
+    // A second instance wired with ipcMain, to read the answer.
+    const ipcMain = { handle: (channel, fn) => { handlers[channel] = fn; } };
+    const app = new (require('events').EventEmitter)();
+    Object.assign(app, { getPath: (name) => `/tmp/${name}`, isPackaged: false, quit: jest.fn() });
+    const { createBriefs: make, RUNNING_CHANNEL } = require('../../electron-briefs');
+    const module = { startBriefsHost: async () => ({ addWebContents() {}, focused() {}, blurred() {}, restore: async () => {}, stop: async () => {}, sessionChanged() {}, endSession: async () => {} }) };
+    const wired = make({ electron: { app, session: { defaultSession: {} } }, ipcMain, loadHost: () => module, distDir: '/d', engineBase: () => null, apiBase: () => 'http://e', getServer: () => null, getToken: () => ALICE, getWindows: () => [fakeWindow()], showWindow() {}, log: { info() {}, warn() {}, error() {} } });
+    expect(RUNNING_CHANNEL).toBe('briefs:running');
+    expect(handlers['briefs:running']()).toBe(false);
+    await wired.sync(enabled);
+    expect(handlers['briefs:running']()).toBe(true);
+    await wired.sync(null);
+    expect(handlers['briefs:running']()).toBe(false);
+    expect(briefs.isRunning()).toBe(false);
+  });
+});

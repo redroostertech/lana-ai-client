@@ -132,6 +132,7 @@ const briefs = createBriefs({
     const state = localEngine.supervisor.getState();
     return isEngineInUse(state) ? state.url : null;
   },
+  ipcMain,
   apiBase: () => localEngine.apiBase(),
   getServer: () => getSavedServer(),
   getToken: () => authTokenStore.get(),

@@ -35,6 +35,8 @@ const { speechPackages } = require('./electron-local-models');
 const path = require('path');
 
 const BRIEFS_APP_ID = 'lana-notes';
+// Must match RUNNING_CHANNEL in briefs/packages/host/src/preload/bridge.ts.
+const RUNNING_CHANNEL = 'briefs:running';
 // Must match AUDIO_SCHEME in briefs/packages/host/src/main/services/meetingAudio.ts
 // (tests/unit/electron-briefs.test.js checks). Registered before the app is ready without
 // loading the host, so Briefs costs nothing at launch while it is off.
@@ -137,6 +139,7 @@ function isLoaded(window) {
  * @param {function} deps.getServer - () => the saved server (discovery), or null
  * @param {function} deps.getToken - () => the person's LANA session token, or null
  * @param {function} deps.getWindows - () => the open BrowserWindows
+ * @param {object} [deps.ipcMain] - answers the pages' "is Briefs running" question
  * @param {function} deps.showWindow
  * @param {object} deps.log - { info, warn, error }
  */
@@ -155,6 +158,9 @@ function createBriefs(deps) {
   });
   electron.app.on('browser-window-focus', () => host && host.focused());
   electron.app.on('browser-window-blur', () => host && host.blurred());
+  // Pages ask whether Briefs runs before they switch its tone player on (always answered,
+  // so pages without Briefs log nothing).
+  if (deps.ipcMain) deps.ipcMain.handle(RUNNING_CHANNEL, () => host !== null);
 
   function bleHelperPath() {
     if (process.platform !== 'darwin') return null;
@@ -325,4 +331,4 @@ function registerBriefsSchemes(protocol) {
   protocol.registerSchemesAsPrivileged([{ scheme: BRIEFS_AUDIO_SCHEME, privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true } }]);
 }
 
-module.exports = { createBriefs, registerBriefsSchemes, isBriefsEnabled, isClientPage, personKey, personOf, sessionSnapshot, BRIEFS_APP_ID, BRIEFS_AUDIO_SCHEME };
+module.exports = { RUNNING_CHANNEL, createBriefs, registerBriefsSchemes, isBriefsEnabled, isClientPage, personKey, personOf, sessionSnapshot, BRIEFS_APP_ID, BRIEFS_AUDIO_SCHEME };

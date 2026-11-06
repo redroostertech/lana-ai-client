@@ -116,11 +116,8 @@ describe("the tone player in the client's preload", () => {
     const { exposeBriefsBridge } = await import("../src/preload/bridge.js");
     const exposed: Record<string, unknown> = {};
     const started: unknown[] = [];
-    const ipc = (answers: boolean) => ({
-      invoke: async () => {
-        if (!answers) throw new Error("No handler registered for 'briefs:access.state'");
-        return { kind: "entitled", offline: false };
-      },
+    const ipc = (running: boolean) => ({
+      invoke: async (channel: string) => (channel === "briefs:running" ? running : null),
       on: () => undefined,
       removeListener: () => undefined,
       send: () => undefined,
