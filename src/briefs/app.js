@@ -729,13 +729,20 @@
     const position = Math.min(snapshot.position, total);
     const play = els.replay.querySelector('[data-replay="toggle"]');
     if (!play) return;
-    play.innerHTML = icon(snapshot.isPlaying ? 'pause' : 'play');
+    // Redraw only on a change: replacing the icon while the audio plays (several times a
+    // second) swaps the node under the pointer between press and release, and the click is lost.
+    const playIcon = snapshot.isPlaying ? 'pause' : 'play';
+    if (play.dataset.icon !== playIcon) {
+      play.dataset.icon = playIcon;
+      play.innerHTML = icon(playIcon);
+    }
     play.setAttribute('aria-label', snapshot.isPlaying ? 'Pause' : 'Play');
     play.title = blocked || (snapshot.isPlaying ? 'Pause' : 'Play');
     els.replay.querySelectorAll('[data-replay="toggle"],[data-replay="back"],[data-replay="forward"],[data-replay="speed"]').forEach((button) => {
       button.setAttribute('aria-disabled', String(!ready));
     });
-    els.replay.querySelector('[data-replay="speed"]').textContent = `${snapshot.speed}x`;
+    const speed = els.replay.querySelector('[data-replay="speed"]');
+    if (speed.textContent !== `${snapshot.speed}x`) speed.textContent = `${snapshot.speed}x`;
     const follow = els.replay.querySelector('[data-replay="follow"]');
     follow.classList.toggle('is-on', state.followAlong);
     follow.setAttribute('aria-pressed', String(state.followAlong));
