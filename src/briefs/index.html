@@ -34,10 +34,28 @@
 
         <section id="briefs-detail" class="briefs-detail" aria-label="Meeting">
           <lex-empty id="briefs-detail-empty" icon="file-text" message="Choose a meeting" description="Meetings from your phone and the ones you record here show up on the left."></lex-empty>
-          <div id="briefs-detail-meeting" class="briefs-detail-meeting hidden">
-            <p class="briefs-overline" id="briefs-detail-when"></p>
-            <h2 id="briefs-detail-title" class="briefs-detail-title"></h2>
-            <p id="briefs-detail-meta" class="briefs-detail-meta"></p>
+          <div id="briefs-detail-meeting" class="briefs-meeting hidden">
+            <header class="briefs-meeting-head">
+              <p class="briefs-overline" id="briefs-detail-when"></p>
+              <h2 id="briefs-detail-title" class="briefs-meeting-title"></h2>
+              <p id="briefs-detail-meta" class="briefs-meeting-facts"></p>
+            </header>
+            <div id="briefs-replay" class="briefs-replay" aria-label="Meeting audio"></div>
+            <p id="briefs-meeting-error" class="briefs-meeting-error hidden" role="alert"></p>
+            <div class="briefs-meeting-body">
+              <section class="briefs-transcript" aria-labelledby="briefs-transcript-title">
+                <div class="briefs-transcript-head">
+                  <span id="briefs-transcript-title" class="briefs-overline">Transcript</span>
+                  <span class="briefs-transcript-tip">Click a line to clip it. Shift click or drag for several.</span>
+                </div>
+                <ol id="briefs-turns" class="briefs-turns" role="listbox" tabindex="0" aria-multiselectable="true" aria-label="Transcript lines. Click a line to clip it, Shift click to add lines."></ol>
+                <div id="briefs-clipbar" class="briefs-clipbar hidden" role="toolbar" aria-label="Clip actions"></div>
+              </section>
+              <aside class="briefs-side" aria-label="Key points and notes">
+                <lex-tabs id="briefs-side-tabs" active="keyPoints"></lex-tabs>
+                <div id="briefs-side-panel" class="briefs-side-panel" role="tabpanel"></div>
+              </aside>
+            </div>
           </div>
         </section>
       </section>
@@ -63,6 +81,8 @@
   <script src="../js/lex/components/foundation/lex-empty.js"></script>
   <script src="../js/lex/components/foundation/lex-modal.js"></script>
   <script src="../js/lex/components/foundation/lex-tabs.js"></script>
+  <script src="../js/lex/components/foundation/lex-toast.js"></script>
+  <script src="../js/lex/components/foundation/lex-spinner.js"></script>
   <script src="../js/lex/components/form/lex-select.js"></script>
   <script src="../js/lex/components/form/lex-input.js"></script>
   <script src="../js/lex/components/layout/lex-sidebar.js"></script>
@@ -95,6 +115,8 @@
   <script src="../js/lex/components/chat/lex-lana-panel.js"></script>
   <script src="../js/lex/components/layout/lex-lana-dock.js"></script>
   <script src="../js/auth-guard.js"></script>
+  <script src="../js/briefs/briefs-meeting.js"></script>
+  <script src="../js/briefs/briefs-replay.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>
