@@ -23,12 +23,15 @@
  */
 import { execFile } from "node:child_process";
 import { createRequire } from "node:module";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { app, safeStorage } from "electron";
 import { createSealedFileKeyVault, safeStorageSealer } from "@lana/core/keys";
 import { AUDIT_EVENTS, GatewayStore } from "@lana/core/store";
 import { importStandalone, standaloneSources, type StandaloneImportOutcome, type StandaloneSource } from "./standaloneImport.js";
 import { parseArgs } from "./importStandaloneArgs.js";
+import { readClientToken, type ClientTokenDeps } from "./clientToken.js";
 
 const MESSAGES: Record<StandaloneImportOutcome, string> = {
   imported: "Done. Your meetings and phone pairing are now in LANA. Open LANA and your phone will find it as the same computer.",
@@ -56,26 +59,32 @@ async function main(): Promise<number> {
   const root = resolve(__dirname, "..", "..");
   const load = createRequire(join(root, "package.json"));
   const pkg = load("./package.json") as { productName?: string };
-  // The client's name: its keystore entry and its data folder.
-  app.setName(pkg.productName ?? "Lana AI");
+  // The client's name: its keystore entry. Electron's own files for this run go to a
+  // throwaway folder, so nothing is written into the client's data folder.
+  const clientName = pkg.productName ?? "Lana AI";
+  app.setName(clientName);
+  const clientUserData = join(app.getPath("appData"), clientName);
+  const scratch = mkdtempSync(join(tmpdir(), "lana-briefs-import-"));
+  app.setPath("userData", scratch);
   await app.whenReady();
 
-  const { createTokenStore } = load("./electron-token-store.js") as { createTokenStore(deps: unknown): { get(): string | null } };
-  const { authTokenPersistence } = load("./electron-storage.js") as { authTokenPersistence: unknown };
+  // Read only: the client's sign-in from a temporary copy of its settings file. The client's
+  // own settings and token modules delete what they cannot read, so they are never loaded here.
+  const Store = (load("electron-store") as { default?: unknown }).default ?? load("electron-store");
+  const token = readClientToken({ userData: clientUserData, Store: Store as ClientTokenDeps["Store"], decrypt: (ciphertext) => safeStorage.decryptString(ciphertext) });
   const { personOf, personKey } = load("./electron-briefs.js") as {
     personOf(token: string | null): { id: string; email: string } | null;
     personKey(token: string | null): string | null;
   };
-  const token = createTokenStore({ safeStorage, persistence: authTokenPersistence }).get();
   const person = personOf(token);
   const key = personKey(token);
   if (person === null || key === null) {
-    process.stdout.write("Sign in to LANA on this computer first, then run this again.\n");
+    process.stdout.write("Could not read your LANA sign-in. Open LANA, sign in, quit it, then run this again.\n");
     return 1;
   }
 
   const sealer = safeStorageSealer(safeStorage);
-  const userData = args.userData ?? app.getPath("userData");
+  const userData = args.userData ?? clientUserData;
   const target = join(userData, "briefs", "people", key);
   const sources: StandaloneSource[] = args.source === null
     ? standaloneSources(app.getPath("appData"))
