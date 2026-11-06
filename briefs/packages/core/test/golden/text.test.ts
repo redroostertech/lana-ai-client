@@ -19,7 +19,9 @@ describe("text rules match Swift", () => {
     for (const { utf8, blank } of rules.blank) expect([utf8, isBlank(hexToString(utf8))]).toEqual([utf8, blank]);
   });
 
-  it("uses Foundation's exact whitespace sets", () => {
+  // Scans every Unicode code point three times (about 2 s alone); the full parallel suite
+  // can push it past the 5 s default.
+  it("uses Foundation's exact whitespace sets", { timeout: 30_000 }, () => {
     const sets = golden<Record<"whitespaces_and_newlines" | "whitespaces" | "is_whitespace", string[]>>("text-rules");
     const members = (test: (text: string) => boolean): string[] => {
       const found: string[] = [];
