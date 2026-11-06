@@ -928,6 +928,10 @@
         }
         topbarMenuItems.push({ id: 'settings', label: 'Settings', icon: 'settings' });
         topbarMenuItems.push({ id: 'help', label: 'Help & Support', icon: 'help-circle' });
+        if (appContext === 'briefs') {
+          // Handled by the Briefs page (src/briefs/app.js): replays its walkthrough.
+          topbarMenuItems.push({ id: 'briefs-walkthrough', label: 'LANA Briefs walkthrough', icon: 'play' });
+        }
         topbarMenuItems.push({ divider: true });
         topbarMenuItems.push({ id: 'logout', label: 'Sign out', icon: 'log-out', variant: 'danger' });
         this.setTopbarMenuItems(topbarMenuItems);

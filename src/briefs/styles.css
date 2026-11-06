@@ -1628,3 +1628,165 @@ body {
   color: var(--briefs-muted);
   font-size: 13px;
 }
+
+/* The LANA Briefs walkthrough (<lex-walkthrough class="briefs-tour">): its pictures. */
+
+lex-walkthrough.briefs-tour {
+  --lex-walkthrough-accent: var(--bt-accent);
+}
+
+.briefs-tour-devices {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.briefs-tour-device {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--briefs-ink);
+}
+
+.briefs-tour-device svg {
+  width: 48px;
+  height: 48px;
+  stroke-width: 1.5;
+}
+
+.briefs-tour-device span {
+  color: var(--briefs-muted);
+  font-size: 13px;
+}
+
+.briefs-tour-privacy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--bt-accent);
+}
+
+.briefs-tour-privacy-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.briefs-tour-privacy-line svg {
+  width: 24px;
+  height: 24px;
+}
+
+.briefs-tour-privacy-line span {
+  width: 28px;
+  height: 1px;
+  background: var(--bt-accent);
+}
+
+.briefs-tour-privacy-caption {
+  font-size: 13px;
+}
+
+/* A bracket card: the LANA mark's two corners on a plain card. */
+.briefs-tour-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 380px;
+  max-width: calc(100vw - 64px);
+  padding: 24px;
+  background: var(--briefs-surface);
+  text-align: left;
+}
+
+.briefs-tour-card::before,
+.briefs-tour-card::after {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border: 0 solid var(--bt-accent);
+  pointer-events: none;
+}
+
+.briefs-tour-card::before {
+  top: 0;
+  left: 0;
+  border-top-width: 1px;
+  border-left-width: 1px;
+}
+
+.briefs-tour-card::after {
+  right: 0;
+  bottom: 0;
+  border-right-width: 1px;
+  border-bottom-width: 1px;
+}
+
+.briefs-tour-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.briefs-tour-eyebrow {
+  color: var(--briefs-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.briefs-tour-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  color: var(--briefs-muted);
+  font-size: 12px;
+  box-shadow: inset 0 0 0 1px var(--briefs-line);
+}
+
+.briefs-tour-pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.briefs-tour-card-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--briefs-ink);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.briefs-tour-card-title svg {
+  width: 20px;
+  height: 20px;
+}
+
+.briefs-tour-card-detail {
+  margin: 0;
+  color: var(--briefs-muted);
+  font-size: 13px;
+}
+
+.briefs-tour-card-confirm {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-end;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--lex-radius-md);
+  background: var(--bt-accent);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+}

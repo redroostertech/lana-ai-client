@@ -15,6 +15,7 @@
   const R = window.BriefsRecording;
   const B = window.BriefsShare;
   const P = window.BriefsStatus;
+  const W = window.BriefsWalkthrough;
   /** How copy names this device (platform neutral). */
   const DEVICE_NOUN = 'computer';
 
@@ -808,6 +809,45 @@
     }
     const yes = target.closest('[data-phone-remove-yes]');
     if (yes) removePhone(yes.dataset.phoneRemoveYes);
+  }
+
+  // ── Walkthrough (first run, and from the gear menu) ───
+  // The host remembers per person that it was seen (settings.walkthroughCompleted).
+
+  async function signedInUserID() {
+    try {
+      const account = await bridge().account.state();
+      return account && account.kind === 'signedIn' && account.user ? String(account.user.id) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async function maybeShowWalkthrough() {
+    const api = bridge();
+    if (!api || !api.settings || !W) return;
+    const userID = await signedInUserID();
+    if (userID === null || !onPage()) return;
+    let seen = true;
+    try {
+      seen = await api.settings.walkthroughCompleted(userID);
+    } catch (_) {
+      seen = true;
+    }
+    if (!seen && onPage()) showWalkthrough(userID);
+  }
+
+  function showWalkthrough(userID) {
+    if (document.querySelector('lex-walkthrough')) return;
+    const tour = document.createElement('lex-walkthrough');
+    tour.className = 'briefs-tour';
+    tour.brand = 'BRIEFS.';
+    tour.pages = W.pages(icon, DEVICE_NOUN);
+    tour.addEventListener('lex-walkthrough-done', (event) => {
+      if (userID) bridge().settings.setWalkthroughCompleted(userID).catch(() => {});
+      if (event.detail && event.detail.action === 'pair') openPhones();
+    });
+    document.body.appendChild(tour);
   }
 
   // ── Inline edit ───────────────────────────────────────
@@ -1986,6 +2026,11 @@
       globalsBound = true;
       // Capture, so it runs before the shell turns the click into a page load.
       document.addEventListener('sidebar-nav-click', onSidebarNav, true);
+      // The gear menu's LANA Briefs walkthrough (Briefs pages only).
+      document.addEventListener('topbar-menu-action', (event) => {
+        if (!onPage() || !event.detail || event.detail.actionId !== 'briefs-walkthrough') return;
+        signedInUserID().then(showWalkthrough);
+      });
       // The top bar's phone status card: Pair a phone or Manage phones.
       document.addEventListener('topbar-status-action', () => {
         if (onPage()) openPhones();
@@ -2019,6 +2064,7 @@
     if (new URLSearchParams(window.location.search).get('new') === '1') showNew();
     loadMeetings();
     loadPhoneStatus();
+    maybeShowWalkthrough();
     const api = bridge();
     if (api && state.mode !== 'new') {
       api.recording.state().then((view) => {
