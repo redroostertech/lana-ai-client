@@ -5211,6 +5211,12 @@
 
     currentTasksList = tasks || [];
     currentTaskMatterId = matter.matter_id;
+    // Every task on this Board belongs to this matter; the task drawer shows
+    // the matter's name (it read "Organization-level" without one).
+    var boardMatterName = matter.matter_name || matter.name || matter.title || '';
+    currentTasksList.forEach(function (task) {
+      if (task && !task.matter_name && boardMatterName) task.matter_name = boardMatterName;
+    });
     syncWorkspaceTaskDetailProvider();
 
     if (currentTasksList.length === 0) {
