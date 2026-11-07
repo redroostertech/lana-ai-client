@@ -355,3 +355,45 @@ describe('my tasks comment mentions (SCRUM-235)', () => {
     );
   });
 });
+
+// The My Tasks page has its own task details view; it had the same gap as the
+// shared drawer (2026-11-07): subtasks were never read from the server and a
+// checkmark was not saved.
+describe('my tasks subtasks are the server\'s', () => {
+  const SUB = 'aaaaaaaa-0000-4000-8000-000000000001';
+
+  function clickToggle(content, id) {
+    const toggle = { getAttribute: (attr) => (attr === 'data-subtask-toggle' ? id : null) };
+    const event = {
+      preventDefault() {},
+      stopPropagation() {},
+      target: { closest: (selector) => (selector === '[data-subtask-toggle]' ? toggle : null) },
+    };
+    ((content.listeners && content.listeners.click) || []).forEach((handler) => handler(event));
+  }
+
+  test('opening a task loads its subtasks; checking one off saves it', async () => {
+    const api = {
+      listSubtasks: jest.fn().mockResolvedValue({ data: [{ id: SUB, name: 'Verify the benefit statement', status: 'pending' }] }),
+      updateSubtask: jest.fn().mockResolvedValue({ data: {} }),
+    };
+    const { window, content } = loadMyTasks({ api });
+    window.LanaTaskDetails.open({ id: TASK_UUID, title: 'Review statement', matter_id: 'matter-1', metadata: {} });
+    await flush();
+
+    expect(api.listSubtasks).toHaveBeenCalledWith({ parent_task_id: TASK_UUID, sort: 'order_index', order: 'asc', limit: 100 });
+    expect(content.innerHTML).toContain('Verify the benefit statement');
+
+    clickToggle(content, SUB);
+    await flush();
+    expect(api.updateSubtask).toHaveBeenCalledWith(SUB, { status: 'completed' });
+  });
+
+  test('a connector task is not fetched (control)', async () => {
+    const api = { listSubtasks: jest.fn() };
+    const { window } = loadMyTasks({ api });
+    window.LanaTaskDetails.open({ id: TASK_UUID, title: 'Imported', source: 'connector', metadata: {} });
+    await flush();
+    expect(api.listSubtasks).not.toHaveBeenCalled();
+  });
+});

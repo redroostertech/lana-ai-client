@@ -1449,3 +1449,60 @@
 #myTasksTable td:nth-child(2) {
   max-width: 0;
 }
+
+/* LANA subtask suggestions in the shared task drawer (task-detail-drawer.js) */
+.my-task-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-spacing-sm, 0.5rem);
+  margin-bottom: var(--lex-spacing-md, 0.75rem);
+  padding: var(--lex-spacing-md, 0.75rem);
+  border: 1px solid rgba(124, 58, 237, 0.28);
+  border-radius: var(--lex-radius-md, 8px);
+  background: rgba(124, 58, 237, 0.06);
+  color: var(--lex-text-primary);
+  font-size: var(--lex-body-sm-size, 0.8125rem);
+}
+.my-task-suggestions--pending {
+  flex-direction: row;
+  align-items: center;
+  color: var(--lex-text-secondary);
+}
+.my-task-suggestions__head {
+  display: flex;
+  align-items: center;
+  gap: var(--lex-spacing-sm, 0.5rem);
+  font-weight: 600;
+}
+.my-task-suggestions__mark {
+  position: relative;
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  color: #7c3aed;
+}
+.my-task-suggestions__mark svg { position: absolute; width: 8px; height: 8px; }
+.my-task-suggestions__mark svg:first-child { top: 0; left: 0; }
+.my-task-suggestions__mark svg:last-child { bottom: 0; right: 0; }
+.my-task-suggestions__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-spacing-xs, 0.25rem);
+}
+.my-task-suggestions__item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--lex-spacing-sm, 0.5rem);
+  padding: var(--lex-spacing-sm, 0.5rem);
+  border-radius: var(--lex-radius-sm, 6px);
+  background: var(--lex-bg-primary);
+  cursor: pointer;
+}
+.my-task-suggestions__item input { margin-top: 0.2rem; accent-color: #7c3aed; }
+.my-task-suggestions__text { display: flex; flex-direction: column; min-width: 0; }
+.my-task-suggestions__title { font-weight: 500; }
+.my-task-suggestions__desc { color: var(--lex-text-tertiary); }
+.my-task-suggestions__actions {
+  display: flex;
+  gap: var(--lex-spacing-sm, 0.5rem);
+}

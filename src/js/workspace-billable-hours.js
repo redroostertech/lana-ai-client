@@ -724,7 +724,7 @@
       html += '<textarea id="bhEditDescription" style="width:100%;min-height:4rem;padding:0.5rem;border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.375rem;font-size:0.875rem;font-family:inherit;resize:vertical;">' + Lex.Utils.escapeHtml(entry.description || '') + '</textarea>';
       if (isDraft) {
         html += '<div style="display:flex;gap:0.5rem;margin-top:0.25rem;">';
-        html += '<button id="bhRegenDescBtn" style="font-size:0.75rem;color:var(--lex-color-blue-600);cursor:pointer;background:none;border:none;padding:0;">Regenerate description with AI</button>';
+        html += '<lex-btn id="bhRegenDescBtn" variant="lana" size="sm">Rewrite description</lex-btn>';
         html += '</div>';
       }
     } else {
@@ -861,7 +861,7 @@
       var regenBtn = document.getElementById('bhRegenDescBtn');
       if (regenBtn) {
         regenBtn.addEventListener('click', function () {
-          regenBtn.textContent = 'Generating...';
+          _setGenerateLabel(regenBtn, 'Rewriting...');
           regenBtn.disabled = true;
           api.post('/api/v1/billable-hours/drafts/' + entry.id + '/regenerate')
             .then(function (result) {
@@ -869,11 +869,12 @@
                 var textarea = document.getElementById('bhEditDescription');
                 if (textarea) textarea.value = result.data.description;
               }
-              regenBtn.textContent = 'Regenerate description with AI';
+              _setGenerateLabel(regenBtn, 'Rewrite description');
               regenBtn.disabled = false;
             })
             .catch(function () {
-              regenBtn.textContent = 'Failed — try again';
+              _setGenerateLabel(regenBtn, 'Rewrite description');
+              if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.error('LANA could not rewrite the description. Try again.');
               regenBtn.disabled = false;
             });
         });
@@ -1046,13 +1047,19 @@
   // Generate Button
   // ═══════════════════════════════════════════════════════════════
 
+  // lex-btn keeps its rendered button; plain textContent would replace it.
+  function _setGenerateLabel(btn, label) {
+    if (window.Lex && Lex.Utils && Lex.Utils.setLexButtonText) Lex.Utils.setLexButtonText(btn, label);
+    else btn.textContent = label;
+  }
+
   function _wireGenerateButton(matter) {
     var btn = document.getElementById('bhGenerateBtn');
     if (!btn || btn._bhWired) return;
     btn._bhWired = true;
 
     btn.addEventListener('click', function () {
-      btn.textContent = 'Generating...';
+      _setGenerateLabel(btn, 'Drafting...');
       btn.disabled = true;
 
       // The user's LOCAL calendar day — toISOString() would send the UTC day,
@@ -1062,7 +1069,7 @@
         .then(function (result) {
           var data = result && result.data;
           var count = (data && data.generated) || 0;
-          btn.textContent = 'Generate for Today';
+          _setGenerateLabel(btn, 'Draft today\'s entries');
           btn.disabled = false;
           if (count > 0) {
             if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.success(count + ' draft' + (count !== 1 ? 's' : '') + ' generated');
@@ -1072,7 +1079,7 @@
           _refresh();
         })
         .catch(function () {
-          btn.textContent = 'Generate for Today';
+          _setGenerateLabel(btn, 'Draft today\'s entries');
           btn.disabled = false;
           if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.error('Generation failed');
         });

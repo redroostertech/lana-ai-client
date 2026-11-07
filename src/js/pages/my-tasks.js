@@ -591,6 +591,25 @@
     }
   }
 
+  // A LANA task keeps its subtasks on the server (GET /api/v1/subtasks);
+  // a connector task or a draft has no server id, so it stays local.
+  async function loadTaskSubtasks(task) {
+    if (!window.api || !api.listSubtasks || !isUuid(taskUuid(task)) || task.source === 'connector') return;
+    var store = getTaskDetailStore(task);
+    if (store.subtasksRemote || store.subtasksLoading) return;
+    store.subtasksLoading = true;
+    try {
+      var response = await api.listSubtasks({ parent_task_id: taskUuid(task), sort: 'order_index', order: 'asc', limit: 100 });
+      store.subtasks = asArray(response && response.data).map(normalizeSubtask);
+      store.subtasksRemote = true;
+      if (state.viewingTask && detailKey(state.viewingTask) === detailKey(task)) rerenderTaskDetails();
+    } catch (error) {
+      console.warn('[MyTasks] Failed to load subtasks:', error && error.message);
+    } finally {
+      store.subtasksLoading = false;
+    }
+  }
+
   function addDetailActivity(task, type, label) {
     var store = getTaskDetailStore(task);
     store.activity.unshift({
@@ -1041,6 +1060,7 @@
     modal.open = true;
     requestAnimationFrame(function () { syncTaskActivityTabs(task); });
     loadTaskComments(task);
+    loadTaskSubtasks(task);
   }
 
   function exposeTaskDetailsBridge() {
@@ -2457,13 +2477,23 @@
     if (kind === 'subtask') {
       var subtaskTitle = detailInputValue('subtask');
       if (!subtaskTitle) return;
-      store.subtasks.push({
-        id: 'local-subtask-' + LanaTime.nowMs(),
-        title: subtaskTitle,
-        status: 'pending',
-        assignee: '',
-        due_date: ''
-      });
+      if (store.subtasksRemote && window.api && api.createSubtask) {
+        try {
+          var created = await api.createSubtask({ name: subtaskTitle, parent_task_id: taskUuid(task) });
+          store.subtasks.push(normalizeSubtask(created && created.data ? created.data : created, store.subtasks.length));
+        } catch (error) {
+          if (window.Lex && Lex.Toast) Lex.Toast.error(error.message || 'Failed to add subtask');
+          return;
+        }
+      } else {
+        store.subtasks.push({
+          id: 'local-subtask-' + LanaTime.nowMs(),
+          title: subtaskTitle,
+          status: 'pending',
+          assignee: '',
+          due_date: ''
+        });
+      }
       addDetailActivity(task, 'history', 'Added subtask "' + subtaskTitle + '"');
       rerenderTaskDetails();
       return;
@@ -2542,7 +2572,7 @@
     rerenderTaskDetails();
   }
 
-  function handleSubtaskToggle(itemId) {
+  async function handleSubtaskToggle(itemId) {
     var task = state.viewingTask;
     if (!task || !itemId) return;
     var store = getTaskDetailStore(task);
@@ -2550,7 +2580,18 @@
       return String(entry.id) === String(itemId);
     });
     if (!item) return;
+    var previous = item.status;
     item.status = normalizeStatus(item.status) === 'complete' ? 'pending' : 'complete';
+    if (store.subtasksRemote && window.api && api.updateSubtask && isUuid(item.id)) {
+      try {
+        await api.updateSubtask(item.id, { status: item.status === 'complete' ? 'completed' : 'pending' });
+      } catch (error) {
+        item.status = previous;
+        if (window.Lex && Lex.Toast) Lex.Toast.error(error.message || 'Failed to update subtask');
+        rerenderTaskDetails();
+        return;
+      }
+    }
     addDetailActivity(task, 'history', (item.status === 'complete' ? 'Completed' : 'Reopened') + ' subtask "' + item.title + '"');
     rerenderTaskDetails();
   }

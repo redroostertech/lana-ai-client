@@ -12,7 +12,10 @@
      <lex-btn variant="ghost" icon="true" badge="5"><svg>...</svg></lex-btn>
 
    Icon names: any Lex.Icons name (Lucide icons) — e.g. "plus", "search", "arrow-right"
-   Variants: primary | secondary | danger | success | warning | info | ghost
+   Variants: primary | secondary | danger | success | warning | info | ghost | lana
+     variant="lana" is the LANA pill (gradient, corner-bracket mark) for any
+     action where LANA generates something; give it the action as its label,
+     e.g. <lex-btn variant="lana">Generate suggestions</lex-btn>.
    Sizes: sm | md | lg
    icon="true" for icon-only buttons (square padding)
    badge="N" shows a red notification bubble (0 or empty hides it, >99 shows "99+")
@@ -50,6 +53,20 @@
     style.id = 'lex-btn-styles';
     style.textContent = `
       /* ── Button base ─────────────────────────────────── */
+
+      /* LANA pill: same look as the Ask LANA button (lex-ask-lana-btn). */
+      .lex-btn-inner.lex-btn-inner--lana {
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 4px 12px rgba(99,102,241,0.25), inset 0 1px 0 rgba(255,255,255,0.15);
+      }
+      .lex-btn-inner.lex-btn-inner--lana:hover:not(:disabled) {
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15), 0 8px 24px rgba(124,58,237,0.35), inset 0 1px 0 rgba(255,255,255,0.2);
+      }
+      .lex-btn-lana-mark { position: relative; width: 14px; height: 14px; flex-shrink: 0; }
+      .lex-btn-lana-mark svg { position: absolute; width: 8px; height: 8px; }
+      .lex-btn-lana-mark svg:first-child { top: 0; left: 0; }
+      .lex-btn-lana-mark svg:last-child { bottom: 0; right: 0; }
 
       .lex-btn-inner {
         position: relative;
@@ -235,6 +252,13 @@
           bgHover: 'var(--lex-color-gray-100)',
           text:    'var(--lex-text-secondary)',
           ripple:  'rgba(0,0,0,0.06)'
+        },
+        lana: {
+          bg:      'linear-gradient(135deg, #1e1b4b 0%, #4338ca 40%, #7c3aed 70%, #c026d3 100%)',
+          bgHover: 'linear-gradient(135deg, #1e1b4b 0%, #3730a3 40%, #6d28d9 70%, #a21caf 100%)',
+          text:    '#ffffff',
+          ripple:  'rgba(255,255,255,0.25)',
+          ring:    'rgba(124,58,237,0.45)'
         }
       };
 
@@ -248,7 +272,8 @@
         lg: 'var(--lex-btn-radius-lg, 13px)'
       };
 
-      const radius = radii[this.size] || radii.md;
+      const isLana = this.variant === 'lana';
+      const radius = isLana ? 'var(--lex-radius-full, 9999px)' : (radii[this.size] || radii.md);
 
       // Sizes — icon-only buttons get square padding, text buttons get horizontal padding.
       // font-size always applied regardless of icon mode.
@@ -266,7 +291,7 @@
 
       const sizeStyle = sizes[this.size] || sizes.md;
 
-      const cssVars = `--_btn-bg:${v.bg};--_btn-bg-hover:${v.bgHover};--_btn-text:${v.text};--_btn-ripple:${v.ripple};--_btn-ring:${v.bg};--_btn-radius:${radius};`;
+      const cssVars = `--_btn-bg:${v.bg};--_btn-bg-hover:${v.bgHover};--_btn-text:${v.text};--_btn-ripple:${v.ripple};--_btn-ring:${v.ring || v.bg};--_btn-radius:${radius};`;
 
       const spinnerSize = this.size === 'sm' ? 14 : this.size === 'lg' ? 18 : 16;
       const spinner = this.loading ? `
@@ -282,14 +307,20 @@
         ? `<span class="lex-btn-badge${badgeSizeCls}">${badgeCount > 99 ? '99+' : badgeCount}</span>`
         : '';
 
-      const leadSvg = this.leadingIcon ? getIcon(this.leadingIcon, this.size) : '';
+      const lanaMark = isLana
+        ? '<span class="lex-btn-lana-mark" aria-hidden="true">'
+          + '<svg viewBox="0 0 8 8" fill="none"><path d="M0 0L8 0M0 0L0 8" stroke="currentColor" stroke-width="1.5"/></svg>'
+          + '<svg viewBox="0 0 8 8" fill="none"><path d="M8 8L0 8M8 8L8 0" stroke="currentColor" stroke-width="1.5"/></svg>'
+          + '</span>'
+        : '';
+      const leadSvg = lanaMark + (this.leadingIcon ? getIcon(this.leadingIcon, this.size) : '');
       const trailSvg = this.trailingIcon ? getIcon(this.trailingIcon, this.size) : '';
       const labelText = (this.label && !this._hasOwnContent()) ? this.escapeHtml(this.label) : '';
 
       return `${badgeHtml}<button
           type="${this.type}"
           ${this.form ? `form="${this.escapeHtml ? this.escapeHtml(this.form) : this.form}"` : ''}
-          class="lex-btn-inner"
+          class="lex-btn-inner${isLana ? ' lex-btn-inner--lana' : ''}"
           style="${cssVars}${sizeStyle}"
           ${this.disabled || this.loading ? 'disabled' : ''}
         >${spinner}${leadSvg}<slot-content>${labelText}</slot-content>${trailSvg}</button>`;

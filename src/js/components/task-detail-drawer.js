@@ -337,7 +337,47 @@
     ].join('');
   }
 
-  function renderSubtasks(store) {
+  // LANA suggestions for this task (metadata.lana_suggestions, from the
+  // board row). Generating: a note. Ready: pick which to add. Reviewed or
+  // failed: nothing here (a failure was already sent as a notification).
+  function renderSuggestions(task, store) {
+    var suggestions = task && task.lana_suggestions;
+    if (!suggestions) return '';
+    var mark = '<span class="my-task-suggestions__mark" aria-hidden="true">'
+      + '<svg viewBox="0 0 8 8" fill="none"><path d="M0 0L8 0M0 0L0 8" stroke="currentColor" stroke-width="1.5"/></svg>'
+      + '<svg viewBox="0 0 8 8" fill="none"><path d="M8 8L0 8M8 8L8 0" stroke="currentColor" stroke-width="1.5"/></svg>'
+      + '</span>';
+    if (suggestions.status === 'generating') {
+      return '<div class="my-task-suggestions my-task-suggestions--pending">' + mark
+        + '<span>LANA is suggesting subtasks. You will get a notification when they are ready.</span></div>';
+    }
+    if (suggestions.status !== 'ready') return '';
+    var items = asArray(suggestions.subtasks);
+    var skipped = store.suggestionSkips || {};
+    var rows = items.map(function (item, index) {
+      return [
+        '<label class="my-task-suggestions__item">',
+        '  <input type="checkbox" data-shared-suggestion-index="' + index + '"' + (skipped[index] ? '' : ' checked') + ' />',
+        '  <span class="my-task-suggestions__text">',
+        '    <span class="my-task-suggestions__title">' + esc(item && item.title) + '</span>',
+        item && item.description ? '    <span class="my-task-suggestions__desc">' + esc(item.description) + '</span>' : '',
+        '  </span>',
+        '</label>'
+      ].join('');
+    }).join('');
+    return [
+      '<div class="my-task-suggestions">',
+      '  <div class="my-task-suggestions__head">' + mark + '<span>' + (items.length ? 'LANA suggested these subtasks' : 'LANA has no subtasks to suggest') + '</span></div>',
+      rows ? '  <div class="my-task-suggestions__list">' + rows + '</div>' : '',
+      '  <div class="my-task-suggestions__actions">',
+      items.length ? '    <lex-btn size="sm" variant="primary" data-shared-suggestions-review="accept">Add selected</lex-btn>' : '',
+      '    <lex-btn size="sm" variant="ghost" data-shared-suggestions-review="dismiss">Dismiss</lex-btn>',
+      '  </div>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderSubtasks(store, task) {
     var rows = store.subtasks.length
       ? store.subtasks.map(function (item) {
         var complete = normalizeStatus(item.status) === 'complete';
@@ -355,6 +395,7 @@
     return [
       '<section class="my-task-issue-section">',
       sectionHeader('Subtasks', store.subtasks.length, 'Add subtask', 'subtask'),
+      renderSuggestions(task, store),
       '<div class="my-task-subtask-list">' + rows + '</div>',
       '<div class="my-task-inline-add hidden" data-shared-task-add-panel="subtask">',
       '  <input type="text" data-shared-task-input="subtask" placeholder="Add subtask" />',
@@ -547,7 +588,7 @@
       '<div class="my-task-issue__main">',
       renderDescription(task),
       renderChecklist(store),
-      renderSubtasks(store),
+      renderSubtasks(store, task),
       renderDocuments(store),
       renderActivity(task, store),
       '</div>',
@@ -617,7 +658,17 @@
     if (kind === 'subtask') {
       var subtask = inputValue('subtask');
       if (!subtask) return;
-      store.subtasks.push({ id: 'local-subtask-' + LanaTime.nowMs(), title: subtask, status: 'pending' });
+      if (store.subtasksRemote && window.api && api.createSubtask) {
+        try {
+          var created = await api.createSubtask({ name: subtask, parent_task_id: taskId(task) });
+          store.subtasks.push(normalizeSubtask(created && created.data ? created.data : created, store.subtasks.length));
+        } catch (error) {
+          toastError(error.message || 'Failed to add subtask');
+          return;
+        }
+      } else {
+        store.subtasks.push({ id: 'local-subtask-' + LanaTime.nowMs(), title: subtask, status: 'pending' });
+      }
       addActivity(store, 'Added subtask "' + subtask + '"');
       render();
       return;
@@ -720,6 +771,67 @@
     } catch (error) {
       // Leave metadata/local comments in place; the drawer still works offline.
       console.warn('[TaskDetails] Failed to load comments:', error && error.message);
+    }
+  }
+
+  // LANA tasks keep their subtasks on the server; a connector task or a task
+  // made offline has no server id, so its drawer stays local.
+  async function loadSubtasks(task) {
+    if (!window.api || !api.listSubtasks || !isUuid(taskId(task)) || task.source === 'connector') return;
+    var store = getStore(task);
+    try {
+      var response = await api.listSubtasks({ parent_task_id: taskId(task), sort: 'order_index', order: 'asc', limit: 100 });
+      store.subtasks = asArray(response && response.data).map(normalizeSubtask);
+      store.subtasksRemote = true;
+      if (state.task && detailKey(state.task) === detailKey(task)) render();
+    } catch (error) {
+      console.warn('[TaskDetails] Failed to load subtasks:', error && error.message);
+    }
+  }
+
+  async function toggleSubtask(subtaskId) {
+    var task = state.task;
+    if (!task) return;
+    var store = getStore(task);
+    var item = store.subtasks.find(function (entry) { return String(entry.id) === String(subtaskId); });
+    if (!item) return;
+    var previous = item.status;
+    item.status = normalizeStatus(item.status) === 'complete' ? 'pending' : 'complete';
+    render();
+    if (store.subtasksRemote && window.api && api.updateSubtask && isUuid(item.id)) {
+      try {
+        await api.updateSubtask(item.id, { status: item.status === 'complete' ? 'completed' : 'pending' });
+      } catch (error) {
+        item.status = previous;
+        toastError(error.message || 'Failed to update subtask');
+        render();
+        return;
+      }
+    }
+    addActivity(store, (item.status === 'complete' ? 'Completed' : 'Reopened') + ' subtask "' + item.title + '"');
+    render();
+  }
+
+  async function reviewSuggestions(decision) {
+    var task = state.task;
+    if (!task || !task.lana_suggestions || !window.api || !api.reviewTaskSuggestions) return;
+    var store = getStore(task);
+    var skipped = store.suggestionSkips || {};
+    var accept = decision === 'accept'
+      ? asArray(task.lana_suggestions.subtasks).map(function (_item, index) { return index; }).filter(function (index) { return !skipped[index]; })
+      : [];
+    try {
+      var response = await api.reviewTaskSuggestions(taskId(task), accept);
+      var result = response && response.data ? response.data : response;
+      var added = asArray(result && result.subtasks).map(normalizeSubtask);
+      store.subtasks = store.subtasks.concat(added);
+      task.lana_suggestions = (result && result.lana_suggestions) || { status: 'reviewed' };
+      store.suggestionSkips = {};
+      if (added.length) addActivity(store, 'Added ' + added.length + ' LANA subtask' + (added.length === 1 ? '' : 's'));
+      render();
+      if (state.options && typeof state.options.onRefresh === 'function') state.options.onRefresh();
+    } catch (error) {
+      toastError(error.message || 'Failed to save your choice');
     }
   }
 
@@ -892,13 +1004,14 @@
       var subtask = event.target.closest('[data-shared-subtask-toggle]');
       if (subtask && state.task) {
         event.preventDefault();
-        var store = getStore(state.task);
-        var item = store.subtasks.find(function (entry) { return String(entry.id) === String(subtask.getAttribute('data-shared-subtask-toggle')); });
-        if (item) {
-          item.status = normalizeStatus(item.status) === 'complete' ? 'pending' : 'complete';
-          addActivity(store, (item.status === 'complete' ? 'Completed' : 'Reopened') + ' subtask "' + item.title + '"');
-          render();
-        }
+        toggleSubtask(subtask.getAttribute('data-shared-subtask-toggle'));
+        return;
+      }
+
+      var review = event.target.closest('[data-shared-suggestions-review]');
+      if (review && state.task) {
+        event.preventDefault();
+        reviewSuggestions(review.getAttribute('data-shared-suggestions-review'));
         return;
       }
 
@@ -917,6 +1030,13 @@
 
     document.addEventListener('change', function (event) {
       if (!event.target.closest('#sharedTaskDetailsModal')) return;
+      var suggestion = event.target.closest('[data-shared-suggestion-index]');
+      if (suggestion && state.task) {
+        var suggestionStore = getStore(state.task);
+        suggestionStore.suggestionSkips = suggestionStore.suggestionSkips || {};
+        suggestionStore.suggestionSkips[suggestion.getAttribute('data-shared-suggestion-index')] = !suggestion.checked;
+        return;
+      }
       var check = event.target.closest('[data-shared-checklist-id]');
       if (check && state.task) {
         var store = getStore(state.task);
@@ -949,7 +1069,10 @@
     state.task = task;
     state.options = options || state.options || {};
     var opened = render();
-    if (opened) loadComments(task);
+    if (opened) {
+      loadComments(task);
+      loadSubtasks(task);
+    }
     return opened;
   }
 

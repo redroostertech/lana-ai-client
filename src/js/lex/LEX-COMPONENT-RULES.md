@@ -277,7 +277,7 @@ Lex.state.onAuthChange(callback); // subscribe
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `label` | String | `''` | Button text when the element has no children (`<lex-btn label="Save">` or `btn.label = 'Save'`). Children win when present. Escaped. |
-| `variant` | String | `'primary'` | `primary`, `secondary`, `danger`, `success`, `warning`, `info`, `ghost` |
+| `variant` | String | `'primary'` | `primary`, `secondary`, `danger`, `success`, `warning`, `info`, `ghost`, `lana` |
 | `size` | String | `'md'` | `sm`, `md`, `lg` |
 | `leadingIcon` | String | `''` | Lex.Icons (Lucide) name before the text (`leading-icon`) |
 | `trailingIcon` | String | `''` | Icon after the text (`trailing-icon`) |
@@ -297,6 +297,7 @@ There is no `href`; for navigation use a link or `Lex.Nav.go()` in a click handl
 - Use `variant="secondary"` for non-primary actions
 - Use `variant="danger"` only for destructive actions (delete, remove)
 - Use `variant="ghost"` for toolbar/inline actions
+- Use `variant="lana"` for every action where LANA generates something (suggestions, drafts, summaries, plans). It renders the LANA pill (gradient, corner-bracket mark). Label it with the action, e.g. `Generate suggestions`, never just `LANA`. Always offer a plain action beside it (e.g. `Create Task`) so LANA is never required, and run the generation in the background with a notification when it is done rather than blocking the screen.
 - Icon-only buttons **must** have an explicit `aria-label` property
 
 ### `<lex-card>`

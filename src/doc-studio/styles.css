@@ -52,12 +52,6 @@ button:hover {
   border-color: var(--accent);
 }
 
-button.primary {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: #fff;
-}
-
 .app-shell {
   display: grid;
   grid-template-columns: 360px 1fr;

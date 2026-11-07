@@ -45,6 +45,14 @@
   // Helpers
   // =========================================================================
 
+  // The Generate button is a lex-btn; plain textContent would replace its
+  // rendered button (and the LANA mark), so labels go through the helper.
+  function setGenerateLabel(btn, label) {
+    if (!btn) return;
+    if (window.Lex && Lex.Utils && Lex.Utils.setLexButtonText) Lex.Utils.setLexButtonText(btn, label);
+    else btn.textContent = label;
+  }
+
   function _escapeHtml(text) {
     if (!text) return '';
     var str = String(text);
@@ -259,7 +267,7 @@
     if (previewDiv) previewDiv.classList.add('hidden');
     if (blanksDiv) blanksDiv.classList.add('hidden');
     if (customVarsDiv) customVarsDiv.classList.add('hidden');
-    if (genBtn) { genBtn.disabled = true; genBtn.textContent = 'Generate Document'; }
+    if (genBtn) { genBtn.disabled = true; setGenerateLabel(genBtn, 'Generate Document'); }
     self.state.blankFilter = 'all';
 
     // Reset filter buttons to "All" active
@@ -920,9 +928,9 @@
     if (genBtn) {
       genBtn.disabled = count === 0;
       if (count > 1) {
-        genBtn.textContent = 'Generate ' + count + ' Documents';
+        setGenerateLabel(genBtn, 'Generate ' + count + ' Documents');
       } else {
-        genBtn.textContent = 'Generate Document';
+        setGenerateLabel(genBtn, 'Generate Document');
       }
     }
 
@@ -1578,7 +1586,7 @@
 
     if (genBtn) {
       genBtn.disabled = true;
-      genBtn.textContent = total > 1 ? 'Generating 1 of ' + total + '...' : 'Generating...';
+      setGenerateLabel(genBtn, total > 1 ? 'Generating 1 of ' + total + '...' : 'Generating...');
     }
 
     // Collect custom variables for curly brace placeholders
@@ -1644,7 +1652,7 @@
 
     if (total >= BATCH_THRESHOLD) {
       // Batch mode: queue all contacts for background processing
-      if (genBtn) genBtn.textContent = 'Queuing ' + total + ' documents...';
+      if (genBtn) setGenerateLabel(genBtn, 'Queuing ' + total + ' documents...');
 
       try {
         var batchResponse = await fetch(api.baseUrl + '/api/v1/matters/' + st.matterId + '/documents/' + st.docId + '/generate-from-template/batch', {
@@ -1668,7 +1676,7 @@
         var batchId = batchData.batch_id;
 
         // Poll for completion
-        if (genBtn) genBtn.textContent = 'Processing 0 of ' + total + '...';
+        if (genBtn) setGenerateLabel(genBtn, 'Processing 0 of ' + total + '...');
 
         self._pollIntervalId = setInterval(async function () {
           try {
@@ -1678,7 +1686,7 @@
             var statusData = (await statusResp.json()).data;
             var done = statusData.completed + statusData.failed;
 
-            if (genBtn) genBtn.textContent = 'Processing ' + done + ' of ' + total + '...';
+            if (genBtn) setGenerateLabel(genBtn, 'Processing ' + done + ' of ' + total + '...');
 
             if (statusData.status === 'completed' || statusData.status === 'completed_with_errors' || statusData.status === 'failed') {
               clearInterval(self._pollIntervalId);
@@ -1688,7 +1696,7 @@
 
               if (genBtn) {
                 genBtn.disabled = false;
-                genBtn.textContent = 'Generate Document';
+                setGenerateLabel(genBtn, 'Generate Document');
               }
 
               if (failed > 0) {
@@ -1705,7 +1713,7 @@
         return; // Don't fall through to the summary code below
       } catch (error) {
         self.onError('Batch generation failed: ' + error.message);
-        if (genBtn) { genBtn.disabled = false; genBtn.textContent = 'Generate Document'; }
+        if (genBtn) { genBtn.disabled = false; setGenerateLabel(genBtn, 'Generate Document'); }
         return;
       }
     }
@@ -1715,7 +1723,7 @@
       var contact = st.selectedContacts[ci];
 
       if (genBtn && total > 1) {
-        genBtn.textContent = 'Generating ' + (ci + 1) + ' of ' + total + '...';
+        setGenerateLabel(genBtn, 'Generating ' + (ci + 1) + ' of ' + total + '...');
       }
 
       try {
@@ -1780,7 +1788,7 @@
 
     if (genBtn) {
       genBtn.disabled = false;
-      genBtn.textContent = 'Generate Document';
+      setGenerateLabel(genBtn, 'Generate Document');
     }
   };
 

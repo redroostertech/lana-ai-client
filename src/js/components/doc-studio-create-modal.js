@@ -100,7 +100,7 @@
         // form from the Generate click with requestSubmit().
         "footer-content='" +
           '<lex-btn type="button" id="dscmCancelBtn" variant="secondary">Cancel</lex-btn>' +
-          '<lex-btn type="button" id="dscmGenerateBtn" variant="primary">Generate</lex-btn>' +
+          '<lex-btn type="button" id="dscmGenerateBtn" variant="lana">Generate document</lex-btn>' +
         "'>" +
         '<form id="dscmCreateForm" class="p-6 space-y-5 dscm-form">' +
           '<p class="dscm-intro">Generate a workspace-specific file from selected or all workspace documents</p>' +

@@ -141,7 +141,7 @@
                   </div>
                   <div style="display:flex;gap:0.5rem;">
                     <lex-btn id="bhAddManualBtn" variant="primary" size="sm">+ New entry</lex-btn>
-                    <lex-btn id="bhGenerateBtn" variant="outline" size="sm">Generate for Today</lex-btn>
+                    <lex-btn id="bhGenerateBtn" variant="lana" size="sm">Draft today's entries</lex-btn>
                   </div>
                 </div>
                 <lex-table
@@ -221,6 +221,7 @@
       </div>
       <div class="flex gap-3">
         <lex-btn type="button" onclick="closeTaskModal()" variant="secondary">Cancel</lex-btn>
+        <lex-btn id="taskGenerateBtn" type="button" variant="lana" onclick="createTaskWithSuggestions()">Generate suggestions</lex-btn>
         <lex-btn id="taskSubmitBtn" type="submit" form="taskForm" variant="primary">Save Task</lex-btn>
       </div>
     </div>'>
@@ -280,17 +281,6 @@
             <lex-select id="taskAssignedTo" label="Assignee" placeholder="Unassigned"
               options='[{"value":"","label":"Unassigned"}]'>
             </lex-select>
-          </div>
-        </div>
-
-        <div id="taskSuggestionsPanel" class="hidden border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">LANA title suggestion</label>
-            <lex-input id="taskSuggestedTitle" label="" placeholder="Generated title"></lex-input>
-          </div>
-          <div id="taskSuggestedSubtasksWrap" class="hidden">
-            <div class="text-sm font-medium text-gray-700 mb-2">Suggested subtasks</div>
-            <div id="taskSuggestedSubtasks" class="space-y-2"></div>
           </div>
         </div>
 
@@ -456,7 +446,7 @@
 
   <!-- Doc Studio Document Creation Modal -->
   <lex-modal id="createDocStudioDocumentModal" heading="Create with Doc Studio" size="lg" hide-actions close-on-overlay
-    footer-content='<lex-btn type="button" id="cancelDocStudioDocumentBtn" variant="secondary">Cancel</lex-btn><lex-btn type="submit" form="createDocStudioDocumentForm" id="generateDocStudioDocumentBtn" variant="primary">Generate</lex-btn>'>
+    footer-content='<lex-btn type="button" id="cancelDocStudioDocumentBtn" variant="secondary">Cancel</lex-btn><lex-btn type="submit" form="createDocStudioDocumentForm" id="generateDocStudioDocumentBtn" variant="lana">Generate document</lex-btn>'>
     <form id="createDocStudioDocumentForm" class="p-6 space-y-5">
       <p class="text-sm text-gray-500">Generate a workspace-specific file from selected or all workspace documents</p>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -979,7 +969,7 @@
 
   <!-- DOCX Template Generation Modal -->
   <lex-modal id="docxTemplateModal" heading="Generate Document from Template" size="full" hide-actions close-on-overlay
-    footer-content='<lex-btn type="button" id="docxTemplateCancelBtn" variant="secondary">Cancel</lex-btn><lex-btn type="button" id="docxTemplateGenerateBtn" variant="primary" disabled>Generate Document</lex-btn>'>
+    footer-content='<lex-btn type="button" id="docxTemplateCancelBtn" variant="secondary">Cancel</lex-btn><lex-btn type="button" id="docxTemplateGenerateBtn" variant="lana" disabled>Generate Document</lex-btn>'>
     <div class="flex flex-col h-full">
       <!-- Two-column body -->
       <div class="flex-1 flex overflow-hidden">

@@ -2684,13 +2684,41 @@ class ApiClient {
   }
 
   /**
-   * Ask LANA to suggest a title and subtasks for a new workspace task
-   * @param {string} matterId - The matter ID
-   * @param {Object} payload - Description, task fields, and workspace context
-   * @returns {Promise<Object>} Suggestion response
+   * List subtasks. Supports page, limit, sort (name, created_at, updated_at,
+   * due_date, status, priority), order (asc, desc), status, parent_task_id,
+   * assigned_to, priority and search.
+   * @param {Object} params - query filters
+   * @returns {Promise<Object>} { data, metadata: { page, limit, total, totalPages } }
    */
-  async suggestWorkspaceTask(matterId, payload) {
-    return this.post(`/api/v1/matters/${matterId}/tasks/suggestions`, payload);
+  async listSubtasks(params = {}) {
+    const query = new URLSearchParams();
+    Object.keys(params).forEach((key) => {
+      if (params[key] !== undefined && params[key] !== null && params[key] !== '') query.set(key, String(params[key]));
+    });
+    return this.get(`/api/v1/subtasks?${query.toString()}`);
+  }
+
+  /**
+   * Add a subtask under a task the caller can see.
+   * @param {Object} subtask - { name, parent_task_id, description?, status? }
+   */
+  async createSubtask(subtask) {
+    return this.post('/api/v1/subtasks', subtask);
+  }
+
+  /**
+   * Update a subtask (e.g. { status: 'completed' } or { status: 'pending' }).
+   */
+  async updateSubtask(subtaskId, updates) {
+    return this.patch(`/api/v1/subtasks/${encodeURIComponent(subtaskId)}`, updates);
+  }
+
+  /**
+   * Add the LANA-suggested subtasks the person chose (positions in the
+   * task's stored suggestion list). An empty list dismisses them.
+   */
+  async reviewTaskSuggestions(taskId, accept) {
+    return this.post(`/api/v1/tasks/${encodeURIComponent(taskId)}/suggestions/review`, { accept: accept || [] });
   }
 
   /**

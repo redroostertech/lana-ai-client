@@ -33,7 +33,6 @@
   var currentWorkspaceState = null;
   var currentTaskMatterId = null;
   var currentEditingTask = null;
-  var workspaceTaskSuggestionState = null;
   var currentTasksList = [];
   var commentPollInterval = null;
   var currentCommentPage = 1;
@@ -6775,164 +6774,42 @@
     var notesField = document.getElementById('taskNotesField');
     var statusPriorityFields = document.getElementById('taskStatusPriorityFields');
     var createPriorityField = document.getElementById('taskCreatePriorityField');
-    var suggestionsPanel = document.getElementById('taskSuggestionsPanel');
     var submitBtn = document.getElementById('taskSubmitBtn');
+    var generateBtn = document.getElementById('taskGenerateBtn');
 
     if (titleField) titleField.classList.toggle('hidden', !isEdit);
     if (notesField) notesField.classList.toggle('hidden', !isEdit);
     if (statusPriorityFields) statusPriorityFields.classList.toggle('hidden', !isEdit);
     if (createPriorityField) createPriorityField.classList.toggle('hidden', isEdit);
-    if (suggestionsPanel) suggestionsPanel.classList.toggle('hidden', isEdit || !workspaceTaskSuggestionState);
+    // LANA suggestions are offered when creating, never required.
+    if (generateBtn) {
+      generateBtn.classList.toggle('hidden', isEdit);
+      generateBtn.loading = false;
+      generateBtn.disabled = false;
+    }
     if (submitBtn && window.Lex && Lex.Utils && Lex.Utils.setLexButtonText) {
-      Lex.Utils.setLexButtonText(submitBtn, isEdit ? 'Save Task' : (workspaceTaskSuggestionState ? 'Create Task' : 'Generate Suggestions'));
+      Lex.Utils.setLexButtonText(submitBtn, isEdit ? 'Save Task' : 'Create Task');
       submitBtn.loading = false;
       submitBtn.disabled = false;
     }
   }
 
-  function setTaskSubmitLoading(label) {
+  function setTaskButtonsBusy(busyBtn, label) {
     var submitBtn = document.getElementById('taskSubmitBtn');
-    if (!submitBtn) return null;
-    if (window.Lex && Lex.Utils && Lex.Utils.setLexButtonText) {
-      Lex.Utils.setLexButtonText(submitBtn, label);
+    var generateBtn = document.getElementById('taskGenerateBtn');
+    [submitBtn, generateBtn].forEach(function (btn) {
+      if (btn) btn.disabled = true;
+    });
+    if (busyBtn) {
+      if (window.Lex && Lex.Utils && Lex.Utils.setLexButtonText) Lex.Utils.setLexButtonText(busyBtn, label);
+      busyBtn.loading = true;
     }
-    submitBtn.loading = true;
-    submitBtn.disabled = true;
-    return submitBtn;
-  }
-
-  function resetWorkspaceTaskSuggestionState() {
-    workspaceTaskSuggestionState = null;
-    var titleEl = document.getElementById('taskSuggestedTitle');
-    if (titleEl) titleEl.value = '';
-    var list = document.getElementById('taskSuggestedSubtasks');
-    if (list) list.innerHTML = '';
-    var wrap = document.getElementById('taskSuggestedSubtasksWrap');
-    if (wrap) wrap.classList.add('hidden');
-    var panel = document.getElementById('taskSuggestionsPanel');
-    if (panel) panel.classList.add('hidden');
   }
 
   function taskFallbackTitle(description) {
     var text = String(description || '').trim().replace(/\s+/g, ' ');
     if (!text) return 'New workspace task';
     return text.length > 90 ? text.slice(0, 87).replace(/\s+\S*$/, '') + '...' : text;
-  }
-
-  function compactWorkspaceStateForTask(state) {
-    if (!state || typeof state !== 'object') return null;
-    return {
-      schema_version: state.schema_version || null,
-      revision: state.revision || null,
-      identity: state.identity || null,
-      standing_summary: state.standing_summary ? {
-        one_line: state.standing_summary.one_line || '',
-        current_posture: state.standing_summary.current_posture || '',
-        latest_material_change: state.standing_summary.latest_material_change || ''
-      } : null,
-      counts: state.counts || {
-        tasks: state.work && state.work.counts ? state.work.counts : null,
-        documents: state.documents && state.documents.counts ? state.documents.counts : null,
-        notes: state.notes_and_conversations && state.notes_and_conversations.notes ? state.notes_and_conversations.notes.counts : null,
-        contacts: state.participants_and_entities && state.participants_and_entities.counts ? state.participants_and_entities.counts : null
-      },
-      open_tasks: (state.open_tasks || (state.work && state.work.open_tasks) || []).slice(0, 8),
-      upcoming_deadlines: (state.upcoming_deadlines || (state.work && state.work.upcoming_deadlines) || []).slice(0, 6),
-      recent_documents: (state.recent_documents || (state.documents && state.documents.recent_documents) || []).slice(0, 8),
-      people: (state.people || (state.participants_and_entities && state.participants_and_entities.people) || []).slice(0, 8),
-      risks: (state.risks || []).slice(0, 6),
-      freshness: state.freshness || null,
-      provenance: state.provenance ? {
-        generated_by: state.provenance.generated_by || null
-      } : null
-    };
-  }
-
-  function buildWorkspaceTaskContext() {
-    var workspaceState = compactWorkspaceStateForTask(currentWorkspaceState);
-
-    return {
-      workspace_state_ref: workspaceState ? {
-        revision: workspaceState.revision || null,
-        schema_version: workspaceState.schema_version || null
-      } : null,
-      client_context_policy: 'ui_reference_only_server_builds_authoritative_workspace_state'
-    };
-  }
-
-  function renderTaskSuggestions(suggestions) {
-    suggestions = suggestions || {};
-    var signature = currentTaskSuggestionSignature();
-    workspaceTaskSuggestionState = {
-      title: suggestions.title || '',
-      description: String((document.getElementById('taskDescription') || {}).value || '').trim(),
-      signature: signature,
-      subtasks: Array.isArray(suggestions.subtasks) ? suggestions.subtasks : [],
-      workspace_state_revision: suggestions.workspace_state_revision || suggestions.workspaceStateRevision || null,
-      source_refs: Array.isArray(suggestions.source_refs) ? suggestions.source_refs : []
-    };
-
-    var titleEl = document.getElementById('taskSuggestedTitle');
-    if (titleEl) titleEl.value = workspaceTaskSuggestionState.title || taskFallbackTitle((document.getElementById('taskDescription') || {}).value);
-
-    var list = document.getElementById('taskSuggestedSubtasks');
-    var wrap = document.getElementById('taskSuggestedSubtasksWrap');
-    if (list) {
-      if (workspaceTaskSuggestionState.subtasks.length) {
-        list.innerHTML = workspaceTaskSuggestionState.subtasks.map(function (item, index) {
-          var title = item.title || item.name || '';
-          var description = item.description || '';
-          return '<label class="flex items-start gap-3 rounded-md border border-gray-200 bg-white p-3 text-sm">' +
-            '<input type="checkbox" class="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600" data-task-suggestion-index="' + index + '" checked>' +
-            '<span class="min-w-0">' +
-              '<span class="block font-medium text-gray-900">' + escapeHtml(title) + '</span>' +
-              (description ? '<span class="block text-gray-500 mt-1">' + escapeHtml(description) + '</span>' : '') +
-            '</span>' +
-          '</label>';
-        }).join('');
-      } else {
-        list.innerHTML = '';
-      }
-    }
-    if (wrap) wrap.classList.toggle('hidden', workspaceTaskSuggestionState.subtasks.length === 0);
-
-    setTaskModalMode(false);
-  }
-
-  async function generateTaskSuggestionsForCreate() {
-    var descriptionEl = document.getElementById('taskDescription');
-    var description = descriptionEl ? String(descriptionEl.value || '').trim() : '';
-    if (!description) {
-      Lex.Toast.error('Describe the task first');
-      return false;
-    }
-
-    var priority = (document.getElementById('taskCreatePriority') || {}).value || 'normal';
-    var dueDate = toApiTimestamp((document.getElementById('taskDueDate') || {}).value);
-    var assigneeId = (document.getElementById('taskAssignedTo') || {}).value || null;
-
-    var response = await api.suggestWorkspaceTask(currentTaskMatterId, {
-      description: description,
-      priority: priority,
-      due_date: dueDate,
-      assigned_to_user_id: assigneeId,
-      workspace_context: buildWorkspaceTaskContext()
-    });
-
-    var suggestions = response && response.suggestions ? response.suggestions : {};
-    if (!suggestions.title) suggestions.title = taskFallbackTitle(description);
-    renderTaskSuggestions(suggestions);
-    Lex.Toast.success('Suggestions ready');
-    return true;
-  }
-
-  function currentTaskSuggestionSignature() {
-    return JSON.stringify({
-      description: String((document.getElementById('taskDescription') || {}).value || '').trim(),
-      priority: (document.getElementById('taskCreatePriority') || {}).value || 'normal',
-      due_date: toApiTimestamp((document.getElementById('taskDueDate') || {}).value),
-      assigned_to_user_id: (document.getElementById('taskAssignedTo') || {}).value || null
-    });
   }
 
   function confirmTaskDueDate() {
@@ -6946,18 +6823,6 @@
   }
   window.confirmTaskDueDate = confirmTaskDueDate;
 
-  function selectedSuggestedSubtasks() {
-    if (!workspaceTaskSuggestionState || !workspaceTaskSuggestionState.subtasks) return [];
-    var selected = [];
-    var boxes = document.querySelectorAll('[data-task-suggestion-index]:checked');
-    for (var i = 0; i < boxes.length; i++) {
-      var index = parseInt(boxes[i].getAttribute('data-task-suggestion-index'), 10);
-      var item = workspaceTaskSuggestionState.subtasks[index];
-      if (item && (item.title || item.name)) selected.push(item);
-    }
-    return selected;
-  }
-
   // Open Create Task Modal
   async function openCreateTaskModal(matterId) {
     currentTaskMatterId = matterId;
@@ -6969,7 +6834,6 @@
     modal.heading = 'Create Task';
     var form = document.getElementById('taskForm');
     if (form) form.reset();
-    resetWorkspaceTaskSuggestionState();
     setTaskModalMode(false);
     var taskIdEl = document.getElementById('taskId');
     if (taskIdEl) taskIdEl.value = '';
@@ -7014,7 +6878,6 @@
       }
 
       currentEditingTask = task;
-      resetWorkspaceTaskSuggestionState();
       var modal = document.getElementById('taskModal');
       if (!modal) return;
 
@@ -7148,130 +7011,102 @@
     }
   }
 
+  // Create a task from the form. With generateSuggestions the server saves
+  // the task and asks LANA for a title and subtasks in the background; the
+  // person gets a notification when they are ready, so the modal never
+  // waits on LANA.
+  async function createTaskFromForm(generateSuggestions) {
+    var descriptionValue = String((document.getElementById('taskDescription') || {}).value || '').trim();
+    if (!descriptionValue) {
+      Lex.Toast.error('Describe the task first');
+      return;
+    }
+
+    var busyBtn = document.getElementById(generateSuggestions ? 'taskGenerateBtn' : 'taskSubmitBtn');
+    setTaskButtonsBusy(busyBtn, generateSuggestions ? 'Starting...' : 'Creating...');
+
+    var taskData = {
+      title: taskFallbackTitle(descriptionValue),
+      description: descriptionValue,
+      notes: null,
+      status: 'pending',
+      priority: (document.getElementById('taskCreatePriority') || {}).value || 'normal',
+      due_date: toApiTimestamp((document.getElementById('taskDueDate') || {}).value),
+      assigned_to_user_id: (document.getElementById('taskAssignedTo') || {}).value || null
+    };
+    if (generateSuggestions) taskData.generate_suggestions = true;
+
+    try {
+      var createdResponse = await api.createTask(currentTaskMatterId, taskData);
+      var createdTask = (createdResponse && (createdResponse.task || createdResponse.data)) || createdResponse || {};
+      var suggestionState = createdTask.lana_suggestions || null;
+
+      closeTaskModal();
+      if (!generateSuggestions) {
+        Lex.Toast.success('Task created');
+      } else if (suggestionState && suggestionState.status === 'failed') {
+        Lex.Toast.error('Task created, but LANA could not start suggestions. You can add subtasks yourself.');
+      } else {
+        Lex.Toast.success('Task created. LANA is suggesting subtasks and will notify you when they are ready.');
+      }
+      await refreshCurrentMatter();
+    } catch (err) {
+      console.error('Create task error:', err);
+      Lex.Toast.error('Failed to create task' + (err && err.message ? ': ' + err.message : ''));
+      setTaskModalMode(false);
+    }
+  }
+
+  function createTaskWithSuggestions() {
+    return createTaskFromForm(true);
+  }
+  window.createTaskWithSuggestions = createTaskWithSuggestions;
+
   // Save Task (Create or Update)
   async function saveTask(event) {
     event.preventDefault();
 
     var taskIdEl = document.getElementById('taskId');
     var taskId = taskIdEl ? taskIdEl.value : '';
-    var isEdit = !!taskId;
+    if (!taskId) {
+      await createTaskFromForm(false);
+      return;
+    }
 
-    var descriptionValue = String((document.getElementById('taskDescription') || {}).value || '').trim();
-    var assignedToUserId = (document.getElementById('taskAssignedTo') || {}).value || null;
-    var createPriority = (document.getElementById('taskCreatePriority') || {}).value || 'normal';
-    var editPriority = (document.getElementById('taskPriority') || {}).value || 'normal';
-    var dueDateValue = toApiTimestamp((document.getElementById('taskDueDate') || {}).value);
-    var suggestedTitleValue = String((document.getElementById('taskSuggestedTitle') || {}).value || '').trim();
+    var taskData = {
+      title: String((document.getElementById('taskTitle') || {}).value || '').trim(),
+      description: String((document.getElementById('taskDescription') || {}).value || '').trim() || null,
+      notes: (document.getElementById('taskNotes') || {}).value || null,
+      status: (document.getElementById('taskStatus') || {}).value || 'pending',
+      priority: (document.getElementById('taskPriority') || {}).value || 'normal',
+      due_date: toApiTimestamp((document.getElementById('taskDueDate') || {}).value),
+      assigned_to_user_id: (document.getElementById('taskAssignedTo') || {}).value || null
+    };
 
-    var taskData = isEdit
-      ? {
-        title: String((document.getElementById('taskTitle') || {}).value || '').trim(),
-        description: descriptionValue || null,
-        notes: (document.getElementById('taskNotes') || {}).value || null,
-        status: (document.getElementById('taskStatus') || {}).value || 'pending',
-        priority: editPriority,
-        due_date: dueDateValue,
-        assigned_to_user_id: assignedToUserId
-      }
-      : {
-        title: suggestedTitleValue || taskFallbackTitle(descriptionValue),
-        description: descriptionValue,
-        notes: null,
-        status: 'pending',
-        priority: createPriority,
-        due_date: dueDateValue,
-        assigned_to_user_id: assignedToUserId,
-        workspace_state_revision: workspaceTaskSuggestionState ? workspaceTaskSuggestionState.workspace_state_revision : null,
-        workspace_state_source_refs: workspaceTaskSuggestionState && Array.isArray(workspaceTaskSuggestionState.source_refs)
-          ? workspaceTaskSuggestionState.source_refs
-          : [],
-        approved_subtasks: []
-      };
-
-    if (isEdit && !taskData.title) {
+    if (!taskData.title) {
       Lex.Toast.error('Title is required');
       return;
     }
 
-    if (!isEdit && !descriptionValue) {
-      Lex.Toast.error('Description is required');
-      return;
-    }
-
-    if (isEdit && isCloseoutTaskStatus(taskData.status)) {
+    if (isCloseoutTaskStatus(taskData.status)) {
       var taskCloseout = readCloseoutCommentary('taskCloseout');
       if (taskCloseout) {
         taskData.closeout_commentary = taskCloseout;
       }
     }
 
-    var submitBtn = setTaskSubmitLoading(isEdit ? 'Updating...' : (workspaceTaskSuggestionState ? 'Creating...' : 'Generating...'));
+    setTaskButtonsBusy(document.getElementById('taskSubmitBtn'), 'Updating...');
 
     try {
-      if (isEdit) {
-        await api.updateTask(taskId, taskData);
-        Lex.Toast.success('Task updated successfully');
-      } else {
-        if (!workspaceTaskSuggestionState) {
-          await generateTaskSuggestionsForCreate();
-          if (submitBtn) {
-            setTaskModalMode(false);
-          }
-          return;
-        }
-
-        if (workspaceTaskSuggestionState.signature !== currentTaskSuggestionSignature()) {
-          resetWorkspaceTaskSuggestionState();
-          await generateTaskSuggestionsForCreate();
-          if (submitBtn) {
-            setTaskModalMode(false);
-          }
-          Lex.Toast.error('Task details changed. Review the updated suggestions.');
-          return;
-        }
-
-        taskData.approved_subtasks = selectedSuggestedSubtasks().map(function (item) {
-          return {
-            title: item.title || item.name || '',
-            description: item.description || null,
-            source_refs: Array.isArray(item.source_refs) ? item.source_refs : []
-          };
-        }).filter(function (item) {
-          return item.title;
-        });
-
-        var createdResponse = await api.createTask(currentTaskMatterId, taskData);
-        var createdTask = (createdResponse && (createdResponse.task || createdResponse.data)) || createdResponse;
-        var createdSubtaskCount = createdTask && Array.isArray(createdTask.subtasks) ? createdTask.subtasks.length : 0;
-        Lex.Toast.success(createdSubtaskCount > 0 ? 'Task and subtasks created successfully' : 'Task created successfully');
-      }
-
+      await api.updateTask(taskId, taskData);
+      Lex.Toast.success('Task updated successfully');
       var modal = document.getElementById('taskModal');
       if (modal) modal.open = false;
-      resetWorkspaceTaskSuggestionState();
-
-      if (submitBtn) {
-        submitBtn.loading = false;
-        submitBtn.disabled = false;
-      }
-
       await refreshCurrentMatter();
-
     } catch (err) {
       console.error('Save task error:', err);
-      // In create mode the first submit generates suggestions; report that
-      // phase accurately instead of claiming task creation failed.
-      var failMsg = isEdit
-        ? 'Failed to update task'
-        : (workspaceTaskSuggestionState ? 'Failed to create task' : 'Failed to generate suggestions');
-      if (err && err.message) failMsg += ': ' + err.message;
-      Lex.Toast.error(failMsg);
-
-      if (submitBtn) {
-        submitBtn.loading = false;
-        submitBtn.disabled = false;
-        setTaskModalMode(isEdit);
-      }
+      Lex.Toast.error('Failed to update task' + (err && err.message ? ': ' + err.message : ''));
+      setTaskModalMode(true);
     }
   }
 
@@ -7281,7 +7116,6 @@
     if (modal) modal.open = false;
     var form = document.getElementById('taskForm');
     if (form) form.reset();
-    resetWorkspaceTaskSuggestionState();
     currentTaskMatterId = null;
     currentEditingTask = null;
   }
@@ -9037,7 +8871,7 @@
             '</div>' +
           '</div>' +
           '<div class="mt-3">' +
-            '<lex-btn onclick="generateMatterIntelligence(\'' + matter.matter_id + '\')" variant="primary" size="sm" leading-icon="zap">Generate</lex-btn>' +
+            '<lex-btn onclick="generateMatterIntelligence(\'' + matter.matter_id + '\')" variant="lana" size="sm">Generate insights</lex-btn>' +
           '</div>';
       } else if (!hasContent) {
         // Profile exists but empty
@@ -9053,7 +8887,7 @@
             '</div>' +
           '</div>' +
           '<div class="mt-3">' +
-            '<lex-btn onclick="generateMatterIntelligence(\'' + matter.matter_id + '\')" variant="primary" size="sm" leading-icon="refresh">Regenerate</lex-btn>' +
+            '<lex-btn onclick="generateMatterIntelligence(\'' + matter.matter_id + '\')" variant="lana" size="sm">Regenerate insights</lex-btn>' +
           '</div>';
       } else {
         // Has content — render brand voice + themes
@@ -10466,7 +10300,7 @@
         '<label for="dgStream" class="text-sm text-gray-600">Stream output in real-time</label>' +
       '</div>' +
       '<div class="pt-3 border-t border-gray-200">' +
-        '<lex-btn type="submit" variant="primary" id="dgSubmitBtn">Generate Document</lex-btn>' +
+        '<lex-btn type="submit" variant="lana" id="dgSubmitBtn">Generate Document</lex-btn>' +
       '</div>' +
     '</form>';
   }
