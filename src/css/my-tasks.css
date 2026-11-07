@@ -1506,3 +1506,13 @@
   display: flex;
   gap: var(--lex-spacing-sm, 0.5rem);
 }
+
+/* Jira-style task and subtask key (M17-3) in the task drawer */
+.my-task-issue__key {
+  margin-left: 0.5rem;
+  font-family: var(--lex-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--lex-text-secondary, #4b5563);
+}
+.my-task-subtask-row__title .my-task-issue__key { margin-left: 0; margin-right: 0.25rem; }

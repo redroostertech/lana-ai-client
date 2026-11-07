@@ -205,6 +205,7 @@
       id: String(firstDefined(item.id, item.task_id, 'subtask-' + index)),
       title: firstDefined(item.title, item.name, item.description, 'Subtask'),
       status: normalizeStatus(firstDefined(item.status, 'pending')),
+      item_key: firstDefined(item.item_key, ''),
       assignee: firstDefined(item.assignee_name, item.assignee, item.assigned_to_name, ''),
       due_date: firstDefined(item.due_date, item.dueDate, '')
     };
@@ -293,7 +294,7 @@
     return [
       '<header class="my-task-issue__hero">',
       '  <div class="my-task-issue__headline">',
-      '    <div class="my-task-issue__eyebrow"><lex-badge label="' + (task.matter_id ? 'Workspace' : 'Organization') + '" color="blue"></lex-badge></div>',
+      '    <div class="my-task-issue__eyebrow"><lex-badge label="' + (task.matter_id ? 'Workspace' : 'Organization') + '" color="blue"></lex-badge>' + (task.item_key ? '<span class="my-task-issue__key">' + esc(task.item_key) + '</span>' : '') + '</div>',
       '    <h2>' + esc(taskTitle(task)) + '</h2>',
       '    <div class="my-task-issue__quick-meta">',
       '      <span>' + iconHtml('briefcase') + esc(taskMatterName(task) || 'Organization-level') + '</span>',
@@ -385,7 +386,7 @@
           '<div class="my-task-subtask-row">',
           '  <button type="button" class="my-task-subtask-row__check" data-shared-subtask-toggle="' + esc(item.id) + '">' + iconHtml(complete ? 'check-circle' : 'circle') + '</button>',
           '  <div class="my-task-subtask-row__body">',
-          '    <div class="my-task-subtask-row__title ' + (complete ? 'is-complete' : '') + '">' + esc(item.title) + '</div>',
+          '    <div class="my-task-subtask-row__title ' + (complete ? 'is-complete' : '') + '">' + (item.item_key ? '<span class="my-task-issue__key">' + esc(item.item_key) + '</span> ' : '') + esc(item.title) + '</div>',
           '    <div class="my-task-subtask-row__meta"><lex-badge label="' + esc(statusLabel(item.status)) + '" color="' + esc(statusColor(item.status)) + '"></lex-badge></div>',
           '  </div>',
           '</div>'
@@ -671,6 +672,7 @@
       }
       addActivity(store, 'Added subtask "' + subtask + '"');
       render();
+      refreshBoard(store);
       return;
     }
     if (kind === 'document') {
@@ -810,6 +812,12 @@
     }
     addActivity(store, (item.status === 'complete' ? 'Completed' : 'Reopened') + ' subtask "' + item.title + '"');
     render();
+    refreshBoard(store);
+  }
+
+  // The Board shows subtasks as cards; refresh it after a saved subtask change.
+  function refreshBoard(store) {
+    if (store && store.subtasksRemote && state.options && typeof state.options.onRefresh === 'function') state.options.onRefresh();
   }
 
   async function reviewSuggestions(decision) {

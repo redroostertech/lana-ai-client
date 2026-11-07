@@ -168,6 +168,28 @@ describe('task drawer subtasks', () => {
   });
 });
 
+describe('task drawer keys', () => {
+  test('shows the task key and each subtask key', async () => {
+    const api = apiStub({ listSubtasks: jest.fn(async () => ({ data: [{ id: SUB_A, item_key: 'M17-4', name: 'Verify the statement', status: 'pending' }] })) });
+    const { drawer, html } = loadDrawer(api);
+    drawer.open(boardTask({ item_key: 'M17-3' }));
+    await flush();
+    expect(html()).toContain('<span class="my-task-issue__key">M17-3</span>');
+    expect(html()).toContain('<span class="my-task-issue__key">M17-4</span> Verify the statement');
+  });
+
+  test('a saved subtask change refreshes the Board behind the drawer', async () => {
+    const api = apiStub();
+    const onRefresh = jest.fn();
+    const { drawer, fire } = loadDrawer(api);
+    drawer.open(boardTask(), { onRefresh });
+    await flush();
+    fire('click', { 'data-shared-subtask-toggle': SUB_A });
+    await flush();
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('task drawer LANA suggestions', () => {
   const ready = {
     status: 'ready',

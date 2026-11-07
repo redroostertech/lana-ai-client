@@ -58,3 +58,60 @@
     gap: 0.75rem;
   }
 }
+
+/* Board cards: type and key (Task M17-3, Subtask M17-4), the parent link on a
+   subtask card, and a task's subtask count. */
+.kanban-card__type-row {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-bottom: 0.375rem;
+  font-size: 0.6875rem;
+  line-height: 1;
+}
+.kanban-card__type {
+  padding: 0.1875rem 0.375rem;
+  border-radius: 0.25rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.kanban-card__type--task {
+  background: var(--lex-color-blue-50, #eff6ff);
+  color: var(--lex-color-blue-700, #1d4ed8);
+}
+.kanban-card__type--subtask {
+  background: rgba(124, 58, 237, 0.08);
+  color: #6d28d9;
+}
+.kanban-card__key {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-family: var(--lex-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-weight: 600;
+  color: var(--lex-text-secondary, #4b5563);
+}
+.kanban-card.kanban-card--subtask {
+  border-left: 3px solid rgba(124, 58, 237, 0.45);
+}
+.kanban-card__parent .kanban-card__key { font-size: 0.6875rem; }
+.kanban-card__parent {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
+  min-width: 0;
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary, #6b7280);
+}
+.kanban-card__parent-label { flex-shrink: 0; }
+.kanban-card__parent-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kanban-card__subtasks {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--lex-text-secondary, #4b5563);
+}

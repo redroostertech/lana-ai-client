@@ -5257,12 +5257,19 @@
     var content = document.getElementById('tabContentTasks');
     if (!content) return;
 
+    // Tasks and their subtasks, each subtask as its own card linked to its task.
+    var boardItems = window.LanaBoardWorkItems ? LanaBoardWorkItems.boardItems(allTasks) : allTasks;
+    var inColumn = function (column) {
+      return boardItems.filter(function (item) {
+        return (window.LanaBoardWorkItems ? LanaBoardWorkItems.columnFor(item) : item.status) === column;
+      });
+    };
     var tasksByStatus = {
-      pending:     allTasks.filter(function (t) { return t.status === 'pending'     || t.status === 'Pending'; }),
-      in_progress: allTasks.filter(function (t) { return t.status === 'in_progress' || t.status === 'In Progress'; }),
-      in_review:   allTasks.filter(function (t) { return t.status === 'in_review'   || t.status === 'In Review'; }),
-      complete:    allTasks.filter(function (t) { return t.status === 'complete'    || t.status === 'Complete'; }),
-      cancelled:   allTasks.filter(function (t) { return t.status === 'cancelled'   || t.status === 'Cancelled'; })
+      pending:     inColumn('pending'),
+      in_progress: inColumn('in_progress'),
+      in_review:   inColumn('in_review'),
+      complete:    inColumn('complete'),
+      cancelled:   inColumn('cancelled')
     };
 
     var lanaCount = allTasks.filter(function (t) { return t.source === 'lana'; }).length;
@@ -5343,9 +5350,41 @@
     '</div>';
   }
 
+  // Type and key row, as Jira shows them: "Task M17-3", "Subtask M17-4".
+  function _kanbanTypeKeyHtml(type, key) {
+    return '<div class="kanban-card__type-row">' +
+      '<span class="kanban-card__type kanban-card__type--' + type.toLowerCase() + '">' + type + '</span>' +
+      (key ? '<span class="kanban-card__key">' + escapeHtml(key) + '</span>' : '') +
+    '</div>';
+  }
+
+  function _renderKanbanSubtaskCard(item) {
+    var dataAttr = 'data-task-id="' + escapeHtml(item.id) + '" data-item-kind="subtask" data-parent-task-id="' + escapeHtml(item.parent_id) + '"';
+    var dueHtml = item.due_date
+      ? '<div class="flex items-center gap-1 text-xs text-gray-500 mt-2">' + formatDueDate(item.due_date) + '</div>'
+      : '';
+    return '<div class="kanban-card kanban-card--subtask bg-white border border-gray-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-all cursor-move" draggable="true" ' + dataAttr +
+      ' ondragstart="handleKanbanDragStart(event)" ondragend="handleKanbanDragEnd(event)" onclick="openTaskQuickView(\'' + escapeHtml(item.parent_id) + '\')">' +
+      _kanbanTypeKeyHtml('Subtask', item.item_key) +
+      '<h5 class="text-sm font-medium text-gray-900 line-clamp-2">' + escapeHtml(item.title) + '</h5>' +
+      '<div class="kanban-card__parent" title="' + escapeHtml(item.parent_title) + '">' +
+        '<span class="kanban-card__parent-label">Part of</span>' +
+        (item.parent_key ? '<span class="kanban-card__key">' + escapeHtml(item.parent_key) + '</span>' : '') +
+        '<span class="kanban-card__parent-title">' + escapeHtml(item.parent_title) + '</span>' +
+      '</div>' +
+      dueHtml +
+    '</div>';
+  }
+
   function _renderKanbanCard(task) {
+    if (task && task.kind === 'subtask') return _renderKanbanSubtaskCard(task);
     var isLana = task.source === 'lana';
     var title = escapeHtml(task.title || task.task_name || '');
+    var subtaskTotal = Array.isArray(task.subtasks) ? task.subtasks.length : 0;
+    var subtaskDone = subtaskTotal ? task.subtasks.filter(function (s) { return s && s.status === 'completed'; }).length : 0;
+    var subtaskSummaryHtml = subtaskTotal
+      ? '<div class="kanban-card__subtasks">' + subtaskDone + '/' + subtaskTotal + ' subtasks</div>'
+      : '';
 
     var externalBadge = !isLana
       ? '<span class="text-xs lex-bg-accent-soft lex-text-accent px-2 py-0.5 rounded flex-shrink-0">External</span>'
@@ -5372,7 +5411,8 @@
     // Serialize task data for drag; avoid injecting raw JSON into HTML
     var taskDataAttr = 'data-task-id="' + task.id + '" data-task-status="' + escapeHtml(task.status) + '"';
 
-    return '<div class="bg-white border border-gray-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-all ' + (isLana ? 'cursor-move' : 'cursor-default') + '" draggable="' + isLana + '" ' + taskDataAttr + ' ondragstart="handleKanbanDragStart(event)" ondragend="handleKanbanDragEnd(event)" onclick="openTaskQuickView(\'' + task.id + '\')">' +
+    return '<div class="kanban-card bg-white border border-gray-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-all ' + (isLana ? 'cursor-move' : 'cursor-default') + '" draggable="' + isLana + '" ' + taskDataAttr + ' ondragstart="handleKanbanDragStart(event)" ondragend="handleKanbanDragEnd(event)" onclick="openTaskQuickView(\'' + task.id + '\')">' +
+      (isLana ? _kanbanTypeKeyHtml('Task', task.item_key) : '') +
       '<div class="flex items-start gap-2 mb-2">' +
         '<h5 class="text-sm font-medium text-gray-900 flex-1 line-clamp-2">' + title + '</h5>' +
         externalBadge +
@@ -5382,6 +5422,7 @@
       assigneeHtml +
       dueDateHtml +
       descHtml +
+      subtaskSummaryHtml +
       taskRuleChipsHtml(task) +
       (Array.isArray(task.actions) && task.actions.length ? '<div data-task-actions-for="' + escapeHtml(String(task.id)) + '" hidden></div>' : '') +
       taskProvenanceHtml(task) +
@@ -5400,7 +5441,15 @@
     // Find the dragged card's task id and look it up
     var card = event.currentTarget;
     var taskId = card && card.dataset.taskId;
-    _draggedTask = taskId ? currentTasksList.find(function (t) { return String(t.id) === String(taskId); }) : null;
+    if (card && card.dataset.itemKind === 'subtask') {
+      var parent = currentTasksList.find(function (t) { return String(t.id) === String(card.dataset.parentTaskId); });
+      var subtask = parent && Array.isArray(parent.subtasks)
+        ? parent.subtasks.find(function (s) { return String(s.id) === String(taskId); })
+        : null;
+      _draggedTask = subtask ? { kind: 'subtask', id: String(subtask.id), status: subtask.status || 'pending', title: subtask.title } : null;
+    } else {
+      _draggedTask = taskId ? currentTasksList.find(function (t) { return String(t.id) === String(taskId); }) : null;
+    }
     event.dataTransfer.effectAllowed = 'move';
     if (card) card.classList.add('opacity-50');
   };
@@ -5427,6 +5476,10 @@
     if (!_draggedTask) return;
 
     var task = _draggedTask;
+    if (task.kind === 'subtask') {
+      await _moveSubtaskCard(task, newStatus);
+      return;
+    }
     // Normalize: convert spaces to underscores
     var oldStatusNorm = task.status.split(' ').join('_').toLowerCase();
     var newStatusNorm = newStatus.split(' ').join('_').toLowerCase();
@@ -5457,6 +5510,39 @@
       Lex.Toast.error('Failed to move task');
     }
   };
+
+  async function _reloadBoardTasks() {
+    var matterId = (currentMatterData && currentMatterData.matter_id) ||
+                   (currentMatterData && currentMatterData.matter && currentMatterData.matter.matter_id);
+    if (!matterId) return;
+    var response = await api.getMatterTasks(matterId);
+    var updatedTasks = response.tasks || [];
+    if (currentMatterData) {
+      currentMatterData.tasks = updatedTasks;
+      renderTasksTab(currentMatterData.matter, updatedTasks);
+    } else {
+      currentTasksList = updatedTasks;
+      renderKanbanBoard(matterId, updatedTasks);
+    }
+  }
+
+  // A subtask card moves only that subtask. Subtasks have no review step.
+  async function _moveSubtaskCard(item, column) {
+    var nextStatus = window.LanaBoardWorkItems ? LanaBoardWorkItems.subtaskStatusForColumn(column) : null;
+    if (!nextStatus) {
+      Lex.Toast.error('Subtasks have no review step. Move it to In Progress or Complete.');
+      return;
+    }
+    if (window.LanaBoardWorkItems && LanaBoardWorkItems.columnFor(item) === column) return;
+    try {
+      await api.updateSubtask(item.id, { status: nextStatus });
+      Lex.Toast.success('Subtask moved to ' + column.split('_').join(' '));
+      await _reloadBoardTasks();
+    } catch (error) {
+      console.error('[Tasks] Failed to move subtask:', error);
+      Lex.Toast.error('Failed to move subtask');
+    }
+  }
 
   async function _updateTaskStatus(taskId, newStatus) {
     var task = currentTasksList.find(function (t) { return t.id === taskId; });
