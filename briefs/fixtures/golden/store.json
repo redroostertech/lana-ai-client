@@ -1,0 +1,396 @@
+{
+  "aad_prefix" : "lana.gateway|",
+  "data_key" : "6afcf503148c6b44dc385fba1522749170a1ecb8e81fdefcac81bc2f96e14f41",
+  "entries" : [
+    {
+      "at" : "2027-01-15T08:00:00.000Z",
+      "detail" : "{}",
+      "event" : "device.paired",
+      "hash" : "db8bbdf0ce842965d542b8b440d8e252df09372a098fb228d1bc4654b3eb5a98",
+      "prev_hash" : "0000000000000000000000000000000000000000000000000000000000000000",
+      "seq" : 1,
+      "subject" : "dev_01JCQ7A1B2C3D4E5F6G7H8J9K0"
+    },
+    {
+      "at" : "2027-01-15T08:00:01.500Z",
+      "detail" : "{\"account\":\"acct-42\",\"scopes\":\"matters,contacts\"}",
+      "event" : "connector.linked",
+      "hash" : "5d7c9bd3bc9257f303641136372a683983fc593d2477d8628e69e46df831c7fc",
+      "prev_hash" : "db8bbdf0ce842965d542b8b440d8e252df09372a098fb228d1bc4654b3eb5a98",
+      "seq" : 2,
+      "subject" : "clio"
+    },
+    {
+      "at" : "2027-01-15T08:00:01.501Z",
+      "detail" : "{\"note\":\"Ünïcödé \\\"quoted\\\" back\\\\slash | pipe / slash \\n newline \\u0001 ctl 😀   \",\"state\":\"active\"}",
+      "event" : "license.changed",
+      "hash" : "de6b1cd96e097353f733810c96ad15dea523fd7074248a9697932a6146399ce8",
+      "prev_hash" : "5d7c9bd3bc9257f303641136372a683983fc593d2477d8628e69e46df831c7fc",
+      "seq" : 3,
+      "subject" : "license"
+    },
+    {
+      "at" : "2027-01-15T08:01:01.501Z",
+      "detail" : "{\"A\":\"upper\",\"intent_id\":\"int_01JCQ8A1B2C3D4E5F6G7H8J9K0\",\"type\":\"note.log\",\"z\":\"\",\"é\":\"e\"}",
+      "event" : "action.executed",
+      "hash" : "b948026bb09b035ff5c5221d417044e02736a2c6bb238f85dbf3c41d66417c8d",
+      "prev_hash" : "de6b1cd96e097353f733810c96ad15dea523fd7074248a9697932a6146399ce8",
+      "seq" : 4,
+      "subject" : "int_01JCQ8A1B2C3D4E5F6G7H8J9K0|x"
+    },
+    {
+      "at" : "2027-01-15T09:01:01.501Z",
+      "detail" : "{}",
+      "event" : "device.revoked",
+      "hash" : "90edc70b89f15d5656a9915382541e2b8f681fd4665d1ac1d47b6767cec0268f",
+      "prev_hash" : "b948026bb09b035ff5c5221d417044e02736a2c6bb238f85dbf3c41d66417c8d",
+      "seq" : 5,
+      "subject" : "dev_01JCQ7A1B2C3D4E5F6G7H8J9K0"
+    },
+    {
+      "at" : "2028-02-19T09:01:01.501Z",
+      "detail" : "{}",
+      "event" : "audio.purged",
+      "hash" : "ced37bb84415998c67d17075bab54d94d35f1c6dcca55494ecbc632f75e459bc",
+      "prev_hash" : "90edc70b89f15d5656a9915382541e2b8f681fd4665d1ac1d47b6767cec0268f",
+      "seq" : 6,
+      "subject" : ""
+    }
+  ],
+  "export" : "{\"at\":\"2027-01-15T08:00:00.000Z\",\"detail\":\"{}\",\"event\":\"device.paired\",\"hash\":\"db8bbdf0ce842965d542b8b440d8e252df09372a098fb228d1bc4654b3eb5a98\",\"prev_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"seq\":1,\"subject\":\"dev_01JCQ7A1B2C3D4E5F6G7H8J9K0\"}\n{\"at\":\"2027-01-15T08:00:01.500Z\",\"detail\":\"{\\\"account\\\":\\\"acct-42\\\",\\\"scopes\\\":\\\"matters,contacts\\\"}\",\"event\":\"connector.linked\",\"hash\":\"5d7c9bd3bc9257f303641136372a683983fc593d2477d8628e69e46df831c7fc\",\"prev_hash\":\"db8bbdf0ce842965d542b8b440d8e252df09372a098fb228d1bc4654b3eb5a98\",\"seq\":2,\"subject\":\"clio\"}\n{\"at\":\"2027-01-15T08:00:01.501Z\",\"detail\":\"{\\\"note\\\":\\\"Ünïcödé \\\\\\\"quoted\\\\\\\" back\\\\\\\\slash | pipe / slash \\\\n newline \\\\u0001 ctl 😀   \\\",\\\"state\\\":\\\"active\\\"}\",\"event\":\"license.changed\",\"hash\":\"de6b1cd96e097353f733810c96ad15dea523fd7074248a9697932a6146399ce8\",\"prev_hash\":\"5d7c9bd3bc9257f303641136372a683983fc593d2477d8628e69e46df831c7fc\",\"seq\":3,\"subject\":\"license\"}\n{\"at\":\"2027-01-15T08:01:01.501Z\",\"detail\":\"{\\\"A\\\":\\\"upper\\\",\\\"intent_id\\\":\\\"int_01JCQ8A1B2C3D4E5F6G7H8J9K0\\\",\\\"type\\\":\\\"note.log\\\",\\\"z\\\":\\\"\\\",\\\"é\\\":\\\"e\\\"}\",\"event\":\"action.executed\",\"hash\":\"b948026bb09b035ff5c5221d417044e02736a2c6bb238f85dbf3c41d66417c8d\",\"prev_hash\":\"de6b1cd96e097353f733810c96ad15dea523fd7074248a9697932a6146399ce8\",\"seq\":4,\"subject\":\"int_01JCQ8A1B2C3D4E5F6G7H8J9K0|x\"}\n{\"at\":\"2027-01-15T09:01:01.501Z\",\"detail\":\"{}\",\"event\":\"device.revoked\",\"hash\":\"90edc70b89f15d5656a9915382541e2b8f681fd4665d1ac1d47b6767cec0268f\",\"prev_hash\":\"b948026bb09b035ff5c5221d417044e02736a2c6bb238f85dbf3c41d66417c8d\",\"seq\":5,\"subject\":\"dev_01JCQ7A1B2C3D4E5F6G7H8J9K0\"}\n{\"at\":\"2028-02-19T09:01:01.501Z\",\"detail\":\"{}\",\"event\":\"audio.purged\",\"hash\":\"ced37bb84415998c67d17075bab54d94d35f1c6dcca55494ecbc632f75e459bc\",\"prev_hash\":\"90edc70b89f15d5656a9915382541e2b8f681fd4665d1ac1d47b6767cec0268f\",\"seq\":6,\"subject\":\"\"}\n{\"entries\":\"6\",\"head\":\"ced37bb84415998c67d17075bab54d94d35f1c6dcca55494ecbc632f75e459bc\",\"intact\":\"true\"}\n",
+  "intact" : true,
+  "migrations" : [
+    "v1_core",
+    "v2_ask_threads",
+    "v3_action_inbox",
+    "v4_action_seen",
+    "v5_local_meetings"
+  ],
+  "schema" : [
+    {
+      "name" : "ask_thread_meeting",
+      "sql" : "CREATE INDEX ask_thread_meeting ON ask_thread(meeting_id)",
+      "tbl_name" : "ask_thread",
+      "type" : "index"
+    },
+    {
+      "name" : "intent_deleted_status",
+      "sql" : "CREATE INDEX intent_deleted_status ON intent(deleted_at, status)",
+      "tbl_name" : "intent",
+      "type" : "index"
+    },
+    {
+      "name" : "intent_meeting",
+      "sql" : "CREATE INDEX intent_meeting ON intent(meeting_id)",
+      "tbl_name" : "intent",
+      "type" : "index"
+    },
+    {
+      "name" : "intent_status",
+      "sql" : "CREATE INDEX intent_status ON intent(status)",
+      "tbl_name" : "intent",
+      "type" : "index"
+    },
+    {
+      "name" : "intent_type",
+      "sql" : "CREATE INDEX intent_type ON intent(type)",
+      "tbl_name" : "intent",
+      "type" : "index"
+    },
+    {
+      "name" : "intent_updated",
+      "sql" : "CREATE INDEX intent_updated ON intent(updated_at)",
+      "tbl_name" : "intent",
+      "type" : "index"
+    },
+    {
+      "name" : "manual_action_deleted_status",
+      "sql" : "CREATE INDEX manual_action_deleted_status ON manual_action(deleted_at, status)",
+      "tbl_name" : "manual_action",
+      "type" : "index"
+    },
+    {
+      "name" : "manual_action_meeting",
+      "sql" : "CREATE INDEX manual_action_meeting ON manual_action(meeting_id)",
+      "tbl_name" : "manual_action",
+      "type" : "index"
+    },
+    {
+      "name" : "manual_action_type",
+      "sql" : "CREATE INDEX manual_action_type ON manual_action(type)",
+      "tbl_name" : "manual_action",
+      "type" : "index"
+    },
+    {
+      "name" : "manual_action_updated",
+      "sql" : "CREATE INDEX manual_action_updated ON manual_action(updated_at)",
+      "tbl_name" : "manual_action",
+      "type" : "index"
+    },
+    {
+      "name" : "sqlite_autoindex_ask_thread_1",
+      "sql" : null,
+      "tbl_name" : "ask_thread",
+      "type" : "index"
+    },
+    {
+      "name" : "sqlite_autoindex_audit_log_1",
+      "sql" : null,
+      "tbl_name" : "audit_log",
+      "type" : "index"
+    },
+    {
+      "name" : "sqlite_autoindex_bundle_receipt_1",
+      "sql" : null,
+      "tbl_name" : "bundle_receipt",
+      "type" : "index"
+    },
+    {
+      "name" : "sqlite_autoindex_grdb_migrations_1",
+      "sql" : null,
+      "tbl_name" : "grdb_migrations",
+      "type" : "index"
+    },
+    {
+      "name" : "sqlite_autoindex_idempotency_ledger_1",
+      "sql" : null,
+      "tbl_name" : "idempotency_ledger",
+      "type" : "index"
+    },
+    {
+      "name" : "sqlite_autoindex_intent_1",
+      "sql" : null,
+      "tbl_name" : "intent",
+      "type" : "index"
+    },
+    {
+      "name" : "sqlite_autoindex_manual_action_1",
+      "sql" : null,
+      "tbl_name" : "manual_action",
+      "type" : "index"
+    },
+    {
+      "name" : "sqlite_autoindex_meeting_1",
+      "sql" : null,
+      "tbl_name" : "meeting",
+      "type" : "index"
+    },
+    {
+      "name" : "sqlite_autoindex_meeting_2",
+      "sql" : null,
+      "tbl_name" : "meeting",
+      "type" : "index"
+    },
+    {
+      "name" : "sqlite_autoindex_meeting_audio_1",
+      "sql" : null,
+      "tbl_name" : "meeting_audio",
+      "type" : "index"
+    },
+    {
+      "name" : "sqlite_autoindex_paired_device_1",
+      "sql" : null,
+      "tbl_name" : "paired_device",
+      "type" : "index"
+    },
+    {
+      "name" : "sqlite_autoindex_setting_1",
+      "sql" : null,
+      "tbl_name" : "setting",
+      "type" : "index"
+    },
+    {
+      "name" : "ask_thread",
+      "sql" : "CREATE TABLE ask_thread (\n    id TEXT PRIMARY KEY,\n    meeting_id TEXT REFERENCES meeting(id) ON DELETE CASCADE,\n    sealed_turns BLOB NOT NULL,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL\n)",
+      "tbl_name" : "ask_thread",
+      "type" : "table"
+    },
+    {
+      "name" : "audit_log",
+      "sql" : "CREATE TABLE audit_log (\n    seq INTEGER PRIMARY KEY AUTOINCREMENT,\n    at TEXT NOT NULL,\n    event TEXT NOT NULL,\n    subject TEXT NOT NULL,\n    detail TEXT NOT NULL,\n    prev_hash TEXT NOT NULL,\n    hash TEXT NOT NULL UNIQUE\n)",
+      "tbl_name" : "audit_log",
+      "type" : "table"
+    },
+    {
+      "name" : "bundle_receipt",
+      "sql" : "CREATE TABLE bundle_receipt (\n    bundle_id TEXT PRIMARY KEY,\n    receipt TEXT NOT NULL,\n    manifest TEXT NOT NULL,\n    received_at TEXT NOT NULL\n)",
+      "tbl_name" : "bundle_receipt",
+      "type" : "table"
+    },
+    {
+      "name" : "entity_mirror",
+      "sql" : "CREATE VIRTUAL TABLE \"entity_mirror\" USING fts5(source UNINDEXED, external_id UNINDEXED, kind UNINDEXED, name, email, display_number, client_name, tokenize='''unicode61'' ''remove_diacritics'' ''2''')",
+      "tbl_name" : "entity_mirror",
+      "type" : "table"
+    },
+    {
+      "name" : "entity_mirror_config",
+      "sql" : "CREATE TABLE 'entity_mirror_config'(k PRIMARY KEY, v) WITHOUT ROWID",
+      "tbl_name" : "entity_mirror_config",
+      "type" : "table"
+    },
+    {
+      "name" : "entity_mirror_content",
+      "sql" : "CREATE TABLE 'entity_mirror_content'(id INTEGER PRIMARY KEY, c0, c1, c2, c3, c4, c5, c6)",
+      "tbl_name" : "entity_mirror_content",
+      "type" : "table"
+    },
+    {
+      "name" : "entity_mirror_data",
+      "sql" : "CREATE TABLE 'entity_mirror_data'(id INTEGER PRIMARY KEY, block BLOB)",
+      "tbl_name" : "entity_mirror_data",
+      "type" : "table"
+    },
+    {
+      "name" : "entity_mirror_docsize",
+      "sql" : "CREATE TABLE 'entity_mirror_docsize'(id INTEGER PRIMARY KEY, sz BLOB)",
+      "tbl_name" : "entity_mirror_docsize",
+      "type" : "table"
+    },
+    {
+      "name" : "entity_mirror_idx",
+      "sql" : "CREATE TABLE 'entity_mirror_idx'(segid, term, pgno, PRIMARY KEY(segid, term)) WITHOUT ROWID",
+      "tbl_name" : "entity_mirror_idx",
+      "type" : "table"
+    },
+    {
+      "name" : "grdb_migrations",
+      "sql" : "CREATE TABLE grdb_migrations (identifier TEXT NOT NULL PRIMARY KEY)",
+      "tbl_name" : "grdb_migrations",
+      "type" : "table"
+    },
+    {
+      "name" : "idempotency_ledger",
+      "sql" : "CREATE TABLE idempotency_ledger (\n    key TEXT PRIMARY KEY,\n    plan_hash TEXT NOT NULL,\n    status TEXT NOT NULL CHECK (status IN ('pending', 'completed', 'failed')),\n    result TEXT,\n    error TEXT,\n    attempts INTEGER NOT NULL DEFAULT 1,\n    started_at TEXT NOT NULL,\n    finished_at TEXT\n)",
+      "tbl_name" : "idempotency_ledger",
+      "type" : "table"
+    },
+    {
+      "name" : "intent",
+      "sql" : "CREATE TABLE intent (\n    id TEXT PRIMARY KEY,\n    meeting_id TEXT NOT NULL REFERENCES meeting(id) ON DELETE CASCADE,\n    type TEXT NOT NULL,\n    status TEXT NOT NULL,\n    idempotency_key TEXT NOT NULL,\n    sealed_intent BLOB NOT NULL,\n    resolution BLOB,\n    updated_at TEXT NOT NULL\n, deleted_at TEXT, seen_at TEXT)",
+      "tbl_name" : "intent",
+      "type" : "table"
+    },
+    {
+      "name" : "intent_event",
+      "sql" : "CREATE TABLE intent_event (\n    seq INTEGER PRIMARY KEY AUTOINCREMENT,\n    intent_id TEXT NOT NULL REFERENCES intent(id) ON DELETE CASCADE,\n    from_status TEXT,\n    to_status TEXT NOT NULL,\n    actor TEXT NOT NULL,\n    detail TEXT,\n    at TEXT NOT NULL\n)",
+      "tbl_name" : "intent_event",
+      "type" : "table"
+    },
+    {
+      "name" : "manual_action",
+      "sql" : "CREATE TABLE manual_action (\n    id TEXT PRIMARY KEY,\n    meeting_id TEXT REFERENCES meeting(id) ON DELETE SET NULL,\n    type TEXT NOT NULL,\n    status TEXT NOT NULL,\n    idempotency_key TEXT NOT NULL,\n    sealed_action BLOB NOT NULL,\n    resolution BLOB,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    deleted_at TEXT\n, seen_at TEXT)",
+      "tbl_name" : "manual_action",
+      "type" : "table"
+    },
+    {
+      "name" : "meeting",
+      "sql" : "CREATE TABLE \"meeting\" (\n    id TEXT PRIMARY KEY,\n    bundle_id TEXT NOT NULL UNIQUE,\n    phone_device_id TEXT REFERENCES paired_device(device_id),\n    started_at TEXT NOT NULL,\n    duration_seconds REAL NOT NULL,\n    received_at TEXT NOT NULL,\n    attestation_method TEXT NOT NULL,\n    attestation_latency_ms INTEGER NOT NULL,\n    sealed_record BLOB NOT NULL,\n    origin TEXT NOT NULL DEFAULT 'phone' CHECK (origin IN ('phone', 'computer')),\n    CHECK ((origin = 'phone') = (phone_device_id IS NOT NULL))\n)",
+      "tbl_name" : "meeting",
+      "type" : "table"
+    },
+    {
+      "name" : "meeting_audio",
+      "sql" : "CREATE TABLE meeting_audio (\n    meeting_id TEXT NOT NULL REFERENCES meeting(id) ON DELETE CASCADE,\n    idx INTEGER NOT NULL,\n    name TEXT NOT NULL,\n    file_name TEXT NOT NULL,\n    byte_count INTEGER NOT NULL,\n    purged_at TEXT,\n    PRIMARY KEY (meeting_id, idx)\n)",
+      "tbl_name" : "meeting_audio",
+      "type" : "table"
+    },
+    {
+      "name" : "outbox",
+      "sql" : "CREATE TABLE outbox (\n    seq INTEGER PRIMARY KEY AUTOINCREMENT,\n    event TEXT NOT NULL,\n    payload TEXT NOT NULL,\n    created_at TEXT NOT NULL,\n    delivered_at TEXT\n)",
+      "tbl_name" : "outbox",
+      "type" : "table"
+    },
+    {
+      "name" : "paired_device",
+      "sql" : "CREATE TABLE paired_device (\n    device_id TEXT PRIMARY KEY,\n    display_name TEXT NOT NULL,\n    signing_key BLOB NOT NULL,\n    agreement_key BLOB NOT NULL,\n    transport_psk BLOB NOT NULL,\n    paired_at TEXT NOT NULL,\n    revoked_at TEXT\n)",
+      "tbl_name" : "paired_device",
+      "type" : "table"
+    },
+    {
+      "name" : "setting",
+      "sql" : "CREATE TABLE setting (\n    key TEXT PRIMARY KEY,\n    value TEXT NOT NULL\n)",
+      "tbl_name" : "setting",
+      "type" : "table"
+    },
+    {
+      "name" : "sqlite_sequence",
+      "sql" : "CREATE TABLE sqlite_sequence(name,seq)",
+      "tbl_name" : "sqlite_sequence",
+      "type" : "table"
+    },
+    {
+      "name" : "audit_append_only_delete",
+      "sql" : "CREATE TRIGGER audit_append_only_delete BEFORE DELETE ON audit_log\nBEGIN SELECT RAISE(ABORT, 'audit_log is append-only'); END",
+      "tbl_name" : "audit_log",
+      "type" : "trigger"
+    },
+    {
+      "name" : "audit_append_only_update",
+      "sql" : "CREATE TRIGGER audit_append_only_update BEFORE UPDATE ON audit_log\nBEGIN SELECT RAISE(ABORT, 'audit_log is append-only'); END",
+      "tbl_name" : "audit_log",
+      "type" : "trigger"
+    },
+    {
+      "name" : "intent_event_append_only_delete",
+      "sql" : "CREATE TRIGGER intent_event_append_only_delete BEFORE DELETE ON intent_event\nWHEN (SELECT COUNT(*) FROM intent WHERE id = OLD.intent_id) > 0\nBEGIN SELECT RAISE(ABORT, 'intent_event is append-only'); END",
+      "tbl_name" : "intent_event",
+      "type" : "trigger"
+    },
+    {
+      "name" : "intent_event_append_only_update",
+      "sql" : "CREATE TRIGGER intent_event_append_only_update BEFORE UPDATE ON intent_event\nBEGIN SELECT RAISE(ABORT, 'intent_event is append-only'); END",
+      "tbl_name" : "intent_event",
+      "type" : "trigger"
+    }
+  ],
+  "sealed" : [
+    {
+      "context" : "meeting|mtg_01JCQ7A1B2C3D4E5F6G7H8J9K0",
+      "plaintext" : "7b227469746c65223a2241636d6520696e74616b65227d",
+      "sealed" : "0ecfe060f40cf9e322bd0e30c248dbac97889e180323f5f7d6c5b551aafe78afba9b45e31a5f243ee061eaf7fe938388cb1805"
+    },
+    {
+      "context" : "intent|int_01JCQ8A1B2C3D4E5F6G7H8J9K0",
+      "plaintext" : "7b7d",
+      "sealed" : "1ef0f255d35371a76d63d3c2d566dcdde9f499b8e462310e6ba77358d100"
+    },
+    {
+      "context" : "audio|mtg_01JCQ7A1B2C3D4E5F6G7H8J9K0|0",
+      "plaintext" : "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fa000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f30",
+      "sealed" : "90d40cae69d7eec03d0f6ddb7ed37f8702d4adddd99e4eb6d518a72debf14bb1a4be5a870db8ae99c276d9a8ea24cff3b3e5d5520b33a966ad7c4ffc03ff7baec0e6ef577fc52c167a3a8b7d4fb83ab36a4a53c1140e04c76c64640f0b8a849ac01fa33759f56697a675e7136f005d37ca94d64c2c119da79b27255e79ba3bae52337d2f4eb1954e4a87f98ee95f8a1137bc4d1e271967cb8fbf19169080eb06884795d67b2409530694ea307b7fa314a9062b7c2ceb94bd6166b8d7f48d1aa2140270682ef3e543981cf63c9280d0f01a635e383f3ead07d00bb372c2ba1d9e481a4fef5c94ca27f9b3309ac0eb778b533120575977b00fa677fbbd286f1e62c49abb6691f4919dad6d12421fb4140d9d8ddc869074d534dbb42ec04be6dbc50568198da4733964271780d67acc6b0009731999c4734add394ae9271e7366b0885a78ec8957509d"
+    },
+    {
+      "context" : "ask|thread-1",
+      "plaintext" : "",
+      "sealed" : "f0efc993c1631a0e00aa66e2c5d287131f001cbe39b09c8b3d0f3993"
+    },
+    {
+      "context" : "psk|dev_01JCQ7A1B2C3D4E5F6G7H8J9K0",
+      "plaintext" : "2ecfebff8cfd45592d139546e746313aa3534333f43027d79cdad3f18cace7d1",
+      "sealed" : "202870b29c20b983b850fc809cf1916317f9bc5dc1818ae70a00cf9e59ec68e9afa4aa6737eae94a002949d7a38eef7c863106979f88ac607d2d2f92"
+    }
+  ],
+  "tamper" : [
+    {
+      "broken_at" : 3,
+      "case" : "edit_detail_index_2"
+    },
+    {
+      "broken_at" : 4,
+      "case" : "edit_and_rehash_index_2"
+    },
+    {
+      "broken_at" : 3,
+      "case" : "remove_index_1"
+    },
+    {
+      "broken_at" : 5,
+      "case" : "swap_index_3_4"
+    },
+    {
+      "broken_at" : null,
+      "case" : "drop_last"
+    }
+  ]
+}

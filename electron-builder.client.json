@@ -27,6 +27,11 @@
       "to": ".",
       "filter": ["*.js", "package.json"]
     },
+    {
+      "from": "briefs/dist",
+      "to": "briefs/dist",
+      "filter": ["*.cjs"]
+    },
     "node_modules/electron-store/**/*",
     "node_modules/conf/**/*",
     "node_modules/atomically/**/*",
@@ -40,6 +45,13 @@
     "node_modules/require-from-string/**/*",
     "node_modules/uri-js/**/*",
     "node_modules/semver/**/*",
+    "node_modules/bonjour-service/**/*",
+    "node_modules/multicast-dns/**/*",
+    "node_modules/dns-packet/**/*",
+    "node_modules/@leichtgewicht/ip-codec/**/*",
+    "node_modules/thunky/**/*",
+    "node_modules/sherpa-onnx-node/**/*",
+    "node_modules/sherpa-onnx-*/**/*",
     "!**/{.DS_Store,.git,.hg,.svn,.gitignore,.gitattributes}",
     "!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs}"
   ],
@@ -49,7 +61,13 @@
       "schemes": ["lana-ai"]
     }
   ],
+  "beforePack": "scripts/briefs-before-pack.js",
   "asar": true,
+  "asarUnpack": [
+    "node_modules/sherpa-onnx-node/**/*",
+    "node_modules/sherpa-onnx-*/**/*",
+    "briefs/dist/briefs-transcription-worker.cjs"
+  ],
   "npmRebuild": false,
   "mac": {
     "category": "public.app-category.business",
@@ -62,15 +80,21 @@
     "entitlementsInherit": "build/entitlements.mac.plist",
     "notarize": true,
     "binaries": [
-      "Contents/Resources/screen-voice/lana-screen-voice"
+      "Contents/Resources/screen-voice/lana-screen-voice",
+      "Contents/Resources/briefs/LanaBleWake"
     ],
     "extendInfo": {
-      "NSMicrophoneUsageDescription": "LANA uses the microphone only while you activate dictation or the voice agent."
+      "NSMicrophoneUsageDescription": "LANA uses the microphone when you dictate, talk with LANA, or record a meeting.",
+      "NSBluetoothAlwaysUsageDescription": "LANA uses Bluetooth to let your paired phone know when this computer has something for it."
     },
     "extraResources": [
       {
         "from": "build/screen-voice/lana-screen-voice",
         "to": "screen-voice/lana-screen-voice"
+      },
+      {
+        "from": "build/briefs/LanaBleWake",
+        "to": "briefs/LanaBleWake"
       }
     ]
   },

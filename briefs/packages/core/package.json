@@ -1,0 +1,37 @@
+{
+  "name": "@lana/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "LANA Briefs engine inside the LANA client: canonical JSON, ids, intents, crypto and handoff frames, byte compatible with LanaNotesKit. Dependencies install at the client root.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./json": "./src/json/index.ts",
+    "./ids": "./src/ids/index.ts",
+    "./intent": "./src/intent/index.ts",
+    "./crypto": "./src/crypto/index.ts",
+    "./handoff": "./src/handoff/index.ts",
+    "./tone": "./src/tone/index.ts",
+    "./store": "./src/store/index.ts",
+    "./keys": "./src/keys/index.ts",
+    "./gateway": "./src/gateway/index.ts",
+    "./ask": "./src/ask/index.ts",
+    "./runtime": "./src/runtime/index.ts",
+    "./model": "./src/model/index.ts",
+    "./talk": "./src/talk/index.ts",
+    "./actions": "./src/actions/index.ts",
+    "./lana": "./src/lana/index.ts",
+    "./recording": "./src/recording/index.ts",
+    "./summarizer": "./src/summarizer/index.ts",
+    "./bytes": "./src/bytes/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@hpke/core": "1.9.0",
+    "bonjour-service": "1.4.4",
+    "sherpa-onnx-node": "2.0.1"
+  }
+}

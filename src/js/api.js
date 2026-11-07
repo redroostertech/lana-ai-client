@@ -26,7 +26,8 @@ function getPagePath(targetPage) {
         currentPath.includes('/workflows/') ||
         currentPath.includes('/insights/') ||
         currentPath.includes('/automation/') ||
-        currentPath.includes('/voice/')) {
+        currentPath.includes('/voice/') ||
+        currentPath.includes('/briefs/')) {
       return '../' + targetPage;
     }
     return targetPage;

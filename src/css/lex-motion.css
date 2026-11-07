@@ -1,0 +1,105 @@
+/* Lex UI: shared motion (ported from LANA Briefs' design system).
+   Add a class to anything that should arrive with LANA's motion:
+     .lex-entrance   fade and rise; stagger with .lex-entrance-step-1 to -5 (80 ms apart)
+     .lex-push       in from the trailing edge (going forward)
+     .lex-push-back  in from the leading edge (going back)
+     .lex-rise       up with a slight scale (panels, cards)
+     .lex-pop        scale in (marks, badges)
+     .lex-shake      a short shake (a wrong answer)
+   Reduce Motion turns every movement into a plain crossfade. */
+
+:root {
+  --lex-ease-standard-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --lex-duration-standard-spring: 420ms;
+  --lex-ease-snappy-spring: cubic-bezier(0.25, 1.1, 0.5, 1);
+  --lex-duration-snappy-spring: 240ms;
+  --lex-ease-bouncy-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --lex-duration-bouncy-spring: 320ms;
+  --lex-duration-motion-standard: 300ms;
+  --lex-ease-motion-in-out: cubic-bezier(0.42, 0, 0.58, 1);
+}
+
+@keyframes lex-entrance {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes lex-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes lex-push-in {
+  from { opacity: 0; transform: translateX(48px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes lex-push-back-in {
+  from { opacity: 0; transform: translateX(-48px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes lex-rise-in {
+  from { opacity: 0; transform: translateY(16px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes lex-pop-in {
+  from { opacity: 0; transform: scale(0.85); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes lex-shake {
+  0%, 100% { transform: none; }
+  16%, 50%, 83% { transform: translateX(6px); }
+  33%, 66% { transform: translateX(-6px); }
+}
+
+.lex-entrance {
+  animation: lex-entrance var(--lex-duration-standard-spring) var(--lex-ease-standard-spring) both;
+  animation-delay: var(--lex-entrance-delay, 0ms);
+}
+
+/* Stagger steps: 80 ms apart, the walkthrough's rhythm. */
+.lex-entrance-step-1 { --lex-entrance-delay: 80ms; }
+.lex-entrance-step-2 { --lex-entrance-delay: 160ms; }
+.lex-entrance-step-3 { --lex-entrance-delay: 240ms; }
+.lex-entrance-step-4 { --lex-entrance-delay: 320ms; }
+.lex-entrance-step-5 { --lex-entrance-delay: 400ms; }
+
+.lex-push {
+  animation: lex-push-in var(--lex-duration-standard-spring) var(--lex-ease-standard-spring) both;
+}
+
+.lex-push-back {
+  animation: lex-push-back-in var(--lex-duration-standard-spring) var(--lex-ease-standard-spring) both;
+}
+
+.lex-rise {
+  animation: lex-rise-in var(--lex-duration-standard-spring) var(--lex-ease-standard-spring) both;
+}
+
+.lex-pop {
+  animation: lex-pop-in var(--lex-duration-standard-spring) var(--lex-ease-standard-spring) both;
+}
+
+.lex-shake {
+  animation: lex-shake 400ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lex-entrance,
+  .lex-push,
+  .lex-push-back,
+  .lex-rise,
+  .lex-pop {
+    animation-name: lex-fade-in;
+    animation-duration: var(--lex-duration-motion-standard);
+    animation-timing-function: var(--lex-ease-motion-in-out);
+    animation-delay: 0ms;
+  }
+
+  .lex-shake {
+    animation: none;
+  }
+}

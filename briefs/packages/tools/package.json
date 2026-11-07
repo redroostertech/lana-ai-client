@@ -1,0 +1,11 @@
+{
+  "name": "@lana/briefs-tools",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "One-time LANA Briefs developer tools, run outside the app (never shipped): the import from the standalone Briefs desktop app. Dependencies install at the client root.",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

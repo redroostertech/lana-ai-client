@@ -310,6 +310,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
 /**
  * Expose a simple API for checking if running in Electron
  */
+// LANA Briefs: the typed bridge as window.lanaBriefs (briefs/packages/host/src/preload/bridge.ts).
+// Main answers only the client's own pages, and only while Briefs is on for the firm.
+try {
+  require('./briefs/dist/briefs-preload.cjs').exposeBriefsBridge(contextBridge, ipcRenderer);
+} catch (_) {
+  // Not built (npm run build:briefs): the client runs without Briefs.
+}
+
 contextBridge.exposeInMainWorld('isElectron', true);
 
 /**

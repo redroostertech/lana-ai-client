@@ -1,0 +1,27 @@
+{
+  "initial_state": "answer",
+  "states": [
+    {
+      "id": "answer",
+      "type": "llm_call",
+      "sub_prompt": "Reply in this format and nothing else. First line: KIND: fact, or KIND: suggestion if the question asks for advice, ideas, methods or next steps. Then ANSWER: the full answer, which may continue over several lines (a suggestion gives one direct sentence, then 3 to 6 concrete steps, each on its own line starting with - ), or ANSWER: NONE for a fact the passages do not give. Last line: SOURCES: the passage labels you used, such as P1, P3. Never repeat an earlier answer.",
+      "temperature": 0.1,
+      "output_schema": "lana.ask.answer.v1",
+      "retry": {
+        "limit": 1
+      },
+      "gates": [
+        {
+          "id": "lana.grounded_citations",
+          "on": "output"
+        }
+      ],
+      "next": "answered"
+    },
+    {
+      "id": "answered",
+      "type": "terminal",
+      "outcome": "answered"
+    }
+  ]
+}

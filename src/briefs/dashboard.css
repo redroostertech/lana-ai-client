@@ -1,0 +1,323 @@
+/* LANA Briefs Dashboard: the dashboard (src/briefs/dashboard.html). Uses the Briefs tokens in
+   styles.css and the shared motion classes in css/lex-motion.css. */
+
+.briefs-dashboard-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* A recording under way: opens it. */
+.briefs-dashboard-live {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--lex-status-danger, #c2410c);
+  border-radius: var(--lex-radius-xl);
+  background: var(--briefs-surface);
+  color: var(--briefs-ink);
+  text-decoration: none;
+}
+
+.briefs-dashboard-live.is-writing {
+  border-color: var(--briefs-pick-edge);
+}
+
+.briefs-dashboard-live-pulse {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--lex-status-danger, #c2410c);
+  animation: briefs-dashboard-pulse 1.6s ease-in-out infinite;
+}
+
+.briefs-dashboard-live.is-writing .briefs-dashboard-live-pulse {
+  background: var(--bt-accent);
+}
+
+@keyframes briefs-dashboard-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.8); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .briefs-dashboard-live-pulse { animation: none; }
+}
+
+.briefs-dashboard-live-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.briefs-dashboard-live-title {
+  font-weight: 600;
+}
+
+.briefs-dashboard-live-detail {
+  color: var(--briefs-muted);
+  font-size: 13px;
+}
+
+.briefs-dashboard-live-open {
+  color: var(--bt-accent);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.briefs-dashboard-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.briefs-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.briefs-dashboard-main,
+.briefs-dashboard-side {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.briefs-dashboard-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--briefs-line);
+  border-radius: var(--lex-radius-xl);
+  background: var(--briefs-surface);
+}
+
+.briefs-dashboard-panel-head .briefs-overline {
+  margin: 0;
+}
+
+.briefs-dashboard-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.briefs-dashboard-list > li + li {
+  border-top: 1px solid var(--briefs-line);
+}
+
+.briefs-dashboard-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 4px;
+  border: 0;
+  border-radius: var(--lex-radius-lg);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 150ms ease-out;
+}
+
+.briefs-dashboard-row:hover {
+  background: var(--briefs-soft);
+}
+
+.briefs-dashboard-row:focus-visible {
+  outline: 2px solid var(--lex-border-focus);
+  outline-offset: 1px;
+}
+
+.briefs-dashboard-row-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--lex-radius-lg);
+  background: var(--briefs-soft);
+  color: var(--briefs-ink);
+}
+
+.briefs-dashboard-row-icon.is-good {
+  color: var(--bt-accent);
+}
+
+.briefs-dashboard-row-icon.is-warning {
+  color: var(--lex-status-warning-text);
+  background: var(--lex-status-warning-bg);
+}
+
+.briefs-dashboard-row-icon.is-danger {
+  color: var(--lex-status-danger-text);
+  background: var(--lex-status-danger-bg);
+}
+
+.briefs-dashboard-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.briefs-dashboard-row-title {
+  overflow: hidden;
+  color: var(--briefs-ink);
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.briefs-dashboard-row-detail {
+  overflow: hidden;
+  color: var(--briefs-muted);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.briefs-dashboard-pill {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  color: var(--briefs-muted);
+  font-size: 12px;
+  white-space: nowrap;
+  box-shadow: inset 0 0 0 1px var(--briefs-line);
+}
+
+.briefs-dashboard-pill.is-good {
+  color: var(--bt-accent);
+  box-shadow: inset 0 0 0 1px var(--bt-accent);
+}
+
+.briefs-dashboard-pill.is-warning {
+  color: var(--lex-status-warning-text);
+  background: var(--lex-status-warning-bg);
+  box-shadow: none;
+}
+
+.briefs-dashboard-pill.is-danger {
+  color: var(--lex-status-danger-text);
+  background: var(--lex-status-danger-bg);
+  box-shadow: none;
+}
+
+.briefs-dashboard-count {
+  flex: none;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 9999px;
+  background: var(--bt-accent);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+  text-align: center;
+}
+
+.briefs-dashboard-empty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 4px;
+  color: var(--briefs-muted);
+  font-size: 14px;
+}
+
+.briefs-dashboard-empty svg {
+  flex: none;
+  color: var(--bt-accent);
+}
+
+.briefs-dashboard-empty.is-large {
+  flex-direction: column;
+  padding: 24px;
+  text-align: center;
+}
+
+.briefs-dashboard-phone-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--briefs-ink);
+  font-weight: 600;
+}
+
+.briefs-dashboard-phone-icon {
+  display: grid;
+  place-items: center;
+  color: var(--bt-accent);
+}
+
+.briefs-dashboard-phone-status.is-warning .briefs-dashboard-phone-icon {
+  color: var(--lex-status-warning);
+}
+
+.briefs-dashboard-phone-summary {
+  margin: 0;
+  color: var(--briefs-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.briefs-dashboard-phone-rows {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  margin: 4px 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--briefs-line);
+  font-size: 13px;
+}
+
+.briefs-dashboard-phone-rows dt {
+  color: var(--briefs-muted);
+}
+
+.briefs-dashboard-phone-rows dd {
+  margin: 0;
+  color: var(--briefs-ink);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.briefs-dashboard-phone lex-btn {
+  align-self: flex-start;
+}
+
+@media (max-width: 960px) {
+  .briefs-dashboard-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .briefs-dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .briefs-dashboard-body {
+    padding: 16px;
+  }
+
+  .briefs-dashboard-metrics {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

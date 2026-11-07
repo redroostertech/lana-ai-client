@@ -319,3 +319,8 @@ src/js/tiptap-bundle-built.js.map
 # Built by: npm run css:build
 src/css/tailwind-output.css
 build/screen-voice/
+
+# LANA Briefs build output
+build/briefs/
+briefs/native/macos/ble-wake-helper/.build/
+build/briefs-tools/

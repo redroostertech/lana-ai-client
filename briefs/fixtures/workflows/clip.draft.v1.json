@@ -1,0 +1,21 @@
+{
+  "initial_state": "draft",
+  "states": [
+    {
+      "id": "draft",
+      "type": "llm_call",
+      "sub_prompt": "Reply with exactly one line in the format above and nothing else.",
+      "temperature": 0.2,
+      "output_schema": "lana.clip.draft.v1",
+      "retry": {
+        "limit": 1
+      },
+      "next": "drafted"
+    },
+    {
+      "id": "drafted",
+      "type": "terminal",
+      "outcome": "drafted"
+    }
+  ]
+}

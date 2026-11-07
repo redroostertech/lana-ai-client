@@ -1,0 +1,15 @@
+{
+  "initial_state": "extract",
+  "states": [
+    {
+      "id": "extract",
+      "type": "llm_call",
+      "sub_prompt": "Write the notes for this transcript part, in the required format.",
+      "temperature": 0.2,
+      "output_schema": "lana.notes.chunk.v1",
+      "retry": { "limit": 1 },
+      "next": "extracted"
+    },
+    { "id": "extracted", "type": "terminal", "outcome": "extracted" }
+  ]
+}

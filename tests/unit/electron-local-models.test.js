@@ -9,7 +9,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
-const { CATALOG, embeddingModel, downloadModel, isInstalled, embeddingEngineEnv } = require('../../electron-local-models');
+const { CATALOG, SPEECH_CATALOG, speechPackages, embeddingModel, downloadModel, isInstalled, embeddingEngineEnv } = require('../../electron-local-models');
 
 // The firm's embedding identity (LANA-AI deploy/railway/embed/embed-pin.json).
 const FIRM_IDENTITY = {
@@ -47,6 +47,37 @@ describe('local model catalog', () => {
 
   test('the embedding model is exactly the firm\'s embedding identity', () => {
     expect(embeddingModel()).toMatchObject(FIRM_IDENTITY);
+  });
+});
+
+describe('LANA Briefs speech models in the same catalog', () => {
+  test('every speech file and notice comes from our R2 bucket over https with a size and sha256 pin, inside its package', () => {
+    expect(SPEECH_CATALOG.map((entry) => entry.id).sort()).toEqual(['embedding', 'kokoro', 'parakeet', 'segmentation', 'vad']);
+    for (const entry of SPEECH_CATALOG) {
+      expect(entry.role).toBe('speech');
+      expect(entry.license).toMatch(/\S/);
+      expect(entry.notices.map((notice) => notice.path)).toEqual(expect.arrayContaining(['LICENSE', 'NOTICE']));
+      for (const file of [...entry.files, ...entry.notices]) {
+        expect(file.url.startsWith(`https://models.lanaai.io/briefs/speech/${entry.id}/`)).toBe(true);
+        expect(file.url).not.toMatch(/huggingface|github/i);
+        expect(file.sha256).toMatch(/^[a-f0-9]{64}$/);
+        expect(Number.isSafeInteger(file.sizeBytes) && file.sizeBytes > 0).toBe(true);
+      }
+      for (const file of entry.files) expect(file.path === entry.target || file.path.startsWith(`${entry.target}/`)).toBe(true);
+    }
+  });
+
+  test('Briefs gets the speech packages in its store\'s shape, the same pins', () => {
+    const packages = speechPackages();
+    expect(packages).toHaveLength(SPEECH_CATALOG.length);
+    const [vad] = packages.filter((pkg) => pkg.id === 'vad');
+    const pinned = SPEECH_CATALOG.find((entry) => entry.id === 'vad').files[0];
+    expect(vad).toEqual({ id: 'vad', target: 'silero_vad.onnx', files: [{ path: pinned.path, url: pinned.url, bytes: pinned.sizeBytes, sha256: pinned.sha256 }] });
+  });
+
+  test('the catalog cannot be changed at run time', () => {
+    expect(Object.isFrozen(SPEECH_CATALOG)).toBe(true);
+    expect(Object.isFrozen(SPEECH_CATALOG[0].files[0])).toBe(true);
   });
 });
 

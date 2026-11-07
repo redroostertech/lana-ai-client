@@ -184,6 +184,128 @@
         display: block;
       }
 
+      /* ── Status icon and its hover card (a page's state; one optional action) ── */
+
+      .lex-topbar-status-anchor {
+        position: relative;
+        display: flex;
+      }
+
+      .lex-topbar-status {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.5rem;
+        border: none;
+        background: none;
+        color: var(--lex-topbar-icon-color);
+        border-radius: var(--lex-radius-md);
+        cursor: default;
+      }
+
+      .lex-topbar-status:hover {
+        background: var(--lex-bg-tertiary);
+      }
+
+      .lex-topbar-status[data-tone="warning"] {
+        color: var(--lex-status-warning);
+      }
+
+      .lex-topbar-status:focus-visible {
+        outline: 2px solid var(--lex-border-focus);
+        outline-offset: 1px;
+      }
+
+      .lex-topbar-status svg {
+        display: block;
+      }
+
+      .lex-topbar-status-card {
+        position: absolute;
+        top: 100%;
+        right: 0;
+        z-index: var(--lex-z-dropdown, 50);
+        width: 320px;
+        max-width: calc(100vw - 32px);
+        padding-top: 6px;
+        visibility: hidden;
+        opacity: 0;
+        transition: opacity var(--lex-transition-fast), visibility 0s linear 150ms;
+      }
+
+      .lex-topbar-status-anchor:hover .lex-topbar-status-card,
+      .lex-topbar-status-anchor:focus-within .lex-topbar-status-card {
+        visibility: visible;
+        opacity: 1;
+        transition: opacity var(--lex-transition-fast);
+      }
+
+      .lex-topbar-status-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 14px 16px;
+        border: 1px solid var(--lex-border-default);
+        border-radius: var(--lex-radius-xl);
+        background: var(--lex-bg-primary);
+        box-shadow: var(--lex-shadow-lg);
+        text-align: left;
+      }
+
+      .lex-topbar-status-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0;
+        color: var(--lex-text-primary);
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .lex-topbar-status-dot {
+        flex: none;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--lex-status-success, #2f7d5f);
+      }
+
+      .lex-topbar-status-dot[data-tone="warning"] {
+        background: var(--lex-status-warning);
+      }
+
+      .lex-topbar-status-summary {
+        margin: 0;
+        color: var(--lex-text-secondary);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .lex-topbar-status-rows {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 6px 12px;
+        margin: 0;
+        padding-top: 10px;
+        border-top: 1px solid var(--lex-border-default);
+        font-size: 13px;
+      }
+
+      .lex-topbar-status-rows dt {
+        color: var(--lex-text-secondary);
+      }
+
+      .lex-topbar-status-rows dd {
+        margin: 0;
+        color: var(--lex-text-primary);
+        white-space: pre-line;
+        overflow-wrap: anywhere;
+      }
+
+      .lex-topbar-status-action {
+        align-self: flex-start;
+      }
+
       /* ── Notification badge ─────────────────────────────── */
 
       .lex-topbar-badge {
@@ -351,7 +473,16 @@
         suppressAutoBack:  { type: Boolean, default: false },
         backLabel:         { type: String,  default: 'Back' },
         backHref:          { type: String,  default: '' },
-        menuItems:         { type: Array,   default: [] }
+        menuItems:         { type: Array,   default: [] },
+        // An optional status icon before Refresh with a hover card (e.g. LANA Briefs:
+        // listening for the phone). statusRows: [{ label, value }]. statusAction is the
+        // card's one button; clicking it emits topbar-status-action.
+        statusIcon:        { type: String,  default: '' },
+        statusLabel:       { type: String,  default: '' },
+        statusTone:        { type: String,  default: '' },
+        statusSummary:     { type: String,  default: '' },
+        statusRows:        { type: Array,   default: [] },
+        statusAction:      { type: String,  default: '' }
       };
     }
 
@@ -374,6 +505,56 @@
         return typeof window !== 'undefined' && !!window.history && window.history.length > 1;
       } catch (e) {
         return false;
+      }
+    }
+
+    /** The status icon and its hover card, or '' when there is none. */
+    _statusHtml() {
+      if (!this.statusIcon || !this.statusLabel) return '';
+      const esc = (value) => this.escapeHtml(String(value == null ? '' : value));
+      const tone = this.statusTone === 'warning' ? 'warning' : 'good';
+      const rows = Array.isArray(this.statusRows) ? this.statusRows.filter((row) => row && row.label) : [];
+      let card = `<div class="lex-topbar-status-panel">`;
+      card += `<p class="lex-topbar-status-title"><span class="lex-topbar-status-dot" data-tone="${tone}" aria-hidden="true"></span>${esc(this.statusLabel)}</p>`;
+      if (this.statusSummary) card += `<p class="lex-topbar-status-summary">${esc(this.statusSummary)}</p>`;
+      if (rows.length > 0) {
+        card += `<dl class="lex-topbar-status-rows">${rows.map((row) => `<dt>${esc(row.label)}</dt><dd>${esc(row.value)}</dd>`).join('')}</dl>`;
+      }
+      if (this.statusAction) {
+        card += `<lex-btn class="lex-topbar-status-action" data-action="status-action" variant="secondary" size="sm">${esc(this.statusAction)}</lex-btn>`;
+      }
+      card += `</div>`;
+      return `<span class="lex-topbar-status-anchor" data-topbar-status data-signature="${esc(this._statusSignature())}">`
+        + `<button type="button" class="lex-topbar-status" data-tone="${tone}" aria-label="${esc(this.statusLabel)}" aria-describedby="lex-topbar-status-card">${icon(this.statusIcon, 'normal')}</button>`
+        + `<div class="lex-topbar-status-card" id="lex-topbar-status-card" role="tooltip">${card}</div>`
+        + `</span>`;
+    }
+
+    _statusSignature() {
+      return JSON.stringify([this.statusIcon, this.statusLabel, this.statusTone, this.statusSummary, this.statusRows, this.statusAction]);
+    }
+
+    /** Puts the status icon in place, changes it, or removes it, without a full render. */
+    _syncStatus(root) {
+      const right = root.querySelector('.lex-topbar-right');
+      if (!right) return;
+      const current = right.querySelector('[data-topbar-status]');
+      const html = this._statusHtml();
+      if (html === '') {
+        if (current) current.remove();
+        return;
+      }
+      if (current && current.dataset.signature === this._statusSignature()) return;
+      const holder = document.createElement('div');
+      holder.innerHTML = html;
+      const next = holder.firstElementChild;
+      // Keep focus inside the card when it is redrawn under the pointer or keyboard.
+      const hadFocus = current && current.contains(document.activeElement);
+      if (current) current.replaceWith(next);
+      else right.insertBefore(next, right.firstChild);
+      if (hadFocus) {
+        const target = next.querySelector('.lex-topbar-status');
+        if (target) target.focus();
       }
     }
 
@@ -409,6 +590,7 @@
           }
         }
 
+        this._syncStatus(root);
         return null; // preserve injected DOM (e.g. sticky toggle)
       }
 
@@ -442,6 +624,8 @@
 
       // ── Right ──
       html += `<div class="lex-topbar-right">`;
+
+      html += this._statusHtml();
 
       // Refresh button (always present)
       html += `<lex-btn data-action="refresh" class="lex-topbar-refresh" variant="primary" leading-icon="refresh-cw" size="sm" title="Refresh">Refresh</lex-btn>`;
@@ -494,6 +678,10 @@
         } else if (window.history && window.history.length > 1) {
           window.history.back();
         }
+      });
+
+      this.delegate('click', '[data-action="status-action"]', () => {
+        this.emit('topbar-status-action');
       });
 
       this.delegate('click', '[data-action="refresh"]', () => {

@@ -1,0 +1,1967 @@
+/* LANA Briefs: the meetings list and the meeting pane (Lex shell, Lex tokens). */
+:root {
+  --briefs-bg: var(--lex-bg-secondary);
+  --briefs-surface: var(--lex-bg-primary);
+  --briefs-ink: var(--lex-text-primary);
+  --briefs-muted: var(--lex-text-secondary);
+  --briefs-line: var(--lex-border-default);
+  --briefs-soft: var(--lex-bg-tertiary);
+  --briefs-selected: var(--lex-bg-tertiary);
+  --briefs-accent: var(--lex-color-brand-500);
+  --briefs-accent-strong: var(--lex-color-brand-700);
+  --briefs-flag: var(--lex-color-warning-500);
+  --briefs-clip: var(--lex-color-warning-50);
+  --briefs-clip-edge: var(--lex-color-warning-500);
+  --briefs-pick: var(--lex-bg-accent-soft);
+  --briefs-pick-edge: var(--lex-border-accent);
+
+  /* The transcript work area keeps LANA Briefs' own look (selection, clips, markers):
+     the standalone app's tokens (lana-notes packages/ui tokens.css). */
+  --bt-accent: #2f7d5f;
+  --bt-accent-strong: #3d9a75;
+  --bt-flag: #a86a17;
+  --bt-ink: #14110f;
+  --bt-muted: #5f5a54;
+  --bt-faint: #8c867f;
+  --bt-hairline: rgb(20 17 15 / 0.12);
+  --bt-surface: #ffffff;
+  --bt-surface-raised: #efece7;
+  --bt-radius-s: 4px;
+  --bt-radius-m: 8px;
+  --bt-radius-xl: 16px;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--briefs-bg);
+  color: var(--briefs-ink);
+  font-family: var(--lex-font-sans);
+}
+
+.hidden {
+  display: none !important;
+}
+
+.briefs-scroll {
+  container: briefs / inline-size;
+  min-height: 100%;
+  padding: 22px;
+  box-sizing: border-box;
+}
+
+.briefs-workspace {
+  display: flex;
+  min-height: calc(100vh - 140px);
+}
+
+.briefs-detail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: 24px;
+  background: var(--briefs-surface);
+  border: 1px solid var(--briefs-line);
+  border-radius: 12px;
+  min-width: 0;
+}
+
+.briefs-overline {
+  margin: 0;
+  font-size: 12px;
+  font-weight: var(--lex-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--briefs-muted);
+}
+
+.briefs-list-note {
+  margin: 0;
+  padding: 16px 12px;
+  font-size: 14px;
+  color: var(--briefs-muted);
+}
+
+/* ── Meeting ─────────────────────────────────────── */
+
+.briefs-detail:has(.briefs-meeting:not(.hidden)) {
+  align-items: stretch;
+  padding: 0;
+}
+
+.briefs-meeting {
+  container: briefs-meeting / inline-size;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  max-height: calc(100vh - 140px);
+}
+
+.briefs-meeting-head {
+  padding: 20px 24px 8px;
+}
+
+.briefs-meeting-title {
+  margin: 6px 0 4px;
+  font-size: 24px;
+  font-weight: var(--lex-weight-bold);
+}
+
+.briefs-meeting-facts {
+  margin: 0;
+  font-size: 14px;
+  color: var(--briefs-muted);
+}
+
+.briefs-editable {
+  padding: 0 4px;
+  margin: 0 -4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: text;
+}
+
+.briefs-editable:hover {
+  background: var(--briefs-soft);
+}
+
+.briefs-inline {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+}
+
+.briefs-inline-field {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 6px;
+  border: 1px solid var(--lex-border-focus);
+  border-radius: 6px;
+  background: var(--briefs-surface);
+  color: inherit;
+  font: inherit;
+  resize: vertical;
+}
+
+.briefs-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--briefs-muted);
+  cursor: pointer;
+}
+
+.briefs-icon-btn:hover {
+  background: var(--briefs-soft);
+  color: var(--briefs-ink);
+}
+
+[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.briefs-meeting-error {
+  margin: 4px 24px 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--lex-status-danger-bg);
+  color: var(--lex-status-danger-text);
+  font-size: 14px;
+}
+
+/* Replay bar and marker track */
+
+.briefs-replay {
+  padding: 8px 24px 12px;
+  border-bottom: 1px solid var(--briefs-line);
+}
+
+.briefs-replay-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.briefs-replay-play {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--lex-radius-full);
+  background: var(--lex-bg-accent);
+  color: var(--lex-text-on-accent);
+  cursor: pointer;
+}
+
+.briefs-replay-time {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--briefs-muted);
+}
+
+.briefs-replay-status {
+  font-size: 13px;
+  color: var(--briefs-muted);
+}
+
+.briefs-replay-spacer {
+  flex: 1;
+}
+
+.briefs-replay-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--briefs-line);
+  border-radius: var(--lex-radius-full);
+  background: transparent;
+  color: var(--briefs-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.briefs-replay-chip svg {
+  display: none;
+}
+
+.briefs-replay-chip.is-on {
+  border-color: var(--briefs-pick-edge);
+  color: var(--briefs-ink);
+}
+
+.briefs-replay-chip.is-on svg {
+  display: inline;
+}
+
+.briefs-track {
+  position: relative;
+  margin-top: 12px;
+  padding: 0 6px;
+  outline: none;
+}
+
+.briefs-track.is-seekable {
+  cursor: pointer;
+}
+
+.briefs-track:focus-visible {
+  outline: 2px solid var(--bt-accent);
+  outline-offset: 2px;
+  border-radius: var(--bt-radius-s);
+}
+
+.briefs-track-lane {
+  position: relative;
+  height: 22px;
+}
+
+.briefs-track-line {
+  position: relative;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bt-hairline);
+}
+
+.briefs-track-knob {
+  position: absolute;
+  top: -4px;
+  left: calc(var(--playhead, 0%) - 6px);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--bt-accent);
+}
+
+.briefs-tick {
+  position: absolute;
+  left: var(--at);
+  width: 3px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--bt-muted);
+}
+
+.briefs-track-above .briefs-tick {
+  bottom: 2px;
+}
+
+.briefs-track-below .briefs-tick {
+  top: 2px;
+}
+
+.briefs-tick.is-range {
+  width: max(6px, var(--span, 0%));
+}
+
+.briefs-tick.is-summary { background: var(--bt-accent); }
+.briefs-tick.is-decision { background: var(--bt-accent-strong); }
+.briefs-tick.is-openQuestion { background: var(--bt-flag); }
+.briefs-tick.is-soft { height: 18px; opacity: 1; background: color-mix(in srgb, var(--bt-accent) 18%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bt-accent) 40%, transparent); border-radius: var(--bt-radius-s); }
+.briefs-tick.is-note { background: var(--bt-ink); }
+.briefs-tick.is-action { background: var(--bt-faint); }
+.briefs-tick.is-clip { height: 5px; background: color-mix(in srgb, var(--bt-flag) 70%, transparent); }
+.briefs-tick.is-selected {
+  height: 10px;
+  border-radius: var(--bt-radius-s);
+  background: color-mix(in srgb, var(--bt-accent) 22%, transparent);
+  box-shadow: inset 0 0 0 1px var(--bt-accent);
+}
+
+.briefs-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--bt-muted);
+}
+
+.briefs-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.briefs-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--swatch);
+}
+
+.briefs-swatch.is-soft {
+  width: 16px;
+  background: color-mix(in srgb, var(--swatch) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--swatch) 50%, transparent);
+}
+
+.briefs-swatch.is-summary { --swatch: var(--bt-accent); }
+.briefs-swatch.is-decision { --swatch: var(--bt-accent-strong); }
+.briefs-swatch.is-openQuestion { --swatch: var(--bt-flag); }
+.briefs-swatch.is-note { --swatch: var(--bt-ink); }
+.briefs-swatch.is-action { --swatch: var(--bt-faint); }
+.briefs-swatch.is-clip { --swatch: var(--bt-flag); }
+
+/* Transcript and side panel */
+
+.briefs-meeting-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
+  flex: 1;
+  min-height: 0;
+}
+
+.briefs-transcript {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-right: 1px solid var(--briefs-line);
+}
+
+.briefs-transcript-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  padding: 16px 32px 8px 48px;
+}
+
+.briefs-transcript-tip {
+  font-size: 12px;
+  color: var(--bt-faint);
+}
+
+.briefs-turns {
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px 32px 24px;
+  list-style: none;
+  outline: none;
+  color: var(--bt-ink);
+}
+
+.briefs-turns.is-dragging,
+.briefs-turns.is-dragging .briefs-turn-text {
+  user-select: none;
+}
+
+.briefs-turn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 16px;
+  border-radius: var(--bt-radius-s);
+  cursor: default;
+}
+
+.briefs-turn:hover:not(.is-selected) {
+  background: color-mix(in srgb, var(--bt-ink) 4%, transparent);
+}
+
+/* A source line of the key point picked in the side panel. */
+.briefs-turn.is-highlighted {
+  background: color-mix(in srgb, var(--bt-accent) 14%, transparent);
+}
+
+/* The turn under the playhead while the audio plays (follow along). */
+.briefs-turn.is-current {
+  box-shadow: inset 3px 0 0 var(--bt-accent);
+  background: color-mix(in srgb, var(--bt-accent) 7%, transparent);
+}
+
+/* A clip reads as one block: a soft amber tint through the gaps between its lines and a
+   thin bar in the gutter. */
+.briefs-turn.is-clipped::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: color-mix(in srgb, var(--bt-flag) 16%, transparent);
+  border-radius: var(--bt-radius-s);
+}
+
+.briefs-turn.is-clipped::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -8px;
+  width: 2px;
+  background: color-mix(in srgb, var(--bt-flag) 70%, transparent);
+}
+
+.briefs-turn.clip-first::before,
+.briefs-turn.clip-middle::before,
+.briefs-turn.clip-first::after,
+.briefs-turn.clip-middle::after {
+  bottom: -16px;
+}
+
+.briefs-turn.clip-first::before { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.briefs-turn.clip-middle::before { border-radius: 0; }
+.briefs-turn.clip-last::before { border-top-left-radius: 0; border-top-right-radius: 0; }
+
+/* Picked lines: a green tint inside one outline around the whole run. */
+.briefs-turn.is-selected {
+  background: color-mix(in srgb, var(--bt-accent) 16%, transparent);
+  box-shadow: inset 1px 0 0 var(--bt-accent), inset -1px 0 0 var(--bt-accent);
+  border-radius: 0;
+}
+
+.briefs-turn.is-selected.is-selection-first {
+  box-shadow: inset 1px 0 0 var(--bt-accent), inset -1px 0 0 var(--bt-accent), inset 0 1px 0 var(--bt-accent);
+  border-top-left-radius: var(--bt-radius-s);
+  border-top-right-radius: var(--bt-radius-s);
+}
+
+.briefs-turn.is-selected.is-selection-last {
+  box-shadow: inset 1px 0 0 var(--bt-accent), inset -1px 0 0 var(--bt-accent), inset 0 -1px 0 var(--bt-accent);
+  border-bottom-left-radius: var(--bt-radius-s);
+  border-bottom-right-radius: var(--bt-radius-s);
+}
+
+.briefs-turn.is-selected.is-selection-first.is-selection-last {
+  box-shadow: inset 0 0 0 1px var(--bt-accent);
+}
+
+.briefs-turns:focus-visible .briefs-turn.is-selected {
+  background: color-mix(in srgb, var(--bt-accent) 22%, transparent);
+}
+
+.briefs-turn-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.briefs-turn-speaker {
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.briefs-turn .briefs-editable {
+  border-radius: 2px;
+  text-decoration: underline dotted transparent;
+  text-underline-offset: 4px;
+}
+
+.briefs-turn .briefs-editable:hover {
+  background: transparent;
+  text-decoration-color: var(--bt-faint);
+}
+
+.briefs-turn-time {
+  font-size: 12px;
+  color: var(--bt-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A circled play button, always shown, like the standalone app. */
+.briefs-turn-play {
+  margin-left: auto;
+  align-self: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: var(--bt-ink);
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
+
+.briefs-turn-play:hover {
+  background: color-mix(in srgb, var(--bt-ink) 6%, transparent);
+  color: var(--bt-ink);
+}
+
+.briefs-turn-play .briefs-play-icon {
+  color: inherit;
+}
+
+.briefs-turn-play .briefs-play-icon svg {
+  width: 11px;
+  height: 11px;
+  margin-left: 1px;
+}
+
+.briefs-turn-play[data-playing="true"] {
+  color: var(--bt-accent);
+}
+
+.briefs-turn-text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.33;
+  color: var(--bt-ink);
+  white-space: pre-wrap;
+  user-select: text;
+}
+
+/* The clip bar: the meeting container's footer while lines are picked. */
+.briefs-clipbar {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 12px 24px 14px;
+  border-top: 1px solid var(--briefs-line);
+  border-radius: 0 0 12px 12px;
+  background: var(--bt-surface);
+  color: var(--bt-ink);
+}
+
+.briefs-clipbar-head {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.briefs-clipbar-what {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+}
+
+.briefs-clipbar-summary {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.briefs-clipbar-hint {
+  font-size: 12px;
+  color: var(--bt-muted);
+}
+
+.briefs-clipbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.briefs-clipbar-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--bt-radius-m);
+  background: var(--bt-surface-raised);
+  color: var(--bt-ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: default;
+}
+
+.briefs-clipbar-action svg {
+  color: var(--bt-accent);
+}
+
+.briefs-clipbar-action[data-clip-action="unhighlight"] svg {
+  color: var(--bt-muted);
+}
+
+.briefs-clipbar-action:hover {
+  background: color-mix(in srgb, var(--bt-accent) 12%, var(--bt-surface-raised));
+}
+
+.briefs-clipbar-action:focus-visible {
+  outline: 2px solid var(--bt-accent);
+  outline-offset: 1px;
+}
+
+.briefs-clipbar-action[aria-disabled="true"] {
+  opacity: 0.45;
+}
+
+.briefs-clipbar-drafting {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  font-size: 13px;
+  color: var(--bt-muted);
+}
+
+.briefs-side {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.briefs-side lex-tabs {
+  padding: 4px 16px 0;
+}
+
+.briefs-side-panel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 16px 16px;
+}
+
+.briefs-points-group {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.briefs-point {
+  padding: 4px 0 4px 14px;
+  border-left: 3px solid var(--bt-accent);
+  border-radius: 0;
+}
+
+.briefs-point.is-decision { border-left-color: var(--bt-accent-strong); }
+.briefs-point.is-openQuestion { border-left-color: var(--bt-flag); }
+.briefs-point.is-selected { background: color-mix(in srgb, var(--bt-accent) 8%, transparent); }
+
+.briefs-point-text {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--bt-ink);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+}
+
+.briefs-point-sources {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.briefs-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 6px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--bt-surface);
+  box-shadow: inset 0 0 0 1px var(--bt-hairline);
+  color: var(--bt-ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.briefs-source.is-approximate {
+  box-shadow: inset 0 0 0 1px var(--bt-hairline);
+  border: 1px dashed var(--bt-hairline);
+}
+
+.briefs-play-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--bt-accent);
+}
+
+/* The source chip's circled play. */
+.briefs-source .briefs-play-icon {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.25px currentColor;
+}
+
+.briefs-play-icon svg {
+  width: 9px;
+  height: 9px;
+  margin-left: 1px;
+}
+
+.briefs-point-question {
+  margin-top: 8px;
+}
+
+.briefs-question-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--briefs-muted);
+}
+
+.briefs-question-step.is-ready {
+  color: var(--briefs-ink);
+}
+
+.briefs-gap {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--lex-icon-warning);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.briefs-gap-title {
+  display: block;
+  font-size: 14px;
+  color: var(--briefs-ink);
+}
+
+.briefs-gap-reason {
+  display: block;
+  font-size: 12px;
+  color: var(--briefs-muted);
+}
+
+.briefs-notes {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.briefs-note {
+  padding: 10px 12px;
+  border: 1px solid var(--briefs-line);
+  border-radius: 8px;
+}
+
+.briefs-note-at {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--lex-text-accent);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.briefs-note-text {
+  margin: 4px 0 0;
+  font-size: 14px;
+  white-space: pre-wrap;
+}
+
+/* ── Notes ───────────────────────────────────────── */
+
+.briefs-notes-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.briefs-notes-status {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--lex-status-danger-text);
+}
+
+.briefs-note-row {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--briefs-line);
+  background: var(--briefs-surface);
+  color: var(--briefs-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.briefs-notes li:first-child .briefs-note-row { border-radius: 10px 10px 0 0; }
+.briefs-notes li:last-child .briefs-note-row { border-bottom: 0; border-radius: 0 0 10px 10px; }
+.briefs-notes li:only-child .briefs-note-row { border-radius: 10px; }
+
+.briefs-note-row:hover {
+  background: var(--briefs-soft);
+}
+
+.briefs-note-row-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: var(--lex-weight-semibold);
+}
+
+.briefs-note-row-line {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--briefs-muted);
+}
+
+.briefs-note-row-time {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.briefs-note-row-preview {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.briefs-note-row-clip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--briefs-muted);
+}
+
+.briefs-note-row-clip svg {
+  width: 14px;
+  height: 14px;
+  color: var(--bt-flag);
+}
+
+.briefs-side-panel .briefs-notes {
+  gap: 0;
+  border: 1px solid var(--briefs-line);
+  border-radius: 10px;
+}
+
+/* One note full size over the meeting, written like Notes.app. */
+.briefs-detail:has(.briefs-note-editor:not(.hidden)) {
+  align-items: stretch;
+  padding: 0;
+}
+
+.briefs-note-editor {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  max-height: calc(100vh - 140px);
+}
+
+.briefs-note-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--briefs-line);
+}
+
+.briefs-note-spacer {
+  flex: 1;
+}
+
+.briefs-note-status {
+  font-size: 13px;
+  color: var(--briefs-muted);
+}
+
+.briefs-note-status.is-error {
+  color: var(--lex-status-danger-text);
+}
+
+.briefs-note-scroll {
+  flex: 1;
+  min-height: 320px;
+  overflow-y: auto;
+  cursor: text;
+}
+
+.briefs-note-canvas {
+  display: flex;
+  flex-direction: column;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 28px 32px 64px;
+}
+
+.briefs-note-date {
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--briefs-muted);
+}
+
+.briefs-note-moment {
+  align-self: center;
+  margin-top: 6px;
+  padding: 3px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bt-flag) 14%, transparent);
+  color: var(--bt-flag);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.briefs-note-title,
+.briefs-note-body {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  background: transparent;
+  color: var(--briefs-ink);
+  font-family: inherit;
+}
+
+.briefs-note-title {
+  margin-top: 24px;
+  font-size: 24px;
+  font-weight: var(--lex-weight-bold);
+  line-height: 1.3;
+}
+
+.briefs-note-body {
+  margin-top: 8px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.briefs-note-title::placeholder,
+.briefs-note-body::placeholder {
+  color: var(--lex-text-tertiary);
+}
+
+/* ── New meeting ─────────────────────────────────── */
+
+.briefs-detail:has(.briefs-new:not(.hidden)) {
+  align-items: stretch;
+  padding: 0;
+}
+
+.briefs-new {
+  width: 100%;
+  min-width: 0;
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
+}
+
+.briefs-new-body {
+  display: grid;
+  gap: 16px;
+  max-width: 640px;
+  padding: 8px 24px 32px;
+}
+
+.briefs-new-note {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--briefs-soft);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.briefs-new-note.is-warning {
+  background: var(--lex-status-warning-bg);
+  color: var(--lex-status-warning-text);
+}
+
+.briefs-new-permissions {
+  display: grid;
+  gap: 8px;
+}
+
+.briefs-new-permission {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+}
+
+.briefs-new-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.briefs-new-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--briefs-muted);
+}
+
+.briefs-new-hint:empty {
+  display: none;
+}
+
+.briefs-new-how {
+  margin-top: 12px;
+}
+
+.briefs-new-steps {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding-left: 20px;
+}
+
+.briefs-new-step-title {
+  display: block;
+  font-weight: var(--lex-weight-semibold);
+}
+
+.briefs-new-step-detail {
+  display: block;
+  font-size: 14px;
+  color: var(--briefs-muted);
+}
+
+.briefs-live-clock {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.briefs-live-pulse {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--briefs-muted);
+}
+
+.briefs-live-pulse.is-on {
+  background: var(--lex-status-danger);
+  animation: briefs-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes briefs-pulse {
+  50% { opacity: 0.35; }
+}
+
+.briefs-live-time {
+  font-size: 32px;
+  font-weight: var(--lex-weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+.briefs-live-state {
+  color: var(--briefs-muted);
+}
+
+.briefs-meters {
+  display: grid;
+  gap: 12px;
+}
+
+.briefs-meter-label {
+  display: flex;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: var(--lex-weight-medium);
+}
+
+.briefs-meter-status {
+  font-weight: var(--lex-weight-normal, 400);
+  color: var(--briefs-muted);
+}
+
+.briefs-meter-bars {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 36px;
+  margin-top: 6px;
+}
+
+.briefs-meter-bar {
+  flex: 1;
+  min-height: 2px;
+  height: calc(var(--level, 0) * 100%);
+  border-radius: 1px;
+  background: var(--briefs-accent);
+}
+
+.briefs-meter-bars.is-off .briefs-meter-bar {
+  background: var(--briefs-soft);
+}
+
+.briefs-live-compose {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.briefs-progress {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.briefs-progress-step {
+  display: flex;
+  gap: 10px;
+  color: var(--briefs-muted);
+}
+
+.briefs-progress-step.is-active,
+.briefs-progress-step.is-done {
+  color: var(--briefs-ink);
+}
+
+.briefs-progress-mark {
+  display: inline-flex;
+  width: 20px;
+  justify-content: center;
+}
+
+.briefs-progress-text {
+  display: grid;
+  flex: 1;
+  gap: 6px;
+}
+
+.briefs-progress-bar {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--briefs-soft);
+  overflow: hidden;
+}
+
+.briefs-progress-fill {
+  display: block;
+  height: 100%;
+  width: calc(var(--progress, 0) * 100%);
+  background: var(--briefs-accent);
+}
+
+@container briefs-meeting (max-width: 699px) {
+  .briefs-meeting-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .briefs-transcript {
+    border-right: 0;
+    border-bottom: 1px solid var(--briefs-line);
+  }
+}
+
+/* Share (Send to phone) beside the meeting title, and Needs review under the header. */
+
+.briefs-meeting-head-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.briefs-meeting-head-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.briefs-share {
+  position: relative;
+  flex: none;
+  padding-top: 4px;
+}
+
+.briefs-share-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  padding: 12px 14px;
+  border: 1px solid var(--briefs-line);
+  border-radius: var(--lex-radius-xl);
+  background: var(--briefs-surface);
+  box-shadow: var(--lex-shadow-lg);
+}
+
+.briefs-share-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.briefs-share-section h3 {
+  margin: 0;
+}
+
+.briefs-share-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.briefs-share-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 4px 0;
+}
+
+.briefs-share-row + .briefs-share-row {
+  border-top: 1px solid var(--briefs-line);
+}
+
+.briefs-share-phone {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--lex-radius-lg);
+  background: var(--briefs-soft);
+  color: var(--briefs-ink);
+}
+
+.briefs-share-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.briefs-share-name {
+  overflow: hidden;
+  color: var(--briefs-ink);
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.briefs-share-status,
+.briefs-share-note,
+.briefs-share-empty {
+  margin: 0;
+  color: var(--briefs-muted);
+  font-size: 13px;
+}
+
+.briefs-share-note.is-warning {
+  padding: 6px 10px;
+  border-radius: var(--lex-radius-lg);
+  background: var(--lex-status-warning-bg);
+  color: var(--lex-status-warning-text);
+}
+
+.briefs-share-note.is-error {
+  padding: 6px 10px;
+  border-radius: var(--lex-radius-lg);
+  background: var(--lex-status-danger-bg);
+  color: var(--lex-status-danger-text);
+}
+
+.briefs-share-sent {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--bt-accent);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.briefs-share-sent:focus-visible {
+  outline: 2px solid var(--lex-border-focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.briefs-review {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 8px 24px 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--briefs-flag);
+  border-radius: var(--lex-radius-xl);
+  background: var(--briefs-surface);
+}
+
+.briefs-review-overline,
+.briefs-review-lead,
+.briefs-review-hint {
+  margin: 0;
+}
+
+.briefs-review-lead,
+.briefs-review-hint {
+  color: var(--briefs-muted);
+  font-size: 13px;
+}
+
+.briefs-review-conflict {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--briefs-line);
+}
+
+.briefs-review-label {
+  color: var(--briefs-ink);
+  font-weight: 600;
+}
+
+.briefs-review-versions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.briefs-review-version .briefs-overline {
+  margin: 0;
+}
+
+.briefs-review-text {
+  margin: 4px 0 0;
+  color: var(--briefs-ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.briefs-review-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.briefs-review-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.briefs-review-field {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--lex-border-focus);
+  border-radius: var(--lex-radius-md);
+  background: var(--briefs-surface);
+  color: var(--briefs-ink);
+  font: inherit;
+  resize: vertical;
+}
+
+/* Phones: paired phones and pairing (opened from the top bar's phone status). */
+
+.briefs-phones {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.briefs-phones-lead {
+  margin: 0;
+  color: var(--briefs-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.briefs-phones-error {
+  margin: 0;
+}
+
+.briefs-pair-panel {
+  padding: 16px;
+  border: 1px solid var(--briefs-pick-edge);
+  border-radius: var(--lex-radius-xl);
+  background: var(--briefs-surface);
+  animation: briefs-pair-rise 220ms ease-out;
+}
+
+@keyframes briefs-pair-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .briefs-pair-panel { animation: none; }
+}
+
+.briefs-pair-busy {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--briefs-muted);
+  font-size: 14px;
+}
+
+.briefs-pair-qr {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20px;
+}
+
+/* A QR code scans only dark on light: white in both themes. */
+.briefs-pair-code {
+  flex: none;
+  width: 200px;
+  height: 200px;
+  padding: 8px;
+  border-radius: var(--lex-radius-lg);
+  background: #ffffff;
+}
+
+.briefs-pair-code svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.briefs-pair-text {
+  flex: 1 1 220px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.briefs-pair-text .briefs-overline,
+.briefs-pair-confirm .briefs-overline {
+  margin: 0;
+}
+
+.briefs-pair-title {
+  margin: 0;
+  color: var(--briefs-ink);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.briefs-pair-note {
+  margin: 0;
+  color: var(--briefs-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.briefs-pair-waiting {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--briefs-muted);
+  font-size: 13px;
+}
+
+.briefs-pair-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.briefs-pair-digits {
+  display: flex;
+  gap: 6px;
+}
+
+.briefs-pair-digit {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 52px;
+  border-radius: var(--lex-radius-lg);
+  background: var(--briefs-soft);
+  color: var(--briefs-ink);
+  font-size: 26px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.briefs-pair-digit.is-group-start {
+  margin-left: 12px;
+}
+
+.briefs-pair-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.briefs-pair-outcome {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.briefs-pair-outcome .briefs-pair-title {
+  flex: 1;
+  min-width: 200px;
+  font-size: 14px;
+}
+
+.briefs-pair-outcome.is-warning {
+  border-color: var(--briefs-flag);
+}
+
+.briefs-pair-mark {
+  flex: none;
+}
+
+.briefs-phones-paired {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.briefs-phones-paired .briefs-overline {
+  margin: 0;
+}
+
+.briefs-phone-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.briefs-phone-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 4px 0;
+}
+
+.briefs-phone-row + .briefs-phone-row {
+  border-top: 1px solid var(--briefs-line);
+}
+
+.briefs-phone-confirm {
+  display: flex;
+  gap: 6px;
+}
+
+.briefs-phone-warning {
+  padding: 0 0 8px 42px;
+  color: var(--briefs-muted);
+  font-size: 13px;
+}
+
+/* The LANA Briefs walkthrough (<lex-walkthrough class="briefs-tour">): its pictures. */
+
+lex-walkthrough.briefs-tour {
+  --lex-walkthrough-accent: var(--bt-accent);
+}
+
+.briefs-tour-devices {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.briefs-tour-device {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--briefs-ink);
+}
+
+.briefs-tour-device svg {
+  width: 48px;
+  height: 48px;
+  stroke-width: 1.5;
+}
+
+.briefs-tour-device span {
+  color: var(--briefs-muted);
+  font-size: 13px;
+}
+
+.briefs-tour-privacy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--bt-accent);
+}
+
+.briefs-tour-privacy-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.briefs-tour-privacy-line svg {
+  width: 24px;
+  height: 24px;
+}
+
+.briefs-tour-privacy-line span {
+  width: 28px;
+  height: 1px;
+  background: var(--bt-accent);
+}
+
+.briefs-tour-privacy-caption {
+  font-size: 13px;
+}
+
+/* A bracket card: the LANA mark's two corners on a plain card. */
+.briefs-tour-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 380px;
+  max-width: calc(100vw - 64px);
+  padding: 24px;
+  background: var(--briefs-surface);
+  text-align: left;
+}
+
+.briefs-tour-card::before,
+.briefs-tour-card::after {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border: 0 solid var(--bt-accent);
+  pointer-events: none;
+}
+
+.briefs-tour-card::before {
+  top: 0;
+  left: 0;
+  border-top-width: 1px;
+  border-left-width: 1px;
+}
+
+.briefs-tour-card::after {
+  right: 0;
+  bottom: 0;
+  border-right-width: 1px;
+  border-bottom-width: 1px;
+}
+
+.briefs-tour-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.briefs-tour-eyebrow {
+  color: var(--briefs-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.briefs-tour-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  color: var(--briefs-muted);
+  font-size: 12px;
+  box-shadow: inset 0 0 0 1px var(--briefs-line);
+}
+
+.briefs-tour-pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.briefs-tour-card-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--briefs-ink);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.briefs-tour-card-title svg {
+  width: 20px;
+  height: 20px;
+}
+
+.briefs-tour-card-detail {
+  margin: 0;
+  color: var(--briefs-muted);
+  font-size: 13px;
+}
+
+.briefs-tour-card-confirm {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-end;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--lex-radius-md);
+  background: var(--bt-accent);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Review a proposed action, pick its LANA matter, confirm (src/js/briefs/briefs-action-ui.js). */
+
+.briefs-act {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.briefs-act-origin {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--briefs-muted);
+  font-size: 13px;
+}
+
+.briefs-act-evidence {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.briefs-act-evidence .briefs-overline,
+.briefs-act-matter .briefs-overline {
+  margin: 0;
+}
+
+.briefs-act-quote {
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--bt-accent);
+  border-radius: 0 var(--lex-radius-md) var(--lex-radius-md) 0;
+  background: var(--briefs-soft);
+  color: var(--briefs-ink);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.briefs-act-quote-who {
+  display: block;
+  color: var(--briefs-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.briefs-act-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.briefs-act-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--briefs-line);
+  border-radius: var(--lex-radius-md);
+  background: var(--briefs-surface);
+  color: var(--briefs-ink);
+  font: inherit;
+  font-size: 14px;
+}
+
+.briefs-act-input:focus {
+  outline: none;
+  border-color: var(--lex-border-focus);
+}
+
+textarea.briefs-act-input {
+  resize: vertical;
+}
+
+.briefs-act-due {
+  max-width: 220px;
+}
+
+.briefs-act-matter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--briefs-pick-edge);
+  border-radius: var(--lex-radius-xl);
+}
+
+.briefs-act-hits {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.briefs-act-hit {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--lex-radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.briefs-act-hit:hover,
+.briefs-act-hit:focus-visible {
+  background: var(--briefs-soft);
+  outline: none;
+}
+
+.briefs-act-hit-label {
+  color: var(--briefs-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.briefs-act-hit-detail,
+.briefs-act-hit-note,
+.briefs-act-note {
+  margin: 0;
+  color: var(--briefs-muted);
+  font-size: 13px;
+}
+
+.briefs-act-hit-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+}
+
+.briefs-act-chosen {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--bt-accent);
+}
+
+.briefs-act-chosen .briefs-act-hit-label {
+  flex: 1;
+}
+
+.briefs-act-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.briefs-act-spacer {
+  flex: 1;
+}
+
+.briefs-act-done {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--bt-accent);
+  border-radius: var(--lex-radius-xl);
+}
+
+.briefs-act-done-text {
+  flex: 1;
+  min-width: 200px;
+}
+
+.briefs-act-done-title {
+  margin: 0;
+  color: var(--briefs-ink);
+  font-weight: 600;
+}
+
+.briefs-act-buttons {
+  display: flex;
+  gap: 8px;
+}
