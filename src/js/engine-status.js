@@ -90,15 +90,29 @@
    * Rows for the Settings "Local AI service" card.
    * @param {Object|null} status
    */
+  /** "127.0.0.1:8080" when the API base is on this computer, else ''. */
+  function localServer(apiBase) {
+    var match = typeof apiBase === 'string' ? apiBase.match(/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?/i) : null;
+    return match ? match[1] + (match[2] || '') : '';
+  }
+
+  /** Where LANA's AI runs while the local AI engine is not in use. */
+  function serverSentence(status) {
+    var here = localServer(status && status.apiBase);
+    return here
+      ? 'LANA\'s AI runs on the LANA server on this computer (' + here + ').'
+      : 'LANA\'s AI runs on your organization\'s server.';
+  }
+
   function settingsView(status) {
     var described = describeEngineStatus(status);
     if (!status || !status.configured) {
       return {
         available: false,
-        statusLabel: 'Not installed',
+        statusLabel: 'Not set up',
         tone: 'gray',
         rows: [],
-        note: 'The local AI engine is not installed on this computer, so LANA\'s AI runs on your organization\'s server.',
+        note: 'The local AI engine is not set up on this computer. ' + serverSentence(status),
         showToggle: false,
         showBackgroundJobs: false,
         showRestart: false
@@ -113,8 +127,8 @@
         tone: 'gray',
         rows: [],
         note: status.reason === 'engine_not_found'
-          ? 'The local AI engine is not installed where LANA expects it, so LANA\'s AI runs on your organization\'s server.'
-          : 'LANA\'s AI runs on your organization\'s server, and so do your background jobs.',
+          ? 'The local AI engine is not installed where LANA expects it. ' + serverSentence(status)
+          : serverSentence(status) + ' Background jobs run there too.',
         showToggle: true,
         showBackgroundJobs: false,
         showRestart: false

@@ -140,9 +140,18 @@ describe('settingsView', () => {
   });
 
   test('shows only the controls that can be used on this computer', () => {
-    expect(status.settingsView({ configured: false })).toMatchObject({ statusLabel: 'Not installed', showToggle: false, showBackgroundJobs: false, showRestart: false });
+    expect(status.settingsView({ configured: false })).toMatchObject({ statusLabel: 'Not set up', showToggle: false, showBackgroundJobs: false, showRestart: false });
     expect(status.settingsView({ configured: true, enabled: false, inUse: false, reason: 'disabled' })).toMatchObject({ showToggle: true, showBackgroundJobs: false, showRestart: false });
     expect(status.settingsView(engineStatus())).toMatchObject({ showToggle: true, showBackgroundJobs: true, showRestart: true });
+  });
+
+  test('a LANA server on this computer is named as such, not as the organization\'s server', () => {
+    expect(status.settingsView({ configured: false, apiBase: 'http://127.0.0.1:8080' }).note)
+      .toBe('The local AI engine is not set up on this computer. LANA\'s AI runs on the LANA server on this computer (127.0.0.1:8080).');
+    expect(status.settingsView({ configured: false, apiBase: 'https://acme.lanaai.io' }).note)
+      .toBe('The local AI engine is not set up on this computer. LANA\'s AI runs on your organization\'s server.');
+    expect(status.settingsView({ configured: true, enabled: false, inUse: false, reason: 'disabled', apiBase: 'http://localhost:8080' }).note)
+      .toBe('LANA\'s AI runs on the LANA server on this computer (localhost:8080). Background jobs run there too.');
   });
 });
 
