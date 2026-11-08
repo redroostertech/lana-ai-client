@@ -2,14 +2,6 @@ export const STORAGE_KEYS = {
   user: 'user'
 };
 
-export const ADMIN_ROLE_NAMES = [
-  'admin',
-  'super_admin',
-  'system_admin',
-  'org_admin',
-  'organization_admin'
-];
-
 /**
  * System-level connectors that ship as built-ins. app.js seeds the readiness
  * catalog with them so legacy connectors (Leadly, ActionStep, GoHighLevel)

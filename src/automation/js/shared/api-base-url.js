@@ -30,12 +30,3 @@ export function getApiUrl(path) {
   return `${base}${prefixedPath}`;
 }
 
-// Compatibility alias retained for the connector-iframe loader
-// (custom-ui-loader.js), which builds blob HTML for legacy connector UIs.
-// Prefer `getApiUrl` or `window.api.baseUrl` directly in new code.
-export function resolveAutomationApiBaseUrl(preferred = '') {
-  if (typeof preferred === 'string' && /^https?:\/\//i.test(preferred.trim())) {
-    return preferred.trim();
-  }
-  return canonicalBaseUrl();
-}
