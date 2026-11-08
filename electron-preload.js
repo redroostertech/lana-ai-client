@@ -304,6 +304,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
    */
   /** Settings > General: this computer and this copy of LANA, and software updates (electron-system-info.js). */
   getSystemInfo: () => ipcRenderer.invoke('settings:system-info'),
+  getAiTopology: () => ipcRenderer.invoke('settings:ai-topology'),
   getUpdateStatus: () => ipcRenderer.invoke('settings:update-status'),
   checkForClientUpdates: () => ipcRenderer.invoke('settings:check-for-updates'),
   installClientUpdate: () => ipcRenderer.invoke('settings:install-update'),

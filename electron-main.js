@@ -177,6 +177,8 @@ const { redactUrlForLog } = require('./electron-log-redaction');
 const { BrainchildManager, discover, validateLink, mcpBinForRoot, isAllowedVaultRoot } = require('./src/electron-brainchild-manager');
 const { ElectronScreenVoice } = require('./src/screen-voice/electron-screen-voice');
 const { isAllowedExternalUrl } = require('./src/electron-external-url');
+const { registerAiTopologyIpc } = require('./electron-ai-topology');
+const localModelsCatalog = require('./electron-local-models');
 const {
   SCREEN_DICTION_ID,
   screenDictionAvailable,
@@ -1916,6 +1918,15 @@ ipcMain.handle('vpn-get-device-id', async () => {
  *
  * Note: granted_user_id is treated as semi-sensitive — never log it.
  */
+// Settings > Capabilities > AI models: Pip on this computer, the server, Forge (electron-ai-topology.js).
+registerAiTopologyIpc(ipcMain, {
+  env: process.env,
+  savedServer: () => getSavedServer(),
+  catalog: localModelsCatalog.CATALOG,
+  modelsDir: () => localModelsCatalog.modelsDir(process.env, app.getPath('userData')),
+  logError
+});
+
 // Settings > General: About, Software update, Language & region (electron-system-info.js).
 registerSystemInfoIpc(ipcMain, {
   app,

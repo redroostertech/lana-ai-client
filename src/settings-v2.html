@@ -307,6 +307,18 @@
                 <p id="sv2-local-engine-jobs-empty" class="sv2-local-engine-note" hidden></p>
               </div>
             </div>
+            <!-- Pip, models, server, Forge, routing (settings-ai-models.js). -->
+            <div id="sv2-ai-pip" class="sv2-ai-group" hidden>
+              <div class="sv2-local-engine-option-copy">
+                <span class="sv2-local-engine-option-name">Pip model server</span>
+                <span id="sv2-ai-pip-pinned" class="sv2-local-engine-option-description"></span>
+              </div>
+              <div id="sv2-ai-pip-rows" class="sv2-ai-rows" role="list"></div>
+            </div>
+            <div id="sv2-ai-models" class="sv2-ai-group" hidden>
+              <span class="sv2-local-engine-option-name">Models on this computer</span>
+              <div id="sv2-ai-models-rows" class="sv2-ai-rows" role="list"></div>
+            </div>
             <!-- Speech models (settings-briefs.js): shown while LANA Briefs is on. -->
             <div id="sv2-section-briefs-models" class="sv2-local-engine-speech sv2-briefs" hidden>
               <div class="sv2-local-engine-option-copy">
@@ -314,6 +326,22 @@
                 <span class="sv2-local-engine-option-description">LANA Briefs transcribes meetings on this computer. Notes and actions are written by LANA's AI.</span>
               </div>
               <div id="sv2-briefs-models" class="sv2-briefs-models" aria-live="polite"></div>
+            </div>
+            <div id="sv2-ai-server" class="sv2-ai-group" hidden>
+              <span class="sv2-local-engine-option-name">Organization server</span>
+              <div id="sv2-ai-server-rows" class="sv2-ai-kv"></div>
+            </div>
+            <div id="sv2-ai-forge" class="sv2-ai-group" hidden>
+              <div class="sv2-local-engine-option-copy">
+                <span class="sv2-local-engine-option-name">Forge</span>
+                <span class="sv2-local-engine-option-description">LANA's cloud AI. Your organization's server answers with it.</span>
+              </div>
+              <div id="sv2-ai-forge-rows" class="sv2-ai-kv"></div>
+            </div>
+            <div id="sv2-ai-routing" class="sv2-ai-group" hidden>
+              <span class="sv2-local-engine-option-name">Prompt routing</span>
+              <p id="sv2-ai-routing-current" class="sv2-local-engine-option-description"></p>
+              <p id="sv2-ai-routing-hybrid" class="sv2-local-engine-option-description"></p>
             </div>
           </lex-card>
         </section>
@@ -866,6 +894,8 @@
   <script src="js/engine-status.js"></script>
   <script src="js/engine-background-jobs.js"></script>
   <script src="js/pages/settings-local-engine.js"></script>
+  <script src="js/settings-ai-models.model.js"></script>
+  <script src="js/pages/settings-ai-models.js"></script>
   <script src="js/offline-copy-status.js"></script>
   <script src="js/pages/settings-offline-copy.js"></script>
   <script src="js/embedding-reembed-status.js"></script>

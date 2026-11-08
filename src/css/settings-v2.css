@@ -1532,6 +1532,63 @@
   display: none !important;
 }
 
+/* AI models groups: Pip, models, server, Forge, routing (settings-ai-models.js). */
+.sv2-ai-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--lex-border-subtle);
+}
+
+.sv2-ai-group p {
+  margin: 0;
+}
+
+.sv2-ai-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sv2-ai-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sv2-ai-row-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sv2-ai-row-name {
+  color: var(--lex-text-primary);
+  font-size: var(--lex-body-sm-size);
+  font-weight: var(--lex-weight-medium, 500);
+}
+
+.sv2-ai-row-detail {
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-sm-size);
+  line-height: var(--lex-body-sm-height);
+  overflow-wrap: anywhere;
+}
+
+.sv2-ai-row lex-badge {
+  flex: none;
+}
+
+.sv2-ai-kv {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 /* Speech models (LANA Briefs) inside the AI models card; rows from settings-briefs.css. */
 .sv2-local-engine-speech {
   margin-top: 16px;
