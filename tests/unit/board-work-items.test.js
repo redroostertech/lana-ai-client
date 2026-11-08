@@ -110,3 +110,37 @@ describe('Ask LANA about a task', () => {
     expect(B.taskChatPrompt({ title: 'Call the bank' })).toBe('Help me with Call the bank.');
   });
 });
+
+describe('subtask card menu and Ask LANA about a subtask', () => {
+  const values = (items) => items.map((i) => (i.divider ? '-' : i.value));
+
+  test.each([
+    ['pending', ['complete', 'close', '-', 'lana']],
+    ['completed', ['close', '-', 'lana']],
+    ['cancelled', ['complete', '-', 'lana']]
+  ])('a %s subtask offers %j', (status, expected) => {
+    expect(values(B.subtaskMenuItems({ id: 's1', status }))).toEqual(expected);
+  });
+
+  test('labels name the subtask, and the statuses are the subtask ones', () => {
+    expect(B.subtaskMenuItems({ status: 'pending' }).filter((i) => !i.divider).map((i) => i.label))
+      .toEqual(['Complete Subtask', 'Close Subtask', 'Ask LANA about this subtask']);
+    expect([B.subtaskCloseoutStatus('complete'), B.subtaskCloseoutStatus('close'), B.subtaskCloseoutStatus('lana')])
+      .toEqual(['completed', 'cancelled', null]);
+  });
+
+  test('sends the subtask AND its parent task, with the other subtasks', () => {
+    const subtask = task.subtasks[0];
+    const context = B.subtaskChatContext(subtask, task, { matter_id: 'MATT-00017', matter_name: 'Estate planning intake' });
+    expect(context).toEqual(expect.objectContaining({ type: 'ui_card', card_kind: 'subtask', card_key: 'subtask:s1', ui_label: 'M17-4 Verify the statement' }));
+    expect(context.details).toEqual(expect.objectContaining({ subtask_id: 's1', item_key: 'M17-4', title: 'Verify the statement', status: 'pending' }));
+    expect(context.details.parent_task).toEqual(expect.objectContaining({ task_id: 't1', item_key: 'M17-3', title: 'Review Employee Benefit Statement' }));
+    expect(context.details.parent_task.subtasks.map((s) => s.item_key)).toEqual(['M17-4', 'M17-5', 'M17-6']);
+    expect(context.page.matter_id).toBe('MATT-00017');
+    expect(B.taskChatPrompt(subtask)).toBe('Help me with M17-4 Verify the statement.');
+  });
+
+  test('a task card says it is a task', () => {
+    expect(B.taskChatContext(task, {}).card_kind).toBe('task');
+  });
+});

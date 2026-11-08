@@ -772,9 +772,16 @@
 
     // Board task card "..." menu (Complete Task, Close Task, Ask LANA).
     trackDocListener('lex-select', function (e) {
-      var menu = e.target && e.target.closest ? e.target.closest('[data-board-task-menu]') : null;
-      if (!menu || !e.detail) return;
-      _handleBoardTaskMenu(menu.getAttribute('data-board-task-menu'), e.detail.value);
+      if (!e.detail || !e.target || !e.target.closest) return;
+      var menu = e.target.closest('[data-board-task-menu]');
+      if (menu) {
+        _handleBoardTaskMenu(menu.getAttribute('data-board-task-menu'), e.detail.value);
+        return;
+      }
+      var subtaskMenu = e.target.closest('[data-board-subtask-menu]');
+      if (subtaskMenu) {
+        _handleBoardSubtaskMenu(subtaskMenu.getAttribute('data-parent-task-id'), subtaskMenu.getAttribute('data-board-subtask-menu'), e.detail.value);
+      }
     });
 
     // Card action delegation — single listener handles ALL lex-card action buttons
@@ -5379,13 +5386,23 @@
     '</div>';
   }
 
+  function _kanbanSubtaskMenuHtml(item) {
+    var items = LanaBoardWorkItems.subtaskMenuItems(item);
+    return '<div class="kanban-card__menu" onclick="event.stopPropagation()">' +
+      '<lex-dropdown-btn floating icon="more-horizontal" icon-only variant="ghost" align="end" aria-label="Subtask actions"' +
+        ' data-board-subtask-menu="' + escapeHtml(item.id) + '" data-parent-task-id="' + escapeHtml(item.parent_id) + '"' +
+        ' options="' + escapeHtml(JSON.stringify(items)) + '"></lex-dropdown-btn>' +
+    '</div>';
+  }
+
   function _renderKanbanSubtaskCard(item) {
     var dataAttr = 'data-task-id="' + escapeHtml(item.id) + '" data-item-kind="subtask" data-parent-task-id="' + escapeHtml(item.parent_id) + '"';
     var dueHtml = item.due_date
       ? '<div class="flex items-center gap-1 text-xs text-gray-500 mt-2">' + formatDueDate(item.due_date) + '</div>'
       : '';
-    return '<div class="kanban-card bg-white border border-gray-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-all cursor-move" draggable="true" ' + dataAttr +
+    return '<div class="kanban-card kanban-card--has-menu bg-white border border-gray-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-all cursor-move" draggable="true" ' + dataAttr +
       ' ondragstart="handleKanbanDragStart(event)" ondragend="handleKanbanDragEnd(event)" onclick="openTaskQuickView(\'' + escapeHtml(item.parent_id) + '\')">' +
+      _kanbanSubtaskMenuHtml(item) +
       _kanbanTitleHtml(item.title) +
       _kanbanCapsulesHtml('Subtask', item.priority || 'normal') +
       _kanbanKeyHtml(item.item_key) +
@@ -5575,21 +5592,49 @@
     });
   }
 
+  // Complete or close a subtask from its card. Subtasks have no closeout
+  // notes, so this saves the status directly.
+  async function _handleBoardSubtaskMenu(parentTaskId, subtaskId, action) {
+    var parent = currentTasksList.find(function (t) { return String(t.id) === String(parentTaskId); });
+    var subtask = parent && Array.isArray(parent.subtasks)
+      ? parent.subtasks.find(function (s) { return String(s.id) === String(subtaskId); })
+      : null;
+    if (!parent || !subtask) return;
+    if (action === 'lana') {
+      var matter = (currentMatterData && currentMatterData.matter) || {};
+      _openLanaWithCard(LanaBoardWorkItems.subtaskChatContext(subtask, parent, matter), LanaBoardWorkItems.taskChatPrompt(subtask));
+      return;
+    }
+    var status = LanaBoardWorkItems.subtaskCloseoutStatus(action);
+    if (!status) return;
+    try {
+      await api.updateSubtask(subtask.id, { status: status });
+      Lex.Toast.success(status === 'cancelled' ? 'Subtask closed' : 'Subtask completed');
+      await _reloadBoardTasks();
+    } catch (error) {
+      console.error('[Tasks] Failed to update subtask:', error);
+      Lex.Toast.error('Failed to update subtask' + (error && error.message ? ': ' + error.message : ''));
+    }
+  }
+
   // Open the LANA dock with this task attached, to chat about it.
   function _askLanaAboutBoardTask(task) {
+    var matter = (currentMatterData && currentMatterData.matter) || {};
+    _openLanaWithCard(LanaBoardWorkItems.taskChatContext(task, matter), LanaBoardWorkItems.taskChatPrompt(task));
+  }
+
+  function _openLanaWithCard(context, prompt) {
     var dock = document.querySelector('lex-lana-dock');
     if (!dock || typeof dock.openWith !== 'function') {
       Lex.Toast.info('LANA is still loading. Try again in a moment.');
       return;
     }
-    var matter = (currentMatterData && currentMatterData.matter) || {};
-    var context = LanaBoardWorkItems.taskChatContext(task, matter);
     dock.openWith({
       contextType: 'full_chat',
       matterId: context.page.matter_id || null,
       matterName: context.page.matter_name || null,
       cardContext: context,
-      prefillPrompt: LanaBoardWorkItems.taskChatPrompt(task)
+      prefillPrompt: prompt
     });
   }
 

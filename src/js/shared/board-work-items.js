@@ -15,9 +15,15 @@
  *   - subtaskStatusForColumn(column) -> the subtask status for a column, or null when not allowed
  *   - cardTitle(text)                -> the title cut to CARD_TITLE_MAX characters on a word, with "..."
  *   - taskMenuItems(task)            -> the card's "..." menu: Complete Task, Close Task, Ask LANA
+ *   - subtaskMenuItems(subtask)      -> the same menu for a subtask card
  *   - taskCloseoutStatus(action)     -> the task status a menu action sets ('complete' or 'cancelled')
+ *   - subtaskCloseoutStatus(action)  -> the subtask status a menu action sets ('completed' or 'cancelled')
  *   - taskChatContext(task, matter)  -> the card context the LANA dock attaches for "Ask LANA"
- *   - taskChatPrompt(task)           -> the prompt the dock composer starts with
+ *   - subtaskChatContext(subtask, parentTask, matter) -> the subtask AND its parent task, for "Ask LANA"
+ *   - taskChatPrompt(item)           -> the prompt the dock composer starts with (task or subtask)
+ *
+ * The chat reads card_kind ('task' or 'subtask') to help work the item rather
+ * than just explain the card (unified-prompt-builder WORK_ITEM_CARD_FOCUS).
  */
 
 (function (global) {
@@ -67,19 +73,32 @@
   // The "..." menu on a task card. Closing a task sets it to cancelled; a task
   // already in that column does not offer the same action again.
   var TASK_CLOSEOUT_STATUS = { complete: 'complete', close: 'cancelled' };
+  var SUBTASK_CLOSEOUT_STATUS = { complete: 'completed', close: 'cancelled' };
+
+  function workItemMenuItems(item, noun) {
+    var column = columnFor(item);
+    var items = [];
+    if (column !== 'complete') items.push({ value: 'complete', label: 'Complete ' + noun, icon: 'check-circle' });
+    if (column !== 'cancelled') items.push({ value: 'close', label: 'Close ' + noun, icon: 'x-circle' });
+    if (items.length) items.push({ divider: true });
+    items.push({ value: 'lana', label: 'Ask LANA about this ' + noun.toLowerCase(), variant: 'lana' });
+    return items;
+  }
 
   function taskMenuItems(task) {
-    var column = columnFor(task);
-    var items = [];
-    if (column !== 'complete') items.push({ value: 'complete', label: 'Complete Task', icon: 'check-circle' });
-    if (column !== 'cancelled') items.push({ value: 'close', label: 'Close Task', icon: 'x-circle' });
-    if (items.length) items.push({ divider: true });
-    items.push({ value: 'lana', label: 'Ask LANA about this task', variant: 'lana' });
-    return items;
+    return workItemMenuItems(task, 'Task');
+  }
+
+  function subtaskMenuItems(subtask) {
+    return workItemMenuItems(subtask, 'Subtask');
   }
 
   function taskCloseoutStatus(action) {
     return TASK_CLOSEOUT_STATUS[action] || null;
+  }
+
+  function subtaskCloseoutStatus(action) {
+    return SUBTASK_CLOSEOUT_STATUS[action] || null;
   }
 
   function taskLabel(task) {
@@ -87,39 +106,62 @@
     return task && task.item_key ? task.item_key + ' ' + title : title;
   }
 
-  // Same ui_card shape as the matter Summary cards, so the dock and the chat
-  // read it the same way.
-  function taskChatContext(task, matter) {
-    task = task || {};
-    matter = matter || {};
+  function taskDetails(task) {
     var subtasks = Array.isArray(task.subtasks) ? task.subtasks : [];
     return {
+      task_id: String(task.id || ''),
+      item_key: task.item_key || null,
+      title: task.title || task.task_name || '',
+      status: task.status || null,
+      priority: task.priority || null,
+      assigned_to: task.assigned_to || null,
+      due_date: task.due_date || null,
+      description: task.description && task.description !== 'null' ? task.description : null,
+      subtasks: subtasks.map(function (s) {
+        return { item_key: s.item_key || null, title: s.title || s.name || '', status: s.status || 'pending' };
+      })
+    };
+  }
+
+  // Same ui_card shape as the matter Summary cards, so the dock and the chat
+  // read it the same way; card_kind tells the chat it is a work item.
+  function workItemCardContext(kind, item, matter, details, fallbackMatterId) {
+    matter = matter || {};
+    return {
       type: 'ui_card',
-      ui_label: taskLabel(task),
+      card_kind: kind,
+      ui_label: taskLabel(item),
       source: 'workspace_details_board',
-      card_key: 'task:' + String(task.id || ''),
-      card_title: task.title || task.task_name || 'Untitled task',
+      card_key: kind + ':' + String(item.id || ''),
+      card_title: item.title || item.task_name || item.name || 'Untitled ' + kind,
       page: {
         route: 'workspace-details',
         tab: 'tasks',
-        matter_id: matter.matter_id || matter.id || task.matter_id || '',
+        matter_id: matter.matter_id || matter.id || fallbackMatterId || '',
         matter_name: matter.matter_name || matter.name || matter.title || '',
         matter_type: matter.matter_type || matter.type || ''
       },
-      details: {
-        task_id: String(task.id || ''),
-        item_key: task.item_key || null,
-        title: task.title || task.task_name || '',
-        status: task.status || null,
-        priority: task.priority || null,
-        assigned_to: task.assigned_to || null,
-        due_date: task.due_date || null,
-        description: task.description && task.description !== 'null' ? task.description : null,
-        subtasks: subtasks.map(function (s) {
-          return { item_key: s.item_key || null, title: s.title || s.name || '', status: s.status || 'pending' };
-        })
-      }
+      details: details
     };
+  }
+
+  function taskChatContext(task, matter) {
+    task = task || {};
+    return workItemCardContext('task', task, matter, taskDetails(task), task.matter_id);
+  }
+
+  function subtaskChatContext(subtask, parentTask, matter) {
+    subtask = subtask || {};
+    parentTask = parentTask || {};
+    return workItemCardContext('subtask', subtask, matter, {
+      subtask_id: String(subtask.id || ''),
+      item_key: subtask.item_key || null,
+      title: subtask.title || subtask.name || '',
+      status: subtask.status || null,
+      priority: subtask.priority || null,
+      due_date: subtask.due_date || null,
+      parent_task: taskDetails(parentTask)
+    }, parentTask.matter_id);
   }
 
   function taskChatPrompt(task) {
@@ -164,8 +206,11 @@
     cardTitle: cardTitle,
     CARD_TITLE_MAX: CARD_TITLE_MAX,
     taskMenuItems: taskMenuItems,
+    subtaskMenuItems: subtaskMenuItems,
     taskCloseoutStatus: taskCloseoutStatus,
+    subtaskCloseoutStatus: subtaskCloseoutStatus,
     taskChatContext: taskChatContext,
+    subtaskChatContext: subtaskChatContext,
     taskChatPrompt: taskChatPrompt
   };
 
