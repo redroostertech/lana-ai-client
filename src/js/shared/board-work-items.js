@@ -13,6 +13,7 @@
  *   - boardItems(tasks)              -> tasks followed by their subtask cards
  *   - columnFor(item)                -> the Board column key for a task or subtask card
  *   - subtaskStatusForColumn(column) -> the subtask status for a column, or null when not allowed
+ *   - cardTitle(text)                -> the title cut to CARD_TITLE_MAX characters on a word, with "..."
  */
 
 (function (global) {
@@ -36,6 +37,17 @@
     cancelled: 'cancelled'
   };
 
+  var CARD_TITLE_MAX = 90;
+
+  function cardTitle(text) {
+    var value = String(text || '').trim();
+    if (value.length <= CARD_TITLE_MAX) return value;
+    var cut = value.slice(0, CARD_TITLE_MAX);
+    var lastSpace = cut.lastIndexOf(' ');
+    if (lastSpace > CARD_TITLE_MAX * 0.6) cut = cut.slice(0, lastSpace);
+    return cut.trimEnd() + '...';
+  }
+
   function normalizedStatus(status) {
     return String(status || '').trim().toLowerCase().split(' ').join('_');
   }
@@ -55,6 +67,7 @@
       item_key: subtask.item_key || null,
       title: subtask.title || subtask.name || 'Subtask',
       status: subtask.status || 'pending',
+      priority: subtask.priority || null,
       due_date: subtask.due_date || null,
       parent_id: String(task.id),
       parent_key: task.item_key || null,
@@ -81,7 +94,9 @@
   var moduleApi = {
     boardItems: boardItems,
     columnFor: columnFor,
-    subtaskStatusForColumn: subtaskStatusForColumn
+    subtaskStatusForColumn: subtaskStatusForColumn,
+    cardTitle: cardTitle,
+    CARD_TITLE_MAX: CARD_TITLE_MAX
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = moduleApi;

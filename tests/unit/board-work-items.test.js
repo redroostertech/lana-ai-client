@@ -44,3 +44,23 @@ describe('columns', () => {
     expect(B.subtaskStatusForColumn(column)).toBe(status);
   });
 });
+
+describe('card title', () => {
+  test('a short title is shown whole', () => {
+    expect(B.cardTitle('  Review Employee Benefit Statement ')).toBe('Review Employee Benefit Statement');
+  });
+
+  test('a long title is cut on a word, under the limit, with "..."', () => {
+    const long = 'Verify the benefit statement against the client employment contract and note every coverage amount that differs';
+    const shown = B.cardTitle(long);
+    expect(shown.endsWith('...')).toBe(true);
+    expect(shown.length).toBeLessThanOrEqual(B.CARD_TITLE_MAX + 3);
+    expect(long.startsWith(shown.slice(0, -3))).toBe(true);
+    expect(long.charAt(shown.length - 3)).toBe(' ');
+  });
+
+  test('a subtask card carries its priority', () => {
+    const cards = B.boardItems([{ id: 't1', title: 'T', subtasks: [{ id: 's1', title: 'S', priority: 'high' }] }]);
+    expect(cards[1].priority).toBe('high');
+  });
+});

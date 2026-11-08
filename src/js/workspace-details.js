@@ -5350,12 +5350,26 @@
     '</div>';
   }
 
-  // Type and key row, as Jira shows them: "Task M17-3", "Subtask M17-4".
-  function _kanbanTypeKeyHtml(type, key) {
-    return '<div class="kanban-card__type-row">' +
-      '<span class="kanban-card__type kanban-card__type--' + type.toLowerCase() + '">' + type + '</span>' +
-      (key ? '<span class="kanban-card__key">' + escapeHtml(key) + '</span>' : '') +
+  // Board card layout, the same for tasks and subtasks:
+  //   title (cut to LanaBoardWorkItems.CARD_TITLE_MAX)
+  //   [type capsule][priority capsule]
+  //   key (M17-4)
+  //   "Part of M17-3 <task title>" on a subtask card
+  function _kanbanTitleHtml(text) {
+    var full = String(text || '');
+    return '<h5 class="kanban-card__title" title="' + escapeHtml(full) + '">' + escapeHtml(LanaBoardWorkItems.cardTitle(full)) + '</h5>';
+  }
+
+  function _kanbanCapsulesHtml(type, priority, extraHtml) {
+    return '<div class="kanban-card__capsules">' +
+      (type ? '<span class="kanban-card__capsule kanban-card__type">' + type + '</span>' : '') +
+      (priority ? getPriorityBadge(priority) : '') +
+      (extraHtml || '') +
     '</div>';
+  }
+
+  function _kanbanKeyHtml(key) {
+    return key ? '<div class="kanban-card__key">' + escapeHtml(key) + '</div>' : '';
   }
 
   function _renderKanbanSubtaskCard(item) {
@@ -5363,13 +5377,14 @@
     var dueHtml = item.due_date
       ? '<div class="flex items-center gap-1 text-xs text-gray-500 mt-2">' + formatDueDate(item.due_date) + '</div>'
       : '';
-    return '<div class="kanban-card kanban-card--subtask bg-white border border-gray-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-all cursor-move" draggable="true" ' + dataAttr +
+    return '<div class="kanban-card bg-white border border-gray-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-all cursor-move" draggable="true" ' + dataAttr +
       ' ondragstart="handleKanbanDragStart(event)" ondragend="handleKanbanDragEnd(event)" onclick="openTaskQuickView(\'' + escapeHtml(item.parent_id) + '\')">' +
-      _kanbanTypeKeyHtml('Subtask', item.item_key) +
-      '<h5 class="text-sm font-medium text-gray-900 line-clamp-2">' + escapeHtml(item.title) + '</h5>' +
+      _kanbanTitleHtml(item.title) +
+      _kanbanCapsulesHtml('Subtask', item.priority) +
+      _kanbanKeyHtml(item.item_key) +
       '<div class="kanban-card__parent" title="' + escapeHtml(item.parent_title) + '">' +
         '<span class="kanban-card__parent-label">Part of</span>' +
-        (item.parent_key ? '<span class="kanban-card__key">' + escapeHtml(item.parent_key) + '</span>' : '') +
+        (item.parent_key ? '<span class="kanban-card__parent-key">' + escapeHtml(item.parent_key) + '</span>' : '') +
         '<span class="kanban-card__parent-title">' + escapeHtml(item.parent_title) + '</span>' +
       '</div>' +
       dueHtml +
@@ -5379,7 +5394,6 @@
   function _renderKanbanCard(task) {
     if (task && task.kind === 'subtask') return _renderKanbanSubtaskCard(task);
     var isLana = task.source === 'lana';
-    var title = escapeHtml(task.title || task.task_name || '');
     var subtaskTotal = Array.isArray(task.subtasks) ? task.subtasks.length : 0;
     var subtaskDone = subtaskTotal ? task.subtasks.filter(function (s) { return s && s.status === 'completed'; }).length : 0;
     var subtaskSummaryHtml = subtaskTotal
@@ -5387,41 +5401,33 @@
       : '';
 
     var externalBadge = !isLana
-      ? '<span class="text-xs lex-bg-accent-soft lex-text-accent px-2 py-0.5 rounded flex-shrink-0">External</span>'
+      ? '<span class="kanban-card__capsule kanban-card__capsule--external">External</span>'
       : '';
 
     var assigneeHtml = task.assigned_to
-      ? '<div class="flex items-center gap-1 text-xs text-gray-600 mb-2">' +
+      ? '<div class="flex items-center gap-1 text-xs text-gray-600 mt-2">' +
           '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>' +
           '<span class="truncate">' + escapeHtml(task.assigned_to) + '</span>' +
         '</div>'
       : '';
 
     var dueDateHtml = task.due_date
-      ? '<div class="flex items-center gap-1 text-xs text-gray-500">' +
+      ? '<div class="flex items-center gap-1 text-xs text-gray-500 mt-1">' +
           '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>' +
           formatDueDate(task.due_date) +
         '</div>'
-      : '';
-
-    var descHtml = (task.description && task.description !== 'null')
-      ? '<p class="mt-2 text-xs text-gray-600 line-clamp-2">' + escapeHtml(task.description) + '</p>'
       : '';
 
     // Serialize task data for drag; avoid injecting raw JSON into HTML
     var taskDataAttr = 'data-task-id="' + task.id + '" data-task-status="' + escapeHtml(task.status) + '"';
 
     return '<div class="kanban-card bg-white border border-gray-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-all ' + (isLana ? 'cursor-move' : 'cursor-default') + '" draggable="' + isLana + '" ' + taskDataAttr + ' ondragstart="handleKanbanDragStart(event)" ondragend="handleKanbanDragEnd(event)" onclick="openTaskQuickView(\'' + task.id + '\')">' +
-      (isLana ? _kanbanTypeKeyHtml('Task', task.item_key) : '') +
-      '<div class="flex items-start gap-2 mb-2">' +
-        '<h5 class="text-sm font-medium text-gray-900 flex-1 line-clamp-2">' + title + '</h5>' +
-        externalBadge +
-      '</div>' +
+      _kanbanTitleHtml(task.title || task.task_name || '') +
+      _kanbanCapsulesHtml(isLana ? 'Task' : '', task.priority || 'normal', externalBadge) +
+      _kanbanKeyHtml(task.item_key) +
       (window.LanaOfflineCopy ? LanaOfflineCopy.waitingBadgeHtml(task) : '') +
-      '<div class="mb-2">' + getPriorityBadge(task.priority) + '</div>' +
       assigneeHtml +
       dueDateHtml +
-      descHtml +
       subtaskSummaryHtml +
       taskRuleChipsHtml(task) +
       (Array.isArray(task.actions) && task.actions.length ? '<div data-task-actions-for="' + escapeHtml(String(task.id)) + '" hidden></div>' : '') +

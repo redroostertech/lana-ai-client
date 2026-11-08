@@ -59,47 +59,60 @@
   }
 }
 
-/* Board cards: type and key (Task M17-3, Subtask M17-4), the parent link on a
-   subtask card, and a task's subtask count. */
-.kanban-card__type-row {
+/* Board cards: title, then [type][priority] capsules, then the key (M17-4),
+   then the parent link on a subtask card, and a task's subtask count. */
+.kanban-card__title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--lex-text-primary, #111827);
+  overflow-wrap: anywhere;
+}
+.kanban-card__capsules {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.375rem;
-  margin-bottom: 0.375rem;
-  font-size: 0.6875rem;
-  line-height: 1;
+  margin-top: 0.5rem;
+}
+.kanban-card__capsule {
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1rem;
 }
 .kanban-card__type {
-  padding: 0.1875rem 0.375rem;
-  border-radius: 0.25rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  border: 1px solid var(--lex-border-default, #d1d5db);
+  color: var(--lex-text-secondary, #4b5563);
 }
-.kanban-card__type--task {
-  background: var(--lex-color-blue-50, #eff6ff);
-  color: var(--lex-color-blue-700, #1d4ed8);
+.kanban-card__capsule--external {
+  background: var(--lex-bg-accent-soft, #eef2ff);
+  color: var(--lex-text-accent, #4338ca);
 }
-.kanban-card__type--subtask {
-  background: rgba(124, 58, 237, 0.08);
-  color: #6d28d9;
-}
-.kanban-card__key {
+.kanban-card__key,
+.kanban-card__parent-key {
   flex-shrink: 0;
   white-space: nowrap;
   font-family: var(--lex-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-weight: 600;
   color: var(--lex-text-secondary, #4b5563);
 }
-.kanban-card.kanban-card--subtask {
-  border-left: 3px solid rgba(124, 58, 237, 0.45);
+.kanban-card__key {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
 }
-.kanban-card__parent .kanban-card__key { font-size: 0.6875rem; }
+.kanban-card__parent-key { font-size: 0.6875rem; }
 .kanban-card__parent {
   display: flex;
   align-items: center;
   gap: 0.375rem;
-  margin-top: 0.5rem;
+  margin-top: 0.375rem;
   min-width: 0;
   font-size: 0.75rem;
   color: var(--lex-text-tertiary, #6b7280);
