@@ -3,7 +3,9 @@
  * organization" card (local AI engine plan, phase 10).
  *
  * The person's card reads the engine's GET /api/engine/v1/offline/status
- * (the API base is the local engine): state, as of, what is on this computer,
+ * (the API base is the local engine), and only while the engine is in use;
+ * otherwise it says an offline copy needs the local AI service and asks
+ * nothing (the organization's server has no such route): state, as of, what is on this computer,
  * changes waiting to sync, changes to review (keep mine or use theirs) and
  * changes the organization's server did not accept. The words come from
  * LanaOfflineCopy.settingsView (src/js/offline-copy-status.js).
@@ -116,7 +118,14 @@
       refused.hidden = view.refused.length === 0;
     }
 
+    var engineApi = window.electronAPI && window.electronAPI.engine;
+    var engineInUse = false;
+
     function refresh() {
+      if (!engineInUse) {
+        render(null);
+        return Promise.resolve();
+      }
       return api.get(STATUS_PATH).then(render).catch(function () { render(null); });
     }
 
@@ -161,9 +170,20 @@
       });
     }
 
-    refresh();
+    if (engineApi && typeof engineApi.onState === 'function') {
+      engineApi.onState(function (status) {
+        var now = model.engineInUse(status);
+        if (now === engineInUse) return;
+        engineInUse = now;
+        refresh();
+      });
+    }
+    var engineRead = engineApi && typeof engineApi.getStatus === 'function'
+      ? engineApi.getStatus().then(function (result) { engineInUse = model.engineInUse(result); }, function () {})
+      : Promise.resolve();
+    engineRead.then(refresh);
     bootAdmin();
-    setInterval(function () { if (!document.hidden) refresh(); }, REFRESH_MS);
+    setInterval(function () { if (!document.hidden && engineInUse) refresh(); }, REFRESH_MS);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

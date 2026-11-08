@@ -205,7 +205,18 @@
     });
   }
 
-  var api = { STATES: STATES, asOfLabel: asOfLabel, waitingBadgeHtml: waitingBadgeHtml, discardWarning: discardWarning, beforeSignOut: beforeSignOut, draftCardView: draftCardView, formatAsOf: formatAsOf, settingsView: settingsView, bannerMessage: bannerMessage, adminView: adminView, countsLine: countsLine, lastStatus: null };
+  /**
+   * Whether the engine on this computer is serving requests: only then does
+   * /api/engine/v1/offline/* exist. Otherwise the API base is the
+   * organization's server, which has no such route.
+   * @param {Object|null} result - electronAPI.engine.getStatus() result, or a status from onState
+   */
+  function engineInUse(result) {
+    var status = result && Object.prototype.hasOwnProperty.call(result, 'success') ? result.status : result;
+    return Boolean(result && (result.success !== false) && status && status.inUse);
+  }
+
+  var api = { engineInUse: engineInUse, STATES: STATES, asOfLabel: asOfLabel, waitingBadgeHtml: waitingBadgeHtml, discardWarning: discardWarning, beforeSignOut: beforeSignOut, draftCardView: draftCardView, formatAsOf: formatAsOf, settingsView: settingsView, bannerMessage: bannerMessage, adminView: adminView, countsLine: countsLine, lastStatus: null };
 
   global.LanaOfflineCopy = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

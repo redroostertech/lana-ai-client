@@ -1768,7 +1768,13 @@ class ApiClient {
    */
   async logout() {
     var offline = typeof window !== 'undefined' ? window.LanaOfflineCopy : null;
-    if (!this.demoMode && offline && typeof offline.beforeSignOut === 'function') {
+    // Only the local engine keeps an offline copy; without it there is nothing to send first.
+    var engineApi = typeof window !== 'undefined' && window.electronAPI ? window.electronAPI.engine : null;
+    var engineInUse = false;
+    if (offline && typeof offline.engineInUse === 'function' && engineApi && typeof engineApi.getStatus === 'function') {
+      try { engineInUse = offline.engineInUse(await engineApi.getStatus()); } catch (_) { engineInUse = false; }
+    }
+    if (!this.demoMode && engineInUse && typeof offline.beforeSignOut === 'function') {
       var modal = window.Lex && window.Lex.Modal;
       var proceed = await offline.beforeSignOut(this, modal && typeof modal.confirmAsync === 'function' ? modal.confirmAsync.bind(modal) : null);
       if (!proceed) return { cancelled: true };

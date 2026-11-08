@@ -136,3 +136,18 @@ describe('offline draft card', () => {
     expect(view.detail).toMatch(detail);
   });
 });
+
+describe('engineInUse: only the local engine serves /api/engine/v1/offline/*', () => {
+  test('a getStatus result with the engine in use', () => {
+    expect(offline.engineInUse({ success: true, status: { inUse: true } })).toBe(true);
+  });
+  test('the engine is off or not installed: the organization\'s server has no such route', () => {
+    expect(offline.engineInUse({ success: true, status: { inUse: false, configured: false } })).toBe(false);
+    expect(offline.engineInUse({ success: false, error: 'no engine' })).toBe(false);
+    expect(offline.engineInUse(null)).toBe(false);
+  });
+  test('a status pushed by onState', () => {
+    expect(offline.engineInUse({ inUse: true, enabled: true })).toBe(true);
+    expect(offline.engineInUse({ inUse: false })).toBe(false);
+  });
+});
