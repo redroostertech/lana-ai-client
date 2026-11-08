@@ -275,7 +275,7 @@ describe('capability entries', () => {
     // Device-specific wording saved on the organization never shows (control: unknown keeps its own).
     const stale = Object.assign({}, screenDiction, { id: 'lana-notes', label: 'LANA Notes', description: 'Sovereign meeting notes from your iPhone' });
     const [briefs, other] = Apps.normalizeEnabledAppList([stale, screenDiction]);
-    expect(briefs.description).toBe('Meetings recorded on your phone or this computer, with notes and actions');
+    expect(briefs.description).toBe('Meetings with notes and actions');
     expect(other.description).toBe(screenDiction.description);
   });
 
