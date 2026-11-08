@@ -263,3 +263,10 @@ describe('a long attention list', () => {
     expect(few).not.toContain('more');
   });
 });
+
+describe('reason copy', () => {
+  test('not signed in hides the no-sync reason it explains; other reasons stay (control: stale sync alone still shows)', () => {
+    expect(H.reasonList(['auth_expired', 'sync_disabled', 'stale_sync'])).toEqual(['Not signed in. Connect to keep syncing.', 'Syncing is turned off.']);
+    expect(H.reasonList(['stale_sync'])).toEqual(['No successful sync in the last day.']);
+  });
+});

@@ -36,7 +36,11 @@
   /** Short copy for each reason code, without repeats. */
   function reasonList(codes) {
     var out = [];
-    (Array.isArray(codes) ? codes : []).forEach(function (code) {
+    var list = Array.isArray(codes) ? codes : [];
+    // Not being signed in already explains why nothing synced; do not say both.
+    var notSignedIn = list.indexOf('auth_expired') !== -1;
+    list.forEach(function (code) {
+      if (notSignedIn && code === 'stale_sync') return;
       var text = reasonText(code);
       if (out.indexOf(text) === -1) out.push(text);
     });
