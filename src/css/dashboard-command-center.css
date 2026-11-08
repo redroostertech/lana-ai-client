@@ -263,6 +263,16 @@
    5. Zone E — Pipeline Intelligence (4 columns)
    ========================================================================== */
 
+/* The Workspaces hero and its How it works row */
+#ccZoneA {
+  margin-bottom: 1.25rem;
+}
+
+.cc-loop {
+  display: block;
+  margin-bottom: 1.5rem;
+}
+
 .cc-pipeline {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

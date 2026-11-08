@@ -350,6 +350,37 @@
    * Data comes from api.user (already loaded) and is augmented after Zone E
    * resolves matter count.
    */
+  /**
+   * The Workspaces hero: Open workspaces, the walkthrough (shown once per person,
+   * and from Take the walkthrough), and the How it works steps.
+   */
+  function wireWorkspacesHero() {
+    var openBtn = el('ccOpenWorkspacesBtn');
+    if (openBtn) openBtn.addEventListener('click', function () { Lex.Nav.go('matters.html'); });
+    var tourBtn = el('ccTourBtn');
+    if (tourBtn) tourBtn.addEventListener('click', function () {
+      if (window.LanaAppWalkthrough) window.LanaAppWalkthrough.show('workspaces');
+    });
+    var loop = el('ccLoop');
+    if (loop) loop.addEventListener('lex-app-loop-select', function (event) {
+      var step = event.detail && event.detail.value;
+      if (step === 'open') Lex.Nav.go('matters.html');
+      else if (step === 'tasks') Lex.Nav.go('my-tasks.html');
+      else if (step === 'ask') {
+        var dock = document.querySelector('lex-lana-dock');
+        if (dock && typeof dock.openWith === 'function') dock.openWith({ contextType: 'full_chat', prefillPrompt: 'What should I focus on today?' });
+      }
+    });
+    if (window.LanaAppWalkthrough && window.WorkspacesWalkthrough) {
+      window.LanaAppWalkthrough.register('workspaces', {
+        brand: 'WORKSPACES.',
+        pages: window.WorkspacesWalkthrough.pages,
+        onAction: function (action) { if (action === 'open') Lex.Nav.go('matters.html'); }
+      });
+      window.LanaAppWalkthrough.showFirstRun('workspaces');
+    }
+  }
+
   function renderZoneA() {
     var now = LanaTime.nowDate();
     var banner = el('ccZoneA');
@@ -3008,6 +3039,7 @@
 
     // ── 3. Zone A — render immediately (local data only) ──────────────────
     renderZoneA();
+    wireWorkspacesHero();
 
     // Hide admin-only sections before the fan-out so they never flash empty.
     // renderZoneE always runs: the Workspaces tile is visible to everyone.

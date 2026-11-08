@@ -83,6 +83,14 @@ describe('showing a walkthrough', () => {
     expect(saved).toHaveLength(1);
   });
 
+  test('waits for the next visit when another tour is already on screen', async () => {
+    const { w, saved } = boot({});
+    w.document.body.appendChild(w.document.createElement('lex-onboarding'));
+    expect(await w.LanaAppWalkthrough.showFirstRun('agents')).toBe(false);
+    expect(w.document.querySelector('lex-walkthrough')).toBeNull();
+    expect(saved).toHaveLength(0);
+  });
+
   test('not shown again once seen, nor when preferences cannot be read (control: shown when not seen)', async () => {
     expect(await boot({ onboarding: { walkthroughs: { agents: 'earlier' } } }).w.LanaAppWalkthrough.showFirstRun('agents')).toBe(false);
     const offline = boot({});

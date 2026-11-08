@@ -14,6 +14,9 @@
  *   LanaAppWalkthrough.showFirstRun('agents');   // only if not finished before
  *   LanaAppWalkthrough.show('agents');           // the hero's "Take the walkthrough"
  *
+ * Only one tour shows per visit: when another (the general LANA tour, lex-onboarding)
+ * is already on screen, the first-run walkthrough waits for the next visit.
+ *
  * Public API (window.LanaAppWalkthrough, or module.exports in Node):
  *   register(app, definition), show(app), showFirstRun(app),
  *   seenFrom(preferences, app), withSeen(preferences, app, isoTime)
@@ -106,6 +109,9 @@
     var preferences = await loadPreferences();
     // Unknown (offline, not signed in): do not interrupt.
     if (!preferences || seenFrom(preferences, app)) return false;
+    // One tour per visit: if another tour is on screen (the general LANA tour on
+    // a first sign-in), wait for the next visit; this one stays unseen.
+    if (document.querySelector('lex-onboarding, lex-walkthrough')) return false;
     return Boolean(show(app));
   }
 

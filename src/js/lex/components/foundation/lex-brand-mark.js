@@ -20,7 +20,7 @@
   'use strict';
 
   const { LexElement, defineLex } = window.Lex;
-  const LOOPS = { idle: true, sync: true, spinner: true, success: false, orbit: true, flow: true, chart: true };
+  const LOOPS = { idle: true, sync: true, spinner: true, success: false, orbit: true, flow: true, chart: true, connect: true, grid: true };
 
   class LexBrandMark extends LexElement {
     static get properties() {

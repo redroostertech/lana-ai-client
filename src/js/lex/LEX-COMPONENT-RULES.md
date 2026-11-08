@@ -957,7 +957,7 @@ The "How it works" row under an app hero: `kicker`, `heading`, and `steps` (JSON
 
 ### App walkthroughs
 
-Every app home has a first-run walkthrough in `<lex-walkthrough>` (Briefs runs its own; Agents, Automate and Insights use `js/shared/app-walkthrough.js`). Pages live in `js/walkthroughs/<app>-walkthrough.js`: six pages (welcome, one per step, ready), each an eyebrow, a headline with an accent, one sentence, and an animated picture built from the `app-tour-*` pieces in `css/app-walkthrough.css` (simplified copies of the real screen). `LanaAppWalkthrough.showFirstRun(app)` shows it once per person, remembered in their server preferences (`onboarding.walkthroughs`); the hero's ghost button "Take the walkthrough" calls `LanaAppWalkthrough.show(app)`. The last page's action opens the first real task.
+Every app home has a first-run walkthrough in `<lex-walkthrough>` (Briefs runs its own; Workspaces, Agents, Automate, Insights and Data Connectors use `js/shared/app-walkthrough.js`). Only one tour shows per visit: when the general LANA tour (`lex-onboarding`) is on screen, the app walkthrough waits for the next visit. Pages live in `js/walkthroughs/<app>-walkthrough.js`: six pages (welcome, one per step, ready), each an eyebrow, a headline with an accent, one sentence, and an animated picture built from the `app-tour-*` pieces in `css/app-walkthrough.css` (simplified copies of the real screen). `LanaAppWalkthrough.showFirstRun(app)` shows it once per person, remembered in their server preferences (`onboarding.walkthroughs`); the hero's ghost button "Take the walkthrough" calls `LanaAppWalkthrough.show(app)`. The last page's action opens the first real task.
 
 ### Brand animations
 

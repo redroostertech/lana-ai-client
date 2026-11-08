@@ -7,6 +7,8 @@
 
   <!-- ── CSS + Tailwind in head — behavioral scripts at end of body ── -->
   <link rel="stylesheet" href="css/lex-tokens.css">
+  <link rel="stylesheet" href="css/lex-motion.css">
+  <link rel="stylesheet" href="css/app-walkthrough.css">
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/session-tracking.css">
   <link rel="stylesheet" href="css/dashboard-command-center.css">
@@ -43,15 +45,20 @@
       <!-- ================================================================
            Zone A — Morning Orientation Bar (full width)
            ================================================================ -->
-      <lex-banner
+      <lex-app-hero
         id="ccZoneA"
-        variant="light"
-        corners
+        eyebrow="Workspaces"
         heading="Good morning, there"
+        accent="Here is your day."
         subtitle=""
-        lana
-        lana-context-type="full_chat"
-      ></lex-banner>
+        animation="grid"
+        steps="Matters,Tasks,Documents"
+      >
+        <lex-btn id="ccOpenWorkspacesBtn" variant="primary" size="lg" leading-icon="folder">Open workspaces</lex-btn>
+        <lex-btn variant="lana" size="lg" data-lana-dock-trigger data-lana-context-type="full_chat"
+          data-lana-prefill="What should I focus on today?">Ask LANA what to focus on</lex-btn>
+        <lex-btn id="ccTourBtn" variant="ghost" size="lg" leading-icon="play">Take the walkthrough</lex-btn>
+      </lex-app-hero>
 
 
       <!-- ================================================================
@@ -65,6 +72,9 @@
       </div>
 
       <!-- Expandable detail panel (accordion — one open at a time) -->
+      <lex-app-loop id="ccLoop" class="cc-loop" kicker="How it works" heading="Your matters, your tasks, one place."
+        steps="[{&quot;value&quot;: &quot;open&quot;, &quot;title&quot;: &quot;Open a workspace&quot;, &quot;text&quot;: &quot;Each client matter has its own workspace: notes, documents, tasks and a Board.&quot;}, {&quot;value&quot;: &quot;tasks&quot;, &quot;title&quot;: &quot;Work your tasks&quot;, &quot;text&quot;: &quot;See what is yours across every matter, and move it from first step to done.&quot;}, {&quot;value&quot;: &quot;ask&quot;, &quot;title&quot;: &quot;Ask LANA&quot;, &quot;text&quot;: &quot;Ask about any matter and LANA answers from that matter\u2019s own file.&quot;}]"></lex-app-loop>
+
       <lex-detail-panel id="ccDetailPanel"></lex-detail-panel>
 
 
@@ -468,6 +478,14 @@
        are defined when template content enters the DOM. Tree-order upgrade ensures
        parents capture un-rendered children (no double-rendering). -->
   <script src="js/lex/components/foundation/lex-banner.js"></script>
+  <script src="js/vendor/lottie_light.min.js"></script>
+  <script src="js/lex/brand/lex-brand-animations.js"></script>
+  <script src="js/lex/components/foundation/lex-brand-mark.js"></script>
+  <script src="js/lex/components/layout/lex-app-hero.js"></script>
+  <script src="js/lex/components/layout/lex-app-loop.js"></script>
+  <script src="js/lex/components/layout/lex-walkthrough.js"></script>
+  <script src="js/shared/app-walkthrough.js"></script>
+  <script src="js/walkthroughs/workspaces-walkthrough.js"></script>
   <script src="js/lex/components/foundation/lex-metric.js"></script>
   <script src="js/lex/components/foundation/lex-action-card.js"></script>
   <script src="js/lex/components/foundation/lex-badge.js"></script>

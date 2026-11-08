@@ -47,7 +47,7 @@
         eyebrow: 'Step 3: Check your tools',
         title: 'Make sure the data ',
         accent: 'is ready',
-        detail: 'Automations read from your connectors. Use Connect your tools on the Library page to see which ones are ready before you turn one on.',
+        detail: 'Automations read from your connectors. Open Data Connectors from the account menu to see which tools are connected before you turn one on.',
         illustration: `<div class="app-tour-card app-tour-in">
             <div class="app-tour-card-head"><span class="app-tour-eyebrow">Connectors</span><span class="app-tour-pill">2 ready</span></div>
             <div class="app-tour-row app-tour-in app-tour-d2"><span class="app-tour-row-value">Practice management</span><span class="app-tour-pill"><span class="app-tour-dot"></span>Ready</span></div>

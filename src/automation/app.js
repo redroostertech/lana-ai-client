@@ -391,9 +391,10 @@ function bindGlobalEvents() {
   }
   // The Library "How it works" steps open the view each one names.
   document.body.addEventListener('lex-app-loop-select', (event) => {
-    if (event.detail && event.detail.value && els.viewContent && els.viewContent.contains(event.target)) {
-      setView(event.detail.value);
-    }
+    if (!event.detail || !event.detail.value || !els.viewContent || !els.viewContent.contains(event.target)) return;
+    // Connecting happens on the app-wide Data Connectors page.
+    if (event.detail.value === 'data-connectors' && window.Lex && window.Lex.Nav) window.Lex.Nav.go('data-connectors.html');
+    else setView(event.detail.value);
   });
   document.body.addEventListener('input', onAppInput);
   document.body.addEventListener('change', onAppInput);

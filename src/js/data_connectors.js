@@ -455,6 +455,16 @@
     });
   }
 
+  function scrollToConnectorList() {
+    var list = document.getElementById('connectorTableMount') || document.getElementById('connectorsContent');
+    if (list) list.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function openLanaAbout(prompt) {
+    var dock = document.querySelector('lex-lana-dock');
+    if (dock && typeof dock.openWith === 'function') dock.openWith({ contextType: 'full_chat', prefillPrompt: prompt });
+  }
+
   function syncMcpAction() {
     var button = document.getElementById('addMcpServerBannerBtn');
     if (!button) return;
@@ -1818,6 +1828,28 @@
     var bannerImportBtn = document.getElementById('importConnectorBannerBtn');
     if (bannerImportBtn) {
       bannerImportBtn.addEventListener('click', openImportConnectorModal);
+    }
+
+    // Hero: browse the list, replay the walkthrough, and the How it works steps.
+    var browseBtn = document.getElementById('dcBrowseBtn');
+    if (browseBtn) browseBtn.addEventListener('click', scrollToConnectorList);
+    var tourBtn = document.getElementById('dcTourBtn');
+    if (tourBtn) tourBtn.addEventListener('click', function () {
+      if (window.LanaAppWalkthrough) window.LanaAppWalkthrough.show('connectors');
+    });
+    var loop = document.getElementById('dcLoop');
+    if (loop) loop.addEventListener('lex-app-loop-select', function (event) {
+      var step = event.detail && event.detail.value;
+      if (step === 'use') openLanaAbout('What data do we have connected, and what can I ask about it?');
+      else scrollToConnectorList();
+    });
+    if (window.LanaAppWalkthrough && window.ConnectorsWalkthrough) {
+      window.LanaAppWalkthrough.register('connectors', {
+        brand: 'CONNECTORS.',
+        pages: window.ConnectorsWalkthrough.pages,
+        onAction: function (action) { if (action === 'browse') scrollToConnectorList(); }
+      });
+      window.LanaAppWalkthrough.showFirstRun('connectors');
     }
 
     // "Add MCP server" (shown only when the MCP UI is visible). Delegated:

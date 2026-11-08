@@ -204,7 +204,7 @@ export async function toggleAutomation(context, automationId, isEnabled) {
 // The three steps under the hero; each value is the view it opens.
 const LIBRARY_LOOP_STEPS = [
   { value: 'builder', title: 'Pick a trigger', text: 'Choose what starts it: a new matter, a form, or a schedule.' },
-  { value: 'connectors', title: 'Connect your tools', text: 'Make sure the apps it reads from and writes to are ready.' },
+  { value: 'data-connectors', title: 'Connect your tools', text: 'Make sure the apps it reads from and writes to are connected in Data Connectors.' },
   { value: 'runs', title: 'Watch every run', text: 'Each run is logged with what it did, so nothing happens out of sight.' }
 ];
 

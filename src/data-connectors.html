@@ -7,6 +7,8 @@
 
   <!-- ── CSS + Tailwind in head — behavioral scripts at end of body ── -->
   <link rel="stylesheet" href="css/lex-tokens.css">
+  <link rel="stylesheet" href="css/lex-motion.css">
+  <link rel="stylesheet" href="css/app-walkthrough.css">
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/tailwind-output.css">
   <link rel="stylesheet" href="css/companion-bridge-consent.css">
@@ -24,6 +26,12 @@
       min-height: 0;
       border: 0;
       background: var(--lex-bg-primary);
+    }
+
+    /* The hero's How it works row, between the hero and the connector list. */
+    .dc-loop {
+      display: block;
+      margin: 1.5rem 0 0.5rem;
     }
   </style>
 
@@ -52,23 +60,24 @@
     <main>
 
       <!-- Info Banner -->
-      <lex-banner
+      <lex-app-hero
         id="connectorsBanner"
-        variant="light"
-        corners
-        heading="Connect Your Business Data"
-        subtitle="Connectors bridge your existing business systems with LanaAI, automatically syncing data across CRMs, case management, financial tools, and more. Once connected, your team gets unified access to all your business data while LanaAI gains the context needed to provide intelligent assistance across your entire operation."
-        lana
-        lana-context-type="full_chat"
+        eyebrow="Data Connectors"
+        heading="Bring your systems"
+        accent="into one place."
+        subtitle="Connect the tools your firm already uses. LANA keeps their data in sync, so chat, Insights and Automate can all use it."
+        animation="connect"
+        steps="Connect,Sync,Use"
       >
-        <lex-btn id="importConnectorBannerBtn" variant="secondary" leading-icon="upload">
-          Import Connector
-        </lex-btn>
+        <lex-btn id="dcBrowseBtn" variant="primary" size="lg" leading-icon="plug">Browse connectors</lex-btn>
+        <lex-btn id="importConnectorBannerBtn" variant="secondary" size="lg" leading-icon="upload">Import connector</lex-btn>
         <!-- Shown by data_connectors.js only when MCP_CONNECTORS_ENABLED is on and the user is a system or org admin -->
-        <lex-btn id="addMcpServerBannerBtn" class="lex-mcp-add-action" variant="secondary" leading-icon="plus" hidden>
-          Add MCP server
-        </lex-btn>
-      </lex-banner>
+        <lex-btn id="addMcpServerBannerBtn" class="lex-mcp-add-action" variant="secondary" size="lg" leading-icon="plus" hidden>Add MCP server</lex-btn>
+        <lex-btn id="dcTourBtn" variant="ghost" size="lg" leading-icon="play">Take the walkthrough</lex-btn>
+      </lex-app-hero>
+
+      <lex-app-loop id="dcLoop" class="dc-loop" kicker="How it works" heading="Three steps to connected data."
+        steps="[{&quot;value&quot;: &quot;find&quot;, &quot;title&quot;: &quot;Find your tool&quot;, &quot;text&quot;: &quot;Search the list below for the system your firm uses, then choose Connect.&quot;}, {&quot;value&quot;: &quot;allow&quot;, &quot;title&quot;: &quot;Allow access once&quot;, &quot;text&quot;: &quot;Approve access on your tool\u2019s own sign-in page, or paste an API key if it asks.&quot;}, {&quot;value&quot;: &quot;use&quot;, &quot;title&quot;: &quot;Use it everywhere&quot;, &quot;text&quot;: &quot;Connected data feeds chat, Insights and Automate, kept in sync.&quot;}]"></lex-app-loop>
 
       <!-- Connector Categories - Loading Skeleton -->
       <div id="connectorsLoading" class="space-y-8 mb-4 p-4">
@@ -432,6 +441,14 @@
        parents capture un-rendered children (no double-rendering). -->
   <script src="js/lex/components/foundation/lex-badge.js"></script>
   <script src="js/lex/components/foundation/lex-banner.js"></script>
+  <script src="js/vendor/lottie_light.min.js"></script>
+  <script src="js/lex/brand/lex-brand-animations.js"></script>
+  <script src="js/lex/components/foundation/lex-brand-mark.js"></script>
+  <script src="js/lex/components/layout/lex-app-hero.js"></script>
+  <script src="js/lex/components/layout/lex-app-loop.js"></script>
+  <script src="js/lex/components/layout/lex-walkthrough.js"></script>
+  <script src="js/shared/app-walkthrough.js"></script>
+  <script src="js/walkthroughs/connectors-walkthrough.js"></script>
   <script src="js/lex/components/foundation/lex-modal.js"></script>
   <script src="js/lex/components/form/lex-input.js"></script>
   <script src="js/lex/components/form/lex-select.js"></script>
