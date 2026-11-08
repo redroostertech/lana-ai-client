@@ -53,7 +53,7 @@
         eyebrow: 'Step 3: Build your own',
         title: 'Pick the numbers ',
         accent: 'you care about',
-        detail: 'Use Create dashboard to choose the measures that matter to you and lay them out your way.',
+        detail: 'Use Create dashboard to pick the cards you want to see, then save it as your own dashboard.',
         illustration: `<div class="app-tour-card app-tour-in">
             <div class="app-tour-card-head"><span class="app-tour-eyebrow">New dashboard</span></div>
             <div class="app-tour-grid">
