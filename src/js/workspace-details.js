@@ -5380,7 +5380,7 @@
     return '<div class="kanban-card bg-white border border-gray-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-all cursor-move" draggable="true" ' + dataAttr +
       ' ondragstart="handleKanbanDragStart(event)" ondragend="handleKanbanDragEnd(event)" onclick="openTaskQuickView(\'' + escapeHtml(item.parent_id) + '\')">' +
       _kanbanTitleHtml(item.title) +
-      _kanbanCapsulesHtml('Subtask', item.priority) +
+      _kanbanCapsulesHtml('Subtask', item.priority || 'normal') +
       _kanbanKeyHtml(item.item_key) +
       '<div class="kanban-card__parent" title="' + escapeHtml(item.parent_title) + '">' +
         '<span class="kanban-card__parent-label">Part of</span>' +
