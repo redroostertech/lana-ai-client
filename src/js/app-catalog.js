@@ -198,16 +198,17 @@
     // page. An app we cannot route is not renderable: drop it.
     if (!base) return null;
 
-    // `base` LAST for id+route+label: this catalog is the ONLY source of truth
-    // for routes (bundle-relative files like 'admin/analytics.html') and for
-    // the names of the apps it knows. A legacy payload may still carry a
-    // URL-path route ('/insights') or a name copied onto the organization at
-    // setup ('LanaWorks'); neither may win, so a rename ships with the app and
-    // needs no organization record edits. Discovery still decides WHICH apps an
-    // organization gets; description/colors stay caller-overridable.
+    // `base` LAST for id+route+label+description: this catalog is the ONLY
+    // source of truth for routes (bundle-relative files like
+    // 'admin/analytics.html') and for the names and descriptions of the apps it
+    // knows. A legacy payload may still carry a URL-path route ('/insights') or
+    // copy saved on the organization at setup ('LanaWorks', old device-specific
+    // wording); none of it may win, so copy changes ship with the app and need
+    // no organization record edits. Discovery still decides WHICH apps an
+    // organization gets; colors stay caller-overridable.
     var normalized = typeof item === 'string'
       ? Object.assign({}, base)
-      : Object.assign({}, base, item, { id: id, route: base.route, label: base.label });
+      : Object.assign({}, base, item, { id: id, route: base.route, label: base.label, description: base.description });
 
     if (!normalized.id || !normalized.label || !normalized.route) return null;
     if (!Array.isArray(normalized.colors)) normalized.colors = [];
@@ -277,7 +278,7 @@
       // A capability this bundle knows (lana-notes is Briefs) uses the
       // catalog's name, like normalizeApp; an unknown one keeps its own.
       label: (CATALOG[id] && CATALOG[id].label) || item.label,
-      description: item.description || '',
+      description: (CATALOG[id] && CATALOG[id].description) || item.description || '',
       colors: Array.isArray(item.colors) ? item.colors : [],
       route: {
         type: 'capability',

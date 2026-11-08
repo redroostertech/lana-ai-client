@@ -1878,7 +1878,7 @@
         ? Object.assign({}, base)
         // The catalog names the apps it knows, as in LanaClientApps.normalizeApp:
         // a name copied onto the organization at setup never wins.
-        : Object.assign({}, base, item, { id: id, route: base.route, label: base.label });
+        : Object.assign({}, base, item, { id: id, route: base.route, label: base.label, description: base.description });
       if (!normalized.id || !normalized.label || !normalized.route) return null;
       return normalized;
     }

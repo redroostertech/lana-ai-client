@@ -93,7 +93,7 @@ describe('LanaClientApps.normalizeApp', () => {
     expect(Apps.normalizeApp({ id: 'not-a-real-app', label: 'Fake', route: 'evil.html' })).toBeNull();
   });
 
-  test('control plane may override description and colors but never route, id or the name', () => {
+  test('control plane may override colors but never route, id, the name or the description', () => {
     const app = Apps.normalizeApp({
       id: 'insights',
       label: 'Firm Analytics',
@@ -102,7 +102,7 @@ describe('LanaClientApps.normalizeApp', () => {
       colors: ['#000000']
     });
     expect(app.label).toBe('Insights');
-    expect(app.description).toBe('Custom copy');
+    expect(app.description).toBe('Dashboards, reporting, and firm analytics');
     expect(app.colors).toEqual(['#000000']);
     expect(app.route).toBe('admin/analytics.html');
     expect(app.id).toBe('lana-insights');
@@ -272,6 +272,11 @@ describe('capability entries', () => {
     const notes = Object.assign({}, screenDiction, { id: 'lana-notes', label: 'LANA Notes' });
     const list = Apps.normalizeEnabledAppList([notes, screenDiction]);
     expect(list.map((a) => a.label)).toEqual(['Briefs', 'Screen Dictation']);
+    // Device-specific wording saved on the organization never shows (control: unknown keeps its own).
+    const stale = Object.assign({}, screenDiction, { id: 'lana-notes', label: 'LANA Notes', description: 'Sovereign meeting notes from your iPhone' });
+    const [briefs, other] = Apps.normalizeEnabledAppList([stale, screenDiction]);
+    expect(briefs.description).toBe('Meetings recorded on your phone or this computer, with notes and actions');
+    expect(other.description).toBe(screenDiction.description);
   });
 
   test('never emits a capability as a navigable app-switcher route', () => {
