@@ -26,7 +26,7 @@ Decisions that constrain every change (details in the plan, "Decisions made"):
 |---|---|---|---|
 | LANA client with Briefs | `/Users/mwestbrooks/Desktop/lana-app/.runtime/lae-client-devnew` (a git worktree of `lana-ai-client`) | `development-new`. The Briefs work was built on `briefs-phase0` (40 commits, `e61541e` to `d68d198`), merged in `d19e46f6`; that branch has been removed. | Yes, `origin/development-new` |
 | Backend: runtime request route (Workstream R) | `.runtime/lae-runtime-request` | `lae-runtime-request`, tip `9c0db9dcb` | Not merged |
-| Backend: Covo website intake receiver | `.runtime/lana-runtime-merge` | `covo-intake-receiver`, one commit `5beda16e6` on top of `lana-local-ai-engine` | **No.** Local only |
+| Backend: Covo website intake receiver | `.runtime/lana-runtime-merge` | `covo-intake-receiver`, one commit `5beda16e6` on top of `lana-local-ai-engine` | Yes, `origin/covo-intake-receiver`, no PR yet |
 | Covo (website intake agent) | `/Users/mwestbrooks/Desktop/lana-app/concierge` | `development`, no code changes | n/a |
 | Demo law firm website | `/Users/mwestbrooks/Desktop/lana-app/demo-sites/whitfield-park/index.html` | not in git | n/a |
 | Retired standalone app (reference only) | `/Users/mwestbrooks/Desktop/lana-app/lana-notes/desktop` | | Don't open it. It would advertise the same computer identity as the client. |
@@ -96,7 +96,7 @@ A fix that came out of the end-to-end check: `briefs/packages/core/src/lana/lana
 ## 5. Known gaps (true today)
 
 1. **AI drafting does not run.** Notes, worded tasks and Ask need the runtime route, which exists only on `lae-runtime-request` (not merged into the backend `lana-api-dev` runs). Today Briefs fails with `modelNotReady` and falls back to a starting point built from the clip. This is the biggest gap: in the demo, Briefs could record, transcribe and file items, but not write them.
-2. **The backend Covo work is not pushed.** `covo-intake-receiver` exists only on this computer. The client work is on `origin/development-new`.
+2. **No PRs yet.** The client work is on `origin/development-new` and the backend Covo work on `origin/covo-intake-receiver`; neither has a pull request.
 3. **Covo isn't private end to end.** Covo runs its chat on OpenAI (`INFERENCE_PROVIDER=openai`) and stores the conversation in its own database. On the 2026-11-06 demo call we said intake data is "saved securely in your instance", which isn't accurate for Covo today. A Florida attorney said even prospective-client information is confidential.
 4. **Phase 1f verification is open:** a paired phone syncing with the client, and a real recording producing notes through the runtime, on the 9B model and on Forge.
 5. **Phase 3 (one Inbox) is not started.** Briefs actions are reviewed in Briefs' own modal, not in the client's action queue and bell.
@@ -106,7 +106,7 @@ A fix that came out of the end-to-end check: `briefs/packages/core/src/lana/lana
 
 ### Immediately (in this order)
 
-1. **Get the backend work off this computer.** Push `covo-intake-receiver` and open a PR into `lana-local-ai-engine`. Ask Michael before pushing. Stage commits by explicit path, never `git add -A`; other work streams share these trees.
+1. **Open the PRs.** `covo-intake-receiver` into `lana-local-ai-engine` (backend). Ask Michael before opening them. Stage commits by explicit path, never `git add -A`; other work streams share these trees.
 2. **Make AI drafting work.** Merge or rebase `lae-runtime-request` into the backend that `lana-api-dev` runs, then confirm `POST /api/v1/runtime/requests` answers. Run a real recording through Briefs and check that notes and worded tasks appear on the 9B model.
    - This touches how chat reaches the model, so chat E2E is required: `tests/e2e/chat-core/run-visual-test-report.js` and `tests/e2e/chat-agentic/...`, then read `results.json`.
    - The engine agent owns `llamacpp.service.js` this week. Coordinate before editing it (plan, "Working alongside the engine agent").
