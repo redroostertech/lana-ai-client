@@ -1,5 +1,5 @@
 /**
- * Settings > Capabilities > AI models: wording for where LANA's AI runs. Pure, no DOM.
+ * Settings > Capabilities > AI: wording for where LANA's AI runs. Pure, no DOM.
  *
  *   topology    window.electronAPI.getAiTopology() (electron-ai-topology.js): the Pip addresses this
  *               client was given, the catalog models downloaded here, the server address, Forge

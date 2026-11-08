@@ -1,5 +1,5 @@
 /**
- * Settings > Capabilities > AI models: the groups below the local AI engine.
+ * Settings > Capabilities > AI: the groups below the local AI engine.
  *
  *   Pip on this computer, Models on this computer   window.electronAPI.getAiTopology(), and the
  *                                                   server's own Pip when the server runs here

@@ -1,5 +1,5 @@
 /**
- * Settings > Capabilities > AI models: where LANA's AI can run, read in the main process.
+ * Settings > Capabilities > AI: where LANA's AI can run, read in the main process.
  *
  *   Local   the Pip model server on this computer (chat and embeddings endpoints the
  *           client hands the local AI engine: LANA_ENGINE_CHAT_URL, LANA_ENGINE_EMBEDDING_URL),

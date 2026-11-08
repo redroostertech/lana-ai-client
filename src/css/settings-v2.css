@@ -1532,7 +1532,7 @@
   display: none !important;
 }
 
-/* AI models groups: Pip, models, server, Forge, routing (settings-ai-models.js). */
+/* AI card groups: Pip, models, server, Forge, routing (settings-ai-models.js). */
 .sv2-ai-group {
   display: flex;
   flex-direction: column;
@@ -1589,7 +1589,7 @@
   gap: 8px;
 }
 
-/* Speech models (LANA Briefs) inside the AI models card; rows from settings-briefs.css. */
+/* Speech models (LANA Briefs) inside the AI card; rows from settings-briefs.css. */
 .sv2-local-engine-speech {
   margin-top: 16px;
   padding-top: 16px;

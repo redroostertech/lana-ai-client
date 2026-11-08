@@ -1,6 +1,6 @@
 'use strict';
 
-/** Settings > Capabilities > AI models wording (src/js/settings-ai-models.model.js). */
+/** Settings > Capabilities > AI wording (src/js/settings-ai-models.model.js). */
 const M = require('../../src/js/settings-ai-models.model');
 
 const TOPOLOGY = {

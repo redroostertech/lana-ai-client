@@ -1,5 +1,5 @@
 /**
- * Settings V2: "AI models" card (was "Local AI service") (local-ai-engine plan, phase 6).
+ * Settings V2: "AI" card (was "Local AI service") (local-ai-engine plan, phase 6).
  *
  * Shows the main process's engine status (running, port, organization server
  * reachable, data API versions), the "Use local AI engine" setting and a
