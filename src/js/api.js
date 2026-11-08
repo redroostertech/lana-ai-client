@@ -751,14 +751,17 @@ class ApiClient {
         // Extract error message with comprehensive fallback chain
         const finalErrorMessage = extractApiErrorMessage(result, 'Request failed');
 
-        // Log the error details for debugging
-        console.error('[LanaAPI] Request failed:', {
-          endpoint,
-          status: response.status,
-          errorCode,
-          errorMessage: finalErrorMessage,
-          fullResponse: result
-        });
+        // Log the error details for debugging, unless the caller expects this status
+        // (options.quietStatuses, e.g. [404] for an endpoint older servers do not have).
+        if (!(Array.isArray(options.quietStatuses) && options.quietStatuses.includes(response.status))) {
+          console.error('[LanaAPI] Request failed:', {
+            endpoint,
+            status: response.status,
+            errorCode,
+            errorMessage: finalErrorMessage,
+            fullResponse: result
+          });
+        }
 
         // Support both error formats: {error: {message: ...}} and {detail: ...}
         throw new ApiError(finalErrorMessage, response.status, result);

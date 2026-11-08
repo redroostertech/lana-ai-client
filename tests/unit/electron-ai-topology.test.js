@@ -22,13 +22,20 @@ const CATALOG = [
 
 describe('pipEndpoint', () => {
   test('not set, not running, running with its model and build', async () => {
-    expect(await pipEndpoint(undefined, fakeFetch({}))).toEqual({ url: null, state: 'not_set', model: null, build: null });
-    expect(await pipEndpoint('http://127.0.0.1:8081/', fakeFetch({}))).toEqual({ url: 'http://127.0.0.1:8081', state: 'not_running', model: null, build: null });
+    expect(await pipEndpoint(undefined, fakeFetch({}))).toEqual({ url: null, state: 'not_set', version: null, model: null, build: null });
+    expect(await pipEndpoint('http://127.0.0.1:8081/', fakeFetch({}))).toEqual({ url: 'http://127.0.0.1:8081', state: 'not_running', version: null, model: null, build: null });
     const running = await pipEndpoint('http://127.0.0.1:8081', fakeFetch({
       'http://127.0.0.1:8081/health': [200, { status: 'ok' }],
       'http://127.0.0.1:8081/props': [200, { model_path: '/models/Qwen3.5-9B-Q4_K_M.gguf', build_info: 'b3.0.0-ddedf87af419' }],
     }));
-    expect(running).toEqual({ url: 'http://127.0.0.1:8081', state: 'running', model: 'Qwen3.5-9B-Q4_K_M.gguf', build: 'b3.0.0-ddedf87af419' });
+    expect(running).toEqual({ url: 'http://127.0.0.1:8081', state: 'running', version: null, model: 'Qwen3.5-9B-Q4_K_M.gguf', build: 'b3.0.0-ddedf87af419' });
+  });
+
+  test('Pip says its version, build and model on /health', async () => {
+    const pip = await pipEndpoint('http://127.0.0.1:8081', fakeFetch({
+      'http://127.0.0.1:8081/health': [200, { status: 'ok', version: '3.0.0', build: 'ddedf87af419', model: 'Qwen3.8-9B-Q4_K_M' }],
+    }));
+    expect(pip).toEqual({ url: 'http://127.0.0.1:8081', state: 'running', version: '3.0.0', model: 'Qwen3.8-9B-Q4_K_M', build: 'ddedf87af419' });
   });
 
   test('a server error is not running', async () => {

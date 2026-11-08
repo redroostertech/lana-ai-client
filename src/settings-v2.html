@@ -310,13 +310,16 @@
             <!-- Pip, models, server, Forge, routing (settings-ai-models.js). -->
             <div id="sv2-ai-pip" class="sv2-ai-group" hidden>
               <div class="sv2-local-engine-option-copy">
-                <span class="sv2-local-engine-option-name">Pip model server</span>
+                <span class="sv2-local-engine-option-name">Pip on this computer</span>
                 <span id="sv2-ai-pip-pinned" class="sv2-local-engine-option-description"></span>
               </div>
               <div id="sv2-ai-pip-rows" class="sv2-ai-rows" role="list"></div>
             </div>
             <div id="sv2-ai-models" class="sv2-ai-group" hidden>
-              <span class="sv2-local-engine-option-name">Models on this computer</span>
+              <div class="sv2-local-engine-option-copy">
+                <span class="sv2-local-engine-option-name">Local engine downloads</span>
+                <span class="sv2-local-engine-option-description">Models the LANA app downloads for its own local AI engine.</span>
+              </div>
               <div id="sv2-ai-models-rows" class="sv2-ai-rows" role="list"></div>
             </div>
             <!-- Speech models (settings-briefs.js): shown while LANA Briefs is on. -->
@@ -334,14 +337,13 @@
             <div id="sv2-ai-forge" class="sv2-ai-group" hidden>
               <div class="sv2-local-engine-option-copy">
                 <span class="sv2-local-engine-option-name">Forge</span>
-                <span class="sv2-local-engine-option-description">LANA's cloud AI. Your organization's server answers with it.</span>
+                <span class="sv2-local-engine-option-description">LANA's cloud AI.</span>
               </div>
               <div id="sv2-ai-forge-rows" class="sv2-ai-kv"></div>
             </div>
             <div id="sv2-ai-routing" class="sv2-ai-group" hidden>
               <span class="sv2-local-engine-option-name">Prompt routing</span>
-              <p id="sv2-ai-routing-current" class="sv2-local-engine-option-description"></p>
-              <p id="sv2-ai-routing-hybrid" class="sv2-local-engine-option-description"></p>
+              <div id="sv2-ai-routing-lines" class="sv2-ai-rows"></div>
             </div>
           </lex-card>
         </section>

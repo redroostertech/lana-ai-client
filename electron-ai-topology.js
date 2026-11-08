@@ -34,23 +34,24 @@ async function getJson(url, fetchImpl) {
 }
 
 /**
- * One Pip endpoint: whether it answers, and the model and build it reports (/props, as
- * llama.cpp servers do), when it says.
+ * One Pip endpoint: whether it answers, and the version, build and model it reports.
  */
 async function pipEndpoint(rawUrl, fetchImpl) {
   const url = trimmed(rawUrl);
-  if (!url) return { url: null, state: 'not_set', model: null, build: null };
+  if (!url) return { url: null, state: 'not_set', version: null, model: null, build: null };
   const health = await getJson(`${url}/health`, fetchImpl);
-  if (!health.answered) return { url, state: 'not_running', model: null, build: null };
-  const props = await getJson(`${url}/props`, fetchImpl);
-  const body = props.body && typeof props.body === 'object' ? props.body : {};
-  const modelPath = typeof body.model_path === 'string' ? body.model_path : (body.default_generation_settings && body.default_generation_settings.model) || null;
-  return {
-    url,
-    state: 'running',
-    model: modelPath ? path.basename(String(modelPath)) : null,
-    build: typeof body.build_info === 'string' ? body.build_info : null
-  };
+  if (!health.answered) return { url, state: 'not_running', version: null, model: null, build: null };
+  // Pip reports its version, build and model on /health; other llama.cpp servers say it on /props.
+  const said = health.body && typeof health.body === 'object' ? health.body : {};
+  let model = typeof said.model === 'string' ? said.model : null;
+  let build = typeof said.build === 'string' ? said.build : null;
+  if (!model || !build) {
+    const props = await getJson(`${url}/props`, fetchImpl);
+    const body = props.body && typeof props.body === 'object' ? props.body : {};
+    if (!model && typeof body.model_path === 'string') model = path.basename(body.model_path);
+    if (!build && typeof body.build_info === 'string') build = body.build_info;
+  }
+  return { url, state: 'running', version: typeof said.version === 'string' ? said.version : null, model, build };
 }
 
 /** Downloaded means the file is in place at its catalog size (the full sha256 check runs when the engine loads it). */

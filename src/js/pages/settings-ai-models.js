@@ -1,9 +1,11 @@
 /**
  * Settings > Capabilities > AI models: the groups below the local AI engine.
  *
- *   Pip model server, Models on this computer   window.electronAPI.getAiTopology()
- *   Organization server                          that, plus GET /api/v1/system/version
- *   Forge, Prompt routing                        that, plus window.electronAPI.engine status
+ *   Pip on this computer, Models on this computer   window.electronAPI.getAiTopology(), and the
+ *                                                   server's own Pip when the server runs here
+ *   Organization server, Forge, Prompt routing      GET /api/v1/system/ai (the server's own report
+ *                                                   of its Pip, relay and routing), GET
+ *                                                   /api/v1/system/version, the engine status
  *
  * The local AI engine's own rows stay in settings-local-engine.js. Wording comes from
  * settings-ai-models.model.js (window.LanaAiModels).
@@ -15,6 +17,7 @@
   var topology = null;
   var engine = null;
   var version = null;
+  var serverAi = null;
 
   function el(id) {
     return document.getElementById(id);
@@ -68,14 +71,17 @@
   function render() {
     if (!topology) return;
     el('sv2-ai-pip-pinned').textContent = M.pinnedLine(topology);
-    fill('sv2-ai-pip-rows', M.pipRows(topology).map(badgeRow));
+    fill('sv2-ai-pip-rows', M.pipRows(topology, serverAi).map(badgeRow));
     var models = M.modelRows(topology);
     fill('sv2-ai-models-rows', models.map(badgeRow));
-    fill('sv2-ai-server-rows', kvRows(M.serverRows(topology, version)));
-    fill('sv2-ai-forge-rows', kvRows(M.forgeRows(topology)));
-    var route = M.routing(engine, topology);
-    el('sv2-ai-routing-current').textContent = route.current;
-    el('sv2-ai-routing-hybrid').textContent = route.hybrid;
+    fill('sv2-ai-server-rows', kvRows(M.serverRows(topology, version, serverAi)));
+    fill('sv2-ai-forge-rows', kvRows(M.forgeRows(topology, serverAi)));
+    fill('sv2-ai-routing-lines', M.routing(engine, topology, serverAi).map(function (line) {
+      var p = document.createElement('p');
+      p.className = 'sv2-local-engine-option-description';
+      p.textContent = line;
+      return p;
+    }));
     show('sv2-ai-pip', true);
     show('sv2-ai-models', models.length > 0);
     show('sv2-ai-server', true);
@@ -90,13 +96,18 @@
     }).catch(function () { /* The groups stay hidden. */ });
   }
 
-  function loadVersion() {
+  function loadServer() {
     var api = window.api;
     if (!api || typeof api.get !== 'function') return;
     api.get('/api/v1/system/version').then(function (result) {
       version = result || null;
       render();
     }).catch(function () { version = null; render(); });
+    // An older server has no /system/ai; the card then says the server does not report it.
+    api.get('/api/v1/system/ai', { quietStatuses: [404] }).then(function (result) {
+      serverAi = result && result.routing ? result : null;
+      render();
+    }).catch(function () { serverAi = null; render(); });
   }
 
   function boot() {
@@ -112,8 +123,8 @@
       }
     }
     loadTopology();
-    loadVersion();
-    document.addEventListener('lex-refresh', function () { loadTopology(); loadVersion(); });
+    loadServer();
+    document.addEventListener('lex-refresh', function () { loadTopology(); loadServer(); });
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
