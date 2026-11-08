@@ -3,7 +3,7 @@
  *
  * Left in-page section navigation for settings-v2.html. Turns the single
  * scrolling page into tabbed sections (Profile, General, Security,
- * This computer, Screen diction, Plugins, Plan & billing, Usage, Data controls) driven by a vertical nav rail.
+ * Capabilities, Screen diction, Plugins, Plan & billing, Usage, Data controls) driven by a vertical nav rail.
  *
  * Responsibilities:
  *   - Inject the nav icons from Lex.Icons (never emoji glyphs).
@@ -36,7 +36,7 @@
     { id: 'general',        icon: 'settings' },
     { id: 'notifications',  icon: 'bell' },
     { id: 'security',       icon: 'shield' },
-    { id: 'computer',       icon: 'laptop' },
+    { id: 'capabilities',   icon: 'puzzle' },
     { id: 'screen-diction', icon: 'mic' },
     { id: 'apps',           icon: 'layout-grid' },
     { id: 'phone',          icon: 'smartphone' },
