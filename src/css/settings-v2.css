@@ -1506,8 +1506,9 @@
 
 /* ── Local AI service (settings-local-engine.js) ─────────────────── */
 
+/* First card in the Capabilities panel: level with the nav, like every other panel. */
 .sv2-local-engine {
-  margin-top: 16px;
+  margin-top: 0;
 }
 
 .sv2-local-engine[hidden] {
