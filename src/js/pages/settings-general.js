@@ -122,10 +122,19 @@
 
   // ── Legal ─────────────────────────────────────────────
 
+  /**
+   * The licenses page is a fragment the app shell's router injects. Settings is its own page
+   * with no router, so going there directly shows the raw fragment: open the shell and have it
+   * start on the licenses page instead (app.js reads _lex_last_path).
+   */
   function openLicenses() {
     var route = 'open-source-licenses.html';
-    if (window.Lex && window.Lex.Nav && typeof window.Lex.Nav.go === 'function') window.Lex.Nav.go(route);
-    else window.location.href = route;
+    if (window.LexRouter && typeof window.LexRouter.navigate === 'function' && window.Lex && window.Lex.Nav) {
+      window.Lex.Nav.go(route);
+      return;
+    }
+    try { sessionStorage.setItem('_lex_last_path', '/' + route); } catch (_) { /* the shell opens on its default page */ }
+    window.location.href = 'app.html';
   }
 
   /** Terms and Privacy open on lanaai.io in the system browser. */

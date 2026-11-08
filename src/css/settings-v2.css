@@ -1532,55 +1532,123 @@
   display: none !important;
 }
 
-/* AI card groups: Pip, models, server, Forge, routing (settings-ai-models.js). */
+/* AI card groups: Local and Cloud (settings-ai-models.js). */
 .sv2-ai-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 16px;
-  padding-top: 16px;
+  margin-top: 24px;
+  padding-top: 20px;
   border-top: 1px solid var(--lex-border-subtle);
 }
 
-.sv2-ai-group p {
-  margin: 0;
-}
-
-.sv2-ai-rows {
+.sv2-ai-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: var(--lex-radius-md);
+  overflow: hidden;
 }
 
-.sv2-ai-row {
+.sv2-ai-list-part:empty {
+  display: none;
+}
+
+.sv2-ai-item + .sv2-ai-item,
+.sv2-ai-list-part + .sv2-ai-list-part .sv2-ai-item:first-child {
+  border-top: 1px solid var(--lex-border-subtle);
+}
+
+.sv2-ai-item-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
+  width: 100%;
+  padding: 12px 16px;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
 }
 
-.sv2-ai-row-copy {
+.sv2-ai-item-head:hover {
+  background: var(--lex-bg-secondary);
+}
+
+.sv2-ai-item-head:focus-visible {
+  outline: 2px solid var(--lex-border-focus, var(--lex-color-brand-500));
+  outline-offset: -2px;
+}
+
+.sv2-ai-item-copy {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
 }
 
-.sv2-ai-row-name {
+.sv2-ai-item-name {
   color: var(--lex-text-primary);
+  font-size: var(--lex-body-size, 0.9375rem);
+  font-weight: var(--lex-weight-medium, 500);
+}
+
+.sv2-ai-item-summary {
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-sm-size);
+  line-height: var(--lex-body-sm-height);
+}
+
+.sv2-ai-item-side {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sv2-ai-item-chevron {
+  display: inline-flex;
+  color: var(--lex-text-tertiary);
+  transition: transform 0.15s ease;
+}
+
+.sv2-ai-item.is-open .sv2-ai-item-chevron {
+  transform: rotate(180deg);
+}
+
+.sv2-ai-item-body {
+  padding: 4px 16px 16px;
+}
+
+.sv2-ai-item-facts {
+  display: grid;
+  grid-template-columns: minmax(120px, 180px) 1fr;
+  gap: 8px 16px;
+  margin: 0;
+}
+
+.sv2-ai-item-facts dt {
+  color: var(--lex-text-tertiary);
   font-size: var(--lex-body-sm-size);
   font-weight: var(--lex-weight-medium, 500);
 }
 
-.sv2-ai-row-detail {
-  color: var(--lex-text-secondary);
+.sv2-ai-item-facts dd {
+  margin: 0;
+  color: var(--lex-text-primary);
   font-size: var(--lex-body-sm-size);
   line-height: var(--lex-body-sm-height);
   overflow-wrap: anywhere;
 }
 
-.sv2-ai-row lex-badge {
-  flex: none;
+.sv2-ai-item-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--lex-border-subtle);
 }
 
 .sv2-ai-kv {
@@ -1589,15 +1657,15 @@
   gap: 8px;
 }
 
-/* Speech models (LANA Briefs) inside the AI card; rows from settings-briefs.css. */
-.sv2-local-engine-speech {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--lex-border-subtle);
-}
+@container sv2-panels (max-width: 559px) {
+  .sv2-ai-item-facts {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
 
-.sv2-local-engine-speech .sv2-briefs-models {
-  margin-top: 12px;
+  .sv2-ai-item-facts dd {
+    margin-bottom: 8px;
+  }
 }
 
 .sv2-local-engine-message,
@@ -1777,4 +1845,51 @@
 
 [data-lex-theme="dark"] .sv2-local-engine-job[data-parked="true"] {
   background: color-mix(in srgb, var(--lex-color-warning-700) 28%, transparent);
+}
+
+
+/* ── Text hierarchy (every Settings panel) ───────────────────────────
+   Card title > card subtitle > group heading (.sv2-subhead) > row title > body text.
+   Each level differs in size, weight or color so they never blend. */
+
+/* Card title (lex-card heading) and subtitle, with a line separating them from the body. */
+.sv2-panels lex-card h3.text-lg {
+  font-size: var(--lex-h4-size, 1.25rem);
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.sv2-panels lex-card h3.text-lg + p {
+  margin-top: 6px;
+  line-height: var(--lex-body-sm-height);
+}
+
+.sv2-panels lex-card div.mb-4:has(> div > h3.text-lg) {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--lex-border-subtle);
+}
+
+/* Group heading inside a card: small, uppercase, spaced. */
+.sv2-panels .sv2-subhead {
+  margin: 0 0 8px;
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-caption-size, 0.75rem);
+  font-weight: var(--lex-weight-semibold, 600);
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sv2-local-engine-head .sv2-subhead {
+  margin: 0;
+}
+
+/* Row title over its body text: a clear gap between the two. */
+.sv2-panels .sv2-local-engine-option-copy,
+.sv2-panels .sv2-general-option-copy,
+.sv2-panels .sv2-briefs-option-copy,
+.sv2-panels .sv2-offline-copy-option-copy,
+.sv2-panels .sv2-capability-option-copy {
+  gap: 4px;
 }

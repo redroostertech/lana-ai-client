@@ -83,6 +83,66 @@
     },
     {
       "type": "library",
+      "bom-ref": "lana:model-nomic-embed-text",
+      "name": "Nomic Embed Text v1.5 (search embeddings)",
+      "version": "v1.5 (F16 GGUF)",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "copyright": "Nomic AI",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana:model-qwen3.5-9b",
+      "name": "Qwen3.5 9B (chat)",
+      "version": "Q4_K_M GGUF",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "copyright": "Copyright 2026 Alibaba Cloud",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://huggingface.co/Qwen/Qwen3.5-9B"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana:model-qwen3.5-0.8b",
+      "name": "Qwen3.5 0.8B (draft model that speeds up chat)",
+      "version": "Q4_K_M GGUF",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "copyright": "Copyright 2026 Alibaba Cloud",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://huggingface.co/Qwen/Qwen3.5-0.8B"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "lana:chart.js",
       "name": "Chart.js",
       "version": "4.4.1",

@@ -1918,11 +1918,12 @@ ipcMain.handle('vpn-get-device-id', async () => {
  *
  * Note: granted_user_id is treated as semi-sensitive — never log it.
  */
-// Settings > Capabilities > AI models: Pip on this computer, the server, Forge (electron-ai-topology.js).
+// Settings > Capabilities > AI: local model servers, the server, Forge (electron-ai-topology.js).
 registerAiTopologyIpc(ipcMain, {
   env: process.env,
   savedServer: () => getSavedServer(),
   catalog: localModelsCatalog.CATALOG,
+  speechCatalog: localModelsCatalog.SPEECH_CATALOG,
   modelsDir: () => localModelsCatalog.modelsDir(process.env, app.getPath('userData')),
   logError
 });

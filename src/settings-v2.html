@@ -217,7 +217,7 @@
 
             <lex-divider spacing="md"></lex-divider>
             <lex-stack direction="vertical" gap="1">
-              <lex-text variant="primary" size="body-sm" weight="semibold" tag="h3">About your practice</lex-text>
+              <h4 class="sv2-subhead">About your practice</h4>
               <lex-text variant="secondary" size="body-sm" tag="p">LANA uses this to tailor every answer to your area of law.</lex-text>
             </lex-stack>
 
@@ -242,7 +242,7 @@
           <section id="sv2-personalization-memory" class="sv2-memory" aria-busy="true">
             <div class="sv2-memory-header">
               <div>
-                <lex-text variant="primary" size="body-sm" weight="semibold" tag="h3">LANA Memory</lex-text>
+                <h4 class="sv2-subhead">LANA Memory</h4>
                 <lex-text variant="secondary" size="body-sm" tag="p">What LANA has retained for personalization and workspace continuity.</lex-text>
               </div>
               <lex-btn id="sv2-memory-manage-btn" variant="secondary" size="sm" icon="database">Manage memories</lex-btn>
@@ -274,7 +274,7 @@
         <section id="sv2-section-local-engine" class="sv2-local-engine" aria-busy="true" hidden>
           <lex-card heading="AI" subtitle="Where LANA's AI runs: on this computer, on your organization's server, or in the cloud">
             <div class="sv2-local-engine-head">
-              <span class="sv2-local-engine-option-name">Local AI engine</span>
+              <h4 class="sv2-subhead">Local AI engine</h4>
               <div class="sv2-local-engine-head-side">
                 <lex-badge id="sv2-local-engine-badge" label="Checking" color="gray"></lex-badge>
                 <lex-btn id="sv2-local-engine-restart" variant="ghost" size="sm" label="Restart" hidden></lex-btn>
@@ -307,65 +307,44 @@
                 <p id="sv2-local-engine-jobs-empty" class="sv2-local-engine-note" hidden></p>
               </div>
             </div>
-            <!-- Pip, models, server, Forge, routing (settings-ai-models.js). -->
-            <div id="sv2-ai-pip" class="sv2-ai-group" hidden>
-              <div class="sv2-local-engine-option-copy">
-                <span class="sv2-local-engine-option-name">Local (On this computer)</span>
-                <span id="sv2-ai-pip-pinned" class="sv2-local-engine-option-description"></span>
+            <!-- Local and Cloud (settings-ai-models.js); Speech and Voice rows from settings-briefs.js. -->
+            <div id="sv2-ai-local" class="sv2-ai-group" hidden>
+              <h4 class="sv2-subhead">Local (On this computer)</h4>
+              <div class="sv2-ai-list" role="list">
+                <div id="sv2-ai-local-rows" class="sv2-ai-list-part"></div>
+                <div id="sv2-briefs-models" class="sv2-ai-list-part" aria-live="polite"></div>
               </div>
-              <div id="sv2-ai-pip-rows" class="sv2-ai-rows" role="list"></div>
             </div>
-            <div id="sv2-ai-models" class="sv2-ai-group" hidden>
-              <div class="sv2-local-engine-option-copy">
-                <span class="sv2-local-engine-option-name">Local engine downloads</span>
-                <span class="sv2-local-engine-option-description">Models the LANA app downloads for its own local AI engine.</span>
-              </div>
-              <div id="sv2-ai-models-rows" class="sv2-ai-rows" role="list"></div>
-            </div>
-            <!-- Speech models (settings-briefs.js): shown while LANA Briefs is on. -->
-            <div id="sv2-section-briefs-models" class="sv2-local-engine-speech sv2-briefs" hidden>
-              <div class="sv2-local-engine-option-copy">
-                <span class="sv2-local-engine-option-name">Speech models</span>
-                <span class="sv2-local-engine-option-description">LANA Briefs transcribes meetings on this computer. Notes and actions are written by LANA's AI.</span>
-              </div>
-              <div id="sv2-briefs-models" class="sv2-briefs-models" aria-live="polite"></div>
-            </div>
-            <div id="sv2-ai-server" class="sv2-ai-group" hidden>
-              <span class="sv2-local-engine-option-name">Organization server</span>
-              <div id="sv2-ai-server-rows" class="sv2-ai-kv"></div>
-            </div>
-            <div id="sv2-ai-forge" class="sv2-ai-group" hidden>
-              <div class="sv2-local-engine-option-copy">
-                <span class="sv2-local-engine-option-name">Cloud</span>
-                <span class="sv2-local-engine-option-description">Forge, LANA's cloud AI.</span>
-              </div>
-              <div id="sv2-ai-forge-rows" class="sv2-ai-kv"></div>
-            </div>
-            <div id="sv2-ai-routing" class="sv2-ai-group" hidden>
-              <span class="sv2-local-engine-option-name">Prompt routing</span>
-              <div id="sv2-ai-routing-lines" class="sv2-ai-rows"></div>
+            <div id="sv2-ai-cloud" class="sv2-ai-group" hidden>
+              <h4 class="sv2-subhead">Cloud</h4>
+              <div id="sv2-ai-cloud-rows" class="sv2-ai-kv"></div>
             </div>
           </lex-card>
         </section>
         <section id="sv2-section-offline-copy" class="sv2-offline-copy" aria-busy="true" hidden>
-          <lex-card heading="Offline copy" subtitle="Your own matters, tasks, contacts, notes, recent chats and documents, encrypted on this computer">
+          <lex-card heading="Offline copy" subtitle="Your own matters, tasks, contacts, notes, recent chats and documents, kept encrypted on this computer">
             <div class="sv2-offline-copy-head">
-              <lex-badge id="sv2-offline-copy-badge" label="Checking" color="gray"></lex-badge>
-              <lex-btn id="sv2-offline-copy-sync" variant="ghost" size="sm">Sync now</lex-btn>
+              <h4 class="sv2-subhead">On this computer</h4>
+              <div class="sv2-offline-copy-head-side">
+                <lex-badge id="sv2-offline-copy-badge" label="Checking" color="gray"></lex-badge>
+                <lex-btn id="sv2-offline-copy-sync" variant="ghost" size="sm" label="Sync now"></lex-btn>
+              </div>
             </div>
             <p id="sv2-offline-copy-message" class="sv2-offline-copy-message" role="status" hidden></p>
             <dl id="sv2-offline-copy-rows" class="sv2-offline-copy-rows"></dl>
             <div id="sv2-offline-copy-conflicts" class="sv2-offline-copy-list" role="list" aria-label="Changes to review" hidden></div>
             <div id="sv2-offline-copy-refused" class="sv2-offline-copy-list" role="list" aria-label="Changes not saved" hidden></div>
-            <p class="sv2-offline-copy-note">Answers from the offline copy are labelled with the time of the last sync. Changes you make offline sync when you are back online; chat cannot make changes while offline.</p>
-          </lex-card>
-          <lex-card id="sv2-offline-copy-admin" heading="Offline copies for your organization" subtitle="For organization admins" hidden>
-            <div class="sv2-offline-copy-option">
-              <div class="sv2-offline-copy-option-copy">
-                <span class="sv2-offline-copy-option-name">Let people keep an offline copy</span>
-                <span id="sv2-offline-copy-admin-description" class="sv2-offline-copy-option-description"></span>
+            <p id="sv2-offline-copy-note" class="sv2-offline-copy-note" hidden>Answers from the offline copy show the time of the last sync. Changes you make offline sync when you are back online; chat cannot make changes while offline.</p>
+            <!-- For organization admins (settings-offline-copy.js shows it). -->
+            <div id="sv2-offline-copy-admin" class="sv2-offline-copy-admin" hidden>
+              <h4 class="sv2-subhead">For your organization</h4>
+              <div class="sv2-offline-copy-option">
+                <div class="sv2-offline-copy-option-copy">
+                  <span class="sv2-offline-copy-option-name">Let people keep an offline copy</span>
+                  <span id="sv2-offline-copy-admin-description" class="sv2-offline-copy-option-description"></span>
+                </div>
+                <lex-toggle id="sv2-offline-copy-admin-toggle" name="offline_copies_enabled" aria-label="Let people keep an offline copy"></lex-toggle>
               </div>
-              <lex-toggle id="sv2-offline-copy-admin-toggle" name="offline_copies_enabled" aria-label="Let people keep an offline copy"></lex-toggle>
             </div>
           </lex-card>
         </section>

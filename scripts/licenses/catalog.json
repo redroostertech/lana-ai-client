@@ -6,6 +6,7 @@
   },
   "sections": [
     { "id": "runtime", "title": "Runtime", "detail": "The application runtime." },
+    { "id": "models", "title": "AI models", "detail": "Models the app downloads on request for its local AI and keeps on this computer." },
     { "id": "vendored", "title": "Bundled libraries", "detail": "Browser libraries shipped as files with the app." },
     { "id": "fonts", "title": "Fonts", "detail": "Typefaces bundled with the app." },
     { "id": "npm", "title": "JavaScript packages", "detail": "npm packages compiled into the app's main process and editor bundles, or shipped in its node_modules." }
@@ -52,6 +53,40 @@
         { "title": "sherpa-onnx, Apache License 2.0", "file": "scripts/licenses/texts/sherpa-onnx-Apache-2.0.txt" },
         { "title": "ONNX Runtime, MIT License", "file": "scripts/licenses/texts/onnxruntime-MIT.txt" }
       ]
+    },
+    {
+      "id": "model-nomic-embed-text",
+      "section": "models",
+      "name": "Nomic Embed Text v1.5 (search embeddings)",
+      "version": "v1.5 (F16 GGUF)",
+      "license": "Apache-2.0",
+      "copyright": "Nomic AI",
+      "attribution": "Downloaded on request for local search embeddings.",
+      "source": "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5",
+      "notes": "The model card states Apache-2.0 and ships no license file, so this page supplies the Apache License 2.0 text.",
+      "texts": [{ "title": "Apache License 2.0", "file": "scripts/licenses/texts/Apache-2.0.txt" }]
+    },
+    {
+      "id": "model-qwen3.5-9b",
+      "section": "models",
+      "name": "Qwen3.5 9B (chat)",
+      "version": "Q4_K_M GGUF",
+      "license": "Apache-2.0",
+      "copyright": "Copyright 2026 Alibaba Cloud",
+      "attribution": "Downloaded on request for local chat.",
+      "source": "https://huggingface.co/Qwen/Qwen3.5-9B",
+      "texts": [{ "title": "Qwen3.5, Apache License 2.0", "file": "scripts/licenses/texts/qwen3.5-Apache-2.0.txt" }]
+    },
+    {
+      "id": "model-qwen3.5-0.8b",
+      "section": "models",
+      "name": "Qwen3.5 0.8B (draft model that speeds up chat)",
+      "version": "Q4_K_M GGUF",
+      "license": "Apache-2.0",
+      "copyright": "Copyright 2026 Alibaba Cloud",
+      "attribution": "Downloaded on request to speed up local chat.",
+      "source": "https://huggingface.co/Qwen/Qwen3.5-0.8B",
+      "texts": [{ "title": "Qwen3.5, Apache License 2.0", "file": "scripts/licenses/texts/qwen3.5-Apache-2.0.txt" }]
     },
     {
       "id": "chart.js",

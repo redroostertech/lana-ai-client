@@ -85,7 +85,7 @@
    */
   function settingsView(status, locale) {
     if (!status) {
-      return { available: false, badge: STATES.off.label, tone: STATES.off.tone, message: 'An offline copy needs the local AI service on this computer.', rows: [], conflicts: [], refused: [] };
+      return { available: false, badge: STATES.off.label, tone: STATES.off.tone, message: 'Needs the local AI engine on this computer.', rows: [], conflicts: [], refused: [] };
     }
     var state = STATES[status.state] ? status.state : 'off';
     var message = '';

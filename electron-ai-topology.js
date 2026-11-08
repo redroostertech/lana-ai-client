@@ -1,9 +1,9 @@
 /**
  * Settings > Capabilities > AI: where LANA's AI can run, read in the main process.
  *
- *   Local   the Pip model server on this computer (chat and embeddings endpoints the
- *           client hands the local AI engine: LANA_ENGINE_CHAT_URL, LANA_ENGINE_EMBEDDING_URL),
- *           the Pip build LANA pins, and which catalog models are downloaded here.
+ *   Local   the model servers on this computer (chat and embeddings endpoints the client
+ *           hands the local AI engine: LANA_ENGINE_CHAT_URL, LANA_ENGINE_EMBEDDING_URL), the
+ *           app's model catalog (downloaded or not) and the names of the speech models.
  *   Server  the organization's LANA server (its version is read by the renderer, signed in).
  *   Forge   LANA's cloud AI (discovery's forgeUrl and sovereign flag). The server's AI is Forge.
  *
@@ -54,7 +54,7 @@ async function pipEndpoint(rawUrl, fetchImpl) {
   return { url, state: 'running', version: typeof said.version === 'string' ? said.version : null, model, build };
 }
 
-/** Downloaded means the file is in place at its catalog size (the full sha256 check runs when the engine loads it). */
+/** The app's local model catalog, each marked downloaded when its file is in place at its catalog size. */
 function catalogModels(catalog, dir, statSync = fs.statSync) {
   return catalog.map((entry) => {
     let downloaded = false;
@@ -63,17 +63,22 @@ function catalogModels(catalog, dir, statSync = fs.statSync) {
   });
 }
 
+/** The speech packages LANA Briefs downloads (names only; Briefs reports their state and size). */
+function speechModels(speechCatalog) {
+  return speechCatalog.map((entry) => ({ id: entry.id, name: entry.name }));
+}
+
 /**
  * @param {object} deps
  * @param {NodeJS.ProcessEnv} deps.env
  * @param {object|null} deps.savedServer   electron-storage getSavedServer()
- * @param {Array} deps.catalog             electron-local-models CATALOG
- * @param {string|null} deps.modelsDir
+ * @param {Array} [deps.catalog]         electron-local-models CATALOG
+ * @param {Array} [deps.speechCatalog]   electron-local-models SPEECH_CATALOG
+ * @param {string|null} [deps.modelsDir]
  * @param {Function} [deps.fetchImpl]
  * @param {Function} [deps.statSync]
  */
-async function aiTopology({ env, savedServer, catalog, modelsDir, fetchImpl = fetch, statSync = fs.statSync }) {
-  const pinned = (catalog.find((entry) => entry.runtime) || {}).runtime || null;
+async function aiTopology({ env, savedServer, catalog = [], speechCatalog = [], modelsDir = null, fetchImpl = fetch, statSync = fs.statSync }) {
   const forgeUrl = trimmed(savedServer && savedServer.forgeUrl);
   const [chat, embedding, forge] = await Promise.all([
     pipEndpoint(env.LANA_ENGINE_CHAT_URL, fetchImpl),
@@ -81,12 +86,9 @@ async function aiTopology({ env, savedServer, catalog, modelsDir, fetchImpl = fe
     forgeUrl ? getJson(`${forgeUrl}/health`, fetchImpl) : Promise.resolve(null)
   ]);
   return {
-    pip: {
-      pinned: pinned ? { version: pinned.version, build: pinned.build } : null,
-      chat,
-      embedding,
-      models: catalogModels(catalog, modelsDir, statSync)
-    },
+    pip: { chat, embedding },
+    models: catalogModels(catalog, modelsDir, statSync),
+    speech: speechModels(speechCatalog),
     server: { url: trimmed(savedServer && (savedServer.chefUrl || savedServer.url)) },
     forge: {
       url: forgeUrl,
@@ -99,7 +101,10 @@ async function aiTopology({ env, savedServer, catalog, modelsDir, fetchImpl = fe
 function registerAiTopologyIpc(ipcMain, deps) {
   ipcMain.handle('settings:ai-topology', async () => {
     try {
-      return { success: true, topology: await aiTopology({ env: deps.env, savedServer: deps.savedServer(), catalog: deps.catalog, modelsDir: deps.modelsDir() }) };
+      return {
+        success: true,
+        topology: await aiTopology({ env: deps.env, savedServer: deps.savedServer(), catalog: deps.catalog, speechCatalog: deps.speechCatalog, modelsDir: deps.modelsDir() })
+      };
     } catch (error) {
       deps.logError('[settings] Failed to read the AI setup', error);
       return { success: false, error: 'LANA could not read where its AI runs.' };

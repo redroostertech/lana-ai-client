@@ -34,6 +34,7 @@
     var conflicts = document.getElementById('sv2-offline-copy-conflicts');
     var refused = document.getElementById('sv2-offline-copy-refused');
     var syncBtn = document.getElementById('sv2-offline-copy-sync');
+    var note = document.getElementById('sv2-offline-copy-note');
     var adminCard = document.getElementById('sv2-offline-copy-admin');
     var adminToggle = document.getElementById('sv2-offline-copy-admin-toggle');
     var adminDescription = document.getElementById('sv2-offline-copy-admin-description');
@@ -82,6 +83,8 @@
       message.setAttribute('data-tone', view.tone === 'red' ? 'red' : 'blue');
       message.hidden = !view.message;
       syncBtn.hidden = !view.available;
+      // How offline answers and changes behave matters only while there is a copy.
+      if (note) note.hidden = !view.available;
       clear(rows);
       view.rows.forEach(function (r) {
         var dt = document.createElement('dt');

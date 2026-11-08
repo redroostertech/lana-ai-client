@@ -29,11 +29,35 @@
 }
 
 .sv2-offline-copy-message {
-  margin-top: 12px;
+  margin-top: 8px;
+}
+
+.sv2-offline-copy-head-side {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sv2-offline-copy-head .sv2-subhead {
+  margin: 0;
+}
+
+/* A problem stands out; an explanation stays plain body text. */
+.sv2-offline-copy-message[data-tone="red"] {
   padding: 8px 12px;
   border-radius: var(--lex-radius-md);
-  background: var(--lex-status-info-bg);
-  color: var(--lex-status-info-text);
+}
+
+.sv2-offline-copy-note[hidden],
+.sv2-offline-copy-admin[hidden] {
+  display: none;
+}
+
+.sv2-offline-copy-admin {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--lex-border-subtle);
 }
 
 .sv2-offline-copy-message[data-tone="red"] {
@@ -116,11 +140,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-}
-
-[data-lex-theme="dark"] .sv2-offline-copy-message {
-  background: var(--lex-color-info-700);
-  color: var(--lex-color-info-50);
 }
 
 [data-lex-theme="dark"] .sv2-offline-copy-message[data-tone="red"] {

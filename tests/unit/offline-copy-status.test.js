@@ -24,7 +24,7 @@ describe('offline copy settings view', () => {
   test.each([
     [{ state: 'locked', locked_message: 'locked after 14 days' }, 'Locked', 'red', /14 days/],
     [{ state: 'empty' }, 'Not synced yet', 'gray', /next time/],
-    [null, 'Off', 'gray', /local AI service/]
+    [null, 'Off', 'gray', /local AI engine/]
   ])('state %j', (status, badge, tone, message) => {
     const view = offline.settingsView(status);
     expect(view.badge).toBe(badge);

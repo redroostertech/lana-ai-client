@@ -15,11 +15,6 @@ function fakeFetch(routes) {
   };
 }
 
-const CATALOG = [
-  { id: 'embed', role: 'embedding', name: 'Nomic Embed', filename: 'embed.gguf', sizeBytes: 100, runtime: { name: 'pip', version: '3.0.0', build: 'ddedf87af419' } },
-  { id: 'chat', role: 'chat', name: 'Qwen 9B', filename: 'chat.gguf', sizeBytes: 500 },
-];
-
 describe('pipEndpoint', () => {
   test('not set, not running, running with its model and build', async () => {
     expect(await pipEndpoint(undefined, fakeFetch({}))).toEqual({ url: null, state: 'not_set', version: null, model: null, build: null });
@@ -45,23 +40,21 @@ describe('pipEndpoint', () => {
 
 describe('catalogModels', () => {
   test('downloaded when the file is in place at its catalog size', () => {
-    const sizes = { '/m/embed.gguf': 100, '/m/chat.gguf': 12 };
+    const catalog = [{ id: 'a', name: 'A', role: 'chat', filename: 'a.gguf', sizeBytes: 100 }, { id: 'b', name: 'B', role: 'embedding', filename: 'b.gguf', sizeBytes: 50 }];
+    const sizes = { '/m/a.gguf': 100, '/m/b.gguf': 12 };
     const stat = (file) => { if (!(file in sizes)) throw new Error('ENOENT'); return { size: sizes[file] }; };
-    expect(catalogModels(CATALOG, '/m', stat).map((m) => [m.id, m.downloaded])).toEqual([['embed', true], ['chat', false]]);
-    expect(catalogModels(CATALOG, null, stat).every((m) => m.downloaded === false)).toBe(true);
+    expect(catalogModels(catalog, '/m', stat).map((m) => [m.id, m.downloaded])).toEqual([['a', true], ['b', false]]);
+    expect(catalogModels(catalog, null, stat).every((m) => !m.downloaded)).toBe(true);
   });
 });
 
 describe('aiTopology', () => {
-  test('Pip, the server and Forge', async () => {
+  test('local model servers, the server and Forge', async () => {
     const topology = await aiTopology({
       env: { LANA_ENGINE_CHAT_URL: 'http://127.0.0.1:8081' },
       savedServer: { url: 'http://127.0.0.1:47011', chefUrl: 'http://127.0.0.1:8080', forgeUrl: 'https://forge-api.lanaai.io', forgeSovereign: null },
-      catalog: CATALOG,
-      modelsDir: null,
       fetchImpl: fakeFetch({ 'https://forge-api.lanaai.io/health': [200, { status: 'ok' }] }),
     });
-    expect(topology.pip.pinned).toEqual({ version: '3.0.0', build: 'ddedf87af419' });
     expect(topology.pip.chat.state).toBe('not_running');
     expect(topology.pip.embedding.state).toBe('not_set');
     expect(topology.server).toEqual({ url: 'http://127.0.0.1:8080' });
@@ -69,7 +62,7 @@ describe('aiTopology', () => {
   });
 
   test('no Forge address: nothing to reach', async () => {
-    const topology = await aiTopology({ env: {}, savedServer: null, catalog: CATALOG, modelsDir: null, fetchImpl: fakeFetch({}) });
+    const topology = await aiTopology({ env: {}, savedServer: null, fetchImpl: fakeFetch({}) });
     expect(topology.forge).toEqual({ url: null, reachable: null, sovereign: false });
     expect(topology.server.url).toBeNull();
   });

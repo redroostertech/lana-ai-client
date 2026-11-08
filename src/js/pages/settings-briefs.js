@@ -147,58 +147,69 @@
 
   // ── Speech models ─────────────────────────────────────
 
+  var lastModels = null;
+
+  /** The Briefs controls for one speech row: progress, a note and the download or remove button. */
+  function modelActions(row) {
+    var box = document.createElement('div');
+    box.className = 'sv2-ai-item-actions';
+    if (row.progress !== null) {
+      var bar = document.createElement('lex-progress-bar');
+      bar.className = 'sv2-briefs-model-bar';
+      bar.setAttribute('value', String(row.progress));
+      bar.setAttribute('size', 'sm');
+      box.appendChild(bar);
+    }
+    // Once downloaded, the size is already in the row's facts.
+    if (row.note && row.badge !== 'Ready') {
+      var note = document.createElement('span');
+      note.className = 'sv2-briefs-option-description';
+      note.textContent = row.note;
+      box.appendChild(note);
+    }
+    if (row.action) {
+      var button = document.createElement('lex-btn');
+      button.setAttribute('variant', row.action === 'download' ? 'secondary' : 'ghost');
+      button.setAttribute('size', 'sm');
+      if (row.action === 'download') button.setAttribute('leading-icon', 'download');
+      button.setAttribute('data-briefs-model', row.id);
+      button.setAttribute('data-briefs-model-action', row.action);
+      button.setAttribute('label', row.actionLabel);
+      box.appendChild(button);
+    }
+    return box;
+  }
+
+  function modelBadge(label, color) {
+    var badge = document.createElement('lex-badge');
+    badge.setAttribute('label', label);
+    badge.setAttribute('color', color);
+    badge.setAttribute('size', 'sm');
+    return badge;
+  }
+
+  /**
+   * Speech and Voice, as rows of Settings > Capabilities > AI > Local (window.LanaAiRow).
+   * Speech is LANA transcription with its download; Voice is listed but not downloaded here,
+   * because Talk with LANA, its only user, is not in this app yet.
+   */
   function renderModels(status) {
+    if (status) lastModels = status;
     var box = el('sv2-briefs-models');
-    if (!box) return;
-    var rows = S.modelRows(status);
-    el('sv2-section-briefs-models').hidden = rows.length === 0;
+    var rowApi = window.LanaAiRow;
+    var words = window.LanaAiModels;
+    if (!box || !rowApi || !words || !lastModels) return;
+    var topology = rowApi.topology();
     while (box.firstChild) box.removeChild(box.firstChild);
-    rows.forEach(function (row) {
-      var item = document.createElement('div');
-      item.className = 'sv2-briefs-model';
-      var copy = document.createElement('div');
-      copy.className = 'sv2-briefs-option-copy';
-      var name = document.createElement('span');
-      name.className = 'sv2-briefs-option-name';
-      name.textContent = row.title;
-      var detail = document.createElement('span');
-      detail.className = 'sv2-briefs-option-description';
-      detail.textContent = row.detail;
-      copy.appendChild(name);
-      copy.appendChild(detail);
-      if (row.progress !== null) {
-        var bar = document.createElement('lex-progress-bar');
-        bar.className = 'sv2-briefs-model-bar';
-        bar.setAttribute('value', String(row.progress));
-        bar.setAttribute('size', 'sm');
-        copy.appendChild(bar);
-      }
-      if (row.note) {
-        var note = document.createElement('span');
-        note.className = 'sv2-briefs-option-description';
-        note.textContent = row.note;
-        copy.appendChild(note);
-      }
-      var side = document.createElement('div');
-      side.className = 'sv2-briefs-model-side';
-      var badge = document.createElement('lex-badge');
-      badge.setAttribute('label', row.badge);
-      badge.setAttribute('color', row.color);
-      side.appendChild(badge);
-      if (row.action) {
-        var button = document.createElement('lex-btn');
-        button.setAttribute('variant', row.action === 'download' ? 'secondary' : 'ghost');
-        button.setAttribute('size', 'sm');
-        if (row.action === 'download') button.setAttribute('leading-icon', 'download');
-        button.setAttribute('data-briefs-model', row.id);
-        button.setAttribute('data-briefs-model-action', row.action);
-        button.setAttribute('label', row.actionLabel);
-        side.appendChild(button);
-      }
-      item.appendChild(copy);
-      item.appendChild(side);
-      box.appendChild(item);
+    S.modelRows(lastModels).forEach(function (row) {
+      var view = words.speechRow('speech', topology, lastModels[row.id]);
+      box.appendChild(rowApi.create(view, { badge: modelBadge(row.badge, row.color), actions: modelActions(row) }));
     });
+    if (lastModels.voice) {
+      var voice = words.speechRow('voice', topology, lastModels.voice);
+      var ready = lastModels.voice.state && lastModels.voice.state.kind === 'ready';
+      box.appendChild(rowApi.create(voice, { badge: modelBadge(ready ? 'Ready' : 'Not in use', ready ? 'green' : 'gray') }));
+    }
   }
 
   function onModelClick(event) {
@@ -262,6 +273,8 @@
     });
 
     el('sv2-briefs-models').addEventListener('click', onModelClick);
+    // Model names arrive with the AI card's topology; draw again when they do.
+    window.addEventListener('lana-ai-topology', function () { renderModels(null); });
 
     if (typeof api.onEvent === 'function') {
       api.onEvent(function (event) {
