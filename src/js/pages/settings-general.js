@@ -128,6 +128,14 @@
     else window.location.href = route;
   }
 
+  /** Terms and Privacy open on lanaai.io in the system browser. */
+  function openHref(event) {
+    var url = event.currentTarget.getAttribute('data-href');
+    var api = window.electronAPI;
+    if (api && typeof api.openExternal === 'function') api.openExternal(url);
+    else window.open(url, '_blank', 'noopener');
+  }
+
   // ── Setup ─────────────────────────────────────────────
 
   function boot() {
@@ -148,6 +156,10 @@
 
     var licenses = el('sv2-legal-licenses');
     if (licenses) licenses.addEventListener('click', openLicenses);
+    ['sv2-legal-terms', 'sv2-legal-privacy'].forEach(function (id) {
+      var link = el(id);
+      if (link) link.addEventListener('click', openHref);
+    });
 
     var api = window.electronAPI;
     if (!api || typeof api.getSystemInfo !== 'function') return;
