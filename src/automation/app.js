@@ -381,6 +381,14 @@ function bindGlobalEvents() {
   }
 
   document.body.addEventListener('click', onAppClick);
+  // The walkthrough (js/walkthroughs/automate-walkthrough.js): its last page opens the builder.
+  if (window.LanaAppWalkthrough && window.AutomateWalkthrough) {
+    window.LanaAppWalkthrough.register('automate', {
+      brand: 'AUTOMATE.',
+      pages: window.AutomateWalkthrough.pages,
+      onAction: (action) => { if (action === 'create') setView('builder'); }
+    });
+  }
   // The Library "How it works" steps open the view each one names.
   document.body.addEventListener('lex-app-loop-select', (event) => {
     if (event.detail && event.detail.value && els.viewContent && els.viewContent.contains(event.target)) {
@@ -481,6 +489,10 @@ async function bootstrapApp() {
   renderUserChip();
   setView(state.currentView, { replaceHistory: true });
   await refreshCurrentView();
+  // First visit to Automate's Library: show the walkthrough once.
+  if (state.currentView === 'library' && window.LanaAppWalkthrough) {
+    window.LanaAppWalkthrough.showFirstRun('automate');
+  }
 
   // Check for deep-link: /builder?automationId=<uuid>
   // If present, go directly to the builder in edit mode.
@@ -1260,6 +1272,11 @@ async function onAppClick(event) {
     if (sourceId) {
       await handleSetConnectorDefault(sourceId);
     }
+    return;
+  }
+
+  if (event.target.closest('[data-automate-tour]')) {
+    if (window.LanaAppWalkthrough) window.LanaAppWalkthrough.show('automate');
     return;
   }
 

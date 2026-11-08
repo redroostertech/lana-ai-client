@@ -9,6 +9,8 @@
   <link rel="stylesheet" href="../css/lex-tokens.css">
   <link rel="stylesheet" href="../css/components.css">
   <link rel="stylesheet" href="../css/tailwind-output.css">
+  <link rel="stylesheet" href="../css/lex-motion.css">
+  <link rel="stylesheet" href="../css/app-walkthrough.css">
   <link rel="stylesheet" href="../css/admin/insights-dashboard.css">
   <link rel="stylesheet" href="../css/admin/admin-card-grid.css">
   <script src="../js/tailwind-loader.js"></script>
@@ -40,6 +42,7 @@
         <lex-btn id="createDashboardBtn" variant="primary" size="lg" icon="plus">Create dashboard</lex-btn>
         <lex-btn variant="lana" size="lg" data-lana-dock-trigger data-lana-context-type="full_chat"
           data-lana-prefill="What changed in our numbers this week?">Ask LANA about the numbers</lex-btn>
+        <lex-btn id="insightsTourBtn" variant="ghost" size="lg" leading-icon="play">Take the walkthrough</lex-btn>
       </lex-app-hero>
 
       <lex-app-loop id="insightsLoop" kicker="How it works" heading="From your data to a decision."
@@ -170,6 +173,9 @@
   <script src="../js/lex/components/foundation/lex-brand-mark.js"></script>
   <script src="../js/lex/components/layout/lex-app-hero.js"></script>
   <script src="../js/lex/components/layout/lex-app-loop.js"></script>
+  <script src="../js/lex/components/layout/lex-walkthrough.js"></script>
+  <script src="../js/shared/app-walkthrough.js"></script>
+  <script src="../js/walkthroughs/insights-walkthrough.js"></script>
   <script src="../js/lex/components/foundation/lex-action-card.js"></script>
 
   <!-- Inject page content + hoist modals -->

@@ -224,6 +224,7 @@ export function renderLibrary(context) {
     >
       <lex-btn variant="primary" size="lg" icon="plus" data-automate-view="builder">New automation</lex-btn>
       <lex-btn variant="secondary" size="lg" data-automate-view="runs">See run history</lex-btn>
+      <lex-btn variant="ghost" size="lg" leading-icon="play" data-automate-tour>Take the walkthrough</lex-btn>
     </lex-app-hero>
     <div class="automation-page-banner-badges">
       ${badge(`${templateLibrary.length} starter templates`)}

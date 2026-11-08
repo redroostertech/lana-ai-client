@@ -1,0 +1,368 @@
+/* App walkthroughs (Agents, Automate, Insights): the animated pictures inside
+   <lex-walkthrough class="app-tour">. Each picture is a small, simplified copy of the
+   real screen, so people recognise it when they get there. Pieces arrive one after
+   another (app-tour-d1..d6) and then keep a gentle loop going. Everything holds
+   still with Reduce Motion. Needs css/lex-motion.css. */
+
+lex-walkthrough.app-tour {
+  --lex-walkthrough-accent: #2f7d5f;
+  --app-tour-accent: #2f7d5f;
+  --app-tour-accent-soft: rgba(47, 125, 95, 0.1);
+  --app-tour-ink: var(--lex-text-primary, #171b18);
+  --app-tour-muted: var(--lex-text-secondary, #616861);
+  --app-tour-line: var(--lex-border-subtle, #e1e5e1);
+  --app-tour-amber: #b7791f;
+  --app-tour-amber-soft: rgba(183, 121, 31, 0.12);
+}
+
+/* Staggered arrival */
+.app-tour-in { opacity: 0; animation: app-tour-in 420ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+.app-tour-d1 { animation-delay: 120ms; }
+.app-tour-d2 { animation-delay: 360ms; }
+.app-tour-d3 { animation-delay: 600ms; }
+.app-tour-d4 { animation-delay: 840ms; }
+.app-tour-d5 { animation-delay: 1080ms; }
+.app-tour-d6 { animation-delay: 1320ms; }
+
+@keyframes app-tour-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+/* A card that looks like a piece of the app */
+.app-tour-card {
+  width: min(420px, 86vw);
+  padding: 18px 20px;
+  border: 1px solid var(--app-tour-line);
+  border-radius: 16px;
+  background: var(--lex-bg-primary, #fff);
+  box-shadow: 0 18px 44px rgba(20, 30, 25, 0.12);
+  color: var(--app-tour-ink);
+  text-align: left;
+}
+.app-tour-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.app-tour-eyebrow {
+  color: var(--app-tour-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.app-tour-title { display: block; font-size: 15px; font-weight: 650; }
+.app-tour-detail { margin: 4px 0 0; color: var(--app-tour-muted); font-size: 13px; line-height: 1.5; }
+
+/* Rows that tick in */
+.app-tour-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-top: 1px solid var(--app-tour-line);
+  font-size: 13px;
+}
+.app-tour-row:first-of-type { border-top: 0; }
+.app-tour-row-label { flex: 0 0 96px; color: var(--app-tour-muted); }
+.app-tour-row-value { flex: 1; min-width: 0; }
+.app-tour-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--app-tour-accent-soft);
+  color: var(--app-tour-accent);
+}
+.app-tour-check svg { width: 12px; height: 12px; }
+
+/* Pills and chips */
+.app-tour-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--app-tour-accent-soft);
+  color: var(--app-tour-accent);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.app-tour-pill--amber { background: var(--app-tour-amber-soft); color: var(--app-tour-amber); }
+.app-tour-pill--muted { background: var(--lex-bg-secondary, #f2f3f1); color: var(--app-tour-muted); }
+.app-tour-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.app-tour-dot--live { animation: app-tour-blink 1.4s ease-in-out infinite; }
+.app-tour-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.app-tour-chip {
+  padding: 3px 9px;
+  border: 1px solid var(--app-tour-line);
+  border-radius: 999px;
+  font-size: 12px;
+}
+.app-tour-chip--off { color: var(--app-tour-muted); text-decoration: line-through; }
+
+@keyframes app-tour-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* A choice grid where one option gets picked */
+.app-tour-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  width: min(400px, 86vw);
+}
+.app-tour-choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--app-tour-line);
+  border-radius: 14px;
+  background: var(--lex-bg-primary, #fff);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+}
+.app-tour-choice svg { width: 18px; height: 18px; color: var(--app-tour-accent); flex-shrink: 0; }
+.app-tour-choice--picked { animation: app-tour-in 420ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards, app-tour-pick 3.2s ease-in-out 1.4s infinite; }
+
+@keyframes app-tour-pick {
+  0%, 18% { border-color: var(--app-tour-line); box-shadow: none; }
+  30%, 80% { border-color: var(--app-tour-accent); box-shadow: 0 0 0 4px var(--app-tour-accent-soft); }
+  100% { border-color: var(--app-tour-line); box-shadow: none; }
+}
+
+/* A chain of steps with a pulse running along it */
+.app-tour-chain {
+  --app-tour-travel: 350px;
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 26px;
+}
+.app-tour-chain::before {
+  position: absolute;
+  top: 50%;
+  left: 40px;
+  right: 40px;
+  height: 2px;
+  background: var(--app-tour-line);
+  content: '';
+}
+.app-tour-chain-pulse {
+  position: absolute;
+  top: calc(50% - 5px);
+  left: 40px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--app-tour-accent);
+  box-shadow: 0 0 0 6px var(--app-tour-accent-soft);
+  animation: app-tour-travel 2.8s cubic-bezier(0.65, 0, 0.35, 1) 1.2s infinite;
+  opacity: 0;
+}
+.app-tour-step {
+  position: relative;
+  z-index: 1;
+  width: 128px;
+  padding: 14px 12px;
+  border: 1px solid var(--app-tour-line);
+  border-radius: 14px;
+  background: var(--lex-bg-primary, #fff);
+  box-shadow: 0 10px 26px rgba(20, 30, 25, 0.08);
+  text-align: left;
+}
+.app-tour-step .app-tour-eyebrow { display: block; margin-bottom: 6px; color: var(--app-tour-accent); }
+.app-tour-step span:last-child { font-size: 13px; font-weight: 600; line-height: 1.35; }
+
+@keyframes app-tour-travel {
+  0% { opacity: 0; transform: translateX(0); }
+  10% { opacity: 1; }
+  85% { opacity: 1; transform: translateX(var(--app-tour-travel, 290px)); }
+  100% { opacity: 0; transform: translateX(var(--app-tour-travel, 290px)); }
+}
+
+/* A progress bar that keeps filling */
+.app-tour-progress {
+  height: 6px;
+  margin-top: 14px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--lex-bg-secondary, #f2f3f1);
+}
+.app-tour-progress span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--app-tour-accent);
+  transform-origin: left center;
+  animation: app-tour-fill 3s ease-in-out 0.8s infinite;
+  transform: scaleX(0.08);
+}
+@keyframes app-tour-fill {
+  0% { transform: scaleX(0.08); }
+  70%, 100% { transform: scaleX(1); }
+}
+
+/* A working step (three soft dots) */
+.app-tour-working { display: inline-flex; gap: 4px; }
+.app-tour-working i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--app-tour-accent);
+  animation: app-tour-blink 1.2s ease-in-out infinite;
+}
+.app-tour-working i:nth-child(2) { animation-delay: 0.2s; }
+.app-tour-working i:nth-child(3) { animation-delay: 0.4s; }
+
+/* A button that invites a click */
+.app-tour-actions { display: flex; gap: 8px; margin-top: 16px; }
+.app-tour-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 1px solid var(--app-tour-line);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.app-tour-button svg { width: 14px; height: 14px; }
+.app-tour-button--primary {
+  border-color: var(--app-tour-accent);
+  background: var(--app-tour-accent);
+  color: #fff;
+  animation: app-tour-invite 2.4s ease-in-out 1.6s infinite;
+}
+.app-tour-button--lana {
+  border-color: transparent;
+  background: linear-gradient(135deg, #1e1b4b 0%, #4338ca 40%, #7c3aed 70%, #c026d3 100%);
+  color: #fff;
+}
+@keyframes app-tour-invite {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(47, 125, 95, 0.35); }
+  50% { box-shadow: 0 0 0 8px rgba(47, 125, 95, 0); }
+}
+
+/* Two things with the LANA mark between them */
+.app-tour-pair { display: flex; align-items: center; gap: 28px; }
+.app-tour-end {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--app-tour-ink);
+  font-size: 13px;
+}
+.app-tour-end svg { width: 44px; height: 44px; stroke-width: 1.5; }
+.app-tour-end span { color: var(--app-tour-muted); }
+
+/* Sources flowing in */
+.app-tour-sources { display: flex; flex-direction: column; gap: 10px; }
+.app-tour-source {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--app-tour-line);
+  border-radius: 12px;
+  background: var(--lex-bg-primary, #fff);
+  font-size: 13px;
+}
+.app-tour-source svg { width: 16px; height: 16px; color: var(--app-tour-accent); }
+.app-tour-stream { position: relative; width: 70px; height: 2px; background: var(--app-tour-line); }
+.app-tour-stream::after {
+  position: absolute;
+  top: -3px;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--app-tour-accent);
+  content: '';
+  animation: app-tour-stream 1.6s ease-in-out 1s infinite;
+  opacity: 0;
+}
+@keyframes app-tour-stream {
+  0% { opacity: 0; transform: translateX(0); }
+  20%, 80% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(62px); }
+}
+
+/* Mini dashboard: numbers and rising bars */
+.app-tour-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
+.app-tour-kpi { padding: 10px; border-radius: 12px; background: var(--lex-bg-secondary, #f6f7f5); }
+.app-tour-kpi span { display: block; color: var(--app-tour-muted); font-size: 11px; }
+.app-tour-kpi strong { display: block; margin-top: 4px; font-size: 18px; letter-spacing: -0.02em; }
+.app-tour-bars { display: flex; align-items: flex-end; gap: 8px; height: 90px; }
+.app-tour-bars i {
+  flex: 1;
+  border-radius: 6px 6px 3px 3px;
+  background: var(--app-tour-accent-soft);
+  transform-origin: bottom;
+  transform: scaleY(0.12);
+  animation: app-tour-grow 3.6s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+.app-tour-bars i:nth-child(1) { height: 40%; animation-delay: 0.5s; }
+.app-tour-bars i:nth-child(2) { height: 62%; animation-delay: 0.62s; }
+.app-tour-bars i:nth-child(3) { height: 48%; animation-delay: 0.74s; }
+.app-tour-bars i:nth-child(4) { height: 80%; animation-delay: 0.86s; background: var(--app-tour-accent); }
+.app-tour-bars i:nth-child(5) { height: 70%; animation-delay: 0.98s; }
+.app-tour-bars i:nth-child(6) { height: 92%; animation-delay: 1.1s; background: var(--app-tour-accent); }
+@keyframes app-tour-grow {
+  0% { transform: scaleY(0.12); }
+  30%, 80% { transform: scaleY(1); }
+  100% { transform: scaleY(0.12); }
+}
+
+/* A layout filling up, tile by tile */
+.app-tour-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.app-tour-slot {
+  height: 56px;
+  border: 1px dashed var(--app-tour-line);
+  border-radius: 12px;
+}
+.app-tour-tile {
+  height: 56px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--app-tour-accent-soft);
+  color: var(--app-tour-accent);
+  font-size: 11px;
+  font-weight: 700;
+}
+.app-tour-tile--wide { grid-column: span 2; }
+
+/* A short conversation */
+.app-tour-chat { display: flex; flex-direction: column; gap: 10px; width: min(400px, 86vw); }
+.app-tour-bubble {
+  max-width: 82%;
+  padding: 10px 14px;
+  border-radius: 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: left;
+}
+.app-tour-bubble--you { align-self: flex-end; border-bottom-right-radius: 4px; background: var(--lex-bg-secondary, #f2f3f1); }
+.app-tour-bubble--lana { align-self: flex-start; border-bottom-left-radius: 4px; background: var(--app-tour-accent-soft); color: var(--app-tour-ink); }
+.app-tour-bubble--typing { padding: 12px 16px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .app-tour-in { opacity: 1; animation: none; }
+  .app-tour-choice--picked, .app-tour-chain-pulse, .app-tour-progress span, .app-tour-working i,
+  .app-tour-dot--live, .app-tour-button--primary, .app-tour-stream::after, .app-tour-bars i { animation: none; }
+  .app-tour-choice--picked { opacity: 1; border-color: var(--app-tour-accent); }
+  .app-tour-progress span { transform: scaleX(0.66); }
+  .app-tour-bars i { transform: none; }
+  .app-tour-chain-pulse, .app-tour-stream::after { opacity: 0; }
+}

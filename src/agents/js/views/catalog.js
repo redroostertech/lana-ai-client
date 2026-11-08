@@ -27,6 +27,7 @@
     +     ' animation="orbit" steps="Build,Run,Review">'
     +     '<lex-btn id="agentsCreateBtn" variant="primary" size="lg" icon="plus">Build an agent</lex-btn>'
     +     '<lex-btn id="agentsImportBtn" variant="secondary" size="lg" icon="upload">Bring one from Claude</lex-btn>'
+    +     '<lex-btn id="agentsTourBtn" variant="ghost" size="lg" leading-icon="play">Take the walkthrough</lex-btn>'
     +   '</lex-app-hero>'
 
     +   '<section class="agents-studio-metrics" aria-label="Workspace pulse">'
@@ -486,6 +487,7 @@
 
   function wire(rootEl, ctx, state) {
     bind(state, el('agentsCreateBtn'), 'click', function () { ctx.app.setView('create'); });
+    bind(state, el('agentsTourBtn'), 'click', function () { if (global.LanaAppWalkthrough) global.LanaAppWalkthrough.show('agents'); });
     bind(state, el('agentsImportBtn'), 'click', function () { ctx.app.setView('create', { mode: 'import' }); });
     bind(state, el('agentsViewOutcomesBtn'), 'click', function () { ctx.app.setView('activity'); });
     bind(state, el('agentsFilterTabs'), 'lex-change', function (event) {
@@ -534,6 +536,18 @@
     bind(state, el('agentsRunScope'), 'lex-change', function () { syncRunScope(state); });
   }
 
+  // The walkthrough (js/walkthroughs/agents-walkthrough.js): its last page opens the builder.
+  function registerWalkthrough(ctx) {
+    var tours = global.LanaAppWalkthrough;
+    if (!tours || !global.AgentsWalkthrough) return false;
+    tours.register('agents', {
+      brand: 'AGENTS.',
+      pages: global.AgentsWalkthrough.pages,
+      onAction: function (action) { if (action === 'create') ctx.app.setView('create'); }
+    });
+    return true;
+  }
+
   function render(rootEl, ctx) {
     rootEl.innerHTML = TEMPLATE;
     var state = createState();
@@ -541,6 +555,7 @@
     wire(rootEl, ctx, state);
     loadAgents(state);
     loadRecentOutcomes(state);
+    if (registerWalkthrough(ctx)) global.LanaAppWalkthrough.showFirstRun('agents');
   }
 
   function destroy(rootEl) {

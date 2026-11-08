@@ -131,6 +131,10 @@
       Lex.Nav.go('admin/dashboard-builder.html');
       return;
     }
+    if (e.target.closest('#insightsTourBtn')) {
+      if (window.LanaAppWalkthrough) window.LanaAppWalkthrough.show('insights');
+      return;
+    }
 
     var card = e.target.closest('[data-dashboard-href]');
     var href = card && card.dataset && card.dataset.dashboardHref;
@@ -257,6 +261,15 @@
     content.addEventListener('action-click', onActionClick);
     content.addEventListener('click', onDashboardCardClick);
     content.addEventListener('lex-app-loop-select', onLoopStep);
+    // The walkthrough (js/walkthroughs/insights-walkthrough.js): its last page opens the builder.
+    if (window.LanaAppWalkthrough && window.InsightsWalkthrough) {
+      window.LanaAppWalkthrough.register('insights', {
+        brand: 'INSIGHTS.',
+        pages: window.InsightsWalkthrough.pages,
+        onAction: function (action) { if (action === 'create') Lex.Nav.go('admin/dashboard-builder.html'); }
+      });
+      window.LanaAppWalkthrough.showFirstRun('insights');
+    }
     renderDashboardShortcuts();
     // Catalog summary cards were removed from the page; skip the API call.
   }
