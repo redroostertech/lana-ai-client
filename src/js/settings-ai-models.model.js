@@ -146,14 +146,13 @@
     };
   }
 
-  /** The cloud: its address, whether it answers, and whether the server sends prompts to it. */
+  /** The cloud: whether it answers, and whether the server sends prompts to it. */
   function cloudRows(topology, serverAi) {
     var forge = (topology && topology.forge) || {};
     var reach = forge.reachable === true ? 'Reachable' : forge.reachable === false ? 'Not reachable' : 'Unknown';
     var used = !serverAi ? 'Unknown' : serverAi.relay && serverAi.relay.enabled ? 'Yes' : 'No, turned off on your server';
     return [
-      { label: 'Address', value: forge.url || 'Not set for your organization' },
-      { label: 'Status', value: forge.url ? reach : 'Unknown' },
+      { label: 'Status', value: forge.url ? reach : 'Not set for your organization' },
       { label: 'Used by your server', value: used },
       { label: 'Sovereign mode', value: forge.sovereign ? 'On' : 'Off' }
     ];

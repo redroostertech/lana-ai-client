@@ -66,11 +66,11 @@ test('Speech and Voice: their models, and size and state from Briefs', () => {
 
 test('the cloud, and whether the server uses it', () => {
   expect(M.cloudRows(TOPOLOGY, SERVER_AI)).toEqual([
-    { label: 'Address', value: 'https://forge-api.lanaai.io' },
     { label: 'Status', value: 'Not reachable' },
     { label: 'Used by your server', value: 'No, turned off on your server' },
     { label: 'Sovereign mode', value: 'Off' },
   ]);
-  expect(M.cloudRows(TOPOLOGY, { ...SERVER_AI, relay: { enabled: true } })[2].value).toBe('Yes');
-  expect(M.cloudRows(TOPOLOGY, null)[2].value).toBe('Unknown');
+  expect(M.cloudRows(TOPOLOGY, { ...SERVER_AI, relay: { enabled: true } })[1].value).toBe('Yes');
+  expect(M.cloudRows(TOPOLOGY, null)[1].value).toBe('Unknown');
+  expect(JSON.stringify(M.cloudRows(TOPOLOGY, SERVER_AI))).not.toContain('forge-api');
 });
