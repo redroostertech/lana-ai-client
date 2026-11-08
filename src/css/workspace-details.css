@@ -80,7 +80,7 @@
   gap: 0.375rem;
   margin-top: 0.5rem;
 }
-/* Same size as a medium lex-badge (the priority capsule beside it). */
+/* The External capsule is the same size as a medium lex-badge beside it. */
 .kanban-card__capsules > lex-badge { display: inline-flex; }
 .kanban-card__capsule {
   display: inline-flex;
@@ -90,11 +90,6 @@
   font-size: 0.75rem;
   font-weight: 500;
   line-height: 1rem;
-}
-.kanban-card__type {
-  padding: 0.0625rem 0.5625rem;
-  border: 1px solid var(--lex-border-default, #d1d5db);
-  color: var(--lex-text-secondary, #4b5563);
 }
 .kanban-card__capsule--external {
   background: var(--lex-bg-accent-soft, #eef2ff);

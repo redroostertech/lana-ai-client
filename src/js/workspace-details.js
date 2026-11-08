@@ -5344,7 +5344,8 @@
   //   [type capsule][priority capsule]
   //   key (M17-4)
   //   "Part of M17-3 <task title>" on a subtask card
-  // The priority capsule is the same lex-badge the task drawer shows.
+  // Both capsules are lex-badges: Task is blue, Subtask is indigo, and the
+  // priority is the same badge the task drawer shows.
   function _kanbanTitleHtml(text) {
     var full = String(text || '');
     return '<h5 class="kanban-card__title" title="' + escapeHtml(full) + '">' + escapeHtml(LanaBoardWorkItems.cardTitle(full)) + '</h5>';
@@ -5352,7 +5353,7 @@
 
   function _kanbanCapsulesHtml(type, priority, extraHtml) {
     return '<div class="kanban-card__capsules">' +
-      (type ? '<span class="kanban-card__capsule kanban-card__type">' + type + '</span>' : '') +
+      (type ? '<lex-badge label="' + type + '" color="' + (type === 'Subtask' ? 'indigo' : 'blue') + '"></lex-badge>' : '') +
       (priority ? getPriorityBadge(priority) : '') +
       (extraHtml || '') +
     '</div>';
