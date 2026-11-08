@@ -27,8 +27,8 @@
       "type": "framework",
       "bom-ref": "lana:electron",
       "name": "Electron",
-      "version": "44.7.0",
-      "purl": "pkg:npm/electron@44.7.0",
+      "version": "44.9.1",
+      "purl": "pkg:npm/electron@44.9.1",
       "licenses": [
         {
           "license": {
@@ -48,7 +48,7 @@
       "type": "framework",
       "bom-ref": "lana:chromium",
       "name": "Chromium, Node.js and V8 (inside Electron)",
-      "version": "44.7.0 (Electron build)",
+      "version": "44.9.1 (Electron build)",
       "licenses": [
         {
           "expression": "BSD-3-Clause AND MIT AND LGPL-2.1-or-later AND MPL-2.0 AND Apache-2.0"
@@ -59,6 +59,25 @@
         {
           "type": "website",
           "url": "https://www.chromium.org/"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana:sherpa-onnx",
+      "name": "sherpa-onnx and ONNX Runtime (LANA Briefs speech)",
+      "version": "2.0.1",
+      "purl": "pkg:npm/sherpa-onnx-node@2.0.1",
+      "licenses": [
+        {
+          "expression": "Apache-2.0 AND MIT"
+        }
+      ],
+      "copyright": "The sherpa-onnx authors (k2-fsa); Copyright (c) Microsoft Corporation (ONNX Runtime)",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/k2-fsa/sherpa-onnx"
         }
       ]
     },
@@ -252,6 +271,60 @@
     },
     {
       "type": "library",
+      "bom-ref": "lana:qrcode",
+      "name": "node-qrcode",
+      "version": "1.5.4",
+      "purl": "pkg:npm/qrcode@1.5.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2012 Ryan Day",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/soldair/node-qrcode"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "public_html/js/vendor/qrcode.min.js"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana:lottie-web",
+      "name": "lottie-web (light player)",
+      "version": "5.13.0",
+      "purl": "pkg:npm/lottie-web@5.13.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2015 Bodymovin",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/airbnb/lottie-web"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "public_html/js/vendor/lottie_light.min.js"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "lana:lucide",
       "name": "Lucide icons",
       "version": "0.574.0",
@@ -354,6 +427,27 @@
         {
           "type": "website",
           "url": "https://github.com/clauseggers/Playfair-Display"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40leichtgewicht/ip-codec@2.0.5",
+      "name": "@leichtgewicht/ip-codec",
+      "version": "2.0.5",
+      "purl": "pkg:npm/%40leichtgewicht/ip-codec@2.0.5",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2021 Martin Heidegger",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/martinheidegger/ip-codec#readme"
         }
       ]
     },
@@ -1031,6 +1125,27 @@
     },
     {
       "type": "library",
+      "bom-ref": "pkg:npm/bonjour-service@1.4.4",
+      "name": "bonjour-service",
+      "version": "1.4.4",
+      "purl": "pkg:npm/bonjour-service@1.4.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (https://github.com/onlxltd/bonjour-service) (c) 2021 ON LX Limited",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/onlxltd/bonjour-service"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:npm/builder-util-runtime@9.7.0",
       "name": "builder-util-runtime",
       "version": "9.7.0",
@@ -1152,6 +1267,27 @@
         {
           "type": "website",
           "url": "https://github.com/felixge/node-delayed-stream"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/dns-packet@5.6.1",
+      "name": "dns-packet",
+      "version": "5.6.1",
+      "purl": "pkg:npm/dns-packet@5.6.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2016 Mathias Buus",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/mafintosh/dns-packet"
         }
       ]
     },
@@ -1892,6 +2028,27 @@
     },
     {
       "type": "library",
+      "bom-ref": "pkg:npm/multicast-dns@7.2.5",
+      "name": "multicast-dns",
+      "version": "7.2.5",
+      "purl": "pkg:npm/multicast-dns@7.2.5",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2015 Mathias Buus",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/mafintosh/multicast-dns"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:npm/orderedmap@2.1.1",
       "name": "orderedmap",
       "version": "2.1.1",
@@ -2228,6 +2385,27 @@
     },
     {
       "type": "library",
+      "bom-ref": "pkg:npm/sherpa-onnx-node@2.0.1",
+      "name": "sherpa-onnx-node",
+      "version": "2.0.1",
+      "purl": "pkg:npm/sherpa-onnx-node@2.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "copyright": "The next-gen Kaldi team",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/csukuangfj/sherpa-onnx#readme"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:npm/supports-color@7.2.0",
       "name": "supports-color",
       "version": "7.2.0",
@@ -2244,6 +2422,27 @@
         {
           "type": "website",
           "url": "chalk/supports-color"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/thunky@1.1.0",
+      "name": "thunky",
+      "version": "1.1.0",
+      "purl": "pkg:npm/thunky@1.1.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2018 Mathias Buus",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/mafintosh/thunky#readme"
         }
       ]
     },

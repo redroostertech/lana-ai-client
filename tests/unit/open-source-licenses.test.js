@@ -57,7 +57,8 @@ describe('generated open-source inventory', () => {
   it('gives every component a license text, except the Chromium file and packages published without one', () => {
     const missing = allItems.filter((item) => item.id !== 'chromium' && Model.textsFor(notices, item).length === 0);
     for (const item of missing) expect(item.notes).toContain('ships no license file');
-    expect(missing.map((item) => item.name).sort()).toEqual(['agent-base', 'https-proxy-agent', 'lazy-val']);
+    // sherpa-onnx-node: its Apache-2.0 and ONNX Runtime notices are in the catalog's Runtime entry.
+    expect(missing.map((item) => item.name).sort()).toEqual(['agent-base', 'https-proxy-agent', 'lazy-val', 'sherpa-onnx-node']);
   });
 
   it('lists Electron and the bundled npm packages with a stated license', () => {

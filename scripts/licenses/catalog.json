@@ -37,6 +37,23 @@
       "texts": []
     },
     {
+      "id": "sherpa-onnx",
+      "section": "runtime",
+      "name": "sherpa-onnx and ONNX Runtime (LANA Briefs speech)",
+      "version": { "npm": "sherpa-onnx-node" },
+      "license": "Apache-2.0 AND MIT",
+      "licenseName": "Apache-2.0 for sherpa-onnx; MIT for ONNX Runtime",
+      "copyright": "The sherpa-onnx authors (k2-fsa); Copyright (c) Microsoft Corporation (ONNX Runtime)",
+      "attribution": "LANA Briefs transcribes and tells speakers apart on this computer with sherpa-onnx (sherpa-onnx-node and its native package for each platform), which includes ONNX Runtime.",
+      "source": "https://github.com/k2-fsa/sherpa-onnx",
+      "purl": "pkg:npm/sherpa-onnx-node",
+      "notes": "The npm packages ship no license file, so this page supplies both notices. The speech models are downloaded on request and carry their own licenses.",
+      "texts": [
+        { "title": "sherpa-onnx, Apache License 2.0", "file": "scripts/licenses/texts/sherpa-onnx-Apache-2.0.txt" },
+        { "title": "ONNX Runtime, MIT License", "file": "scripts/licenses/texts/onnxruntime-MIT.txt" }
+      ]
+    },
+    {
       "id": "chart.js",
       "section": "vendored",
       "name": "Chart.js",
@@ -123,6 +140,32 @@
       "source": "https://github.com/mozilla/pdf.js",
       "purl": "pkg:npm/pdfjs-dist",
       "texts": [{ "title": "PDF.js, Apache License 2.0", "file": "scripts/licenses/texts/pdf.js-Apache-2.0.txt" }]
+    },
+    {
+      "id": "qrcode",
+      "section": "vendored",
+      "name": "node-qrcode",
+      "version": "1.5.4",
+      "file": "public_html/js/vendor/qrcode.min.js",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2012 Ryan Day",
+      "source": "https://github.com/soldair/node-qrcode",
+      "purl": "pkg:npm/qrcode",
+      "notes": "Browser bundle built with esbuild; draws the LANA Briefs phone pairing code.",
+      "texts": [{ "title": "node-qrcode, MIT License", "file": "scripts/licenses/texts/qrcode-MIT.txt" }]
+    },
+    {
+      "id": "lottie-web",
+      "section": "vendored",
+      "name": "lottie-web (light player)",
+      "version": "5.13.0",
+      "file": "public_html/js/vendor/lottie_light.min.js",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2015 Bodymovin",
+      "source": "https://github.com/airbnb/lottie-web",
+      "purl": "pkg:npm/lottie-web",
+      "notes": "Plays the LANA brand animations.",
+      "texts": [{ "title": "lottie-web, MIT License", "file": "scripts/licenses/texts/lottie-web-MIT.txt" }]
     },
     {
       "id": "lucide",
