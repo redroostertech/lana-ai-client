@@ -5,7 +5,7 @@
      Profile     — view/edit user name, email, role, org
      Security    — password change (live validation) + MFA (conditional)
      Preferences — desktop and in-app notification toggles (conditional)
-     Sessions    — active session list, revoke individual/all
+     Sessions    — see pages/settings-sessions.js
      VPN         — VPN status, config download, setup/reset (Electron only)
 
    Conditional sections (Preferences, VPN) are shown/hidden based on config.
@@ -25,10 +25,6 @@
   var _notificationTypes = [];
   var _inAppTypesExpanded = false;
   var MFA_SETTINGS_VISIBLE = false;
-  var _sessions = [];
-  var _sessionsLoaded = false;
-  var _sessionsLoading = null;
-  var _sessionsModal = null;
 
   // Password requirement special characters
   var PW_SPECIALS = '!@#$%^&*()_+-=[]{}|;:,.<>?';
@@ -97,10 +93,6 @@
     dom.inAppTypesToggle = document.getElementById('sv2-in-app-types-toggle');
     dom.inAppTypes = document.getElementById('sv2-in-app-types');
 
-    // Sessions
-    dom.sessionsCard      = document.getElementById('sv2-sessions-card');
-    dom.sessionsStatus    = document.getElementById('sv2-sessions-status');
-    dom.sessionsManageBtn = document.getElementById('sv2-sessions-manage-btn');
 
     // VPN
     dom.vpnContent = document.getElementById('sv2-vpn-content');
@@ -1036,160 +1028,7 @@
     });
   }
 
-  // =========================================================================
-  // Sessions
-  // =========================================================================
-
-  var fmtDate     = Lex.Utils.formatDate;
   var fmtDateTime = Lex.Utils.formatDateTime;
-
-  function sessionCountLabel(count) {
-    if (!_sessionsLoaded) return 'Loading sessions...';
-    if (count === 1) return '1 active session.';
-    return String(count || 0) + ' active sessions.';
-  }
-
-  function setSessionsStatus(message, isErr) {
-    if (!dom.sessionsStatus) return;
-    dom.sessionsStatus.textContent = message || '';
-    dom.sessionsStatus.setAttribute('variant', isErr ? 'danger' : 'tertiary');
-  }
-
-  function setSessionsModalStatus(message, isErr) {
-    var status = document.getElementById('sv2-sessions-modal-status');
-    if (!status) return;
-    status.textContent = message || '';
-    status.setAttribute('variant', isErr ? 'danger' : 'tertiary');
-  }
-
-  function sessionRows(sessions) {
-    return (sessions || []).map(function (s) {
-      return {
-        id:         String(s.id || ''),
-        device:     String(s.user_agent || s.device_info || 'Unknown device'),
-        ip_address: String(s.ip_address || s.ip || '\u2014'),
-        created_at: s.created_at ? fmtDateTime(s.created_at) : '\u2014',
-        expires_at: s.expires_at ? fmtDate(s.expires_at)     : '\u2014'
-      };
-    });
-  }
-
-  function renderSessionsTable() {
-    var table = document.getElementById('sv2-sessions-modal-table');
-    if (!table || typeof table.setData !== 'function') return;
-    Lex.Redact.on(table);
-    table.setData(sessionRows(_sessions));
-    Lex.Redact.off(table);
-  }
-
-  function setSessionsLoading(isLoading) {
-    var refreshBtn = document.getElementById('sv2-sessions-modal-refresh-btn');
-    var revokeBtn = document.getElementById('sv2-revoke-all-btn');
-    if (refreshBtn) refreshBtn.loading = isLoading;
-    if (revokeBtn) revokeBtn.disabled = isLoading;
-  }
-
-  function loadSessions(options) {
-    options = options || {};
-    if (_sessionsLoading && !options.force) return _sessionsLoading;
-
-    setSessionsStatus('Loading sessions...');
-    setSessionsModalStatus('Loading sessions...');
-    setSessionsLoading(true);
-
-    _sessionsLoading = api.get('/api/v1/auth/session').then(function (result) {
-      var data = result.data || result;
-      _sessions = Array.isArray(data) ? data : (data.sessions || []);
-      _sessionsLoaded = true;
-      setSessionsStatus(sessionCountLabel(_sessions.length));
-      setSessionsModalStatus(sessionCountLabel(_sessions.length));
-      renderSessionsTable();
-      return _sessions;
-    }).catch(function () {
-      _sessions = [];
-      _sessionsLoaded = true;
-      setSessionsStatus('Could not load sessions.', true);
-      setSessionsModalStatus('Could not load sessions.', true);
-      renderSessionsTable();
-      return [];
-    }).finally(function () {
-      setSessionsLoading(false);
-      _sessionsLoading = null;
-    });
-
-    return _sessionsLoading;
-  }
-
-  function openSessionsModal() {
-    if (_sessionsModal && _sessionsModal.open) return;
-
-    var content = document.createElement('div');
-    content.className = 'sv2-sessions-modal';
-    content.innerHTML =
-      '<div class="sv2-sessions-modal-toolbar">' +
-        '<lex-text id="sv2-sessions-modal-status" variant="tertiary" size="body-sm" tag="p">' +
-          esc(sessionCountLabel(_sessions.length)) +
-        '</lex-text>' +
-      '</div>' +
-      '<lex-table ' +
-        'id="sv2-sessions-modal-table" ' +
-        'class="sv2-sessions-table" ' +
-        'columns="device,ip_address,created_at,expires_at" ' +
-        'labels="Device,IP Address,Created,Expires" ' +
-        'empty-text="No active sessions" ' +
-        'sort-by="created_at" ' +
-        'sort-dir="desc" ' +
-        'compact ' +
-        'aria-label="Active sessions">' +
-      '</lex-table>';
-
-    _sessionsModal = Lex.Modal.open({
-      heading: 'Active Sessions',
-      content: content,
-      hideActions: true,
-      size: 'xl',
-      closeOnOverlay: true,
-      backButton: true,
-      backLabel: 'Back to settings',
-      headerActions: '<lex-btn id="sv2-sessions-modal-refresh-btn" variant="ghost" size="sm" icon="refresh-cw" aria-label="Refresh sessions">Refresh</lex-btn>',
-      footerContent: '<lex-btn id="sv2-revoke-all-btn" variant="danger" size="sm" icon="log-out">Revoke All Other Sessions</lex-btn>'
-    });
-
-    _sessionsModal.addEventListener('lex-close', function () {
-      _sessionsModal = null;
-    });
-    _sessionsModal.addEventListener('lex-back', function () {
-      var modal = _sessionsModal;
-      if (!modal) return;
-      modal.emit('lex-close');
-      modal.open = false;
-    });
-
-    setTimeout(function () {
-      var refreshBtn = document.getElementById('sv2-sessions-modal-refresh-btn');
-      var revokeBtn = document.getElementById('sv2-revoke-all-btn');
-      if (refreshBtn) refreshBtn.addEventListener('click', function () { loadSessions({ force: true }); });
-      if (revokeBtn) revokeBtn.addEventListener('click', revokeAllSessions);
-      renderSessionsTable();
-      if (!_sessionsLoaded) loadSessions();
-      if (_sessionsLoading) setSessionsLoading(true);
-    }, 0);
-  }
-
-  function revokeAllSessions() {
-    Lex.Modal.confirm('Revoke All Sessions', 'This will log you out of all other devices. Continue?', function () {
-      var currentToken = window.lanaAuthToken?.get();
-      api.delete('/api/v1/auth/session/', { revoke_all_except: currentToken }).then(function () {
-        Lex.Toast.success('All other sessions revoked');
-        loadSessions({ force: true });
-      }).catch(function (error) {
-        Lex.Toast.error(error.message || 'Failed to revoke sessions');
-      });
-    }, {
-      variant: 'danger',
-      confirmText: 'Revoke All'
-    });
-  }
 
 
   // =========================================================================
@@ -2390,19 +2229,11 @@
       dom.inAppTypesToggle.addEventListener('click', handleInAppTypesToggleClick);
     }
 
-    // ── Sessions ──
-    if (dom.sessionsManageBtn) {
-      dom.sessionsManageBtn.addEventListener('click', openSessionsModal);
-    }
-
-    // Session table — no per-row revoke in settings (user revokes all or none)
-
     // Topbar refresh button
     document.addEventListener('lex-refresh', function (e) {
       e.preventDefault();
       loadProfile();
       loadMfaStatus();
-      loadSessions();
       loadConnectedApps();
       if (_userConnectionsAvailable) loadUserConnections();
     });
@@ -2422,7 +2253,6 @@
     } else {
       loadMfaStatus();
     }
-    loadSessions();
     loadConnectedApps();
     loadUserConnections();
     showConditionalSections();

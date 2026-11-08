@@ -260,63 +260,6 @@
 }
 
 
-/* ── Active Sessions ─────────────────────────────────────────────── */
-
-.sv2-sessions-summary {
-  min-height: 56px;
-}
-
-.sv2-sessions-summary-copy {
-  flex: 1 1 auto;
-  min-width: 0;
-  width: 100%;
-  align-self: stretch;
-  text-align: left;
-}
-
-.sv2-sessions-summary-copy lex-text {
-  display: block;
-  width: 100%;
-  text-align: left;
-}
-
-.sv2-sessions-summary-copy lex-text .lex-text-inner {
-  justify-content: flex-start;
-}
-
-.sv2-sessions-summary lex-btn {
-  flex: 0 0 auto;
-}
-
-.sv2-sessions-modal {
-  display: grid;
-  width: 100%;
-  gap: 12px;
-  min-height: min(440px, 60vh);
-  grid-template-rows: auto minmax(0, 1fr);
-  align-content: start;
-}
-
-.sv2-sessions-modal-toolbar {
-  display: block;
-  min-width: 0;
-}
-
-.sv2-sessions-modal-toolbar lex-text[tag="p"] {
-  margin: 0;
-}
-
-.sv2-sessions-table {
-  width: 100%;
-  min-width: 0;
-  min-height: 360px;
-}
-
-.sv2-sessions-table .lex-table-scroll-area {
-  max-height: 520px;
-}
-
-
 /* ── Profile Edit Mode ───────────────────────────────────────────── */
 
 #sv2-profile-edit {
@@ -1286,14 +1229,7 @@
     align-items: stretch;
   }
 
-  /* lex-stack sets its flex layout as inline styles on the host. */
-  .sv2-sessions-summary {
-    flex-direction: column !important;
-    align-items: stretch !important;
-  }
-
-  .sv2-memory-header lex-btn,
-  .sv2-sessions-summary lex-btn {
+  .sv2-memory-header lex-btn {
     align-self: flex-start;
   }
 }
@@ -1301,14 +1237,12 @@
 /* Modals are hoisted to <body> and sized from the window, so these stay on
    @media. */
 @media (max-width: 540px) {
-  .sv2-memory-modal-toolbar,
-  .sv2-sessions-modal-toolbar {
+  .sv2-memory-modal-toolbar {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .sv2-memory-modal-toolbar lex-btn,
-  .sv2-sessions-modal-toolbar lex-btn {
+  .sv2-memory-modal-toolbar lex-btn {
     width: 100%;
   }
 

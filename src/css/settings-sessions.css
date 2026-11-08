@@ -1,0 +1,96 @@
+/* Settings V2 > Profile > Active sessions (src/js/pages/settings-sessions.js). */
+
+.sv2-sessions {
+  margin-bottom: 0.5rem;
+}
+
+.sv2-sessions-note {
+  margin: 0;
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-sm-size);
+  line-height: var(--lex-body-sm-height);
+}
+
+.sv2-sessions-note.sv2-sessions-error {
+  color: var(--lex-status-danger-text);
+}
+
+.sv2-sessions-list {
+  display: flex;
+  flex-direction: column;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sv2-sessions-list:empty {
+  display: none;
+}
+
+.sv2-sessions-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--lex-border-subtle);
+}
+
+.sv2-sessions-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--lex-radius-md);
+  background: var(--lex-surface-subtle, var(--lex-bg-secondary));
+  color: var(--lex-text-secondary);
+}
+
+.sv2-sessions-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sv2-sessions-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sv2-sessions-name {
+  color: var(--lex-text-primary);
+  font-size: var(--lex-body-size, 0.9375rem);
+  font-weight: var(--lex-weight-medium, 500);
+}
+
+.sv2-sessions-details {
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-sm-size);
+  line-height: var(--lex-body-sm-height);
+  overflow-wrap: anywhere;
+}
+
+.sv2-sessions-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--lex-border-subtle);
+}
+
+.sv2-sessions-footer lex-btn {
+  flex: none;
+}
+
+@media (max-width: 640px) {
+  .sv2-sessions-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}

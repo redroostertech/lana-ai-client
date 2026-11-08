@@ -3,13 +3,15 @@
  *
  * Left in-page section navigation for settings-v2.html. Turns the single
  * scrolling page into tabbed sections (Profile, General, Security,
- * Personalization, Capabilities, Plugins, Plan & billing, Usage, Data controls) driven by a vertical nav rail.
+ * Capabilities, Plugins, Plan & billing, Usage, Data controls) driven by a vertical nav rail.
  *
  * Responsibilities:
  *   - Inject the nav icons from Lex.Icons (never emoji glyphs).
  *   - Activate one panel at a time; keep the others hidden.
  *   - Read location.hash on load and activate the matching section
  *     (the account menu deep-links to #profile / #personalization / #billing).
+ *     A hash in ANCHORS names a card inside a section (Personalization and
+ *     Active sessions live in Profile): that section opens and the card scrolls in.
  *   - Keep LANA-ONE-only sections fail-closed unless its edition flag is true.
  *   - Update location.hash when the user picks a section, and react to
  *     back/forward hash changes.
@@ -34,7 +36,6 @@
     { id: 'general',        icon: 'settings' },
     { id: 'notifications',  icon: 'bell' },
     { id: 'security',       icon: 'shield' },
-    { id: 'personalization', icon: 'wand-2' },
     { id: 'capabilities',   icon: 'puzzle' },
     { id: 'apps',           icon: 'layout-grid' },
     { id: 'phone',          icon: 'smartphone' },
@@ -43,6 +44,12 @@
     { id: 'usage',          icon: 'bar-chart-2' },
     { id: 'data-controls',  icon: 'shield' }
   ];
+
+  // Hash → the section holding that card, and the card to scroll to.
+  var ANCHORS = {
+    personalization: { section: 'profile', card: 'sv2-section-personalization' },
+    sessions: { section: 'profile', card: 'sv2-section-sessions' }
+  };
 
   var DEFAULT_SECTION = 'profile';
   var lanaOneEnabled = false;
@@ -74,9 +81,24 @@
   }
 
   // "#billing" → "billing"; unknown / empty → default.
+  function hashName() {
+    return (window.location.hash || '').replace('#', '');
+  }
+
   function sectionFromHash() {
-    var raw = (window.location.hash || '').replace('#', '');
+    var raw = hashName();
+    if (Object.prototype.hasOwnProperty.call(ANCHORS, raw)) return ANCHORS[raw].section;
     return validSection(raw) || DEFAULT_SECTION;
+  }
+
+  // "#personalization": once Profile shows, bring that card into view.
+  function scrollToAnchor() {
+    var raw = hashName();
+    if (!Object.prototype.hasOwnProperty.call(ANCHORS, raw)) return;
+    var card = document.getElementById(ANCHORS[raw].card);
+    if (card && typeof card.scrollIntoView === 'function') {
+      setTimeout(function () { card.scrollIntoView({ block: 'start' }); }, 0);
+    }
   }
 
   function tabEl(id)   { return document.getElementById('sv2-tab-' + id); }
@@ -183,6 +205,7 @@
   function onHashChange() {
     // External hash change (deep link / back-forward); do not rewrite it.
     activate(sectionFromHash(), { updateHash: false });
+    scrollToAnchor();
   }
 
   function resolveEditionGate() {
@@ -230,6 +253,7 @@
 
     // Initial section comes from the hash (account-menu deep links), else Profile.
     activate(sectionFromHash(), { updateHash: false });
+    scrollToAnchor();
     resolveEditionGate();
   }
 

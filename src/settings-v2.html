@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="css/briefs-phones.css">
   <link rel="stylesheet" href="css/settings-briefs.css">
   <link rel="stylesheet" href="css/settings-general.css">
+  <link rel="stylesheet" href="css/settings-sessions.css">
   <script src="js/tailwind-loader.js"></script>
 
   <link rel="stylesheet" href="css/lex-chat.css">
@@ -80,11 +81,6 @@
           data-section="security" aria-controls="sv2-panel-security" aria-selected="false" tabindex="-1">
           <span class="sv2-nav-icon" data-icon="shield" aria-hidden="true"></span>
           <span class="sv2-nav-label">Security</span>
-        </button>
-        <button type="button" class="sv2-nav-item" role="tab" id="sv2-tab-personalization"
-          data-section="personalization" aria-controls="sv2-panel-personalization" aria-selected="false" tabindex="-1">
-          <span class="sv2-nav-icon" data-icon="wand-2" aria-hidden="true"></span>
-          <span class="sv2-nav-label">Personalization</span>
         </button>
         <button type="button" class="sv2-nav-item" role="tab" id="sv2-tab-capabilities"
           data-section="capabilities" aria-controls="sv2-panel-capabilities" aria-selected="false" tabindex="-1">
@@ -197,12 +193,6 @@
       </section>
 
 
-      </div><!-- /sv2-panel-profile -->
-
-      <!-- ╔══════════════════ PERSONALIZATION PANEL ═══════════════════╗ -->
-      <div class="sv2-panel" id="sv2-panel-personalization" role="tabpanel"
-        aria-labelledby="sv2-tab-personalization" data-section="personalization">
-
       <!-- Personalization — always visible; saved data hydrates when the API is available.
            ══════════════════════════════════════════════════════════════ -->
       <section id="sv2-section-personalization" style="margin-bottom:0.5rem">
@@ -256,8 +246,21 @@
         </lex-card>
       </section>
 
+      <!-- Active sessions (settings-sessions.js): every device signed in to this account.
+           ══════════════════════════════════════════════════════════════ -->
+      <section id="sv2-section-sessions" class="sv2-sessions">
+        <lex-card id="sv2-sessions-card" heading="Active sessions" subtitle="Devices signed in to your LANA account">
+          <p id="sv2-sessions-status" class="sv2-sessions-note">Loading sessions...</p>
+          <ul id="sv2-sessions-list" class="sv2-sessions-list" aria-label="Signed-in devices"></ul>
+          <div class="sv2-sessions-footer">
+            <p class="sv2-sessions-note">Signs out every device, including this computer. You will need to sign in again on each one.</p>
+            <lex-btn id="sv2-sessions-signout-all" variant="danger" size="sm" icon="log-out" label="Sign out of all devices"></lex-btn>
+          </div>
+        </lex-card>
+      </section>
 
-      </div><!-- /sv2-panel-personalization -->
+      </div><!-- /sv2-panel-profile -->
+
 
       <!-- ╔════════════════════ CAPABILITIES PANEL ════════════════════╗ -->
       <div class="sv2-panel" id="sv2-panel-capabilities" role="tabpanel"
@@ -609,17 +612,6 @@
 
         </section>
 
-        <section id="sv2-section-sessions" style="margin-bottom:0.5rem">
-          <lex-card id="sv2-sessions-card" heading="Active Sessions">
-            <lex-stack class="sv2-sessions-summary" direction="horizontal" gap="4" justify="between" align="center">
-              <lex-stack class="sv2-sessions-summary-copy" direction="vertical" gap="1">
-                <lex-text variant="secondary" size="body-sm">Review signed-in devices and revoke sessions you no longer use.</lex-text>
-                <lex-text id="sv2-sessions-status" variant="tertiary" size="body-sm">Loading sessions...</lex-text>
-              </lex-stack>
-              <lex-btn id="sv2-sessions-manage-btn" variant="secondary" size="sm" icon="monitor">Manage sessions</lex-btn>
-            </lex-stack>
-          </lex-card>
-        </section>
       </div><!-- /sv2-panel-security -->
 
       <!-- ╔═══════════════════ PLAN & BILLING PANEL ════════════════════╗
@@ -849,6 +841,8 @@
   <script src="js/settings-v2.js"></script>
   <script src="js/pages/settings-billing.js"></script>
   <script src="js/pages/settings-personalization.js"></script>
+  <script src="js/settings-sessions.model.js"></script>
+  <script src="js/pages/settings-sessions.js"></script>
   <script src="js/pages/settings-usage.js"></script>
   <script src="js/pages/settings-capabilities.js"></script>
   <script src="js/settings-general.model.js"></script>
