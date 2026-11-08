@@ -28,7 +28,7 @@
     return [
       {
         id: 'welcome',
-        eyebrow: 'Welcome to LANA Briefs',
+        eyebrow: 'Welcome to Briefs',
         title: 'Your meetings, ',
         accent: 'kept close',
         detail: `Record on your phone. Read the notes, ask questions and act on them here on your ${noun}.`,
@@ -71,7 +71,7 @@
         eyebrow: 'All set',
         title: 'You are ',
         accent: 'ready',
-        detail: 'Pair a phone now, or later from the phone icon at the top of LANA Briefs.',
+        detail: 'Pair a phone now, or later from the phone icon at the top of Briefs.',
         illustration: '<lex-brand-mark animation="success" size="160"></lex-brand-mark>',
         actions: [{ id: 'pair', label: 'Pair a phone', icon: 'smartphone', variant: 'primary' }],
       },

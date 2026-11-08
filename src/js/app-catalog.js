@@ -4,28 +4,28 @@
   var CATALOG = {
     'lana-works': {
       id: 'lana-works',
-      label: 'LanaWorks',
+      label: 'Workspaces',
       description: 'Manage matters, workspaces and client operations',
       route: 'dashboard.html',
       colors: ['#82d8ff', '#4267df', '#126f62', '#111827']
     },
     'lana-agents': {
       id: 'lana-agents',
-      label: 'LanaAgents',
+      label: 'Agents',
       description: 'Browse and run AI agents',
       route: 'agents/index.html',
       colors: ['#a78bfa', '#7c3aed', '#5b21b6', '#1e1b4b']
     },
     'lana-insights': {
       id: 'lana-insights',
-      label: 'LanaInsights',
+      label: 'Insights',
       description: 'Dashboards, reporting, and firm analytics',
       route: 'admin/analytics.html',
       colors: ['#60a5fa', '#2563eb', '#7c3aed', '#0f172a']
     },
     'lana-automations': {
       id: 'lana-automations',
-      label: 'LanaAutomate',
+      label: 'Automate',
       description: 'Build, deploy and monitor automated workflows',
       route: 'automation/index.html',
       colors: ['#ffd16f', '#f97316', '#7c3aed', '#4c1d95']
@@ -53,7 +53,7 @@
     },
     'lana-notes': {
       id: 'lana-notes',
-      label: 'LANA Briefs',
+      label: 'Briefs',
       description: 'Meetings recorded on your phone or this computer, with notes and actions',
       route: 'briefs/dashboard.html',
       colors: ['#7dd3a8', '#2f9e6e', '#155e46', '#0b1f17']

@@ -119,7 +119,7 @@
     if (total === 0) {
       els.recent.innerHTML = `<li class="briefs-dashboard-empty is-large">
           <lex-brand-mark animation="idle" size="96"></lex-brand-mark>
-          <span>No meetings yet. Record one here with New meeting, or send one from LANA Briefs on your phone.</span>
+          <span>No meetings yet. Record one here with New meeting, or send one from Briefs on your phone.</span>
         </li>`;
       return;
     }

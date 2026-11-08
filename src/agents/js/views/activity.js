@@ -200,7 +200,7 @@
       console.error('[agents] Failed to load outcomes', err);
       hide(el('atLoading'));
       var empty = el('atEmpty');
-      if (empty) empty.innerHTML = '<lex-empty icon="alert-circle" message="Outcomes are unavailable" description="Check the LANA Agents service and try again."></lex-empty>';
+      if (empty) empty.innerHTML = '<lex-empty icon="alert-circle" message="Outcomes are unavailable" description="Check the Agents service and try again."></lex-empty>';
       show(empty);
     });
   }

@@ -17,11 +17,11 @@
       case 'waitingForPairing':
         return { tone: 'warning', label: 'No phone paired', summary: 'Pair a phone to send meetings to this computer. Until then this computer does not listen on your network.' };
       case 'starting':
-        return { tone: 'warning', label: 'Starting', summary: 'LANA Briefs is starting on this computer. Meetings from your phone can be received in a moment.' };
+        return { tone: 'warning', label: 'Starting', summary: 'Briefs is starting on this computer. Meetings from your phone can be received in a moment.' };
       case 'signedOut':
         return { tone: 'warning', label: 'Signed out', summary: 'Sign in to LANA to receive meetings from your phone.' };
       case 'failed':
-        return { tone: 'warning', label: 'Stopped', summary: `${error || 'LANA Briefs stopped listening for your phone.'} Restart LANA to try again.` };
+        return { tone: 'warning', label: 'Stopped', summary: `${error || 'Briefs stopped listening for your phone.'} Restart LANA to try again.` };
       default:
         return { tone: 'warning', label: 'Not listening', summary: 'This computer is not receiving meetings from your phone right now.' };
     }

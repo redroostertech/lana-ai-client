@@ -7,7 +7,7 @@ const phone = (fields) => Object.assign({ id: 'dev_1', name: "Mike's iPhone", sh
 
 describe('Send to phone state line', () => {
   test('says waiting, declined or Not now, whichever is current', () => {
-    expect(B.sendHint(phone({ queued: true }))).toContain('the next time LANA Briefs syncs');
+    expect(B.sendHint(phone({ queued: true }))).toContain('the next time Briefs syncs');
     expect(B.sendHint(phone({}))).toBeNull();
     expect(B.sendHint(phone({ declinedAt: '2026-11-01T16:00:00.000Z' }))).toBe("Declined on Mike's iPhone");
     expect(B.sendHint(phone({ snoozedAt: '2026-11-01T16:00:00.000Z' }))).toBe("Not now on Mike's iPhone");

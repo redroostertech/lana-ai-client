@@ -8,7 +8,7 @@
      tour.brand = 'BRIEFS.';
      tour.pages = [{
        id: 'welcome',
-       eyebrow: 'Welcome to LANA Briefs',
+       eyebrow: 'Welcome to Briefs',
        title: 'Your meetings, ', accent: 'kept close', trailing: '.',
        detail: 'Record on your phone. Read the notes here.',
        illustration: '<lex-brand-mark animation="idle" size="160"></lex-brand-mark>',

@@ -367,7 +367,7 @@
       console.error('[agents] Failed to load workspace agents', err);
       hide(el('agentsLoading'));
       var empty = el('agentsEmpty');
-      if (empty) empty.innerHTML = '<lex-empty icon="alert-circle" message="Agent workspace unavailable" description="Check the LANA Agents service and try again."></lex-empty>';
+      if (empty) empty.innerHTML = '<lex-empty icon="alert-circle" message="Agent workspace unavailable" description="Check the Agents service and try again."></lex-empty>';
       show(empty);
     });
   }

@@ -2190,7 +2190,7 @@ async function recordAutomationTriggeredActivity(automation, automationId) {
       body: JSON.stringify({
         type: 'info',
         title: 'Automation triggered',
-        body: `${automationName} was started from LanaAutomate Home.`,
+        body: `${automationName} was started from Automate Home.`,
         action_url: 'automation/index.html#runs'
       })
     });

@@ -333,7 +333,7 @@
       return;
     }
     const rows = view.phones.length === 0
-      ? '<p class="briefs-share-empty">No phone paired yet. Pair one in LANA Briefs on your phone.</p>'
+      ? '<p class="briefs-share-empty">No phone paired yet. Pair one in Briefs on your phone.</p>'
       : `<ul class="briefs-share-rows">${view.phones.map((phone) => phoneRowHtml(phone)).join('')}</ul>`;
     const footnote = B.shareFootnote(view.phones);
     const notice = state.shareNotice;

@@ -145,7 +145,7 @@
             <div class="briefs-pair-code" data-pair-qr aria-label="Pairing code to scan" role="img"></div>
             <div class="briefs-pair-text">
               <p class="briefs-overline">Pair a phone</p>
-              <p class="briefs-pair-title">Open LANA Briefs on your phone and scan this code.</p>
+              <p class="briefs-pair-title">Open Briefs on your phone and scan this code.</p>
               <p class="briefs-pair-note">The code works once and expires in <span data-pair-left>${codeLeft(pairing.expiresAt)}</span>.</p>
               <p class="briefs-pair-waiting"><lex-spinner size="sm"></lex-spinner>Waiting for the phone</p>
               <div><lex-btn variant="secondary" size="sm" data-pair="cancel">Cancel</lex-btn></div>

@@ -546,7 +546,7 @@
     if (!grid) return;
     hide(el('agentBuilderTemplateLoading'));
     if (!state.templates.length) {
-      grid.innerHTML = '<div class="agent-builder-no-templates"><strong>No starting points are available.</strong><span>Ask an administrator to enable the LANA Agents app and seed its templates.</span></div>';
+      grid.innerHTML = '<div class="agent-builder-no-templates"><strong>No starting points are available.</strong><span>Ask an administrator to enable the Agents app and seed its templates.</span></div>';
       return;
     }
     var html = '';
@@ -1212,7 +1212,7 @@
       console.error('[agents] Guided builder failed to load templates', err);
       hide(el('agentBuilderTemplateLoading'));
       var grid = el('agentBuilderTemplateGrid');
-      if (grid) grid.innerHTML = '<div class="agent-builder-no-templates"><strong>Starting points could not be loaded.</strong><span>Check the LANA Agents service and try again.</span></div>';
+      if (grid) grid.innerHTML = '<div class="agent-builder-no-templates"><strong>Starting points could not be loaded.</strong><span>Check the Agents service and try again.</span></div>';
     });
   }
 

@@ -45,7 +45,7 @@
 
   /** The line under a waiting send, or why it is no longer waiting. Null when there is nothing to say. */
   function sendHint(phone) {
-    if (phone.queued) return `It goes to ${phoneLabel(phone)} the next time LANA Briefs syncs. Open LANA Briefs on your phone to sync now.`;
+    if (phone.queued) return `It goes to ${phoneLabel(phone)} the next time Briefs syncs. Open Briefs on your phone to sync now.`;
     const answer = latestAnswer(phone);
     if (answer === null) return null;
     return answer === 'declined' ? `Declined on ${phoneLabel(phone)}` : `Not now on ${phoneLabel(phone)}`;
