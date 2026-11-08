@@ -164,18 +164,6 @@
     return 'gray';
   }
 
-  function priorityLabel(priority) {
-    var p = String(priority || 'normal').toLowerCase();
-    return p.charAt(0).toUpperCase() + p.slice(1);
-  }
-
-  function priorityColor(priority) {
-    var p = String(priority || '').toLowerCase();
-    if (p === 'high' || p === 'urgent' || p === 'critical') return 'red';
-    if (p === 'medium' || p === 'normal') return 'yellow';
-    return 'gray';
-  }
-
   function assigneeName(task) {
     return firstDefined(
       task.assigned_to_name,
@@ -533,7 +521,7 @@
       '    <dl class="my-task-detail__meta">',
       '      <div class="my-task-detail__row"><dt>Status</dt><dd>' + statusSelectHtml(task) + '</dd></div>',
       '      <div class="my-task-detail__row"><dt>Assignee</dt><dd>' + esc(assigneeName(task)) + '</dd></div>',
-      '      <div class="my-task-detail__row"><dt>Priority</dt><dd><lex-badge label="' + esc(priorityLabel(task.priority)) + '" color="' + esc(priorityColor(task.priority)) + '"></lex-badge></dd></div>',
+      '      <div class="my-task-detail__row"><dt>Priority</dt><dd>' + LanaTaskPriority.badgeHtml(task.priority) + '</dd></div>',
       '      <div class="my-task-detail__row"><dt>' + (task.matter_id ? 'Workspace' : 'Level') + '</dt><dd>' + esc(taskMatterName(task) || 'Organization-level') + '</dd></div>',
       task.due_date ? '      <div class="my-task-detail__row"><dt>Due date</dt><dd>' + esc(formatDate(task.due_date)) + '</dd></div>' : '',
       task.created_by_name ? '      <div class="my-task-detail__row"><dt>Reporter</dt><dd>' + esc(task.created_by_name) + '</dd></div>' : '',

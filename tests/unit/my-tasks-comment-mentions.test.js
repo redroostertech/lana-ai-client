@@ -151,6 +151,7 @@ function loadMyTasks(options = {}) {
     document: documentStub,
     Lex,
     api,
+    LanaTaskPriority: require('../../src/js/shared/task-priority.js'),
     LanaTime: { nowMs: () => 1787609400000, nowIso: () => '2026-08-24T22:10:00.000Z' },
     requestAnimationFrame: (fn) => fn(),
     Event: function Event(type) { this.type = type; this.bubbles = true; },

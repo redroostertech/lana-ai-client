@@ -5169,18 +5169,7 @@
   }
 
   function getPriorityBadge(priority) {
-    var priorityMap = {
-      'high':   { cls: 'bg-red-100 text-red-800',   label: 'High' },
-      'medium': { cls: 'bg-amber-100 text-amber-800', label: 'Medium' },
-      'normal': { cls: 'bg-gray-100 text-gray-800',  label: 'Normal' },
-      'low':    { cls: 'bg-blue-100 text-blue-800',  label: 'Low' },
-      'High':   { cls: 'bg-red-100 text-red-800',   label: 'High' },
-      'Medium': { cls: 'bg-amber-100 text-amber-800', label: 'Medium' },
-      'Normal': { cls: 'bg-gray-100 text-gray-800',  label: 'Normal' },
-      'Low':    { cls: 'bg-blue-100 text-blue-800',  label: 'Low' }
-    };
-    var cfg = priorityMap[priority] || { cls: 'bg-gray-100 text-gray-800', label: priority || 'Normal' };
-    return '<span class="px-2 py-1 text-xs font-medium rounded-full ' + cfg.cls + '">' + escapeHtml(cfg.label) + '</span>';
+    return LanaTaskPriority.badgeHtml(priority);
   }
 
   function formatDueDate(dateString) {
@@ -5355,6 +5344,7 @@
   //   [type capsule][priority capsule]
   //   key (M17-4)
   //   "Part of M17-3 <task title>" on a subtask card
+  // The priority capsule is the same lex-badge the task drawer shows.
   function _kanbanTitleHtml(text) {
     var full = String(text || '');
     return '<h5 class="kanban-card__title" title="' + escapeHtml(full) + '">' + escapeHtml(LanaBoardWorkItems.cardTitle(full)) + '</h5>';
@@ -5394,12 +5384,6 @@
   function _renderKanbanCard(task) {
     if (task && task.kind === 'subtask') return _renderKanbanSubtaskCard(task);
     var isLana = task.source === 'lana';
-    var subtaskTotal = Array.isArray(task.subtasks) ? task.subtasks.length : 0;
-    var subtaskDone = subtaskTotal ? task.subtasks.filter(function (s) { return s && s.status === 'completed'; }).length : 0;
-    var subtaskSummaryHtml = subtaskTotal
-      ? '<div class="kanban-card__subtasks">' + subtaskDone + '/' + subtaskTotal + ' subtasks</div>'
-      : '';
-
     var externalBadge = !isLana
       ? '<span class="kanban-card__capsule kanban-card__capsule--external">External</span>'
       : '';
@@ -5428,7 +5412,6 @@
       (window.LanaOfflineCopy ? LanaOfflineCopy.waitingBadgeHtml(task) : '') +
       assigneeHtml +
       dueDateHtml +
-      subtaskSummaryHtml +
       taskRuleChipsHtml(task) +
       (Array.isArray(task.actions) && task.actions.length ? '<div data-task-actions-for="' + escapeHtml(String(task.id)) + '" hidden></div>' : '') +
       taskProvenanceHtml(task) +

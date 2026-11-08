@@ -50,6 +50,7 @@ function loadDrawer(api) {
     requestAnimationFrame: () => {},
     Lex,
     api,
+    LanaTaskPriority: require('../../src/js/shared/task-priority.js'),
     LanaTime: { nowMs: () => 1, nowIso: () => '2026-11-07T00:00:00.000Z' },
     console: { warn() {}, log() {}, error() {} },
     setTimeout

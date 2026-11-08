@@ -58,6 +58,7 @@ function load(getMyTasks) {
     },
     Lex,
     api,
+    LanaTaskPriority: require('../../src/js/shared/task-priority.js'),
     LanaTime: { nowMs: () => 0, nowIso: () => '' },
     requestAnimationFrame: (fn) => fn(),
     URLSearchParams,

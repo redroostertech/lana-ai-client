@@ -100,17 +100,6 @@
     return 'gray';
   }
 
-  function priorityLabel(priority) {
-    var p = priority ? String(priority).toLowerCase() : 'normal';
-    return p.charAt(0).toUpperCase() + p.slice(1);
-  }
-
-  function priorityColor(priority) {
-    if (priority === 'high') return 'red';
-    if (priority === 'medium' || priority === 'normal') return 'yellow';
-    return 'gray';
-  }
-
   function taskMatterLabel(task) {
     return taskMatterName(task) || 'Organization-level';
   }
@@ -1011,7 +1000,7 @@
       '    <dl class="my-task-detail__meta">',
       '      <div class="my-task-detail__row"><dt>Status</dt><dd>' + statusSelectHtml(task) + '</dd></div>',
       '      <div class="my-task-detail__row"><dt>Assignee</dt><dd>' + esc(taskAssigneeName(task)) + '</dd></div>',
-      '      <div class="my-task-detail__row"><dt>Priority</dt><dd><lex-badge label="' + esc(priorityLabel(task.priority || 'normal')) + '" color="' + esc(priorityColor(task.priority)) + '"></lex-badge></dd></div>',
+      '      <div class="my-task-detail__row"><dt>Priority</dt><dd>' + LanaTaskPriority.badgeHtml(task.priority) + '</dd></div>',
       '      <div class="my-task-detail__row"><dt>' + (task.matter_id ? 'Workspace' : 'Level') + '</dt><dd>' + matterLinkHtml(task) + '</dd></div>',
       task.due_date ? '      <div class="my-task-detail__row"><dt>Due date</dt><dd>' + esc(formatDate(task.due_date)) + '</dd></div>' : '      <div class="my-task-detail__row"><dt>Due date</dt><dd class="my-task-detail__muted">None</dd></div>',
       task.created_by_name ? '      <div class="my-task-detail__row"><dt>Reporter</dt><dd>' + esc(task.created_by_name) + '</dd></div>' : '',
@@ -1238,7 +1227,7 @@
       priority: function (val, row) {
         var task = row && row._raw;
         var raw = task && task.priority ? task.priority : 'normal';
-        return '<lex-badge label="' + esc(priorityLabel(raw)) + '" color="' + esc(priorityColor(raw)) + '"></lex-badge>';
+        return LanaTaskPriority.badgeHtml(raw);
       },
       due_date: function (val) {
         return val ? '<span class="my-task-table__created">' + esc(formatDate(val)) + '</span>' : '<span class="my-task-detail__muted">—</span>';

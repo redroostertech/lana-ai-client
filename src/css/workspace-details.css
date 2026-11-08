@@ -60,7 +60,7 @@
 }
 
 /* Board cards: title, then [type][priority] capsules, then the key (M17-4),
-   then the parent link on a subtask card, and a task's subtask count. */
+   then the parent link on a subtask card. */
 .kanban-card__title {
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -80,14 +80,19 @@
   gap: 0.375rem;
   margin-top: 0.5rem;
 }
+/* Same size as a medium lex-badge (the priority capsule beside it). */
+.kanban-card__capsules > lex-badge { display: inline-flex; }
 .kanban-card__capsule {
-  padding: 0.25rem 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.625rem;
   border-radius: 9999px;
   font-size: 0.75rem;
   font-weight: 500;
   line-height: 1rem;
 }
 .kanban-card__type {
+  padding: 0.0625rem 0.5625rem;
   border: 1px solid var(--lex-border-default, #d1d5db);
   color: var(--lex-text-secondary, #4b5563);
 }
@@ -122,9 +127,4 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.kanban-card__subtasks {
-  margin-top: 0.5rem;
-  font-size: 0.75rem;
-  color: var(--lex-text-secondary, #4b5563);
 }
