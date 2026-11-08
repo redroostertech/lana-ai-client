@@ -1876,7 +1876,9 @@
       if (!base) return null;
       const normalized = typeof item === 'string'
         ? Object.assign({}, base)
-        : Object.assign({}, base, item, { id: id, route: base.route });
+        // The catalog names the apps it knows, as in LanaClientApps.normalizeApp:
+        // a name copied onto the organization at setup never wins.
+        : Object.assign({}, base, item, { id: id, route: base.route, label: base.label });
       if (!normalized.id || !normalized.label || !normalized.route) return null;
       return normalized;
     }

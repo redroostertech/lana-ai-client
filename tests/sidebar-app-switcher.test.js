@@ -49,6 +49,16 @@ describe('LexSidebar app switcher gates', () => {
     expect(items.find((item) => item.id === 'document-library').href).toBe('document-library.html');
   });
 
+  test('without app-catalog, names stored on the organization still do not win over the app names', () => {
+    const { Sidebar } = loadSidebar();
+    const subject = { _getAppCatalog: Sidebar.prototype._getAppCatalog };
+    const normalize = (item) => Sidebar.prototype._normalizeAppItem.call(subject, item);
+    expect([
+      { id: 'lana-works', label: 'LanaWorks' }, { id: 'lana-agents', label: 'LanaAgents' },
+      { id: 'lana-insights', label: 'LanaInsights' }, { id: 'lana-automations', label: 'LanaAutomate' }
+    ].map((item) => normalize(item).label)).toEqual(['Workspaces', 'Agents', 'Insights', 'Automate']);
+  });
+
   test('dynamic lists wait for API readiness before first request', async () => {
     const { Sidebar } = loadSidebar();
     const events = [];

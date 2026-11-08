@@ -93,7 +93,7 @@ describe('LanaClientApps.normalizeApp', () => {
     expect(Apps.normalizeApp({ id: 'not-a-real-app', label: 'Fake', route: 'evil.html' })).toBeNull();
   });
 
-  test('control plane may override presentation but never route or id', () => {
+  test('control plane may override description and colors but never route, id or the name', () => {
     const app = Apps.normalizeApp({
       id: 'insights',
       label: 'Firm Analytics',
@@ -101,11 +101,19 @@ describe('LanaClientApps.normalizeApp', () => {
       route: '/somewhere-else',
       colors: ['#000000']
     });
-    expect(app.label).toBe('Firm Analytics');
+    expect(app.label).toBe('Insights');
     expect(app.description).toBe('Custom copy');
     expect(app.colors).toEqual(['#000000']);
     expect(app.route).toBe('admin/analytics.html');
     expect(app.id).toBe('lana-insights');
+  });
+
+  test('names copied onto an organization at setup do not win over the app names', () => {
+    const stored = [
+      { id: 'lana-works', label: 'LanaWorks' }, { id: 'lana-agents', label: 'LanaAgents' },
+      { id: 'lana-insights', label: 'LanaInsights' }, { id: 'lana-automations', label: 'LanaAutomate' }
+    ];
+    expect(Apps.normalizeAppList(stored).map((a) => a.label)).toEqual(['Workspaces', 'Agents', 'Insights', 'Automate']);
   });
 });
 
@@ -258,6 +266,12 @@ describe('capability entries', () => {
 
   test('preserves capabilities in the enabled-app entitlement manifest', () => {
     expect(Apps.normalizeEnabledAppList([screenDiction])).toEqual([screenDiction]);
+  });
+
+  test('a capability the app knows uses its own name (lana-notes is Briefs); an unknown one keeps its label (control)', () => {
+    const notes = Object.assign({}, screenDiction, { id: 'lana-notes', label: 'LANA Notes' });
+    const list = Apps.normalizeEnabledAppList([notes, screenDiction]);
+    expect(list.map((a) => a.label)).toEqual(['Briefs', 'Screen Dictation']);
   });
 
   test('never emits a capability as a navigable app-switcher route', () => {
