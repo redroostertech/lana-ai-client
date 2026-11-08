@@ -46,7 +46,7 @@ function memoryStorage() {
 
 describe('connection health summary', () => {
   test('every reason code has short, plain copy', () => {
-    expect(H.reasonText('auth_expired')).toBe('Sign-in expired. Reconnect to keep syncing.');
+    expect(H.reasonText('auth_expired')).toBe('Not signed in. Connect to keep syncing.');
     expect(H.reasonText('stale_sync')).toBe('No successful sync in the last day.');
     expect(H.reasonText('inactive')).toBe('This connection is turned off.');
     expect(H.reasonText('sync_disabled')).toBe('Syncing is turned off.');
@@ -61,7 +61,7 @@ describe('connection health summary', () => {
     expect(view.needsAttention).toBe(2);
     expect(view.items.map((i) => i.id)).toEqual([SOURCE_A, SOURCE_B]);
     expect(view.items[0]).toMatchObject({ name: 'Gmail', connectorId: 'gmail', scope: 'personal', action: 'Reconnect' });
-    expect(view.items[0].reasons).toEqual(['Sign-in expired. Reconnect to keep syncing.', 'Some syncs failed today.']);
+    expect(view.items[0].reasons).toEqual(['Not signed in. Connect to keep syncing.', 'Some syncs failed today.']);
     expect(view.items[1]).toMatchObject({ name: 'Clio', action: 'Open', reasons: ['No successful sync in the last day.'] });
     expect(H.rowNeedsAttention(view, ['clio', SOURCE_B])).toBe(true);
     expect(H.rowNeedsAttention(view, ['33333333-4444-4555-8666-777777777777'])).toBe(false);
@@ -71,7 +71,7 @@ describe('connection health summary', () => {
     const html = H.attentionMarkup(H.healthView(HEALTH));
     expect(html).toContain('<lex-badge label="Needs attention" color="yellow" size="sm"></lex-badge>');
     expect(html).toContain('2 connections need a look.');
-    expect(html).toContain('Sign-in expired. Reconnect to keep syncing.');
+    expect(html).toContain('Not signed in. Connect to keep syncing.');
     expect(html).toContain(`data-dc-health-open="${SOURCE_A}" data-dc-health-connector="gmail">Reconnect</lex-btn>`);
     expect(html).toContain(`data-dc-health-open="${SOURCE_B}" data-dc-health-connector="clio">Open</lex-btn>`);
     expect(html).not.toContain('QuickBooks');
@@ -248,5 +248,18 @@ describe('Data Connectors page wiring', () => {
 
     const memberPage = loadPage({ admin: false });
     expect(memberPage.connectorActionsCell(memberPage.mapConnectorRow(quickbooks, [quickbooks], []))).not.toContain('openAddInstanceModal');
+  });
+});
+
+describe('a long attention list', () => {
+  test('shows the first five and says how many more are marked below (control: five or fewer show all)', () => {
+    const conn = (i) => ({ id: 's' + i, connector_id: 'c' + i, name: 'Tool ' + i, status: 'needs_attention', reasons: ['stale_sync'] });
+    const many = H.attentionMarkup(H.healthView({ data: { summary: { needs_attention: 13 }, connections: Array.from({ length: 13 }, (_, i) => conn(i)) } }));
+    expect((many.match(/dc-attention-item/g) || []).length).toBe(5);
+    expect(many).toContain('13 connections need a look.');
+    expect(many).toContain('8 more are marked in the list below.');
+    const few = H.attentionMarkup(H.healthView({ data: { summary: { needs_attention: 5 }, connections: Array.from({ length: 5 }, (_, i) => conn(i)) } }));
+    expect((few.match(/dc-attention-item/g) || []).length).toBe(5);
+    expect(few).not.toContain('more');
   });
 });

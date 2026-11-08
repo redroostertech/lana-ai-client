@@ -19,7 +19,7 @@
   // ── Connection health ───────────────────────────────────────────────
 
   var REASON_COPY = {
-    auth_expired: 'Sign-in expired. Reconnect to keep syncing.',
+    auth_expired: 'Not signed in. Connect to keep syncing.',
     inactive: 'This connection is turned off.',
     sync_disabled: 'Syncing is turned off.',
     sync_error: 'The last sync failed.',
@@ -27,6 +27,7 @@
     recent_failures: 'Some syncs failed today.'
   };
   var FALLBACK_REASON = 'Something needs a look.';
+  var ATTENTION_LIST_MAX = 5;
 
   function reasonText(code) {
     return REASON_COPY[String(code || '')] || FALLBACK_REASON;
@@ -226,7 +227,10 @@
   function attentionMarkup(view) {
     if (!view || !view.needsAttention || !view.items.length) return '';
     var count = view.items.length;
-    var rows = view.items.map(function (item) {
+    // A long list would push the connectors far down; the rest carry a row badge.
+    var shown = view.items.slice(0, ATTENTION_LIST_MAX);
+    var more = count - shown.length;
+    var rows = shown.map(function (item) {
       return '<li class="dc-attention-item">' +
         '<div class="dc-attention-text"><strong class="dc-attention-name">' + esc(item.name) + '</strong>' +
         '<span class="dc-attention-reason">' + esc(item.reasons.join(' ')) + '</span></div>' +
@@ -237,7 +241,8 @@
     return '<div class="dc-attention-head">' +
       '<lex-badge label="Needs attention" color="yellow" size="sm"></lex-badge>' +
       '<span class="dc-attention-count">' + count + (count === 1 ? ' connection needs a look.' : ' connections need a look.') + '</span>' +
-      '</div><ul class="dc-attention-list">' + rows + '</ul>';
+      '</div><ul class="dc-attention-list">' + rows + '</ul>' +
+      (more > 0 ? '<p class="dc-attention-more">' + more + (more === 1 ? ' more is' : ' more are') + ' marked in the list below.</p>' : '');
   }
 
   /** The permission notices, or '' when there are none. */
