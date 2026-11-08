@@ -110,7 +110,8 @@
     return {
       id: role,
       name: role === 'chat' ? 'Chat' : 'Embedding',
-      summary: endpoint.state === 'running' ? 'Running on this computer' : endpoint.state === 'not_running' ? 'Set up, but not answering' : 'Not running on this computer',
+      // A line under the name only when something is not available; the badge says the rest.
+      summary: endpoint.state === 'running' ? '' : endpoint.state === 'not_running' ? 'Set up, but not answering' : 'Not running on this computer',
       badge: state.label,
       tone: state.tone,
       facts: facts
@@ -134,7 +135,7 @@
       id: kind,
       briefsId: BRIEFS_IDS[kind],
       name: kind === 'speech' ? 'Speech' : 'Voice',
-      summary: ready ? 'Downloaded to this computer' : kindOfState === 'downloading' ? 'Downloading'
+      summary: ready ? '' : kindOfState === 'downloading' ? 'Downloading'
         : kind === 'voice' ? 'Not used in this app yet' : 'Not downloaded',
       facts: [
         { label: 'Models', value: names.length ? names.join('; ') : 'Not reported' },

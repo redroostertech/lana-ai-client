@@ -37,7 +37,7 @@ const fact = (row, label) => (row.facts.find((f) => f.label === label) || {}).va
 
 test('Chat and Embedding: status from what runs here, facts from the app\'s models', () => {
   const [chat, embedding] = M.localRows(TOPOLOGY, SERVER_AI);
-  expect(chat).toMatchObject({ id: 'chat', name: 'Chat', badge: 'Running', tone: 'green', summary: 'Running on this computer' });
+  expect(chat).toMatchObject({ id: 'chat', name: 'Chat', badge: 'Running', tone: 'green', summary: '' });
   expect(fact(chat, 'Model')).toBe('Qwen3.5 9B (Q4_K_M), with Qwen3.5 0.8B (Q4_K_M)');
   expect(fact(chat, 'Space on this computer')).toBe('6.2 GB, not downloaded yet');
   expect(fact(chat, 'Running now')).toBe('Qwen3.8-9B-Q4_K_M, served by the LANA server on this computer');
@@ -55,7 +55,7 @@ test('the server\'s model servers count only when the server runs on this comput
 
 test('Speech and Voice: their models, and size and state from Briefs', () => {
   const speech = M.speechRow('speech', TOPOLOGY, { id: 'transcription', sizeText: '704 MB', state: { kind: 'ready' } });
-  expect(speech).toMatchObject({ id: 'speech', briefsId: 'transcription', name: 'Speech', summary: 'Downloaded to this computer' });
+  expect(speech).toMatchObject({ id: 'speech', briefsId: 'transcription', name: 'Speech', summary: '' });
   expect(fact(speech, 'Models')).toBe('Silero voice detection; Parakeet TDT 0.6B v2 (int8), speech to text; Pyannote segmentation 3.0, who spoke when; TitaNet small, telling speakers apart');
   expect(fact(speech, 'Space on this computer')).toBe('About 704 MB');
   const voice = M.speechRow('voice', TOPOLOGY, { id: 'voice', sizeText: '310 MB', state: { kind: 'notDownloaded' } });
