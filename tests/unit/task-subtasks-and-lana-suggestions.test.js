@@ -325,6 +325,12 @@ describe('Create Task modal', () => {
     expect(submit.getAttribute('variant')).toBe('primary');
   });
 
+  test('Generate suggestions sits on the left; Cancel then Create stay on the right', () => {
+    const [left, right] = footer.body.firstElementChild.children;
+    expect(left.querySelector('#taskGenerateBtn')).not.toBeNull();
+    expect(Array.from(right.children).map((b) => b.textContent.trim() || b.id)).toEqual(['Cancel', 'Save Task']);
+  });
+
   test('the blocking in-modal suggestion review is gone', () => {
     expect(start).toBeGreaterThan(-1);
     expect(modal).toContain('id="taskForm"');
