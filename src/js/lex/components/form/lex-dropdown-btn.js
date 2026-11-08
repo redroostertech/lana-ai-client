@@ -30,8 +30,10 @@
                     absolutely positioned child of the element.
      searchable, disabled
 
-   Items: { value, label, icon?, description?, href?, target?, variant?: 'danger',
+   Items: { value, label, icon?, description?, href?, target?, variant?: 'danger' | 'lana',
             danger?: true, disabled?: true } or { divider: true } separators.
+     variant 'lana' draws the item as the LANA pill (the lex-btn variant="lana"
+     look) for an action that hands off to LANA, e.g. "Ask LANA about this task".
      href renders the item as a link (javascript: URLs are dropped); clicking
      it still emits lex-select and then follows the link.
 
@@ -165,6 +167,27 @@
       .lex-ddbtn-item--danger .lex-ddbtn-item-icon {
         color: var(--lex-color-danger-600, var(--lex-color-danger-500));
       }
+
+      .lex-ddbtn-item.lex-ddbtn-item--lana {
+        justify-content: center;
+        margin: 6px 8px 4px;
+        padding: 8px 14px;
+        border-radius: 9999px;
+        background: linear-gradient(135deg, #1e1b4b 0%, #4338ca 40%, #7c3aed 70%, #c026d3 100%);
+        color: #ffffff;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 4px 12px rgba(99,102,241,0.25), inset 0 1px 0 rgba(255,255,255,0.15);
+      }
+      .lex-ddbtn-item.lex-ddbtn-item--lana:hover,
+      .lex-ddbtn-item.lex-ddbtn-item--lana.lex-ddbtn-item--focused,
+      .lex-ddbtn-item.lex-ddbtn-item--lana:focus {
+        background: linear-gradient(135deg, #1e1b4b 0%, #3730a3 40%, #6d28d9 70%, #a21caf 100%);
+      }
+      .lex-ddbtn-lana-mark { position: relative; width: 14px; height: 14px; flex-shrink: 0; }
+      .lex-ddbtn-lana-mark svg { position: absolute; width: 8px; height: 8px; }
+      .lex-ddbtn-lana-mark svg:first-child { top: 0; left: 0; }
+      .lex-ddbtn-lana-mark svg:last-child { bottom: 0; right: 0; }
 
       .lex-ddbtn-item--disabled {
         opacity: 0.45;
@@ -354,8 +377,14 @@
           let cls = 'lex-ddbtn-item';
           if (idx === this._focusedIdx) cls += ' lex-ddbtn-item--focused';
           if (item.variant === 'danger' || item.danger === true) cls += ' lex-ddbtn-item--danger';
+          if (item.variant === 'lana') cls += ' lex-ddbtn-item--lana';
           if (item.disabled) cls += ' lex-ddbtn-item--disabled';
-          const iconHtml = item.icon ? `<span class="lex-ddbtn-item-icon" aria-hidden="true">${getIcon(item.icon)}</span>` : '';
+          const iconHtml = item.variant === 'lana'
+            ? '<span class="lex-ddbtn-lana-mark" aria-hidden="true">'
+              + '<svg viewBox="0 0 8 8" fill="none"><path d="M0 0L8 0M0 0L0 8" stroke="currentColor" stroke-width="1.5"/></svg>'
+              + '<svg viewBox="0 0 8 8" fill="none"><path d="M8 8L0 8M8 8L8 0" stroke="currentColor" stroke-width="1.5"/></svg>'
+              + '</span>'
+            : (item.icon ? `<span class="lex-ddbtn-item-icon" aria-hidden="true">${getIcon(item.icon)}</span>` : '');
           const value = item.value === null || item.value === undefined ? '' : String(item.value);
           const label = item.label === null || item.label === undefined ? value : item.label;
           const common = `class="${cls}" data-value="${this.escapeHtml(value)}" data-idx="${idx}" role="menuitem" tabindex="-1"${item.disabled ? ' aria-disabled="true" data-disabled="true"' : ''}`;

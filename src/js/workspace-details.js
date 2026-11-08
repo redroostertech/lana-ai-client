@@ -770,6 +770,13 @@
       }
     }
 
+    // Board task card "..." menu (Complete Task, Close Task, Ask LANA).
+    trackDocListener('lex-select', function (e) {
+      var menu = e.target && e.target.closest ? e.target.closest('[data-board-task-menu]') : null;
+      if (!menu || !e.detail) return;
+      _handleBoardTaskMenu(menu.getAttribute('data-board-task-menu'), e.detail.value);
+    });
+
     // Card action delegation — single listener handles ALL lex-card action buttons
     trackDocListener('card-action', function (e) {
       if (!e.detail || !e.target) return;
@@ -5363,6 +5370,15 @@
     return key ? '<div class="kanban-card__key">' + escapeHtml(key) + '</div>' : '';
   }
 
+  // The "..." menu shown on hover over a LANA task card.
+  function _kanbanTaskMenuHtml(task) {
+    var items = LanaBoardWorkItems.taskMenuItems(task);
+    return '<div class="kanban-card__menu" onclick="event.stopPropagation()">' +
+      '<lex-dropdown-btn floating icon="more-horizontal" icon-only variant="ghost" align="end" aria-label="Task actions"' +
+        ' data-board-task-menu="' + escapeHtml(String(task.id)) + '" options="' + escapeHtml(JSON.stringify(items)) + '"></lex-dropdown-btn>' +
+    '</div>';
+  }
+
   function _renderKanbanSubtaskCard(item) {
     var dataAttr = 'data-task-id="' + escapeHtml(item.id) + '" data-item-kind="subtask" data-parent-task-id="' + escapeHtml(item.parent_id) + '"';
     var dueHtml = item.due_date
@@ -5406,7 +5422,9 @@
     // Serialize task data for drag; avoid injecting raw JSON into HTML
     var taskDataAttr = 'data-task-id="' + task.id + '" data-task-status="' + escapeHtml(task.status) + '"';
 
-    return '<div class="kanban-card bg-white border border-gray-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-all ' + (isLana ? 'cursor-move' : 'cursor-default') + '" draggable="' + isLana + '" ' + taskDataAttr + ' ondragstart="handleKanbanDragStart(event)" ondragend="handleKanbanDragEnd(event)" onclick="openTaskQuickView(\'' + task.id + '\')">' +
+    var hasMenu = isLana && task.editable !== false;
+    return '<div class="kanban-card' + (hasMenu ? ' kanban-card--has-menu' : '') + ' bg-white border border-gray-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-all ' + (isLana ? 'cursor-move' : 'cursor-default') + '" draggable="' + isLana + '" ' + taskDataAttr + ' ondragstart="handleKanbanDragStart(event)" ondragend="handleKanbanDragEnd(event)" onclick="openTaskQuickView(\'' + task.id + '\')">' +
+      (hasMenu ? _kanbanTaskMenuHtml(task) : '') +
       _kanbanTitleHtml(task.title || task.task_name || '') +
       _kanbanCapsulesHtml(isLana ? 'Task' : '', task.priority || 'normal', externalBadge) +
       _kanbanKeyHtml(task.item_key) +
@@ -5500,6 +5518,80 @@
       Lex.Toast.error('Failed to move task');
     }
   };
+
+  function _handleBoardTaskMenu(taskId, action) {
+    var task = currentTasksList.find(function (t) { return String(t.id) === String(taskId); });
+    if (!task) return;
+    if (action === 'lana') {
+      _askLanaAboutBoardTask(task);
+      return;
+    }
+    var status = LanaBoardWorkItems.taskCloseoutStatus(action);
+    if (status) _openBoardTaskCloseout(task, status);
+  }
+
+  // Complete or close a task from its card, with the same optional closeout
+  // notes as the task modal's "Completion notes" (all fields optional).
+  function _openBoardTaskCloseout(task, status) {
+    var closing = status === 'cancelled';
+    var verb = closing ? 'Close' : 'Complete';
+    var title = (task.item_key ? task.item_key + ' ' : '') + (task.title || task.task_name || '');
+    var content =
+      '<div class="kanban-closeout">' +
+        '<p class="kanban-closeout__task">' + escapeHtml(title) + '</p>' +
+        '<p class="kanban-closeout__hint">Optional. Notes are saved with the task for reporting and follow-up.</p>' +
+        '<lex-textarea id="boardCloseoutReason" rows="3"' +
+          ' label="' + (closing ? 'What is being closed, and why?' : 'What was completed, and why?') + '"' +
+          ' placeholder="' + (closing ? 'No longer needed, duplicate, handled elsewhere...' : 'Outcome, decision, or reason...') + '"></lex-textarea>' +
+        '<lex-textarea id="boardCloseoutWentWell" label="What went well?" rows="2" placeholder="Wins or useful signals..."></lex-textarea>' +
+        '<lex-textarea id="boardCloseoutCouldImprove" label="What could be better?" rows="2" placeholder="Risks, misses, or improvements..."></lex-textarea>' +
+        '<lex-textarea id="boardCloseoutActionItems" label="Action items" rows="2" placeholder="One follow-up per line..."></lex-textarea>' +
+      '</div>' +
+      '<lex-btn data-slot="footer" variant="secondary" data-closeout-action="cancel">Cancel</lex-btn>' +
+      '<lex-btn data-slot="footer" variant="primary" data-closeout-action="confirm">' + verb + ' Task</lex-btn>';
+
+    var modal = Lex.Modal.open({ heading: verb + ' task', content: content, size: 'md', hideActions: true });
+    modal.addEventListener('click', async function (e) {
+      var btn = e.target && e.target.closest ? e.target.closest('[data-closeout-action]') : null;
+      if (!btn || btn.loading) return;
+      if (btn.getAttribute('data-closeout-action') !== 'confirm') {
+        modal.removeAfterClose();
+        return;
+      }
+      var payload = { status: status };
+      var commentary = readCloseoutCommentary('boardCloseout');
+      if (commentary) payload.closeout_commentary = commentary;
+      btn.loading = true;
+      try {
+        await api.updateTask(task.id, payload);
+        modal.removeAfterClose();
+        Lex.Toast.success(closing ? 'Task closed' : 'Task completed');
+        await _reloadBoardTasks();
+      } catch (error) {
+        console.error('[Tasks] Failed to ' + verb.toLowerCase() + ' task:', error);
+        btn.loading = false;
+        Lex.Toast.error('Failed to ' + verb.toLowerCase() + ' task' + (error && error.message ? ': ' + error.message : ''));
+      }
+    });
+  }
+
+  // Open the LANA dock with this task attached, to chat about it.
+  function _askLanaAboutBoardTask(task) {
+    var dock = document.querySelector('lex-lana-dock');
+    if (!dock || typeof dock.openWith !== 'function') {
+      Lex.Toast.info('LANA is still loading. Try again in a moment.');
+      return;
+    }
+    var matter = (currentMatterData && currentMatterData.matter) || {};
+    var context = LanaBoardWorkItems.taskChatContext(task, matter);
+    dock.openWith({
+      contextType: 'full_chat',
+      matterId: context.page.matter_id || null,
+      matterName: context.page.matter_name || null,
+      cardContext: context,
+      prefillPrompt: LanaBoardWorkItems.taskChatPrompt(task)
+    });
+  }
 
   async function _reloadBoardTasks() {
     var matterId = (currentMatterData && currentMatterData.matter_id) ||

@@ -61,6 +61,40 @@
 
 /* Board cards: title, then [type][priority] capsules, then the key (M17-4),
    then the parent link on a subtask card. */
+/* The "..." menu on a task card: shown on hover or keyboard focus, and kept
+   while its menu is open. */
+.kanban-card--has-menu { position: relative; }
+.kanban-card--has-menu .kanban-card__title { padding-right: 1.75rem; }
+.kanban-card__menu {
+  position: absolute;
+  top: 0.375rem;
+  right: 0.375rem;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.kanban-card--has-menu:hover .kanban-card__menu,
+.kanban-card--has-menu:focus-within .kanban-card__menu,
+.kanban-card__menu:has([aria-expanded="true"]) {
+  opacity: 1;
+}
+
+/* Complete / Close task dialog */
+.kanban-closeout {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.kanban-closeout__task {
+  margin: 0;
+  font-weight: 600;
+  color: var(--lex-text-primary, #111827);
+}
+.kanban-closeout__hint {
+  margin: -0.5rem 0 0;
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary, #6b7280);
+}
+
 .kanban-card__title {
   display: -webkit-box;
   -webkit-box-orient: vertical;

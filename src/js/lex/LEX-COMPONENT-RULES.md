@@ -656,7 +656,7 @@ Button that opens a dropdown action menu (not a value selector).
 | `searchable` | Boolean | `false` | Search box in the menu |
 | `disabled` | Boolean | `false` | Disabled trigger |
 
-**Items:** `{ value, label, icon?, description?, href?, target?, variant?: 'danger', danger?: true, disabled?: true }`, or `{ divider: true }` for a separator. `href` renders the item as a link (`javascript:`/`data:` URLs are dropped); clicking it emits `lex-select` and then follows the link.
+**Items:** `{ value, label, icon?, description?, href?, target?, variant?: 'danger' | 'lana', danger?: true, disabled?: true }`, or `{ divider: true }` for a separator. `variant: 'lana'` draws the item as the LANA pill (same look as `lex-btn variant="lana"`) for an action that hands off to LANA; label it with the action, e.g. `Ask LANA about this task`. `href` renders the item as a link (`javascript:`/`data:` URLs are dropped); clicking it emits `lex-select` and then follows the link.
 
 **Events:** `lex-select { value, label, item }` (`value` is the string form)
 

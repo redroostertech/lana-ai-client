@@ -154,6 +154,25 @@ describe('lex-dropdown-btn floating', () => {
     expect(w.document.querySelector('.lex-ddbtn-layer')).toBeNull();
   });
 
+  test('a variant "lana" item is drawn as the LANA pill and still emits lex-select (control: a plain item is not)', async () => {
+    const { w, dd } = await setup('floating');
+    dd.options = [{ value: 'complete', label: 'Complete Task', icon: 'check-circle' }, { divider: true }, { value: 'lana', label: 'Ask LANA about this task', variant: 'lana' }];
+    await tick(w);
+    const picked = [];
+    dd.addEventListener('lex-select', (e) => picked.push(e.detail.value));
+    await open(w, dd);
+    const lana = w.document.querySelector('.lex-ddbtn-layer .lex-ddbtn-item[data-value="lana"]');
+    const plain = w.document.querySelector('.lex-ddbtn-layer .lex-ddbtn-item[data-value="complete"]');
+    expect(lana.classList.contains('lex-ddbtn-item--lana')).toBe(true);
+    expect(lana.querySelector('.lex-ddbtn-lana-mark')).not.toBeNull();
+    expect(lana.textContent.trim()).toBe('Ask LANA about this task');
+    expect(plain.classList.contains('lex-ddbtn-item--lana')).toBe(false);
+    expect(plain.querySelector('.lex-ddbtn-lana-mark')).toBeNull();
+    lana.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+    await tick(w);
+    expect(picked).toEqual(['lana']);
+  });
+
   test('a mousedown inside the floating menu keeps it open; outside closes it', async () => {
     const { w, dd } = await setup('floating');
     await open(w, dd);

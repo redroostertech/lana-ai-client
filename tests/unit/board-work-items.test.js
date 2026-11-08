@@ -64,3 +64,49 @@ describe('card title', () => {
     expect(cards[1].priority).toBe('high');
   });
 });
+
+describe('task card menu', () => {
+  const values = (items) => items.map((i) => (i.divider ? '-' : i.value));
+
+  test.each([
+    ['pending', ['complete', 'close', '-', 'lana']],
+    ['in_review', ['complete', 'close', '-', 'lana']],
+    ['complete', ['close', '-', 'lana']],
+    ['cancelled', ['complete', '-', 'lana']]
+  ])('a %s task offers %j', (status, expected) => {
+    expect(values(B.taskMenuItems({ id: 't1', status }))).toEqual(expected);
+  });
+
+  test('Ask LANA is the LANA pill with an action label', () => {
+    const lana = B.taskMenuItems({ status: 'pending' }).find((i) => i.value === 'lana');
+    expect(lana).toEqual({ value: 'lana', label: 'Ask LANA about this task', variant: 'lana' });
+  });
+
+  test('complete sets complete and close sets cancelled; anything else sets nothing', () => {
+    expect([B.taskCloseoutStatus('complete'), B.taskCloseoutStatus('close'), B.taskCloseoutStatus('lana'), B.taskCloseoutStatus('')])
+      .toEqual(['complete', 'cancelled', null, null]);
+  });
+});
+
+describe('Ask LANA about a task', () => {
+  const matter = { matter_id: 'MATT-00017', matter_name: 'Estate planning intake: Jordan Ellis', matter_type: 'estate' };
+
+  test('attaches the task, its key, matter and subtasks as a ui_card the dock already reads', () => {
+    const context = B.taskChatContext(task, matter);
+    expect(context).toEqual(expect.objectContaining({
+      type: 'ui_card', ui_label: 'M17-3 Review Employee Benefit Statement', source: 'workspace_details_board', card_key: 'task:t1'
+    }));
+    expect(context.page).toEqual({ route: 'workspace-details', tab: 'tasks', matter_id: 'MATT-00017', matter_name: 'Estate planning intake: Jordan Ellis', matter_type: 'estate' });
+    expect(context.details).toEqual(expect.objectContaining({ task_id: 't1', item_key: 'M17-3', title: 'Review Employee Benefit Statement', status: 'pending' }));
+    expect(context.details.subtasks.map((s) => s.item_key)).toEqual(task.subtasks.map((s) => s.item_key));
+    expect(B.taskChatPrompt(task)).toBe('Help me with M17-3 Review Employee Benefit Statement.');
+  });
+
+  test('a task with no key or description still reads cleanly', () => {
+    const context = B.taskChatContext({ id: 't9', title: 'Call the bank', description: 'null' }, {});
+    expect(context.ui_label).toBe('Call the bank');
+    expect(context.details.description).toBeNull();
+    expect(context.details.subtasks).toEqual([]);
+    expect(B.taskChatPrompt({ title: 'Call the bank' })).toBe('Help me with Call the bank.');
+  });
+});
