@@ -10,10 +10,10 @@ const preferences = { listenerError: null, bluetooth: { text: 'On', tone: 'neutr
 describe('status card', () => {
   test('listening with a paired phone: wifi, the details and Manage phones', () => {
     const card = B.statusCard(listening, preferences, [phone]);
-    expect(card).toMatchObject({ icon: 'wifi', tone: 'good', label: 'Listening for your phone', action: 'Manage phones' });
+    expect(card).toMatchObject({ icon: 'wifi', tone: 'good', label: 'Listening for your devices', action: 'Manage devices' });
     const paired = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(phone.pairedAt));
     expect(card.rows).toEqual([
-      { label: 'Paired phones', value: `iPhone, paired ${paired}` },
+      { label: 'Paired devices', value: `iPhone, paired ${paired}` },
       { label: 'Bluetooth wake', value: 'On' },
       { label: 'Background updates', value: 'On, for 8 hours after each sync' },
     ]);
@@ -21,13 +21,13 @@ describe('status card', () => {
 
   test('no phone paired: struck through, not listening, and Pair a phone', () => {
     const card = B.statusCard({ listener: { kind: 'waitingForPairing' }, receiving: false }, preferences, []);
-    expect(card).toMatchObject({ icon: 'wifi-off', tone: 'warning', label: 'No phone paired', action: 'Pair a phone' });
+    expect(card).toMatchObject({ icon: 'wifi-off', tone: 'warning', label: 'No device paired', action: 'Pair a device' });
     expect(card.summary).toContain('does not listen');
-    expect(card.rows[0]).toEqual({ label: 'Paired phones', value: 'None paired' });
+    expect(card.rows[0]).toEqual({ label: 'Paired devices', value: 'None paired' });
   });
 
   test('a meeting arriving shows first; a failure gives the reason', () => {
-    expect(B.statusCard({ listener: { kind: 'listening' }, receiving: true }, preferences, [phone]).rows[0]).toEqual({ label: 'Right now', value: 'Receiving a meeting from your phone' });
+    expect(B.statusCard({ listener: { kind: 'listening' }, receiving: true }, preferences, [phone]).rows[0]).toEqual({ label: 'Right now', value: 'Receiving a meeting from a device' });
     const failed = B.statusCard({ listener: { kind: 'failed', message: 'x' }, receiving: false }, Object.assign({}, preferences, { listenerError: 'The port is in use.' }), [phone]);
     expect(failed).toMatchObject({ icon: 'wifi-off', tone: 'warning', label: 'Stopped' });
     expect(failed.summary).toBe('The port is in use. Restart LANA to try again.');
@@ -36,8 +36,8 @@ describe('status card', () => {
   test('signed out offers nothing to press; unanswered host still gives a card', () => {
     expect(B.statusCard({ listener: { kind: 'signedOut' }, receiving: false }, null, []).action).toBe('');
     const unknown = B.statusCard(null, null, null);
-    expect(unknown).toMatchObject({ icon: 'wifi-off', label: 'Not listening', action: 'Pair a phone' });
-    expect(unknown.rows).toEqual([{ label: 'Paired phones', value: 'None paired' }]);
+    expect(unknown).toMatchObject({ icon: 'wifi-off', label: 'Not listening', action: 'Pair a device' });
+    expect(unknown.rows).toEqual([{ label: 'Paired devices', value: 'None paired' }]);
   });
 
   test('background updates read Off, or On for one hour', () => {

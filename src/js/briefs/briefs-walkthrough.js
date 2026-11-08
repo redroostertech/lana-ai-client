@@ -71,9 +71,9 @@
         eyebrow: 'All set',
         title: 'You are ',
         accent: 'ready',
-        detail: 'Pair a phone now, or later from the phone icon at the top of Briefs.',
+        detail: 'Pair a device now, or later from the device icon at the top of Briefs.',
         illustration: '<lex-brand-mark animation="success" size="160"></lex-brand-mark>',
-        actions: [{ id: 'pair', label: 'Pair a phone', icon: 'smartphone', variant: 'primary' }],
+        actions: [{ id: 'pair', label: 'Pair a device', icon: 'smartphone', variant: 'primary' }],
       },
     ];
   }

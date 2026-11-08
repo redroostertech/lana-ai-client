@@ -13,24 +13,24 @@
   function describe(listener, error) {
     switch (listener && listener.kind) {
       case 'listening':
-        return { tone: 'good', label: 'Listening for your phone', summary: 'This computer is ready to receive meetings from your phone. Keep LANA open, with both devices on the same network.' };
+        return { tone: 'good', label: 'Listening for your devices', summary: 'This computer is ready to receive meetings from your devices. Keep LANA open, with both on the same network.' };
       case 'waitingForPairing':
-        return { tone: 'warning', label: 'No phone paired', summary: 'Pair a phone to send meetings to this computer. Until then this computer does not listen on your network.' };
+        return { tone: 'warning', label: 'No device paired', summary: 'Pair a device to send meetings to this computer. Until then this computer does not listen on your network.' };
       case 'starting':
-        return { tone: 'warning', label: 'Starting', summary: 'Briefs is starting on this computer. Meetings from your phone can be received in a moment.' };
+        return { tone: 'warning', label: 'Starting', summary: 'Briefs is starting on this computer. Meetings from your devices can be received in a moment.' };
       case 'signedOut':
-        return { tone: 'warning', label: 'Signed out', summary: 'Sign in to LANA to receive meetings from your phone.' };
+        return { tone: 'warning', label: 'Signed out', summary: 'Sign in to LANA to receive meetings from your devices.' };
       case 'failed':
-        return { tone: 'warning', label: 'Stopped', summary: `${error || 'Briefs stopped listening for your phone.'} Restart LANA to try again.` };
+        return { tone: 'warning', label: 'Stopped', summary: `${error || 'Briefs stopped listening for your devices.'} Restart LANA to try again.` };
       default:
-        return { tone: 'warning', label: 'Not listening', summary: 'This computer is not receiving meetings from your phone right now.' };
+        return { tone: 'warning', label: 'Not listening', summary: 'This computer is not receiving meetings from your devices right now.' };
     }
   }
 
   function phonesValue(phones) {
     if (!Array.isArray(phones) || phones.length === 0) return 'None paired';
     return phones.map((phone) => {
-      const name = String(phone.displayName || '').trim() || 'Phone';
+      const name = String(phone.displayName || '').trim() || 'Device';
       const when = phone.pairedAt ? Date.parse(phone.pairedAt) : Number.NaN;
       return Number.isNaN(when) ? name : `${name}, paired ${pairedDate.format(new Date(when))}`;
     }).join('\n');
@@ -50,20 +50,20 @@
     const listener = gateway ? gateway.listener : null;
     const text = describe(listener, preferences && preferences.listenerError);
     const rows = [];
-    if (gateway && gateway.receiving) rows.push({ label: 'Right now', value: 'Receiving a meeting from your phone' });
-    rows.push({ label: 'Paired phones', value: phonesValue(phones) });
+    if (gateway && gateway.receiving) rows.push({ label: 'Right now', value: 'Receiving a meeting from a device' });
+    rows.push({ label: 'Paired devices', value: phonesValue(phones) });
     if (preferences && preferences.bluetooth && preferences.bluetooth.text) rows.push({ label: 'Bluetooth wake', value: preferences.bluetooth.text });
     if (preferences) rows.push({ label: 'Background updates', value: backgroundValue(preferences.backgroundUpdates) });
     const hasPhones = Array.isArray(phones) && phones.length > 0;
     const signedOut = listener !== null && listener !== undefined && listener.kind === 'signedOut';
     return {
-      // No phone paired: struck through, whatever the listener says.
+      // No device paired: struck through, whatever the listener says.
       icon: text.tone === 'good' && hasPhones ? 'wifi' : 'wifi-off',
       tone: hasPhones ? text.tone : 'warning',
       label: text.label,
       summary: text.summary,
       rows,
-      action: signedOut ? '' : hasPhones ? 'Manage phones' : 'Pair a phone',
+      action: signedOut ? '' : hasPhones ? 'Manage devices' : 'Pair a device',
     };
   }
 

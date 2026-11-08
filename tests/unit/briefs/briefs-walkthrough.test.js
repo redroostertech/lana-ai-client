@@ -10,7 +10,7 @@ describe('Briefs walkthrough', () => {
 
   test('five pages in the standalone order, ending with Pair a phone', () => {
     expect(pages.map((page) => page.id)).toEqual(['welcome', 'privacy', 'pairing', 'review', 'ready']);
-    expect(pages[4].actions).toEqual([{ id: 'pair', label: 'Pair a phone', icon: 'smartphone', variant: 'primary' }]);
+    expect(pages[4].actions).toEqual([{ id: 'pair', label: 'Pair a device', icon: 'smartphone', variant: 'primary' }]);
     pages.slice(0, 4).forEach((page) => expect(page.actions).toBeUndefined());
   });
 

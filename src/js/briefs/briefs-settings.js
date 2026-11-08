@@ -47,10 +47,10 @@
   function proximityRows(preferences) {
     const prefs = preferences || {};
     return [
-      { key: 'tone', title: `Tone from this ${DEVICE_NOUN}'s speaker`, detail: `Always on. The phone hears a one-time code played by this ${DEVICE_NOUN}.`, checked: true, disabled: true },
+      { key: 'tone', title: `Tone from this ${DEVICE_NOUN}'s speaker`, detail: `Always on. The device hears a one-time code played by this ${DEVICE_NOUN}.`, checked: true, disabled: true },
       { key: 'requireMacClick', title: `Require a click on this ${DEVICE_NOUN} after the tone`, detail: `Someone at this ${DEVICE_NOUN} approves every handoff, even when the tone worked.`, checked: Boolean(prefs.requireMacClick), disabled: false },
-      { key: 'allowQR', title: 'Allow the QR fallback', detail: `When the tone fails, this ${DEVICE_NOUN} shows a code the phone scans.`, checked: Boolean(prefs.allowQR), disabled: false },
-      { key: 'allowMacApproval', title: `Allow approval on this ${DEVICE_NOUN}`, detail: `When the tone and QR code fail, someone at this ${DEVICE_NOUN} can let the phone in.`, checked: Boolean(prefs.allowMacApproval), disabled: false },
+      { key: 'allowQR', title: 'Allow the QR fallback', detail: `When the tone fails, this ${DEVICE_NOUN} shows a code the device scans.`, checked: Boolean(prefs.allowQR), disabled: false },
+      { key: 'allowMacApproval', title: `Allow approval on this ${DEVICE_NOUN}`, detail: `When the tone and QR code fail, someone at this ${DEVICE_NOUN} can let the device in.`, checked: Boolean(prefs.allowMacApproval), disabled: false },
     ];
   }
 

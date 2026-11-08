@@ -150,7 +150,7 @@
       <p class="briefs-dashboard-phone-status is-${card.tone}"><span class="briefs-dashboard-phone-icon">${icon(card.icon)}</span>${escape(card.label)}</p>
       <p class="briefs-dashboard-phone-summary">${escape(card.summary)}</p>
       ${rows ? `<dl class="briefs-dashboard-phone-rows">${rows}</dl>` : ''}
-      ${card.action ? `<lex-btn variant="${card.action === 'Pair a phone' ? 'primary' : 'secondary'}" size="sm" leading-icon="smartphone" data-dashboard="phones">${escape(card.action)}</lex-btn>` : ''}`;
+      ${card.action ? `<lex-btn variant="${card.action === 'Pair a device' ? 'primary' : 'secondary'}" size="sm" leading-icon="smartphone" data-dashboard="phones">${escape(card.action)}</lex-btn>` : ''}`;
     els.banner.setAttribute('status', card.tone === 'good' ? 'connected' : 'warning');
   }
 

@@ -382,35 +382,35 @@
       </div><!-- /sv2-panel-screen-diction -->
 
       <!-- ╔════════════════════════ CONNECTED DEVICES PANEL ═══════════╗
-           Paired phones, how meetings arrive and background updates (LANA Briefs).
+           Paired devices, how meetings arrive and background updates (LANA Briefs).
            Rendered by settings-briefs.js; the Phones dialog is briefs-phones-ui.js. -->
       <div class="sv2-panel sv2-hidden" id="sv2-panel-phone" role="tabpanel"
         aria-labelledby="sv2-tab-phone" data-section="phone">
         <section id="sv2-section-phone" class="sv2-briefs">
-          <lex-card heading="Phones" subtitle="Phones that send meetings to this computer">
+          <lex-card heading="Devices" subtitle="Devices that send meetings to this computer">
             <div class="sv2-briefs-head">
               <lex-badge id="sv2-phone-badge" label="Checking" color="gray"></lex-badge>
-              <lex-btn id="sv2-phone-manage" variant="secondary" size="sm" leading-icon="smartphone" label="Pair a phone"></lex-btn>
+              <lex-btn id="sv2-phone-manage" variant="secondary" size="sm" leading-icon="smartphone" label="Pair a device"></lex-btn>
             </div>
             <p id="sv2-phone-summary" class="sv2-briefs-note"></p>
             <div id="sv2-phone-rows" class="sv2-briefs-rows"></div>
             <p id="sv2-phone-error" class="sv2-briefs-message" role="alert" hidden></p>
           </lex-card>
-          <lex-card heading="Proximity check" subtitle="How this computer knows a phone is in the room before it accepts a meeting">
+          <lex-card heading="Proximity check" subtitle="How this computer knows a device is in the room before it accepts a meeting">
             <div id="sv2-phone-proximity"></div>
           </lex-card>
-          <lex-card heading="Background updates" subtitle="Changes to meetings a phone already has">
+          <lex-card heading="Background updates" subtitle="Changes to meetings a device already has">
             <div class="sv2-briefs-option sv2-briefs-option-first">
               <div class="sv2-briefs-option-copy">
-                <span class="sv2-briefs-option-name">Let paired phones receive updates in the background</span>
-                <span class="sv2-briefs-option-description">After a sync checked by the tone or QR code, the phone can get your changes to meetings it already has without the tone, while it is on this network. It never sends anything or receives new meetings this way.</span>
+                <span class="sv2-briefs-option-name">Let paired devices receive updates in the background</span>
+                <span class="sv2-briefs-option-description">After a sync checked by the tone or QR code, the device can get your changes to meetings it already has without the tone, while it is on this network. It never sends anything or receives new meetings this way.</span>
               </div>
-              <lex-toggle id="sv2-phone-background" name="briefs_background_updates" aria-label="Let paired phones receive updates in the background"></lex-toggle>
+              <lex-toggle id="sv2-phone-background" name="briefs_background_updates" aria-label="Let paired devices receive updates in the background"></lex-toggle>
             </div>
             <div class="sv2-briefs-option">
               <div class="sv2-briefs-option-copy">
                 <span class="sv2-briefs-option-name">Lease length</span>
-                <span class="sv2-briefs-option-description">How long a phone may sync in the background after its last sync checked by this computer.</span>
+                <span class="sv2-briefs-option-description">How long a device may sync in the background after its last sync checked by this computer.</span>
               </div>
               <lex-segmented id="sv2-phone-lease" name="briefs_lease_hours" aria-label="Lease length"></lex-segmented>
             </div>

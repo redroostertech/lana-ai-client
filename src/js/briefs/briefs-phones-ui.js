@@ -147,17 +147,17 @@
         return `<div class="briefs-pair-panel briefs-pair-qr">
             <div class="briefs-pair-code" data-pair-qr aria-label="Pairing code to scan" role="img"></div>
             <div class="briefs-pair-text">
-              <p class="briefs-overline">Pair a phone</p>
-              <p class="briefs-pair-title">Open Briefs on your phone and scan this code.</p>
+              <p class="briefs-overline">Pair a device</p>
+              <p class="briefs-pair-title">Open Briefs on your device and scan this code.</p>
               <p class="briefs-pair-note">The code works once and expires in <span data-pair-left>${codeLeft(pairing.expiresAt)}</span>.</p>
-              <p class="briefs-pair-waiting"><lex-spinner size="sm"></lex-spinner>Waiting for the phone</p>
+              <p class="briefs-pair-waiting"><lex-spinner size="sm"></lex-spinner>Waiting for the device</p>
               <div><lex-btn variant="secondary" size="sm" data-pair="cancel">Cancel</lex-btn></div>
             </div>
           </div>`;
       case 'confirming':
         return `<div class="briefs-pair-panel briefs-pair-confirm">
             <p class="briefs-overline">Confirm the code</p>
-            <p class="briefs-pair-title">Does ${escape(pairing.phoneName || 'your phone')} show this code?</p>
+            <p class="briefs-pair-title">Does ${escape(pairing.phoneName || 'your device')} show this code?</p>
             <div class="briefs-pair-digits" role="img" aria-label="Code ${escape(String(pairing.code || '').split('').join(' '))}">${String(pairing.code || '').split('').map((digit, index) => `<span class="briefs-pair-digit${index === 3 ? ' is-group-start' : ''}">${escape(digit)}</span>`).join('')}</div>
             <p class="briefs-pair-note">Both screens must show the same six digits. If they differ, cancel: someone may be in between.</p>
             <div class="briefs-pair-buttons">
@@ -168,12 +168,12 @@
       case 'paired':
         return `<div class="briefs-pair-panel briefs-pair-outcome is-good" role="status">
             <lex-brand-mark class="briefs-pair-mark" animation="success" size="48" label="Paired"></lex-brand-mark>
-            <p class="briefs-pair-title">${escape(pairing.phoneName || 'Your phone')} is paired. It can now send meetings to this ${DEVICE_NOUN}.</p>
+            <p class="briefs-pair-title">${escape(pairing.phoneName || 'Your device')} is paired. It can now send meetings to this ${DEVICE_NOUN}.</p>
             <lex-btn variant="secondary" size="sm" data-pair="done">Done</lex-btn>
           </div>`;
       case 'expired':
         return `<div class="briefs-pair-panel briefs-pair-outcome is-warning" role="status">
-            <p class="briefs-pair-title">The pairing code expired. Show a new one when your phone is ready.</p>
+            <p class="briefs-pair-title">The pairing code expired. Show a new one when your device is ready.</p>
             <lex-btn variant="secondary" size="sm" leading-icon="refresh-cw" data-pair="start">New code</lex-btn>
           </div>`;
       case 'failed':
@@ -188,10 +188,10 @@
 
   function phoneListHtml() {
     const phones = phone.phones || [];
-    if (phones.length === 0) return '<p class="briefs-list-note">No phone paired yet.</p>';
+    if (phones.length === 0) return '<p class="briefs-list-note">No device paired yet.</p>';
     const when = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
     return `<p class="briefs-overline">Paired</p><ul class="briefs-phone-list">${phones.map((item) => {
-      const name = escape(item.displayName || 'Phone');
+      const name = escape(item.displayName || 'Device');
       const removing = phone.removing === item.id;
       const date = item.pairedAt && !Number.isNaN(Date.parse(item.pairedAt)) ? `Paired ${when.format(new Date(item.pairedAt))}` : 'Paired';
       return `<li class="briefs-phone-row${removing ? ' is-removing' : ''}">
@@ -209,10 +209,10 @@
     const pairing = phone.pairing || { kind: 'idle' };
     const busy = pairing.kind !== 'idle';
     body.innerHTML = `
-      <p class="briefs-phones-lead">Only paired phones can send meetings to this ${DEVICE_NOUN}. It listens on your network only while a phone is paired, or while you pair one.</p>
-      ${busy ? pairingHtml(pairing) : '<div><lex-btn variant="primary" size="sm" leading-icon="smartphone" data-pair="start">Pair a phone</lex-btn></div>'}
+      <p class="briefs-phones-lead">Only paired devices can send meetings to this ${DEVICE_NOUN}. It listens on your network only while a device is paired, or while you pair one.</p>
+      ${busy ? pairingHtml(pairing) : '<div><lex-btn variant="primary" size="sm" leading-icon="smartphone" data-pair="start">Pair a device</lex-btn></div>'}
       ${phone.error ? `<p class="briefs-meeting-error briefs-phones-error" role="alert">${escape(phone.error)}</p>` : ''}
-      <section class="briefs-phones-paired" aria-label="Paired phones">${phoneListHtml()}</section>`;
+      <section class="briefs-phones-paired" aria-label="Paired devices">${phoneListHtml()}</section>`;
     stopTimer();
     if (pairing.kind === 'showingCode') {
       drawQr(pairing.qrText);
@@ -241,7 +241,7 @@
     } catch (_) {
       result = null;
     }
-    phone.error = result && result.ok ? null : ((result && result.error && result.error.message) || 'LANA could not remove that phone. Try again.');
+    phone.error = result && result.ok ? null : ((result && result.error && result.error.message) || 'LANA could not remove that device. Try again.');
     await refresh();
     renderPhones();
   }
@@ -335,7 +335,7 @@
     stopTimer();
     modal = document.createElement('lex-modal');
     modal.id = 'briefs-phones';
-    modal.setAttribute('heading', 'Phones');
+    modal.setAttribute('heading', 'Devices');
     modal.setAttribute('size', 'md');
     modal.setAttribute('hide-actions', '');
     body = document.createElement('div');
