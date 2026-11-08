@@ -8,8 +8,6 @@ import {
 } from './js/constants.js';
 import { escapeHtml, normalizeText, parseJson } from './js/shared/utils.js';
 import { getApiUrl } from './js/shared/api-base-url.js';
-import { renderConnectors } from './js/views/connectors.js';
-import { renderConnectorDetail, teardownConnectorDetail } from './js/views/connector-detail.js';
 import { buildChecklist, renderHome } from './js/views/home.js';
 import { invalidateLibraryTable, renderLibrary, toggleAutomation } from './js/views/library.js';
 import {
@@ -46,9 +44,7 @@ import {
 } from './js/views/builder.js';
 import { invalidateRunsTable, renderRuns } from './js/views/runs.js';
 import { invalidateApprovalsTable, renderApprovals } from './js/views/approvals.js';
-import { indexConnectors, findConnectorById, normalizeConnector, buildLanaClientConnectorUrl } from './js/shared/connectors.js';
-import { hasAdminRole } from './js/shared/access.js';
-import { formatFileSize } from './js/shared/utils.js';
+import { indexConnectors } from './js/shared/connectors.js';
 
 function openWorkspaceResourceUrl(resourceUrl) {
   const href = String(resourceUrl || '').trim();
@@ -96,9 +92,6 @@ const state = {
   token: readCanonicalToken(),
   user: readCanonicalUser(),
   apiBaseUrl: (window.api && window.api.baseUrl) || '',
-  connectorsChecklistHidden: typeof localStorage !== 'undefined'
-    ? localStorage.getItem(STORAGE_KEYS.connectorsChecklistHidden) === '1'
-    : false,
   links: null,
   currentView: 'library',
   dashboard: null,
@@ -120,43 +113,6 @@ const state = {
   connectorHealth: [],
   installedConnectors: [],
   connectorIndex: [],
-  pinnedConnectors: (() => {
-    if (typeof localStorage === 'undefined') return [];
-    const raw = parseJson(localStorage.getItem(STORAGE_KEYS.pinnedConnectors), []);
-    return Array.isArray(raw) ? raw.filter((id) => typeof id === 'string' && id) : [];
-  })(),
-  connectorDetail: {
-    selectedId: typeof localStorage !== 'undefined'
-      ? (localStorage.getItem(STORAGE_KEYS.selectedConnectorId) || null)
-      : null,
-    error: null,
-    // GAP #10: lazy-loaded integration sources for multi-account default UI
-    sourcesState: null // { sources: [], loading: false, loaded: false }
-  },
-  connectorImport: {
-    open: false,
-    selectedFile: null,
-    uploading: false,
-    error: null,
-    // Context for "Update connector" flows. When set, the import is
-    // scoped to a specific connector kind and the backend rejects a
-    // mismatched ZIP. When null, the import is a fresh install.
-    targetConnectorId: null,
-    targetConnectorName: null
-  },
-  connectorAddInstance: {
-    open: false,
-    slug: null,
-    connectorName: null,
-    manifest: null,
-    submitting: false,
-    error: null
-  },
-  connectorConfirm: {
-    mode: null,
-    connectorId: null,
-    busy: false
-  },
   approvals: [],
   selectedApprovalId: null,
   selectedApprovalDetail: null,
@@ -316,30 +272,9 @@ function cacheElements() {
   els.checkDataModalSteps = document.getElementById('check-data-modal-steps');
   els.checkDataModalGo = document.getElementById('check-data-modal-go');
 
-  els.connectorImportModal = document.getElementById('connector-import-modal');
-  els.connectorImportDropZone = document.getElementById('connector-import-dropzone');
-  els.connectorImportFileInput = document.getElementById('connector-import-file-input');
-  els.connectorImportPreview = document.getElementById('connector-import-preview');
-  els.connectorImportFileName = document.getElementById('connector-import-file-name');
-  els.connectorImportFileSize = document.getElementById('connector-import-file-size');
-  els.connectorImportStatus = document.getElementById('connector-import-status');
-  els.connectorImportSubmit = document.getElementById('connector-import-submit');
-
-  els.connectorConfirmModal = document.getElementById('connector-confirm-modal');
-  els.connectorConfirmMessage = document.getElementById('connector-confirm-message');
-  els.connectorConfirmSubmit = document.getElementById('connector-confirm-submit');
-  els.connectorConfirmCancel = document.getElementById('connector-confirm-cancel');
-
-  els.connectorAddInstanceModal = document.getElementById('connector-add-instance-modal');
-  els.connectorAddInstanceLabel = document.getElementById('connector-add-instance-label');
-  els.connectorAddInstanceHelper = document.getElementById('connector-add-instance-helper');
-  els.connectorAddInstanceKey = document.getElementById('connector-add-instance-key');
-  els.connectorAddInstanceForm = document.getElementById('connector-add-instance-form');
-  els.connectorAddInstanceError = document.getElementById('connector-add-instance-error');
-  els.connectorAddInstanceSubmit = document.getElementById('connector-add-instance-submit');
 }
 
-// The five automation dialogs are lex-modals: the component owns the backdrop,
+// The automation dialogs are lex-modals: the component owns the backdrop,
 // header close, Escape and focus trap. These helpers keep the call sites short.
 function setModalOpen(modal, open) {
   if (modal) modal.open = Boolean(open);
@@ -405,15 +340,6 @@ function bindGlobalEvents() {
   // same state reset the Cancel buttons do.
   els.templateModal?.addEventListener('lex-close', () => closeTemplateModal());
   els.checkDataModal?.addEventListener('lex-close', () => closeCheckDataModal());
-  els.connectorImportModal?.addEventListener('lex-close', () => closeConnectorImportModal());
-  els.connectorConfirmModal?.addEventListener('lex-close', () => closeConnectorConfirmModal());
-  els.connectorAddInstanceModal?.addEventListener('lex-close', () => closeAddInstanceModal());
-  // Footer "Create Instance" is <lex-btn type="submit" form=…>; Enter in the
-  // key field submits the same form.
-  els.connectorAddInstanceForm?.addEventListener('submit', (event) => {
-    event.preventDefault();
-    submitAddInstance();
-  });
   document.body.addEventListener('breadcrumb-navigate', onBreadcrumbNavigate);
 
   // Dirty-state guard: warn before the user closes/reloads the tab while in
@@ -426,13 +352,6 @@ function bindGlobalEvents() {
       event.returnValue = '';
     }
   });
-
-  if (els.connectorImportFileInput) {
-    els.connectorImportFileInput.addEventListener('change', onConnectorImportFileChange);
-  }
-  if (els.connectorImportDropZone) {
-    setupConnectorImportDropZone(els.connectorImportDropZone);
-  }
 
   window.addEventListener('popstate', onAutomationPopState);
 }
@@ -582,11 +501,6 @@ function showApp() {
 }
 
 function setView(view, options = {}) {
-  if (state.currentView === 'connector-detail' && view !== 'connector-detail') {
-    teardownConnectorDetail();
-    // GAP #10: clear lazy-loaded sources when leaving connector-detail
-    state.connectorDetail.sourcesState = null;
-  }
   if (state.currentView === 'runs' && view !== 'runs') {
     state.selectedRunId = null;
     state.selectedRunDetail = null;
@@ -609,10 +523,6 @@ function setView(view, options = {}) {
 
   if (els.topbar) {
     let heading = meta.title || 'Automation';
-    if (view === 'connector-detail') {
-      const selected = resolveSelectedConnector();
-      if (selected?.name) heading = selected.name;
-    }
     if (view === 'library-detail') {
       const automation = state.libraryDetail?.automation;
       if (automation?.automation_name) heading = automation.automation_name;
@@ -708,15 +618,6 @@ function onAutomationPopState() {
   refreshCurrentView().catch((error) => {
     flash(error.message || 'Failed to refresh view.', true);
   });
-}
-
-function resolveSelectedConnector() {
-  const id = state.connectorDetail?.selectedId;
-  if (!id) return null;
-  const direct = findConnectorById(state.connectorIndex || [], id);
-  if (direct) return direct;
-  const fromReadiness = findConnectorById(state.connectors || [], id);
-  return fromReadiness ? normalizeConnector(fromReadiness) : null;
 }
 
 function onTopbarMenuAction(event) {
@@ -816,9 +717,6 @@ async function onBreadcrumbNavigate(event) {
   }
 
   if (!VIEW_DEFINITIONS[raw]) return;
-  if (state.currentView === 'connector-detail' && raw === 'connectors') {
-    clearSelectedConnector();
-  }
   setView(raw);
   await refreshCurrentView();
 }
@@ -869,8 +767,7 @@ async function refreshCurrentView() {
   switch (state.currentView) {
     case 'home':
       // Also refresh installed connectors so the "N ready connectors" badge
-      // on the home screen stays in sync with the Connectors view (both reads
-      // from state.connectorIndex via countReadyConnectors).
+      // reads current data (state.connectorIndex via countReadyConnectors).
       await Promise.all([
         loadDashboard(),
         loadTemplates(),
@@ -882,23 +779,6 @@ async function refreshCurrentView() {
       ]);
       rebuildConnectorIndex();
       await loadOnboardingState();
-      break;
-    case 'connectors':
-      await Promise.all([
-        loadConnectors(),
-        loadConnectorHealth(),
-        loadInstalledConnectors(),
-        loadUserProfile()
-      ]);
-      rebuildConnectorIndex();
-      break;
-    case 'connector-detail':
-      await Promise.all([
-        loadConnectors(),
-        loadInstalledConnectors(),
-        loadUserProfile()
-      ]);
-      rebuildConnectorIndex();
       break;
     case 'library':
       invalidateLibraryTable(createContext());
@@ -949,8 +829,6 @@ function renderCurrentView() {
     renderHome(context);
     configureHomeComposer();
   }
-  if (state.currentView === 'connectors') renderConnectors(context);
-  if (state.currentView === 'connector-detail') renderConnectorDetail(context);
   if (state.currentView === 'library') renderLibrary(context);
   if (state.currentView === 'library-detail') renderLibraryDetail(context);
   // Library-detail dialogs live outside #view-content; close them on any other view.
@@ -1149,8 +1027,12 @@ async function tryResumeSession() {
 async function onAppClick(event) {
   if (event.target.closest('[data-check-data-go]')) {
     closeCheckDataModal();
-    setView('connectors');
-    await refreshCurrentView();
+    openDataConnectorsPage();
+    return;
+  }
+
+  if (event.target.closest('[data-open-data-connectors]')) {
+    openDataConnectorsPage();
     return;
   }
 
@@ -1166,113 +1048,6 @@ async function onAppClick(event) {
   if (navButton) {
     setView(navButton.dataset.openView);
     await refreshCurrentView();
-    return;
-  }
-
-  // Pin toggle must run before the open-connector check, because the pin
-  // button lives inside a <tr> that also carries data-open-connector-detail.
-  const pinEl = event.target.closest('[data-connector-pin]');
-  if (pinEl) {
-    event.preventDefault();
-    event.stopPropagation();
-    const id = pinEl.dataset.connectorPin;
-    if (id) {
-      toggleConnectorPin(id);
-    }
-    return;
-  }
-
-  // Add Instance — same story: the button lives inside a row that carries
-  // data-open-connector-detail, so it must be checked first to prevent the
-  // click from falling through to opening the current instance.
-  const addInstanceEl = event.target.closest('[data-connector-add-instance]');
-  if (addInstanceEl) {
-    event.preventDefault();
-    event.stopPropagation();
-    const slug = addInstanceEl.dataset.connectorAddInstance;
-    if (slug) {
-      openAddInstanceModal(slug);
-    }
-    return;
-  }
-
-  // Update connector — opens the import modal pre-scoped to this connector
-  // kind so the backend rejects a mismatched ZIP.
-  const updateConnectorEl = event.target.closest('[data-connector-update]');
-  if (updateConnectorEl) {
-    event.preventDefault();
-    event.stopPropagation();
-    const slug = updateConnectorEl.dataset.connectorUpdate;
-    const name = updateConnectorEl.dataset.connectorUpdateName || slug;
-    if (slug) {
-      openConnectorImportModal({
-        targetConnectorId: slug,
-        targetConnectorName: name
-      });
-    }
-    return;
-  }
-
-  // GAP #3: Re-auth banner — "Re-authorize" button opens connector detail (OAuth flow)
-  const reauthEl = event.target.closest('[data-connector-reauth]');
-  if (reauthEl) {
-    const connectorId = reauthEl.dataset.connectorReauth;
-    if (connectorId) {
-      openConnectorInLanaClient(connectorId);
-    }
-    return;
-  }
-
-  // GAP #3: Re-auth banner — "Dismiss" button
-  const dismissReauthEl = event.target.closest('[data-dismiss-reauth-banner]');
-  if (dismissReauthEl) {
-    const slug = dismissReauthEl.dataset.dismissReauthBanner;
-    if (slug) {
-      if (!Array.isArray(state.dismissedReauthBanners)) state.dismissedReauthBanners = [];
-      if (!state.dismissedReauthBanners.includes(slug)) {
-        state.dismissedReauthBanners.push(slug);
-      }
-      renderCurrentView();
-    }
-    return;
-  }
-
-  const openConnectorEl = event.target.closest('[data-open-connector-detail]');
-  if (openConnectorEl) {
-    const id = openConnectorEl.dataset.openConnectorDetail;
-    if (id) {
-      openConnectorInLanaClient(id);
-    }
-    return;
-  }
-
-  const connectorActionEl = event.target.closest('[data-connector-action]');
-  if (connectorActionEl) {
-    const action = connectorActionEl.dataset.connectorAction;
-    const targetId = connectorActionEl.dataset.connectorId
-      || state.connectorDetail.selectedId
-      || null;
-    await handleConnectorAction(action, targetId);
-    return;
-  }
-
-  // GAP #10: Load integration sources for a connector (lazy)
-  const loadSourcesEl = event.target.closest('[data-connector-load-sources]');
-  if (loadSourcesEl) {
-    const slug = loadSourcesEl.dataset.connectorLoadSources;
-    if (slug) {
-      await handleLoadConnectorSources(slug);
-    }
-    return;
-  }
-
-  // GAP #10: Set integration source as default
-  const setDefaultEl = event.target.closest('[data-connector-set-default]');
-  if (setDefaultEl) {
-    const sourceId = setDefaultEl.dataset.connectorSetDefault;
-    if (sourceId) {
-      await handleSetConnectorDefault(sourceId);
-    }
     return;
   }
 
@@ -1469,32 +1244,8 @@ async function onAppClick(event) {
     return;
   }
 
-  if (event.target.closest('[data-app-action="refresh-connector-health"]')) {
-    await refreshConnectorHealth();
-    return;
-  }
-
-  if (event.target.closest('[data-app-action="hide-connectors-checklist"]')) {
-    state.connectorsChecklistHidden = true;
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.connectorsChecklistHidden, '1');
-    }
-    renderCurrentView();
-    return;
-  }
-
   if (event.target.closest('[data-app-action="validate-builder"]')) {
     validateBuilder(createContext());
-    return;
-  }
-
-  const connectorsPageButton = event.target.closest('[data-connectors-page]');
-  if (connectorsPageButton) {
-    const page = parseInt(connectorsPageButton.dataset.connectorsPage, 10);
-    if (Number.isFinite(page) && state.filters.connectors) {
-      state.filters.connectors.page = page;
-      renderCurrentView();
-    }
     return;
   }
 
@@ -1584,21 +1335,6 @@ async function onAppClick(event) {
       state.filters.library.page = page;
       renderCurrentView();
     }
-    return;
-  }
-
-  const connectorsSortButton = event.target.closest('[data-connectors-sort]');
-  if (connectorsSortButton && state.filters.connectors) {
-    const field = connectorsSortButton.dataset.connectorsSort;
-    if (!field) return;
-    if (state.filters.connectors.sortBy === field) {
-      state.filters.connectors.sortDir = state.filters.connectors.sortDir === 'asc' ? 'desc' : 'asc';
-    } else {
-      state.filters.connectors.sortBy = field;
-      state.filters.connectors.sortDir = 'asc';
-    }
-    state.filters.connectors.page = 1;
-    renderCurrentView();
     return;
   }
 
@@ -1823,7 +1559,7 @@ async function onAppInput(event) {
         ? parseInt(filterField.value, 10)
         : filterField.value;
       state.filters[filterView][key] = Number.isNaN(nextValue) ? filterField.value : nextValue;
-      if ((filterView === 'connectors' || filterView === 'library' || filterView === 'runs') && key !== 'page') {
+      if ((filterView === 'library' || filterView === 'runs') && key !== 'page') {
         state.filters[filterView].page = 1;
       }
       if (filterView === 'library') {
@@ -1979,8 +1715,7 @@ function closeTemplateModal() {
 function openCheckDataModal(templateId) {
   const template = getTemplateLibrary().find((entry) => entry.id === templateId);
   if (!template || !els.checkDataModal) {
-    setView('connectors');
-    refreshCurrentView();
+    openDataConnectorsPage();
     return;
   }
 
@@ -2341,605 +2076,13 @@ function rebuildConnectorIndex() {
   });
 }
 
-function gotoConnectorDetail(connectorId) {
-  if (!connectorId) return;
-  state.connectorDetail.selectedId = connectorId;
-  state.connectorDetail.error = null;
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(STORAGE_KEYS.selectedConnectorId, connectorId);
-  }
-  setView('connector-detail');
-  refreshCurrentView();
-}
-
 /**
- * Open the given connector's management page in lana-client.
- *
- * The automation server mounts lana-client/src at /lex-framework on its
- * own origin, so we route to a same-origin URL under that mount. The
- * target page is lana-client's existing per-connector HTML, which is
- * already shell-embedded via chrome="embedded" with a back button.
+ * Connectors are managed on the app-wide Data Connectors page, so every
+ * Automate entry point that used to open its own Connectors view goes there.
  */
-function openConnectorInLanaClient(connectorId) {
-  if (!connectorId) return;
-
-  const connector = findConnectorById(state.connectorIndex || [], connectorId)
-    || findConnectorById(state.connectors || [], connectorId);
-
-  const url = buildLanaClientConnectorUrl(connector);
-  if (!url) {
-    console.warn('[connectors] Unable to resolve connector for routing', { connectorId });
-    return;
-  }
-
-  window.open(url, '_blank', 'noopener,noreferrer');
-}
-
-/**
- * Toggle a connector's pinned state. Pinned connectors always sort to
- * the top of the connectors list, regardless of the active sort field.
- * Persisted to localStorage so the pin survives reloads.
- */
-function toggleConnectorPin(connectorId) {
-  if (!connectorId) return;
-  const current = Array.isArray(state.pinnedConnectors) ? state.pinnedConnectors : [];
-  const idx = current.indexOf(connectorId);
-  if (idx === -1) {
-    state.pinnedConnectors = [...current, connectorId];
-  } else {
-    state.pinnedConnectors = current.filter((id) => id !== connectorId);
-  }
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(STORAGE_KEYS.pinnedConnectors, JSON.stringify(state.pinnedConnectors));
-  }
-  renderCurrentView();
-}
-
-function clearSelectedConnector() {
-  state.connectorDetail.selectedId = null;
-  if (typeof localStorage !== 'undefined') {
-    localStorage.removeItem(STORAGE_KEYS.selectedConnectorId);
-  }
-  teardownConnectorDetail();
-}
-
-async function handleConnectorAction(action, connectorId) {
-  switch (action) {
-    case 'back':
-      clearSelectedConnector();
-      setView('connectors');
-      await refreshCurrentView();
-      return;
-
-    case 'open-import': {
-      if (!hasAdminRole(createContext())) {
-        flash('You do not have permission to import connectors.', true);
-        return;
-      }
-      openConnectorImportModal();
-      return;
-    }
-
-    case 'retry-ui':
-      renderCurrentView();
-      return;
-
-    case 'use-in-builder': {
-      if (connectorId) {
-        state.builder.preferredConnectorId = connectorId;
-      }
-      setView('builder');
-      await refreshCurrentView();
-      return;
-    }
-
-    case 'uninstall':
-      openConnectorConfirmModal('uninstall', connectorId);
-      return;
-
-    case 'delete':
-      openConnectorConfirmModal('delete', connectorId);
-      return;
-
-    case 'confirm-cancel':
-      closeConnectorConfirmModal();
-      return;
-
-    case 'confirm-submit':
-      await submitConnectorConfirm();
-      return;
-
-    case 'import-close':
-      closeConnectorImportModal();
-      return;
-
-    case 'import-clear':
-      clearConnectorImportFile();
-      return;
-
-    case 'import-submit':
-      await submitConnectorImport();
-      return;
-
-    case 'add-instance-close':
-      closeAddInstanceModal();
-      return;
-
-    case 'add-instance-submit':
-      await submitAddInstance();
-      return;
-
-    default:
-      console.warn('[connector-action] unknown action:', action);
-  }
-}
-
-/**
- * GAP #10: Lazily load integration sources for a connector slug.
- * Calls GET /api/v1/integrations/sources?connector_id=<slug>.
- * Results stored in state.connectorDetail.sourcesState.
- *
- * @param {string} slug - connector_id slug
- */
-async function handleLoadConnectorSources(slug) {
-  state.connectorDetail.sourcesState = { sources: [], loading: true, loaded: false };
-  renderCurrentView();
-  try {
-    const payload = await fetchJson(
-      `/api/v1/integrations/sources?connector_id=${encodeURIComponent(slug)}`,
-      { headers: authHeaders() }
-    );
-    state.connectorDetail.sourcesState = {
-      sources: payload.sources || [],
-      loading: false,
-      loaded: true
-    };
-  } catch (err) {
-    state.connectorDetail.sourcesState = { sources: [], loading: false, loaded: true };
-    flash(err.message || 'Failed to load accounts.', true);
-  }
-  renderCurrentView();
-}
-
-/**
- * GAP #10: Set a specific integration_source as the default for its connector.
- * Calls PATCH /api/v1/integrations/sources/:id/default.
- * On success, updates the local connector index entry and re-renders.
- *
- * @param {string} sourceId - integration_source UUID
- */
-async function handleSetConnectorDefault(sourceId) {
-  try {
-    const res = await fetch(`/api/v1/integrations/sources/${encodeURIComponent(sourceId)}/default`, {
-      method: 'PATCH',
-      headers: { ...authHeaders() }
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      flash((err.error && err.error.message) || err.error || 'Failed to set default.', true);
-      return;
-    }
-    const data = await res.json();
-    flash('Default account updated.');
-
-    // Update the in-memory sourcesState so the badge flips immediately without a full reload
-    if (state.connectorDetail.sourcesState && Array.isArray(state.connectorDetail.sourcesState.sources)) {
-      const connectorId = data.data?.connector_id;
-      state.connectorDetail.sourcesState.sources = state.connectorDetail.sourcesState.sources.map((s) => ({
-        ...s,
-        is_default: connectorId
-          ? (s.id === sourceId && s.connector_id === connectorId)
-          : s.id === sourceId
-      }));
-    }
-
-    // Refresh connectors so the UI reflects the new default
-    await loadConnectors();
-    renderCurrentView();
-  } catch (err) {
-    flash(err.message || 'Failed to set default.', true);
-  }
-}
-
-function openConnectorConfirmModal(mode, connectorId) {
-  if (!els.connectorConfirmModal) return;
-  const targetId = connectorId || state.connectorDetail.selectedId;
-  if (!targetId) {
-    flash('No connector selected.', true);
-    return;
-  }
-  const connector = findConnectorById(state.connectorIndex || [], targetId)
-    || findConnectorById(state.connectors || [], targetId);
-  if (!connector) {
-    flash('Connector not found.', true);
-    return;
-  }
-
-  if (mode === 'delete' && connector.allowDelete === false) {
-    flash('System connectors cannot be permanently deleted.', true);
-    return;
-  }
-
-  state.connectorConfirm = { mode, connectorId: targetId, busy: false };
-
-  const title = mode === 'delete' ? 'Delete Connector' : 'Uninstall Connector';
-  const body = mode === 'delete'
-    ? `Permanently delete "${connector.name}"? All synced data, configuration, and custom UI files will be removed. This cannot be undone.`
-    : `Uninstall "${connector.name}"? The connection will be disconnected but configuration and synced data will be preserved.`;
-
-  els.connectorConfirmModal.heading = title;
-  if (els.connectorConfirmMessage) els.connectorConfirmMessage.textContent = body;
-  if (els.connectorConfirmSubmit) {
-    setLexBtnText(els.connectorConfirmSubmit, mode === 'delete' ? 'Delete Permanently' : 'Uninstall');
-    els.connectorConfirmSubmit.setAttribute('variant', mode === 'delete' ? 'danger' : 'primary');
-  }
-
-  setModalOpen(els.connectorConfirmModal, true);
-}
-
-function closeConnectorConfirmModal() {
-  setModalOpen(els.connectorConfirmModal, false);
-  state.connectorConfirm = { mode: null, connectorId: null, busy: false };
-}
-
-async function submitConnectorConfirm() {
-  const { mode, connectorId, busy } = state.connectorConfirm || {};
-  if (!mode || !connectorId || busy) return;
-
-  state.connectorConfirm.busy = true;
-  if (els.connectorConfirmSubmit) els.connectorConfirmSubmit.setAttribute('disabled', '');
-
-  try {
-    const suffix = mode === 'delete' ? '?hard=true' : '';
-    await fetchJson(`/api/integrations/connectors/${encodeURIComponent(connectorId)}${suffix}`, {
-      method: 'DELETE',
-      headers: authHeaders()
-    });
-    flash(mode === 'delete' ? 'Connector deleted.' : 'Connector uninstalled.');
-    closeConnectorConfirmModal();
-    clearSelectedConnector();
-    setView('connectors');
-    await refreshCurrentView();
-  } catch (error) {
-    flash(error.message || `Failed to ${mode} connector.`, true);
-    state.connectorConfirm.busy = false;
-    if (els.connectorConfirmSubmit) els.connectorConfirmSubmit.removeAttribute('disabled');
-  }
-}
-
-function openAddInstanceModal(slug) {
-  if (!els.connectorAddInstanceModal || !slug) return;
-
-  // Resolve the connector from the index so we can pull the manifest labels.
-  const connector = (state.connectorIndex || []).find((c) =>
-    (c.connector_id || c.connector_type) === slug
-  );
-
-  if (!connector) {
-    flash(`Connector '${slug}' not found.`, true);
-    return;
-  }
-
-  const multi = connector.multi_instance || {};
-  if (!multi.enabled) {
-    flash(`Connector '${connector.name || slug}' does not support multiple instances.`, true);
-    return;
-  }
-
-  state.connectorAddInstance = {
-    open: true,
-    slug,
-    connectorName: connector.name || slug,
-    manifest: multi,
-    submitting: false,
-    error: null
-  };
-
-  els.connectorAddInstanceModal.heading = `Add ${connector.name || slug} Instance`;
-  if (els.connectorAddInstanceLabel) {
-    els.connectorAddInstanceLabel.textContent = multi.instance_label || 'Instance name';
-  }
-  if (els.connectorAddInstanceHelper) {
-    els.connectorAddInstanceHelper.textContent =
-      multi.instance_helper_text || 'Use letters, numbers, and hyphens only. No spaces.';
-  }
-  if (els.connectorAddInstanceKey) {
-    els.connectorAddInstanceKey.value = '';
-    els.connectorAddInstanceKey.placeholder = multi.instance_placeholder || 'instance-name';
-  }
-  if (els.connectorAddInstanceError) {
-    els.connectorAddInstanceError.textContent = '';
-    els.connectorAddInstanceError.classList.add('hidden');
-  }
-  if (els.connectorAddInstanceSubmit) {
-    els.connectorAddInstanceSubmit.removeAttribute('disabled');
-  }
-
-  setModalOpen(els.connectorAddInstanceModal, true);
-
-  // Focus the input after the modal renders
-  requestAnimationFrame(() => {
-    if (els.connectorAddInstanceKey) {
-      els.connectorAddInstanceKey.focus();
-    }
-  });
-}
-
-function closeAddInstanceModal() {
-  if (!els.connectorAddInstanceModal) return;
-  setModalOpen(els.connectorAddInstanceModal, false);
-  state.connectorAddInstance = {
-    open: false,
-    slug: null,
-    connectorName: null,
-    manifest: null,
-    submitting: false,
-    error: null
-  };
-  if (els.connectorAddInstanceKey) {
-    els.connectorAddInstanceKey.value = '';
-  }
-  if (els.connectorAddInstanceError) {
-    els.connectorAddInstanceError.textContent = '';
-    els.connectorAddInstanceError.classList.add('hidden');
-  }
-}
-
-async function submitAddInstance() {
-  const s = state.connectorAddInstance;
-  if (!s.open || !s.slug || s.submitting) return;
-
-  const rawKey = (els.connectorAddInstanceKey?.value || '').trim();
-  if (!rawKey) {
-    showAddInstanceError(`${s.manifest?.instance_label || 'Instance name'} is required.`);
-    return;
-  }
-  if (!/^[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(rawKey)) {
-    showAddInstanceError('Use letters, numbers, and hyphens only. No spaces.');
-    return;
-  }
-  if (rawKey.toLowerCase() === 'default') {
-    showAddInstanceError("'default' is reserved for the original instance — pick a different name.");
-    return;
-  }
-
-  state.connectorAddInstance.submitting = true;
-  if (els.connectorAddInstanceSubmit) els.connectorAddInstanceSubmit.setAttribute('disabled', '');
-  if (els.connectorAddInstanceError) {
-    els.connectorAddInstanceError.textContent = '';
-    els.connectorAddInstanceError.classList.add('hidden');
-  }
-
-  try {
-    const result = await fetchJson(
-      `/api/integrations/connectors/${encodeURIComponent(s.slug)}/instances`,
-      {
-        method: 'POST',
-        headers: {
-          ...authHeaders(),
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ instance_key: rawKey })
-      }
-    );
-
-    flash(`Created ${result?.data?.source_name || `${s.connectorName} instance`}.`);
-    closeAddInstanceModal();
-
-    // Refresh the connectors view so the new row shows up immediately
-    await loadInstalledConnectors();
-    rebuildConnectorIndex();
-    renderCurrentView();
-  } catch (error) {
-    const msg = error?.payload?.error || error?.message || 'Failed to create instance.';
-    showAddInstanceError(msg);
-    state.connectorAddInstance.submitting = false;
-    if (els.connectorAddInstanceSubmit) els.connectorAddInstanceSubmit.removeAttribute('disabled');
-  }
-}
-
-function showAddInstanceError(message) {
-  if (!els.connectorAddInstanceError) return;
-  els.connectorAddInstanceError.textContent = message;
-  els.connectorAddInstanceError.classList.remove('hidden');
-}
-
-function openConnectorImportModal(opts = {}) {
-  if (!els.connectorImportModal) return;
-  const targetConnectorId = opts.targetConnectorId || null;
-  const targetConnectorName = opts.targetConnectorName || null;
-
-  state.connectorImport = {
-    open: true,
-    selectedFile: null,
-    uploading: false,
-    error: null,
-    targetConnectorId,
-    targetConnectorName
-  };
-  resetConnectorImportDom();
-  applyConnectorImportModalContext();
-  setModalOpen(els.connectorImportModal, true);
-}
-
-function closeConnectorImportModal() {
-  if (!els.connectorImportModal) return;
-  setModalOpen(els.connectorImportModal, false);
-  state.connectorImport = {
-    open: false,
-    selectedFile: null,
-    uploading: false,
-    error: null,
-    targetConnectorId: null,
-    targetConnectorName: null
-  };
-  resetConnectorImportDom();
-  applyConnectorImportModalContext();
-}
-
-// Update the import modal chrome (title, description, submit label) based on
-// whether we're running a fresh import or an "Update <connector>" flow.
-function applyConnectorImportModalContext() {
-  const descEl = els.connectorImportModal?.querySelector('.template-modal-description');
-  const submitEl = els.connectorImportSubmit;
-  const ctx = state.connectorImport;
-
-  if (ctx?.targetConnectorId && ctx.targetConnectorName) {
-    if (els.connectorImportModal) els.connectorImportModal.heading = `Update ${ctx.targetConnectorName}`;
-    if (descEl) {
-      descEl.innerHTML = `Upload a ZIP package to update <strong>${escapeHtmlSafe(ctx.targetConnectorName)}</strong>. ` +
-        'The new version will replace the current files and apply to every instance of this connector. ' +
-        'The manifest must match — uploading a ZIP for a different connector will be rejected.';
-    }
-    if (submitEl) setLexBtnText(submitEl, 'Upload Update');
-  } else {
-    if (els.connectorImportModal) els.connectorImportModal.heading = 'Import Connector';
-    if (descEl) {
-      descEl.innerHTML = 'Upload a ZIP package containing <code>manifest.json</code>, <code>connector.json</code>, and optional UI assets. ' +
-        'The backend validates the manifest, hook code, and UI files before installing.';
-    }
-    if (submitEl) setLexBtnText(submitEl, 'Upload Connector');
-  }
-}
-
-// Minimal escape — reuse the shared one when we already have access, otherwise fall back
-function escapeHtmlSafe(value) {
-  return String(value || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function resetConnectorImportDom() {
-  if (els.connectorImportFileInput) els.connectorImportFileInput.value = '';
-  if (els.connectorImportPreview) els.connectorImportPreview.classList.add('hidden');
-  if (els.connectorImportFileName) els.connectorImportFileName.textContent = '';
-  if (els.connectorImportFileSize) els.connectorImportFileSize.textContent = '';
-  if (els.connectorImportStatus) {
-    els.connectorImportStatus.textContent = '';
-    els.connectorImportStatus.className = 'muted';
-  }
-  if (els.connectorImportSubmit) els.connectorImportSubmit.setAttribute('disabled', '');
-}
-
-function clearConnectorImportFile() {
-  state.connectorImport.selectedFile = null;
-  resetConnectorImportDom();
-}
-
-function onConnectorImportFileChange(event) {
-  const file = event?.target?.files?.[0] || null;
-  applyConnectorImportFile(file);
-}
-
-function applyConnectorImportFile(file) {
-  if (!file) {
-    clearConnectorImportFile();
-    return;
-  }
-  const isZip = file.type === 'application/zip'
-    || file.type === 'application/x-zip-compressed'
-    || (file.name && file.name.toLowerCase().endsWith('.zip'));
-  if (!isZip) {
-    if (els.connectorImportStatus) {
-      els.connectorImportStatus.textContent = 'Please select a valid ZIP file.';
-      els.connectorImportStatus.className = 'form-error';
-    }
-    return;
-  }
-  state.connectorImport.selectedFile = file;
-  if (els.connectorImportPreview) els.connectorImportPreview.classList.remove('hidden');
-  if (els.connectorImportFileName) els.connectorImportFileName.textContent = file.name;
-  if (els.connectorImportFileSize) els.connectorImportFileSize.textContent = formatFileSize(file.size);
-  if (els.connectorImportStatus) {
-    els.connectorImportStatus.textContent = 'Ready to upload.';
-    els.connectorImportStatus.className = 'muted';
-  }
-  if (els.connectorImportSubmit) els.connectorImportSubmit.removeAttribute('disabled');
-}
-
-function setupConnectorImportDropZone(zone) {
-  const prevent = (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-  };
-  ['dragenter', 'dragover', 'dragleave', 'drop'].forEach((name) => {
-    zone.addEventListener(name, prevent);
-  });
-  zone.addEventListener('dragenter', () => zone.classList.add('drop-hover'));
-  zone.addEventListener('dragover', () => zone.classList.add('drop-hover'));
-  zone.addEventListener('dragleave', () => zone.classList.remove('drop-hover'));
-  zone.addEventListener('drop', (event) => {
-    zone.classList.remove('drop-hover');
-    const file = event.dataTransfer?.files?.[0] || null;
-    applyConnectorImportFile(file);
-  });
-  zone.addEventListener('click', (event) => {
-    if (event.target.closest('[data-connector-action]')) return;
-    if (els.connectorImportFileInput) els.connectorImportFileInput.click();
-  });
-}
-
-async function submitConnectorImport() {
-  const file = state.connectorImport?.selectedFile;
-  if (!file) return;
-  if (state.connectorImport.uploading) return;
-
-  state.connectorImport.uploading = true;
-  if (els.connectorImportSubmit) els.connectorImportSubmit.setAttribute('disabled', '');
-  if (els.connectorImportStatus) {
-    els.connectorImportStatus.textContent = 'Uploading…';
-    els.connectorImportStatus.className = 'muted';
-  }
-
-  try {
-    const formData = new FormData();
-    formData.append('connector_zip', file);
-
-    // When invoked from an "Update <connector>" context, scope the import
-    // so the backend rejects a mismatched manifest.
-    const targetSlug = state.connectorImport.targetConnectorId;
-    const targetName = state.connectorImport.targetConnectorName;
-    if (targetSlug) {
-      formData.append('target_connector_id', targetSlug);
-    }
-
-    const headers = { ...authHeaders() };
-    // Let the browser set the correct multipart boundary.
-    delete headers['Content-Type'];
-
-    const response = await fetch('/api/generic-connectors/import', {
-      method: 'POST',
-      headers,
-      body: formData
-    });
-    const contentType = response.headers.get('content-type') || '';
-    const payload = contentType.includes('application/json')
-      ? await response.json()
-      : await response.text();
-
-    if (!response.ok) {
-      const message = typeof payload === 'string'
-        ? payload
-        : (payload?.detail || payload?.error || payload?.message || `Upload failed (${response.status})`);
-      throw new Error(message);
-    }
-
-    const connectorLabel = targetName || payload?.name || 'Connector';
-    flash(targetSlug ? `Updated ${connectorLabel}.` : `${connectorLabel} imported.`);
-    closeConnectorImportModal();
-    await loadInstalledConnectors();
-    rebuildConnectorIndex();
-    renderCurrentView();
-  } catch (error) {
-    state.connectorImport.uploading = false;
-    if (els.connectorImportSubmit) els.connectorImportSubmit.removeAttribute('disabled');
-    if (els.connectorImportStatus) {
-      els.connectorImportStatus.textContent = error.message || 'Upload failed.';
-      els.connectorImportStatus.className = 'form-error';
-    }
+function openDataConnectorsPage() {
+  if (window.Lex && window.Lex.Nav && typeof window.Lex.Nav.go === 'function') {
+    window.Lex.Nav.go('data-connectors.html');
   }
 }
 
@@ -2998,20 +2141,6 @@ async function loadConnectorHealth() {
   }
 }
 
-async function refreshConnectorHealth() {
-  try {
-    await fetchJson('/api/connector-health/refresh', {
-      method: 'POST',
-      headers: authHeaders()
-    });
-    await loadConnectorHealth();
-    renderCurrentView();
-    flash('Connector readiness refreshed.');
-  } catch (error) {
-    flash(error.message || 'Failed to refresh connector readiness.', true);
-  }
-}
-
 async function loadApprovalDetail(approvalId, fallbackApproval = null) {
   if (!approvalId) return;
   const localApproval = fallbackApproval || state.approvals.find((approval) => {
@@ -3057,18 +2186,6 @@ async function decideApproval(approvalId, action, comments = '') {
   } finally {
     state.approvalActioning = false;
     renderCurrentView();
-  }
-}
-
-async function loadUserProfile() {
-  try {
-    const payload = await fetchJson('/api/users/me/profile', {
-      headers: authHeaders()
-    });
-    state.userProfile = payload.profile || payload.user || payload || null;
-  } catch (error) {
-    console.warn('Profile endpoint unavailable; continuing without profile payload.', error);
-    state.userProfile = null;
   }
 }
 

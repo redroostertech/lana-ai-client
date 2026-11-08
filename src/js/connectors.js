@@ -361,6 +361,14 @@ const Connectors = {
   },
 
   /**
+   * Health of the connections the caller can see:
+   * { success, data: { summary, connections[], checked_at } }.
+   */
+  async getHealth() {
+    return api.get('/api/v1/integrations/connectors/health');
+  },
+
+  /**
    * Fetch installed + catalog connectors and return a deduplicated, merged list.
    * The installed record (UUID id) is preferred over its catalog twin so the
    * caller can address a real integration source.

@@ -366,7 +366,7 @@ button:disabled {
 
 
 
-/* Body of the automation lex-modals (template, check data, connector import / add instance / confirm). */
+/* Body of the automation lex-modals (template, check data). */
 .automation-modal-body {
   display: flex;
   flex-direction: column;
@@ -2773,10 +2773,6 @@ button:disabled {
   gap: 14px;
 }
 
-.connectors-checklist-row {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
 .check-item {
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -2928,8 +2924,7 @@ pre.code-preview {
   .login-shell,
   .login-notes,
   .form-grid,
-  .checklist,
-  .connectors-checklist-row {
+  .checklist {
     grid-template-columns: 1fr;
   }
 
@@ -3013,49 +3008,6 @@ pre.code-preview {
   gap: 6px;
 }
 
-.connector-add-instance-form {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin: 16px 0;
-}
-.connector-add-instance-form .form-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.connector-add-instance-form .form-field > span:first-child {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--lex-text-primary, #26211C);
-}
-.connector-add-instance-form input[type="text"] {
-  padding: 10px 12px;
-  border: 1px solid var(--lex-border-default, #E8E5E1);
-  border-radius: 8px;
-  font-size: 14px;
-  font-family: inherit;
-  background: var(--lex-bg-primary, #FFFFFF);
-  color: var(--lex-text-primary, #26211C);
-}
-.connector-add-instance-form input[type="text"]:focus {
-  outline: none;
-  border-color: var(--lex-input-border-focus, #6366F1);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lex-input-border-focus, #6366F1) 20%, transparent);
-}
-.connector-add-instance-form input[type="text"]:invalid {
-  border-color: var(--lex-border-default, #E8E5E1);
-}
-.connector-add-instance-form .muted {
-  font-size: 12px;
-  color: var(--lex-text-secondary, #9CA3AF);
-}
-.connector-add-instance-panel .form-error {
-  color: var(--lex-color-danger-500, #F04438);
-  font-size: 13px;
-  font-weight: 500;
-  margin: 0;
-}
 
 .connectors-row {
   cursor: pointer;
@@ -3103,26 +3055,6 @@ pre.code-preview {
   color: var(--lex-color-warning-500, #f5a524);
 }
 
-.connectors-admin-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 16px 20px;
-  margin: 16px 0;
-  border: 1px dashed rgba(99, 102, 241, 0.35);
-  border-radius: 12px;
-  background: rgba(99, 102, 241, 0.04);
-}
-.connectors-admin-toolbar-copy strong {
-  display: block;
-  font-size: 14px;
-  color: var(--lex-color-text, #1f2937);
-  margin-bottom: 4px;
-}
-.connectors-admin-toolbar-copy .muted {
-  font-size: 13px;
-}
 
 /* ──────────────────────────────────────────────────────────────────
    Connector Detail View
@@ -3132,11 +3064,6 @@ pre.code-preview {
   flex-direction: column;
   gap: 20px;
   min-height: calc(100vh - 120px);
-}
-
-.connector-detail-breadcrumb .lex-breadcrumb,
-.connector-detail-breadcrumb nav.lex-breadcrumb {
-  padding: 0 4px;
 }
 
 .connector-detail-header {
@@ -3165,30 +3092,6 @@ pre.code-preview {
   gap: 16px;
 }
 
-.connector-detail-logo {
-  width: 56px;
-  height: 56px;
-  border-radius: 12px;
-  background: var(--lex-color-bg-subtle, #f4f5f8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  overflow: hidden;
-  color: #9ca3af;
-  font-size: 22px;
-  font-weight: 700;
-}
-.connector-detail-logo img {
-  width: 42px;
-  height: 42px;
-  object-fit: contain;
-}
-.connector-detail-logo span {
-  font-size: 20px;
-  font-weight: 700;
-  color: #94a3b8;
-}
 
 .connector-detail-identity h2 {
   margin: 0 0 4px;
@@ -3221,25 +3124,6 @@ pre.code-preview {
   flex-shrink: 0;
 }
 
-.connector-detail-last-sync {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
-  border-radius: 999px;
-  background: var(--lex-color-bg-subtle, #f4f5f8);
-  font-size: 13px;
-  color: var(--lex-color-text, #111827);
-}
-.connector-detail-last-sync-label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--lex-color-text-muted, #6b7280);
-}
-.connector-detail-last-sync strong {
-  font-weight: 600;
-}
 
 .connector-detail-actions {
   display: flex;
@@ -3247,85 +3131,6 @@ pre.code-preview {
   align-items: center;
   gap: 8px;
   justify-content: flex-end;
-}
-
-.connector-detail-body {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-/* Iframe host */
-.connector-detail-iframe-wrap {
-  position: relative;
-  width: 100%;
-  flex: 1;
-  min-height: 640px;
-  background: #fff;
-  border: 1px solid var(--lex-color-border, #e5e7eb);
-  border-radius: 16px;
-  overflow: hidden;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-}
-.connector-detail-iframe {
-  width: 100%;
-  height: 100%;
-  min-height: 640px;
-  border: 0;
-  display: block;
-}
-.connector-detail-iframe-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-  color: #fff;
-  z-index: 2;
-  transition: opacity 180ms ease;
-}
-.connector-detail-iframe-overlay.hidden {
-  opacity: 0;
-  pointer-events: none;
-}
-.connector-detail-iframe-spinner {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  border: 3px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #fff;
-  animation: connector-spin 900ms linear infinite;
-}
-@keyframes connector-spin {
-  to { transform: rotate(360deg); }
-}
-.connector-detail-iframe-error {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 32px;
-  text-align: center;
-  background: #fff;
-  z-index: 3;
-}
-.connector-detail-iframe-error.hidden {
-  display: none;
-}
-.connector-detail-iframe-error strong {
-  font-size: 16px;
-  color: #dc2626;
-}
-.connector-detail-iframe-error p {
-  color: #6b7280;
-  margin: 0;
-  max-width: 480px;
 }
 
 /* Fallback overview */
@@ -3339,113 +3144,6 @@ pre.code-preview {
   color: var(--lex-color-text-muted, #6b7280);
   line-height: 1.55;
 }
-.connector-detail-chips {
-  margin-top: 20px;
-}
-.connector-detail-chips h4 {
-  margin: 0 0 8px;
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--lex-color-text-muted, #6b7280);
-}
-
-/* Fallback "managed externally" info card — shown for legacy connectors
-   that don't yet have a `ui_entry_point` (Leadly, ActionStep, etc.) */
-.connector-managed-externally-description {
-  margin: 0 0 16px;
-  color: var(--lex-color-text-muted, #6b7280);
-  line-height: 1.55;
-  font-size: 14px;
-}
-.connector-managed-externally-note {
-  margin-top: 20px;
-  padding: 16px 18px;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  border-radius: 12px;
-}
-.connector-managed-externally-note strong {
-  display: block;
-  color: #78350f;
-  font-size: 14px;
-  margin-bottom: 6px;
-}
-.connector-managed-externally-note p {
-  margin: 0;
-  color: #92400e;
-  font-size: 13px;
-  line-height: 1.55;
-}
-
-/* ──────────────────────────────────────────────────────────────────
-   Connector Import Modal
-   ────────────────────────────────────────────────────────────────── */
-.connector-import-dropzone {
-  border: 2px dashed #cbd5f5;
-  border-radius: 14px;
-  padding: 28px 20px;
-  text-align: center;
-  cursor: pointer;
-  transition: border-color 160ms ease, background 160ms ease;
-  background: rgba(99, 102, 241, 0.03);
-  margin: 16px 0 12px;
-}
-.connector-import-dropzone:hover,
-.connector-import-dropzone.drop-hover {
-  border-color: #6366f1;
-  background: rgba(99, 102, 241, 0.08);
-}
-.connector-import-dropzone-icon {
-  width: 48px;
-  height: 48px;
-  color: #6366f1;
-  margin: 0 auto 10px;
-  display: block;
-}
-.connector-import-dropzone p {
-  margin: 4px 0;
-  font-size: 14px;
-  color: var(--lex-color-text, #1f2937);
-}
-.connector-import-dropzone .muted {
-  font-size: 12px;
-}
-
-.connector-import-preview {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 16px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  margin-bottom: 12px;
-}
-.connector-import-preview.hidden {
-  display: none;
-}
-.connector-import-preview-main {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-.connector-import-preview-main svg {
-  width: 28px;
-  height: 28px;
-  color: #6366f1;
-  flex-shrink: 0;
-}
-.connector-import-preview-main strong {
-  display: block;
-  font-size: 14px;
-  color: #111827;
-  word-break: break-all;
-}
-
-
 
 @media (max-width: 900px) {
   .connector-detail-header {
@@ -3454,10 +3152,6 @@ pre.code-preview {
   }
   .connector-detail-actions {
     justify-content: flex-start;
-  }
-  .connector-detail-iframe-wrap,
-  .connector-detail-iframe {
-    min-height: 520px;
   }
 }
 
@@ -4358,41 +4052,7 @@ details[open].ld-step-raw > summary::before {
 /* ---------------------------------------------------------------------------
    GAP #3: OAuth re-authorization warning banner
    --------------------------------------------------------------------------- */
-.connector-reauth-banner {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  background: #fffbea;
-  border: 1px solid #f0c040;
-  border-radius: 8px;
-  padding: 12px 16px;
-  margin: 8px 0;
-  font-size: 0.85rem;
-  color: #7a4f00;
-}
 
-.connector-reauth-banner-icon {
-  flex-shrink: 0;
-  font-size: 1rem;
-  margin-top: 1px;
-}
-
-.connector-reauth-banner-body {
-  flex: 1;
-  min-width: 0;
-}
-
-.connector-reauth-banner-body strong {
-  display: block;
-  margin-bottom: 4px;
-}
-
-.connector-reauth-banner-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-  flex-wrap: wrap;
-}
 
 /* ---------------------------------------------------------------------------
    GAP #9: SSE run-status live badge

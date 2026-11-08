@@ -113,15 +113,6 @@ export function parseJson(value, fallback) {
   }
 }
 
-export function formatFileSize(bytes) {
-  const value = Number(bytes);
-  if (!Number.isFinite(value) || value <= 0) return '0 Bytes';
-  const units = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.min(Math.floor(Math.log(value) / Math.log(1024)), units.length - 1);
-  const scaled = value / Math.pow(1024, i);
-  return `${Math.round(scaled * 100) / 100} ${units[i]}`;
-}
-
 export function timeAgo(isoString) {
   if (!isoString) return 'Never';
   const then = new Date(isoString).getTime();

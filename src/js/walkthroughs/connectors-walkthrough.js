@@ -45,7 +45,7 @@
         eyebrow: 'Step 3: Check the status',
         title: 'See what is ',
         accent: 'connected',
-        detail: 'Each connector says Connected or Not connected. Use Manage accounts to add another login or pick the default one.',
+        detail: 'Each connector says Connected or Not connected. If one says Needs attention, reconnect it. Use Manage accounts to add another login or pick the default one.',
         illustration: `<div class="app-tour-card app-tour-in">
             <div class="app-tour-card-head"><span class="app-tour-eyebrow">Your connectors</span></div>
             <div class="app-tour-row app-tour-in app-tour-d2"><span class="app-tour-row-value">Practice management</span><span class="app-tour-pill"><span class="app-tour-dot"></span>Connected</span></div>

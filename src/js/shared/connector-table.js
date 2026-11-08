@@ -1,8 +1,8 @@
 /**
  * connector-table.js
- * The connector catalog table shared by Data Connectors (data-connectors.html)
- * and the automation app's Connectors view (docs/TABLE-STANDARD.md): toolbar
- * card, section heading with the count, and one client-side lex-table.
+ * The connector catalog table of Data Connectors (data-connectors.html)
+ * (docs/TABLE-STANDARD.md): toolbar card, section heading with the count,
+ * and one client-side lex-table.
  *
  * The catalog is one small list (installed sources merged with the local
  * connector packages, well under 500 rows) that no API pages, so the table
@@ -10,12 +10,12 @@
  *
  * Each page maps its own connectors to rows of raw values:
  *   { id, pin_key, pinned: 'yes'|'no', name, vendor, description, logo_url,
- *     category, auth_type, scope: 'org'|'user', status, version, created_at, _raw }
+ *     category, auth_type, scope: 'org'|'user', status, version, created_at,
+ *     needs_attention?: 'yes'|'no', _raw }
  * and supplies its status vocabulary and the Actions cell.
  *
  * Public API (window.LanaConnectorTable, or module.exports in Node):
  *   - COLUMNS, LABELS, SORTABLE_COLUMNS, SEARCH_KEYS, SORT_OPTIONS
- *   - AUTOMATION_STATUSES, automationStatusKey(status)  (automation app readiness)
  *   - authLabel(value), categoryLabel(value), scopeLabel(value), versionLabel(value)
  *   - columnFilterOptions(rows, statuses)  -> setColumnFilterOptions map
  *   - cellRenderers(config)                -> lex-table renderers
@@ -61,30 +61,6 @@
   };
   var CATEGORY_LABELS = { crm: 'CRM', case: 'Case management', mcp: 'MCP server', unknown: 'Other' };
   var SEARCH_DEBOUNCE_MS = 350;
-
-  // The automation app's readiness vocabulary. The backend pre-creates an
-  // integration source per known connector, so presence is not readiness;
-  // the status is (see automation/js/views/connectors.js).
-  var AUTOMATION_STATUSES = {
-    ready:         { label: 'Ready',         color: 'green' },
-    syncing:       { label: 'Syncing',       color: 'blue' },
-    error:         { label: 'Error',         color: 'red' },
-    coming_soon:   { label: 'Coming soon',   color: 'yellow' },
-    not_installed: { label: 'Not installed', color: 'gray' }
-  };
-  var AUTOMATION_STATUS_KEYS = {
-    connected: 'ready',
-    active: 'ready',
-    installed: 'ready',
-    syncing: 'syncing',
-    error: 'error',
-    coming_soon: 'coming_soon'
-  };
-
-  /** Raw connector status -> AUTOMATION_STATUSES key (not_installed by default). */
-  function automationStatusKey(status) {
-    return AUTOMATION_STATUS_KEYS[String(status || '').trim().toLowerCase()] || 'not_installed';
-  }
 
   var SORT_ICON = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path></svg>';
   var STAR_FILLED = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.39 6.96L22 9.27l-5.45 4.73L17.82 22 12 18.27 6.18 22l1.27-7.99L2 9.27l7.61-.31L12 2z"/></svg>';
@@ -241,10 +217,14 @@
         var label = scopeLabel(value);
         return '<lex-badge label="' + label + '" color="' + (label === 'Personal' ? 'blue' : 'gray') + '" size="sm"></lex-badge>';
       },
-      status: function (value) {
+      status: function (value, row) {
         if (!value) return muted('');
         var info = statusInfo(statuses, value);
-        return '<lex-badge label="' + esc(info.label) + '" color="' + esc(info.color || 'gray') + '" size="sm"></lex-badge>';
+        // A row the health check flagged keeps its status and adds a second badge.
+        var attention = row && row.needs_attention === 'yes'
+          ? '<lex-badge label="Needs attention" color="yellow" size="sm"></lex-badge>'
+          : '';
+        return '<lex-badge label="' + esc(info.label) + '" color="' + esc(info.color || 'gray') + '" size="sm"></lex-badge>' + attention;
       },
       version: function (value) {
         return value ? '<span class="connector-table-text">' + esc(versionLabel(value)) + '</span>' : muted('');
@@ -482,8 +462,6 @@
     SORTABLE_COLUMNS: SORTABLE_COLUMNS,
     SEARCH_KEYS: SEARCH_KEYS,
     SORT_OPTIONS: SORT_OPTIONS,
-    AUTOMATION_STATUSES: AUTOMATION_STATUSES,
-    automationStatusKey: automationStatusKey,
     authLabel: authLabel,
     categoryLabel: categoryLabel,
     scopeLabel: scopeLabel,

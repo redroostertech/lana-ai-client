@@ -9,7 +9,6 @@
   <script src="../js/tailwind-loader.js"></script>
   <link rel="stylesheet" href="../css/lex-tokens.css">
   <link rel="stylesheet" href="../css/lex-chat.css">
-  <link rel="stylesheet" href="../css/connector-table.css">
   <link rel="stylesheet" href="../css/lex-motion.css">
   <link rel="stylesheet" href="../css/app-walkthrough.css">
   <link rel="stylesheet" href="./styles.css">
@@ -61,78 +60,7 @@
           <ol id="check-data-modal-steps" class="template-modal-steps"></ol>
         </div>
       </div>
-      <lex-btn data-slot="footer" id="check-data-modal-go" variant="primary" size="md" data-check-data-go>Go to Connectors</lex-btn>
-    </lex-modal>
-
-    <lex-modal id="connector-import-modal" heading="Import Connector" size="md" class="automation-modal">
-      <div class="automation-modal-body">
-        <p class="template-modal-description">
-          Upload a ZIP package containing <code>manifest.json</code>, <code>connector.json</code>, and optional UI assets.
-          The backend validates the manifest, hook code, and UI files before installing.
-        </p>
-
-        <div id="connector-import-dropzone" class="connector-import-dropzone">
-          <svg class="connector-import-dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-          </svg>
-          <p><strong>Click to upload</strong> or drag and drop a connector ZIP package.</p>
-          <p class="muted">Maximum size depends on your deployment tier.</p>
-          <input type="file" id="connector-import-file-input" accept=".zip,application/zip" hidden>
-        </div>
-
-        <div id="connector-import-preview" class="connector-import-preview hidden">
-          <div class="connector-import-preview-main">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-            </svg>
-            <div>
-              <strong id="connector-import-file-name"></strong>
-              <div id="connector-import-file-size" class="muted"></div>
-            </div>
-          </div>
-          <lex-btn variant="ghost" size="sm" data-connector-action="import-clear">Remove</lex-btn>
-        </div>
-
-        <p id="connector-import-status" class="muted"></p>
-      </div>
-      <lex-btn data-slot="footer" variant="secondary" size="md" data-connector-action="import-close">Cancel</lex-btn>
-      <lex-btn data-slot="footer" id="connector-import-submit" variant="primary" size="md" data-connector-action="import-submit" disabled>Upload Connector</lex-btn>
-    </lex-modal>
-
-    <lex-modal id="connector-add-instance-modal" heading="Add Connector Instance" size="md" class="automation-modal connector-add-instance-panel">
-      <div class="automation-modal-body">
-        <p class="template-modal-description">
-          Create an additional configuration of this connector. Each instance runs independently
-          and can point at a different account, database, or location.
-        </p>
-
-        <form id="connector-add-instance-form" class="connector-add-instance-form" novalidate>
-          <label class="form-field">
-            <span id="connector-add-instance-label">Instance name</span>
-            <input
-              id="connector-add-instance-key"
-              name="instance_key"
-              type="text"
-              autocomplete="off"
-              spellcheck="false"
-              required
-              maxlength="100"
-              pattern="[a-zA-Z0-9][a-zA-Z0-9-]*"
-            >
-            <span id="connector-add-instance-helper" class="muted">Use letters, numbers, and hyphens only. No spaces.</span>
-          </label>
-
-          <p id="connector-add-instance-error" class="form-error hidden"></p>
-        </form>
-      </div>
-      <lex-btn data-slot="footer" variant="secondary" size="md" data-connector-action="add-instance-close">Cancel</lex-btn>
-      <lex-btn data-slot="footer" id="connector-add-instance-submit" type="submit" form="connector-add-instance-form" variant="primary" size="md">Create Instance</lex-btn>
-    </lex-modal>
-
-    <lex-modal id="connector-confirm-modal" heading="Confirm Action" size="md" class="automation-modal">
-      <p id="connector-confirm-message" class="template-modal-description"></p>
-      <lex-btn data-slot="footer" id="connector-confirm-cancel" variant="secondary" size="md" data-connector-action="confirm-cancel">Cancel</lex-btn>
-      <lex-btn data-slot="footer" id="connector-confirm-submit" variant="primary" size="md" data-connector-action="confirm-submit">Confirm</lex-btn>
+      <lex-btn data-slot="footer" id="check-data-modal-go" variant="primary" size="md" data-check-data-go>Open Data Connectors</lex-btn>
     </lex-modal>
 
   </div>
@@ -207,7 +135,6 @@
   <script src="../js/lex/components/layout/lex-lana-dock.js"></script>
   <script src="../js/auth-guard.js"></script>
   <script src="../js/shared/library-column-filters.js"></script>
-  <script src="../js/shared/connector-table.js"></script>
   <script src="./js/shared/table-queries.js"></script>
   <script type="module" src="./app.js"></script>
 </body>

@@ -104,10 +104,10 @@ describe('automation app dialogs', () => {
     return bootLex(html.slice(start, end), LEX_MODAL_THEN_BTN);
   }
 
-  test('all five dialogs are lex-modals with their footer actions in the footer', async () => {
+  test('both dialogs are lex-modals with their footer actions in the footer', async () => {
     const window = bootAutomationModals();
     await tick(window);
-    const ids = ['template-modal', 'check-data-modal', 'connector-import-modal', 'connector-add-instance-modal', 'connector-confirm-modal'];
+    const ids = ['template-modal', 'check-data-modal'];
     for (const id of ids) {
       const modal = window.document.getElementById(id);
       expect(modal.tagName).toBe('LEX-MODAL');
@@ -115,26 +115,22 @@ describe('automation app dialogs', () => {
       expect(modal.querySelectorAll('button button')).toHaveLength(0);
     }
     expect(window.document.querySelector('#template-modal .lex-modal-footer #template-modal-try')).not.toBeNull();
-    expect(window.document.querySelector('#connector-confirm-modal .lex-modal-footer #connector-confirm-submit')).not.toBeNull();
+    expect(window.document.querySelector('#check-data-modal .lex-modal-footer #check-data-modal-go')).not.toBeNull();
   });
 
-  test('Create Instance submits the add-instance form from the footer', async () => {
+  test('the connector dialogs are gone: connectors are managed on Data Connectors', async () => {
     const window = bootAutomationModals();
     await tick(window);
-    const form = window.document.getElementById('connector-add-instance-form');
-    const submit = window.document.querySelector('#connector-add-instance-submit button');
-    expect(submit.getAttribute('type')).toBe('submit');
-    expect(submit.getAttribute('form')).toBe('connector-add-instance-form');
-    let submitted = 0;
-    form.addEventListener('submit', (event) => { event.preventDefault(); submitted += 1; });
-    submit.click();
-    expect(submitted).toBe(1);
+    for (const id of ['connector-import-modal', 'connector-add-instance-modal', 'connector-confirm-modal']) {
+      expect(window.document.getElementById(id)).toBeNull();
+    }
+    expect(window.document.querySelector('#check-data-modal-go').textContent.trim()).toBe('Open Data Connectors');
   });
 
   test('Escape on an open dialog emits lex-close (app.js resets state from it)', async () => {
     const window = bootAutomationModals();
     await tick(window);
-    const modal = window.document.getElementById('connector-confirm-modal');
+    const modal = window.document.getElementById('check-data-modal');
     let closed = 0;
     modal.addEventListener('lex-close', () => { closed += 1; });
     modal.open = true;
@@ -146,9 +142,8 @@ describe('automation app dialogs', () => {
 
   test('app.js drives dialogs through open/heading, not hidden classes', () => {
     const app = read('automation/app.js');
-    expect(app).not.toMatch(/(templateModal|checkDataModal|connectorImportModal|connectorConfirmModal|connectorAddInstanceModal)\.classList/);
-    expect(app).toContain("els.connectorAddInstanceForm?.addEventListener('submit'");
-    expect(app).toContain("els.connectorConfirmModal?.addEventListener('lex-close'");
+    expect(app).not.toMatch(/(templateModal|checkDataModal)\.classList/);
+    expect(app).toContain("els.checkDataModal?.addEventListener('lex-close'");
     expect(app).toContain('syncLibraryDetailModals(context, {})');
   });
 });

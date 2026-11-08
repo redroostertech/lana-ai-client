@@ -1,4 +1,6 @@
 import { SYSTEM_CONNECTORS } from '../constants.js';
+import { badge } from './ui.js';
+import { escapeHtml, formatLabel, normalizeText } from './utils.js';
 
 /**
  * Flexible match function used by findSystemDefaults. Case-insensitive.
@@ -294,43 +296,137 @@ export function indexConnectors(installed = []) {
   return entries;
 }
 
-export function isInstalled(connector) {
-  if (!connector) return false;
-  const status = String(connector.status || '').toLowerCase();
-  return ['connected', 'active', 'installed', 'error', 'syncing'].includes(status);
+// ── Readiness helpers for Home and the builder ─────────────────────────────
+// Connectors are managed on the app-wide Data Connectors page. Automate only
+// reads readiness: Home counts ready connectors, and the builder lists the
+// connectors a template suggests.
+
+export function connectorDisplayName(connector) {
+  const raw = connector.metadata?.name || connector.name || connector.id || connector.connector_id || 'Connector';
+  const base = formatLabel(raw);
+  const instanceKey = connector.instance_key;
+  if (instanceKey && instanceKey !== 'default') {
+    return `${base} (${instanceKey})`;
+  }
+  return base;
 }
 
 /**
- * Build the URL for the lana-client page that manages a given connector.
- * Mirrors the routing in lana-client/src/js/data_connectors.js so a click
- * in the automation app opens the same page a lana-client user would see.
+ * Status to label map. The backend pre-creates an integration_source row for
+ * every known connector, so row presence does NOT mean "configured". The
+ * real signal is `connector.status`:
  *
- * The automation server mounts lana-client/src under /lex-framework on its
- * own origin (see @automation/server.js: `app.use('/lex-framework', ...)`),
- * so the URL is same-origin and needs no separate base.
- *
- * Every connector opens in the shared, data-driven connector viewer. Connector
- * packages can still provide ui_entry_point metadata for specialized panels.
- *
- * @param {Object} connector - Normalized connector record
- * @param {string} [baseUrl='/lex-framework'] - Optional override for the
- *        lana-client mount point. Defaults to the /lex-framework path that
- *        the automation server exposes.
- * @returns {string|null} Target URL, or null when the connector is missing.
+ *   connected | active | installed: configured and usable, "Ready"
+ *   syncing: transient active state, "Syncing"
+ *   error: actionable failure, "Error"
+ *   coming_soon: catalog placeholder, "Coming Soon"
+ *   not_configured | disconnected: needs setup, "Not Installed"
  */
-export function buildLanaClientConnectorUrl(connector, baseUrl = '/lex-framework') {
-  if (!connector) return null;
+const STATUS_MAP = {
+  connected:      { label: 'Ready',         tone: 'success' },
+  active:         { label: 'Ready',         tone: 'success' },
+  installed:      { label: 'Ready',         tone: 'success' },
+  syncing:        { label: 'Syncing',       tone: 'info'    },
+  error:          { label: 'Error',         tone: 'error'   },
+  coming_soon:    { label: 'Coming Soon',   tone: 'warning' },
+  not_configured: { label: 'Not Installed', tone: ''        },
+  disconnected:   { label: 'Not Installed', tone: ''        }
+};
 
-  const base = String(baseUrl || '/lex-framework').replace(/\/+$/, '');
-  const rowId = connector.id || connector.connector_id || connector.connector_type || '';
-  const connectorType = connector.connector_id || connector.connector_type || connector.source_type || rowId;
-  const params = new URLSearchParams({
-    ui: connector.ui_entry_point || '',
-    name: connector.name || connector.connector_name || connector.source_name || 'Connector',
-    connectorId: rowId,
-    connectorType,
-    sourceId: connector.id || '',
-    connectorScope: connector.connector_scope || ''
+const READY_STATUSES = new Set(['connected', 'active', 'installed']);
+
+function resolveConnectorStatus(connector) {
+  if (!connector) return 'not_configured';
+  const raw = connector.status || connector._raw?.status;
+  return String(raw || 'not_configured').toLowerCase();
+}
+
+export function connectorReadiness(_context, connector) {
+  const status = resolveConnectorStatus(connector);
+  return STATUS_MAP[status] || STATUS_MAP.not_configured;
+}
+
+export function isConnectorReady(connector) {
+  return READY_STATUSES.has(resolveConnectorStatus(connector));
+}
+
+export function getConnectorList(context) {
+  const catalog = Array.isArray(context?.state?.connectors) ? context.state.connectors : [];
+  const indexed = Array.isArray(context?.state?.connectorIndex) ? context.state.connectorIndex : [];
+
+  if (catalog.length === 0) return indexed;
+  if (indexed.length === 0) return catalog;
+
+  const installedById = new Map();
+  for (const connector of indexed) {
+    const keys = [
+      connector?.id,
+      connector?.connector_id,
+      connector?.connector_type,
+      connector?.source_type
+    ];
+
+    for (const key of keys) {
+      const normalized = String(key || '').trim().toLowerCase();
+      if (normalized && !installedById.has(normalized)) {
+        installedById.set(normalized, connector);
+      }
+    }
+  }
+
+  return catalog.map((connector) => {
+    const connectorId = String(connector?.id || connector?.connector_id || '').trim().toLowerCase();
+    const installed = installedById.get(connectorId);
+    if (!installed) return connector;
+
+    return {
+      ...installed,
+      ...connector,
+      id: connector.id || installed.id,
+      connector_id: connector.connector_id || connector.id || installed.connector_id,
+      status: installed.status || connector.status,
+      ui_entry_point: installed.ui_entry_point || connector.ui_entry_point,
+      dashboard: installed.dashboard || connector.dashboard,
+      instance_key: installed.instance_key || connector.instance_key,
+      multi_instance: installed.multi_instance || connector.multi_instance,
+      _raw: installed._raw || installed
+    };
   });
-  return `${base}/integrations/connector-viewer.html?${params.toString()}`;
+}
+
+export function countReadyConnectors(context) {
+  return getConnectorList(context).filter((connector) => isConnectorReady(connector)).length;
+}
+
+function getRecommendedTemplatesForConnector(context, connector) {
+  const haystack = normalizeText([
+    connectorDisplayName(connector),
+    connector.metadata?.description,
+    connector.metadata?.category,
+    connector.auth?.type
+  ].filter(Boolean).join(' '));
+
+  return context.getTemplateLibrary().filter((template) =>
+    (template.connectorHints || []).some((hint) => haystack.includes(normalizeText(hint)))
+  );
+}
+
+export function connectorCompact(context, connector) {
+  const readiness = connectorReadiness(context, connector);
+  const snapshot = context.state.connectorHealth.find((entry) => entry.connector_id === (connector.id || connector.connector_id));
+  const templateMatches = getRecommendedTemplatesForConnector(context, connector);
+
+  return `
+    <article class="check-item">
+      <div class="badge-row">
+        ${badge(readiness.label, readiness.tone)}
+        ${badge(connectorScopeLabel(connector), connectorScopeLabel(connector) === 'Personal' ? 'info' : '')}
+        ${badge(connector.auth?.type || connector.metadata?.category || 'runtime')}
+      </div>
+      <strong>${escapeHtml(connectorDisplayName(connector))}</strong>
+      <p>${escapeHtml(connector.metadata?.description || 'No connector description available.')}</p>
+      ${templateMatches.length ? `<div class="badge-row">${templateMatches.slice(0, 2).map((template) => badge(template.name)).join('')}</div>` : ''}
+      ${snapshot && snapshot.status_reason ? `<p>${escapeHtml(snapshot.status_reason)}</p>` : ''}
+    </article>
+  `;
 }

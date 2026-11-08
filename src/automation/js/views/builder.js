@@ -6,7 +6,7 @@ import {
 } from '../constants.js';
 import { badge, emptyState, metaGrid, surface } from '../shared/ui.js';
 import { escapeAttribute, escapeHtml, normalizeText } from '../shared/utils.js';
-import { connectorCompact, connectorDisplayName, countReadyConnectors } from './connectors.js';
+import { connectorCompact, connectorDisplayName, countReadyConnectors } from '../shared/connectors.js';
 // Side-effect import: executes the mapper IIFE so window.DesignToBuilderMapper
 // is available for the "Build with Lana" panel below. The mapper module owns the
 // design-response -> builder-state transform; this view only consumes it.
@@ -2420,7 +2420,7 @@ function renderBuilderStepFooter(currentStep, preflight) {
     <div class="row-actions row-actions-spread">
       <div class="row-actions">
         ${isFirstStep ? '<lex-btn variant="secondary" size="sm" data-open-view="library">Cancel</lex-btn>' : `<lex-btn variant="secondary" size="sm" data-builder-step="${currentStep - 1}">Previous</lex-btn>`}
-        ${currentStep === 2 ? '<lex-btn variant="ghost" size="sm" data-open-view="connectors">Open Connectors</lex-btn>' : ''}
+        ${currentStep === 2 ? '<lex-btn variant="ghost" size="sm" data-open-data-connectors>Open Data Connectors</lex-btn>' : ''}
       </div>
       <div class="row-actions">
         ${isFinalStep

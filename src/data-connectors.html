@@ -33,6 +33,73 @@
       display: block;
       margin: 1.5rem 0 0.5rem;
     }
+
+    /* Needs attention summary and permission notices, above the list. */
+    .dc-attention,
+    .dc-reauth {
+      margin: 1rem 1rem 0;
+      padding: 0.875rem 1rem;
+      border: 1px solid var(--lex-status-warning);
+      border-radius: var(--lex-card-radius);
+      background: var(--lex-status-warning-bg);
+      color: var(--lex-text-primary);
+    }
+    .dc-attention[hidden],
+    .dc-reauth-list[hidden] {
+      display: none;
+    }
+    .dc-attention-head {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .dc-attention-count {
+      font-size: 0.875rem;
+      color: var(--lex-text-secondary);
+    }
+    .dc-attention-list {
+      list-style: none;
+      margin: 0.75rem 0 0;
+      padding: 0;
+      display: grid;
+      gap: 0.5rem;
+    }
+    .dc-attention-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .dc-attention-text {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .dc-attention-name {
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+    .dc-attention-reason,
+    .dc-reauth-text {
+      font-size: 0.875rem;
+      color: var(--lex-text-secondary);
+    }
+    .dc-reauth {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .dc-reauth-text {
+      flex: 1 1 16rem;
+      margin: 0;
+    }
+    .dc-reauth-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
   </style>
 
   <link rel="stylesheet" href="css/lex-chat.css">
@@ -78,6 +145,12 @@
 
       <lex-app-loop id="dcLoop" class="dc-loop" kicker="How it works" heading="Three steps to connected data."
         steps="[{&quot;value&quot;: &quot;find&quot;, &quot;title&quot;: &quot;Find your tool&quot;, &quot;text&quot;: &quot;Search the list below for the system your firm uses, then choose Connect.&quot;}, {&quot;value&quot;: &quot;allow&quot;, &quot;title&quot;: &quot;Allow access once&quot;, &quot;text&quot;: &quot;Approve access on your tool\u2019s own sign-in page, or paste an API key if it asks.&quot;}, {&quot;value&quot;: &quot;use&quot;, &quot;title&quot;: &quot;Use it everywhere&quot;, &quot;text&quot;: &quot;Connected data feeds chat, Insights and Automate, kept in sync.&quot;}]"></lex-app-loop>
+
+      <!-- Google permission notices and the Needs attention summary,
+           rendered by data_connectors.js (js/shared/connector-health-view.js).
+           Both stay hidden when there is nothing to show. -->
+      <section id="dcReauthNotices" class="dc-reauth-list" hidden></section>
+      <section id="dcAttention" class="dc-attention" aria-label="Connections that need attention" hidden></section>
 
       <!-- Connector Categories - Loading Skeleton -->
       <div id="connectorsLoading" class="space-y-8 mb-4 p-4">
@@ -477,6 +550,7 @@
   <!-- Page controller (MUST be last before auth-guard) -->
   <script src="js/shared/library-column-filters.js"></script>
   <script src="js/shared/connector-table.js"></script>
+  <script src="js/shared/connector-health-view.js"></script>
   <script src="js/data_connectors.js"></script>
 
   <!-- PAC bridge consent handler (Lex modal for token requests) -->

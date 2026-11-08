@@ -1,8 +1,8 @@
-/* Connector catalog table (js/shared/connector-table.js), shared by
-   data-connectors.html and the automation app's Connectors view.
+/* Connector catalog table (js/shared/connector-table.js) of
+   data-connectors.html.
    Columns: Pin, Name, Category, Auth, Scope, Status, Version, Created, Actions */
 
-.connector-table table { min-width: 1260px; table-layout: fixed; }
+.connector-table table { min-width: 1310px; table-layout: fixed; }
 .connector-table th { white-space: nowrap; }
 .connector-table td { overflow: hidden; }
 .connector-table th:nth-child(1) { width: 44px; }
@@ -12,7 +12,7 @@
 .connector-table th:nth-child(6) { width: 132px; }
 .connector-table th:nth-child(7) { width: 96px; }
 .connector-table th:nth-child(8) { width: 176px; }
-.connector-table th:nth-child(9) { width: 150px; }
+.connector-table th:nth-child(9) { width: 200px; } /* Open, details, Update, Add another */
 /* Name (column 2) takes the rest: at the minimum width that is ~260px, so a
    narrow window scrolls sideways instead of stacking the name letter by letter. */
 

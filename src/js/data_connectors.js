@@ -52,6 +52,9 @@
   var connectorTable = null;
   var connectorTablePromise = null;
   var connectorTableStore = { query: null };
+  // Connection health (GET /connectors/health) as healthView() shaped it, or
+  // null when it has not loaded or failed. The page works without it.
+  var connectorHealth = null;
 
   function resetState() {
     allConnectors = [];
@@ -67,6 +70,7 @@
     connectorTable = null;
     connectorTablePromise = null;
     connectorTableStore = { query: null };
+    connectorHealth = null;
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────
@@ -542,6 +546,7 @@
   };
 
   var INFO_ICON = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+  var PLUS_ICON = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14M5 12h14"></path></svg>';
   var UPDATE_ICON = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-3-6.7L21 8"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 3v5h-5"></path></svg>';
 
   /**
@@ -570,6 +575,8 @@
       version: String(normalized.version || '').replace(/^v/i, ''),
       created_at: raw.created_at || raw.installed_at || '',
       update_slug: getConnectorUpdateSlug(connector),
+      needs_attention: healthModule() && healthModule().rowNeedsAttention(connectorHealth, [normalized.id, raw.id]) ? 'yes' : 'no',
+      instance_slug: raw.multi_instance && raw.multi_instance.enabled === true ? String(raw.connector_id || '') : '',
       _raw: raw
     };
   }
@@ -593,6 +600,9 @@
     }
     if (row.update_slug) {
       html += '<lex-btn variant="ghost" size="sm" icon="true" onclick="openConnectorUpdateModal(\'' + safeId + '\', event)" aria-label="Update ' + safeName + '" title="Update connector">' + UPDATE_ICON + '</lex-btn>';
+    }
+    if (row.instance_slug && canAddInstance()) {
+      html += '<lex-btn variant="ghost" size="sm" icon="true" onclick="openAddInstanceModal(\'' + safeId + '\', event)" aria-label="Add another ' + safeName + '" title="Add another">' + PLUS_ICON + '</lex-btn>';
     }
     return html;
   }
@@ -635,6 +645,123 @@
     }).then(function (controller) {
       connectorTable = controller;
       return controller;
+    });
+  }
+
+  // ── Health, permission notices, Add another ─────────────────────────
+  // js/shared/connector-health-view.js holds the copy and markup. The backend
+  // decides health and re-auth; this page only shows what it returns.
+
+  function healthModule() {
+    return window.LanaConnectorHealthView || null;
+  }
+
+  /** The server checks connectors:credentials_manage; the button shows to admins only. */
+  function canAddInstance() {
+    return !!(window.Lex && window.Lex.Auth && typeof window.Lex.Auth.isAdmin === 'function' && window.Lex.Auth.isAdmin());
+  }
+
+  function renderHealthSummary() {
+    var mount = document.getElementById('dcAttention');
+    var view = healthModule();
+    if (!mount) return;
+    var html = view ? view.attentionMarkup(connectorHealth) : '';
+    mount.innerHTML = html;
+    if (html) mount.removeAttribute('hidden');
+    else mount.setAttribute('hidden', '');
+  }
+
+  function renderReauthNotices() {
+    var mount = document.getElementById('dcReauthNotices');
+    var view = healthModule();
+    if (!mount) return;
+    var html = view ? view.reauthMarkup(view.reauthNotices(currentInstalledConnectors, view.readDismissed())) : '';
+    mount.innerHTML = html;
+    if (html) mount.removeAttribute('hidden');
+    else mount.setAttribute('hidden', '');
+  }
+
+  /** Loads health on its own; a failure only hides the summary. */
+  function loadConnectorHealth() {
+    var view = healthModule();
+    if (!view || typeof Connectors.getHealth !== 'function') return Promise.resolve(null);
+    return Connectors.getHealth().then(function (payload) {
+      connectorHealth = view.healthView(payload);
+    }).catch(function (error) {
+      console.warn('Connection health could not be loaded:', error && error.message);
+      connectorHealth = null;
+    }).then(function () {
+      renderHealthSummary();
+      if (connectorTable) connectorTable.setRows(connectorRows());
+      return connectorHealth;
+    });
+  }
+
+  /** Reconnect / Open from the summary or a notice: the row's own open flow. */
+  function openConnectionById(sourceId, connectorSlug) {
+    var target = findConnectorById(sourceId) ? sourceId : connectorSlug;
+    if (target) openConnectorManage(target);
+  }
+
+  function dismissReauthNotice(key) {
+    var view = healthModule();
+    if (!view || !key) return;
+    view.rememberDismissed(key);
+    renderReauthNotices();
+  }
+
+  function openAddInstanceModal(connectorId, event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    var view = healthModule();
+    var connector = findConnectorById(connectorId);
+    if (!view || !connector || !window.Lex || !window.Lex.Modal) return;
+    var raw = normalizeConnector(connector).raw || {};
+    var multi = raw.multi_instance || {};
+    var slug = String(raw.connector_id || '');
+    if (!multi.enabled || !slug) return;
+
+    var form = view.instanceForm(normalizeConnector(connector).name, multi);
+    var modal = Lex.Modal.open({
+      heading: form.heading,
+      size: 'sm',
+      content: '<lex-input data-dc-instance-key label="' + escapeAttribute(form.label) + '" help="' + escapeAttribute(form.help) +
+        '" placeholder="' + escapeAttribute(form.placeholder) + '" maxlength="100"></lex-input>',
+      footerContent: '<lex-btn variant="secondary" data-dc-instance-cancel>Cancel</lex-btn>' +
+        '<lex-btn variant="primary" data-dc-instance-submit>Add</lex-btn>'
+    });
+    var busy = false;
+    var closeModal = function () {
+      if (typeof modal.removeAfterClose === 'function') modal.removeAfterClose();
+      else modal.open = false;
+    };
+    var input = function () { return modal.querySelector('[data-dc-instance-key]'); };
+    var submit = function () {
+      if (busy) return;
+      var field = input();
+      busy = true;
+      view.submitInstance(Connectors, slug, field ? field.value : '').then(function (outcome) {
+        busy = false;
+        if (!outcome.ok) {
+          if (field) field.error = outcome.error;
+          return;
+        }
+        closeModal();
+        Lex.Toast.success('Added ' + outcome.key + '.');
+        loadConnectors();
+      });
+    };
+    modal.addEventListener('click', function (e) {
+      if (e.target.closest('[data-dc-instance-cancel]')) closeModal();
+      else if (e.target.closest('[data-dc-instance-submit]')) submit();
+    });
+    modal.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && e.target && e.target.closest && e.target.closest('[data-dc-instance-key]')) {
+        e.preventDefault();
+        submit();
+      }
     });
   }
 
@@ -1250,6 +1377,7 @@
 
     syncMcpAction();
     var mcpVisible = isMcpVisible();
+    loadConnectorHealth();
 
     return Promise.allSettled([
       Connectors.getAll(),
@@ -1295,6 +1423,7 @@
         if (availableSection) availableSection.classList.remove('hidden');
       }
 
+      renderReauthNotices();
       connectorsLoading.classList.add('hidden');
       connectorsContent.classList.remove('hidden');
     }).catch(function (error) {
@@ -1860,6 +1989,24 @@
     });
     syncMcpAction();
 
+    // Needs attention summary and permission notices (re-rendered, so delegated).
+    trackDocListener('click', function (event) {
+      var el = event.target && event.target.closest ? event.target : null;
+      if (!el) return;
+      var open = el.closest('[data-dc-health-open]');
+      if (open) {
+        openConnectionById(open.getAttribute('data-dc-health-open'), open.getAttribute('data-dc-health-connector'));
+        return;
+      }
+      var reconnect = el.closest('[data-dc-reauth-open]');
+      if (reconnect) {
+        openConnectionById(reconnect.getAttribute('data-dc-reauth-open'), '');
+        return;
+      }
+      var dismiss = el.closest('[data-dc-reauth-dismiss]');
+      if (dismiss) dismissReauthNotice(dismiss.getAttribute('data-dc-reauth-dismiss'));
+    });
+
     // Embedded iframe back-button → dismiss the host modal
     var embeddedBackHandler = function (event) {
       var data = event && event.data;
@@ -1937,6 +2084,7 @@
     exposeGlobal('openCustomConnectorUI', openCustomConnectorUI);
     exposeGlobal('refreshConnectorsPage', refreshConnectorsPage);
     exposeGlobal('openMcpServerPanel', openMcpServerPanel);
+    exposeGlobal('openAddInstanceModal', openAddInstanceModal);
 
     // Setup event listeners
     setupEventListeners();
@@ -1986,6 +2134,7 @@
 
     connectorTable = null;
     connectorTablePromise = null;
+    connectorHealth = null;
   }
 
   // Pure table logic, exposed for unit tests.
@@ -1999,7 +2148,9 @@
     withoutMcpRows: withoutMcpRows,
     mcpServerRows: mcpServerRows,
     isMcpVisible: isMcpVisible,
-    getConnectorStatusKey: getConnectorStatusKey
+    getConnectorStatusKey: getConnectorStatusKey,
+    loadConnectorHealth: loadConnectorHealth,
+    canAddInstance: canAddInstance
   };
 
   // ── Init — standalone page, called directly ────────────────────────

@@ -1,8 +1,5 @@
 export const STORAGE_KEYS = {
-  user: 'user',
-  connectorsChecklistHidden: 'lana_automation_connectors_checklist_hidden',
-  selectedConnectorId: 'lana_automation_selected_connector_id',
-  pinnedConnectors: 'lana_automation_pinned_connectors'
+  user: 'user'
 };
 
 export const ADMIN_ROLE_NAMES = [
@@ -14,20 +11,14 @@ export const ADMIN_ROLE_NAMES = [
 ];
 
 /**
- * System-level connectors that ship as built-ins. The detail view uses this
- * list to seed the readiness catalog so legacy connectors (Leadly, ActionStep,
- * GoHighLevel) are always visible even before they're converted to ZIP-style
- * imports with their own `ui/index.html` entry points.
+ * System-level connectors that ship as built-ins. app.js seeds the readiness
+ * catalog with them so legacy connectors (Leadly, ActionStep, GoHighLevel)
+ * count toward readiness even before the backend's catalog returns them.
  *
  * Each entry's `match` block describes how to recognize this connector in a
  * raw backend record. `ids` match against `connector_type` / `connector_id` /
  * `id` / `source_type` / `type` (case-insensitive). `names` match against
  * `name` / `connector_name` / `source_name` / `metadata.name`.
- *
- * The detail view itself does not contain any per-connector layout — it
- * iframes whatever `ui_entry_point` URL the backend returns. For connectors
- * that don't yet have a `ui_entry_point` (the three legacy entries below), the
- * detail view shows a minimal info card until they're ZIP-converted.
  */
 export const SYSTEM_CONNECTORS = [
   {
@@ -89,16 +80,6 @@ export const VIEW_DEFINITIONS = {
     kicker: '',
     title: 'Home',
     summary: ''
-  },
-  connectors: {
-    kicker: 'Connectors',
-    title: 'Connectors',
-    summary: 'Review installed connectors, check auth shape, and confirm which data sources your automations will depend on.'
-  },
-  'connector-detail': {
-    kicker: 'Connector',
-    title: 'Connector',
-    summary: 'Configure, monitor, and manage a connector installed for your organization.'
   },
   library: {
     kicker: 'Library',
@@ -234,17 +215,6 @@ export const TEMPLATE_LIBRARY = [
 ];
 
 export const FILTER_DEFAULTS = {
-  connectors: {
-    query: '',
-    state: 'all',
-    category: 'all',
-    auth: 'all',
-    version: 'all',
-    sortBy: 'name',
-    sortDir: 'asc',
-    page: 1,
-    perPage: 25
-  },
   library: { query: '', state: 'all', sortBy: 'updated_at', sortDir: 'desc', page: 1, perPage: 25 },
   runs: { query: '', state: 'all', sortBy: 'created_at', sortDir: 'desc', page: 1, perPage: 25 },
   approvals: { query: '', state: 'all' }

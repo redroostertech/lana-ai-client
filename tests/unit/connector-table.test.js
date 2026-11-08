@@ -45,17 +45,6 @@ describe('LanaConnectorTable labels', () => {
     expect(T.versionLabel('')).toBe('');
   });
 
-  test('automation readiness maps raw statuses onto one vocabulary', () => {
-    expect(T.automationStatusKey('connected')).toBe('ready');
-    expect(T.automationStatusKey('ACTIVE')).toBe('ready');
-    expect(T.automationStatusKey('installed')).toBe('ready');
-    expect(T.automationStatusKey('syncing')).toBe('syncing');
-    expect(T.automationStatusKey('error')).toBe('error');
-    expect(T.automationStatusKey('coming_soon')).toBe('coming_soon');
-    expect(T.automationStatusKey('disconnected')).toBe('not_installed');
-    expect(T.automationStatusKey('')).toBe('not_installed');
-  });
-
   test('counts and empty copy', () => {
     expect(T.countText(1)).toBe('1 connector');
     expect(T.countText(3)).toBe('3 connectors');

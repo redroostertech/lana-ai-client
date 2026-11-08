@@ -1,6 +1,6 @@
 import { badge } from '../shared/ui.js';
 import { escapeAttribute, escapeHtml, formatLabel, timeAgo } from '../shared/utils.js';
-import { countReadyConnectors } from './connectors.js';
+import { countReadyConnectors } from '../shared/connectors.js';
 
 export function buildChecklist(context) {
   return [
@@ -8,8 +8,8 @@ export function buildChecklist(context) {
       title: 'Review connectors',
       description: 'Confirm that the data sources your automations need are visible and marked ready.',
       done: countReadyConnectors(context) > 0,
-      actionLabel: 'Open Connectors',
-      view: 'connectors'
+      actionLabel: 'Open Data Connectors',
+      view: 'data-connectors'
     },
     {
       title: 'Choose a template',
