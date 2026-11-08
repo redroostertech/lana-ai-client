@@ -55,7 +55,7 @@ function loadPage({ visible = false, wizardFlag = false, servers = [SERVER], ins
     connectorsContent: fakeElement(),
     availableConnectorsSection: fakeElement(),
     connectorTableMount: fakeElement(),
-    addMcpServerBannerBtn: fakeElement()
+    dcAddMenu: fakeElement()
   };
   const doc = { getElementById: (id) => elements[id] || null, querySelectorAll: () => [], addEventListener: () => {} };
   const connectors = {
@@ -101,7 +101,7 @@ describe('MCP rows on Data Connectors', () => {
       .toEqual([{ connector_id: 'gmail' }]);
   });
 
-  test('visible: the servers are listed as rows and the action is shown', async () => {
+  test('visible: the servers are listed as rows and the Add connector menu offers MCP', async () => {
     const { connectors, elements, tableRows } = loadPage({
       visible: true,
       installed: [{ id: '22222222-2222-4333-8444-555555555555', connector_id: 'mcp-server', name: 'Stray row' }],
@@ -109,7 +109,7 @@ describe('MCP rows on Data Connectors', () => {
     });
     await flush(); await flush();
     expect(connectors.mcpListServers).toHaveBeenCalled();
-    expect(elements.addMcpServerBannerBtn.hasAttribute('hidden')).toBe(false);
+    expect(elements.dcAddMenu.options.map((o) => o.value)).toEqual(['import', 'mcp']);
     const names = tableRows.rows.map((r) => r.name);
     expect(names).toContain('Research');
     expect(names).toContain('Gmail');
@@ -118,14 +118,14 @@ describe('MCP rows on Data Connectors', () => {
     expect(names.filter((n) => n === 'Research')).toHaveLength(1);
   });
 
-  test('not visible: no MCP call, no MCP rows, the action stays hidden', async () => {
+  test('not visible: no MCP call, no MCP rows, the menu offers only Import', async () => {
     const { connectors, elements, tableRows, page } = loadPage({
       visible: false,
       catalog: [{ id: 'mcp-server', connector_id: 'mcp-server', name: 'MCP Server' }, { id: 'gmail', connector_id: 'gmail', name: 'Gmail' }]
     });
     await flush(); await flush();
     expect(connectors.mcpListServers).not.toHaveBeenCalled();
-    expect(elements.addMcpServerBannerBtn.hasAttribute('hidden')).toBe(true);
+    expect(elements.dcAddMenu.options.map((o) => o.value)).toEqual(['import']);
     expect(tableRows.rows.map((r) => r.name)).toEqual(['Gmail']);
     expect(page.isMcpVisible()).toBe(false);
   });

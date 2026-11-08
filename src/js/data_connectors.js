@@ -469,11 +469,19 @@
     if (dock && typeof dock.openWith === 'function') dock.openWith({ contextType: 'full_chat', prefillPrompt: prompt });
   }
 
+  // The hero's "Add connector" menu: Import connector always, Add MCP server only
+  // when the MCP UI is visible to this user.
+  var ADD_MENU_IMPORT = { value: 'import', label: 'Import connector', icon: 'upload', description: 'Upload a connector package (.zip)' };
+  var ADD_MENU_MCP = { value: 'mcp', label: 'Add MCP server', icon: 'plus', description: 'Connect a tool that speaks MCP' };
+
+  function addMenuOptions() {
+    return isMcpVisible() ? [ADD_MENU_IMPORT, ADD_MENU_MCP] : [ADD_MENU_IMPORT];
+  }
+
   function syncMcpAction() {
-    var button = document.getElementById('addMcpServerBannerBtn');
-    if (!button) return;
-    if (isMcpVisible()) button.removeAttribute('hidden');
-    else button.setAttribute('hidden', '');
+    var menu = document.getElementById('dcAddMenu');
+    if (!menu) return;
+    menu.options = addMenuOptions();
   }
 
   /**
@@ -1952,11 +1960,14 @@
     // Drag and drop
     setupDragAndDrop();
 
-    // Banner import button (lex-banner slot — element is already in the DOM
-    // when setupEventListeners runs since the HTML fragment is static)
-    var bannerImportBtn = document.getElementById('importConnectorBannerBtn');
-    if (bannerImportBtn) {
-      bannerImportBtn.addEventListener('click', openImportConnectorModal);
+    // Hero "Add connector" menu: Import connector or Add MCP server.
+    var addMenu = document.getElementById('dcAddMenu');
+    if (addMenu && typeof addMenu.addEventListener === 'function') {
+      addMenu.addEventListener('lex-select', function (event) {
+        var choice = event.detail && event.detail.value;
+        if (choice === 'import') openImportConnectorModal();
+        else if (choice === 'mcp' && isMcpVisible()) openAddMcpServer();
+      });
     }
 
     // Hero: browse the list, replay the walkthrough, and the How it works steps.
@@ -1981,12 +1992,6 @@
       window.LanaAppWalkthrough.showFirstRun('connectors');
     }
 
-    // "Add MCP server" (shown only when the MCP UI is visible). Delegated:
-    // lex-banner re-creates its action children when it re-renders.
-    trackDocListener('click', function (event) {
-      var target = event.target && event.target.closest ? event.target.closest('#addMcpServerBannerBtn') : null;
-      if (target) openAddMcpServer();
-    });
     syncMcpAction();
 
     // Needs attention summary and permission notices (re-rendered, so delegated).

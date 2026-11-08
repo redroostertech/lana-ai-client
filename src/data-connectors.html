@@ -138,9 +138,11 @@
         steps="Connect,Sync,Use"
       >
         <lex-btn id="dcBrowseBtn" variant="primary" size="lg" leading-icon="plug">Browse connectors</lex-btn>
-        <lex-btn id="importConnectorBannerBtn" variant="secondary" size="lg" leading-icon="upload">Import connector</lex-btn>
-        <!-- Shown by data_connectors.js only when MCP_CONNECTORS_ENABLED is on and the user is a system or org admin -->
-        <lex-btn id="addMcpServerBannerBtn" class="lex-mcp-add-action" variant="secondary" size="lg" leading-icon="plus" hidden>Add MCP server</lex-btn>
+        <!-- One "Add connector" menu: Import connector, plus Add MCP server, which
+             data_connectors.js adds only when MCP_CONNECTORS_ENABLED is on and the
+             user is a system or org admin. -->
+        <lex-dropdown-btn id="dcAddMenu" floating variant="secondary" icon="plus" button-label="Add connector"
+          options='[{"value":"import","label":"Import connector","icon":"upload","description":"Upload a connector package (.zip)"}]'></lex-dropdown-btn>
         <lex-btn id="dcTourBtn" variant="ghost" size="lg" leading-icon="play">Take the walkthrough</lex-btn>
       </lex-app-hero>
 
@@ -518,6 +520,7 @@
   <script src="js/vendor/lottie_light.min.js"></script>
   <script src="js/lex/brand/lex-brand-animations.js"></script>
   <script src="js/lex/components/foundation/lex-brand-mark.js"></script>
+  <script src="js/lex/components/form/lex-dropdown-btn.js"></script>
   <script src="js/lex/components/layout/lex-app-hero.js"></script>
   <script src="js/lex/components/layout/lex-app-loop.js"></script>
   <script src="js/lex/components/layout/lex-walkthrough.js"></script>

@@ -12,8 +12,8 @@
        <lex-btn variant="secondary" size="lg">Bring one from Claude</lex-btn>
      </lex-app-hero>
 
-   Actions: primary and secondary buttons, and variant="ghost" for a quiet one such as
-   "Take the walkthrough".
+   Actions: primary and secondary buttons, a lex-dropdown-btn (floating) when one button
+   offers several choices, and variant="ghost" for a quiet one such as "Take the walkthrough".
    Properties: eyebrow, heading, accent (the second line), subtitle, animation (a
    lex-brand-mark animation: orbit, flow, sync, chart, idle), steps (up to three short
    labels, comma separated). Changing a property updates the text in place; the
@@ -85,6 +85,9 @@
         border-color: rgba(255, 255, 255, 0.22); background: rgba(255, 255, 255, 0.05); color: #f4f8f5;
       }
       .lex-app-hero-actions lex-btn[variant="ghost"] .lex-btn-inner { background: transparent; color: #b8d6c7; }
+      .lex-app-hero-actions lex-dropdown-btn .lex-ddbtn-trigger {
+        padding: 0.625rem 1.5rem; font-size: var(--lex-body-base-size, 1rem); border-radius: var(--lex-btn-radius-lg, 13px);
+      }
       .lex-app-hero-actions lex-btn[variant="ghost"] .lex-btn-inner:hover { background: rgba(255, 255, 255, 0.06); color: #f4f8f5; }
       .lex-app-hero-visual {
         position: relative; align-self: center; justify-self: center;
