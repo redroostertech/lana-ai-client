@@ -24,206 +24,6 @@
   transform: none;
 }
 
-.agents-studio-hero {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(300px, 0.7fr);
-  min-height: 390px;
-  overflow: hidden;
-  border-radius: var(--lex-radius-xl, 22px);
-  background:
-    radial-gradient(circle at 88% 25%, rgba(106, 196, 157, 0.18), transparent 16rem),
-    linear-gradient(130deg, #111a16 0%, #1a2a23 62%, #263d33 100%);
-  color: #f8faf8;
-  box-shadow: 0 14px 40px rgba(14, 27, 21, 0.15);
-}
-
-.agents-studio-hero::before,
-.agents-studio-hero::after {
-  position: absolute;
-  content: '';
-  pointer-events: none;
-}
-
-.agents-studio-hero::before {
-  inset: 0;
-  opacity: 0.18;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
-  background-size: 34px 34px;
-  mask-image: linear-gradient(90deg, black, transparent 75%);
-}
-
-.agents-studio-hero::after {
-  top: 26px;
-  right: 26px;
-  width: 34px;
-  height: 34px;
-  border-top: 1px solid rgba(255, 255, 255, 0.3);
-  border-right: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-.agents-studio-hero-copy {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  max-width: 720px;
-  padding: clamp(38px, 6vw, 68px);
-}
-
-.agents-studio-eyebrow,
-.agents-studio-section-kicker {
-  font-size: 0.67rem;
-  font-weight: 700;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-}
-
-.agents-studio-eyebrow {
-  color: #9ed9bd;
-}
-
-.agents-studio-hero h1 {
-  margin: 14px 0 16px;
-  color: #f6f9f7;
-  font-family: var(--lex-font-sans, system-ui, sans-serif);
-  font-size: clamp(2.3rem, 4.7vw, 4.25rem);
-  font-weight: 650;
-  letter-spacing: -0.045em;
-  line-height: 0.98;
-}
-
-.agents-studio-hero h1 em {
-  color: #a9d7c2;
-  font-style: normal;
-  font-weight: inherit;
-}
-
-.agents-studio-hero-copy > p {
-  max-width: 580px;
-  margin: 0;
-  color: #acb9b1;
-  font-size: 0.94rem;
-  line-height: 1.65;
-}
-
-.agents-studio-hero-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 26px;
-}
-
-.agents-studio-hero-actions lex-btn[variant="primary"] .lex-btn {
-  border-color: #eff8f3;
-  background: #eff8f3;
-  color: #14241c;
-}
-
-.agents-studio-hero-actions lex-btn[variant="secondary"] .lex-btn {
-  border-color: rgba(255, 255, 255, 0.22);
-  background: rgba(255, 255, 255, 0.05);
-  color: #f4f8f5;
-}
-
-.agents-studio-orbit {
-  position: relative;
-  align-self: center;
-  justify-self: center;
-  width: min(30vw, 340px);
-  height: min(30vw, 340px);
-  min-width: 290px;
-  min-height: 290px;
-}
-
-.agents-studio-orbit-ring {
-  position: absolute;
-  border: 1px solid rgba(177, 221, 200, 0.22);
-  border-radius: 50%;
-}
-
-.agents-studio-orbit-ring--outer {
-  inset: 12px;
-  animation: agents-orbit-spin 34s linear infinite;
-}
-
-.agents-studio-orbit-ring--outer::before,
-.agents-studio-orbit-ring--outer::after {
-  position: absolute;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #9bd4b8;
-  box-shadow: 0 0 16px rgba(155, 212, 184, 0.7);
-  content: '';
-}
-
-.agents-studio-orbit-ring--outer::before {
-  top: 15%;
-  left: 12%;
-}
-
-.agents-studio-orbit-ring--outer::after {
-  right: 7%;
-  bottom: 24%;
-}
-
-.agents-studio-orbit-ring--inner {
-  inset: 72px;
-  border-color: rgba(177, 221, 200, 0.16);
-  animation: agents-orbit-spin 24s linear infinite reverse;
-}
-
-.agents-studio-orbit-core {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 92px;
-  height: 92px;
-  border: 1px solid rgba(198, 231, 215, 0.34);
-  border-radius: 28px;
-  background: rgba(9, 23, 16, 0.7);
-  color: #d9f0e4;
-  font-family: var(--lex-font-sans, system-ui, sans-serif);
-  font-size: 2rem;
-  transform: translate(-50%, -50%) rotate(8deg);
-  box-shadow: 0 0 60px rgba(83, 173, 134, 0.18);
-  backdrop-filter: blur(8px);
-}
-
-.agents-studio-orbit-node {
-  position: absolute;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 64px;
-  height: 28px;
-  padding: 0 11px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
-  background: rgba(11, 29, 20, 0.76);
-  color: #b8c9bf;
-  font-size: 0.64rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  backdrop-filter: blur(8px);
-}
-
-.agents-studio-orbit-node--one { top: 24px; left: 50%; transform: translateX(-50%); }
-.agents-studio-orbit-node--two { right: 4px; bottom: 92px; }
-.agents-studio-orbit-node--three { bottom: 46px; left: 8px; }
-
-@keyframes agents-orbit-spin {
-  to { transform: rotate(360deg); }
-}
-
 .agents-studio-metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -234,7 +34,6 @@
   min-width: 0;
 }
 
-.agents-studio-journey,
 .agents-studio-roster,
 .agents-studio-recent {
   display: flex;
@@ -251,6 +50,10 @@
 
 .agents-studio-section-kicker {
   color: var(--lex-color-success-700, #286950);
+  font-size: 0.67rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
 }
 
 .agents-studio-section-head h2 {
@@ -260,71 +63,6 @@
   font-size: clamp(1.35rem, 2.4vw, 1.9rem);
   font-weight: 650;
   letter-spacing: -0.025em;
-}
-
-.agents-studio-journey-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  overflow: hidden;
-  border: 1px solid var(--lex-border-subtle, #e1e5e1);
-  border-radius: var(--lex-radius-lg, 16px);
-  background: var(--lex-bg-primary, #fff);
-}
-
-.agents-studio-journey-step {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) 20px;
-  gap: 14px;
-  align-items: start;
-  min-height: 130px;
-  padding: 22px;
-  border: 0;
-  border-right: 1px solid var(--lex-border-subtle, #e1e5e1);
-  background: var(--lex-bg-primary, #fff);
-  color: var(--lex-text-primary, #171b18);
-  text-align: left;
-  cursor: pointer;
-  transition: background 160ms ease;
-}
-
-.agents-studio-journey-step:last-child {
-  border-right: 0;
-}
-
-.agents-studio-journey-step:hover {
-  background: var(--lex-color-success-50, #f3f9f6);
-}
-
-.agents-studio-journey-number {
-  color: var(--lex-color-success-700, #286950);
-  font-family: var(--lex-font-sans, system-ui, sans-serif);
-  font-size: 0.68rem;
-  font-weight: 700;
-}
-
-.agents-studio-journey-step strong,
-.agents-studio-journey-step div span {
-  display: block;
-}
-
-.agents-studio-journey-step strong {
-  font-size: 0.83rem;
-}
-
-.agents-studio-journey-step div span {
-  margin-top: 7px;
-  color: var(--lex-text-secondary, #616861);
-  font-size: 0.73rem;
-  line-height: 1.55;
-}
-
-.agents-studio-journey-arrow {
-  color: var(--lex-text-tertiary, #89908a);
-  transition: transform 160ms ease;
-}
-
-.agents-studio-journey-step:hover .agents-studio-journey-arrow {
-  transform: translateX(3px);
 }
 
 .agents-studio-section-head--roster {
@@ -735,54 +473,13 @@
   display: none !important;
 }
 
-@media (max-width: 1050px) {
-  .agents-studio-hero {
-    grid-template-columns: minmax(0, 1fr) 300px;
-  }
-
-  .agents-studio-orbit {
-    transform: scale(0.84);
-  }
-
-  .agents-studio-journey-step {
-    grid-template-columns: 28px 1fr;
-  }
-
-  .agents-studio-journey-arrow {
-    display: none;
-  }
-}
-
 @media (max-width: 820px) {
   .agents-page-container {
     padding: 20px;
   }
 
-  .agents-studio-hero {
-    grid-template-columns: 1fr;
-    min-height: 0;
-  }
-
-  .agents-studio-orbit {
-    display: none;
-  }
-
   .agents-studio-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .agents-studio-journey-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .agents-studio-journey-step {
-    min-height: 0;
-    border-right: 0;
-    border-bottom: 1px solid var(--lex-border-subtle, #e1e5e1);
-  }
-
-  .agents-studio-journey-step:last-child {
-    border-bottom: 0;
   }
 
   .agents-studio-section-head--roster {
@@ -801,11 +498,6 @@
 }
 
 @media (max-width: 580px) {
-  .agents-studio-hero-copy {
-    padding: 34px 26px;
-  }
-
-  .agents-studio-hero-actions,
   .agents-studio-roster-tools,
   .agents-studio-section-head {
     align-items: stretch;
@@ -830,15 +522,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .agents-studio-orbit-ring--outer,
-  .agents-studio-orbit-ring--inner,
   .agents-skeleton-line {
     animation: none;
   }
 
-  .agents-card,
-  .agents-studio-journey-step,
-  .agents-studio-journey-arrow {
+  .agents-card {
     transition: none;
   }
 }

@@ -113,6 +113,19 @@
     }
   }
 
+  // The "How it works" steps under the hero.
+  function onLoopStep(e) {
+    var step = e.detail && e.detail.value;
+    if (step === 'connect') {
+      Lex.Nav.go('data-connectors.html');
+    } else if (step === 'build') {
+      Lex.Nav.go('admin/dashboard-builder.html');
+    } else if (step === 'dashboards') {
+      var list = document.getElementById('mostUsedDashboards');
+      if (list) list.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
   function onDashboardCardClick(e) {
     if (e.target.closest('#createDashboardBtn')) {
       Lex.Nav.go('admin/dashboard-builder.html');
@@ -243,6 +256,7 @@
 
     content.addEventListener('action-click', onActionClick);
     content.addEventListener('click', onDashboardCardClick);
+    content.addEventListener('lex-app-loop-select', onLoopStep);
     renderDashboardShortcuts();
     // Catalog summary cards were removed from the page; skip the API call.
   }

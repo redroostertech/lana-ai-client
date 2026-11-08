@@ -34,15 +34,16 @@
     <main class="admin-card-page">
 
       <!-- Page header -->
-      <lex-banner
-        variant="light"
-        heading="Dashboard"
-        subtitle="Reporting, workspace insights, data exploration, and predictions"
-        lana
-        lana-context-type="full_chat"
-      >
-        <lex-btn id="createDashboardBtn" variant="primary" size="sm">Create Dashboard</lex-btn>
-      </lex-banner>
+      <lex-app-hero eyebrow="Insights" heading="Know how the firm" accent="is really doing."
+        subtitle="Dashboards and reports built from your connected data, ready when you need them."
+        animation="chart" steps="Connect,Measure,Decide">
+        <lex-btn id="createDashboardBtn" variant="primary" size="lg" icon="plus">Create dashboard</lex-btn>
+        <lex-btn variant="lana" size="lg" data-lana-dock-trigger data-lana-context-type="full_chat"
+          data-lana-prefill="What changed in our numbers this week?">Ask LANA about the numbers</lex-btn>
+      </lex-app-hero>
+
+      <lex-app-loop id="insightsLoop" kicker="How it works" heading="From your data to a decision."
+        steps="[{&quot;value&quot;:&quot;connect&quot;,&quot;title&quot;:&quot;Connect your data&quot;,&quot;text&quot;:&quot;Insights reads from the systems your firm already uses.&quot;},{&quot;value&quot;:&quot;dashboards&quot;,&quot;title&quot;:&quot;Open a dashboard&quot;,&quot;text&quot;:&quot;Start with the dashboards you use most, listed below.&quot;},{&quot;value&quot;:&quot;build&quot;,&quot;title&quot;:&quot;Build your own&quot;,&quot;text&quot;:&quot;Pick the numbers that matter to you and arrange them your way.&quot;}]"></lex-app-loop>
 
       <section class="insights-section" aria-labelledby="mostUsedDashboardsHeading">
         <div class="insights-section-header">
@@ -164,6 +165,11 @@
   <!-- Page-specific Lex components (BEFORE inject) -->
   <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
   <script src="../js/lex/components/foundation/lex-banner.js"></script>
+  <script src="../js/vendor/lottie_light.min.js"></script>
+  <script src="../js/lex/brand/lex-brand-animations.js"></script>
+  <script src="../js/lex/components/foundation/lex-brand-mark.js"></script>
+  <script src="../js/lex/components/layout/lex-app-hero.js"></script>
+  <script src="../js/lex/components/layout/lex-app-loop.js"></script>
   <script src="../js/lex/components/foundation/lex-action-card.js"></script>
 
   <!-- Inject page content + hoist modals -->

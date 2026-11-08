@@ -381,6 +381,12 @@ function bindGlobalEvents() {
   }
 
   document.body.addEventListener('click', onAppClick);
+  // The Library "How it works" steps open the view each one names.
+  document.body.addEventListener('lex-app-loop-select', (event) => {
+    if (event.detail && event.detail.value && els.viewContent && els.viewContent.contains(event.target)) {
+      setView(event.detail.value);
+    }
+  });
   document.body.addEventListener('input', onAppInput);
   document.body.addEventListener('change', onAppInput);
   document.body.addEventListener('lex-change', onAppInput);
@@ -1254,6 +1260,13 @@ async function onAppClick(event) {
     if (sourceId) {
       await handleSetConnectorDefault(sourceId);
     }
+    return;
+  }
+
+  // Library hero buttons name the view they open.
+  const automateViewButton = event.target.closest('[data-automate-view]');
+  if (automateViewButton) {
+    setView(automateViewButton.dataset.automateView);
     return;
   }
 

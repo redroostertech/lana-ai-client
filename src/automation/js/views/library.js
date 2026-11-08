@@ -8,7 +8,6 @@ import {
   mutedCell,
   nameCell,
   relativeTimeCell,
-  sectionIntro,
   serverTableSection,
   surface,
   textCell
@@ -202,21 +201,40 @@ export async function toggleAutomation(context, automationId, isEnabled) {
   }
 }
 
+// The three steps under the hero; each value is the view it opens.
+const LIBRARY_LOOP_STEPS = [
+  { value: 'builder', title: 'Pick a trigger', text: 'Choose what starts it: a new matter, a form, or a schedule.' },
+  { value: 'connectors', title: 'Connect your tools', text: 'Make sure the apps it reads from and writes to are ready.' },
+  { value: 'runs', title: 'Watch every run', text: 'Each run is logged with what it did, so nothing happens out of sight.' }
+];
+
 export function renderLibrary(context) {
   const templateLibrary = context.getTemplateLibrary();
   const store = libraryStore(context);
   const Q = Queries();
 
   context.els.viewContent.innerHTML = `
-    ${sectionIntro({
-      eyebrow: 'Templates',
-      title: 'Start from a known workflow pattern.',
-      copy: 'Templates are the safe default. Pick one, then move into the builder to confirm data, scope, and publish settings.',
-      badges: [
-        badge(`${templateLibrary.length} starter templates`),
-        badge(`${context.state.actionCatalog.length} registered action types`)
-      ]
-    })}
+    <lex-app-hero
+      eyebrow="Automate"
+      heading="Set it up once."
+      accent="It runs on its own."
+      subtitle="Start from a template or build your own. Every run is logged, so you always see what happened."
+      animation="flow"
+      steps="Trigger,Run,Log"
+    >
+      <lex-btn variant="primary" size="lg" icon="plus" data-automate-view="builder">New automation</lex-btn>
+      <lex-btn variant="secondary" size="lg" data-automate-view="runs">See run history</lex-btn>
+    </lex-app-hero>
+    <div class="automation-page-banner-badges">
+      ${badge(`${templateLibrary.length} starter templates`)}
+      ${badge(`${context.state.actionCatalog.length} registered action types`)}
+    </div>
+
+    <lex-app-loop
+      kicker="How it works"
+      heading="Every automation follows the same three steps."
+      steps="${escapeAttribute(JSON.stringify(LIBRARY_LOOP_STEPS))}"
+    ></lex-app-loop>
 
     ${surface({
       title: `Template Library (${templateLibrary.length})`,

@@ -7,7 +7,9 @@
 
    Animations: idle (breathes; empty states), sync (phone and computer brackets meet
    and lock; sending), success (brackets snap shut, a check draws in, then holds),
-   spinner (loading). The dark variant plays inside [data-lex-theme="dark"].
+   spinner (loading), and the app banners' orbit (Agents), flow (Automate) and chart
+   (Insights). The dark variant plays inside [data-lex-theme="dark"], or always with
+   variant="dark" (a dark panel on a light page); variant="light" forces light.
    With Reduce Motion nothing moves: looping animations show their first frame and
    success its finished state. Without a label the mark is decorative (aria-hidden).
    Event: lex-brand-mark-finished (success, once it holds).
@@ -18,14 +20,15 @@
   'use strict';
 
   const { LexElement, defineLex } = window.Lex;
-  const LOOPS = { idle: true, sync: true, spinner: true, success: false };
+  const LOOPS = { idle: true, sync: true, spinner: true, success: false, orbit: true, flow: true, chart: true };
 
   class LexBrandMark extends LexElement {
     static get properties() {
       return {
         animation: { type: String, default: 'idle' },
         size:      { type: Number, default: 72 },
-        label:     { type: String, default: '' }
+        label:     { type: String, default: '' },
+        variant:   { type: String, default: 'auto' }
       };
     }
 
@@ -57,7 +60,8 @@
       const files = window.LexBrandAnimations && window.LexBrandAnimations[this.animation];
       const lottie = window.lottie || window.bodymovin;
       if (!files || !lottie) return;
-      const dark = Boolean(this.closest('[data-lex-theme="dark"]'));
+      const dark = this.variant === 'dark'
+        || (this.variant !== 'light' && Boolean(this.closest('[data-lex-theme="dark"]')));
       const loops = LOOPS[this.animation] !== false;
       const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const item = lottie.loadAnimation({

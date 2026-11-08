@@ -2,6 +2,11 @@
   margin-top: 1.5rem;
 }
 
+/* The hero's "How it works" row sits between the hero and the dashboard lists. */
+.admin-card-page > lex-app-loop {
+  margin-top: 1.5rem;
+}
+
 .insights-section-header {
   display: flex;
   align-items: end;

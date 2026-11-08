@@ -25,10 +25,12 @@
   <template id="page-content">
     <div class="briefs-scroll briefs-dashboard">
       <section class="briefs-dashboard-body" aria-live="polite">
-        <lex-banner id="briefs-dashboard-banner" class="lex-entrance" variant="light" heading="Briefs" subtitle="Your meetings, kept close." status="none">
-          <lex-btn variant="primary" leading-icon="plus" data-dashboard="new">New meeting</lex-btn>
-          <lex-btn variant="secondary" leading-icon="play" data-dashboard="walkthrough">Take the walkthrough</lex-btn>
-        </lex-banner>
+        <lex-app-hero id="briefs-dashboard-banner" class="lex-entrance" eyebrow="Briefs" heading="Your meetings," accent="kept close."
+          subtitle="Record a meeting here, or send one from your phone. Notes and proposed actions appear here."
+          animation="sync" steps="Record,Notes,Actions">
+          <lex-btn variant="primary" size="lg" leading-icon="plus" data-dashboard="new">New meeting</lex-btn>
+          <lex-btn variant="secondary" size="lg" leading-icon="play" data-dashboard="walkthrough">Take the walkthrough</lex-btn>
+        </lex-app-hero>
 
         <a id="briefs-dashboard-live" class="briefs-dashboard-live lex-rise hidden" href="./index.html?new=1" data-dashboard="live">
           <span class="briefs-dashboard-live-pulse" aria-hidden="true"></span>
@@ -42,6 +44,9 @@
           <lex-metric id="briefs-dashboard-metric-waiting" label="Actions waiting" value="0" status="gray"></lex-metric>
           <lex-metric id="briefs-dashboard-metric-open" label="Meetings with open items" value="0" status="gray"></lex-metric>
         </section>
+
+        <lex-app-loop id="briefs-dashboard-loop" class="lex-entrance lex-entrance-step-1" kicker="How it works"
+          heading="From the meeting to the follow-up." steps="[{&quot;value&quot;:&quot;new&quot;,&quot;title&quot;:&quot;Record&quot;,&quot;text&quot;:&quot;Start a meeting here with New meeting, or record it on your phone.&quot;},{&quot;value&quot;:&quot;meetings&quot;,&quot;title&quot;:&quot;Read the notes&quot;,&quot;text&quot;:&quot;LANA writes the notes and pulls out tasks and follow-ups.&quot;},{&quot;value&quot;:&quot;attention&quot;,&quot;title&quot;:&quot;Review actions&quot;,&quot;text&quot;:&quot;Nothing is sent until you approve each proposed action.&quot;}]"></lex-app-loop>
 
         <div class="briefs-dashboard-grid">
           <div class="briefs-dashboard-main">
@@ -97,6 +102,8 @@
   <script src="../js/vendor/lottie_light.min.js"></script>
   <script src="../js/lex/brand/lex-brand-animations.js"></script>
   <script src="../js/lex/components/foundation/lex-brand-mark.js"></script>
+  <script src="../js/lex/components/layout/lex-app-hero.js"></script>
+  <script src="../js/lex/components/layout/lex-app-loop.js"></script>
   <script src="../js/lex/components/form/lex-select.js"></script>
   <script src="../js/lex/components/form/lex-input.js"></script>
   <script src="../js/lex/components/form/lex-checkbox.js"></script>

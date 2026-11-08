@@ -182,6 +182,14 @@
     }
   }
 
+  // The "How it works" steps: record, open the meetings, or jump to what needs review.
+  function onLoopStep(event) {
+    const step = event.detail && event.detail.value;
+    if (step === 'new') go('briefs/index.html?new=1');
+    else if (step === 'meetings') go('briefs/index.html');
+    else if (step === 'attention' && els.attention) els.attention.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   function onBriefsEvent(event) {
     if (!event || !onPage()) return;
     if (event.type === 'recording') renderLive(event.view);
@@ -205,6 +213,8 @@
     els.recent = byId('briefs-dashboard-recent');
     els.phoneBody = byId('briefs-dashboard-phone-body');
     document.querySelector('.briefs-dashboard').addEventListener('click', onClick);
+    const loop = byId('briefs-dashboard-loop');
+    if (loop) loop.addEventListener('lex-app-loop-select', onLoopStep);
     if (unsubscribe) unsubscribe();
     unsubscribe = Phones.subscribe(renderPhone);
     if (!globalsBound) {

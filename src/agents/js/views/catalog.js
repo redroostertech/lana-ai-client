@@ -22,25 +22,12 @@
 
   var TEMPLATE = ''
     + '<main class="agents-page-container">'
-    +   '<section class="agents-studio-hero">'
-    +     '<div class="agents-studio-hero-copy">'
-    +       '<span class="agents-studio-eyebrow">LANA Agent Studio</span>'
-    +       '<h1>Turn repeat work into<br><em>reliable outcomes.</em></h1>'
-    +       '<p>Build an agent in a few guided steps, run it when you need it, and see exactly what it produced.</p>'
-    +       '<div class="agents-studio-hero-actions">'
-    +         '<lex-btn id="agentsCreateBtn" variant="primary" size="lg" icon="plus">Build an agent</lex-btn>'
-    +         '<lex-btn id="agentsImportBtn" variant="secondary" size="lg" icon="upload">Bring one from Claude</lex-btn>'
-    +       '</div>'
-    +     '</div>'
-    +     '<div class="agents-studio-orbit" aria-hidden="true">'
-    +       '<div class="agents-studio-orbit-ring agents-studio-orbit-ring--outer"></div>'
-    +       '<div class="agents-studio-orbit-ring agents-studio-orbit-ring--inner"></div>'
-    +       '<div class="agents-studio-orbit-core">L</div>'
-    +       '<span class="agents-studio-orbit-node agents-studio-orbit-node--one">Build</span>'
-    +       '<span class="agents-studio-orbit-node agents-studio-orbit-node--two">Run</span>'
-    +       '<span class="agents-studio-orbit-node agents-studio-orbit-node--three">Review</span>'
-    +     '</div>'
-    +   '</section>'
+    +   '<lex-app-hero eyebrow="Agent Studio" heading="Turn repeat work into" accent="reliable outcomes."'
+    +     ' subtitle="Build an agent in a few guided steps, run it when you need it, and see exactly what it produced."'
+    +     ' animation="orbit" steps="Build,Run,Review">'
+    +     '<lex-btn id="agentsCreateBtn" variant="primary" size="lg" icon="plus">Build an agent</lex-btn>'
+    +     '<lex-btn id="agentsImportBtn" variant="secondary" size="lg" icon="upload">Bring one from Claude</lex-btn>'
+    +   '</lex-app-hero>'
 
     +   '<section class="agents-studio-metrics" aria-label="Workspace pulse">'
     +     '<lex-metric id="agentsMetricDeployed" label="Deployed agents" value="–"></lex-metric>'
@@ -49,16 +36,8 @@
     +     '<lex-metric id="agentsMetricCompleted" label="Outcomes ready" value="–"></lex-metric>'
     +   '</section>'
 
-    +   '<section class="agents-studio-journey" aria-labelledby="agentsJourneyTitle">'
-    +     '<div class="agents-studio-section-head">'
-    +       '<div><span class="agents-studio-section-kicker">A simple loop</span><h2 id="agentsJourneyTitle">You always know what happens next.</h2></div>'
-    +     '</div>'
-    +     '<div class="agents-studio-journey-grid">'
-    +       '<button type="button" class="agents-studio-journey-step" data-journey="build"><span class="agents-studio-journey-number">01</span><div><strong>Build</strong><span>Start with the outcome and choose what your agent may use.</span></div><span class="agents-studio-journey-arrow">→</span></button>'
-    +       '<button type="button" class="agents-studio-journey-step" data-journey="run"><span class="agents-studio-journey-number">02</span><div><strong>Run</strong><span>Give it a task yourself or put recurring work on a schedule.</span></div><span class="agents-studio-journey-arrow">→</span></button>'
-    +       '<button type="button" class="agents-studio-journey-step" data-journey="review"><span class="agents-studio-journey-number">03</span><div><strong>Review outcomes</strong><span>Open deliverables, approvals, and a clear record of the work.</span></div><span class="agents-studio-journey-arrow">→</span></button>'
-    +     '</div>'
-    +   '</section>'
+    +   '<lex-app-loop id="agentsJourney" kicker="A simple loop" heading="You always know what happens next."'
+    +     ' steps="[{&quot;value&quot;:&quot;build&quot;,&quot;title&quot;:&quot;Build&quot;,&quot;text&quot;:&quot;Start with the outcome and choose what your agent may use.&quot;},{&quot;value&quot;:&quot;run&quot;,&quot;title&quot;:&quot;Run&quot;,&quot;text&quot;:&quot;Give it a task yourself or put recurring work on a schedule.&quot;},{&quot;value&quot;:&quot;review&quot;,&quot;title&quot;:&quot;Review outcomes&quot;,&quot;text&quot;:&quot;Open deliverables, approvals, and a clear record of the work.&quot;}]"></lex-app-loop>'
 
     +   '<section class="agents-studio-roster" aria-labelledby="agentsRosterTitle">'
     +     '<div class="agents-studio-section-head agents-studio-section-head--roster">'
@@ -520,10 +499,9 @@
     bind(state, el('agentsEmpty'), 'click', function (event) {
       if (event.target.closest('#agentsEmptyCreateBtn')) ctx.app.setView('create');
     });
-    bind(state, document.querySelector('.agents-studio-journey-grid'), 'click', function (event) {
-      var step = event.target.closest('[data-journey]');
-      if (!step) return;
-      var action = step.getAttribute('data-journey');
+    bind(state, el('agentsJourney'), 'lex-app-loop-select', function (event) {
+      var action = event.detail && event.detail.value;
+      if (!action) return;
       if (action === 'build') ctx.app.setView('create');
       else if (action === 'review') ctx.app.setView('activity');
       else {
