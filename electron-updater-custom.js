@@ -16,6 +16,8 @@ const { logInfo, logError, logWarn } = require('./electron-logger');
 let updateCheckInProgress = false;
 let lastUpdateCheck = null;
 let currentUpdateInfo = null;
+// What the last finished check returned (startup, the Help menu or Settings), for Settings > General.
+let lastCheckResult = null;
 
 /**
  * Check for updates against server policy
@@ -29,7 +31,12 @@ async function checkForUpdates(serverUrl, authToken = null, orgId = null) {
     logWarn('Update check already in progress');
     return { updateAvailable: false, message: 'Check already in progress' };
   }
+  const result = await runUpdateCheck(serverUrl, authToken, orgId);
+  lastCheckResult = result;
+  return result;
+}
 
+async function runUpdateCheck(serverUrl, authToken, orgId) {
   updateCheckInProgress = true;
   lastUpdateCheck = new Date();
 
@@ -435,12 +442,21 @@ function getLastUpdateCheck() {
 }
 
 /**
+ * What the last finished update check returned
+ * @returns {Object|null} checkForUpdates' result
+ */
+function getLastCheckResult() {
+  return lastCheckResult;
+}
+
+/**
  * Reset update state
  */
 function resetUpdateState() {
   updateCheckInProgress = false;
   lastUpdateCheck = null;
   currentUpdateInfo = null;
+  lastCheckResult = null;
   logInfo('Update state reset');
 }
 
@@ -467,6 +483,7 @@ module.exports = {
   closeUpdateDialog,
   getCurrentUpdateInfo,
   getLastUpdateCheck,
+  getLastCheckResult,
   resetUpdateState,
   shouldCheckForUpdates
 };

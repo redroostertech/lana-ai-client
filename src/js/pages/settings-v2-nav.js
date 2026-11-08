@@ -32,9 +32,12 @@
   var SECTIONS = [
     { id: 'profile',        icon: 'user' },
     { id: 'general',        icon: 'settings' },
+    { id: 'notifications',  icon: 'bell' },
     { id: 'security',       icon: 'shield' },
     { id: 'personalization', icon: 'wand-2' },
     { id: 'capabilities',   icon: 'puzzle' },
+    { id: 'apps',           icon: 'layout-grid' },
+    { id: 'phone',          icon: 'smartphone' },
     { id: 'plugins',        icon: 'plug' },
     { id: 'billing',        icon: 'sparkles' },
     { id: 'usage',          icon: 'bar-chart-2' },
@@ -50,7 +53,8 @@
     var panel = panelEl(id);
     if (!tab || !panel) return false;
     if (tab.classList.contains('sv2-hidden') || panel.classList.contains('sv2-hidden')) return false;
-    return LANA_ONE_SECTIONS.indexOf(id) === -1 || lanaOneEnabled;
+    // data-ungated: another feature opened this section for everyone (LANA Briefs' Data controls rows).
+    return LANA_ONE_SECTIONS.indexOf(id) === -1 || lanaOneEnabled || panel.hasAttribute('data-ungated');
   }
 
   function enabledSections() {

@@ -95,7 +95,8 @@ const authTokenStore = createTokenStore({ safeStorage, persistence: authTokenPer
 // Phase 10: the offline copy key, OS-keychain encrypted; none without a keychain.
 const { createOfflineKeyStore } = require('./electron-offline-key');
 const offlineKeyStore = createOfflineKeyStore({ safeStorage, persistence: offlineKeyPersistence });
-const { checkForUpdates, downloadAndInstallUpdate, showOptionalUpdateDialog, showForceUpdateDialog, shouldCheckForUpdates, configureAutoUpdater } = require('./electron-updater-custom');
+const { checkForUpdates, downloadAndInstallUpdate, showOptionalUpdateDialog, showForceUpdateDialog, shouldCheckForUpdates, configureAutoUpdater, getLastUpdateCheck, getLastCheckResult } = require('./electron-updater-custom');
+const { registerSystemInfoIpc } = require('./electron-system-info');
 const { logInfo, logError, logWarn, exportLogs, getLogFilePath } = require('./electron-logger');
 
 // Local AI engine (local-ai-engine plan, phase 6). When an engine is
@@ -1961,6 +1962,18 @@ ipcMain.handle('vpn-get-device-id', async () => {
  *
  * Note: granted_user_id is treated as semi-sensitive — never log it.
  */
+// Settings > General: About, Software update, Language & region (electron-system-info.js).
+registerSystemInfoIpc(ipcMain, {
+  app,
+  displayVersion: getAppVersion,
+  checkForUpdates,
+  lastChecked: getLastUpdateCheck,
+  lastResult: getLastCheckResult,
+  savedServer: () => getSavedServer(),
+  installUpdate: (serverUrl) => checkAndHandleUpdates(serverUrl, { notifyUpToDate: true }),
+  logError
+});
+
 const bridgeConsentsStore = new Store({
   name: 'bridge-consents',
   defaults: { consents: {} }

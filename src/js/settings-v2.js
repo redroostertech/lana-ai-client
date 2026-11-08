@@ -762,12 +762,24 @@
 
 
   // =========================================================================
-  // Preferences
+  // Preferences (the Notifications section)
   // =========================================================================
+
+  /** Shows or hides a whole settings section (its tab and panel) and tells the nav. */
+  function setSectionVisible(id, visible) {
+    var tab = document.getElementById('sv2-tab-' + id);
+    var panel = document.getElementById('sv2-panel-' + id);
+    if (!tab || !panel) return;
+    if (tab.classList.contains('sv2-hidden') === !visible) return;
+    tab.classList.toggle('sv2-hidden', !visible);
+    panel.classList.toggle('sv2-hidden', !visible);
+    window.dispatchEvent(new CustomEvent('settings-v2-section-visibility-changed'));
+  }
 
   function loadPreferences() {
     if (!api || typeof api.getNotificationPreferences !== 'function') {
       if (dom.preferencesSection) dom.preferencesSection.classList.add('sv2-hidden');
+      setSectionVisible('notifications', false);
       return;
     }
 
@@ -775,6 +787,7 @@
       var prefs = result.preferences || {};
       _notificationPreferences = prefs;
       if (dom.preferencesSection) dom.preferencesSection.classList.remove('sv2-hidden');
+      setSectionVisible('notifications', true);
       if (dom.prefPush) dom.prefPush.checked = prefs.push_enabled !== false;
       if (dom.prefInApp) dom.prefInApp.checked = prefs.in_app_enabled !== false;
       renderInAppNotificationTypes();
@@ -792,6 +805,7 @@
       return null;
     }).catch(function (error) {
       if (dom.preferencesSection) dom.preferencesSection.classList.add('sv2-hidden');
+      setSectionVisible('notifications', false);
       console.warn('[Settings V2] Failed to load notification preferences:', error);
     });
   }
@@ -1579,10 +1593,12 @@
     if (!isConnectedAppsAvailable()) {
       // Web build / no Electron bridge — keep the section hidden.
       dom.connectedAppsSection.classList.add('sv2-hidden');
+      setSectionVisible('apps', false);
       return;
     }
 
     dom.connectedAppsSection.classList.remove('sv2-hidden');
+    setSectionVisible('apps', true);
     renderConnectedAppsLoading();
 
     window.electronAPI.listBridgeConsents().then(function (consents) {

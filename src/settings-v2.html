@@ -13,6 +13,10 @@
   <link rel="stylesheet" href="css/settings-embedding-reembed.css">
   <link rel="stylesheet" href="css/tailwind-output.css">
   <link rel="stylesheet" href="css/companion-bridge-consent.css">
+  <link rel="stylesheet" href="css/lex-motion.css">
+  <link rel="stylesheet" href="css/briefs-phones.css">
+  <link rel="stylesheet" href="css/settings-briefs.css">
+  <link rel="stylesheet" href="css/settings-general.css">
   <script src="js/tailwind-loader.js"></script>
 
   <link rel="stylesheet" href="css/lex-chat.css">
@@ -67,6 +71,11 @@
           <span class="sv2-nav-icon" data-icon="settings" aria-hidden="true"></span>
           <span class="sv2-nav-label">General</span>
         </button>
+        <button type="button" class="sv2-nav-item" role="tab" id="sv2-tab-notifications"
+          data-section="notifications" aria-controls="sv2-panel-notifications" aria-selected="false" tabindex="-1">
+          <span class="sv2-nav-icon" data-icon="bell" aria-hidden="true"></span>
+          <span class="sv2-nav-label">Notifications</span>
+        </button>
         <button type="button" class="sv2-nav-item" role="tab" id="sv2-tab-security"
           data-section="security" aria-controls="sv2-panel-security" aria-selected="false" tabindex="-1">
           <span class="sv2-nav-icon" data-icon="shield" aria-hidden="true"></span>
@@ -81,6 +90,18 @@
           data-section="capabilities" aria-controls="sv2-panel-capabilities" aria-selected="false" tabindex="-1">
           <span class="sv2-nav-icon" data-icon="puzzle" aria-hidden="true"></span>
           <span class="sv2-nav-label">Capabilities</span>
+        </button>
+        <!-- Apps: shown by settings-v2.js when this computer can list connected apps. -->
+        <button type="button" class="sv2-nav-item sv2-hidden" role="tab" id="sv2-tab-apps"
+          data-section="apps" aria-controls="sv2-panel-apps" aria-selected="false" tabindex="-1">
+          <span class="sv2-nav-icon" data-icon="layout-grid" aria-hidden="true"></span>
+          <span class="sv2-nav-label">Apps</span>
+        </button>
+        <!-- Connected devices: shown by settings-briefs.js while LANA Briefs runs for the firm. -->
+        <button type="button" class="sv2-nav-item sv2-hidden" role="tab" id="sv2-tab-phone"
+          data-section="phone" aria-controls="sv2-panel-phone" aria-selected="false" tabindex="-1">
+          <span class="sv2-nav-icon" data-icon="smartphone" aria-hidden="true"></span>
+          <span class="sv2-nav-label">Connected devices</span>
         </button>
         <button type="button" class="sv2-nav-item sv2-hidden" role="tab" id="sv2-tab-plugins"
           data-section="plugins" aria-controls="sv2-panel-plugins" aria-selected="false" tabindex="-1">
@@ -324,7 +345,51 @@
             <p id="sv2-reembed-note" class="sv2-reembed-note" hidden></p>
           </lex-card>
         </section>
+        <section id="sv2-section-briefs-models" class="sv2-briefs" hidden>
+          <lex-card heading="Speech models" subtitle="LANA Briefs transcribes meetings on this computer">
+            <div id="sv2-briefs-models" class="sv2-briefs-models" aria-live="polite"></div>
+            <p class="sv2-briefs-note">LANA writes notes and actions with the AI model above. These downloads are only for speech.</p>
+          </lex-card>
+        </section>
       </div><!-- /sv2-panel-capabilities -->
+
+      <!-- ╔════════════════════════ CONNECTED DEVICES PANEL ═══════════╗
+           Paired phones, how meetings arrive and background updates (LANA Briefs).
+           Rendered by settings-briefs.js; the Phones dialog is briefs-phones-ui.js. -->
+      <div class="sv2-panel sv2-hidden" id="sv2-panel-phone" role="tabpanel"
+        aria-labelledby="sv2-tab-phone" data-section="phone">
+        <section id="sv2-section-phone" class="sv2-briefs">
+          <lex-card heading="Phones" subtitle="Phones that send meetings to this computer">
+            <div class="sv2-briefs-head">
+              <lex-badge id="sv2-phone-badge" label="Checking" color="gray"></lex-badge>
+              <lex-btn id="sv2-phone-manage" variant="secondary" size="sm" leading-icon="smartphone" label="Pair a phone"></lex-btn>
+            </div>
+            <p id="sv2-phone-summary" class="sv2-briefs-note"></p>
+            <div id="sv2-phone-rows" class="sv2-briefs-rows"></div>
+            <p id="sv2-phone-error" class="sv2-briefs-message" role="alert" hidden></p>
+          </lex-card>
+          <lex-card heading="Proximity check" subtitle="How this computer knows a phone is in the room before it accepts a meeting">
+            <div id="sv2-phone-proximity"></div>
+          </lex-card>
+          <lex-card heading="Background updates" subtitle="Changes to meetings a phone already has">
+            <div class="sv2-briefs-option sv2-briefs-option-first">
+              <div class="sv2-briefs-option-copy">
+                <span class="sv2-briefs-option-name">Let paired phones receive updates in the background</span>
+                <span class="sv2-briefs-option-description">After a sync checked by the tone or QR code, the phone can get your changes to meetings it already has without the tone, while it is on this network. It never sends anything or receives new meetings this way.</span>
+              </div>
+              <lex-toggle id="sv2-phone-background" name="briefs_background_updates" aria-label="Let paired phones receive updates in the background"></lex-toggle>
+            </div>
+            <div class="sv2-briefs-option">
+              <div class="sv2-briefs-option-copy">
+                <span class="sv2-briefs-option-name">Lease length</span>
+                <span class="sv2-briefs-option-description">How long a phone may sync in the background after its last sync checked by this computer.</span>
+              </div>
+              <lex-segmented id="sv2-phone-lease" name="briefs_lease_hours" aria-label="Lease length"></lex-segmented>
+            </div>
+            <p id="sv2-phone-background-message" class="sv2-briefs-note" role="status"></p>
+          </lex-card>
+        </section>
+      </div><!-- /sv2-panel-phone -->
 
       <!-- ╔══════════════════════ PLUGINS PANEL ══════════════════════╗ -->
       <div class="sv2-panel sv2-hidden" id="sv2-panel-plugins" role="tabpanel"
@@ -340,15 +405,47 @@
       </div><!-- /sv2-panel-plugins -->
 
       <!-- ╔═══════════════════════ GENERAL PANEL ═══════════════════════╗
-           App and account settings: time zone, password + MFA, preferences,
-           active sessions, connected apps, and VPN. -->
+           About, software update, date & time, language & region, legal, and VPN. -->
       <div class="sv2-panel" id="sv2-panel-general" role="tabpanel"
         aria-labelledby="sv2-tab-general" data-section="general">
+
+      <!-- About (settings-general.js; facts from electron-system-info.js)
+           ══════════════════════════════════════════════════════════════ -->
+      <section id="sv2-section-about" class="sv2-general sv2-general-top" hidden>
+        <lex-card heading="About" subtitle="This copy of LANA and the computer it runs on">
+          <div id="sv2-about-rows" class="sv2-general-rows"></div>
+          <p id="sv2-about-warning" class="sv2-general-message" role="status" hidden></p>
+        </lex-card>
+      </section>
+
+      <!-- Software update: the LANA client on this computer
+           ══════════════════════════════════════════════════════════════ -->
+      <section id="sv2-section-update" class="sv2-general" hidden>
+        <lex-card heading="Software update" subtitle="The LANA app on this computer">
+          <div class="sv2-general-head">
+            <div class="sv2-general-option-copy">
+              <span class="sv2-general-option-name">LANA <span id="sv2-update-version"></span></span>
+              <span id="sv2-update-summary" class="sv2-general-option-description"></span>
+              <span id="sv2-update-checked" class="sv2-general-option-description"></span>
+            </div>
+            <div class="sv2-general-side">
+              <lex-badge id="sv2-update-badge" label="Checking" color="gray"></lex-badge>
+              <lex-btn id="sv2-update-action" variant="secondary" size="sm" label="Check for updates"></lex-btn>
+            </div>
+          </div>
+          <div id="sv2-update-notes" class="sv2-general-notes" hidden>
+            <span class="sv2-general-label">What's new</span>
+            <p id="sv2-update-notes-text" class="sv2-general-note"></p>
+          </div>
+          <p id="sv2-update-note" class="sv2-general-note"></p>
+          <p class="sv2-general-note">Updates to your organization's LANA server are installed by your administrator.</p>
+        </lex-card>
+      </section>
 
       <!-- Regional
            ══════════════════════════════════════════════════════════════ -->
       <section id="sv2-section-regional" style="margin-bottom:0.5rem">
-        <lex-card heading="Time Zone" subtitle="How dates and times appear across LANA AI">
+        <lex-card heading="Date &amp; time" subtitle="How dates and times appear across LANA">
           <lex-stack direction="vertical" gap="3">
             <lex-select id="sv2-timezone-select"
               name="timezone"
@@ -360,15 +457,64 @@
               <lex-btn id="sv2-tz-detect-btn" variant="ghost" size="sm">Detect</lex-btn>
               <lex-text id="sv2-tz-current" class="sv2-tz-current" variant="tertiary" size="body-sm"></lex-text>
             </lex-stack>
+            <div class="sv2-general-now">
+              <span class="sv2-general-label">Right now</span>
+              <span id="sv2-datetime-now" class="sv2-general-value"></span>
+            </div>
           </lex-stack>
         </lex-card>
       </section>
 
+      <!-- Language & region (settings-general.js)
+           ══════════════════════════════════════════════════════════════ -->
+      <section id="sv2-section-language" class="sv2-general" hidden>
+        <lex-card heading="Language &amp; region" subtitle="The language LANA uses and how this computer is set">
+          <div id="sv2-language-rows" class="sv2-general-rows"></div>
+          <p id="sv2-language-note" class="sv2-general-note"></p>
+        </lex-card>
+      </section>
 
+      <!-- Legal & regulatory
+           ══════════════════════════════════════════════════════════════ -->
+      <section id="sv2-section-legal" class="sv2-general">
+        <lex-card heading="Legal &amp; regulatory" subtitle="Copyright and the software LANA is built with">
+          <div class="sv2-general-option sv2-general-option-first">
+            <div class="sv2-general-option-copy">
+              <span class="sv2-general-option-name">Copyright</span>
+              <span class="sv2-general-option-description">&copy; 2026 RedRooster Technologies Inc. All rights reserved.</span>
+            </div>
+          </div>
+          <div class="sv2-general-option">
+            <div class="sv2-general-option-copy">
+              <span class="sv2-general-option-name">Open-source licenses</span>
+              <span class="sv2-general-option-description">The libraries, fonts and runtime LANA is built with, each used under the license shown, with their full notices.</span>
+            </div>
+            <lex-btn id="sv2-legal-licenses" variant="secondary" size="sm" trailing-icon="chevron-right" label="View licenses"></lex-btn>
+          </div>
+        </lex-card>
+      </section>
+
+
+
+
+      <!-- VPN (conditionally shown by JS — Electron only)
+           ══════════════════════════════════════════════════════════════ -->
+      <section id="sv2-section-vpn" class="sv2-hidden">
+        <div id="sv2-vpn-content">
+          <!-- Entire VPN content rendered by JS (configured vs. not-configured states) -->
+        </div>
+      </section>
+
+      </div><!-- /sv2-panel-general -->
+
+      <!-- ╔════════════════════ NOTIFICATIONS PANEL ════════════════════╗
+           Desktop and in-app notification preferences (settings-v2.js loadPreferences). -->
+      <div class="sv2-panel" id="sv2-panel-notifications" role="tabpanel"
+        aria-labelledby="sv2-tab-notifications" data-section="notifications">
       <!-- Preferences (conditionally shown by JS)
            ══════════════════════════════════════════════════════════════ -->
       <section id="sv2-section-preferences" class="sv2-hidden" style="margin-bottom:0.5rem">
-        <lex-card heading="Preferences" subtitle="Customize your experience">
+        <lex-card heading="Notifications" subtitle="How LANA lets you know about activity">
           <lex-stack direction="vertical" gap="0" divider="true">
             <lex-stack class="sv2-preference-row" direction="horizontal" gap="4" justify="between" align="center">
               <lex-stack class="sv2-preference-copy" direction="vertical" gap="1">
@@ -395,8 +541,12 @@
           </lex-stack>
         </lex-card>
       </section>
+      </div><!-- /sv2-panel-notifications -->
 
-
+      <!-- ╔════════════════════════ APPS PANEL ═════════════════════════╗
+           Sibling LANA apps allowed to use this computer's signed-in session. -->
+      <div class="sv2-panel sv2-hidden" id="sv2-panel-apps" role="tabpanel"
+        aria-labelledby="sv2-tab-apps" data-section="apps">
       <!-- Connected Apps (Electron only — bridge consents)
            ══════════════════════════════════════════════════════════════ -->
       <section id="sv2-section-connected-apps" class="sv2-hidden" style="margin-bottom:0.5rem">
@@ -406,17 +556,7 @@
           </div>
         </lex-card>
       </section>
-
-
-      <!-- VPN (conditionally shown by JS — Electron only)
-           ══════════════════════════════════════════════════════════════ -->
-      <section id="sv2-section-vpn" class="sv2-hidden">
-        <div id="sv2-vpn-content">
-          <!-- Entire VPN content rendered by JS (configured vs. not-configured states) -->
-        </div>
-      </section>
-
-      </div><!-- /sv2-panel-general -->
+      </div><!-- /sv2-panel-apps -->
 
       <!-- ╔══════════════════════ SECURITY PANEL ══════════════════════╗ -->
       <div class="sv2-panel" id="sv2-panel-security" role="tabpanel"
@@ -592,6 +732,18 @@
             <!-- TODO: wire <section id="sv2-section-data-controls"> to export / retention / account-deletion endpoints -->
           </lex-card>
         </section>
+        <section id="sv2-section-briefs-data" class="sv2-briefs" hidden>
+          <lex-card heading="Meeting audio" subtitle="LANA Briefs recordings kept on this computer">
+            <div class="sv2-briefs-option sv2-briefs-option-first">
+              <div class="sv2-briefs-option-copy">
+                <span class="sv2-briefs-option-name">Keep meeting audio for</span>
+                <span class="sv2-briefs-option-description">Audio older than this is deleted when LANA starts and once a day. Transcripts, notes and actions stay.</span>
+              </div>
+              <lex-select id="sv2-briefs-retention" name="briefs_retention_days" variant="outlined" aria-label="Keep meeting audio for"></lex-select>
+            </div>
+            <p id="sv2-briefs-retention-message" class="sv2-briefs-note" role="status"></p>
+          </lex-card>
+        </section>
       </div><!-- /sv2-panel-data-controls -->
 
       </div><!-- /sv2-panels -->
@@ -670,6 +822,9 @@
   <script src="js/lex/components/form/lex-select.js"></script>
   <script src="js/lex/components/form/lex-textarea.js"></script>
   <script src="js/lex/components/form/lex-segmented.js"></script>
+  <script src="js/vendor/lottie_light.min.js"></script>
+  <script src="js/lex/brand/lex-brand-animations.js"></script>
+  <script src="js/lex/components/foundation/lex-brand-mark.js"></script>
   <script src="js/lex/components/data/lex-table.js"></script>
   <script src="js/lex/components/data/lex-pagination.js"></script>
 
@@ -682,6 +837,8 @@
   <script src="js/pages/settings-personalization.js"></script>
   <script src="js/pages/settings-usage.js"></script>
   <script src="js/pages/settings-capabilities.js"></script>
+  <script src="js/settings-general.model.js"></script>
+  <script src="js/pages/settings-general.js"></script>
   <script src="js/engine-status.js"></script>
   <script src="js/engine-background-jobs.js"></script>
   <script src="js/pages/settings-local-engine.js"></script>
@@ -689,6 +846,11 @@
   <script src="js/pages/settings-offline-copy.js"></script>
   <script src="js/embedding-reembed-status.js"></script>
   <script src="js/pages/settings-embedding-reembed.js"></script>
+  <script src="js/vendor/qrcode.min.js"></script>
+  <script src="js/briefs/briefs-status.js"></script>
+  <script src="js/briefs/briefs-phones-ui.js"></script>
+  <script src="js/briefs/briefs-settings.js"></script>
+  <script src="js/pages/settings-briefs.js"></script>
   <script src="js/pages/settings-v2-nav.js"></script>
 
   <!-- PAC bridge consent handler (Lex modal for token requests) -->

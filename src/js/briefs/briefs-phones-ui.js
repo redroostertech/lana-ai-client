@@ -5,6 +5,8 @@
  * - Phones: paired phones, pairing (QR code, then the six digits confirmed on both
  *   screens) and removing a phone, in a lex-modal this module adds to the page;
  * - the walkthrough (<lex-walkthrough>), shown once per person; the host remembers.
+ * Settings > Connected devices (src/js/pages/settings-briefs.js) uses Phones only: attach(container,
+ * { topbar: false, walkthrough: false }).
  * The rules are in briefs-status.js and briefs-walkthrough.js. Nothing here logs names.
  */
 (function (global) {
@@ -35,6 +37,7 @@
   let pairingTimer = null;
   let loadToken = 0;
   let globalsBound = false;
+  let options = { topbar: true, walkthrough: true };
 
   /** This module's pieces are on screen (the shell swaps pages in place). */
   function onPage() {
@@ -69,7 +72,7 @@
 
   function renderStatus() {
     const topbar = document.querySelector('lex-topbar');
-    if (!topbar || !onPage()) return;
+    if (!topbar || !onPage() || !options.topbar) return;
     const view = card();
     topbar.statusIcon = view.icon;
     topbar.statusLabel = view.label;
@@ -323,10 +326,12 @@
   /**
    * Called by each Briefs page's init with an element that lives in the page content
    * (Phones is added there, so it goes when the shell swaps the page). Loads the status
-   * and, on first run, the walkthrough.
+   * and, on first run, the walkthrough. `settings.topbar` and `settings.walkthrough`
+   * (both default true) turn those off for pages outside Briefs.
    */
-  function attach(container) {
+  function attach(container, settings) {
     host = container;
+    options = Object.assign({ topbar: true, walkthrough: true }, settings || {});
     stopTimer();
     modal = document.createElement('lex-modal');
     modal.id = 'briefs-phones';
@@ -347,13 +352,13 @@
     if (!globalsBound) {
       globalsBound = true;
       document.addEventListener('topbar-status-action', () => {
-        if (onPage()) openPhones();
+        if (onPage() && options.topbar) openPhones();
       });
       const api = bridge();
       if (api && typeof api.onEvent === 'function') api.onEvent(onEvent);
     }
     refresh();
-    maybeShowWalkthrough();
+    if (options.walkthrough) maybeShowWalkthrough();
   }
 
   /** Called with the status card whenever it changes (the Dashboard's phone card). */

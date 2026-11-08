@@ -1,0 +1,132 @@
+/* Settings V2 > General: About, Software update, Date & time, Language & region, Legal (settings-general.js). */
+
+.sv2-general {
+  margin-bottom: 0.5rem;
+}
+
+.sv2-general[hidden],
+.sv2-general [hidden] {
+  display: none !important;
+}
+
+.sv2-general-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sv2-general-label {
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-sm-size);
+  font-weight: var(--lex-weight-medium, 500);
+}
+
+.sv2-general-value {
+  color: var(--lex-text-primary);
+  font-size: var(--lex-body-size, 0.9375rem);
+}
+
+.sv2-general-now {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 12px;
+  border-top: 1px solid var(--lex-border-subtle);
+}
+
+.sv2-general-note,
+.sv2-general-option-description {
+  margin: 0;
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-sm-size);
+  line-height: var(--lex-body-sm-height);
+}
+
+.sv2-general-note {
+  margin-top: 12px;
+}
+
+.sv2-general-note:empty {
+  display: none;
+}
+
+.sv2-general-message {
+  margin: 12px 0 0;
+  padding: 8px 12px;
+  border-radius: var(--lex-radius-md);
+  background: var(--lex-status-warning-bg);
+  color: var(--lex-status-warning-text);
+  font-size: var(--lex-body-sm-size);
+}
+
+[data-lex-theme="dark"] .sv2-general-message {
+  background: var(--lex-color-warning-700);
+  color: var(--lex-color-warning-50);
+}
+
+.sv2-general-head,
+.sv2-general-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.sv2-general-option {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--lex-border-subtle);
+}
+
+.sv2-general-option-first {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.sv2-general-option-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sv2-general-option-name {
+  color: var(--lex-text-primary);
+  font-size: var(--lex-body-size, 0.9375rem);
+  font-weight: var(--lex-weight-medium, 500);
+}
+
+.sv2-general-side {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sv2-general-option lex-btn {
+  flex: none;
+}
+
+.sv2-general-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--lex-border-subtle);
+}
+
+.sv2-general-notes .sv2-general-note {
+  margin-top: 0;
+  white-space: pre-line;
+}
+
+@media (max-width: 640px) {
+  .sv2-general-head,
+  .sv2-general-option {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}

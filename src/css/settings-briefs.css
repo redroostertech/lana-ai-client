@@ -1,0 +1,132 @@
+/* Settings V2: LANA Briefs rows (src/js/pages/settings-briefs.js): Phone, Meeting audio, Speech models. */
+
+.sv2-briefs {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+/* First in its panel (Data controls' placeholder before it is hidden while Briefs runs). */
+#sv2-section-phone,
+#sv2-section-briefs-data {
+  margin-top: 0;
+}
+
+.sv2-briefs[hidden],
+.sv2-briefs [hidden] {
+  display: none !important;
+}
+
+.sv2-briefs-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sv2-briefs-note,
+.sv2-briefs-option-description {
+  margin: 0;
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-sm-size);
+  line-height: var(--lex-body-sm-height);
+}
+
+.sv2-briefs-head + .sv2-briefs-note {
+  margin-top: 12px;
+}
+
+.sv2-briefs-note:empty {
+  display: none;
+}
+
+.sv2-briefs-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.sv2-briefs-rows:empty {
+  display: none;
+}
+
+.sv2-briefs-message {
+  margin: 12px 0 0;
+  padding: 8px 12px;
+  border-radius: var(--lex-radius-md);
+  background: var(--lex-status-danger-bg);
+  color: var(--lex-status-danger-text);
+  font-size: var(--lex-body-sm-size);
+}
+
+.sv2-briefs-option,
+.sv2-briefs-model {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--lex-border-subtle);
+}
+
+.sv2-briefs-option-first,
+.sv2-briefs-models > .sv2-briefs-model:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.sv2-briefs-option-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sv2-briefs-option-name {
+  color: var(--lex-text-primary);
+  font-size: var(--lex-body-size, 0.9375rem);
+  font-weight: var(--lex-weight-medium, 500);
+}
+
+.sv2-briefs-option lex-toggle,
+.sv2-briefs-option lex-segmented {
+  flex: none;
+}
+
+.sv2-briefs-option lex-select {
+  flex: none;
+  width: 160px;
+}
+
+.sv2-briefs-option + .sv2-briefs-note:not(:empty) {
+  margin-top: 12px;
+}
+
+.sv2-briefs-models + .sv2-briefs-note {
+  margin-top: 16px;
+}
+
+.sv2-briefs-model-side {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sv2-briefs-model-bar {
+  margin: 6px 0 2px;
+  max-width: 320px;
+}
+
+@media (max-width: 640px) {
+  .sv2-briefs-option,
+  .sv2-briefs-model {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}
