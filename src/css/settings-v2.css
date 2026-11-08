@@ -693,23 +693,17 @@
 }
 
 
-/* ── Capabilities ────────────────────────────────────────────────── */
+/* ── Screen diction (settings-screen-diction.js) ─────────────────── */
 
-.sv2-capabilities-intro,
 .sv2-capabilities-status,
 .sv2-capability-description,
 .sv2-capability-availability,
 .sv2-capability-hint-text,
 .sv2-capability-hint-list,
-.sv2-capability-hint-details,
-.sv2-capabilities-empty p {
+.sv2-capability-hint-details {
   color: var(--lex-text-secondary);
   font-size: var(--lex-body-sm-size);
   line-height: var(--lex-body-sm-height);
-}
-
-.sv2-capabilities-intro {
-  margin: 0 0 4px;
 }
 
 .sv2-capabilities-list {
@@ -794,8 +788,7 @@
 
 .sv2-capability-name,
 .sv2-capability-hints-title,
-.sv2-capability-hint-group h5,
-.sv2-capabilities-empty h3 {
+.sv2-capability-hint-group h5 {
   margin: 0;
   color: var(--lex-text-primary);
 }
@@ -1055,15 +1048,6 @@
 
 .sv2-capabilities-status:empty {
   display: none;
-}
-
-.sv2-capabilities-empty {
-  padding: 28px 0 20px;
-  text-align: center;
-}
-
-.sv2-capabilities-empty p {
-  margin: 6px 0 0;
 }
 
 /* ── Personalization Memory ──────────────────────────────────────── */
@@ -1535,6 +1519,28 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+}
+
+.sv2-local-engine-head-side {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sv2-local-engine [hidden] {
+  display: none !important;
+}
+
+/* Speech models (LANA Briefs) inside the AI models card; rows from settings-briefs.css. */
+.sv2-local-engine-speech {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--lex-border-subtle);
+}
+
+.sv2-local-engine-speech .sv2-briefs-models {
+  margin-top: 12px;
 }
 
 .sv2-local-engine-message,

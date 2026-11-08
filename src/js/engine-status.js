@@ -95,10 +95,13 @@
     if (!status || !status.configured) {
       return {
         available: false,
-        statusLabel: 'Not installed on this computer',
+        statusLabel: 'Not installed',
         tone: 'gray',
         rows: [],
-        note: 'LANA talks to your organization\'s server directly.'
+        note: 'The local AI engine is not installed on this computer, so LANA\'s AI runs on your organization\'s server.',
+        showToggle: false,
+        showBackgroundJobs: false,
+        showRestart: false
       };
     }
     if (!status.inUse) {
@@ -110,8 +113,11 @@
         tone: 'gray',
         rows: [],
         note: status.reason === 'engine_not_found'
-          ? 'The local AI service is not installed where LANA expects it. LANA talks to your organization\'s server directly.'
-          : ''
+          ? 'The local AI engine is not installed where LANA expects it, so LANA\'s AI runs on your organization\'s server.'
+          : 'LANA\'s AI runs on your organization\'s server, and so do your background jobs.',
+        showToggle: true,
+        showBackgroundJobs: false,
+        showRestart: false
       };
     }
     var labels = {
@@ -143,7 +149,10 @@
         { label: 'Organization server', value: chef && described.state !== 'restarting' ? (chef.reachable ? 'Reachable' : 'Not reachable') : 'Unknown' },
         { label: 'Data API versions', value: range || 'Unknown' }
       ],
-      note: ''
+      note: '',
+      showToggle: true,
+      showBackgroundJobs: true,
+      showRestart: true
     };
   }
 

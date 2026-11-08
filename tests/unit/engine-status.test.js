@@ -138,6 +138,12 @@ describe('settingsView', () => {
   test('configured but off', () => {
     expect(status.settingsView({ configured: true, enabled: false, inUse: false, reason: 'disabled' }).statusLabel).toBe('Off');
   });
+
+  test('shows only the controls that can be used on this computer', () => {
+    expect(status.settingsView({ configured: false })).toMatchObject({ statusLabel: 'Not installed', showToggle: false, showBackgroundJobs: false, showRestart: false });
+    expect(status.settingsView({ configured: true, enabled: false, inUse: false, reason: 'disabled' })).toMatchObject({ showToggle: true, showBackgroundJobs: false, showRestart: false });
+    expect(status.settingsView(engineStatus())).toMatchObject({ showToggle: true, showBackgroundJobs: true, showRestart: true });
+  });
 });
 
 describe('settingsView when the version is refused', () => {

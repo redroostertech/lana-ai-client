@@ -1,5 +1,5 @@
 /**
- * Settings V2: "Local AI service" card (local-ai-engine plan, phase 6).
+ * Settings V2: "AI models" card (was "Local AI service") (local-ai-engine plan, phase 6).
  *
  * Shows the main process's engine status (running, port, organization server
  * reachable, data API versions), the "Use local AI engine" setting and a
@@ -27,6 +27,8 @@
     var restartBtn = document.getElementById('sv2-local-engine-restart');
     var note = document.getElementById('sv2-local-engine-note');
     var bgToggle = document.getElementById('sv2-local-engine-bg-toggle');
+    var useRow = document.getElementById('sv2-local-engine-use');
+    var bgGroup = document.getElementById('sv2-local-engine-bg');
     var jobsBadge = document.getElementById('sv2-local-engine-jobs-badge');
     var jobsList = document.getElementById('sv2-local-engine-jobs-list');
     var jobsEmpty = document.getElementById('sv2-local-engine-jobs-empty');
@@ -117,6 +119,10 @@
       });
 
       note.textContent = view.note || '';
+      // Only what can be used here: no engine controls without an engine, no background jobs while it is off.
+      if (useRow) useRow.hidden = !view.showToggle;
+      if (bgGroup) bgGroup.hidden = !view.showBackgroundJobs;
+      restartBtn.hidden = !view.showRestart;
 
       var enabled = Boolean(engineStatus && engineStatus.enabled);
       if (enabled) toggle.setAttribute('checked', '');

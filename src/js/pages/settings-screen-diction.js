@@ -1,9 +1,8 @@
 /**
- * Settings V2 capability activation.
- *
- * Discovery decides which capabilities the organization is entitled to use.
- * This page only controls the local activation preference exposed by the
- * Electron main process; it cannot add entitlements or override `required`.
+ * Settings V2 > Screen diction: this computer's on/off choice, voice agent settings
+ * and permissions, through window.electronAPI.capabilities. Screen diction is a core
+ * client feature (src/screen-voice/feature.js); until it ships the main process lists
+ * nothing and the Screen diction tab stays hidden.
  */
 (function () {
   'use strict';
@@ -296,8 +295,17 @@
     if (window.Lex && Lex.Toast && typeof Lex.Toast[kind] === 'function') Lex.Toast[kind](message);
   }
 
+  // The Screen diction tab shows only when the main process lists the feature.
+  function setTabVisible(visible) {
+    ['sv2-tab-screen-diction', 'sv2-panel-screen-diction'].forEach(function (id) {
+      var node = document.getElementById(id);
+      if (node) node.classList.toggle('sv2-hidden', !visible);
+    });
+    window.dispatchEvent(new CustomEvent('settings-v2-section-visibility-changed'));
+  }
+
   function boot() {
-    var section = document.getElementById('sv2-section-capabilities');
+    var section = document.getElementById('sv2-section-screen-diction');
     var list = document.getElementById('sv2-capabilities-list');
     var status = document.getElementById('sv2-capabilities-status');
     var expandedCapabilities = Object.create(null);
@@ -324,13 +332,8 @@
     function render(capabilities) {
       capabilitySnapshot = Array.isArray(capabilities) ? capabilities : [];
       list.replaceChildren();
-      if (!capabilitySnapshot.length) {
-        var empty = element('div', 'sv2-capabilities-empty');
-        empty.appendChild(element('h3', '', 'No capabilities connected'));
-        empty.appendChild(element('p', '', 'Your organization has not enabled any desktop capabilities.'));
-        list.appendChild(empty);
-        return;
-      }
+      setTabVisible(capabilitySnapshot.length > 0);
+      if (!capabilitySnapshot.length) return;
       withVoiceState(capabilitySnapshot).forEach(function (capability) {
         list.appendChild(renderCapability(
           capability,
@@ -416,7 +419,6 @@
 
     if (!window.electronAPI || !window.electronAPI.capabilities) {
       section.setAttribute('aria-busy', 'false');
-      status.textContent = 'Capability activation is available in the desktop app.';
       render([]);
       return;
     }
@@ -427,14 +429,14 @@
       window.electronAPI.capabilities.getVoicePermissions()
     ]).then(function (results) {
       var result = results[0];
-      if (!result || result.success !== true) throw new Error(result && result.error ? result.error : 'Capabilities could not be loaded.');
+      if (!result || result.success !== true) throw new Error(result && result.error ? result.error : 'Screen diction settings could not be loaded.');
       if (results[1] && results[1].success === true) voiceSettings = results[1].settings;
       if (results[2] && results[2].success === true) voicePermissions = results[2].permissions;
       render(Array.isArray(result.capabilities) ? result.capabilities : []);
       status.textContent = '';
     }).catch(function (error) {
       render([]);
-      status.textContent = error.message || 'Capabilities could not be loaded.';
+      status.textContent = error.message || 'Screen diction settings could not be loaded.';
     }).finally(function () {
       section.setAttribute('aria-busy', 'false');
     });

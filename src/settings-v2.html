@@ -82,10 +82,16 @@
           <span class="sv2-nav-icon" data-icon="shield" aria-hidden="true"></span>
           <span class="sv2-nav-label">Security</span>
         </button>
-        <button type="button" class="sv2-nav-item" role="tab" id="sv2-tab-capabilities"
-          data-section="capabilities" aria-controls="sv2-panel-capabilities" aria-selected="false" tabindex="-1">
-          <span class="sv2-nav-icon" data-icon="puzzle" aria-hidden="true"></span>
-          <span class="sv2-nav-label">Capabilities</span>
+        <button type="button" class="sv2-nav-item" role="tab" id="sv2-tab-computer"
+          data-section="computer" aria-controls="sv2-panel-computer" aria-selected="false" tabindex="-1">
+          <span class="sv2-nav-icon" data-icon="laptop" aria-hidden="true"></span>
+          <span class="sv2-nav-label">This computer</span>
+        </button>
+        <!-- Screen diction: shown by settings-screen-diction.js once the feature ships (src/screen-voice/feature.js). -->
+        <button type="button" class="sv2-nav-item sv2-hidden" role="tab" id="sv2-tab-screen-diction"
+          data-section="screen-diction" aria-controls="sv2-panel-screen-diction" aria-selected="false" tabindex="-1">
+          <span class="sv2-nav-icon" data-icon="mic" aria-hidden="true"></span>
+          <span class="sv2-nav-label">Screen diction</span>
         </button>
         <!-- Apps: shown by settings-v2.js when this computer can list connected apps. -->
         <button type="button" class="sv2-nav-item sv2-hidden" role="tab" id="sv2-tab-apps"
@@ -263,48 +269,52 @@
 
 
       <!-- ╔════════════════════ CAPABILITIES PANEL ════════════════════╗ -->
-      <div class="sv2-panel" id="sv2-panel-capabilities" role="tabpanel"
-        aria-labelledby="sv2-tab-capabilities" data-section="capabilities">
-        <section id="sv2-section-capabilities" style="margin-bottom:0.5rem" aria-busy="true">
-          <lex-card heading="Capabilities" subtitle="Features connected to your organization">
-            <p class="sv2-capabilities-intro">
-              Choose which optional capabilities are active on this device. Required capabilities are managed by your organization.
-            </p>
-            <div id="sv2-capabilities-list" class="sv2-capabilities-list" aria-live="polite"></div>
-            <p id="sv2-capabilities-status" class="sv2-capabilities-status" role="status">Loading capabilities...</p>
-          </lex-card>
-        </section>
+      <div class="sv2-panel" id="sv2-panel-computer" role="tabpanel"
+        aria-labelledby="sv2-tab-computer" data-section="computer">
         <section id="sv2-section-local-engine" class="sv2-local-engine" aria-busy="true" hidden>
-          <lex-card heading="Local AI service" subtitle="LANA's AI runs on this computer and reaches your organization's server for everything else">
+          <lex-card heading="AI models" subtitle="Where LANA's AI runs, and the AI models kept on this computer">
             <div class="sv2-local-engine-head">
-              <lex-badge id="sv2-local-engine-badge" label="Checking" color="gray"></lex-badge>
-              <lex-btn id="sv2-local-engine-restart" variant="ghost" size="sm">Restart</lex-btn>
+              <span class="sv2-local-engine-option-name">Local AI engine</span>
+              <div class="sv2-local-engine-head-side">
+                <lex-badge id="sv2-local-engine-badge" label="Checking" color="gray"></lex-badge>
+                <lex-btn id="sv2-local-engine-restart" variant="ghost" size="sm" label="Restart" hidden></lex-btn>
+              </div>
             </div>
+            <p id="sv2-local-engine-note" class="sv2-local-engine-note"></p>
             <p id="sv2-local-engine-message" class="sv2-local-engine-message" role="status" hidden></p>
             <div id="sv2-local-engine-rows" class="sv2-local-engine-rows"></div>
-            <div class="sv2-local-engine-option">
+            <div id="sv2-local-engine-use" class="sv2-local-engine-option" hidden>
               <div class="sv2-local-engine-option-copy">
                 <span class="sv2-local-engine-option-name">Use local AI engine</span>
-                <span class="sv2-local-engine-option-description">When off, LANA talks to your organization's server directly.</span>
+                <span class="sv2-local-engine-option-description">When off, LANA's AI runs on your organization's server.</span>
               </div>
               <lex-toggle id="sv2-local-engine-toggle" name="local_engine_enabled" aria-label="Use local AI engine"></lex-toggle>
             </div>
-            <div class="sv2-local-engine-option">
+            <div id="sv2-local-engine-bg" hidden>
+              <div class="sv2-local-engine-option">
+                <div class="sv2-local-engine-option-copy">
+                  <span class="sv2-local-engine-option-name">Run my background jobs on this computer when possible</span>
+                  <span class="sv2-local-engine-option-description">Your own agent runs and document indexing start here. When this computer sleeps, closes or goes offline, they move to your organization's cloud.</span>
+                </div>
+                <lex-toggle id="sv2-local-engine-bg-toggle" name="local_engine_background_jobs" aria-label="Run my background jobs on this computer when possible"></lex-toggle>
+              </div>
+              <div class="sv2-local-engine-jobs">
+                <div class="sv2-local-engine-jobs-head">
+                  <span class="sv2-local-engine-option-name">Background jobs</span>
+                  <lex-badge id="sv2-local-engine-jobs-badge" label="Checking" color="gray"></lex-badge>
+                </div>
+                <div id="sv2-local-engine-jobs-list" class="sv2-local-engine-jobs-list" role="list"></div>
+                <p id="sv2-local-engine-jobs-empty" class="sv2-local-engine-note" hidden></p>
+              </div>
+            </div>
+            <!-- Speech models (settings-briefs.js): shown while LANA Briefs is on. -->
+            <div id="sv2-section-briefs-models" class="sv2-local-engine-speech sv2-briefs" hidden>
               <div class="sv2-local-engine-option-copy">
-                <span class="sv2-local-engine-option-name">Run my background jobs on this computer when possible</span>
-                <span class="sv2-local-engine-option-description">Your own agent runs and document indexing start here. When this computer sleeps, closes or goes offline, they move to your organization's cloud.</span>
+                <span class="sv2-local-engine-option-name">Speech models</span>
+                <span class="sv2-local-engine-option-description">LANA Briefs transcribes meetings on this computer. Notes and actions are written by LANA's AI.</span>
               </div>
-              <lex-toggle id="sv2-local-engine-bg-toggle" name="local_engine_background_jobs" aria-label="Run my background jobs on this computer when possible"></lex-toggle>
+              <div id="sv2-briefs-models" class="sv2-briefs-models" aria-live="polite"></div>
             </div>
-            <div class="sv2-local-engine-jobs">
-              <div class="sv2-local-engine-jobs-head">
-                <span class="sv2-local-engine-option-name">Background jobs</span>
-                <lex-badge id="sv2-local-engine-jobs-badge" label="Checking" color="gray"></lex-badge>
-              </div>
-              <div id="sv2-local-engine-jobs-list" class="sv2-local-engine-jobs-list" role="list"></div>
-              <p id="sv2-local-engine-jobs-empty" class="sv2-local-engine-note" hidden></p>
-            </div>
-            <p id="sv2-local-engine-note" class="sv2-local-engine-note"></p>
           </lex-card>
         </section>
         <section id="sv2-section-offline-copy" class="sv2-offline-copy" aria-busy="true" hidden>
@@ -348,13 +358,19 @@
             <p id="sv2-reembed-note" class="sv2-reembed-note" hidden></p>
           </lex-card>
         </section>
-        <section id="sv2-section-briefs-models" class="sv2-briefs" hidden>
-          <lex-card heading="Speech models" subtitle="LANA Briefs transcribes meetings on this computer">
-            <div id="sv2-briefs-models" class="sv2-briefs-models" aria-live="polite"></div>
-            <p class="sv2-briefs-note">LANA writes notes and actions with the AI model above. These downloads are only for speech.</p>
+      </div><!-- /sv2-panel-computer -->
+
+      <!-- ╔═════════════════════════ SCREEN DICTION PANEL ══════════════╗
+           Hidden until the feature ships (SCREEN_DICTION_READY in src/screen-voice/feature.js). -->
+      <div class="sv2-panel sv2-hidden" id="sv2-panel-screen-diction" role="tabpanel"
+        aria-labelledby="sv2-tab-screen-diction" data-section="screen-diction">
+        <section id="sv2-section-screen-diction" class="sv2-screen-diction" aria-busy="true">
+          <lex-card heading="Screen diction" subtitle="Speak, and LANA types or acts in the app in front of you">
+            <div id="sv2-capabilities-list" class="sv2-capabilities-list" aria-live="polite"></div>
+            <p id="sv2-capabilities-status" class="sv2-capabilities-status" role="status"></p>
           </lex-card>
         </section>
-      </div><!-- /sv2-panel-capabilities -->
+      </div><!-- /sv2-panel-screen-diction -->
 
       <!-- ╔════════════════════════ CONNECTED DEVICES PANEL ═══════════╗
            Paired phones, how meetings arrive and background updates (LANA Briefs).
@@ -844,7 +860,7 @@
   <script src="js/settings-sessions.model.js"></script>
   <script src="js/pages/settings-sessions.js"></script>
   <script src="js/pages/settings-usage.js"></script>
-  <script src="js/pages/settings-capabilities.js"></script>
+  <script src="js/pages/settings-screen-diction.js"></script>
   <script src="js/settings-general.model.js"></script>
   <script src="js/pages/settings-general.js"></script>
   <script src="js/engine-status.js"></script>

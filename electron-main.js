@@ -178,11 +178,11 @@ const { BrainchildManager, discover, validateLink, mcpBinForRoot, isAllowedVault
 const { ElectronScreenVoice } = require('./src/screen-voice/electron-screen-voice');
 const { isAllowedExternalUrl } = require('./src/electron-external-url');
 const {
-  SCREEN_DICTION_APP_ID,
-  capabilityItems,
-  capabilityViewModels,
-  isCapabilityActive
-} = require('./src/screen-voice/app-entitlement');
+  SCREEN_DICTION_ID,
+  screenDictionAvailable,
+  isScreenDictionActive,
+  screenDictionViews
+} = require('./src/screen-voice/feature');
 
 /**
  * Brainchild MCP bridge — reads the user's local vault over the MCP stdio
@@ -334,64 +334,36 @@ function isLanaOneEdition() {
   return raw === '1' || raw.toLowerCase() === 'true';
 }
 
+// Screen diction is a core client feature (src/screen-voice/feature.js): this
+// computer's on/off choice lives here, not with the organization's server.
 function getCapabilityPreferencesStore() {
   if (!capabilityPreferencesStore) {
     capabilityPreferencesStore = new Store({
-      name: 'capability-preferences',
-      defaults: { organizations: {} }
+      name: 'screen-diction',
+      defaults: { enabled: false }
     });
   }
   return capabilityPreferencesStore;
 }
 
-function capabilityPreferenceScope(server) {
-  const identity = server?.orgId || server?.url || 'unscoped';
-  return encodeURIComponent(String(identity).slice(0, 500));
+function screenDictionPreference() {
+  return getCapabilityPreferencesStore().get('enabled', false) === true;
 }
 
-function getCapabilityPreferences(server = getSavedServer()) {
-  if (!server) return {};
-  const organizations = getCapabilityPreferencesStore().get('organizations', {});
-  const preferences = organizations && organizations[capabilityPreferenceScope(server)];
-  return preferences && typeof preferences === 'object' && !Array.isArray(preferences) ? preferences : {};
-}
-
-function setCapabilityPreference(server, capabilityId, active) {
-  const store = getCapabilityPreferencesStore();
-  const organizations = store.get('organizations', {});
-  const scope = capabilityPreferenceScope(server);
-  const existing = organizations[scope] && typeof organizations[scope] === 'object'
-    ? organizations[scope]
-    : {};
-  store.set('organizations', {
-    ...organizations,
-    [scope]: { ...existing, [capabilityId]: Boolean(active) }
-  });
-}
-
-function currentCapabilityViewModels(server = getSavedServer()) {
-  return capabilityViewModels(server, getCapabilityPreferences(server), process.platform).map((capability) => (
-    capability.id === SCREEN_DICTION_APP_ID
-      ? { ...capability, openAtLogin: Boolean(screenVoice?.getSettings().openAtLogin) }
-      : capability
+function currentCapabilityViewModels() {
+  return screenDictionViews(screenDictionPreference(), process.platform).map((capability) => (
+    { ...capability, openAtLogin: Boolean(screenVoice?.getSettings().openAtLogin) }
   ));
 }
 
-function syncScreenVoiceEntitlement(server = getSavedServer()) {
-  const enabled = isCapabilityActive(
-    server,
-    SCREEN_DICTION_APP_ID,
-    getCapabilityPreferences(server),
-    process.platform
-  );
+function syncScreenVoiceEntitlement() {
+  const enabled = isScreenDictionActive(screenDictionPreference(), process.platform);
   if (screenVoice) screenVoice.setEntitlementEnabled(enabled);
   return enabled;
 }
 
-function isScreenDictionEntitled(server = getSavedServer()) {
-  return Boolean(server && capabilityItems(server).some((item) => (
-    String(item.id || item.app_id || item.slug || item.key || '').trim() === SCREEN_DICTION_APP_ID
-  )));
+function isScreenDictionEntitled() {
+  return screenDictionAvailable(process.platform);
 }
 
 async function syncScreenVoiceAuthentication(window = mainWindow) {
@@ -445,7 +417,7 @@ function createFileUrl(filePath) {
 function openScreenVoiceSettings() {
   if (!mainWindow || mainWindow.isDestroyed()) return false;
   const settingsUrl = createFileUrl(path.join(__dirname, 'public_html/settings-v2.html'))
-    + '?capability=screen-diction#capabilities';
+    + '?capability=screen-diction#screen-diction';
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
   mainWindow.focus();
@@ -1314,7 +1286,7 @@ ipcMain.handle('save-settings', async (event, settings) => {
   const stored = localEngine.toStored(settings);
   const success = saveServerConnection(stored);
   if (success) {
-    syncScreenVoiceEntitlement(stored);
+    syncScreenVoiceEntitlement();
     syncBriefs(stored);
     await localEngine.sync().catch((error) => logError('[electron-main] Local AI engine did not start', error));
   }
@@ -1338,7 +1310,7 @@ ipcMain.handle('connect-to-server', async (event, server) => {
     // start or retarget the local engine at it.
     const stored = localEngine.toStored(server);
     saveServerConnection(stored);
-    syncScreenVoiceEntitlement(stored);
+    syncScreenVoiceEntitlement();
     syncBriefs(stored);
     await localEngine.sync().catch((error) => logError('[electron-main] Local AI engine did not start', error));
 
@@ -1389,9 +1361,7 @@ ipcMain.handle('get-saved-server', async () => {
   }
 });
 
-// Capabilities are organization entitlements supplied by discovery. Users may
-// activate/deactivate optional capabilities on this device, but cannot create
-// an entitlement or disable a capability marked required by the server.
+// Settings > Screen diction. Empty until the feature ships (SCREEN_DICTION_READY).
 ipcMain.handle('capabilities:list', async () => {
   try {
     return { success: true, platform: process.platform, capabilities: currentCapabilityViewModels() };
@@ -1403,45 +1373,29 @@ ipcMain.handle('capabilities:list', async () => {
 
 ipcMain.handle('capabilities:set-active', async (_event, payload) => {
   try {
-    const server = getSavedServer();
-    const id = typeof payload?.id === 'string' ? payload.id.trim().slice(0, 120) : '';
+    const id = typeof payload?.id === 'string' ? payload.id.trim() : '';
     const active = payload?.active;
-    if (!server || !id || !/^[a-z0-9][a-z0-9-]{0,119}$/.test(id) || typeof active !== 'boolean') {
-      return { success: false, error: 'Invalid capability setting.' };
+    if (id !== SCREEN_DICTION_ID || typeof active !== 'boolean') {
+      return { success: false, error: 'Invalid setting.' };
     }
-
-    const entitled = capabilityItems(server).find((item) => (
-      String(item.id || item.app_id || item.slug || item.key || '').trim() === id
-    ));
-    if (!entitled) return { success: false, error: 'This capability is not enabled for your organization.' };
-    if (entitled.route?.meta?.required === true && active === false) {
-      return { success: false, error: 'This capability is required by your organization.' };
-    }
-
-    const view = currentCapabilityViewModels(server).find((item) => item.id === id);
-    if (!view?.available && active) {
-      return { success: false, error: 'This capability is not available on this platform.' };
-    }
-
-    setCapabilityPreference(server, id, active);
-    syncScreenVoiceEntitlement(server);
-    syncBriefs(server);
-    return { success: true, platform: process.platform, capabilities: currentCapabilityViewModels(server) };
+    if (!isScreenDictionEntitled()) return { success: false, error: 'Screen diction is not available yet.' };
+    getCapabilityPreferencesStore().set('enabled', active);
+    syncScreenVoiceEntitlement();
+    return { success: true, platform: process.platform, capabilities: currentCapabilityViewModels() };
   } catch (error) {
-    logError('[Capabilities] Failed to update capability', error);
-    return { success: false, error: 'The capability setting could not be saved.' };
+    logError('[Screen diction] Failed to update the setting', error);
+    return { success: false, error: 'The setting could not be saved.' };
   }
 });
 
 ipcMain.handle('capabilities:set-open-at-login', async (_event, payload) => {
   try {
-    const server = getSavedServer();
-    if (!isScreenDictionEntitled(server)) return { success: false, error: 'The LANA Voice Agent is not enabled for your organization.' };
+    if (!isScreenDictionEntitled()) return { success: false, error: 'Screen diction is not available yet.' };
     if (!screenVoice || typeof payload?.openAtLogin !== 'boolean') {
       return { success: false, error: 'Open at Login is not available on this platform.' };
     }
     screenVoice.setOpenAtLogin(payload.openAtLogin);
-    return { success: true, platform: process.platform, capabilities: currentCapabilityViewModels(server) };
+    return { success: true, platform: process.platform, capabilities: currentCapabilityViewModels() };
   } catch (error) {
     logError('[Capabilities] Failed to update Open at Login', error);
     return { success: false, error: 'Open at Login could not be saved.' };
@@ -1449,14 +1403,14 @@ ipcMain.handle('capabilities:set-open-at-login', async (_event, payload) => {
 });
 
 ipcMain.handle('capabilities:get-voice-settings', async () => {
-  if (!isScreenDictionEntitled()) return { success: false, error: 'The LANA Voice Agent is not enabled for your organization.' };
+  if (!isScreenDictionEntitled()) return { success: false, error: 'Screen diction is not available yet.' };
   if (!screenVoice) return { success: false, error: 'The LANA Voice Agent is not available on this platform.' };
   return { success: true, settings: screenVoice.getSettings() };
 });
 
 ipcMain.handle('capabilities:set-voice-settings', async (_event, payload) => {
   try {
-    if (!isScreenDictionEntitled()) return { success: false, error: 'The LANA Voice Agent is not enabled for your organization.' };
+    if (!isScreenDictionEntitled()) return { success: false, error: 'Screen diction is not available yet.' };
     if (!screenVoice || !payload?.settings || typeof payload.settings !== 'object' || Array.isArray(payload.settings)) {
       return { success: false, error: 'Invalid voice agent settings.' };
     }
@@ -1469,7 +1423,7 @@ ipcMain.handle('capabilities:set-voice-settings', async (_event, payload) => {
 });
 
 ipcMain.handle('capabilities:get-voice-permissions', async () => {
-  if (!isScreenDictionEntitled()) return { success: false, error: 'The LANA Voice Agent is not enabled for your organization.' };
+  if (!isScreenDictionEntitled()) return { success: false, error: 'Screen diction is not available yet.' };
   if (!screenVoice) return { success: false, error: 'The LANA Voice Agent is not available on this platform.' };
   try { return { success: true, permissions: await screenVoice.permissionStatus() }; }
   catch (_) { return { success: false, error: 'Permission status is temporarily unavailable.' }; }
@@ -1477,7 +1431,7 @@ ipcMain.handle('capabilities:get-voice-permissions', async () => {
 
 ipcMain.handle('capabilities:request-voice-permission', async (_event, payload) => {
   const type = payload?.type;
-  if (!isScreenDictionEntitled()) return { success: false, error: 'The LANA Voice Agent is not enabled for your organization.' };
+  if (!isScreenDictionEntitled()) return { success: false, error: 'Screen diction is not available yet.' };
   if (!screenVoice || !['microphone', 'accessibility'].includes(type)) {
     return { success: false, error: 'Invalid permission request.' };
   }
@@ -1489,7 +1443,7 @@ ipcMain.handle('capabilities:request-voice-permission', async (_event, payload) 
 ipcMain.handle('clear-saved-server', async () => {
   try {
     clearSavedServer();
-    syncScreenVoiceEntitlement(null);
+    syncScreenVoiceEntitlement();
     syncBriefs(null);
     await localEngine.sync().catch((error) => logError('[electron-main] Local AI engine did not stop', error));
     return { success: true };
@@ -2251,12 +2205,7 @@ app.whenReady().then(async () => {
         openExternalUrl: openScreenVoiceResearchUrl,
         notifyUser: notifyScreenVoiceInputRequired,
         ensureDockIcon: applyDockIcon,
-        entitlementEnabled: isCapabilityActive(
-          getSavedServer(),
-          SCREEN_DICTION_APP_ID,
-          getCapabilityPreferences(getSavedServer()),
-          process.platform
-        ),
+        entitlementEnabled: isScreenDictionActive(screenDictionPreference(), process.platform),
         logInfo,
         logError
       });
@@ -2318,7 +2267,7 @@ app.whenReady().then(async () => {
     const effectiveServer = refreshedServer || savedServer;
     if (refreshedServer) {
       saveServerConnection(refreshedServer);
-      syncScreenVoiceEntitlement(refreshedServer);
+      syncScreenVoiceEntitlement();
       syncBriefs(refreshedServer);
     }
 
@@ -2341,7 +2290,7 @@ app.whenReady().then(async () => {
     } else {
       logInfo('[electron-main] Saved server is not reachable, clearing saved server and showing login...');
       clearSavedServer();
-      syncScreenVoiceEntitlement(null);
+      syncScreenVoiceEntitlement();
       syncBriefs(null);
     }
   } else {
