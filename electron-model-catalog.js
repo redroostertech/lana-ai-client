@@ -36,9 +36,9 @@ const LANA_CHAT_MODELS = Object.freeze([
 ]);
 
 /**
- * The built-in copy: the published entries for LANA's models as of 2026-11-09, plus the
- * Qwen3.5 4B, which is not on the bucket yet. Its files are lmstudio-community's (the same
- * publisher as our 9B, whose file matches byte for byte), checked on Pip 3.0.0 on 2026-11-09:
+ * The built-in copy: the published entries for LANA's models as of 2026-11-09. The Qwen3.5 4B
+ * files are lmstudio-community's at revision f9f88ac (the same publisher as our 9B, whose file
+ * matches byte for byte), published to the bucket on 2026-11-09 and checked on Pip 3.0.0:
  * it answers, reads images, and its conversation memory is 594.2 MiB per conversation at
  * 32768 tokens, which the Qwen3.5 estimate in local-ai-fit.model.js predicts.
  */

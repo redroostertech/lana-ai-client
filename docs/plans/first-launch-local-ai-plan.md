@@ -272,7 +272,7 @@ Phase 3 of the custom cloud endpoint plan (backend routing) must land before clo
 ### Phase A: done 2026-11-09
 
 - `electron-hardware.js`: memory, chip, cores, graphics (Apple silicon, NVIDIA through `nvidia-smi` on Windows and Linux, else processor only) and free disk at the models folder. Every reader is injectable, so the tests run on any operating system.
-- `electron-model-catalog.js`: the published Pip catalog (`models.lanaai.io/llm/catalog.json`, or `LANA_MODEL_CATALOG_URL`) cut down to LANA's four chat models and their three vision files. Rows must have a full SHA-256, a bare `.gguf` file name and a size; downloads always point at our bucket. The last good copy is saved, and a built-in copy (the published entries as of 2026-11-09) is used offline.
+- `electron-model-catalog.js`: the published Pip catalog (`models.lanaai.io/llm/catalog.json`, or `LANA_MODEL_CATALOG_URL`) cut down to LANA's five chat models and their four vision files. Rows must have a full SHA-256, a bare `.gguf` file name and a size; downloads always point at our bucket. The last good copy is saved, and a built-in copy (the published entries as of 2026-11-09) is used offline.
 - `src/js/local-ai-fit.model.js`: the sizing in sections 4.2 and 4.3, plus `fitLabel` and `remembersLabel`. Works in the main process and the page.
 - `electron-local-models.js`: `speechSizes()` and `SPEECH_FEATURES`, with the measured speech memory.
 - Tests: `tests/unit/local-ai-fit.model.test.js`, `electron-model-catalog.test.js`, `electron-hardware.test.js`, and a speech sizes test in `electron-local-models.test.js`. 60 pass. Breaking the speech reservation failed 5 tests; letting a row choose its own download address failed 1.
@@ -283,7 +283,7 @@ Phase 3 of the custom cloud endpoint plan (backend routing) must land before clo
 
 - Added to LANA's chat models and the built-in copy. Files: `lmstudio-community/Qwen3.5-4B-GGUF`, the same publisher as our 9B (our 9B on the bucket matches theirs byte for byte). `Qwen3.5-4B-Q4_K_M.gguf` 2,707,513,696 bytes, SHA-256 `25082a7d...a1418c`; `mmproj-Qwen3.5-4B-BF16.gguf` 675,568,768 bytes, SHA-256 `ae08d9d7...454b91`.
 - Checked on Pip 3.0.0 (`ff965d5`) on this Mac: loads with in-engine image reading, answers, and its conversation memory is 594.2 MiB per conversation at 32768 tokens. The Qwen3.5 estimate predicts 594.9 MiB, so no new number is needed.
-- **Not on the bucket yet** (`models.lanaai.io/llm/` answers 404 for both files), and not in the published catalog. Until both are, a computer that is online reads the published catalog and does not see the 4B; only the built-in copy has it. Uploading needs bucket access this Mac does not have.
+- **Published 2026-11-09.** Both files are on the bucket (`models.lanaai.io/llm/`) and in the published catalog, from `lmstudio-community/Qwen3.5-4B-GGUF` at revision `f9f88ac3e234be915e23811a6d28ea287bdb927e` (apache-2.0). The public copies were downloaded again and match the fingerprints above. The catalog before the change is saved in the bucket as `llm/backups/catalog-2026-11-09T14-27-31-069Z.json` (24 entries; now 26). With the live catalog, 12 and 16 GB computers get the 4B at 32,768 tokens, 16 GB with image reading.
 - Qwen publishes the 4B itself only as full-size weights (`Qwen/Qwen3.5-4B`), with no GGUF for any Qwen3.5 model.
 
 ### Phase B: done 2026-11-09
