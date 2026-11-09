@@ -18,6 +18,7 @@
   <link rel="stylesheet" href="css/settings-briefs.css">
   <link rel="stylesheet" href="css/settings-general.css">
   <link rel="stylesheet" href="css/settings-sessions.css">
+  <link rel="stylesheet" href="css/settings-capabilities.css">
   <script src="js/tailwind-loader.js"></script>
 
   <link rel="stylesheet" href="css/lex-chat.css">
@@ -305,9 +306,51 @@
                 <p id="sv2-local-engine-jobs-empty" class="sv2-local-engine-note" hidden></p>
               </div>
             </div>
-            <!-- Local and Cloud (settings-ai-models.js); Speech and Voice rows from settings-briefs.js. -->
+            <!-- This computer and its chat model (settings-capabilities.js). -->
+            <div id="sv2-cap" class="sv2-ai-group sv2-cap" hidden>
+              <h4 class="sv2-subhead">This computer</h4>
+              <dl id="sv2-cap-computer" class="sv2-ai-item-facts sv2-cap-computer"></dl>
+              <h4 class="sv2-subhead sv2-cap-subhead">Chat model</h4>
+              <div class="sv2-cap-chat">
+                <div class="sv2-cap-chat-head">
+                  <div class="sv2-cap-chat-copy">
+                    <span id="sv2-cap-chat-name" class="sv2-cap-chat-name"></span>
+                    <span id="sv2-cap-chat-detail" class="sv2-cap-chat-detail"></span>
+                  </div>
+                  <div class="sv2-cap-chat-side">
+                    <lex-badge id="sv2-cap-chat-badge" size="sm" hidden></lex-badge>
+                    <lex-btn id="sv2-cap-change" variant="secondary" size="sm" label="Change model" hidden></lex-btn>
+                  </div>
+                </div>
+                <p id="sv2-cap-chat-note" class="sv2-cap-note" hidden></p>
+                <div id="sv2-cap-chooser" class="sv2-cap-chooser" hidden>
+                  <p class="sv2-cap-chooser-intro">Pick the chat model this computer uses. LANA downloads it, then restarts chat with it.</p>
+                  <lex-radio id="sv2-cap-choices" name="chat_model" aria-label="Chat model"></lex-radio>
+                  <div class="sv2-cap-actions">
+                    <lex-btn id="sv2-cap-switch" variant="primary" size="sm" label="Switch model"></lex-btn>
+                    <lex-btn id="sv2-cap-cancel" variant="ghost" size="sm" label="Cancel"></lex-btn>
+                  </div>
+                </div>
+                <div id="sv2-cap-progress" class="sv2-cap-progress" role="status" hidden>
+                  <div class="sv2-cap-progress-head">
+                    <span id="sv2-cap-progress-heading" class="sv2-cap-progress-heading"></span>
+                    <span id="sv2-cap-progress-bytes" class="sv2-cap-progress-bytes"></span>
+                  </div>
+                  <lex-progress-bar id="sv2-cap-progress-bar" value="0" size="sm"></lex-progress-bar>
+                  <p id="sv2-cap-progress-current" class="sv2-cap-note"></p>
+                  <p id="sv2-cap-progress-error" class="sv2-cap-error" hidden></p>
+                  <div class="sv2-cap-actions">
+                    <lex-btn id="sv2-cap-pause" variant="secondary" size="sm" label="Pause" hidden></lex-btn>
+                    <lex-btn id="sv2-cap-resume" variant="primary" size="sm" label="Resume" hidden></lex-btn>
+                    <lex-btn id="sv2-cap-retry" variant="primary" size="sm" label="Try again" hidden></lex-btn>
+                  </div>
+                </div>
+                <p id="sv2-cap-notice" class="sv2-cap-notice" role="status" hidden></p>
+              </div>
+            </div>
+            <!-- Set up by LANA (settings-capabilities.js), Speech and Voice rows from settings-briefs.js; Cloud (settings-ai-models.js). -->
             <div id="sv2-ai-local" class="sv2-ai-group" hidden>
-              <h4 class="sv2-subhead">Local (On this computer)</h4>
+              <h4 class="sv2-subhead">Set up by LANA</h4>
               <div class="sv2-ai-list" role="list">
                 <div id="sv2-ai-local-rows" class="sv2-ai-list-part"></div>
                 <div id="sv2-briefs-models" class="sv2-ai-list-part" aria-live="polite"></div>
@@ -853,6 +896,7 @@
   <script src="js/lex/components/form/lex-select.js"></script>
   <script src="js/lex/components/form/lex-textarea.js"></script>
   <script src="js/lex/components/form/lex-segmented.js"></script>
+  <script src="js/lex/components/form/lex-radio.js"></script>
   <script src="js/vendor/lottie_light.min.js"></script>
   <script src="js/lex/brand/lex-brand-animations.js"></script>
   <script src="js/lex/components/foundation/lex-brand-mark.js"></script>
@@ -877,6 +921,10 @@
   <script src="js/pages/settings-local-engine.js"></script>
   <script src="js/settings-ai-models.model.js"></script>
   <script src="js/pages/settings-ai-models.js"></script>
+  <script src="js/local-ai-fit.model.js"></script>
+  <script src="js/first-launch.model.js"></script>
+  <script src="js/settings-capabilities.model.js"></script>
+  <script src="js/pages/settings-capabilities.js"></script>
   <script src="js/api/cloud-endpoint-api.client.js"></script>
   <script src="js/settings-cloud-endpoint.model.js"></script>
   <script src="js/pages/settings-cloud-endpoint.js"></script>

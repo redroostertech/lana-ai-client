@@ -126,7 +126,7 @@
       return { fit: 'wont_fit', contextTokens: null, reason: 'LANA has not measured this model yet.' };
     }
     if (need(model, installed) > diskLeftBytes) {
-      return { fit: 'wont_fit', contextTokens: null, reason: 'There is not enough free space on this computer for ' + gb(model.sizeBytes) + ' GB.' };
+      return { fit: 'wont_fit', contextTokens: null, reason: 'There is not enough free space on this computer for this ' + gb(model.sizeBytes) + ' GB model.' };
     }
     var steps = CONTEXT_STEPS.filter(function (tokens) { return tokens <= model.contextWindow; });
     var best = { fit: 'wont_fit', contextTokens: null };
