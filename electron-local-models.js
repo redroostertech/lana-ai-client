@@ -161,6 +161,32 @@ function speechPackages(catalog = SPEECH_CATALOG) {
   }));
 }
 
+// Which packages each Briefs feature needs (briefs/packages/core/src/model/speechModels.ts
+// SPEECH_GROUPS): listening for Talk, the voice, and meeting transcription.
+const SPEECH_FEATURES = Object.freeze({
+  listener: Object.freeze(['vad', 'parakeet']),
+  voice: Object.freeze(['kokoro']),
+  transcription: Object.freeze(['vad', 'parakeet', 'segmentation', 'embedding'])
+});
+
+// Peak memory while Briefs speech runs, measured 2026-11-09 with sherpa-onnx on Apple silicon
+// (models loaded and run as Briefs configures them): meeting transcription with speaker labels
+// 1.26 GB, Talk listening plus speaking 1.34 GB. Rounded up. Measure again when the engine changes.
+const SPEECH_MEMORY_BYTES = Math.round(1.4 * 1024 ** 3);
+
+/** Bytes on disk for each Briefs feature and memory while speech runs, for sizing (src/js/local-ai-fit.model.js). */
+function speechSizes(catalog = SPEECH_CATALOG) {
+  const bytes = (ids) => catalog
+    .filter((entry) => ids.includes(entry.id))
+    .reduce((total, entry) => total + entry.files.reduce((sum, file) => sum + file.sizeBytes, 0), 0);
+  return {
+    listenerBytes: bytes(SPEECH_FEATURES.listener),
+    voiceBytes: bytes(SPEECH_FEATURES.voice),
+    transcriptionBytes: bytes(SPEECH_FEATURES.transcription),
+    memoryBytes: SPEECH_MEMORY_BYTES
+  };
+}
+
 function embeddingModel() {
   return CATALOG.find((entry) => entry.role === 'embedding');
 }
@@ -225,4 +251,4 @@ async function downloadModel(entry, dir, { fetchImpl = (...args) => fetch(...arg
   }
 }
 
-module.exports = { CATALOG, SPEECH_CATALOG, speechPackages, embeddingModel, modelsDir, isInstalled, downloadModel, sha256OfFile };
+module.exports = { CATALOG, SPEECH_CATALOG, SPEECH_FEATURES, speechPackages, speechSizes, embeddingModel, modelsDir, isInstalled, downloadModel, sha256OfFile };

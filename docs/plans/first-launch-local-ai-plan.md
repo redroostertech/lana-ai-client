@@ -1,6 +1,6 @@
 # First Launch: Local AI Setup Plan
 
-- **Status:** Plan. Nothing built yet.
+- **Status:** Phase A built (sizing, the model list and the computer facts; section 11). Phases B to G not started.
 - **Branch:** `development-new` (client), `covo-intake-receiver` (backend, small changes only)
 - **Date:** 2026-11-09
 - **Owner:** Michael Westbrooks
@@ -134,15 +134,29 @@ New module `src/js/local-ai-fit.model.js` (pure, shared by the main process and 
 
 The models LANA requires are priced first, so the chat choices shown are only ones that leave room for them.
 
-1. Set aside memory first: system 3 GB and the LANA app 2 GB (from LANA One).
-2. Set aside the required models:
+1. Set aside the required models:
    - **Embedding** runs all the time (2048 tokens, 1 slot), so its memory is always set aside.
-   - **Speech and voice** run inside the app only while someone is recording or talking. Set aside the memory of the largest one in use at a time (meeting transcription), so a chat model is never chosen that leaves no room to record.
-3. For each chat model and each context step (32768, 16384, 8192), estimate with Pip Desktop's `estimateImpact`: model + conversation memory + working memory, plus vision if a vision file pairs with it.
-4. Call it **comfortable** if the estimate is under 55% of usable memory, **tight** under 75%, otherwise **won't fit**. Everything together must stay under 88%.
-5. Check free disk, in this order, and stop adding when the disk runs out (keeping 512 MiB free): embedding, the chosen chat model, its vision file, speech, voice.
+   - **Speech and voice** run inside the app only while someone is recording or talking. Their peak was measured on this Mac on 2026-11-09 with the models loaded and running: meeting transcription with speaker labels 1.26 GB, Talk (listening and speaking) 1.34 GB. 1.4 GB is set aside, so a chat model is never chosen that leaves no room to record. The number lives next to the speech catalog (`electron-local-models.js` `speechSizes`) and must be measured again when the speech engine changes.
+2. For each chat model and each context step (32768, 16384, 8192), estimate with Pip Desktop's `estimateImpact`: model + conversation memory + working memory, plus vision if a vision file pairs with it. Two conversations are kept ready (Pip Desktop's default) and the context is per conversation.
+3. Against total memory, call it **comfortable** under 55%, **tight** under 75%, otherwise **won't fit**. The 45% left is what keeps the system and other apps running, so no separate amount is set aside for them. (An earlier draft also set aside 3 GB for the system and 2 GB for the app, as LANA One does. Together with the 55% rule that counted the same room twice, and it pushed a 16 GB Mac down to the 1.7B model.)
+4. **NVIDIA card:** chat and vision use the card's memory, less 1 GB for its driver: comfortable under 85%, tight up to 100%, because nothing else shares the card. Embedding and speech stay in system memory.
+5. **No graphics chip:** the same math as a Mac, but a model over 2 GB is marked "answers slowly" and is never the default. It can still be chosen.
+6. Check free disk, in this order, and stop adding when the disk runs out (keeping 512 MiB free): embedding, the chosen chat model, its vision file, speech, voice. Files already on the computer need no space.
 
-The result for each model: `{ id, name, role, sizeBytes, fit: comfortable | tight | wont_fit, contextTokens, reason }`. Reasons are plain sentences, for example "This computer needs at least 16 GB of memory for this model."
+The result for each chat model: `{ id, name, sizeBytes, fit: comfortable | tight | wont_fit, contextTokens, pages, slow, reason }`. Reasons are plain sentences, for example "This model needs a computer with about 30 GB of memory."
+
+What it picks today (built-in catalog, measured speech memory):
+
+| Computer | Default chat | Remembers | Image reading |
+|---|---|---|---|
+| 4 GB, no graphics chip | Cloud | | Cloud |
+| 8 GB | Qwen3.5 0.8B | 32,768 tokens | No |
+| 16 GB Mac | Qwen3.5 9B | 16,384 tokens | No (same as the server's demo tier) |
+| 24 GB Mac (this one, M4 Pro) | Qwen3.5 9B | 32,768 tokens | Yes |
+| 36 GB Mac | Qwen3.5 9B (35B offered as tight) | 32,768 tokens | Yes |
+| 48 GB Mac and up | Qwen3.5 35B | 32,768 tokens | Yes |
+| 16 GB with a 12 GB NVIDIA card | Qwen3.5 9B | 32,768 tokens | Yes |
+| 16 GB, no graphics chip | Qwen3 1.7B (9B offered as slow) | 32,768 tokens | No |
 
 ### 4.3 Pick the setup
 
@@ -150,7 +164,7 @@ The result for each model: `{ id, name, role, sizeBytes, fit: comfortable | tigh
 - **Vision:** added by LANA only if the chosen chat model stays comfortable with it. If the person picks a different chat model, LANA decides again.
 - **Embedding:** nomic f16 (the pinned file) whenever it fits, which is almost always. Otherwise embedding uses the cloud.
 - **Speech and voice:** installed by LANA when they fit and there is room. If they do not, the Briefs features that need them say so plainly and point to Settings (the existing rule).
-- **Engine tier:** set `LANA_TIER` from the plan (the engine refuses to start without it). The mapping goes in one table next to the fit code, using the backend's tier names.
+- **Engine tier:** set `LANA_TIER` from the plan (the engine refuses to start without it). This is done in phase C, where the engine is started. The backend's tiers (`infra/lib/config/tier.config.js`) start at the 9B (`demo`), so the smaller chat models need a decision there.
 
 The pinned embedding file must stay exactly the pin (`deploy/railway/embed/embed-pin.json`). The catalog is never allowed to change it.
 
@@ -163,7 +177,7 @@ One window, built with Lex components, with its own `first-launch.html`, `.js` a
 1. **Checking this computer.** A short progress line while hardware is read. Under a second.
 2. **Your AI setup.** One card, for chat, with the default already selected:
    - the chat model, its size, and the fit word ("Good fit for this computer")
-   - how much it can remember: "About 24 pages at once"
+   - how much it can remember: "About 44 pages at once" (a page is about 500 words, or 750 tokens)
    - where it runs: "On this computer" or "In the cloud (Forge)"
    - a "Choose a different model" link that lists the chat models with their fit words and how much each remembers. Models that won't fit are greyed out with the reason.
    - Below the card, one short line lists what LANA adds by itself, with no controls: "LANA also sets up search, image reading, listening and speaking for you." Anything that does not fit is left out of that line.
@@ -248,3 +262,17 @@ Phase 3 of the custom cloud endpoint plan (backend routing) must land before clo
 - **Memory estimates are only for Qwen families.** The conversation-memory numbers in `estimateImpact` are measured for Qwen3 and Qwen3.5. A new model family needs its own number before it is offered.
 - **The embed pin is stale.** `embed-pin.json` still names Pip build `ddedf87`. A deployment with no Pip of its own would expect that build. The pin should be restaged for `v3.0.0` before installed clients ship.
 - **Slow downloads.** A 5.6 GB chat model can take a long time. The cloud is used until local files are ready, so the app works from the first minute.
+
+---
+
+## 11. Progress
+
+### Phase A: done 2026-11-09
+
+- `electron-hardware.js`: memory, chip, cores, graphics (Apple silicon, NVIDIA through `nvidia-smi` on Windows and Linux, else processor only) and free disk at the models folder. Every reader is injectable, so the tests run on any operating system.
+- `electron-model-catalog.js`: the published Pip catalog (`models.lanaai.io/llm/catalog.json`, or `LANA_MODEL_CATALOG_URL`) cut down to LANA's four chat models and their three vision files. Rows must have a full SHA-256, a bare `.gguf` file name and a size; downloads always point at our bucket. The last good copy is saved, and a built-in copy (the published entries as of 2026-11-09) is used offline.
+- `src/js/local-ai-fit.model.js`: the sizing in sections 4.2 and 4.3, plus `fitLabel` and `remembersLabel`. Works in the main process and the page.
+- `electron-local-models.js`: `speechSizes()` and `SPEECH_FEATURES`, with the measured speech memory.
+- Tests: `tests/unit/local-ai-fit.model.test.js`, `electron-model-catalog.test.js`, `electron-hardware.test.js`, and a speech sizes test in `electron-local-models.test.js`. 60 pass. Breaking the speech reservation failed 5 tests; letting a row choose its own download address failed 1.
+- Checked live on this Mac: the published catalog loads (`source: published`), the computer reads as Apple M4 Pro, 24 GB, 14 cores, 60 GB free, and the plan is Qwen3.5 9B with image reading at 32,768 tokens, with speech and voice, 7.3 GB to download.
+- Nothing calls these yet. Phase B (downloads) and phase D (the first-launch screen) use them.

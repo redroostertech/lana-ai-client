@@ -9,7 +9,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
-const { CATALOG, SPEECH_CATALOG, speechPackages, embeddingModel, downloadModel, isInstalled } = require('../../electron-local-models');
+const { CATALOG, SPEECH_CATALOG, SPEECH_FEATURES, speechPackages, speechSizes, embeddingModel, downloadModel, isInstalled } = require('../../electron-local-models');
 
 // The firm's embedding identity (LANA-AI deploy/railway/embed/embed-pin.json).
 const FIRM_IDENTITY = {
@@ -78,6 +78,19 @@ describe('LANA Briefs speech models in the same catalog', () => {
   test('the catalog cannot be changed at run time', () => {
     expect(Object.isFrozen(SPEECH_CATALOG)).toBe(true);
     expect(Object.isFrozen(SPEECH_CATALOG[0].files[0])).toBe(true);
+  });
+});
+
+describe('speech sizes for first-launch sizing', () => {
+  test('each Briefs feature counts the files of its packages, and every package is used', () => {
+    const fileBytes = (id) => SPEECH_CATALOG.find((p) => p.id === id).files.reduce((sum, f) => sum + f.sizeBytes, 0);
+    const sizes = speechSizes();
+    expect(sizes.listenerBytes).toBe(fileBytes('vad') + fileBytes('parakeet'));
+    expect(sizes.voiceBytes).toBe(fileBytes('kokoro'));
+    expect(sizes.transcriptionBytes).toBe(['vad', 'parakeet', 'segmentation', 'embedding'].reduce((sum, id) => sum + fileBytes(id), 0));
+    expect(sizes.memoryBytes).toBeGreaterThan(sizes.transcriptionBytes);
+    const used = new Set(Object.values(SPEECH_FEATURES).flat());
+    expect(SPEECH_CATALOG.map((p) => p.id).filter((id) => !used.has(id))).toEqual([]);
   });
 });
 
