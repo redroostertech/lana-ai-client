@@ -118,14 +118,28 @@ function createTokenStore({ safeStorage, persistence }) {
 function hasLiveSession(token, nowMs) {
   if (!isValidToken(token)) return false;
   if (token.indexOf('demo-token-') === 0) return true;
+  const payload = jwtPayload(token);
+  if (!payload) return false;
+  return !payload.exp || payload.exp * 1000 > nowMs;
+}
+
+/** The claims of a JWT, or null when it is not one. Never logged. */
+function jwtPayload(token) {
+  if (!isValidToken(token)) return null;
   const parts = token.split('.');
-  if (parts.length !== 3) return false;
+  if (parts.length !== 3) return null;
   try {
     const payload = JSON.parse(Buffer.from(parts[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'));
-    return !payload.exp || payload.exp * 1000 > nowMs;
+    return payload && typeof payload === 'object' ? payload : null;
   } catch (_) {
-    return false;
+    return null;
   }
+}
+
+/** When the token stops working (ms since epoch), or null when it does not say. */
+function tokenExpiresAt(token) {
+  const payload = jwtPayload(token);
+  return payload && Number.isFinite(payload.exp) ? payload.exp * 1000 : null;
 }
 
 // Only the app's own pages (file://) may read or change the token. A remote
@@ -171,4 +185,4 @@ function registerTokenIpc(ipcMain, tokenStore, onChange = () => {}) {
   });
 }
 
-module.exports = { createTokenStore, registerTokenIpc, isTrustedSender, hasLiveSession, CHANNELS, MAX_TOKEN_LENGTH };
+module.exports = { createTokenStore, registerTokenIpc, isTrustedSender, hasLiveSession, tokenExpiresAt, CHANNELS, MAX_TOKEN_LENGTH };

@@ -13,6 +13,7 @@ const {
   registerTokenIpc,
   isTrustedSender,
   hasLiveSession,
+  tokenExpiresAt,
   CHANNELS
 } = require('../../electron-token-store');
 
@@ -158,6 +159,14 @@ test('hasLiveSession: demo and unexpired JWTs are live, expired and junk are not
   expect(hasLiveSession(jwt(500), 1000 * 1000)).toBe(false);
   expect(hasLiveSession('not-a-jwt', 0)).toBe(false);
   expect(hasLiveSession(null, 0)).toBe(false);
+});
+
+test('tokenExpiresAt: the JWT exp in ms, null when the token does not say', () => {
+  const jwt = (claims) => 'h.' + Buffer.from(JSON.stringify(claims)).toString('base64url') + '.s';
+  expect(tokenExpiresAt(jwt({ exp: 2000 }))).toBe(2000 * 1000);
+  expect(tokenExpiresAt(jwt({ sub: 'u1' }))).toBeNull();
+  expect(tokenExpiresAt('demo-token-1')).toBeNull();
+  expect(tokenExpiresAt(null)).toBeNull();
 });
 
 describe('preload', () => {

@@ -26,6 +26,9 @@
  * discovery, so every decision here is unit tested.
  */
 
+const { hasLiveSession, tokenExpiresAt } = require('./electron-token-store');
+const { originOf } = require('./electron-api-base');
+
 const APP_LINK_ACTIONS = Object.freeze({
   'reset-password': Object.freeze({ params: ['token'], signIn: false }),
   'accept-invite': Object.freeze({ params: ['token'], signIn: false }),
@@ -230,13 +233,96 @@ function createPendingStore({ now = () => Date.now(), ttlMs = PENDING_TTL_MS } =
   };
 }
 
+// Chef's sign-out: the same call the app's sign-out button makes (api.logout).
+const LOGOUT_PATH = '/api/v1/auth/logout';
+
+/**
+ * Signing out because the person switched firms keeps auth in step on both
+ * sides: the old firm's Chef ends the session first (with the old token, at
+ * the old address), then this computer forgets the session and the firm. If
+ * the old firm cannot be reached or refuses, this computer is still cleared:
+ * a firm switch is never blocked. The token goes only into the request's
+ * Authorization header, never into a log line.
+ *
+ * deps:
+ *   getSavedServer() -> the firm being left ({ url } is Chef's address)
+ *   getToken()       -> the session token for it, or null
+ *   fetch(url, init) -> a fetch with its own timeout
+ *   clearLocal()     -> forget the session and the saved firm on this computer
+ *   now()            -> ms since epoch
+ *   log(message)
+ *
+ * The returned signOut() resolves to { serverSignedOut, expiresAt }:
+ * serverSignedOut is false only when a live session may still be open on the
+ * old firm; expiresAt is when its token stops working (null when unknown).
+ */
+function createFirmSignOut(deps) {
+  const log = deps.log || (() => {});
+  const now = deps.now || Date.now;
+
+  async function endOnServer(server, token) {
+    const done = { serverSignedOut: true, expiresAt: null };
+    // No live session, or a demo one: nothing is open on any server.
+    if (!hasLiveSession(token, now()) || token.indexOf('demo-token-') === 0) {return done;}
+    const open = { serverSignedOut: false, expiresAt: tokenExpiresAt(token) };
+    const base = server && originOf(server.url) ? String(server.url).trim().replace(/\/+$/, '') : null;
+    if (!base) {
+      log('old firm sign-out: no address for the old firm');
+      return open;
+    }
+    try {
+      const response = await deps.fetch(`${base}${LOGOUT_PATH}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+      });
+      if (response && response.ok) {
+        log('old firm sign-out: session ended on the old firm');
+        return done;
+      }
+      log(`old firm sign-out: refused (status ${response ? response.status : 'none'})`);
+    } catch (error) {
+      log(`old firm sign-out: not reachable (${(error && error.name) || 'error'})`);
+    }
+    return open;
+  }
+
+  return async function signOut() {
+    const server = deps.getSavedServer();
+    const token = deps.getToken();
+    const result = await endOnServer(server, token);
+    await deps.clearLocal();
+    return result;
+  };
+}
+
+function defaultFormatTime(ms) {
+  return new Date(ms).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+/** What to tell the person when the old firm could not end their session. */
+function oldSessionNotice({ firmName, expiresAt }, formatTime = defaultFormatTime) {
+  const firm = firmName || 'your old firm';
+  const when = Number.isFinite(expiresAt)
+    ? `Your session at ${firm} ends on its own at ${formatTime(expiresAt)}.`
+    : `Your session at ${firm} ends on its own when it expires.`;
+  return {
+    title: 'Signed out on this computer',
+    message: `LANA could not reach ${firm} to sign you out there.`,
+    detail: `You are signed out on this computer and the switch went ahead. ${when}`
+  };
+}
+
 /**
  * The app link flow. deps (all injected by electron-main.js):
  *   getSavedServer()            -> saved firm or null
  *   isSignedIn()                -> a live session for the saved firm
  *   discover(domain, orgIdHint) -> a verified server for that firm, or null
  *   connect(server)             -> save it as this app's firm
- *   signOut()                   -> forget the session and the saved firm
+ *   signOut()                   -> end the session on the saved firm's Chef,
+ *                                  then forget it and the firm here; resolves
+ *                                  to { serverSignedOut, expiresAt } (createFirmSignOut)
+ *   tellOldSessionOpen({ firmName, expiresAt }) -> void, not awaited: the old
+ *                                  firm could not end the session
  *   askSwitch({ domain, firmName })        -> 'switch' | 'stay'
  *   askNotFound({ domain, firmName })      -> 'sign-in' | 'stay'
  *   tellNotFound({ domain })              -> void (nothing saved to stay with)
@@ -260,6 +346,16 @@ function createAppLinkRouter(deps) {
 
   function firmName(server) {
     return (server && (server.orgName || server.orgId || server.domain)) || 'your firm';
+  }
+
+  // Leaving the saved firm for another one. The message never holds up the switch.
+  async function leaveFirm(saved) {
+    const result = await deps.signOut();
+    if (result && result.serverSignedOut === false && deps.tellOldSessionOpen) {
+      Promise.resolve()
+        .then(() => deps.tellOldSessionOpen({ firmName: firmName(saved), expiresAt: result.expiresAt }))
+        .catch(() => {});
+    }
   }
 
   async function continueWith(link) {
@@ -311,13 +407,13 @@ function createAppLinkRouter(deps) {
     }
     const server = await discover(link);
     if (server) {
-      await deps.signOut();
+      await leaveFirm(saved);
       await deps.connect(server);
       return continueWith(link);
     }
     const next = await deps.askNotFound({ domain: linkFirm(link), firmName: firmName(saved) });
     if (next !== 'sign-in') {return 'stayed';}
-    await deps.signOut();
+    await leaveFirm(saved);
     return waitForFirm(link);
   }
 
@@ -427,6 +523,8 @@ module.exports = {
   targetFor,
   createPendingStore,
   createAppLinkRouter,
+  createFirmSignOut,
+  oldSessionNotice,
   registerAppLinkIpc,
   createColdStartQueue,
   deepLinkFromArgv

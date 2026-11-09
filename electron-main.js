@@ -86,7 +86,7 @@ if (process.env.NODE_ENV === 'development') {
 
 // Import thin client modules
 const { refreshHostedDiscovery, verifyServer, discoverByDomain } = require('./electron-discovery');
-const { createAppLinkRouter, registerAppLinkIpc, createColdStartQueue, deepLinkFromArgv } = require('./electron-app-links');
+const { createAppLinkRouter, createFirmSignOut, oldSessionNotice, registerAppLinkIpc, createColdStartQueue, deepLinkFromArgv } = require('./electron-app-links');
 const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified, saveBrainchildLink, getBrainchildLink, clearBrainchildLink, setBrainchildAutoBindDisabled, isBrainchildAutoBindDisabled, authTokenPersistence, offlineKeyPersistence, getLocalEnginePreferences, updateLocalEnginePreferences, firstLaunchPersistence } = require('./electron-storage');
 const { createLocalEngineHost } = require('./electron-local-engine');
 const { createTokenStore, registerTokenIpc, hasLiveSession } = require('./electron-token-store');
@@ -2284,18 +2284,29 @@ async function appLinkMessage(options) {
   return dialog.showMessageBox(parent, { type: 'info', noLink: true, ...options });
 }
 
-const appLinkRouter = createAppLinkRouter({
+// Switching firms from a link ends the session on the old firm's Chef too,
+// then clears this computer; an unreachable firm never blocks the switch.
+const signOutOfFirm = createFirmSignOut({
   getSavedServer: () => getSavedServer(),
-  isSignedIn: () => hasLiveSession(authTokenStore.get(), Date.now()),
-  discover: (domain, orgIdHint) => discoverByDomain(domain, orgIdHint),
-  connect: (server) => applyServerConnection(server),
-  signOut: async () => {
+  getToken: () => authTokenStore.get(),
+  fetch: (url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(5000) }),
+  clearLocal: async () => {
     authTokenStore.clear();
     clearSavedServer();
     syncScreenVoiceEntitlement();
     syncBriefs(null);
     await localEngine.sync().catch((error) => logError('[electron-main] Local AI engine did not stop', error));
   },
+  log: (message) => logInfo(`[AppLinks] ${message}`)
+});
+
+const appLinkRouter = createAppLinkRouter({
+  getSavedServer: () => getSavedServer(),
+  isSignedIn: () => hasLiveSession(authTokenStore.get(), Date.now()),
+  discover: (domain, orgIdHint) => discoverByDomain(domain, orgIdHint),
+  connect: (server) => applyServerConnection(server),
+  signOut: signOutOfFirm,
+  tellOldSessionOpen: (info) => appLinkMessage({ ...oldSessionNotice(info), buttons: ['OK'] }),
   askSwitch: async ({ domain, firmName }) => {
     const { response } = await appLinkMessage({
       title: 'This link is for another firm',

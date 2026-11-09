@@ -17,6 +17,8 @@ const {
   targetFor,
   createPendingStore,
   createAppLinkRouter,
+  createFirmSignOut,
+  oldSessionNotice,
   registerAppLinkIpc,
   createColdStartQueue,
   deepLinkFromArgv,
@@ -192,10 +194,16 @@ function fakeDeps(overrides = {}) {
       return overrides.discovered === undefined ? null : overrides.discovered;
     }),
     connect: async (server) => { calls.connected.push(server); state.saved = server; },
-    signOut: async () => { calls.signOut += 1; state.saved = null; state.signedIn = false; },
+    signOut: async () => {
+      calls.signOut += 1;
+      state.saved = null;
+      state.signedIn = false;
+      return overrides.signOutResult || { serverSignedOut: true, expiresAt: null };
+    },
     askSwitch: async (info) => { calls.askSwitch.push(info); return overrides.switchChoice || 'stay'; },
     askNotFound: async (info) => { calls.askNotFound.push(info); return overrides.notFoundChoice || 'stay'; },
     tellInvalid: async () => { calls.invalid += 1; },
+    tellOldSessionOpen: overrides.tellOldSessionOpen,
     openPage: async (page) => { calls.opened.push(page); },
     openSignIn: async () => { calls.signIn += 1; },
     log: overrides.log || (() => {}),
@@ -364,6 +372,118 @@ describe('createAppLinkRouter', () => {
   });
 });
 
+describe('switching firms ends the session on the old firm too', () => {
+  const OLD = { url: 'https://10.0.0.5:8080/', orgId: 'norton', orgName: 'Norton Law', domain: 'norton.lanaai.io' };
+  const EXP_S = 1893456000; // 2030-01-01
+  const b64 = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
+  const JWT = `${b64({ alg: 'HS256' })}.${b64({ sub: 'u1', exp: EXP_S })}.c2lnbmF0dXJl`;
+  const NOW = () => 1700000000000;
+
+  function signOutWith({ fetchImpl, token = JWT, server = OLD } = {}) {
+    const order = [];
+    const logs = [];
+    const fetch = jest.fn(async (url, init) => {
+      order.push('server');
+      return fetchImpl ? fetchImpl(url, init) : { ok: true, status: 200 };
+    });
+    const clearLocal = jest.fn(async () => { order.push('local'); });
+    const signOut = createFirmSignOut({
+      getSavedServer: () => server,
+      getToken: () => token,
+      fetch,
+      clearLocal,
+      now: NOW,
+      log: (message) => logs.push(message)
+    });
+    return { signOut, fetch, clearLocal, order, logs };
+  }
+
+  test("calls Chef's sign-out at the old address with the old token, then clears this computer", async () => {
+    const t = signOutWith();
+    expect(await t.signOut()).toEqual({ serverSignedOut: true, expiresAt: null });
+    expect(t.fetch).toHaveBeenCalledTimes(1);
+    const [url, init] = t.fetch.mock.calls[0];
+    expect(url).toBe('https://10.0.0.5:8080/api/v1/auth/logout');
+    expect(init.method).toBe('POST');
+    expect(init.headers.Authorization).toBe(`Bearer ${JWT}`);
+    expect(t.order).toEqual(['server', 'local']);
+  });
+
+  test('an unreachable old firm still clears this computer and says when the session ends', async () => {
+    const t = signOutWith({ fetchImpl: () => { const error = new Error('connect ECONNREFUSED'); error.name = 'TypeError'; throw error; } });
+    expect(await t.signOut()).toEqual({ serverSignedOut: false, expiresAt: EXP_S * 1000 });
+    expect(t.order).toEqual(['server', 'local']);
+  });
+
+  test('a refusal from the old firm still clears this computer', async () => {
+    const t = signOutWith({ fetchImpl: () => ({ ok: false, status: 401 }) });
+    expect(await t.signOut()).toEqual({ serverSignedOut: false, expiresAt: EXP_S * 1000 });
+    expect(t.clearLocal).toHaveBeenCalledTimes(1);
+  });
+
+  test('no live session: nothing to end on the old firm', async () => {
+    for (const token of [null, 'demo-token-123', `${b64({ alg: 'HS256' })}.${b64({ exp: 1 })}.c2ln`]) {
+      const t = signOutWith({ token });
+      expect(await t.signOut()).toEqual({ serverSignedOut: true, expiresAt: null });
+      expect(t.fetch).not.toHaveBeenCalled();
+      expect(t.clearLocal).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  test('the token never reaches a log line', async () => {
+    for (const fetchImpl of [undefined, () => ({ ok: false, status: 500 }), () => { throw new Error(JWT); }]) {
+      const t = signOutWith({ fetchImpl });
+      await t.signOut();
+      expect(t.logs.length).toBeGreaterThan(0);
+      for (const line of t.logs) {expect(line).not.toContain(JWT.split('.')[1]);}
+    }
+  });
+
+  test('the notice names the firm and the time the session ends, or says it expires on its own', () => {
+    const timed = oldSessionNotice({ firmName: 'Norton Law', expiresAt: EXP_S * 1000 }, (ms) => `T${ms}`);
+    expect(timed.message).toBe('LANA could not reach Norton Law to sign you out there.');
+    expect(timed.detail).toContain(`Your session at Norton Law ends on its own at T${EXP_S * 1000}.`);
+    const untimed = oldSessionNotice({ firmName: 'Norton Law', expiresAt: null });
+    expect(untimed.detail).toContain('Your session at Norton Law ends on its own when it expires.');
+  });
+
+  describe('in the router', () => {
+    const OTHER = `lana-ai://shared?token=${TOKEN}&domain=smith.lanaai.io`;
+    const found = { url: 'https://100.64.0.9:8080', orgId: 'smith', orgName: 'Smith LLP', domain: 'smith.lanaai.io' };
+
+    test('Switch firm: the old firm could not sign out, the switch goes ahead and the person is told', async () => {
+      const tell = jest.fn();
+      const deps = fakeDeps({ switchChoice: 'switch', discovered: found, signOutResult: { serverSignedOut: false, expiresAt: 42 }, tellOldSessionOpen: tell });
+      const router = createAppLinkRouter(deps);
+      expect(await router.handleUrl(OTHER)).toBe('sign-in');
+      expect(deps.calls.connected).toEqual([found]);
+      expect(tell).toHaveBeenCalledWith({ firmName: 'Norton Law', expiresAt: 42 });
+    });
+
+    test('Connect on sign in: same message when the old firm could not sign out', async () => {
+      const tell = jest.fn();
+      const deps = fakeDeps({ switchChoice: 'switch', discovered: null, notFoundChoice: 'sign-in', signOutResult: { serverSignedOut: false, expiresAt: null }, tellOldSessionOpen: tell });
+      const router = createAppLinkRouter(deps);
+      expect(await router.handleUrl(OTHER)).toBe('connect-firm');
+      expect(tell).toHaveBeenCalledWith({ firmName: 'Norton Law', expiresAt: null });
+    });
+
+    test('a message that never closes does not hold up the switch', async () => {
+      const deps = fakeDeps({ switchChoice: 'switch', discovered: found, signOutResult: { serverSignedOut: false, expiresAt: null }, tellOldSessionOpen: () => new Promise(() => {}) });
+      const router = createAppLinkRouter(deps);
+      expect(await router.handleUrl(OTHER)).toBe('sign-in');
+    });
+
+    test('the old firm signed out: no message', async () => {
+      const tell = jest.fn();
+      const deps = fakeDeps({ switchChoice: 'switch', discovered: found, tellOldSessionOpen: tell });
+      await createAppLinkRouter(deps).handleUrl(OTHER);
+      await Promise.resolve();
+      expect(tell).not.toHaveBeenCalled();
+    });
+  });
+});
+
 test('createPendingStore keeps one link and the newer one wins', () => {
   const store = createPendingStore({ now: () => 0 });
   store.set({ action: 'a' });
@@ -415,6 +535,12 @@ describe('electron-main wiring', () => {
       expect(main).toContain(`case '${action}':`);
     }
     expect(main).toContain('await appLinkRouter.handleUrl(deepLinkUrl);');
+  });
+
+  test("the router's sign-out ends the old firm's session before clearing this computer", () => {
+    expect(main).toMatch(/createFirmSignOut\(\{[\s\S]{0,200}getToken: \(\) => authTokenStore\.get\(\)/);
+    expect(main).toContain('signOut: signOutOfFirm,');
+    expect(main).toContain('tellOldSessionOpen: (info) => appLinkMessage({ ...oldSessionNotice(info)');
   });
 
   test('every deep link entry point goes through the cold-start queue', () => {
