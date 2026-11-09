@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Set up LANA</title>
+  <link rel="stylesheet" href="css/lex-tokens.css">
+  <link rel="stylesheet" href="css/lex-motion.css">
+  <link rel="stylesheet" href="css/app-walkthrough.css">
+  <link rel="stylesheet" href="css/first-launch.css">
+</head>
+<body class="fl-body">
+  <!-- The setup tour (<lex-walkthrough>) is added by first-launch.js once this computer is read. -->
+  <main id="fl-loading" class="fl-loading" aria-live="polite">
+    <lex-brand-mark animation="spinner" size="96" label="Checking this computer"></lex-brand-mark>
+    <p class="fl-loading-text">Checking this computer</p>
+  </main>
+
+  <main id="fl-load-error" class="fl-loading" hidden>
+    <lex-brand-mark animation="idle" size="96"></lex-brand-mark>
+    <p class="fl-loading-text">LANA could not check this computer.</p>
+    <p id="fl-load-error-text" class="fl-loading-detail"></p>
+    <div class="fl-row">
+      <lex-btn id="fl-load-retry" variant="secondary">Try again</lex-btn>
+      <lex-btn id="fl-load-skip" variant="primary">Go to sign in</lex-btn>
+    </div>
+  </main>
+
+  <script src="js/lex/lex.core.js"></script>
+  <script src="js/lex/lex.icons.js"></script>
+  <script src="js/lex/lex.forms.js"></script>
+  <script src="js/lex/index.js"></script>
+  <script src="js/lex/components/foundation/lex-btn.js"></script>
+  <script src="js/lex/components/foundation/lex-progress-bar.js"></script>
+  <script src="js/lex/components/form/lex-radio.js"></script>
+  <script src="js/vendor/lottie_light.min.js"></script>
+  <script src="js/lex/brand/lex-brand-animations.js"></script>
+  <script src="js/lex/components/foundation/lex-brand-mark.js"></script>
+  <script src="js/lex/components/layout/lex-walkthrough.js"></script>
+  <script src="js/local-ai-fit.model.js"></script>
+  <script src="js/first-launch.model.js"></script>
+  <script src="js/first-launch.pages.js"></script>
+  <script src="js/first-launch.js"></script>
+</body>
+</html>

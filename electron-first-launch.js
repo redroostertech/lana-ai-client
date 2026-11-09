@@ -7,8 +7,10 @@
  *                    (src/js/local-ai-fit.model.js): the chat choices, the default, and what LANA
  *                    adds by itself. The first-launch screen and Settings show this.
  *   choose(chatId)   keeps the person's chat choice (null goes back to LANA's default).
- *   accept()         the person pressed Continue: notes it and starts. Nothing is downloaded
- *                    before this.
+ *   findExisting()   model files already on this computer (Pip, LM Studio, ~/.llama-models)
+ *                    that match the plan's files and their pins (electron-model-reuse.js).
+ *   accept(opts)     the person pressed Continue: notes it and starts. Nothing is downloaded
+ *                    before this. { useExisting: true } puts the found files in place first.
  *   resume()         at launch: runs start() whenever setup was accepted. Files in place are
  *                    skipped, so a finished setup goes straight to onReady and Pip starts.
  *   start()          downloads this computer's model files in order (embedding, chat, image
@@ -32,6 +34,7 @@ const fit = require('./src/js/local-ai-fit.model');
 const { readHardware } = require('./electron-hardware');
 const { loadModelCatalog } = require('./electron-model-catalog');
 const localModels = require('./electron-local-models');
+const modelReuse = require('./electron-model-reuse');
 
 const LOCAL_KINDS = new Set(['embedding', 'chat', 'vision']);
 
@@ -43,19 +46,24 @@ const LOCAL_KINDS = new Set(['embedding', 'chat', 'vision']);
  * @param {number} [deps.redactorMemoryBytes] - set aside when the redactor runs on this computer
  * @param {(status: Object) => void} [deps.onStatus]
  * @param {(plan: Object) => void} [deps.onReady] - every local file is in place
- * @param {Object} [deps.io] - { readHardware, loadModelCatalog, localModels, now } for tests
+ * @param {string} [deps.home] - the person's home folder, where other apps keep model files
+ * @param {Object} [deps.io] - { readHardware, loadModelCatalog, localModels, reuse, now } for tests
  */
-function createFirstLaunch({ userDataDir, state, env = process.env, redactorMemoryBytes = 0, onStatus = () => {}, onReady = () => {}, io = {} }) {
+function createFirstLaunch({ userDataDir, state, env = process.env, home = require('os').homedir(), redactorMemoryBytes = 0, onStatus = () => {}, onReady = () => {}, io = {} }) {
   const read = io.readHardware || readHardware;
   const loadCatalog = io.loadModelCatalog || loadModelCatalog;
   const models = io.localModels || localModels;
   const now = io.now || (() => new Date());
+  const reuse = io.reuse || modelReuse;
   const modelsDir = models.modelsDir(env, userDataDir);
   const cacheFile = path.join(userDataDir, 'model-catalog.json');
 
   let status = { phase: 'idle', current: null, receivedBytes: 0, totalBytes: 0, error: null };
   let running = null;
   let controller = null;
+  // Files already on this computer that the person agreed to use (findExisting, accept).
+  let found = [];
+  let useFound = false;
 
   function publish(changes) {
     status = { ...status, ...changes };
@@ -109,8 +117,23 @@ function createFirstLaunch({ userDataDir, state, env = process.env, redactorMemo
     state.write({ chatId: chatId || null, completedAt: null });
   }
 
+  /** Put the found files the plan needs in place, before anything is downloaded. */
+  async function placeAgreed() {
+    if (!useFound || !found.length) {return;}
+    const needed = new Set((await plan()).download.files.map((file) => file.id));
+    for (const candidate of found.filter((c) => needed.has(c.entry.id))) {
+      publish({ phase: 'checking', current: { id: candidate.entry.id, kind: candidate.kind, name: candidate.entry.name } });
+      try {
+        await reuse.placeFound({ entry: candidate.entry, source: candidate.path, modelsDir });
+      } catch (_error) {
+        // Not usable after all: it is downloaded instead.
+      }
+    }
+  }
+
   async function run() {
     controller = new AbortController();
+    await placeAgreed();
     const result = await plan();
     const local = result.download.files.filter((file) => LOCAL_KINDS.has(file.kind));
     const totalBytes = local.reduce((sum, file) => sum + file.bytes, 0);
@@ -155,7 +178,24 @@ function createFirstLaunch({ userDataDir, state, env = process.env, redactorMemo
     return running || Promise.resolve(null);
   }
 
-  function accept() {
+  /**
+   * Model files already on this computer (Pip, LM Studio, ~/.llama-models) that match a file this
+   * plan would download, checked against the pin. Hashing a big file takes a while the first time.
+   * @returns {Promise<{ id, kind, name, bytes, source }[]>}
+   */
+  async function findExisting() {
+    const result = await plan();
+    const kinds = new Map(result.download.files.filter((file) => LOCAL_KINDS.has(file.kind)).map((file) => [file.id, file.kind]));
+    const wanted = [...result.entries.values()].filter((entry) => kinds.has(entry.id));
+    const candidates = await reuse.findCandidates({ entries: wanted, folders: reuse.searchFolders({ home, env }), skipDir: modelsDir });
+    const verified = await reuse.verifyCandidates(candidates, { checksFile: path.join(modelsDir, '.found-checks.json') });
+    found = verified.map((c) => ({ ...c, kind: kinds.get(c.entry.id) }));
+    return found.map((c) => ({ id: c.entry.id, kind: c.kind, name: c.entry.name, bytes: c.entry.sizeBytes, source: c.source }));
+  }
+
+  /** The person pressed Continue. useExisting: put the files findExisting found in place first. */
+  function accept({ useExisting = false } = {}) {
+    useFound = Boolean(useExisting);
     state.write({ acceptedAt: now().toISOString() });
     return start();
   }
@@ -174,7 +214,7 @@ function createFirstLaunch({ userDataDir, state, env = process.env, redactorMemo
     return ids;
   }
 
-  return { plan: async () => view(await plan()), choose, accept, resume, start, pause, speechModels, status: () => status };
+  return { plan: async () => view(await plan()), choose, accept, findExisting, resume, start, pause, speechModels, status: () => status };
 }
 
 module.exports = { createFirstLaunch };

@@ -122,6 +122,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }
   },
 
+  /**
+   * First-launch setup screen (electron-first-launch-ipc.js): the plan for this computer, the
+   * chat choice, Continue, and the downloads. No file addresses reach the page.
+   */
+  firstLaunch: {
+    getPlan: () => ipcRenderer.invoke('first-launch:plan'),
+    choose: (chatId) => ipcRenderer.invoke('first-launch:choose', { chatId: typeof chatId === 'string' ? chatId : null }),
+    findExisting: () => ipcRenderer.invoke('first-launch:find-existing'),
+    continue: (options) => ipcRenderer.invoke('first-launch:continue', { useExisting: Boolean(options && options.useExisting) }),
+    pause: () => ipcRenderer.invoke('first-launch:pause'),
+    resume: () => ipcRenderer.invoke('first-launch:resume'),
+    getStatus: () => ipcRenderer.invoke('first-launch:status'),
+    onStatus: (callback) => {
+      const handler = (_event, status) => callback(status);
+      ipcRenderer.on('first-launch:status-changed', handler);
+      return () => ipcRenderer.removeListener('first-launch:status-changed', handler);
+    }
+  },
+
   /** Discovery-entitled native/background capabilities. */
   capabilities: {
     list: () => ipcRenderer.invoke('capabilities:list'),

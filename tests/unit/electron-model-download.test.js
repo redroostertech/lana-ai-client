@@ -103,6 +103,46 @@ test('pausing keeps the part so the next run resumes', async () => {
   expect(fs.readFileSync(file).equals(BYTES)).toBe(true);
 });
 
+test('pausing with a real fetch (which errors the body on abort) is still a pause, with every byte kept', async () => {
+  // Real fetch tears the response body down with an AbortError when its signal fires. Seen on
+  // the first-launch screen: Pause showed "Setup stopped: This operation was aborted".
+  const controller = new AbortController();
+  const fetchImpl = jest.fn(async (_url, init = {}) => {
+    let at = 0;
+    let ctrl;
+    const body = new ReadableStream({
+      start(c) {
+        ctrl = c;
+        if (init.signal) {init.signal.addEventListener('abort', () => ctrl.error(new DOMException('This operation was aborted', 'AbortError')));}
+      },
+      async pull(c) {
+        // The network is slow, so a read is waiting when Pause is pressed.
+        await new Promise((r) => setTimeout(r, 5));
+        if (init.signal && init.signal.aborted) {return;}
+        if (at >= BYTES.length) { c.close(); return; }
+        c.enqueue(new Uint8Array(BYTES.subarray(at, at + 16 * 1024)));
+        at += 16 * 1024;
+      }
+    });
+    return { status: 200, headers: new Headers(), body };
+  });
+  let seen = 0;
+  const onProgress = ({ received }) => { seen = received; if (received >= 64 * 1024 && !controller.signal.aborted) {setTimeout(() => controller.abort(), 1);} };
+  await expect(downloadVerified(entry(), file, { onProgress, signal: controller.signal }, { fetchImpl })).rejects.toMatchObject({ code: 'cancelled' });
+  expect(fs.statSync(`${file}.part`).size).toBe(seen);
+});
+
+test('pausing before the server answers is a pause', async () => {
+  const controller = new AbortController();
+  const fetchImpl = jest.fn((_url, init = {}) => new Promise((_resolve, reject) => {
+    init.signal.addEventListener('abort', () => reject(new DOMException('This operation was aborted', 'AbortError')));
+  }));
+  const run = downloadVerified(entry(), file, { signal: controller.signal }, { fetchImpl });
+  await new Promise((r) => setTimeout(r, 10));
+  controller.abort();
+  await expect(run).rejects.toMatchObject({ code: 'cancelled' });
+});
+
 test('a download that stops moving is reported as stalled and keeps its part', async () => {
   const fetchImpl = jest.fn(async () => ({
     status: 200,

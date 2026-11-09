@@ -16,7 +16,7 @@ function memoryState(initial = {}) {
   return { read: () => ({ ...value }), write: (changes) => { value = { ...value, ...changes }; return { ...value }; } };
 }
 
-function setup({ memoryGb = 24, diskGb = 200, installed = [], failOn = null, state = memoryState() } = {}) {
+function setup({ memoryGb = 24, diskGb = 200, installed = [], failOn = null, state = memoryState(), reuse = undefined } = {}) {
   const have = new Set(installed);
   const downloads = [];
   const statuses = [];
@@ -44,6 +44,7 @@ function setup({ memoryGb = 24, diskGb = 200, installed = [], failOn = null, sta
       readHardware: () => ({ totalMemoryBytes: memoryGb * GB, accelerator: { backend: 'metal' }, freeDiskBytes: diskGb * GB, chip: 'Test' }),
       loadModelCatalog: async () => ({ ...parseCatalog(BUILT_IN), source: 'built_in' }),
       localModels,
+      reuse: typeof reuse === 'function' ? reuse(have) : reuse,
       now: () => new Date('2026-11-09T12:00:00Z')
     }
   });
@@ -167,4 +168,45 @@ test('speech models for Briefs follow the plan, and none before Continue', async
   const embedding = realModels.embeddingModel();
   const tight = (embedding.sizeBytes + speech.transcriptionBytes) / GB + 0.5 + 0.05;
   expect(await setup({ memoryGb: 4, diskGb: tight, state: accepted() }).firstLaunch.speechModels()).toEqual(['transcription']);
+});
+
+describe('model files already on this computer', () => {
+  function fakeReuse(have, foundIds) {
+    return {
+      searchFolders: jest.fn(() => [{ dir: '/pip', source: 'Pip' }]),
+      findCandidates: jest.fn(async ({ entries }) => entries.filter((e) => foundIds.includes(e.id)).map((entry) => ({ entry, path: `/pip/${entry.filename}`, source: 'Pip' }))),
+      verifyCandidates: jest.fn(async (candidates) => candidates),
+      placeFound: jest.fn(async ({ entry }) => { have.add(entry.id); return 'linked'; })
+    };
+  }
+
+  test('findExisting offers only files this plan would download, and says where they are', async () => {
+    const have = new Set();
+    const reuse = fakeReuse(have, ['qwen3.5-9b-q4', 'nomic-embed-text-v1.5-f16', 'qwen3.5-4b-q4']);
+    const { firstLaunch } = setup({ memoryGb: 24, reuse });
+    const found = await firstLaunch.findExisting();
+    // The 4B is not in a 24 GB plan, so it is not offered.
+    expect(found.map((f) => f.id).sort()).toEqual(['nomic-embed-text-v1.5-f16', 'qwen3.5-9b-q4']);
+    expect(found.find((f) => f.id === 'qwen3.5-9b-q4')).toMatchObject({ kind: 'chat', source: 'Pip', bytes: expect.any(Number) });
+    expect(JSON.stringify(found)).not.toMatch(/\/pip\//);
+  });
+
+  test('saying yes puts them in place and downloads only the rest', async () => {
+    let reuse;
+    const { firstLaunch, downloads } = setup({ memoryGb: 24, reuse: (have) => (reuse = fakeReuse(have, ['qwen3.5-9b-q4', 'nomic-embed-text-v1.5-f16'])) });
+    await firstLaunch.findExisting();
+    await firstLaunch.accept({ useExisting: true });
+    expect(reuse.placeFound).toHaveBeenCalledTimes(2);
+    expect(downloads).toEqual(['mmproj-qwen3.5-9b']);
+  });
+
+  test('saying no downloads everything and places nothing', async () => {
+    const have = new Set();
+    const reuse = fakeReuse(have, ['qwen3.5-9b-q4']);
+    const { firstLaunch, downloads } = setup({ memoryGb: 24, reuse });
+    await firstLaunch.findExisting();
+    await firstLaunch.accept({ useExisting: false });
+    expect(reuse.placeFound).not.toHaveBeenCalled();
+    expect(downloads).toContain('qwen3.5-9b-q4');
+  });
 });

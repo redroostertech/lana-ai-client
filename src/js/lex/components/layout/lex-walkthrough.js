@@ -19,6 +19,18 @@
 
    Keys: Right arrow or Return goes on, Left arrow goes back, Escape skips.
    illustration is trusted HTML from the page (never user content); every other field is text.
+
+   A page that asks something (first launch):
+     content: trusted HTML under the text that people use (choices, progress); unlike the
+       picture it is read out by screen readers. The page fills it after each
+       lex-walkthrough-page event ({ id, index }).
+     nextLabel: the Next (or Finish) button's words; nextVariant its lex-btn variant (a last
+       page that is the only way on can use 'primary'). back: false hides Back.
+     next: false hides Next (the page's own content button moves on, calling tour.next()).
+     tour.skippable = false: no Skip button and Escape does nothing.
+     tour.keyboardNav = false: arrows and Return do not move; only buttons do.
+     lex-walkthrough-next ({ id, index }) is cancelable: preventDefault() stays on the page,
+       for example while something is saved; set tour.page to move on after it.
    Parts of an illustration can use lex-entrance with lex-entrance-step-N (css/lex-motion.css).
    Needs css/lex-motion.css. --lex-walkthrough-accent colors the dots and the headline accent.
 */
@@ -131,6 +143,11 @@
         font-size: 17px;
         line-height: 1.4;
       }
+      .lex-walkthrough-content {
+        width: 100%;
+        max-width: 560px;
+        text-align: left;
+      }
       .lex-walkthrough-actions {
         display: flex;
         flex-wrap: wrap;
@@ -167,7 +184,11 @@
       return {
         pages: { type: Array, default: [], attribute: false },
         brand: { type: String, default: '' },
-        page:  { type: Number, default: 0 }
+        page:  { type: Number, default: 0 },
+        // false: no Skip button and Escape does nothing (a tour that must be finished).
+        skippable: { type: Boolean, default: true },
+        // false: arrows and Return do not move; only the buttons do.
+        keyboardNav: { type: Boolean, default: true }
       };
     }
 
@@ -187,18 +208,19 @@
       const current = pages[index];
       const isFirst = index === 0;
       const isLast = index === pages.length - 1;
+      const noBack = isFirst || current.back === false;
       const esc = (text) => this.escapeHtml(String(text == null ? '' : text));
       // Staggered by step (lex-entrance-step-N in lex-motion.css: N x 80 ms).
       const enter = (step, html, cls = '') => `<div class="lex-entrance lex-entrance-step-${step} ${cls}">${html}</div>`;
       const actions = Array.isArray(current.actions) && current.actions.length > 0
-        ? enter(4, current.actions.map((action) => `<lex-btn variant="${esc(action.variant || 'secondary')}" ${action.icon ? `leading-icon="${esc(action.icon)}"` : ''} data-walkthrough-action="${esc(action.id)}">${esc(action.label)}</lex-btn>`).join(''), 'lex-walkthrough-actions')
+        ? enter(current.content ? 5 : 4, current.actions.map((action) => `<lex-btn variant="${esc(action.variant || 'secondary')}" ${action.icon ? `leading-icon="${esc(action.icon)}"` : ''} data-walkthrough-action="${esc(action.id)}">${esc(action.label)}</lex-btn>`).join(''), 'lex-walkthrough-actions')
         : '';
       const mark = '<svg width="32" height="32" viewBox="0 0 100 100" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square"><path d="M25,43 L25,25 L43,25"/><path d="M75,57 L75,75 L57,75"/></g></svg>';
       return `
         <div class="lex-walkthrough" tabindex="-1" role="dialog" aria-modal="true" aria-label="${esc(pages[0].eyebrow || 'Walkthrough')}">
           <header class="lex-walkthrough-header">
             <span class="lex-walkthrough-brand">${mark}${esc(this.brand)}</span>
-            ${isLast ? '<span></span>' : '<lex-btn variant="ghost" size="sm" data-walkthrough="skip" title="Closes the walkthrough">Skip</lex-btn>'}
+            ${isLast || this.skippable === false ? '<span></span>' : '<lex-btn variant="ghost" size="sm" data-walkthrough="skip" title="Closes the walkthrough">Skip</lex-btn>'}
           </header>
           <div class="lex-walkthrough-stage">
             <section class="lex-walkthrough-page ${this._movedBack ? 'lex-push-back' : 'lex-push'}" aria-live="polite">
@@ -208,13 +230,14 @@
                 ${enter(2, `<h1 class="lex-walkthrough-headline">${esc(current.title)}${current.accent ? `<em>${esc(current.accent)}</em>` : ''}${esc(current.trailing == null ? '.' : current.trailing)}</h1>`)}
                 ${enter(3, `<p class="lex-walkthrough-detail">${esc(current.detail)}</p>`)}
               </div>
+              ${current.content ? enter(4, current.content, 'lex-walkthrough-content') : ''}
               ${actions}
             </section>
           </div>
           <footer class="lex-walkthrough-footer">
-            <lex-btn variant="secondary" size="sm" leading-icon="chevron-left" data-walkthrough="back" class="${isFirst ? 'is-hidden' : ''}" ${isFirst ? 'disabled' : ''}>Back</lex-btn>
+            <lex-btn variant="secondary" size="sm" leading-icon="chevron-left" data-walkthrough="back" class="${noBack ? 'is-hidden' : ''}" ${noBack ? 'disabled' : ''}>Back</lex-btn>
             <span class="lex-walkthrough-dots" role="img" aria-label="Page ${index + 1} of ${pages.length}">${pages.map((_, i) => `<span class="lex-walkthrough-dot${i === index ? ' is-current' : ''}"></span>`).join('')}</span>
-            <lex-btn variant="${isLast ? 'secondary' : 'primary'}" size="sm" data-walkthrough="next">${isLast ? 'Finish' : 'Next'}</lex-btn>
+            <lex-btn variant="${esc(current.nextVariant || (isLast ? 'secondary' : 'primary'))}" size="sm" data-walkthrough="next" class="${current.next === false ? 'is-hidden' : ''}" ${current.next === false ? 'disabled' : ''}>${current.nextLabel ? esc(current.nextLabel) : (isLast ? 'Finish' : 'Next')}</lex-btn>
           </footer>
         </div>`;
     }
@@ -226,24 +249,33 @@
       this.delegate('click', '[data-walkthrough-action]', (event, target) => this.finish(target.dataset.walkthroughAction));
       this.delegate('keydown', '.lex-walkthrough', (event) => {
         if (event.target !== this.querySelector('.lex-walkthrough')) return;
-        if (event.key === 'ArrowRight' || event.key === 'Enter') { event.preventDefault(); this.next(); }
-        else if (event.key === 'ArrowLeft') { event.preventDefault(); this.back(); }
-        else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); this.finish('skip'); }
+        const keys = this.keyboardNav !== false;
+        if (keys && (event.key === 'ArrowRight' || event.key === 'Enter')) { event.preventDefault(); this.next(); }
+        else if (keys && event.key === 'ArrowLeft') { event.preventDefault(); this.back(); }
+        else if (event.key === 'Escape' && this.skippable !== false) { event.preventDefault(); event.stopPropagation(); this.finish('skip'); }
       });
       const root = this.querySelector('.lex-walkthrough');
       if (root && this.isConnected && this.contains(document.activeElement) === false && this._shown) root.focus({ preventScroll: true });
       this._shown = true;
+      const pages = this.pages || [];
+      const index = Math.min(Math.max(0, this.page), pages.length - 1);
+      if (pages[index]) this.emit('lex-walkthrough-page', { id: pages[index].id, index });
     }
 
     next() {
-      const last = (this.pages || []).length - 1;
+      const pages = this.pages || [];
+      const last = pages.length - 1;
+      const current = pages[this.page];
+      const going = new CustomEvent('lex-walkthrough-next', { bubbles: true, cancelable: true, detail: { id: current && current.id, index: this.page } });
+      if (!this.dispatchEvent(going)) return;
       if (this.page >= last) return this.finish(null);
       this._movedBack = false;
       this.page = this.page + 1;
     }
 
     back() {
-      if (this.page <= 0) return;
+      const current = (this.pages || [])[this.page];
+      if (this.page <= 0 || (current && current.back === false)) return;
       this._movedBack = true;
       this.page = this.page - 1;
     }

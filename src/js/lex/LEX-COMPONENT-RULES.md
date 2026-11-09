@@ -588,7 +588,7 @@ Radio group for mutually exclusive options (2-6 choices).
 
 | Own Property | Type | Default | Description |
 |-------------|------|---------|-------------|
-| `options` | Array | `[]` | `[{ value, label, description? }]` |
+| `options` | Array | `[]` | `[{ value, label, description?, disabled? }]`. A `disabled` option shows but cannot be picked; say why in its `description`. |
 
 **Events:** `lex-change { name, value }`
 
@@ -958,6 +958,8 @@ The "How it works" row under an app hero: `kicker`, `heading`, and `steps` (JSON
 ### App walkthroughs
 
 Every app home has a first-run walkthrough in `<lex-walkthrough>` (Briefs runs its own; Workspaces, Agents, Automate, Insights and Data Connectors use `js/shared/app-walkthrough.js`). Only one tour shows per visit: when the general LANA tour (`lex-onboarding`) is on screen, the app walkthrough waits for the next visit. Pages live in `js/walkthroughs/<app>-walkthrough.js`: six pages (welcome, one per step, ready), each an eyebrow, a headline with an accent, one sentence, and an animated picture built from the `app-tour-*` pieces in `css/app-walkthrough.css` (simplified copies of the real screen). `LanaAppWalkthrough.showFirstRun(app)` shows it once per person, remembered in their server preferences (`onboarding.walkthroughs`); the hero's ghost button "Take the walkthrough" calls `LanaAppWalkthrough.show(app)`. The last page's action opens the first real task.
+
+A tour that asks something (first launch, `first-launch.html`) uses the same component: a page's `content` is interactive trusted HTML filled after each `lex-walkthrough-page` event, `nextLabel` and `nextVariant` set the Next button, `back: false` and `next: false` hide Back or Next, and a cancelable `lex-walkthrough-next` lets the page save before moving on. `skippable = false` removes Skip and Escape; `keyboardNav = false` leaves only the buttons to move. App walkthroughs keep the defaults.
 
 ### Brand animations
 

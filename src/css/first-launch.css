@@ -1,0 +1,226 @@
+/* First-launch setup screen (first-launch.html). The tour is <lex-walkthrough class="app-tour">,
+   so its layout, type, accent and motion are the app walkthroughs' (css/app-walkthrough.css);
+   this file adds the parts a setup page needs (cards that fill the column, the progress card)
+   and the dark theme. first-launch.js sets data-lex-theme on <html> from the computer's setting. */
+
+[data-lex-theme="dark"] .fl-body {
+  color-scheme: dark;
+  --lex-bg-primary: #151715;
+  --lex-bg-secondary: #1e211e;
+  --lex-text-primary: #eef1ee;
+  --lex-text-secondary: #b2b9b2;
+  --lex-text-tertiary: #8b938b;
+  --lex-border-default: #343a34;
+  --lex-border-subtle: #2a2f2a;
+  --lex-color-gray-100: #232723;
+  --lex-color-gray-200: #2e332e;
+  --lex-color-gray-300: #3b413b;
+  --lex-bg-accent: #e8ece8;
+  --lex-bg-accent-hover: #ffffff;
+  --lex-text-on-accent: #151715;
+  --lex-bg-accent-soft: rgba(103, 201, 160, 0.16);
+}
+
+[data-lex-theme="dark"] .fl-body lex-walkthrough.app-tour {
+  --lex-walkthrough-accent: #67c9a0;
+  --app-tour-accent: #67c9a0;
+  --app-tour-accent-soft: rgba(103, 201, 160, 0.16);
+  --app-tour-amber: #f0b45a;
+  --app-tour-amber-soft: rgba(240, 180, 90, 0.16);
+}
+
+/* The app's other pages get this from Tailwind's base styles; without it the tour's padding is
+   added to its full height and pushes Back, the dots and Next off the window. */
+.fl-body *,
+.fl-body *::before,
+.fl-body *::after {
+  box-sizing: border-box;
+}
+
+.fl-body {
+  background: var(--lex-bg-primary);
+  color: var(--lex-text-primary);
+}
+
+/* Before the tour: reading this computer. */
+.fl-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 100vh;
+  padding: 32px;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.fl-loading[hidden] {
+  display: none;
+}
+
+.fl-loading-text {
+  margin: 0;
+  color: var(--lex-text-primary);
+  font-size: 17px;
+}
+
+.fl-loading-detail {
+  margin: 0;
+  color: var(--lex-text-secondary);
+  font-size: 14px;
+}
+
+/* Setup pages carry content, so the picture takes less room than in the app tours, and a
+   page with no picture gives all of it to the content. */
+.fl-tour .lex-walkthrough-illustration {
+  min-height: 0;
+}
+
+.fl-tour .lex-walkthrough-illustration:empty {
+  display: none;
+}
+
+.fl-tour .lex-walkthrough-stage {
+  /* A long page (the model list open) scrolls the tour instead of being cut off; sideways
+     stays clipped for the page push. */
+  flex: 1 0 auto;
+  overflow-x: clip;
+  overflow-y: visible;
+  padding: 8px 0;
+}
+
+.fl-tour .lex-walkthrough-page {
+  gap: 24px;
+}
+
+.fl-tour .lex-walkthrough-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.fl-tour [hidden] {
+  display: none !important;
+}
+
+.fl-card.app-tour-card {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fl-card .app-tour-card-head {
+  margin-bottom: 0;
+}
+
+[data-lex-theme="dark"] .fl-card.app-tour-card {
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.35);
+}
+
+.fl-chat-name {
+  font-size: 20px;
+}
+
+.fl-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  color: var(--lex-text-secondary);
+  font-size: 13px;
+}
+
+#fl-choose-toggle {
+  align-self: flex-start;
+  margin-left: -10px;
+}
+
+.fl-choices {
+  padding-top: 12px;
+  border-top: 1px solid var(--app-tour-line);
+}
+
+.fl-choices .lex-radio-group {
+  gap: 12px;
+}
+
+.fl-choices .lex-radio-label {
+  font-weight: 600;
+}
+
+.fl-card .lex-radio-desc {
+  color: var(--lex-text-secondary);
+  font-size: 12px;
+}
+
+.fl-card .app-tour-row-label {
+  flex-basis: 110px;
+  font-weight: 600;
+  color: var(--app-tour-ink);
+}
+
+.fl-card .app-tour-row-value {
+  color: var(--app-tour-muted);
+}
+
+.fl-check--off {
+  background: var(--lex-bg-secondary);
+  color: var(--app-tour-muted);
+}
+
+.fl-disk,
+.fl-note {
+  margin: 0;
+  color: var(--lex-text-secondary);
+  font-size: 14px;
+  text-align: center;
+}
+
+.fl-bytes {
+  color: var(--app-tour-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.fl-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fl-row:empty {
+  display: none;
+}
+
+.fl-error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--lex-status-danger-bg);
+  color: var(--lex-status-danger-text);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+[data-lex-theme="dark"] .fl-error {
+  background: rgba(240, 68, 56, 0.14);
+  color: #fca5a0;
+}
+
+/* Welcome page: what was found, with the button that moves on. */
+.fl-found-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.fl-found-line {
+  margin: 0;
+  color: var(--lex-text-primary);
+  font-size: 15px;
+}

@@ -142,8 +142,15 @@ async function downloadVerified(entry, file, { onProgress = () => {}, signal, fr
 
   // A part that is already whole only needs checking.
   if (have < entry.sizeBytes) {
-    const response = await fetchAllowed(entry.url, { headers: have ? { Range: `bytes=${have}-` } : {}, signal, fetchImpl, allowedHosts })
-      .catch((error) => { throw signal && signal.aborted ? new DownloadError('cancelled', 'The download was paused.') : error; });
+    // The pause signal reaches fetch only until the server answers. After that, a pause ends the
+    // body below by cancelling the reader; real fetch would instead error the read in flight
+    // (AbortError) and the pause would look like a failure.
+    const request = new AbortController();
+    const forward = () => request.abort();
+    if (signal) {signal.addEventListener('abort', forward, { once: true });}
+    const response = await fetchAllowed(entry.url, { headers: have ? { Range: `bytes=${have}-` } : {}, signal: request.signal, fetchImpl, allowedHosts })
+      .catch((error) => { throw signal && signal.aborted ? new DownloadError('cancelled', 'The download was paused.') : error; })
+      .finally(() => { if (signal) {signal.removeEventListener('abort', forward);} });
     if (response.status !== 200 && response.status !== 206) {
       throw new DownloadError('http', `The model download failed (HTTP ${response.status}).`);
     }
@@ -166,6 +173,8 @@ async function downloadVerified(entry, file, { onProgress = () => {}, signal, fr
     };
     const onAbort = () => stop('cancelled');
     if (signal) {signal.addEventListener('abort', onAbort, { once: true });}
+    // Paused while the answer was on its way: the listener above came too late to fire.
+    if (signal && signal.aborted) {stop('cancelled');}
     async function* chunks() {
       armStall();
       while (!stopped) {

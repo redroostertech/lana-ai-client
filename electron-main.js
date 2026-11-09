@@ -172,12 +172,18 @@ function pushLocalServers() {
 // downloads its model files after the person presses Continue on the setup screen (phase D).
 // Every launch after that runs setup again (files in place are skipped) and starts Pip.
 const { createFirstLaunch } = require('./electron-first-launch');
+const { registerFirstLaunchIpc, broadcastFirstLaunchStatus, devHardwareReader } = require('./electron-first-launch-ipc');
+// Development only (NODE_ENV=development, unpackaged): LANA_DEV_HARDWARE pretends the computer
+// is another size, to see the first-launch screen's other states. Null otherwise.
+const devReadHardware = devHardwareReader({ env: process.env, isPackaged: app.isPackaged, read: require('./electron-hardware').readHardware });
 const firstLaunch = createFirstLaunch({
   userDataDir: app.getPath('userData'),
   state: firstLaunchPersistence,
   redactorMemoryBytes: redactorCommand ? REDACTOR_MEMORY_BYTES : 0,
+  io: devReadHardware ? { readHardware: devReadHardware } : {},
   onStatus: (status) => {
     if (status.phase === 'failed') {logWarn(`[first-launch] setup stopped: ${status.error && status.error.code}`);}
+    broadcastFirstLaunchStatus(BrowserWindow.getAllWindows(), status);
   },
   onReady: (result) => {
     logInfo('[first-launch] every local model file is in place; starting Pip');
@@ -185,6 +191,7 @@ const firstLaunch = createFirstLaunch({
       .catch((error) => logError('[electron-main] Pip did not start', error));
   }
 });
+registerFirstLaunchIpc({ ipcMain, firstLaunch, log: (error) => logError('[first-launch] the setup screen call failed', error) });
 
 // LANA Briefs (Briefs integration plan): runs only while discovery lists lana-notes and
 // someone is signed in. Its model work goes to the local AI engine's runtime route.
@@ -1062,8 +1069,10 @@ function createLoginWindow() {
   });
   watchScreenVoiceAuthentication(mainWindow);
 
-  // Load login page directly
-  const loginUrl = createFileUrl(path.join(__dirname, 'public_html/login.html'));
+  // The first-launch setup screen comes before sign-in until the person has pressed Continue
+  // once (first-launch plan, phase D); it then moves on to the login page itself.
+  const firstPage = firstLaunchPersistence.read().acceptedAt ? 'login.html' : 'first-launch.html';
+  const loginUrl = createFileUrl(path.join(__dirname, 'public_html', firstPage));
   mainWindow.loadURL(loginUrl);
 
   // Normalize DPI scaling on Windows high-DPI displays

@@ -10,6 +10,8 @@
        options='[{"value":"a","label":"Option A","description":"First choice"},{"value":"b","label":"Option B"}]'>
      </lex-radio>
 
+   An option with "disabled": true is shown but cannot be picked (say why in its description).
+
    Events: lex-change { name, value: string }
 */
 
@@ -146,22 +148,22 @@
 
       const options = this.options || [];
       const dirCls = this.direction === 'horizontal' ? 'lex-radio-group--horizontal' : 'lex-radio-group--vertical';
-      const disabledAttr = this.disabled ? 'disabled' : '';
-      const disabledCls = this.disabled ? ' lex-radio-row--disabled' : '';
 
       let groupHtml = `<div class="lex-radio-group ${dirCls}" role="radiogroup">`;
 
       options.forEach((opt) => {
         const isSelected = this.value === opt.value;
         const circleCls = isSelected ? 'lex-radio-circle lex-radio-circle--selected' : 'lex-radio-circle';
+        // One option can be off on its own (opt.disabled) while the rest stay choosable.
+        const optDisabled = this.disabled || Boolean(opt.disabled);
 
         groupHtml += `
-          <label class="lex-radio-row${disabledCls}">
+          <label class="lex-radio-row${optDisabled ? ' lex-radio-row--disabled' : ''}">
             <div class="${circleCls}">
               <input type="radio" class="lex-radio-native"
                 name="${this.escapeHtml(this.name)}"
                 value="${this.escapeHtml(opt.value)}"
-                ${isSelected ? 'checked' : ''} ${disabledAttr} />
+                ${isSelected ? 'checked' : ''} ${optDisabled ? 'disabled' : ''} />
               <div class="lex-radio-dot"></div>
             </div>
             <div class="lex-radio-content">
