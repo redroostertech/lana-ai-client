@@ -29,8 +29,12 @@
 
   /** Context steps tried for chat, largest first. Below the last one, chat uses the cloud. */
   var CONTEXT_STEPS = [32768, 16384, 8192];
-  /** The default must hold at least this much at once. */
-  var DEFAULT_MIN_CONTEXT = 16384;
+  /**
+   * The default must hold this much at once (about 44 pages). A smaller model that holds it
+   * beats a bigger one that does not: on 16 GB the 4B with 32768 tokens and image reading is the
+   * default, not the 9B with 16384 and no images (decided 2026-11-09). Bigger models stay choices.
+   */
+  var DEFAULT_MIN_CONTEXT = 32768;
   /** Conversations Pip keeps ready (Pip Desktop's default). Context is per conversation. */
   var PARALLEL = 2;
   /** About 500 words. */
@@ -214,6 +218,7 @@
     }
     // Largest first: the catalog is ordered that way.
     var byDefault = choices.find(function (c) { return canDefault(c, DEFAULT_MIN_CONTEXT); })
+      || choices.find(function (c) { return canDefault(c, CONTEXT_STEPS[1]); })
       || choices.find(function (c) { return canDefault(c, CONTEXT_STEPS[CONTEXT_STEPS.length - 1]); })
       || null;
     var chosen = choices.find(function (c) { return c.id === input.chosenChatId && c.fit !== 'wont_fit'; }) || byDefault;

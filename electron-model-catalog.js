@@ -30,20 +30,29 @@ const MODELS_HOST = 'models.lanaai.io';
 const LANA_CHAT_MODELS = Object.freeze([
   Object.freeze({ id: 'qwen3.5-35b-a3b-q4km', name: 'Qwen3.5 35B' }),
   Object.freeze({ id: 'qwen3.5-9b-q4', name: 'Qwen3.5 9B' }),
+  Object.freeze({ id: 'qwen3.5-4b-q4', name: 'Qwen3.5 4B' }),
   Object.freeze({ id: 'qwen3-1.7b-q4km', name: 'Qwen3 1.7B' }),
   Object.freeze({ id: 'qwen3.5-0.8b-q4', name: 'Qwen3.5 0.8B' })
 ]);
 
-/** The built-in copy: the published entries for LANA's models as of 2026-11-09. */
+/**
+ * The built-in copy: the published entries for LANA's models as of 2026-11-09, plus the
+ * Qwen3.5 4B, which is not on the bucket yet. Its files are lmstudio-community's (the same
+ * publisher as our 9B, whose file matches byte for byte), checked on Pip 3.0.0 on 2026-11-09:
+ * it answers, reads images, and its conversation memory is 594.2 MiB per conversation at
+ * 32768 tokens, which the Qwen3.5 estimate in local-ai-fit.model.js predicts.
+ */
 const BUILT_IN = Object.freeze({
   schemaVersion: 1,
   models: [
     { id: 'qwen3.5-35b-a3b-q4km', role: 'main', family: 'qwen3.5', filename: 'Qwen3.5-35B-A3B-Q4_K_M.gguf', sizeBytes: 21169116992, contextWindow: 32768, sha256: 'f25d609171b8f80950a60f38696597f74025de4070682d2fb1eeffe306ca7d5d' },
     { id: 'qwen3.5-9b-q4', role: 'main', family: 'qwen3.5', filename: 'Qwen3.5-9B-Q4_K_M.gguf', sizeBytes: 5627044256, contextWindow: 32768, sha256: 'cd76ec205963b3b33350093e6904d9de16c4e666fd104e1f632d25c7f15f2a13' },
+    { id: 'qwen3.5-4b-q4', role: 'main', family: 'qwen3.5', filename: 'Qwen3.5-4B-Q4_K_M.gguf', sizeBytes: 2707513696, contextWindow: 32768, sha256: '25082a7dd3776cc3c741c6347d3bd04523f05796607b3fbc32fa3a25dfa1418c' },
     { id: 'qwen3-1.7b-q4km', role: 'main', family: 'qwen3', filename: 'Qwen3-1.7B-Q4_K_M.gguf', sizeBytes: 1282439264, contextWindow: 32768, sha256: 'd2387ca2dbfee2ffabce7120d3770dadca0b293052bc2f0e138fdc940d9bc7b5' },
     { id: 'qwen3.5-0.8b-q4', role: 'main', family: 'qwen3.5', filename: 'Qwen3.5-0.8B-Q4_K_M.gguf', sizeBytes: 527502816, contextWindow: 32768, sha256: 'f5b14da98939b60bbe1019a964eba656407e1e0b64f1fe3003ff6d650e93bfec' },
     { id: 'mmproj-qwen3.5-35b-a3b', role: 'projector', family: 'qwen3.5', filename: 'mmproj-Qwen3.5-35B-A3B-BF16.gguf', sizeBytes: 902822592, pairsWith: 'qwen3.5-35b-a3b-q4km', sha256: 'abe81a7212be307a7723ab47a51a87e5c46d0622273ccb04a6a6feba18b21d63' },
     { id: 'mmproj-qwen3.5-9b', role: 'projector', family: 'qwen3.5', filename: 'mmproj-Qwen3.5-9B-BF16.gguf', sizeBytes: 921705024, pairsWith: 'qwen3.5-9b-q4', sha256: '853698ce7aa6c7ba732478bad280240969ddf7b0fcbf93900046f63903a83383' },
+    { id: 'mmproj-qwen3.5-4b', role: 'projector', family: 'qwen3.5', filename: 'mmproj-Qwen3.5-4B-BF16.gguf', sizeBytes: 675568768, pairsWith: 'qwen3.5-4b-q4', sha256: 'ae08d9d7eceb8f2d0672d61b5e6aa78b611f2942b55ed71d21414980cc454b91' },
     { id: 'mmproj-qwen3.5-0.8b', role: 'projector', family: 'qwen3.5', filename: 'mmproj-Qwen3.5-0.8B-BF16.gguf', sizeBytes: 207346528, pairsWith: 'qwen3.5-0.8b-q4', sha256: 'd312c4d02fd46eea7a16e4f3bbb58840e6222209322ca1e33ca03247ad8935d6' }
   ]
 });

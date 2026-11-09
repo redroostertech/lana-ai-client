@@ -151,16 +151,18 @@ What it picks today (built-in catalog, measured speech memory):
 |---|---|---|---|
 | 4 GB, no graphics chip | Cloud | | Cloud |
 | 8 GB | Qwen3.5 0.8B | 32,768 tokens | No |
-| 16 GB Mac | Qwen3.5 9B | 16,384 tokens | No (same as the server's demo tier) |
+| 12 GB | Qwen3.5 4B | 32,768 tokens | No |
+| 16 GB Mac | Qwen3.5 4B (9B offered at 16,384 tokens) | 32,768 tokens | Yes |
 | 24 GB Mac (this one, M4 Pro) | Qwen3.5 9B | 32,768 tokens | Yes |
 | 36 GB Mac | Qwen3.5 9B (35B offered as tight) | 32,768 tokens | Yes |
 | 48 GB Mac and up | Qwen3.5 35B | 32,768 tokens | Yes |
+| 16 GB with an 8 GB NVIDIA card | Qwen3.5 4B | 32,768 tokens | Yes |
 | 16 GB with a 12 GB NVIDIA card | Qwen3.5 9B | 32,768 tokens | Yes |
 | 16 GB, no graphics chip | Qwen3 1.7B (9B offered as slow) | 32,768 tokens | No |
 
 ### 4.3 Pick the setup
 
-- **Chat (the default the person sees):** the biggest model the client supports that is comfortable at 16384 tokens or more. If none, the biggest one comfortable at 8192. If none, chat uses the cloud and there is nothing to choose.
+- **Chat (the default the person sees):** the biggest model the client supports that is comfortable at 32768 tokens (about 44 pages). A smaller model that holds 32768 beats a bigger one that does not, so a 16 GB computer gets the 4B with image reading, not the 9B at 16384 with none (decided 2026-11-09). If none holds 32768, the biggest comfortable at 16384, then at 8192. If none, chat uses the cloud and there is nothing to choose. Bigger models are still choices.
 - **Vision:** added by LANA only if the chosen chat model stays comfortable with it. If the person picks a different chat model, LANA decides again.
 - **Embedding:** nomic f16 (the pinned file) whenever it fits, which is almost always. Otherwise embedding uses the cloud.
 - **Speech and voice:** installed by LANA when they fit and there is room. If they do not, the Briefs features that need them say so plainly and point to Settings (the existing rule).
@@ -276,3 +278,10 @@ Phase 3 of the custom cloud endpoint plan (backend routing) must land before clo
 - Tests: `tests/unit/local-ai-fit.model.test.js`, `electron-model-catalog.test.js`, `electron-hardware.test.js`, and a speech sizes test in `electron-local-models.test.js`. 60 pass. Breaking the speech reservation failed 5 tests; letting a row choose its own download address failed 1.
 - Checked live on this Mac: the published catalog loads (`source: published`), the computer reads as Apple M4 Pro, 24 GB, 14 cores, 60 GB free, and the plan is Qwen3.5 9B with image reading at 32,768 tokens, with speech and voice, 7.3 GB to download.
 - Nothing calls these yet. Phase B (downloads) and phase D (the first-launch screen) use them.
+
+### Qwen3.5 4B: added 2026-11-09
+
+- Added to LANA's chat models and the built-in copy. Files: `lmstudio-community/Qwen3.5-4B-GGUF`, the same publisher as our 9B (our 9B on the bucket matches theirs byte for byte). `Qwen3.5-4B-Q4_K_M.gguf` 2,707,513,696 bytes, SHA-256 `25082a7d...a1418c`; `mmproj-Qwen3.5-4B-BF16.gguf` 675,568,768 bytes, SHA-256 `ae08d9d7...454b91`.
+- Checked on Pip 3.0.0 (`ff965d5`) on this Mac: loads with in-engine image reading, answers, and its conversation memory is 594.2 MiB per conversation at 32768 tokens. The Qwen3.5 estimate predicts 594.9 MiB, so no new number is needed.
+- **Not on the bucket yet** (`models.lanaai.io/llm/` answers 404 for both files), and not in the published catalog. Until both are, a computer that is online reads the published catalog and does not see the 4B; only the built-in copy has it. Uploading needs bucket access this Mac does not have.
+- Qwen publishes the 4B itself only as full-size weights (`Qwen/Qwen3.5-4B`), with no GGUF for any Qwen3.5 model.

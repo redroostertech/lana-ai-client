@@ -33,7 +33,9 @@ function choice(result, id) {
 describe('the default chat model for a computer', () => {
   test.each([
     ['an 8 GB laptop', computer(8), 'qwen3.5-0.8b-q4', 32768, null],
-    ['a 16 GB Mac', computer(16), 'qwen3.5-9b-q4', 16384, null],
+    ['a 12 GB laptop', computer(12), 'qwen3.5-4b-q4', 32768, null],
+    // A smaller model that holds 32768 tokens beats a bigger one that does not (decided 2026-11-09).
+    ['a 16 GB Mac', computer(16), 'qwen3.5-4b-q4', 32768, 'mmproj-qwen3.5-4b'],
     ['a 24 GB Mac', computer(24), 'qwen3.5-9b-q4', 32768, 'mmproj-qwen3.5-9b'],
     ['a 36 GB Mac', computer(36), 'qwen3.5-9b-q4', 32768, 'mmproj-qwen3.5-9b'],
     ['a 64 GB Mac', computer(64), 'qwen3.5-35b-a3b-q4km', 32768, 'mmproj-qwen3.5-35b-a3b'],
@@ -66,8 +68,11 @@ describe('the chat choices shown', () => {
     expect(choice(result, 'qwen3.5-9b-q4')).toMatchObject({ fit: 'comfortable', contextTokens: 32768, reason: null });
   });
 
-  test('a model that only fits with a smaller context is offered at that context', () => {
-    expect(choice(plan(computer(16)), 'qwen3.5-9b-q4')).toMatchObject({ fit: 'comfortable', contextTokens: 16384 });
+  test('a model that only fits with a smaller context is offered at that context, and can be picked', () => {
+    const result = plan(computer(16), { chosenChatId: 'qwen3.5-9b-q4' });
+    expect(choice(result, 'qwen3.5-9b-q4')).toMatchObject({ fit: 'comfortable', contextTokens: 16384 });
+    expect(result.plan.chat).toMatchObject({ id: 'qwen3.5-9b-q4', contextTokens: 16384 });
+    expect(result.plan.vision.id).toBeNull();
   });
 
   test('a model too big says how much memory it needs', () => {
@@ -113,7 +118,7 @@ describe('the person\'s choice', () => {
   });
 
   test('a choice that will not fit is ignored and the default is used', () => {
-    expect(plan(computer(16), { chosenChatId: 'qwen3.5-35b-a3b-q4km' }).plan.chat.id).toBe('qwen3.5-9b-q4');
+    expect(plan(computer(16), { chosenChatId: 'qwen3.5-35b-a3b-q4km' }).plan.chat.id).toBe('qwen3.5-4b-q4');
   });
 
   test('a chat model with no vision file says it cannot read images', () => {
@@ -157,7 +162,7 @@ describe('the models LANA adds by itself', () => {
   test('a chat model that does not fit on the disk is not offered and a smaller one is the default', () => {
     const result = plan(computer(36, 'metal', { diskGb: 4 }));
     expect(choice(result, 'qwen3.5-9b-q4')).toMatchObject({ fit: 'wont_fit', reason: expect.stringMatching(/not enough free space/) });
-    expect(result.defaultChatId).toBe('qwen3-1.7b-q4km');
+    expect(result.defaultChatId).toBe('qwen3.5-4b-q4');
   });
 
   test('files already on the computer need no space and are not downloaded again', () => {

@@ -21,7 +21,7 @@ describe('parseCatalog', () => {
   test('the built-in copy has every LANA chat model, largest first, and their vision files', () => {
     const parsed = parseCatalog(BUILT_IN);
     expect(parsed.chat.map((m) => m.id)).toEqual(LANA_CHAT_MODELS.map((m) => m.id));
-    expect(parsed.vision.map((v) => v.pairsWith).sort()).toEqual(['qwen3.5-0.8b-q4', 'qwen3.5-35b-a3b-q4km', 'qwen3.5-9b-q4']);
+    expect(parsed.vision.map((v) => v.pairsWith).sort()).toEqual(['qwen3.5-0.8b-q4', 'qwen3.5-35b-a3b-q4km', 'qwen3.5-4b-q4', 'qwen3.5-9b-q4']);
     for (const entry of [...parsed.chat, ...parsed.vision]) {
       expect(entry.sha256).toMatch(/^[a-f0-9]{64}$/);
       expect(entry.url).toBe(`https://models.lanaai.io/llm/${entry.filename}`);
