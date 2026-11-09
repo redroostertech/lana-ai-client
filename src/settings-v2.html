@@ -49,8 +49,6 @@
        variant="light"
        heading="Settings"
        subtitle="Manage your profile, preferences, and account"
-       lana
-       lana-context-type="full_chat"
      ></lex-banner>
 
      <div class="sv2-layout">
@@ -318,6 +316,8 @@
             <div id="sv2-ai-cloud" class="sv2-ai-group" hidden>
               <h4 class="sv2-subhead">Cloud</h4>
               <div id="sv2-ai-cloud-rows" class="sv2-ai-kv"></div>
+              <!-- Your own AI provider, organization admins only (settings-cloud-endpoint.js). -->
+              <div id="sv2-ai-cloud-endpoint" class="sv2-ai-list sv2-cloud-endpoint" role="list" hidden></div>
             </div>
           </lex-card>
         </section>
@@ -877,6 +877,9 @@
   <script src="js/pages/settings-local-engine.js"></script>
   <script src="js/settings-ai-models.model.js"></script>
   <script src="js/pages/settings-ai-models.js"></script>
+  <script src="js/api/cloud-endpoint-api.client.js"></script>
+  <script src="js/settings-cloud-endpoint.model.js"></script>
+  <script src="js/pages/settings-cloud-endpoint.js"></script>
   <script src="js/offline-copy-status.js"></script>
   <script src="js/pages/settings-offline-copy.js"></script>
   <script src="js/embedding-reembed-status.js"></script>

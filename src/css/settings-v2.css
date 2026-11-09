@@ -1658,6 +1658,177 @@
   gap: 8px;
 }
 
+/* Cloud: your own AI provider (settings-cloud-endpoint.js). */
+.sv2-cloud-endpoint {
+  margin-top: 16px;
+}
+
+.sv2-cloud-endpoint-form [hidden],
+.sv2-cloud-endpoint-form-footer [hidden],
+.sv2-cloud-endpoint[hidden],
+.sv2-cloud-endpoint-hosted[hidden],
+.sv2-cloud-endpoint-result[hidden] {
+  display: none !important;
+}
+
+.sv2-cloud-endpoint-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sv2-cloud-endpoint-result {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--lex-radius-md);
+  font-size: var(--lex-body-sm-size);
+  line-height: var(--lex-body-sm-height);
+  overflow-wrap: anywhere;
+}
+
+.sv2-cloud-endpoint-result[data-tone="success"] {
+  background: var(--lex-status-success-bg);
+  color: var(--lex-status-success-text);
+}
+
+.sv2-cloud-endpoint-result[data-tone="warning"] {
+  background: var(--lex-status-warning-bg);
+  color: var(--lex-status-warning-text);
+}
+
+.sv2-cloud-endpoint-result[data-tone="error"] {
+  background: var(--lex-status-danger-bg);
+  color: var(--lex-status-danger-text);
+}
+
+/* Two columns: fields in pairs; the firm question, the switches' row and results span both. */
+.sv2-cloud-endpoint-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 32px;
+  align-items: start;
+}
+
+.sv2-cloud-endpoint-form > .sv2-cloud-endpoint-forge-note,
+.sv2-cloud-endpoint-form > .sv2-cloud-endpoint-notice,
+.sv2-cloud-endpoint-form > .sv2-cloud-endpoint-hosted,
+.sv2-cloud-endpoint-form > .sv2-cloud-endpoint-result {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 760px) {
+  .sv2-cloud-endpoint-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sv2-cloud-endpoint-hosted {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.sv2-cloud-endpoint-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--lex-border-subtle);
+}
+
+.sv2-cloud-endpoint-option-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sv2-cloud-endpoint-option-name {
+  color: var(--lex-text-primary);
+  font-size: var(--lex-body-sm-size);
+  font-weight: var(--lex-weight-medium, 500);
+}
+
+.sv2-cloud-endpoint-option-description {
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-sm-size);
+  line-height: var(--lex-body-sm-height);
+}
+
+.sv2-cloud-endpoint-forge-note {
+  margin: 0;
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-sm-size);
+  line-height: var(--lex-body-sm-height);
+}
+
+lex-btn[data-cloud-action][hidden] {
+  display: none !important;
+}
+
+/* Zero data retention and no training: the notice and its Learn more overlay. */
+.sv2-cloud-endpoint-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  align-self: stretch;
+  padding: 10px 12px 10px 16px;
+  border: 1px solid var(--lex-color-warning-100);
+  border-radius: var(--lex-radius-md);
+  background: var(--lex-status-warning-bg);
+}
+
+.sv2-cloud-endpoint-notice-text {
+  color: var(--lex-status-warning-text);
+  font-size: var(--lex-body-sm-size);
+  line-height: var(--lex-body-sm-height);
+}
+
+.sv2-cloud-endpoint-notice lex-btn {
+  flex: none;
+}
+
+.sv2-cloud-endpoint-learn {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sv2-cloud-endpoint-learn-title {
+  margin: 12px 0 0;
+  color: var(--lex-text-primary);
+  font-size: var(--lex-body-size, 0.9375rem);
+  font-weight: var(--lex-weight-semibold, 600);
+}
+
+.sv2-cloud-endpoint-learn-title:first-child {
+  margin-top: 0;
+}
+
+.sv2-cloud-endpoint-learn-text,
+.sv2-cloud-endpoint-learn-list {
+  margin: 0;
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-sm-size);
+  line-height: var(--lex-body-sm-height);
+}
+
+.sv2-cloud-endpoint-learn-list {
+  padding-left: 20px;
+  list-style: disc;
+}
+
+.sv2-cloud-endpoint-learn-list li + li {
+  margin-top: 6px;
+}
+
+.sv2-cloud-endpoint-footer-spacer {
+  flex: 1;
+}
+
 @container sv2-panels (max-width: 559px) {
   .sv2-ai-item-facts {
     grid-template-columns: 1fr;

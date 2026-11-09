@@ -17,7 +17,7 @@
   'use strict';
 
   var STATES = {
-    running: { label: 'Running', tone: 'green' },
+    running: { label: 'Ready', tone: 'green' },
     not_running: { label: 'Not running', tone: 'yellow' },
     not_set: { label: 'Not set up', tone: 'gray' }
   };
@@ -38,7 +38,7 @@
     },
     voice: {
       goodFor: 'Speaking LANA\'s answers aloud in a natural voice.',
-      howUsed: 'Talk with LANA speaks with it, on this computer. Talk is not in this app yet, so the voice is not downloaded here.'
+      howUsed: 'Talk with LANA will speak with it, on this computer. Talk is not in this app yet.'
     }
   };
 
@@ -89,24 +89,52 @@
     return size(total) + (downloaded ? ', downloaded' : ', not downloaded yet');
   }
 
+  // Every model row has the same details, in this order: Model, Runs in, Good for, How it is
+  // used, Space on this computer.
+  function facts(model, runsIn, role, howUsed, space) {
+    return [
+      { label: 'Model', value: model },
+      { label: 'Runs in', value: runsIn },
+      { label: 'Good for', value: ABOUT[role].goodFor },
+      { label: 'How it is used', value: howUsed },
+      { label: 'Space on this computer', value: space }
+    ];
+  }
+
+  /**
+   * Chat or Embedding served by the LANA server on this computer (the local AI engine is not
+   * set up): the server's own model, not the app's catalog, which only the engine uses.
+   */
+  function viaServerRow(endpoint, role) {
+    return {
+      id: role,
+      name: role === 'chat' ? 'Chat' : 'Embedding',
+      summary: '',
+      badge: STATES.running.label,
+      tone: STATES.running.tone,
+      facts: facts(
+        endpoint.model || 'Not reported',
+        'The LANA server on this computer, not the local AI engine',
+        role,
+        role === 'chat'
+          ? 'Your chat prompts go to the LANA server on this computer, which answers with this model.'
+          : 'The LANA server on this computer indexes your documents and questions with this model.',
+        // Pip does not report its model file size yet.
+        'Not reported by Pip'
+      )
+    };
+  }
+
   /** Chat or Embedding: status from the running model server, facts from the app's catalog. */
   function serverRow(topology, serverAi, role) {
     var found = localServer(topology, serverAi, role);
     var endpoint = found.endpoint;
+    if (found.viaServer && endpoint.state === 'running') return viaServerRow(endpoint, role);
     var state = STATES[endpoint.state] || STATES.not_set;
     var models = catalogFor(topology, role).concat(role === 'chat' ? catalogFor(topology, 'draft') : []);
-    var facts = [
-      { label: 'Model', value: models.length ? models.map(function (m) { return m.name; }).join(', with ') : 'Not reported' },
-      { label: 'Good for', value: ABOUT[role].goodFor },
-      { label: 'How it is used', value: ABOUT[role].howUsed },
-      { label: 'Space on this computer', value: catalogSpace(models) }
-    ];
-    if (endpoint.state === 'running') {
-      facts.push({
-        label: 'Running now',
-        value: (endpoint.model ? endpoint.model + ', ' : '') + (found.viaServer ? 'served by the LANA server on this computer' : 'at ' + endpoint.url)
-      });
-    }
+    var runsIn = endpoint.state === 'running' ? 'The local AI engine on this computer, at ' + endpoint.url
+      : endpoint.state === 'not_running' ? 'The local AI engine on this computer, which is not answering'
+        : 'Nothing on this computer runs it yet. The local AI engine will.';
     return {
       id: role,
       name: role === 'chat' ? 'Chat' : 'Embedding',
@@ -114,7 +142,17 @@
       summary: endpoint.state === 'running' ? '' : endpoint.state === 'not_running' ? 'Set up, but not answering' : 'Not running on this computer',
       badge: state.label,
       tone: state.tone,
-      facts: facts
+      // Running: what that Pip server reports it loaded. Otherwise: the app's catalog copy, which
+      // the engine will use once it is downloaded.
+      facts: endpoint.state === 'running'
+        ? facts(endpoint.model || 'Not reported', runsIn, role, ABOUT[role].howUsed, 'Not reported by Pip')
+        : facts(
+          models.length ? models.map(function (m) { return m.name; }).join(', with ') : 'Not reported',
+          runsIn,
+          role,
+          ABOUT[role].howUsed,
+          catalogSpace(models)
+        )
     };
   }
 
@@ -137,24 +175,25 @@
       name: kind === 'speech' ? 'Speech' : 'Voice',
       summary: ready ? '' : kindOfState === 'downloading' ? 'Downloading'
         : kind === 'voice' ? 'Not used in this app yet' : 'Not downloaded',
-      facts: [
-        { label: 'Models', value: names.length ? names.join('; ') : 'Not reported' },
-        { label: 'Good for', value: ABOUT[kind].goodFor },
-        { label: 'How it is used', value: ABOUT[kind].howUsed },
-        { label: 'Space on this computer', value: status.sizeText ? 'About ' + status.sizeText + (ready ? '' : ' when downloaded') : 'Not reported' }
-      ]
+      facts: facts(
+        names.length ? names.join('; ') : 'Not reported',
+        'This app, on this computer',
+        kind,
+        ABOUT[kind].howUsed,
+        status.sizeText ? 'About ' + status.sizeText + (ready ? '' : ' when downloaded') : 'Not reported'
+      )
     };
   }
 
-  /** The cloud: whether it answers, and whether the server sends prompts to it. */
+  /** Forge, LANA's own cloud: whether it answers, and whether the server sends prompts to it. */
   function cloudRows(topology, serverAi) {
     var forge = (topology && topology.forge) || {};
     var reach = forge.reachable === true ? 'Reachable' : forge.reachable === false ? 'Not reachable' : 'Unknown';
     var used = !serverAi ? 'Unknown' : serverAi.relay && serverAi.relay.enabled ? 'Yes' : 'No, turned off on your server';
     return [
-      { label: 'Status', value: forge.url ? reach : 'Not set for your organization' },
-      { label: 'Used by your server', value: used },
-      { label: 'Sovereign mode', value: forge.sovereign ? 'On' : 'Off' }
+      { label: 'Forge', value: forge.url ? reach : 'Not set for your organization' },
+      // No sovereign mode row: Forge always runs in sovereign mode, so it would never say anything.
+      { label: 'Used by your server', value: used }
     ];
   }
 

@@ -112,7 +112,7 @@
         statusLabel: 'Not set up',
         tone: 'gray',
         rows: [],
-        note: 'The local AI engine is not set up on this computer. ' + serverSentence(status),
+        note: 'The local AI engine is not set up on this computer.',
         showToggle: false,
         showBackgroundJobs: false,
         showRestart: false
@@ -141,28 +141,13 @@
       version_refused: 'Version not supported'
     };
     var tones = { ok: 'green', restarting: 'blue', chef_unavailable: 'yellow', version_refused: 'red' };
-    var health = status.health || {};
-    var chef = health.chef || null;
-    var dataApi = health.data_api || null;
-    var range = '';
-    if (dataApi) {
-      range = 'Speaks ' + dataApi.version + ', needs server ' + dataApi.min_server + ' or later';
-      // A refused handshake reports Chef's versions on the verdict instead.
-      var version = health.version || {};
-      var chefApi = (chef && chef.api) || version.chef;
-      var chefMin = (chef && chef.min_client) || version.chef_min_client;
-      if (chefApi) range += '; server speaks ' + chefApi + ', accepts ' + chefMin + ' or later';
-    }
     return {
       available: true,
       statusLabel: labels[described.state] || 'Unknown',
       tone: tones[described.state] || 'gray',
       message: isQuiet(described.state) ? '' : described.message,
-      rows: [
-        { label: 'Port', value: status.port ? String(status.port) : 'Not assigned' },
-        { label: 'Organization server', value: chef && described.state !== 'restarting' ? (chef.reachable ? 'Reachable' : 'Not reachable') : 'Unknown' },
-        { label: 'Data API versions', value: range || 'Unknown' }
-      ],
+      // No detail rows: the badge and the message say when the server or a version is the problem.
+      rows: [],
       note: '',
       showToggle: true,
       showBackgroundJobs: true,

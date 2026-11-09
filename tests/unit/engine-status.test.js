@@ -120,15 +120,11 @@ describe('controller', () => {
 });
 
 describe('settingsView', () => {
-  test('running engine: port, server reachable, version range', () => {
+  test('running engine: the badge only, no port or version rows', () => {
     const view = status.settingsView(engineStatus());
     expect(view.statusLabel).toBe('Running');
     expect(view.tone).toBe('green');
-    expect(view.rows).toEqual([
-      { label: 'Port', value: '47011' },
-      { label: 'Organization server', value: 'Reachable' },
-      { label: 'Data API versions', value: 'Speaks 1.0, needs server 1.0 or later; server speaks 1.0, accepts 1.0 or later' }
-    ]);
+    expect(view.rows).toEqual([]);
   });
 
   test('not configured: not installed, no rows', () => {
@@ -146,10 +142,11 @@ describe('settingsView', () => {
   });
 
   test('a LANA server on this computer is named as such, not as the organization\'s server', () => {
+    // Not set up: one sentence, with no server line after it.
     expect(status.settingsView({ configured: false, apiBase: 'http://127.0.0.1:8080' }).note)
-      .toBe('The local AI engine is not set up on this computer. LANA\'s AI runs on the LANA server on this computer (127.0.0.1:8080).');
+      .toBe('The local AI engine is not set up on this computer.');
     expect(status.settingsView({ configured: false, apiBase: 'https://acme.lanaai.io' }).note)
-      .toBe('The local AI engine is not set up on this computer. LANA\'s AI runs on your organization\'s server.');
+      .toBe('The local AI engine is not set up on this computer.');
     expect(status.settingsView({ configured: true, enabled: false, inUse: false, reason: 'disabled', apiBase: 'http://localhost:8080' }).note)
       .toBe('LANA\'s AI runs on the LANA server on this computer (localhost:8080). Background jobs run there too.');
   });
@@ -162,12 +159,10 @@ describe('settingsView when the version is refused', () => {
     s.health.version = { status: 'unsupported', direction: 'client_too_old', detail: CLIENT_TOO_OLD, chef: '2.0', chef_min_client: '2.0' };
     const view = status.settingsView(s);
     expect(view).toMatchObject({ statusLabel: 'Version not supported', tone: 'red', message: CLIENT_TOO_OLD });
-    expect(view.rows[2].value).toBe('Speaks 1.0, needs server 1.0 or later; server speaks 2.0, accepts 2.0 or later');
   });
 });
 
-test('settingsView while restarting does not repeat the last server reachability', () => {
+test('settingsView while restarting says so on the badge', () => {
   const view = status.settingsView(engineStatus({ process: 'restarting', healthy: false }));
   expect(view).toMatchObject({ statusLabel: 'Restarting', tone: 'blue' });
-  expect(view.rows[1]).toEqual({ label: 'Organization server', value: 'Unknown' });
 });

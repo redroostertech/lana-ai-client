@@ -203,7 +203,10 @@
     while (box.firstChild) box.removeChild(box.firstChild);
     S.modelRows(lastModels).forEach(function (row) {
       var view = words.speechRow('speech', topology, lastModels[row.id]);
-      box.appendChild(rowApi.create(view, { badge: modelBadge(row.badge, row.color), actions: modelActions(row) }));
+      // No model is removed from Settings (user decision 2026-11-08): a ready model shows no button;
+      // Download, Try again and Cancel stay.
+      var offer = row.badge === 'Ready' ? null : modelActions(row);
+      box.appendChild(rowApi.create(view, { badge: modelBadge(row.badge, row.color), actions: offer || undefined }));
     });
     if (lastModels.voice) {
       var voice = words.speechRow('voice', topology, lastModels.voice);
