@@ -1,6 +1,6 @@
 # First Launch: Local AI Setup Plan
 
-- **Status:** Phase A built (sizing, the model list and the computer facts; section 11). Phases B to G not started.
+- **Status:** Phases A and B built (sizing, the model list, the computer facts, and the downloads; section 11). Phases C to G not started.
 - **Branch:** `development-new` (client), `covo-intake-receiver` (backend, small changes only)
 - **Date:** 2026-11-09
 - **Owner:** Michael Westbrooks
@@ -285,3 +285,14 @@ Phase 3 of the custom cloud endpoint plan (backend routing) must land before clo
 - Checked on Pip 3.0.0 (`ff965d5`) on this Mac: loads with in-engine image reading, answers, and its conversation memory is 594.2 MiB per conversation at 32768 tokens. The Qwen3.5 estimate predicts 594.9 MiB, so no new number is needed.
 - **Not on the bucket yet** (`models.lanaai.io/llm/` answers 404 for both files), and not in the published catalog. Until both are, a computer that is online reads the published catalog and does not see the 4B; only the built-in copy has it. Uploading needs bucket access this Mac does not have.
 - Qwen publishes the 4B itself only as full-size weights (`Qwen/Qwen3.5-4B`), with no GGUF for any Qwen3.5 model.
+
+### Phase B: done 2026-11-09
+
+- `electron-model-download.js`: one file at a time into `<file>.part`, resumed with HTTP Range after a restart (a server that answers 200 starts the part again), cut off past the pinned size, the whole part hashed at the end, renamed only when size and SHA-256 match, deleted when they do not. Pausing and a 30 second stall end the stream cleanly, so every byte received is on disk first. Only https on `models.lanaai.io`, every redirect checked. The disk must hold what is left plus 512 MiB before anything is fetched. A checked file gets a `<file>.verified` note (size, change time, SHA-256), so later launches do not hash gigabytes again; a changed file is hashed again.
+- `electron-local-models.js` `downloadModel` and `isInstalled` now use it. The old downloader is gone.
+- `electron-first-launch.js`: works out the plan for the computer as it is now, keeps the person's chat choice, and downloads embedding, chat and image reading in that order with progress. Nothing is downloaded before the person presses Continue (`accept()`, phase D). After that every launch resumes setup that is not finished (`resume()`, called at app start). When every file is in place it saves `completedAt` and calls `onReady`, which phase C uses to start Pip.
+- Speech and voice: Briefs keeps its speech models in each person's own folder (`briefs/people/<person>/Models/speech`), so they cannot be fetched before sign-in. When a person's Briefs starts, the client asks it for the ones the plan chose (`downloadModels`, new on the Briefs host), and Briefs fetches them with its own resuming store. A second person on the same computer gets their own copy; sharing one copy is a later change in Briefs.
+- `electron-storage.js` `firstLaunchPersistence`: `chatId`, `acceptedAt`, `completedAt`.
+- Tests: `electron-model-download.test.js` (15), `electron-first-launch.test.js` (10), `electron-storage-first-launch.test.js` (3), two new in `electron-briefs.test.js`, the downloader tests in `electron-local-models.test.js` moved to the new one. 140 pass across the related client suites. Breaking the Continue rule failed 2.
+- Checked live against `models.lanaai.io`: the embedding model paused at 60.0 MB with 60.0 MB on disk, resumed from 60.0 MB, finished, and its SHA-256 matches the pin; the second check read the note in under 1 ms. The real plan on this Mac, from the published catalog: Qwen3.5 9B with image reading, then speech and voice.
+- Not done here: the first-launch screen that calls `accept()` (phase D), and starting Pip when it is ready (phase C).

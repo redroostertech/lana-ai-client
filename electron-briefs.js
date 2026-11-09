@@ -140,6 +140,7 @@ function isLoaded(window) {
  * @param {function} deps.getToken - () => the person's LANA session token, or null
  * @param {function} deps.getWindows - () => the open BrowserWindows
  * @param {object} [deps.ipcMain] - answers the pages' "is Briefs running" question
+ * @param {function} [deps.speechModels] - async () => the Briefs speech model ids first launch says to install
  * @param {function} [deps.createCaptureWindow] - () => a hidden BrowserWindow loading briefs/capture.html with the client preload
  * @param {function} deps.showWindow
  * @param {object} deps.log - { info, warn, error }
@@ -268,11 +269,23 @@ function createBriefs(deps) {
       if (!(await windowLoaded())) return;
       addOpenWindows();
       await started.restore();
+      await fetchSpeechModels(started);
     } catch (error) {
       host = null;
       hostKey = null;
       await started.stop().catch(() => {});
       throw error;
+    }
+  }
+
+  /** Speech models live in each person's Briefs folder, so they are fetched once that person's host runs. */
+  async function fetchSpeechModels(started) {
+    if (!deps.speechModels) return;
+    try {
+      const ids = await deps.speechModels();
+      if (ids.length && host === started) started.downloadModels(ids);
+    } catch (_error) {
+      log.warn('[briefs] could not start the speech model downloads');
     }
   }
 

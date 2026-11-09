@@ -458,6 +458,42 @@ function updateLocalEnginePreferences(changes = {}) {
   return next;
 }
 
+// First-launch local AI setup (docs/plans/first-launch-local-ai-plan.md, D8): what the person
+// chose and whether this computer's model files are all in place. Kept apart from the saved
+// server, so signing out does not start setup again.
+//   chatId:      the chat model the person chose, or null for LANA's default
+//   acceptedAt:  when the person pressed Continue on the setup screen (ISO), or null. Nothing
+//                is downloaded before this.
+//   completedAt: when every local model file was in place and checked (ISO), or null
+const FIRST_LAUNCH_KEY = 'firstLaunch';
+const FIRST_LAUNCH_DEFAULTS = Object.freeze({ chatId: null, acceptedAt: null, completedAt: null });
+
+/** Read and write the first-launch state (electron-first-launch.js). */
+const firstLaunchPersistence = {
+  read() {
+    try {
+      const value = store.get(FIRST_LAUNCH_KEY, null);
+      return { ...FIRST_LAUNCH_DEFAULTS, ...(value && typeof value === 'object' ? value : {}) };
+    } catch (error) {
+      logError('[electron-storage] Failed to read first-launch state', error);
+      return { ...FIRST_LAUNCH_DEFAULTS };
+    }
+  },
+  write(changes = {}) {
+    const next = { ...firstLaunchPersistence.read() };
+    if (Object.prototype.hasOwnProperty.call(changes, 'chatId')) {
+      next.chatId = typeof changes.chatId === 'string' && /^[A-Za-z0-9._-]{1,100}$/.test(changes.chatId) ? changes.chatId : null;
+    }
+    for (const key of ['acceptedAt', 'completedAt']) {
+      if (Object.prototype.hasOwnProperty.call(changes, key)) {
+        next[key] = typeof changes[key] === 'string' ? changes[key] : null;
+      }
+    }
+    store.set(FIRST_LAUNCH_KEY, next);
+    return next;
+  }
+};
+
 // Ciphertext of the login token (Electron safeStorage output, base64). The
 // plain token never reaches this store; see electron-token-store.js.
 const AUTH_TOKEN_KEY = 'authTokenEncrypted';
@@ -492,6 +528,7 @@ module.exports = {
   updatePreferences,
   getLocalEnginePreferences,
   updateLocalEnginePreferences,
+  firstLaunchPersistence,
   getAllData,
   clearAllData,
   addToConnectionHistory,

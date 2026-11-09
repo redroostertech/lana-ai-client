@@ -86,7 +86,7 @@ if (process.env.NODE_ENV === 'development') {
 
 // Import thin client modules
 const { refreshHostedDiscovery, verifyServer } = require('./electron-discovery');
-const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified, saveBrainchildLink, getBrainchildLink, clearBrainchildLink, setBrainchildAutoBindDisabled, isBrainchildAutoBindDisabled, authTokenPersistence, offlineKeyPersistence, getLocalEnginePreferences, updateLocalEnginePreferences } = require('./electron-storage');
+const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified, saveBrainchildLink, getBrainchildLink, clearBrainchildLink, setBrainchildAutoBindDisabled, isBrainchildAutoBindDisabled, authTokenPersistence, offlineKeyPersistence, getLocalEnginePreferences, updateLocalEnginePreferences, firstLaunchPersistence } = require('./electron-storage');
 const { createLocalEngineHost } = require('./electron-local-engine');
 const { createTokenStore, registerTokenIpc, hasLiveSession } = require('./electron-token-store');
 
@@ -115,6 +115,19 @@ const localEngine = createLocalEngineHost({
 });
 localEngine.registerIpc();
 
+// First-launch local AI setup (first-launch plan, phase B): sizes this computer and downloads
+// its model files after the person presses Continue on the setup screen (phase D). Every
+// launch resumes a setup that was accepted and not finished.
+const { createFirstLaunch } = require('./electron-first-launch');
+const firstLaunch = createFirstLaunch({
+  userDataDir: app.getPath('userData'),
+  state: firstLaunchPersistence,
+  onStatus: (status) => {
+    if (status.phase === 'failed') {logWarn(`[first-launch] setup stopped: ${status.error && status.error.code}`);}
+  },
+  onReady: () => logInfo('[first-launch] every local model file is in place')
+});
+
 // LANA Briefs (Briefs integration plan): runs only while discovery lists lana-notes and
 // someone is signed in. Its model work goes to the local AI engine's runtime route.
 const { createBriefs, registerBriefsSchemes } = require('./electron-briefs');
@@ -138,6 +151,8 @@ const briefs = createBriefs({
   getServer: () => getSavedServer(),
   getToken: () => authTokenStore.get(),
   getWindows: () => BrowserWindow.getAllWindows(),
+  // The speech and voice models first launch decided fit this computer.
+  speechModels: () => firstLaunch.speechModels(),
   // Records while a Briefs recording is live; never shown.
   createCaptureWindow: () => {
     const capture = new BrowserWindow({
@@ -2140,6 +2155,9 @@ app.whenReady().then(async () => {
   }
 
   logInfo('App ready, starting thin client initialization...');
+
+  // Model downloads cut off last time pick up again in the background.
+  void firstLaunch.resume();
 
   // macOS dock icon. On packaged builds Electron reads from the .app bundle's
   // Contents/Resources/electron.icns; in dev that path is Electron's default

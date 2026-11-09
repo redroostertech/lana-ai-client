@@ -12,17 +12,15 @@
  * the engine checks this computer's Pip build against the organization's
  * identity before it embeds anything. Change it only together with that pin.
  *
- * A download goes to a .part file next to the target, is hashed while it
- * streams, and is renamed into place only when size and sha256 both match;
- * anything else is deleted and reported. A file already in place counts only
- * after the same check.
+ * Downloads go through electron-model-download.js: a .part file next to the
+ * target, resumed after a restart, renamed into place only when size and
+ * sha256 both match, and only from models.lanaai.io. A file already in place
+ * counts only after the same check (noted, so it is not hashed every launch).
  */
 
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
-const { Readable } = require('stream');
-const { pipeline } = require('stream/promises');
+const { downloadVerified, isVerified } = require('./electron-model-download');
 
 const R2_LLM = 'https://models.lanaai.io/llm';
 
@@ -196,59 +194,22 @@ function modelsDir(env, userDataDir) {
   return env.LANA_MODELS_DIR ? path.resolve(env.LANA_MODELS_DIR) : path.join(userDataDir, 'models');
 }
 
-async function sha256OfFile(file) {
-  const hash = crypto.createHash('sha256');
-  await pipeline(fs.createReadStream(file), hash);
-  return hash.digest('hex');
-}
-
-/** True when the entry's file is in `dir` with its pinned size and sha256. */
-async function isInstalled(entry, dir) {
-  const file = path.join(dir, entry.filename);
-  let stat;
-  try { stat = await fs.promises.stat(file); } catch (_error) { return false; }
-  if (!stat.isFile() || stat.size !== entry.sizeBytes) {return false;}
-  return (await sha256OfFile(file)) === entry.sha256;
+/** True when the entry's file is in `dir`, checked (electron-model-download.js isVerified). */
+function isInstalled(entry, dir) {
+  return isVerified(path.join(dir, entry.filename), entry);
 }
 
 /**
- * Download one catalog entry into `dir`, verified.
- * @param {Object} entry - a CATALOG entry
+ * Download one entry into `dir`: resumed after a restart, size and SHA-256 checked, and only
+ * from models.lanaai.io (electron-model-download.js).
+ * @param {Object} entry - a CATALOG entry or a chat or vision entry from electron-model-catalog.js
  * @param {string} dir
- * @param {Object} [deps]
- * @param {typeof fetch} [deps.fetchImpl]
- * @param {(progress: { received: number, total: number }) => void} [deps.onProgress]
- * @param {Object[]} [deps.catalog] - the allowed entries (tests)
+ * @param {Object} [options] - { onProgress, signal, freeBytes }
+ * @param {Object} [deps] - { fetchImpl, fsImpl } for tests
  * @returns {Promise<string>} the installed file path
  */
-async function downloadModel(entry, dir, { fetchImpl = (...args) => fetch(...args), onProgress = () => {}, catalog = CATALOG } = {}) {
-  if (!catalog.includes(entry)) {throw new Error('Only models in the catalog can be downloaded.');}
-  await fs.promises.mkdir(dir, { recursive: true });
-  const target = path.join(dir, entry.filename);
-  if (await isInstalled(entry, dir)) {return target;}
-  const partial = `${target}.part`;
-  const response = await fetchImpl(entry.url);
-  if (!response.ok || !response.body) {throw new Error(`The model download failed (HTTP ${response.status}).`);}
-  const hash = crypto.createHash('sha256');
-  let received = 0;
-  const counted = Readable.fromWeb(response.body);
-  counted.on('data', (chunk) => {
-    received += chunk.length;
-    hash.update(chunk);
-    onProgress({ received, total: entry.sizeBytes });
-  });
-  try {
-    await pipeline(counted, fs.createWriteStream(partial));
-    const digest = hash.digest('hex');
-    if (received !== entry.sizeBytes || digest !== entry.sha256) {
-      throw new Error('The downloaded model did not match its checksum, so it was removed.');
-    }
-    await fs.promises.rename(partial, target);
-    return target;
-  } catch (error) {
-    await fs.promises.rm(partial, { force: true });
-    throw error;
-  }
+function downloadModel(entry, dir, options = {}, deps = {}) {
+  return downloadVerified(entry, path.join(dir, entry.filename), options, deps);
 }
 
-module.exports = { CATALOG, SPEECH_CATALOG, SPEECH_FEATURES, speechPackages, speechSizes, embeddingModel, modelsDir, isInstalled, downloadModel, sha256OfFile };
+module.exports = { CATALOG, SPEECH_CATALOG, SPEECH_FEATURES, speechPackages, speechSizes, embeddingModel, modelsDir, isInstalled, downloadModel };

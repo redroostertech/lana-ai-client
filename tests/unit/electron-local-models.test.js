@@ -94,12 +94,13 @@ describe('speech sizes for first-launch sizing', () => {
   });
 });
 
-describe('verified download', () => {
-  test('a download whose sha256 matches is installed (control)', async () => {
+describe('verified download (electron-model-download.js)', () => {
+  test('a download whose sha256 matches is installed, and counts as installed after', async () => {
     const dir = tempDir();
     const content = Buffer.from('model bytes');
     const entry = fakeEntry(content);
-    const file = await downloadModel(entry, dir, { catalog: [entry], fetchImpl: async () => bytesResponse(content) });
+    const file = await downloadModel(entry, dir, {}, { fetchImpl: async () => bytesResponse(content) });
+    expect(file).toBe(path.join(dir, 'fake.gguf'));
     expect(fs.readFileSync(file)).toEqual(content);
     expect(await isInstalled(entry, dir)).toBe(true);
   });
@@ -110,16 +111,16 @@ describe('verified download', () => {
   ])('%s is removed and reported, and nothing is installed', async (_label, served) => {
     const dir = tempDir();
     const entry = fakeEntry(Buffer.from('model bytes'));
-    await expect(downloadModel(entry, dir, { catalog: [entry], fetchImpl: async () => bytesResponse(served) })).rejects.toThrow(/checksum/);
+    await expect(downloadModel(entry, dir, {}, { fetchImpl: async () => bytesResponse(served) })).rejects.toThrow(/checksum/);
     expect(fs.readdirSync(dir)).toEqual([]);
   });
 
-  test('an HTTP error installs nothing; a model outside the catalog is refused without a request', async () => {
+  test('an HTTP error installs nothing; a model from anywhere but our bucket is refused without a request', async () => {
     const dir = tempDir();
     const entry = fakeEntry(Buffer.from('x'));
-    await expect(downloadModel(entry, dir, { catalog: [entry], fetchImpl: async () => bytesResponse(Buffer.alloc(0), 404) })).rejects.toThrow(/HTTP 404/);
+    await expect(downloadModel(entry, dir, {}, { fetchImpl: async () => bytesResponse(Buffer.alloc(0), 404) })).rejects.toThrow(/HTTP 404/);
     const fetchImpl = jest.fn();
-    await expect(downloadModel(entry, dir, { fetchImpl })).rejects.toThrow(/catalog/);
+    await expect(downloadModel({ ...entry, url: 'https://huggingface.co/x/fake.gguf' }, dir, {}, { fetchImpl })).rejects.toThrow(/own model server/);
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 });

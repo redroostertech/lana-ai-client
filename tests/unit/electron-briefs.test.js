@@ -33,7 +33,7 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
-function setup({ windows = [fakeWindow()], startGate = null, stopGate = null, restoreError = null } = {}) {
+function setup({ windows = [fakeWindow()], startGate = null, stopGate = null, restoreError = null, speechModels } = {}) {
   const app = new EventEmitter();
   Object.assign(app, { getPath: (name) => `/tmp/${name}`, isPackaged: false, quit: jest.fn() });
   const state = { token: ALICE, windows };
@@ -54,6 +54,7 @@ function setup({ windows = [fakeWindow()], startGate = null, stopGate = null, re
         addWebContents: (contents) => host.added.push(contents),
         focused: jest.fn(),
         blurred: jest.fn(),
+        downloadModels: jest.fn(),
         restore: async () => {
           host.restored += 1;
           if (restoreError) throw restoreError;
@@ -83,6 +84,7 @@ function setup({ windows = [fakeWindow()], startGate = null, stopGate = null, re
     getToken: () => state.token,
     getWindows: () => state.windows,
     showWindow: jest.fn(),
+    speechModels,
     log
   });
   return { briefs, app, state, hosts, module, log };
@@ -123,6 +125,28 @@ describe('LANA Briefs in the client', () => {
     await briefs.sync(without);
     expect(host.stopped).toBe(1);
     expect(briefs.isRunning()).toBe(false);
+  });
+
+  test('after restoring, asks the host for the speech models first launch chose; none asked, none started', async () => {
+    const chosen = setup({ speechModels: async () => ['transcription', 'voice'] });
+    await chosen.briefs.sync(enabled);
+    expect(chosen.hosts[0].downloadModels).toHaveBeenCalledWith(['transcription', 'voice']);
+
+    const none = setup({ speechModels: async () => [] });
+    await none.briefs.sync(enabled);
+    expect(none.hosts[0].downloadModels).not.toHaveBeenCalled();
+
+    const without = setup();
+    await without.briefs.sync(enabled);
+    expect(without.hosts[0].downloadModels).not.toHaveBeenCalled();
+  });
+
+  test('a speech plan that cannot be worked out is logged and does not stop Briefs', async () => {
+    const { briefs, hosts, log } = setup({ speechModels: async () => { throw new Error('offline'); } });
+    await briefs.sync(enabled);
+    expect(briefs.isRunning()).toBe(true);
+    expect(hosts[0].downloadModels).not.toHaveBeenCalled();
+    expect(log.warn).toHaveBeenCalledWith('[briefs] could not start the speech model downloads');
   });
 
   test('finding: shared computer. Each person has their own folder, and another person signing in stops the previous host first', async () => {

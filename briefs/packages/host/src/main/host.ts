@@ -13,7 +13,7 @@ import type { App, Dialog, DesktopCapturer, IpcMainEvent, Protocol, SafeStorage,
 import { ipcMain } from "electron";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { RECORDING_FRAME_CHANNEL, RECORDING_LEVELS_CHANNEL, TALK_FRAME_CHANNEL, type AccessStatus, type LanaEvent, type PlatformInfo, type RecordingFrame, type RecordingPermissions, type ThemePreference } from "../shared/api.js";
+import { RECORDING_FRAME_CHANNEL, RECORDING_LEVELS_CHANNEL, TALK_FRAME_CHANNEL, type AccessStatus, type LanaEvent, type ModelID, type PlatformInfo, type RecordingFrame, type RecordingPermissions, type ThemePreference } from "../shared/api.js";
 import { openGatewayRuntime, StartupError, type GatewayRuntime } from "./gateway/gatewayRuntime.js";
 import { EventHub, registerServices } from "./ipc.js";
 import { createMainLog, type MainLog } from "./log.js";
@@ -78,6 +78,12 @@ export interface BriefsHost {
   blurred(): void;
   /** Reads the client's session and opens the phone gateway. Call once a client window has loaded. */
   restore(): Promise<void>;
+  /**
+   * Starts these speech model downloads in the background, the same as pressing Download in
+   * Settings: resumed, checked, with progress on the models event. The client's first launch
+   * calls it with the speech and voice models it decided fit this computer.
+   */
+  downloadModels(ids: readonly ModelID[]): void;
   /** Stops IPC, drains calls in flight and closes the store. */
   stop(): Promise<void>;
 }
@@ -284,6 +290,9 @@ export async function startBriefsHost(options: BriefsHostOptions): Promise<Brief
       endSession: () => runtime.endSession(),
       blurred: () => created.talk.appResignedActive(),
       restore: () => runtime.restore(),
+      downloadModels: (ids) => {
+        for (const id of ids) void created.models.download(id);
+      },
       stop() {
         stopped ??= (async () => {
           log.info("shutdown.closing");
