@@ -44,7 +44,7 @@ describe('the section', () => {
     expect(fact(view.computerFacts, 'Chat runs')).toBe('On this computer');
     expect(view.chat).toMatchObject({ cloud: false, name: 'Qwen3.5 9B', detail: 'Good fit for this computer. About 44 pages at once.', badge: 'Ready', tone: 'green', note: '', canChange: true });
     expect(view.rows.map((r) => [r.id, r.badge])).toEqual([
-      ['search', 'Ready'], ['images', 'Ready'], ['documents', 'Ready'], ['privacy', 'Ready'], ['speech', 'On'], ['voice', 'On']
+      ['search', 'Ready'], ['images', 'Ready'], ['documents', 'Ready'], ['privacy', 'Ready'], ['speech', 'Ready'], ['voice', 'Ready']
     ]);
     expect(rowOf(view, 'privacy').facts[0].value).toBe('Keeps names and private details out of cloud requests.');
     expect(rowOf(view, 'documents').facts[0].value).toBe('Reads your documents on this computer.');
@@ -237,4 +237,9 @@ describe('changing the chat model', () => {
     await c.refreshServers();
     expect(last().view.chat.badge).toBe('Starting');
   });
+});
+
+test('every capsule that means working says Ready: no row uses a second word for it', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '../../src/js/settings-capabilities.model.js'), 'utf8');
+  expect(src).not.toMatch(/label: 'On'/);
 });

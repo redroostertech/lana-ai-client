@@ -37,7 +37,6 @@
     starting: { label: 'Starting', tone: 'blue' },
     not_running: { label: 'Not running', tone: 'yellow' },
     not_installed: { label: 'Not installed', tone: 'gray' },
-    on: { label: 'On', tone: 'green' },
     off: { label: 'Off', tone: 'gray' }
   };
 
@@ -172,9 +171,9 @@
 
     if (includeSpeech) {
       var speechOn = Boolean(plan.speech && plan.speech.install);
-      rows.push(row('speech', 'Speech', speechOn, 'on', speechOn ? 'LANA adds it when you use LANA Briefs.' : plan.speech && plan.speech.reason, 'On this computer'));
+      rows.push(row('speech', 'Speech', speechOn, 'ready', speechOn ? 'LANA adds it when you use LANA Briefs.' : plan.speech && plan.speech.reason, 'On this computer'));
       var voiceOn = Boolean(plan.voice && plan.voice.install);
-      rows.push(row('voice', 'Voice', voiceOn, 'on', voiceOn ? 'LANA adds it when you use LANA Briefs.' : plan.voice && plan.voice.reason, 'On this computer'));
+      rows.push(row('voice', 'Voice', voiceOn, 'ready', voiceOn ? 'LANA adds it when you use LANA Briefs.' : plan.voice && plan.voice.reason, 'On this computer'));
     }
     return rows;
   }
