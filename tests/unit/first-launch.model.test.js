@@ -253,3 +253,16 @@ describe('the controller', () => {
     expect(api.continue).toHaveBeenLastCalledWith({ useExisting: false });
   });
 });
+
+test('a finished setup says LANA is ready, not that it is getting ready, and does not repeat itself', () => {
+  const working = fl.buildProgressView({ phase: 'downloading', totalBytes: 1 });
+  expect(working.header).toMatchObject({ eyebrow: 'Setting up', accent: 'ready' });
+  expect(working.header.title).toMatch(/Getting/);
+  const done = fl.buildProgressView({ phase: 'ready', totalBytes: 1 });
+  expect(done.header.title).not.toMatch(/Getting/);
+  expect(done.header).toMatchObject({ eyebrow: 'All set', title: 'LANA is ', accent: 'ready', detail: '' });
+  expect(done.header.eyebrow.toLowerCase()).not.toContain(done.header.accent);
+  // The card does not say the same thing again.
+  expect(done.current).toBe('');
+  expect(done.heading).not.toMatch(/ready|all set/i);
+});

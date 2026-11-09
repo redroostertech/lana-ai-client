@@ -162,7 +162,10 @@
     var current = s.current ? 'Now getting ' + (KIND_WORDS[s.current.kind] || 'a file') + (s.current.name ? ', ' + s.current.name : '') + '.' : '';
     // mark: the LANA brand animation for the state (lex-brand-mark). note: what signing in now
     // means, true for that state only (a stopped download does not "keep going").
-    var base = { phase: s.phase || 'idle', percent: percent, bytes: bytes, current: '', error: null, canPause: false, canResume: false, canRetry: false, tone: 'normal', mark: 'spinner', note: '' };
+    // header: the page's eyebrow, headline and line above the card, which follow the state so a
+    // finished setup does not still say it is getting ready.
+    var SETTING_UP = { eyebrow: 'Setting up', title: 'Getting LANA ', accent: 'ready', detail: 'This happens once.' };
+    var base = { phase: s.phase || 'idle', percent: percent, bytes: bytes, current: '', error: null, canPause: false, canResume: false, canRetry: false, tone: 'normal', mark: 'spinner', note: '', header: SETTING_UP };
     var KEEPS_GOING = 'The download keeps going in the background after you sign in.';
 
     switch (s.phase) {
@@ -175,7 +178,7 @@
       case 'failed':
         return Object.assign(base, { heading: 'The download stopped', error: failedMessage(s.error), canRetry: true, tone: 'danger', mark: 'idle', note: 'If you sign in now, LANA tries again next time it opens.' });
       case 'ready':
-        return Object.assign(base, { heading: 'All set', percent: 100, current: 'Every file is in place and checked.', tone: 'good', mark: 'success', note: '' });
+        return Object.assign(base, { heading: 'Every file is in place and checked', percent: 100, current: '', tone: 'good', mark: 'success', note: '', header: { eyebrow: 'All set', title: 'LANA is ', accent: 'ready', detail: '' } });
       default:
         return Object.assign(base, { heading: 'Getting ready', current: 'Starting the downloads.', note: KEEPS_GOING });
     }

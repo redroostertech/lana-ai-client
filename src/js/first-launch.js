@@ -149,6 +149,27 @@
     text($('fl-progress-note'), view.note);
     var mark = $('fl-mark');
     if (mark && mark.animation !== view.mark) {mark.animation = view.mark;}
+    applyHeader(view.header);
+  }
+
+  /** The walkthrough page's eyebrow, headline and line, for the current setup state. */
+  function applyHeader(header) {
+    if (!tour || !header) {return;}
+    var eyebrow = tour.querySelector('.lex-walkthrough-eyebrow');
+    var headline = tour.querySelector('.lex-walkthrough-headline');
+    var detail = tour.querySelector('.lex-walkthrough-detail');
+    if (eyebrow) {eyebrow.textContent = header.eyebrow;}
+    if (headline) {
+      headline.textContent = header.title;
+      var accent = document.createElement('em');
+      accent.textContent = header.accent;
+      headline.appendChild(accent);
+      headline.appendChild(document.createTextNode('.'));
+    }
+    if (detail) {
+      detail.textContent = header.detail;
+      detail.hidden = !header.detail;
+    }
   }
 
   function fill() {
