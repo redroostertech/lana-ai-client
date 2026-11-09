@@ -200,19 +200,24 @@
     var words = window.LanaAiModels;
     if (!box || !rowApi || !words || !lastModels) return;
     var topology = rowApi.topology();
+    // The first-launch plan's word on speech and voice (settings-capabilities.js), when it is in.
+    var capabilities = window.LanaCapabilitiesPage;
+    var plan = capabilities ? capabilities.plan() : null;
     while (box.firstChild) box.removeChild(box.firstChild);
     S.modelRows(lastModels).forEach(function (row) {
-      var view = words.speechRow('speech', topology, lastModels[row.id]);
+      var view = words.speechRow('speech', topology, lastModels[row.id], plan && plan.speech);
       // No model is removed from Settings (user decision 2026-11-08): a ready model shows no button;
       // Download, Try again and Cancel stay.
       var offer = row.badge === 'Ready' ? null : modelActions(row);
       box.appendChild(rowApi.create(view, { badge: modelBadge(row.badge, row.color), actions: offer || undefined }));
     });
     if (lastModels.voice) {
-      var voice = words.speechRow('voice', topology, lastModels.voice);
+      var voice = words.speechRow('voice', topology, lastModels.voice, plan && plan.voice);
       var ready = lastModels.voice.state && lastModels.voice.state.kind === 'ready';
       box.appendChild(rowApi.create(voice, { badge: modelBadge(ready ? 'Ready' : 'Not in use', ready ? 'green' : 'gray') }));
     }
+    // Settings > Capabilities stops showing its own Speech and Voice rows once these are here.
+    window.dispatchEvent(new CustomEvent('lana-briefs-models'));
   }
 
   function onModelClick(event) {
@@ -278,6 +283,8 @@
     el('sv2-briefs-models').addEventListener('click', onModelClick);
     // Model names arrive with the AI card's topology; draw again when they do.
     window.addEventListener('lana-ai-topology', function () { renderModels(null); });
+    // And the plan's word on them arrives with Settings > Capabilities.
+    window.addEventListener('lana-capabilities', function () { renderModels(null); });
 
     if (typeof api.onEvent === 'function') {
       api.onEvent(function (event) {

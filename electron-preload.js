@@ -134,6 +134,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     pause: () => ipcRenderer.invoke('first-launch:pause'),
     resume: () => ipcRenderer.invoke('first-launch:resume'),
     getStatus: () => ipcRenderer.invoke('first-launch:status'),
+    // Settings > Capabilities: the plan with each local server's state, the states alone, and
+    // switching the chat model (its files download here, then only the chat server restarts).
+    getCapabilities: () => ipcRenderer.invoke('first-launch:capabilities'),
+    getServers: () => ipcRenderer.invoke('first-launch:servers'),
+    switchChat: (chatId) => ipcRenderer.invoke('first-launch:switch-chat', { chatId: typeof chatId === 'string' ? chatId : null }),
     onStatus: (callback) => {
       const handler = (_event, status) => callback(status);
       ipcRenderer.on('first-launch:status-changed', handler);

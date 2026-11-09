@@ -4,7 +4,7 @@
  * development hardware override is off outside development.
  */
 
-const { CHANNELS, registerFirstLaunchIpc, broadcastFirstLaunchStatus, devHardwareReader } = require('../../electron-first-launch-ipc');
+const { CHANNELS, registerFirstLaunchIpc, broadcastFirstLaunchStatus, devHardwareReader, plainServerState, localServerStates } = require('../../electron-first-launch-ipc');
 
 const GB = 1024 ** 3;
 
@@ -22,6 +22,7 @@ function fakeFirstLaunch() {
     findExisting: jest.fn(async () => [{ id: 'small', kind: 'chat', name: 'Small', bytes: 5, source: 'Pip' }]),
     start: jest.fn(() => new Promise(() => {})),
     pause: jest.fn(async () => null),
+    switchChat: jest.fn(() => new Promise(() => {})), // downloads that never end
     status: () => status
   };
 }
@@ -29,7 +30,7 @@ function fakeFirstLaunch() {
 test('registers every channel', () => {
   const ipc = fakeIpc();
   registerFirstLaunchIpc({ ipcMain: ipc, firstLaunch: fakeFirstLaunch() });
-  for (const channel of [CHANNELS.plan, CHANNELS.findExisting, CHANNELS.choose, CHANNELS.continue, CHANNELS.pause, CHANNELS.resume, CHANNELS.status]) {
+  for (const channel of [CHANNELS.plan, CHANNELS.findExisting, CHANNELS.choose, CHANNELS.continue, CHANNELS.pause, CHANNELS.resume, CHANNELS.status, CHANNELS.capabilities, CHANNELS.servers, CHANNELS.switchChat]) {
     expect(ipc.handlers[channel]).toEqual(expect.any(Function));
   }
 });
@@ -88,6 +89,68 @@ test('a plan that cannot be read comes back as an error, not a throw', async () 
   firstLaunch.plan.mockRejectedValueOnce(new Error('catalog broke'));
   registerFirstLaunchIpc({ ipcMain: ipc, firstLaunch });
   await expect(ipc.call(CHANNELS.plan)).resolves.toEqual({ success: false, error: 'catalog broke' });
+});
+
+describe('Settings > Capabilities', () => {
+  test('switch-chat saves a model that fits and answers at once while its files download', async () => {
+    const ipc = fakeIpc();
+    const firstLaunch = fakeFirstLaunch();
+    registerFirstLaunchIpc({ ipcMain: ipc, firstLaunch });
+    await expect(ipc.call(CHANNELS.switchChat, { chatId: 'small' })).resolves.toMatchObject({ success: true, status: { phase: 'idle' }, plan: { chatChoices: expect.any(Array) } });
+    expect(firstLaunch.switchChat).toHaveBeenCalledWith('small');
+    await ipc.call(CHANNELS.switchChat, { chatId: null });
+    expect(firstLaunch.switchChat).toHaveBeenLastCalledWith(null);
+  });
+
+  test('switch-chat refuses a model too big for this computer, an unknown one, and a non-string', async () => {
+    const ipc = fakeIpc();
+    const firstLaunch = fakeFirstLaunch();
+    registerFirstLaunchIpc({ ipcMain: ipc, firstLaunch });
+    await expect(ipc.call(CHANNELS.switchChat, { chatId: 'huge' })).resolves.toEqual({ success: false, error: 'That chat model does not fit this computer.' });
+    expect((await ipc.call(CHANNELS.switchChat, { chatId: 'nope' })).success).toBe(false);
+    expect((await ipc.call(CHANNELS.switchChat, { chatId: 7 })).success).toBe(false);
+    expect(firstLaunch.switchChat).not.toHaveBeenCalled();
+  });
+
+  test('capabilities returns the plan view and the server states; servers returns the states alone', async () => {
+    const ipc = fakeIpc();
+    const states = { pipInstalled: true, chat: 'ready', embedding: 'ready', redactor: 'not_installed', docling: 'starting' };
+    registerFirstLaunchIpc({ ipcMain: ipc, firstLaunch: fakeFirstLaunch(), servers: async () => states });
+    await expect(ipc.call(CHANNELS.capabilities)).resolves.toMatchObject({ success: true, plan: { chatChoices: expect.any(Array) }, servers: states });
+    await expect(ipc.call(CHANNELS.servers)).resolves.toEqual({ success: true, servers: states });
+  });
+
+  test('a kept process in plain words', () => {
+    expect(plainServerState(null)).toBe('not_running');
+    expect(plainServerState({ process: 'stopped' })).toBe('not_running');
+    expect(plainServerState({ process: 'starting', healthy: false })).toBe('starting');
+    expect(plainServerState({ process: 'restarting', healthy: false })).toBe('starting');
+    expect(plainServerState({ process: 'running', healthy: true })).toBe('ready');
+    expect(plainServerState({ process: 'running', healthy: false })).toBe('starting');
+  });
+
+  test('each server on this computer, with no address or path in the answer', async () => {
+    const running = { process: 'running', healthy: true, url: 'http://127.0.0.1:8081', port: 8081, pid: 4 };
+    const states = await localServerStates({
+      pip: { getState: () => ({ installed: true, servers: { chat: running, embedding: { process: 'starting', healthy: false } } }) },
+      redactor: { getState: () => ({ installed: false, server: null }) },
+      docling: { getState: () => ({ installed: true, external: false, server: running }) }
+    });
+    expect(states).toEqual({ pipInstalled: true, chat: 'ready', embedding: 'starting', redactor: 'not_installed', docling: 'ready' });
+  });
+
+  test('a role the environment names is that server\'s: probed, never Pip\'s', async () => {
+    const probe = jest.fn(async (url) => ({ state: url.endsWith('8091') ? 'running' : 'not_running' }));
+    const states = await localServerStates({
+      pip: { getState: () => ({ installed: false, servers: { chat: null, embedding: null } }) },
+      redactor: { getState: () => ({ installed: false, server: null }) },
+      docling: { getState: () => ({ installed: true, external: true, server: null }) },
+      env: { LANA_ENGINE_CHAT_URL: 'http://127.0.0.1:8091', LANA_ENGINE_EMBEDDING_URL: 'http://127.0.0.1:8092', REDACTOR_URL: 'http://127.0.0.1:9000' },
+      probe
+    });
+    expect(states).toMatchObject({ chat: 'ready', embedding: 'not_running', redactor: 'ready', docling: 'ready' });
+    expect(probe).toHaveBeenCalledTimes(2);
+  });
 });
 
 test('status goes to every open window and skips closed ones', () => {

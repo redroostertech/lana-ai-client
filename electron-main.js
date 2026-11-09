@@ -206,7 +206,7 @@ function pushLocalServers() {
 // downloads its model files after the person presses Continue on the setup screen (phase D).
 // Every launch after that runs setup again (files in place are skipped) and starts Pip.
 const { createFirstLaunch } = require('./electron-first-launch');
-const { registerFirstLaunchIpc, broadcastFirstLaunchStatus, devHardwareReader } = require('./electron-first-launch-ipc');
+const { registerFirstLaunchIpc, broadcastFirstLaunchStatus, devHardwareReader, localServerStates } = require('./electron-first-launch-ipc');
 // Development only (NODE_ENV=development, unpackaged): LANA_DEV_HARDWARE pretends the computer
 // is another size, to see the first-launch screen's other states. Null otherwise.
 const devReadHardware = devHardwareReader({ env: process.env, isPackaged: app.isPackaged, read: require('./electron-hardware').readHardware });
@@ -236,7 +236,13 @@ const firstLaunch = createFirstLaunch({
       .catch((error) => logError('[electron-main] Pip did not start', error));
   }
 });
-registerFirstLaunchIpc({ ipcMain, firstLaunch, log: (error) => logError('[first-launch] the setup screen call failed', error) });
+registerFirstLaunchIpc({
+  ipcMain,
+  firstLaunch,
+  // Settings > Capabilities: whether each server on this computer is ready, starting or not running.
+  servers: () => localServerStates({ pip, redactor, docling, env: process.env, probe: (url) => pipEndpoint(url, fetch) }),
+  log: (error) => logError('[first-launch] the setup screen call failed', error)
+});
 
 // LANA Briefs (Briefs integration plan): runs only while discovery lists lana-notes and
 // someone is signed in. Its model work goes to the local AI engine's runtime route.
@@ -302,7 +308,7 @@ const { redactUrlForLog } = require('./electron-log-redaction');
 const { BrainchildManager, discover, validateLink, mcpBinForRoot, isAllowedVaultRoot } = require('./src/electron-brainchild-manager');
 const { ElectronScreenVoice } = require('./src/screen-voice/electron-screen-voice');
 const { isAllowedExternalUrl } = require('./src/electron-external-url');
-const { registerAiTopologyIpc } = require('./electron-ai-topology');
+const { registerAiTopologyIpc, pipEndpoint } = require('./electron-ai-topology');
 const localModelsCatalog = require('./electron-local-models');
 const {
   SCREEN_DICTION_ID,

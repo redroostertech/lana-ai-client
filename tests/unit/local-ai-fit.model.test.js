@@ -161,7 +161,7 @@ describe('the models LANA adds by itself', () => {
 
   test('a chat model that does not fit on the disk is not offered and a smaller one is the default', () => {
     const result = plan(computer(36, 'metal', { diskGb: 4 }));
-    expect(choice(result, 'qwen3.5-9b-q4')).toMatchObject({ fit: 'wont_fit', reason: expect.stringMatching(/not enough free space/) });
+    expect(choice(result, 'qwen3.5-9b-q4')).toMatchObject({ fit: 'wont_fit', reason: expect.stringMatching(/^There is not enough free space on this computer for this [\d.]+ GB model\.$/) });
     expect(result.defaultChatId).toBe('qwen3.5-4b-q4');
   });
 

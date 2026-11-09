@@ -7,6 +7,10 @@
  *                    (src/js/local-ai-fit.model.js): the chat choices, the default, and what LANA
  *                    adds by itself. The first-launch screen and Settings show this.
  *   choose(chatId)   keeps the person's chat choice (null goes back to LANA's default).
+ *   switchChat(chatId)  Settings > Capabilities: keeps the new choice, stops a download planned
+ *                    for the old one, and runs setup again for the new files. When they are in
+ *                    place onReady fires with the new plan, and Pip keeps every server whose
+ *                    settings did not change, so only the chat server restarts.
  *   findExisting()   model files already on this computer (Pip, LM Studio, ~/.llama-models)
  *                    that match the plan's files and their pins (electron-model-reuse.js).
  *   accept(opts)     the person pressed Continue: notes it and starts. Nothing is downloaded
@@ -135,6 +139,18 @@ function createFirstLaunch({ userDataDir, state, env = process.env, home = requi
     state.write({ chatId: chatId || null, completedAt: null });
   }
 
+  /**
+   * Settings > Capabilities: use another chat model from now on. The choice is saved at once, so
+   * plan() shows it straight away; a download still running for the old plan is stopped first
+   * (its bytes stay on disk), then setup runs for the new files. A computer that never pressed
+   * Continue counts as having pressed it now, so later launches pick the setup up again.
+   */
+  function switchChat(chatId) {
+    choose(chatId);
+    if (!state.read().acceptedAt) {state.write({ acceptedAt: now().toISOString() });}
+    return pause().then(() => start());
+  }
+
   /** Put the found files the plan needs in place, before anything is downloaded. */
   async function placeAgreed() {
     if (!useFound || !found.length) {return;}
@@ -259,7 +275,7 @@ function createFirstLaunch({ userDataDir, state, env = process.env, home = requi
     return ids;
   }
 
-  return { plan: async () => view(await plan()), choose, accept, findExisting, resume, start, pause, speechModels, status: () => status };
+  return { plan: async () => view(await plan()), choose, switchChat, accept, findExisting, resume, start, pause, speechModels, status: () => status };
 }
 
 module.exports = { createFirstLaunch };
