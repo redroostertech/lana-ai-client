@@ -1442,6 +1442,8 @@ ipcMain.handle('connect-to-server', async (event, server) => {
     syncScreenVoiceEntitlement();
     syncBriefs(stored);
     await localEngine.sync().catch((error) => logError('[electron-main] Local AI engine did not start', error));
+    // The app's first calls go to the engine: wait (at most 20 s) until it is listening.
+    await localEngine.untilReady();
 
     // Resize window for main app view
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -2419,6 +2421,7 @@ app.whenReady().then(async () => {
       logInfo('[electron-main] Saved server is reachable, loading main app...');
       updateLastVerified();
       await localEngine.sync().catch((error) => logError('[electron-main] Local AI engine did not start', error));
+      await localEngine.untilReady();
       createWindow(effectiveServer.url);
       syncBriefs(effectiveServer);
       return;
@@ -2428,6 +2431,7 @@ app.whenReady().then(async () => {
       // offline copy until the server is back.
       logInfo('[electron-main] Saved server is not reachable; opening with the local engine and its offline copy');
       await localEngine.sync().catch((error) => logError('[electron-main] Local AI engine did not start', error));
+      await localEngine.untilReady();
       createWindow(effectiveServer.url);
       syncBriefs(effectiveServer);
       return;

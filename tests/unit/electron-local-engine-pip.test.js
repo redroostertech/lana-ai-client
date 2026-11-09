@@ -43,8 +43,8 @@ function storage() {
   };
 }
 
-function makeHost(env, app = { getPath: () => tmp, isPackaged: false }, resourcesPath = null) {
-  host = createLocalEngineHost({ ipcMain: { handle() {}, on() {} }, app, storage: storage(), getWindows: () => [], env, log: { info() {}, warn() {}, error() {} }, resourcesPath });
+function makeHost(env, app = { getPath: () => tmp, isPackaged: false }, resourcesPath = null, restartDelayMs = 0) {
+  host = createLocalEngineHost({ ipcMain: { handle() {}, on() {} }, app, storage: storage(), getWindows: () => [], env, log: { info() {}, warn() {}, error() {} }, resourcesPath, restartDelayMs });
   return host;
 }
 
@@ -179,4 +179,45 @@ describe('the engine inside the installed app', () => {
     expect(resolveEngineConfig({}, {}, { bundledRoot: '/app/engine' })).toMatchObject({ root: '/app/engine', mode: 'spawn', configured: true });
     expect(resolveEngineConfig({}, { enabled: false }, { bundledRoot: '/app/engine' })).toMatchObject({ mode: 'off', reason: 'disabled' });
   });
+});
+
+describe('the main window waits for the engine', () => {
+  test('ready as soon as the engine answers its health check', async () => {
+    makeHost({ LANA_ENGINE_ROOT: root });
+    await host.sync();
+    let ms = 0;
+    const ready = await host.untilReady({ timeoutMs: 20000, pollMs: 100, now: () => ms, sleep: async (t) => { ms += t; await new Promise((r) => setTimeout(r, 5)); } });
+    expect(ready).toBe(true);
+    expect(ms).toBeLessThan(20000);
+  });
+
+  test('gives up after the time limit when the engine never answers, so the window still opens', async () => {
+    global.fetch = jest.fn(async () => { throw new Error('connect ECONNREFUSED'); });
+    makeHost({ LANA_ENGINE_ROOT: root });
+    await host.sync();
+    let ms = 0;
+    const ready = await host.untilReady({ timeoutMs: 1000, pollMs: 250, now: () => ms, sleep: async (t) => { ms += t; } });
+    expect(ready).toBe(false);
+    expect(ms).toBeGreaterThanOrEqual(1000);
+  });
+
+  test('no engine: no wait at all', async () => {
+    makeHost({});
+    await host.sync();
+    let slept = 0;
+    expect(await host.untilReady({ sleep: async () => { slept += 1; } })).toBe(false);
+    expect(slept).toBe(0);
+  });
+});
+
+test('address changes that arrive close together share one engine restart, with the newest addresses', async () => {
+  makeHost({ LANA_ENGINE_ROOT: root }, undefined, null, 200);
+  await host.sync();
+  expect(spawned).toHaveLength(1);
+  const first = host.setModelEndpoints({ LANA_ENGINE_EMBEDDING_URL: 'http://127.0.0.1:8082' });
+  const second = host.setModelEndpoints({ LANA_ENGINE_EMBEDDING_URL: 'http://127.0.0.1:8082', REDACTOR_URL: 'http://127.0.0.1:5', INTERNAL_SERVICE_SECRET: 's'.repeat(64) });
+  const third = host.setModelEndpoints({ LANA_ENGINE_EMBEDDING_URL: 'http://127.0.0.1:8082', REDACTOR_URL: 'http://127.0.0.1:5', INTERNAL_SERVICE_SECRET: 's'.repeat(64), LANA_ENGINE_CHAT_URL: 'http://127.0.0.1:8081' });
+  await Promise.all([first, second, third]);
+  expect(spawned).toHaveLength(2);
+  expect(spawned[1].env).toMatchObject({ LANA_ENGINE_EMBEDDING_URL: 'http://127.0.0.1:8082', REDACTOR_URL: 'http://127.0.0.1:5', LANA_ENGINE_CHAT_URL: 'http://127.0.0.1:8081' });
 });
