@@ -201,10 +201,63 @@ test('Docling is set aside when it is on this computer (1 GiB), so a 12 GB compu
   const input = (doclingBytes) => ({
     hardware: { totalMemoryBytes: 12 * 1024 ** 3, accelerator: { backend: 'metal' }, freeDiskBytes: 1024 ** 4, cores: 12 },
     catalog: parseCatalog(BUILT_IN), embedding: embeddingModel(), speech: speechSizes(),
-    docling: { memoryBytes: doclingBytes }, installed: []
+    docling: { memoryBytes: doclingBytes, provided: true }, installed: []
   });
   expect(fit.planLocalAi(input(0)).plan.chat.id).toBe('qwen3.5-4b-q4');
   expect(fit.planLocalAi(input(require('../../electron-docling').DOCLING_MEMORY_BYTES)).plan.chat.id).toBe('qwen3.5-0.8b-q4');
+});
+
+describe('Docling', () => {
+  const DOCLING_MEMORY = require('../../electron-docling').DOCLING_MEMORY_BYTES;
+  const sizes = require('../../electron-docling-install').sizes('macos-arm64');
+  const docling = (more = {}) => ({ docling: { memoryBytes: DOCLING_MEMORY, provided: false, ...sizes, ...more } });
+
+  test('installed after embedding, chat and vision and before speech, taking its unpacked size on the disk', () => {
+    const result = plan(computer(36), docling());
+    expect(result.plan.docling).toEqual({ install: true, reason: null });
+    expect(result.download.files.map((f) => f.kind)).toEqual(['embedding', 'chat', 'vision', 'docling', 'speech', 'voice']);
+    expect(result.download.files[3]).toEqual({ id: 'docling', kind: 'docling', bytes: sizes.diskBytes, downloadBytes: sizes.downloadBytes });
+  });
+
+  test('the disk: vision comes before it, and it comes before speech', () => {
+    const base = embedding.sizeBytes + catalog.chat[1].sizeBytes + catalog.vision.find((v) => v.pairsWith === catalog.chat[1].id).sizeBytes;
+    const reserve = 512 * 1024 ** 2;
+    // Room for embedding, chat and vision, and a little less than Docling.
+    const short = plan(computer(36, 'metal', { diskGb: (base + reserve + sizes.diskBytes - 1) / GB }), docling());
+    expect(short.plan.vision.id).toBe('mmproj-qwen3.5-9b');
+    expect(short.plan.docling).toMatchObject({ install: false, reason: expect.stringMatching(/not enough free space/) });
+    // Room for Docling and not for speech after it.
+    const exact = plan(computer(36, 'metal', { diskGb: (base + reserve + sizes.diskBytes + 1) / GB }), docling());
+    expect(exact.plan.docling.install).toBe(true);
+    expect(exact.plan.speech).toMatchObject({ install: false, reason: expect.stringMatching(/free space/) });
+  });
+
+  test('memory: set aside only when it fits beside embedding with room to spare', () => {
+    expect(plan(computer(2, 'cpu'), docling()).plan.docling).toMatchObject({ install: false, reason: expect.stringMatching(/memory/) });
+    const big = plan(computer(36), docling());
+    const none = plan(computer(36));
+    expect(big.plan.docling.install).toBe(true);
+    expect(none.plan.docling).toEqual({ install: false, reason: null });
+  });
+
+  test('nothing published for this kind of computer: no memory set aside, nothing downloaded', () => {
+    const input = (d) => fit.planLocalAi({ hardware: computer(12), catalog, embedding, speech, ...d });
+    const result = input(docling({ diskBytes: null, downloadBytes: null }));
+    expect(result.plan.docling).toMatchObject({ install: false, reason: expect.stringMatching(/not ready for this kind of computer/) });
+    expect(result.download.files.some((f) => f.kind === 'docling')).toBe(false);
+    // The same 12 GB computer keeps the 4B: no Docling memory was set aside.
+    expect(result.plan.chat.id).toBe(input({}).plan.chat.id);
+    expect(input(docling()).plan.chat.id).not.toBe(result.plan.chat.id);
+  });
+
+  test('already installed, or a developer\'s Docling: no disk needed', () => {
+    const installed = plan(computer(36, 'metal', { diskGb: 1 }), { ...docling(), installed: [embedding.id, 'qwen3.5-9b-q4', 'mmproj-qwen3.5-9b', 'docling', 'speech', 'voice'] });
+    expect(installed.plan.docling.install).toBe(true);
+    expect(installed.download.neededBytes).toBe(0);
+    const provided = plan(computer(36, 'metal', { diskGb: 1 }), { ...docling({ provided: true, diskBytes: null }), installed: [embedding.id, 'qwen3.5-9b-q4', 'mmproj-qwen3.5-9b', 'speech', 'voice'] });
+    expect(provided.plan.docling.install).toBe(true);
+    expect(provided.download.neededBytes).toBe(0);
+  });
 });
 
 test('the redactor is always set aside when it is on this computer, so a 12 GB computer drops from the 4B', () => {

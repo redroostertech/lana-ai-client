@@ -162,11 +162,21 @@ const redactor = createRedactor({
 });
 
 // Docling on this computer, if there is one (electron-docling.js): the organization's server
-// offers uploaded files to it first, and reads them itself when it is not running.
+// offers uploaded files to it first, and reads them itself when it is not running. Worked out
+// again on every start, so the runtime first-launch setup installs (electron-docling-install.js)
+// starts as soon as it is in place.
 const { createDocling, resolveDoclingCommand, doclingEndpoints, DOCLING_MEMORY_BYTES } = require('./electron-docling');
-const doclingCommand = resolveDoclingCommand({ env: process.env, userDataDir: app.getPath('userData'), home: app.getPath('home'), fileExists: (file) => fs.existsSync(file) });
+const doclingInstall = require('./electron-docling-install');
+const resolveDocling = () => resolveDoclingCommand({
+  env: process.env,
+  userDataDir: app.getPath('userData'),
+  home: app.getPath('home'),
+  fileExists: (file) => fs.existsSync(file),
+  installedRuntime: () => doclingInstall.installedEntry(app.getPath('userData'), doclingInstall.platformKey())
+});
+const doclingAtLaunch = resolveDocling();
 const docling = createDocling({
-  command: doclingCommand,
+  command: resolveDocling,
   spawn: require('child_process').spawn,
   fetch: (url, { timeoutMs = 3000, ...init } = {}) => fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) }),
   pickPort: pickLoopbackPort,
@@ -204,7 +214,17 @@ const firstLaunch = createFirstLaunch({
   userDataDir: app.getPath('userData'),
   state: firstLaunchPersistence,
   redactorMemoryBytes: redactorCommand ? REDACTOR_MEMORY_BYTES : 0,
-  doclingMemoryBytes: doclingCommand && !doclingCommand.external ? DOCLING_MEMORY_BYTES : 0,
+  // A developer's running docling-serve is not on this computer's memory budget; any other is.
+  doclingMemoryBytes: doclingAtLaunch && doclingAtLaunch.external ? 0 : DOCLING_MEMORY_BYTES,
+  // A developer's Docling (LANA_DOCLING_URL, LANA_DOCLING_BIN, a venv) means nothing to download.
+  doclingProvided: () => {
+    const found = resolveDocling();
+    return Boolean(found && found.source !== 'runtime');
+  },
+  onDoclingReady: () => {
+    logInfo('[first-launch] Docling is in place; starting it');
+    void docling.start().catch((error) => logError('[electron-main] Docling did not start', error));
+  },
   io: devReadHardware ? { readHardware: devReadHardware } : {},
   onStatus: (status) => {
     if (status.phase === 'failed') {logWarn(`[first-launch] setup stopped: ${status.error && status.error.code}`);}

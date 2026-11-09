@@ -13,12 +13,13 @@ const GB = 1024 ** 3;
 const MB = 1024 ** 2;
 const catalog = parseCatalog(BUILT_IN);
 
-function planView(memoryGb, { backend = 'metal', diskGb = 200, chosenChatId = null, acceptedAt = null } = {}) {
+function planView(memoryGb, { backend = 'metal', diskGb = 200, chosenChatId = null, acceptedAt = null, docling = undefined } = {}) {
   const result = fit.planLocalAi({
     hardware: { totalMemoryBytes: memoryGb * GB, accelerator: { backend }, freeDiskBytes: diskGb * GB, chip: 'Test chip' },
     catalog,
     embedding: embeddingModel(),
     speech: speechSizes(),
+    docling,
     chosenChatId
   });
   return { ...result, status: { phase: 'idle', current: null, receivedBytes: 0, totalBytes: 0, error: null }, chosenChatId, acceptedAt, completedAt: null };
@@ -81,6 +82,26 @@ describe('the choice screen', () => {
     expect(view.extras.map((e) => e.id)).toEqual(['search', 'images', 'speech', 'voice']);
     expect(view.extras.every((e) => e.included)).toBe(true);
     expect(view.extras.find((e) => e.id === 'speech').text).toMatch(/after you sign in/);
+  });
+
+  test('document reading: one line in plain words with its download size, after image reading', () => {
+    const sizes = require('../../electron-docling-install').sizes('macos-arm64');
+    const memoryBytes = require('../../electron-docling').DOCLING_MEMORY_BYTES;
+    const view = fl.buildChoiceView(planView(24, { docling: { memoryBytes, provided: false, ...sizes } }));
+    expect(view.extras.map((e) => e.id)).toEqual(['search', 'images', 'documents', 'speech', 'voice']);
+    expect(view.extras.find((e) => e.id === 'documents')).toEqual({
+      id: 'documents', title: 'Document reading', included: true,
+      text: `Reads your documents on this computer. ${fl.formatBytes(sizes.downloadBytes)} download.`
+    });
+    // Already here: no size.
+    const here = fl.buildChoiceView(planView(24, { docling: { memoryBytes, provided: true } }));
+    expect(here.extras.find((e) => e.id === 'documents').text).toBe('Reads your documents on this computer.');
+    // Not for this computer: the plan's plain reason, not included.
+    const none = fl.buildChoiceView(planView(24, { docling: { memoryBytes, provided: false, diskBytes: null } }));
+    expect(none.extras.find((e) => e.id === 'documents')).toMatchObject({ included: false, text: expect.stringMatching(/not ready for this kind of computer/) });
+    expect(JSON.stringify([view, here, none])).not.toMatch(/[\u2013\u2014]/);
+    // While it downloads, the progress line names it plainly.
+    expect(fl.buildProgressView({ phase: 'downloading', current: { kind: 'docling', name: 'Docling' }, receivedBytes: 1, totalBytes: 2 }).current).toBe('Now getting the document reader, Docling.');
   });
 
   test('the cloud state: chat uses the cloud, nothing to choose, Continue still offered', () => {

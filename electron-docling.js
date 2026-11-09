@@ -17,13 +17,15 @@
  * Where it is, in this order:
  *   LANA_DOCLING_URL     a docling-serve already running (developers): used as is, nothing started
  *   LANA_DOCLING_BIN     a docling-serve program (developers)
- *   <userData>/docling/docling-serve/docling-serve(.exe)
- *                        the runtime first-launch setup downloads (not published yet; see the
- *                        backend plan local-document-parsing.md, "Docling runtime")
+ *   <userData>/docling/runtime-<version>/
+ *                        the runtime first-launch setup downloads and unpacks, started as
+ *                        python -I -m docling_serve (electron-docling-install.js). Used only when
+ *                        it and every model are in place and match the pin.
  *   LANA_DOCLING_VENV    a Python environment with docling-serve installed (development; also
  *                        ~/.venv/docling when the variable is unset and that folder holds it)
  * Models: <userData>/docling/models when present (DOCLING_SERVE_ARTIFACTS_PATH), else docling's
- * own download on first use (developers only).
+ * own download on first use (developers only). The downloaded runtime never reaches the network
+ * for models: it runs with HF_HUB_OFFLINE and its byte code is never rewritten.
  * None: Docling is not started, and Chef reads every file itself.
  */
 
@@ -60,28 +62,36 @@ function programName(platform) {
 
 /**
  * How to start Docling on this computer, an external address, or null when there is none.
- * @returns {{ external: string }|{ command: string, args: Function, cwd: string, env: Object }|null}
+ * `source` says which: 'external', 'bin', 'runtime' (the downloaded one) or 'venv'.
+ * @param {Function} [installedRuntime] - () => electron-docling-install.js installedEntry() result or null
+ * @returns {{ external: string, source: string }|{ command: string, args: Function, cwd: string, env: Object, source: string }|null}
  */
-function resolveDoclingCommand({ env = {}, userDataDir = null, platform = process.platform, home, fileExists }) {
+function resolveDoclingCommand({ env = {}, userDataDir = null, platform = process.platform, home, fileExists, installedRuntime = () => null }) {
   if (typeof env.LANA_DOCLING_URL === 'string' && env.LANA_DOCLING_URL.trim()) {
-    return { external: env.LANA_DOCLING_URL.trim().replace(/\/+$/, '') };
+    return { external: env.LANA_DOCLING_URL.trim().replace(/\/+$/, ''), source: 'external' };
   }
   const listen = (port) => ['run', '--host', HOST, '--port', String(port)];
   const models = userDataDir ? path.join(userDataDir, 'docling', 'models') : null;
   const modelEnv = models && fileExists(models) ? { DOCLING_SERVE_ARTIFACTS_PATH: models } : {};
   if (typeof env.LANA_DOCLING_BIN === 'string' && env.LANA_DOCLING_BIN.trim()) {
     const file = path.resolve(env.LANA_DOCLING_BIN.trim());
-    return fileExists(file) ? { command: file, args: listen, cwd: path.dirname(file), env: modelEnv } : null;
+    return fileExists(file) ? { command: file, args: listen, cwd: path.dirname(file), env: modelEnv, source: 'bin' } : null;
   }
-  if (userDataDir) {
-    const root = path.join(userDataDir, 'docling', 'docling-serve');
-    const file = path.join(root, programName(platform));
-    if (fileExists(file)) {return { command: file, args: listen, cwd: root, env: modelEnv };}
+  const runtime = installedRuntime();
+  if (runtime && fileExists(runtime.program)) {
+    // The entry already ends in "run": add only where to listen.
+    return {
+      command: runtime.program,
+      args: (port) => [...runtime.args, ...listen(port).slice(1)],
+      cwd: runtime.dir,
+      env: { DOCLING_SERVE_ARTIFACTS_PATH: runtime.models, HF_HUB_OFFLINE: '1', PYTHONDONTWRITEBYTECODE: '1' },
+      source: 'runtime'
+    };
   }
   const venv = env.LANA_DOCLING_VENV ? path.resolve(env.LANA_DOCLING_VENV) : (home ? path.join(home, '.venv', 'docling') : null);
   if (!venv) {return null;}
   const file = platform === 'win32' ? path.join(venv, 'Scripts', programName(platform)) : path.join(venv, 'bin', programName(platform));
-  return fileExists(file) ? { command: file, args: listen, cwd: venv, env: modelEnv } : null;
+  return fileExists(file) ? { command: file, args: listen, cwd: venv, env: modelEnv, source: 'venv' } : null;
 }
 
 /** docling-serve's environment: OS basics and its model folder. Nothing else of the client's. */
@@ -103,7 +113,7 @@ async function checkDocling(fetch, url, { timeoutMs }) {
 
 /**
  * @param {Object} deps
- * @param {Object|null} deps.command - resolveDoclingCommand()
+ * @param {Object|Function|null} deps.command - resolveDoclingCommand(), or a function returning it
  * @param {Function} deps.spawn
  * @param {Function} deps.fetch - (url, { timeoutMs, ... }) => Response
  * @param {Function} deps.pickPort - async (preferred) => a free loopback port
@@ -112,7 +122,7 @@ async function checkDocling(fetch, url, { timeoutMs }) {
  */
 function createDocling(deps) {
   const {
-    command, spawn, fetch, pickPort,
+    spawn, fetch, pickPort,
     baseEnv = {},
     onAddress = () => {},
     openLog = () => null,
@@ -122,6 +132,9 @@ function createDocling(deps) {
     options = {}
   } = deps;
   const opts = { ...DOCLING_DEFAULTS, ...options };
+  // A function is asked again on every start(), so a Docling first-launch setup installed while
+  // the app runs is found without a restart.
+  const currentCommand = () => (typeof deps.command === 'function' ? deps.command() : deps.command || null);
   let keeper = null;
   let announced = null;
 
@@ -133,6 +146,7 @@ function createDocling(deps) {
 
   async function start() {
     if (keeper) {return getState();}
+    const command = currentCommand();
     if (!command) {
       log.info('[docling] no Docling on this computer; the organization\'s server reads uploaded files itself');
       return getState();
@@ -163,6 +177,7 @@ function createDocling(deps) {
   }
 
   function getState() {
+    const command = currentCommand();
     return { installed: Boolean(command), external: Boolean(command && command.external), server: keeper ? keeper.getState() : null };
   }
 

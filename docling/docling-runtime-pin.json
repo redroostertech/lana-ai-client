@@ -1,0 +1,156 @@
+{
+  "comment": "The Docling runtime for the desktop client: a relocatable CPython (python-build-standalone) plus the locked docling-serve packages, one archive per platform, built by scripts/build-docling-runtime.sh on a matching computer. The client downloads the archive and the models below from models.lanaai.io (electron-docling-install.js). Change runtimeVersion whenever an archive changes.",
+  "runtimeVersion": "1.15.1-1",
+  "python": {
+    "version": "3.11.17",
+    "release": "20261021",
+    "builds": {
+      "macos-arm64": {
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261021/cpython-3.11.17%2B20261021-aarch64-apple-darwin-install_only_stripped.tar.gz",
+        "sha256": "1d1335d9d526bc37061af3fe72b0edd88056d7e7d9488eb631946b10b4ab97bb"
+      },
+      "macos-x64": {
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261021/cpython-3.11.17%2B20261021-x86_64-apple-darwin-install_only_stripped.tar.gz",
+        "sha256": "2a9df73aa8f6ff595f912dfb642c7933f604f5c6e24234fd524cb77b2629b9fc"
+      },
+      "windows-x64": {
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261021/cpython-3.11.17%2B20261021-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+        "sha256": "7222d3245519b9f2e786b085af65a3fac06dffa1ddfbe27821ad9b75f2d98c62"
+      },
+      "linux-x64": {
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261021/cpython-3.11.17%2B20261021-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+        "sha256": "224ca8be2d28841e7a382a27c51e74f4ed0aabe249a79294684e782363165948"
+      }
+    }
+  },
+  "packages": {
+    "requirements": "docling/requirements.in",
+    "locks": {
+      "macos-arm64": "docling/locks/macos-arm64.txt"
+    },
+    "sourceBuilds": [
+      "kfp-server-api"
+    ]
+  },
+  "archives": {
+    "macos-arm64": {
+      "url": "https://models.lanaai.io/docling/runtime/1.15.1-1/macos-arm64.tar.gz",
+      "sizeBytes": 603726142,
+      "sha256": "c671cca8979dd2484c09e474369d4bbf272c61d1c9da54ac1c974312d6771e2c",
+      "unpackedBytes": 1961490430,
+      "files": 43506,
+      "minimumOs": "macOS 14"
+    }
+  },
+  "models": {
+    "comment": "The models docling-serve loads for the requests LANA sends (layout, TableFormer accurate and fast, RapidOCR), the same files and sha256s as LANA-AI scripts/download-docling-models.sh. The enrichment-only models there (DocumentFigureClassifier, CodeFormulaV2) are left out: LANA never asks for picture classification or code and formula enrichment (backend src/shared/services/docling.service.js).",
+    "baseUrl": "https://models.lanaai.io/docling",
+    "files": [
+      {
+        "path": "docling-project--docling-layout-heron/config.json",
+        "sizeBytes": 3268,
+        "sha256": "fdea30805ce2f5666b147fca941dcdd27ad468e27d6ed21902207d3da056a97d"
+      },
+      {
+        "path": "docling-project--docling-layout-heron/model.safetensors",
+        "sizeBytes": 171658996,
+        "sha256": "00333a43451945aaf89db8ca9c0a17e75d1537c17db60fdb91aa95f4c7929e0c"
+      },
+      {
+        "path": "docling-project--docling-layout-heron/preprocessor_config.json",
+        "sizeBytes": 444,
+        "sha256": "cd38cd59999e7a95d68e487fbe5132df3d4e5c32a0836add57e6126ba0c4eaf1"
+      },
+      {
+        "path": "docling-project--docling-models/config.json",
+        "sizeBytes": 41,
+        "sha256": "9c34024dc28ff47b75818f415e769809798c29bf9bde6f2ccc63a4acb62396d9"
+      },
+      {
+        "path": "docling-project--docling-models/model_artifacts/tableformer/accurate/tableformer_accurate.safetensors",
+        "sizeBytes": 212758388,
+        "sha256": "2a7d6c924b3cd12fb99a09280ca9c33a89c5d60b93253617d2e088c1a40374d9"
+      },
+      {
+        "path": "docling-project--docling-models/model_artifacts/tableformer/accurate/tm_config.json",
+        "sizeBytes": 7060,
+        "sha256": "984e122ceb8ccf84d84c9d2882f6f2302a44b4f1e577babd6289892c36f3cffd"
+      },
+      {
+        "path": "docling-project--docling-models/model_artifacts/tableformer/fast/tableformer_fast.safetensors",
+        "sizeBytes": 145453276,
+        "sha256": "3119563aab5a7c96fda4d621119b63fd8806272b86c30936d15507616422f718"
+      },
+      {
+        "path": "docling-project--docling-models/model_artifacts/tableformer/fast/tm_config.json",
+        "sizeBytes": 7060,
+        "sha256": "dca6762508dddfae6d57d6cb4ef822c6000119dff0f3b6489db7413118c2622a"
+      },
+      {
+        "path": "RapidOcr/onnx/PP-OCRv4/det/ch_PP-OCRv4_det_mobile.onnx",
+        "sizeBytes": 4745517,
+        "sha256": "d2a7720d45a54257208b1e13e36a8479894cb74155a5efe29462512d42f49da9"
+      },
+      {
+        "path": "RapidOcr/onnx/PP-OCRv4/cls/ch_ppocr_mobile_v2.0_cls_mobile.onnx",
+        "sizeBytes": 585532,
+        "sha256": "e47acedf663230f8863ff1ab0e64dd2d82b838fceb5957146dab185a89d6215c"
+      },
+      {
+        "path": "RapidOcr/onnx/PP-OCRv4/rec/ch_PP-OCRv4_rec_mobile.onnx",
+        "sizeBytes": 10857958,
+        "sha256": "48fc40f24f6d2a207a2b1091d3437eb3cc3eb6b676dc3ef9c37384005483683b"
+      },
+      {
+        "path": "RapidOcr/paddle/PP-OCRv4/rec/ch_PP-OCRv4_rec_mobile/ppocr_keys_v1.txt",
+        "sizeBytes": 26249,
+        "sha256": "28b2362ad4ab2dc38769aa72feb535e3a9ddb3fd2a7585a05920e6393b1dc7f7"
+      },
+      {
+        "path": "RapidOcr/resources/fonts/FZYTK.TTF",
+        "sizeBytes": 3241748,
+        "sha256": "4065a23df6823c8e2b69a0e76d02f02a6470b8774a5e91086609701ad95cc33f"
+      },
+      {
+        "path": "RapidOcr/torch/PP-OCRv4/det/ch_PP-OCRv4_det_mobile.pth",
+        "sizeBytes": 14506268,
+        "sha256": "89622c3f3e76b3ac7d10d9434c1f117a7471dba44723885cc04b49932a740d5b"
+      },
+      {
+        "path": "RapidOcr/torch/PP-OCRv4/cls/ch_ptocr_mobile_v2.0_cls_mobile.pth",
+        "sizeBytes": 588638,
+        "sha256": "bfe13860824b3365c0c7f7ccfcddc8ff11645c60051739ff18bc9913f60c98e1"
+      },
+      {
+        "path": "RapidOcr/torch/PP-OCRv4/rec/ch_PP-OCRv4_rec_mobile.pth",
+        "sizeBytes": 26919769,
+        "sha256": "cb4265bb4300a2487e93e82ccfa1924bf9cd1194c1a202ab17a96b4911c27e0b"
+      },
+      {
+        "path": "RapidOcr/onnx/PP-OCRv4/det/en_PP-OCRv3_det_mobile.onnx",
+        "sizeBytes": 2421707,
+        "sha256": "ea07c15d38ac40cd69da3c493444ec75b44ff23840553ff8ba102c1219ed39c2"
+      },
+      {
+        "path": "RapidOcr/onnx/PP-OCRv4/rec/en_PP-OCRv4_rec_mobile.onnx",
+        "sizeBytes": 7653044,
+        "sha256": "e8770c967605983d1570cdf5352041dfb68fa0c21664f49f47b155abd3e0e318"
+      },
+      {
+        "path": "RapidOcr/paddle/PP-OCRv4/rec/en_PP-OCRv4_rec_mobile/en_dict.txt",
+        "sizeBytes": 190,
+        "sha256": "5662df9d2d03f0e8ca0d3b0649d6acbab904b6a14b3d3521463c71c37c668ce3"
+      },
+      {
+        "path": "RapidOcr/torch/PP-OCRv4/det/en_PP-OCRv3_det_mobile.pth",
+        "sizeBytes": 2540826,
+        "sha256": "62aba369c8245f131bb08348a7d9c3135234d5c139ec92b34c8ac7b9ba7c2846"
+      },
+      {
+        "path": "RapidOcr/torch/PP-OCRv4/rec/en_PP-OCRv4_rec_mobile.pth",
+        "sizeBytes": 23761948,
+        "sha256": "f9723c94847de59df9b059faaed041fbb35f014ea973da40290b1e97004e1d4e"
+      }
+    ]
+  }
+}

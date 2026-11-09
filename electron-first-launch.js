@@ -14,7 +14,8 @@
  *   resume()         at launch: runs start() whenever setup was accepted. Files in place are
  *                    skipped, so a finished setup goes straight to onReady and Pip starts.
  *   start()          downloads this computer's model files in order (embedding, chat, image
- *                    reading), one at a time, in the background. Progress goes to onStatus.
+ *                    reading, then Docling: its runtime and models, electron-docling-install.js),
+ *                    one at a time, in the background. Progress goes to onStatus.
  *   pause()          stops after the bytes already received are on disk.
  *   speechModels()   the Briefs speech models to fetch once a person signs in: Briefs keeps them
  *                    in each person's own folder, so they cannot be fetched before sign-in.
@@ -35,8 +36,9 @@ const { readHardware } = require('./electron-hardware');
 const { loadModelCatalog } = require('./electron-model-catalog');
 const localModels = require('./electron-local-models');
 const modelReuse = require('./electron-model-reuse');
+const doclingInstall = require('./electron-docling-install');
 
-const LOCAL_KINDS = new Set(['embedding', 'chat', 'vision']);
+const LOCAL_KINDS = new Set(['embedding', 'chat', 'vision', 'docling']);
 
 /**
  * @param {Object} deps
@@ -45,17 +47,22 @@ const LOCAL_KINDS = new Set(['embedding', 'chat', 'vision']);
  * @param {Object} [deps.env]
  * @param {number} [deps.redactorMemoryBytes] - set aside when the redactor runs on this computer
  * @param {number} [deps.doclingMemoryBytes] - set aside when Docling runs on this computer
+ * @param {() => boolean} [deps.doclingProvided] - a Docling other than the one setup installs is
+ *                                              here (a developer's): nothing to download
+ * @param {(plan: Object) => void} [deps.onDoclingReady] - Docling was just installed
  * @param {(status: Object) => void} [deps.onStatus]
  * @param {(plan: Object) => void} [deps.onReady] - every local file is in place
  * @param {string} [deps.home] - the person's home folder, where other apps keep model files
- * @param {Object} [deps.io] - { readHardware, loadModelCatalog, localModels, reuse, now } for tests
+ * @param {Object} [deps.io] - { readHardware, loadModelCatalog, localModels, reuse, docling, platformKey, now } for tests
  */
-function createFirstLaunch({ userDataDir, state, env = process.env, home = require('os').homedir(), redactorMemoryBytes = 0, doclingMemoryBytes = 0, onStatus = () => {}, onReady = () => {}, io = {} }) {
+function createFirstLaunch({ userDataDir, state, env = process.env, home = require('os').homedir(), redactorMemoryBytes = 0, doclingMemoryBytes = 0, doclingProvided = () => false, onStatus = () => {}, onReady = () => {}, onDoclingReady = () => {}, io = {} }) {
   const read = io.readHardware || readHardware;
   const loadCatalog = io.loadModelCatalog || loadModelCatalog;
   const models = io.localModels || localModels;
   const now = io.now || (() => new Date());
   const reuse = io.reuse || modelReuse;
+  const dl = io.docling || doclingInstall;
+  const doclingKey = io.platformKey !== undefined ? io.platformKey : dl.platformKey();
   const modelsDir = models.modelsDir(env, userDataDir);
   const cacheFile = path.join(userDataDir, 'model-catalog.json');
 
@@ -94,14 +101,23 @@ function createFirstLaunch({ userDataDir, state, env = process.env, home = requi
       loadCatalog({ cacheFile })
     ]);
     const byId = entries(catalog);
+    const installed = await installedIds(byId);
+    const provided = Boolean(doclingProvided());
+    if (!provided && dl.isInstalled(userDataDir, doclingKey)) {installed.push('docling');}
+    const doclingSizes = dl.sizes(doclingKey);
     const result = fit.planLocalAi({
       hardware,
       catalog,
       embedding: models.embeddingModel(),
       speech: models.speechSizes(),
       redactor: { memoryBytes: redactorMemoryBytes },
-      docling: { memoryBytes: doclingMemoryBytes },
-      installed: await installedIds(byId),
+      docling: {
+        memoryBytes: doclingMemoryBytes,
+        provided,
+        diskBytes: doclingSizes ? doclingSizes.diskBytes : null,
+        downloadBytes: doclingSizes ? doclingSizes.downloadBytes : null
+      },
+      installed,
       chosenChatId: state.read().chatId
     });
     return { ...result, catalogSource: catalog.source, entries: byId, hardware };
@@ -138,14 +154,30 @@ function createFirstLaunch({ userDataDir, state, env = process.env, home = requi
     await placeAgreed();
     const result = await plan();
     const local = result.download.files.filter((file) => LOCAL_KINDS.has(file.kind));
-    const totalBytes = local.reduce((sum, file) => sum + file.bytes, 0);
+    // Docling needs more disk than it downloads (its archive unpacks); progress counts downloads.
+    const fetched = (file) => file.downloadBytes || file.bytes;
+    const totalBytes = local.reduce((sum, file) => sum + fetched(file), 0);
     let doneBytes = 0;
     publish({ phase: local.length ? 'downloading' : 'checking', current: null, receivedBytes: 0, totalBytes, error: null });
     for (const file of local) {
+      const startAt = doneBytes;
+      if (file.kind === 'docling') {
+        publish({ current: { id: file.id, kind: file.kind, name: 'Docling' } });
+        await dl.install({
+          userDataDir,
+          key: doclingKey,
+          signal: controller.signal,
+          freeBytes: () => read({ modelsDir }).freeDiskBytes,
+          onProgress: ({ received }) => publish({ receivedBytes: startAt + Math.min(received, fetched(file)) })
+        });
+        doneBytes += fetched(file);
+        publish({ receivedBytes: doneBytes });
+        try { onDoclingReady(result); } catch (_error) { /* listener errors are not ours */ }
+        continue;
+      }
       const entry = result.entries.get(file.id);
       // Free space now, not at plan time: another file may have just used it.
       const freeBytes = read({ modelsDir }).freeDiskBytes;
-      const startAt = doneBytes;
       publish({ current: { id: entry.id, kind: file.kind, name: entry.name } });
       await models.downloadModel(entry, modelsDir, {
         signal: controller.signal,

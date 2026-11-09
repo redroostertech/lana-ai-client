@@ -16,8 +16,12 @@ function memoryState(initial = {}) {
   return { read: () => ({ ...value }), write: (changes) => { value = { ...value, ...changes }; return { ...value }; } };
 }
 
-function setup({ memoryGb = 24, diskGb = 200, installed = [], failOn = null, state = memoryState(), reuse = undefined } = {}) {
+// Docling's sizes are the pinned archive's and models' (electron-docling-install.js).
+const DOCLING_SIZES = require('../../electron-docling-install').sizes('macos-arm64');
+
+function setup({ memoryGb = 24, diskGb = 200, installed = [], failOn = null, state = memoryState(), reuse = undefined, doclingKey = null, doclingProvided = false, doclingMemoryBytes = 0 } = {}) {
   const have = new Set(installed);
+  const doclingReady = jest.fn();
   const downloads = [];
   const statuses = [];
   const ready = jest.fn();
@@ -35,9 +39,26 @@ function setup({ memoryGb = 24, diskGb = 200, installed = [], failOn = null, sta
       have.add(entry.id);
     })
   };
+  const docling = {
+    platformKey: () => doclingKey,
+    sizes: (key) => (key === 'macos-arm64' ? DOCLING_SIZES : null),
+    isInstalled: jest.fn(() => have.has('docling')),
+    install: jest.fn(async ({ userDataDir, key, signal, onProgress }) => {
+      downloads.push('docling');
+      if (failOn && failOn.id === 'docling') {throw failOn.error;}
+      if (signal.aborted) {throw new DownloadError('cancelled', 'paused');}
+      expect({ userDataDir, key }).toEqual({ userDataDir: '/user', key: 'macos-arm64' });
+      onProgress({ received: DOCLING_SIZES.downloadBytes / 2, total: DOCLING_SIZES.downloadBytes, step: 'runtime' });
+      onProgress({ received: DOCLING_SIZES.downloadBytes, total: DOCLING_SIZES.downloadBytes, step: 'models' });
+      have.add('docling');
+    })
+  };
   const firstLaunch = createFirstLaunch({
     userDataDir: '/user',
     state,
+    doclingMemoryBytes,
+    doclingProvided: () => doclingProvided,
+    onDoclingReady: doclingReady,
     onStatus: (s) => statuses.push(s),
     onReady: ready,
     io: {
@@ -45,10 +66,12 @@ function setup({ memoryGb = 24, diskGb = 200, installed = [], failOn = null, sta
       loadModelCatalog: async () => ({ ...parseCatalog(BUILT_IN), source: 'built_in' }),
       localModels,
       reuse: typeof reuse === 'function' ? reuse(have) : reuse,
+      docling,
+      platformKey: doclingKey,
       now: () => new Date('2026-11-09T12:00:00Z')
     }
   });
-  return { firstLaunch, downloads, statuses, ready, state, localModels, have };
+  return { firstLaunch, downloads, statuses, ready, state, localModels, have, docling, doclingReady };
 }
 
 test('the plan for the page: chat choices, the default, what LANA adds, and no file addresses', async () => {
@@ -208,5 +231,66 @@ describe('model files already on this computer', () => {
     await firstLaunch.accept({ useExisting: false });
     expect(reuse.placeFound).not.toHaveBeenCalled();
     expect(downloads).toContain('qwen3.5-9b-q4');
+  });
+});
+
+describe('Docling', () => {
+  const DOCLING_MEMORY = require('../../electron-docling').DOCLING_MEMORY_BYTES;
+
+  test('comes after embedding, chat and image reading, counts its download (not its unpacked size) in progress, and is announced', async () => {
+    const { firstLaunch, downloads, statuses, ready, doclingReady } = setup({ memoryGb: 24, doclingKey: 'macos-arm64' });
+    const view = await firstLaunch.plan();
+    expect(view.plan.docling).toEqual({ install: true, reason: null });
+    expect(view.download.files.map((f) => f.kind)).toEqual(['embedding', 'chat', 'vision', 'docling', 'speech', 'voice']);
+    expect(view.download.files[3]).toMatchObject({ bytes: DOCLING_SIZES.diskBytes, downloadBytes: DOCLING_SIZES.downloadBytes });
+    await firstLaunch.start();
+    expect(downloads).toEqual(['nomic-embed-text-v1.5-f16', 'qwen3.5-9b-q4', 'mmproj-qwen3.5-9b', 'docling']);
+    expect(doclingReady).toHaveBeenCalledTimes(1);
+    expect(ready).toHaveBeenCalledTimes(1);
+    const last = statuses[statuses.length - 1];
+    expect(last).toMatchObject({ phase: 'ready' });
+    expect(last.receivedBytes).toBe(last.totalBytes);
+    const others = view.download.files.slice(0, 3).reduce((sum, f) => sum + f.bytes, 0);
+    expect(last.totalBytes).toBe(others + DOCLING_SIZES.downloadBytes);
+    expect(statuses.some((s) => s.current && s.current.kind === 'docling')).toBe(true);
+    const received = statuses.map((s) => s.receivedBytes);
+    expect(received).toEqual([...received].sort((a, b) => a - b));
+  });
+
+  test('installed already, or another Docling here (a developer\'s): nothing to download', async () => {
+    const installed = setup({ doclingKey: 'macos-arm64', installed: ['nomic-embed-text-v1.5-f16', 'qwen3.5-9b-q4', 'mmproj-qwen3.5-9b', 'docling'] });
+    await installed.firstLaunch.start();
+    expect(installed.downloads).toEqual([]);
+    const provided = setup({ doclingKey: 'macos-arm64', doclingProvided: true, installed: ['nomic-embed-text-v1.5-f16', 'qwen3.5-9b-q4', 'mmproj-qwen3.5-9b'] });
+    expect((await provided.firstLaunch.plan()).plan.docling).toEqual({ install: true, reason: null });
+    await provided.firstLaunch.start();
+    expect(provided.downloads).toEqual([]);
+    expect(provided.docling.install).not.toHaveBeenCalled();
+  });
+
+  test('no runtime built for this kind of computer: not downloaded, and said plainly', async () => {
+    const { firstLaunch, downloads } = setup({ doclingKey: 'windows-x64' });
+    expect((await firstLaunch.plan()).plan.docling).toMatchObject({ install: false, reason: expect.stringMatching(/not ready for this kind of computer/) });
+    await firstLaunch.start();
+    expect(downloads).not.toContain('docling');
+  });
+
+  test('a computer too small to set aside its memory does not get it', async () => {
+    const { firstLaunch, downloads } = setup({ memoryGb: 2, doclingKey: 'macos-arm64', doclingMemoryBytes: DOCLING_MEMORY });
+    expect((await firstLaunch.plan()).plan.docling).toMatchObject({ install: false, reason: expect.stringMatching(/memory/) });
+    await firstLaunch.start();
+    expect(downloads).toEqual(['nomic-embed-text-v1.5-f16']);
+  });
+
+  test('a cut-off Docling install fails the run, and the next start installs only Docling', async () => {
+    const error = new DownloadError('stalled', 'The model download stopped moving. It will pick up where it stopped.');
+    const run = setup({ doclingKey: 'macos-arm64', failOn: { id: 'docling', error } });
+    await run.firstLaunch.start();
+    expect(run.firstLaunch.status()).toMatchObject({ phase: 'failed', error: { code: 'stalled' } });
+    expect(run.ready).not.toHaveBeenCalled();
+    const again = setup({ doclingKey: 'macos-arm64', state: run.state, installed: ['nomic-embed-text-v1.5-f16', 'qwen3.5-9b-q4', 'mmproj-qwen3.5-9b'] });
+    await again.firstLaunch.start();
+    expect(again.downloads).toEqual(['docling']);
+    expect(again.ready).toHaveBeenCalledTimes(1);
   });
 });

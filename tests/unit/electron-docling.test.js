@@ -51,7 +51,7 @@ describe('where Docling is', () => {
   const listen = ['run', '--host', '127.0.0.1', '--port', '9'];
 
   test('a docling-serve the developer already runs (LANA_DOCLING_URL) is used as is', () => {
-    expect(resolveDoclingCommand({ env: { LANA_DOCLING_URL: 'http://127.0.0.1:8085/' }, fileExists: exists() })).toEqual({ external: 'http://127.0.0.1:8085' });
+    expect(resolveDoclingCommand({ env: { LANA_DOCLING_URL: 'http://127.0.0.1:8085/' }, fileExists: exists() })).toEqual({ external: 'http://127.0.0.1:8085', source: 'external' });
   });
 
   test('a developer program (LANA_DOCLING_BIN), with the downloaded models when they are there', () => {
@@ -62,11 +62,19 @@ describe('where Docling is', () => {
     expect(resolveDoclingCommand({ env: { LANA_DOCLING_BIN: '/b/missing' }, fileExists: exists() })).toBeNull();
   });
 
-  test('the runtime first-launch setup put in this app\'s data folder', () => {
-    const mac = path.join('/data', 'docling', 'docling-serve', 'docling-serve');
-    expect(resolveDoclingCommand({ env: {}, userDataDir: '/data', platform: 'darwin', fileExists: exists(mac) })).toMatchObject({ command: mac, env: {} });
-    const win = path.join('C:\\data', 'docling', 'docling-serve', 'docling-serve.exe');
-    expect(resolveDoclingCommand({ env: {}, userDataDir: 'C:\\data', platform: 'win32', fileExists: exists(win) }).command).toBe(win);
+  test('the runtime first-launch setup installed: its Python runs docling-serve, offline, with its models', () => {
+    const dir = path.join('/data', 'docling', 'runtime-1.15.1-1');
+    const program = path.join(dir, 'python', 'bin', 'python3');
+    const models = path.join('/data', 'docling', 'models');
+    const installedRuntime = () => ({ dir, models, program, args: ['-I', '-B', '-u', '-m', 'docling_serve', 'run'] });
+    const found = resolveDoclingCommand({ env: {}, userDataDir: '/data', home: '/home/t', platform: 'darwin', fileExists: exists(program, path.join('/home/t', '.venv', 'docling', 'bin', 'docling-serve')), installedRuntime });
+    expect(found).toMatchObject({ command: program, cwd: dir, source: 'runtime', env: { DOCLING_SERVE_ARTIFACTS_PATH: models, HF_HUB_OFFLINE: '1' } });
+    expect(found.args(9)).toEqual(['-I', '-B', '-u', '-m', 'docling_serve', 'run', '--host', '127.0.0.1', '--port', '9']);
+    // Not installed (or its program is gone): the development fallbacks still apply.
+    expect(resolveDoclingCommand({ env: {}, userDataDir: '/data', home: '/home/t', platform: 'darwin', fileExists: exists(), installedRuntime })).toBeNull();
+    expect(resolveDoclingCommand({ env: {}, userDataDir: '/data', home: '/home/t', platform: 'darwin', fileExists: exists(), installedRuntime: () => null })).toBeNull();
+    // A developer program named in the environment comes first.
+    expect(resolveDoclingCommand({ env: { LANA_DOCLING_BIN: '/b/docling-serve' }, userDataDir: '/data', fileExists: exists('/b/docling-serve', program), installedRuntime }).source).toBe('bin');
   });
 
   test('development: a Python environment with docling-serve; none at all means no Docling', () => {
@@ -116,6 +124,19 @@ describe('running it', () => {
     expect(h.spawns).toEqual([]);
     expect(h.addresses).toEqual([]);
     expect(h.docling.getState()).toEqual({ installed: false, external: false, server: null });
+  });
+
+  test('installed while the app runs: start() asks again and starts it, without a restart', async () => {
+    let current = null;
+    const h = harness({ command: () => current });
+    await h.docling.start();
+    expect(h.spawns).toEqual([]);
+    current = COMMAND;
+    await h.docling.start();
+    expect(h.spawns).toHaveLength(1);
+    expect(h.spawns[0].cmd).toBe(COMMAND.command);
+    expect(h.docling.getState().installed).toBe(true);
+    await h.docling.stop();
   });
 
   test('a developer\'s running docling-serve is handed over without starting anything', async () => {

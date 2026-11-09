@@ -53,8 +53,18 @@
     return parts.join(' ');
   }
 
+  /** The Docling line: what it does, and its download size when there is one. */
+  function documentsLine(plan, download) {
+    var docling = plan.docling;
+    if (!docling || (!docling.install && !docling.reason)) {return null;}
+    if (!docling.install) {return { id: 'documents', title: 'Document reading', text: docling.reason, included: false };}
+    var file = ((download && download.files) || []).find(function (f) { return f.kind === 'docling'; });
+    var size = file ? ' ' + formatBytes(file.downloadBytes || file.bytes) + ' download.' : '';
+    return { id: 'documents', title: 'Document reading', text: 'Reads your documents on this computer.' + size, included: true };
+  }
+
   /** One short line for each thing LANA sets up by itself. */
-  function extrasLines(plan) {
+  function extrasLines(plan, download) {
     var lines = [];
     lines.push(plan.embedding && plan.embedding.where === 'local'
       ? { id: 'search', title: 'Search', text: 'Finds things in your files, on this computer.', included: true }
@@ -62,6 +72,8 @@
     lines.push(plan.vision && plan.vision.id
       ? { id: 'images', title: 'Image reading', text: 'Reads pictures and scanned pages.', included: true }
       : { id: 'images', title: 'Image reading', text: plan.chat && plan.chat.where === 'cloud' ? 'Uses the cloud, with chat.' : ((plan.vision && plan.vision.reason) || 'Not on this computer.'), included: false });
+    var documents = documentsLine(plan, download);
+    if (documents) {lines.push(documents);}
     lines.push(plan.speech && plan.speech.install
       ? { id: 'speech', title: 'Listening', text: 'Turns speech into text. Added after you sign in.', included: true }
       : { id: 'speech', title: 'Listening', text: (plan.speech && plan.speech.reason) || 'Not on this computer.', included: false });
@@ -134,13 +146,13 @@
         };
       }),
       selectedId: selectedId,
-      extras: extrasLines(plan),
+      extras: extrasLines(plan, view.download),
       disk: diskLine(view.download),
       continueLabel: 'Continue'
     };
   }
 
-  var KIND_WORDS = { embedding: 'the search model', chat: 'the chat model', vision: 'the image reading file' };
+  var KIND_WORDS = { embedding: 'the search model', chat: 'the chat model', vision: 'the image reading file', docling: 'the document reader' };
   // The downloader's own messages are already plain; anything else gets a plain sentence.
   var PLAIN_CODES = { no_space: true, http: true, mismatch: true, too_big: true, stalled: true, not_allowed: true };
 

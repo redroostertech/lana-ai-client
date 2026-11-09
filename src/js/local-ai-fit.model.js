@@ -160,8 +160,13 @@
    * @param {Object} [input.redactor]  { memoryBytes }: the redactor runs whenever the app is open
    *                                  (electron-redactor.js REDACTOR_MEMORY_BYTES); none when it
    *                                  is not on this computer
-   * @param {Object} [input.docling]  { memoryBytes }: Docling runs whenever the app is open when it
-   *                                  is on this computer (electron-docling.js DOCLING_MEMORY_BYTES)
+   * @param {Object} [input.docling]  { memoryBytes, diskBytes, downloadBytes, provided }: Docling runs
+   *                                  whenever the app is open when it is on this computer
+   *                                  (electron-docling.js DOCLING_MEMORY_BYTES). provided: one is here
+   *                                  already (a developer's, or the runtime first launch installed).
+   *                                  Otherwise diskBytes is what installing it takes on the disk at
+   *                                  once (electron-docling-install.js sizes), null when no runtime
+   *                                  is built for this kind of computer
    * @param {string[]} [input.installed]  ids already on disk and checked (they need no space)
    * @param {string} [input.chosenChatId]  the person's choice; ignored when it won't fit
    * @returns {Object} { computer, chatChoices, defaultChatId, plan, download }
@@ -179,7 +184,11 @@
     function take(entry, kind) {
       var bytes = need(entry, installed);
       diskLeft -= bytes;
-      if (bytes) {files.push({ id: entry.id, kind: kind, bytes: bytes });}
+      if (!bytes) {return;}
+      var file = { id: entry.id, kind: kind, bytes: bytes };
+      // Docling takes more room than it downloads: its archive unpacks beside itself.
+      if (entry.downloadBytes) {file.downloadBytes = entry.downloadBytes;}
+      files.push(file);
     }
 
     // 1. Embedding: always on, so always set aside.
@@ -199,8 +208,13 @@
     if (input.redactor && input.redactor.memoryBytes) {reserved += input.redactor.memoryBytes;}
 
     // 1c. Docling: runs whenever the app is open when it is on this computer, so the organization's
-    //     server can hand it uploaded files to read (electron-docling.js DOCLING_MEMORY_BYTES).
-    if (input.docling && input.docling.memoryBytes) {reserved += input.docling.memoryBytes;}
+    //     server can hand it uploaded files to read (electron-docling.js DOCLING_MEMORY_BYTES). Set
+    //     aside only when it is here or can be installed, and fits beside embedding with room to
+    //     spare. Disk is checked after vision, below: chat and vision come first on the disk.
+    var docling = input.docling || null;
+    var doclingAvailable = Boolean(docling && (docling.provided || installed.docling || docling.diskBytes != null));
+    var doclingFitsMemory = doclingAvailable && level((reserved + (docling.memoryBytes || 0)) / pool.systemBytes, COMFORTABLE, TIGHT) === 'comfortable';
+    if (doclingFitsMemory) {reserved += docling.memoryBytes || 0;}
 
     // 2. Speech and voice: set aside only when they fit beside embedding. Disk is checked
     //    after chat, below, because chat comes first on the disk.
@@ -255,6 +269,23 @@
       } else {
         plan.vision = { id: vision.id, reason: null };
         take(vision, 'vision');
+      }
+    }
+
+    // 4b. Docling, after chat and vision on the disk and before speech.
+    if (!docling) {
+      plan.docling = { install: false, reason: null };
+    } else if (!doclingAvailable) {
+      plan.docling = { install: false, reason: 'Reading documents on this computer is not ready for this kind of computer yet.' };
+    } else if (!doclingFitsMemory) {
+      plan.docling = { install: false, reason: 'This computer does not have enough memory to read documents here, so your organization\'s server reads them.' };
+    } else {
+      var doclingEntry = { id: 'docling', sizeBytes: docling.provided ? 0 : docling.diskBytes, downloadBytes: docling.downloadBytes };
+      if (need(doclingEntry, installed) > diskLeft) {
+        plan.docling = { install: false, reason: 'There is not enough free space on this computer to read documents here, so your organization\'s server reads them.' };
+      } else {
+        plan.docling = { install: true, reason: null };
+        take(doclingEntry, 'docling');
       }
     }
 

@@ -1,0 +1,13 @@
+# The Python packages in the Docling runtime for the desktop client (scripts/build-docling-runtime.sh).
+# The same coherent set the servers run (backend Dockerfile, docling venv stage), without the
+# docling-serve web UI. Change these only together with the lock files in docling/locks/.
+docling==2.100.0
+docling-slim==2.100.0
+docling-serve==1.15.1
+docling-jobkit==1.12.1
+# RapidOCR's inference backend (backend infra/lib/release/onnxruntime-wheel-pins.js).
+onnxruntime==1.30.0
+# CPU torch. On macOS the PyPI wheel is the CPU build; on Linux and Windows the lock is
+# compiled against https://download.pytorch.org/whl/cpu so no CUDA wheels come in.
+torch==2.14.1
+torchvision==0.29.1
