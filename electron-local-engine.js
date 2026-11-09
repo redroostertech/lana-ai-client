@@ -15,7 +15,7 @@ const net = require('net');
 const path = require('path');
 const crypto = require('crypto');
 const childProcess = require('child_process');
-const { createEngineSupervisor, LOOPBACK_HOST } = require('./electron-engine-supervisor');
+const { createEngineSupervisor, engineEntry, LOOPBACK_HOST } = require('./electron-engine-supervisor');
 const { createEngineControlClient } = require('./electron-engine-control');
 const { resolveEngineConfig, resolveApiBase, presentServer, toStoredServer, isEngineInUse } = require('./electron-api-base');
 
@@ -37,7 +37,14 @@ const CHANNELS = Object.freeze({
 // the embedding settings (electron-local-models.js).
 // The engine reads its embedding identity from its Pip's /health (backend
 // src/engine/local-embedding-identity.js), so no model file, id or version is passed.
-const ENGINE_MODEL_ENV = Object.freeze(['LANA_TIER', 'EMBEDDING_MODEL', 'LANA_ENGINE_EMBEDDING_URL', 'LANA_ENGINE_CHAT_URL', 'LANA_FORGE_URL']);
+// LANA_TOKENIZER_GGUF: the chat model file, so the engine counts tokens with its vocabulary.
+const ENGINE_MODEL_ENV = Object.freeze(['LANA_TIER', 'EMBEDDING_MODEL', 'LANA_ENGINE_EMBEDDING_URL', 'LANA_ENGINE_CHAT_URL', 'LANA_FORGE_URL', 'LANA_TOKENIZER_GGUF']);
+
+// The engine will not start without an engine level (LANA_TIER). When neither the environment
+// nor anything else names one, the client gives demo: it budgets 8192 tokens, which never
+// exceeds a planned Pip slot (8192 at the least) or a cloud model's window, so it is safe for
+// every chat model. A level tuned for local models under 9B is a backend decision.
+const DEFAULT_ENGINE_TIER = 'demo';
 
 // A sleep or quit waits this long for the engine to hand running jobs off.
 const HANDOFF_WAIT_MS = 12000;
@@ -137,6 +144,16 @@ function pushOfflineKeyFor({ token, offlineKey, control }) {
 }
 
 /**
+ * The engine inside the installed app (<resources>/engine), when it is there. Development
+ * builds use LANA_ENGINE_ROOT instead.
+ */
+function bundledEngineRoot({ app, resourcesPath, fileExists }) {
+  if (!app.isPackaged || !resourcesPath) {return null;}
+  const root = path.join(resourcesPath, 'engine');
+  return fileExists(engineEntry(root)) ? root : null;
+}
+
+/**
  * @param {Object} deps
  * @param {Object} deps.ipcMain
  * @param {Object} deps.app - for isPackaged, getPath, execPath
@@ -147,15 +164,19 @@ function pushOfflineKeyFor({ token, offlineKey, control }) {
  * @param {Function} [deps.getAuthToken] - () => the signed-in person's session token or null
  * @param {Object} [deps.offlineKey] - electron-offline-key.js store (phase 10); none means no offline copy
  */
-function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = process.env, log, getAuthToken = () => null, offlineKey = null }) {
+function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = process.env, log, getAuthToken = () => null, offlineKey = null, resourcesPath = process.resourcesPath }) {
   const cwd = path.join(app.getPath('userData'), 'local-engine');
   try { fs.mkdirSync(cwd, { recursive: true }); } catch (_error) { /* spawn reports it */ }
+  const bundledRoot = bundledEngineRoot({ app, resourcesPath, fileExists: (file) => fs.existsSync(file) });
+  const engineConfig = () => resolveEngineConfig(env, storage.getLocalEnginePreferences(), { bundledRoot });
+  // Pip's addresses and the engine level, from electron-pip-supervisor.js. The environment wins.
+  let modelEndpoints = {};
 
   // Packaged builds have no `node` on PATH: run Electron's binary as node.
   const nodePath = env.LANA_ENGINE_NODE || (app.isPackaged ? process.execPath : 'node');
   const nodeEnv = !env.LANA_ENGINE_NODE && app.isPackaged ? { ELECTRON_RUN_AS_NODE: '1' } : {};
 
-  let config = resolveEngineConfig(env, storage.getLocalEnginePreferences());
+  let config = engineConfig();
   let osSignals = null;
   let pushedFor = null; // the engine process (pid) and token the session was last pushed for
 
@@ -173,8 +194,29 @@ function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = proces
     if (offlineKey) {extra.LANA_ENGINE_OFFLINE_DIR = path.join(cwd, 'offline');}
     for (const name of ENGINE_MODEL_ENV) {
       if (typeof env[name] === 'string' && env[name]) {extra[name] = env[name];}
+      else if (typeof modelEndpoints[name] === 'string' && modelEndpoints[name]) {extra[name] = modelEndpoints[name];}
     }
+    if (!extra.LANA_TIER) {extra.LANA_TIER = DEFAULT_ENGINE_TIER;}
     return extra;
+  }
+
+  /**
+   * Pip's servers changed (started, moved port, or stopped). A running engine is restarted so it
+   * picks up the new addresses; one not yet started reads them when it starts.
+   * @param {Object} values - ENGINE_MODEL_ENV names to values (missing or null means none)
+   */
+  async function setModelEndpoints(values) {
+    const next = {};
+    for (const name of ENGINE_MODEL_ENV) {
+      if (typeof values[name] === 'string' && values[name]) {next[name] = values[name];}
+    }
+    if (JSON.stringify(next) === JSON.stringify(modelEndpoints)) {return;}
+    modelEndpoints = next;
+    const state = supervisor.getState();
+    if (state.mode === 'spawn' && state.process !== 'stopped') {
+      log.info('[local-engine] Pip addresses changed; restarting the engine');
+      await supervisor.restart();
+    }
   }
 
   function backgroundJobsView() {
@@ -279,7 +321,7 @@ function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = proces
 
   /** Re-read settings and the saved server; start, restart or stop the engine. */
   async function sync() {
-    config = resolveEngineConfig(env, storage.getLocalEnginePreferences());
+    config = engineConfig();
     await supervisor.configure(config, chefUrl());
     return status();
   }
@@ -328,6 +370,7 @@ function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = proces
     present: (server) => presentServer(server, supervisor.getState()),
     toStored: (server) => toStoredServer(server, { engineUrl: supervisor.getState().url, storedUrl: chefUrl() }),
     stop: () => supervisor.stop(),
+    setModelEndpoints,
     prepareQuit,
     attachOsSignals,
     sessionChanged,
@@ -336,4 +379,4 @@ function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = proces
   };
 }
 
-module.exports = { createLocalEngineHost, statusView, pickLoopbackPort, backgroundJobsEnabled, CHANNELS, ENGINE_MODEL_ENV, pushOfflineKeyFor, canOpenOffline };
+module.exports = { createLocalEngineHost, bundledEngineRoot, DEFAULT_ENGINE_TIER, statusView, pickLoopbackPort, backgroundJobsEnabled, CHANNELS, ENGINE_MODEL_ENV, pushOfflineKeyFor, canOpenOffline };

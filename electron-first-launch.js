@@ -9,7 +9,8 @@
  *   choose(chatId)   keeps the person's chat choice (null goes back to LANA's default).
  *   accept()         the person pressed Continue: notes it and starts. Nothing is downloaded
  *                    before this.
- *   resume()         at launch: starts again when setup was accepted and is not complete.
+ *   resume()         at launch: runs start() whenever setup was accepted. Files in place are
+ *                    skipped, so a finished setup goes straight to onReady and Pip starts.
  *   start()          downloads this computer's model files in order (embedding, chat, image
  *                    reading), one at a time, in the background. Progress goes to onStatus.
  *   pause()          stops after the bytes already received are on disk.
@@ -18,7 +19,7 @@
  *
  * Every launch can call start(): a file already in place is checked from its note and skipped,
  * and a file cut off last time resumes. When every file is in place, `completedAt` is saved and
- * onReady fires, which is when Pip can start (phase C).
+ * onReady fires with the plan, and Pip starts from it (electron-pip-supervisor.js).
  *
  * The plan is worked out again on each launch from the computer as it is now, so more memory or
  * a fuller disk is taken into account. The person's chat choice is kept, and used whenever it
@@ -158,8 +159,7 @@ function createFirstLaunch({ userDataDir, state, env = process.env, onStatus = (
   }
 
   function resume() {
-    const saved = state.read();
-    return saved.acceptedAt && !saved.completedAt ? start() : Promise.resolve(null);
+    return state.read().acceptedAt ? start() : Promise.resolve(null);
   }
 
   /** The Briefs speech models (ModelService ids) the plan says to install; none before Continue. */

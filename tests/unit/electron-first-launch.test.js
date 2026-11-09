@@ -134,7 +134,7 @@ test('start while running returns the same run, so files are never fetched twice
   expect(downloads).toHaveLength(3);
 });
 
-test('Continue notes the acceptance and starts; resume only runs setup that was accepted and not finished', async () => {
+test('Continue notes the acceptance and starts; resume runs setup on every launch after Continue', async () => {
   const fresh = setup();
   await fresh.firstLaunch.resume();
   expect(fresh.downloads).toEqual([]);
@@ -146,9 +146,16 @@ test('Continue notes the acceptance and starts; resume only runs setup that was 
   await cutOff.firstLaunch.resume();
   expect(cutOff.downloads).toEqual(['qwen3.5-9b-q4', 'mmproj-qwen3.5-9b']);
 
-  const done = setup({ state: memoryState({ acceptedAt: '2026-11-08T00:00:00Z', completedAt: '2026-11-08T01:00:00Z' }) });
+  // Finished last time: nothing to fetch, and ready fires again so Pip starts on this launch.
+  const done = setup({ state: memoryState({ acceptedAt: '2026-11-08T00:00:00Z', completedAt: '2026-11-08T01:00:00Z' }), installed: ['nomic-embed-text-v1.5-f16', 'qwen3.5-9b-q4', 'mmproj-qwen3.5-9b'] });
   await done.firstLaunch.resume();
   expect(done.downloads).toEqual([]);
+  expect(done.ready).toHaveBeenCalledTimes(1);
+
+  // A file removed since: fetched again.
+  const missing = setup({ state: memoryState({ acceptedAt: '2026-11-08T00:00:00Z', completedAt: '2026-11-08T01:00:00Z' }), installed: ['nomic-embed-text-v1.5-f16', 'qwen3.5-9b-q4'] });
+  await missing.firstLaunch.resume();
+  expect(missing.downloads).toEqual(['mmproj-qwen3.5-9b']);
 });
 
 test('speech models for Briefs follow the plan, and none before Continue', async () => {

@@ -115,9 +115,28 @@ const localEngine = createLocalEngineHost({
 });
 localEngine.registerIpc();
 
-// First-launch local AI setup (first-launch plan, phase B): sizes this computer and downloads
-// its model files after the person presses Continue on the setup screen (phase D). Every
-// launch resumes a setup that was accepted and not finished.
+// Pip on this computer (first-launch plan, phase C): runs the chat and embedding servers the
+// plan picked, and hands their addresses to the local engine.
+const { createPip, resolvePipBinary, engineEndpoints } = require('./electron-pip-supervisor');
+const { pickLoopbackPort } = require('./electron-local-engine');
+const pip = createPip({
+  binary: resolvePipBinary({ env: process.env, resourcesPath: process.resourcesPath, isPackaged: app.isPackaged, fileExists: (file) => fs.existsSync(file) }),
+  dir: path.join(app.getPath('userData'), 'pip'),
+  spawn: require('child_process').spawn,
+  fetch: (url, { timeoutMs = 3000, ...init } = {}) => fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) }),
+  pickPort: pickLoopbackPort,
+  env: process.env,
+  log: { info: logInfo, warn: logWarn, error: (message) => logError(message) },
+  onAddresses: (addresses) => {
+    logInfo(`[pip] addresses: chat ${addresses.chat || 'none'}, embedding ${addresses.embedding || 'none'}`);
+    localEngine.setModelEndpoints(engineEndpoints(addresses))
+      .catch((error) => logError('[electron-main] Local AI engine did not restart for Pip', error));
+  }
+});
+
+// First-launch local AI setup (first-launch plan, phases B and C): sizes this computer and
+// downloads its model files after the person presses Continue on the setup screen (phase D).
+// Every launch after that runs setup again (files in place are skipped) and starts Pip.
 const { createFirstLaunch } = require('./electron-first-launch');
 const firstLaunch = createFirstLaunch({
   userDataDir: app.getPath('userData'),
@@ -125,7 +144,11 @@ const firstLaunch = createFirstLaunch({
   onStatus: (status) => {
     if (status.phase === 'failed') {logWarn(`[first-launch] setup stopped: ${status.error && status.error.code}`);}
   },
-  onReady: () => logInfo('[first-launch] every local model file is in place')
+  onReady: (result) => {
+    logInfo('[first-launch] every local model file is in place; starting Pip');
+    pip.apply(result, localModelsCatalog.modelsDir(process.env, app.getPath('userData')))
+      .catch((error) => logError('[electron-main] Pip did not start', error));
+  }
 });
 
 // LANA Briefs (Briefs integration plan): runs only while discovery lists lana-notes and
@@ -2363,6 +2386,10 @@ app.on('before-quit', async (event) => {
       .catch((error) => logError('[electron-main] Failed to stop LANA Briefs', error))
       .then(() => localEngine.prepareQuit())
       .catch((error) => logError('[electron-main] Failed to stop the local AI engine', error))
+      // Pip last: the engine may still be handing a job off through it.
+      .then(() => firstLaunch.pause())
+      .then(() => pip.stop())
+      .catch((error) => logError('[electron-main] Failed to stop Pip', error))
       .finally(() => app.quit());
     return;
   }

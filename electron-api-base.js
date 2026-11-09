@@ -37,12 +37,14 @@ function originOf(value) {
  *
  * @param {Object} env - process.env
  * @param {{ enabled?: boolean|null, root?: string|null, port?: number|null }} prefs - electron-store localEngine
+ * @param {{ bundledRoot?: string|null }} [defaults] - the engine inside the installed app, when it is there
  * @returns {{ mode: 'off'|'spawn'|'attach', reason: string|null, root: string|null, attachUrl: string|null, configured: boolean, enabled: boolean, preferredPort: number|null }}
  */
-function resolveEngineConfig(env = {}, prefs = {}) {
+function resolveEngineConfig(env = {}, prefs = {}, { bundledRoot = null } = {}) {
   const attachUrl = originOf(env.LANA_ENGINE_URL);
   const root = (typeof env.LANA_ENGINE_ROOT === 'string' && env.LANA_ENGINE_ROOT.trim())
     || (typeof prefs.root === 'string' && prefs.root.trim())
+    || bundledRoot
     || null;
   const configured = Boolean(attachUrl || root);
   // Default on when an engine is configured; an explicit false turns it off.
