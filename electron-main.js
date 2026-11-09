@@ -85,7 +85,8 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // Import thin client modules
-const { refreshHostedDiscovery, verifyServer } = require('./electron-discovery');
+const { refreshHostedDiscovery, verifyServer, discoverByDomain } = require('./electron-discovery');
+const { createAppLinkRouter, registerAppLinkIpc, createColdStartQueue, deepLinkFromArgv } = require('./electron-app-links');
 const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified, saveBrainchildLink, getBrainchildLink, clearBrainchildLink, setBrainchildAutoBindDisabled, isBrainchildAutoBindDisabled, authTokenPersistence, offlineKeyPersistence, getLocalEnginePreferences, updateLocalEnginePreferences, firstLaunchPersistence } = require('./electron-storage');
 const { createLocalEngineHost } = require('./electron-local-engine');
 const { createTokenStore, registerTokenIpc, hasLiveSession } = require('./electron-token-store');
@@ -990,7 +991,7 @@ function isBackendManagedOAuthState(state) {
  * Create the main application window
  * @param {string} serverUrl - Server URL to connect to
  */
-function createWindow(serverUrl = null) {
+function createWindow(serverUrl = null, startPage = 'dashboard.html') {
   logInfo(`Creating main window with server: ${serverUrl || 'none'}`);
 
   // Create the browser window
@@ -1018,9 +1019,11 @@ function createWindow(serverUrl = null) {
   });
   watchScreenVoiceAuthentication(mainWindow);
 
-  // Load the v2 dashboard as the entry point
-  const startUrl = createFileUrl(path.join(__dirname, 'public_html/dashboard.html'));
+  // Load the v2 dashboard as the entry point (or the page an app link opens)
+  const startUrl = publicPageUrl(startPage);
   mainWindow.loadURL(startUrl);
+  // Links that launched the app wait for the first window (electron-app-links.js).
+  mainWindow.webContents.once('did-finish-load', () => deepLinkQueue.markReady());
 
   // Normalize DPI scaling on Windows high-DPI displays
   if (process.platform === 'win32') {
@@ -1082,6 +1085,21 @@ function createWindow(serverUrl = null) {
   });
 }
 
+// The first-launch setup screen comes before sign-in until the person has pressed Continue
+// once (first-launch plan, phase D); it then moves on to the login page itself.
+function signInPageName() {
+  return firstLaunchPersistence.read().acceptedAt ? 'login.html' : 'first-launch.html';
+}
+
+/** file:// URL of a page under public_html; relativeUrl may carry a ?query. */
+function publicPageUrl(relativeUrl) {
+  const value = String(relativeUrl || '');
+  const queryAt = value.indexOf('?');
+  const page = queryAt === -1 ? value : value.slice(0, queryAt);
+  const query = queryAt === -1 ? '' : value.slice(queryAt);
+  return createFileUrl(path.join(__dirname, 'public_html', page)) + query;
+}
+
 /**
  * Create login window
  * With hosted discovery, we go straight to login - org resolution happens there
@@ -1114,11 +1132,9 @@ function createLoginWindow() {
   });
   watchScreenVoiceAuthentication(mainWindow);
 
-  // The first-launch setup screen comes before sign-in until the person has pressed Continue
-  // once (first-launch plan, phase D); it then moves on to the login page itself.
-  const firstPage = firstLaunchPersistence.read().acceptedAt ? 'login.html' : 'first-launch.html';
-  const loginUrl = createFileUrl(path.join(__dirname, 'public_html', firstPage));
+  const loginUrl = publicPageUrl(signInPageName());
   mainWindow.loadURL(loginUrl);
+  mainWindow.webContents.once('did-finish-load', () => deepLinkQueue.markReady());
 
   // Normalize DPI scaling on Windows high-DPI displays
   if (process.platform === 'win32') {
@@ -1411,7 +1427,9 @@ ipcMain.handle('get-config', async () => {
 });
 
 // Handle secure storage operations
-ipcMain.handle('save-settings', async (event, settings) => {
+// Save the firm this app connects to (the sign-in page, and app links that
+// found their firm through discovery).
+async function applyServerConnection(settings) {
   const stored = localEngine.toStored(settings);
   const success = saveServerConnection(stored);
   if (success) {
@@ -1419,6 +1437,11 @@ ipcMain.handle('save-settings', async (event, settings) => {
     syncBriefs(stored);
     await localEngine.sync().catch((error) => logError('[electron-main] Local AI engine did not start', error));
   }
+  return success;
+}
+
+ipcMain.handle('save-settings', async (event, settings) => {
+  const success = await applyServerConnection(settings);
   return { success };
 });
 
@@ -2115,6 +2138,8 @@ ipcMain.handle('settings:revoke-bridge-consent', async (_event, payload) => {
  *   lana-ai://approval/<approval-id>        — Open approval detail
  *   lana-ai://agent-run/<run-id>            — Open agent run
  *   lana-ai://automation/<automation-id>    — Open automation detail
+ *   lana-ai://reset-password|accept-invite|activate|sign|shared?...
+ *                                           Links from Chef's emails (electron-app-links.js)
  */
 const handleDeepLink = async (deepLinkUrl) => {
   logInfo(`Deep link received: ${redactUrlForLog(deepLinkUrl)}`);
@@ -2136,6 +2161,13 @@ const handleDeepLink = async (deepLinkUrl) => {
       case 'file':
       case 'workspace':
         await navigateClientDeepLink(urlObj);
+        break;
+      case 'reset-password':
+      case 'accept-invite':
+      case 'activate':
+      case 'sign':
+      case 'shared':
+        await appLinkRouter.handleUrl(deepLinkUrl);
         break;
       default:
         logInfo(`Unknown deep link route: ${route}`);
@@ -2220,10 +2252,96 @@ const handleConnectLink = (urlObj) => {
   }
 };
 
-// Handle deep links on macOS (when app is already running)
+// App links from Chef's emails (electron-app-links.js). The router decides the
+// firm and sign-in; these are the window, dialog and storage pieces it uses.
+function showMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return false;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+  return true;
+}
+
+async function openAppLinkPage(relativeUrl) {
+  if (!showMainWindow()) {
+    const saved = getSavedServer();
+    createWindow(saved ? saved.url : null, relativeUrl);
+    return;
+  }
+  await mainWindow.loadURL(publicPageUrl(relativeUrl));
+}
+
+async function openAppLinkSignIn() {
+  if (!showMainWindow()) {
+    createLoginWindow();
+    return;
+  }
+  await mainWindow.loadURL(publicPageUrl(signInPageName()));
+}
+
+async function appLinkMessage(options) {
+  const parent = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
+  return dialog.showMessageBox(parent, { type: 'info', noLink: true, ...options });
+}
+
+const appLinkRouter = createAppLinkRouter({
+  getSavedServer: () => getSavedServer(),
+  isSignedIn: () => hasLiveSession(authTokenStore.get(), Date.now()),
+  discover: (domain, orgIdHint) => discoverByDomain(domain, orgIdHint),
+  connect: (server) => applyServerConnection(server),
+  signOut: async () => {
+    authTokenStore.clear();
+    clearSavedServer();
+    syncScreenVoiceEntitlement();
+    syncBriefs(null);
+    await localEngine.sync().catch((error) => logError('[electron-main] Local AI engine did not stop', error));
+  },
+  askSwitch: async ({ domain, firmName }) => {
+    const { response } = await appLinkMessage({
+      title: 'This link is for another firm',
+      message: `This link is for ${domain}.`,
+      detail: `This app is connected to ${firmName}. To open the link, LANA signs you out of ${firmName} and connects to the firm in the link.`,
+      buttons: [`Stay with ${firmName}`, 'Switch firm'],
+      defaultId: 0,
+      cancelId: 0
+    });
+    return response === 1 ? 'switch' : 'stay';
+  },
+  askNotFound: async ({ domain, firmName }) => {
+    const { response } = await appLinkMessage({
+      type: 'warning',
+      title: 'Firm not found',
+      message: `LANA could not find the firm for ${domain}.`,
+      detail: `You can stay with ${firmName}, or sign out and connect to the firm yourself on the sign-in screen.`,
+      buttons: [`Stay with ${firmName}`, 'Connect on sign in'],
+      defaultId: 0,
+      cancelId: 0
+    });
+    return response === 1 ? 'sign-in' : 'stay';
+  },
+  tellInvalid: () => appLinkMessage({
+    type: 'warning',
+    title: 'Link not recognized',
+    message: 'This link could not be opened.',
+    detail: 'It may be incomplete. Open it again from the email, or ask for a new one.',
+    buttons: ['OK']
+  }),
+  openPage: openAppLinkPage,
+  openSignIn: openAppLinkSignIn,
+  log: (message) => logInfo(`[AppLinks] ${message}`)
+});
+registerAppLinkIpc(ipcMain, appLinkRouter);
+
+// Deep links that arrive before the first window has loaded (the app was
+// launched by the link) wait for it; every route goes through this.
+const deepLinkQueue = createColdStartQueue((url) => handleDeepLink(url));
+const launchDeepLink = deepLinkFromArgv(process.argv);
+if (launchDeepLink) deepLinkQueue.receive(launchDeepLink);
+
+// Handle deep links on macOS (cold start included: open-url can fire before the window exists)
 app.on('open-url', (event, url) => {
   event.preventDefault();
-  handleDeepLink(url);
+  deepLinkQueue.receive(url);
 });
 
 // Handle deep links on Windows/Linux (when app is launched)
@@ -2240,9 +2358,9 @@ if (!gotTheLock) {
     }
     
     // Check for deep link in command line
-    const url = commandLine.find(arg => arg.startsWith('lana-ai://'));
+    const url = deepLinkFromArgv(commandLine);
     if (url) {
-      handleDeepLink(url);
+      deepLinkQueue.receive(url);
     }
   });
 }

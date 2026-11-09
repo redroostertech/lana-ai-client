@@ -68,6 +68,25 @@ lana-ai://connect/<org-id>
 lana-ai://oauth/callback?provider=<provider>&...
 ```
 
+## Links From Chef's Emails
+
+Password reset, invitation, activation, signature and share emails link to an https bounce page on the control plane, which opens `lana-ai://<action>?<params>`. `electron-app-links.js` validates and routes them; the contract is fixed with the backend.
+
+| Action | Parameters | Opens |
+| --- | --- | --- |
+| `reset-password` | `token` | `password-reset.html` |
+| `accept-invite` | `token` | `accept-invite.html` (calls `POST /api/v1/auth/accept-invite`) |
+| `activate` | `code` | `activate.html` (calls `POST /api/v1/auth/activate`) |
+| `sign` | `document`, `packet` | `file-editor.html?id=<document>&signature_packet=<packet>`, after sign-in |
+| `shared` | `token` | `shared-link.html`, after sign-in; redeems `POST /api/v1/sharing/links/<token>/redeem` and opens the document, matter or folder |
+
+Every action also accepts `domain`, the firm's domain. Any other key, a repeated key or a value of the wrong shape rejects the link. Tokens and codes are never logged or written to disk.
+
+- No saved firm: the domain is looked up through hosted discovery (org id guessed from the first label, as in `<org-id>.lanaai.io`). If that fails, sign in shows the firm to connect with the domain filled in, and the link continues once it is connected.
+- The domain names another firm than the saved one: the person is asked. Staying changes nothing; switching signs them out of the saved firm and connects the other one.
+- `sign` and `shared` while signed out: the link waits in memory (30 minutes) and continues right after sign-in.
+- A link that launches the app waits until the first window has loaded (macOS `open-url`, Windows and Linux command line).
+
 ## Safety Rules
 
 - Unknown routes are rejected.

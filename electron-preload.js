@@ -99,6 +99,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   clearSavedServer: () => ipcRenderer.invoke('clear-saved-server'),
 
   /**
+   * App links from Chef's emails (electron-app-links.js). The sign-in page asks
+   * whether a link is waiting (never its token) and, once the firm is connected
+   * or the person signed in, which page to continue to.
+   */
+  appLinks: {
+    loginContext: () => ipcRenderer.invoke('app-links:login-context'),
+    takePending: (stage) => ipcRenderer.invoke('app-links:take-pending', { stage })
+  },
+
+  /**
    * The API base, synchronously, so a page's first request already uses it:
    * the local AI engine's loopback address when it is in use, otherwise the
    * organization's server. Null before an organization is connected.

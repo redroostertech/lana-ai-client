@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Opening a shared item - LANA</title>
+  <!-- Opened by a share link (lana-ai://shared?token=..., electron-app-links.js) after
+       sign-in. Redeems the link, asks for its password when it has one, then opens
+       the item the way the app opens it elsewhere. -->
+  <link rel="stylesheet" href="css/lex-tokens.css">
+  <link rel="stylesheet" href="css/tailwind-output.css">
+  <link rel="stylesheet" href="css/app-link-pages.css">
+  <link rel="stylesheet" href="css/shared-link.css">
+  <script src="js/config.js"></script>
+  <script src="js/time-utils.js"></script>
+  <script src="js/shared/request-retry.js"></script>
+  <script src="js/api.js"></script>
+</head>
+<body class="alp-body">
+  <main class="alp-page">
+    <lex-card class="alp-panel">
+      <lex-brand-mark animation="idle" size="56" class="alp-mark"></lex-brand-mark>
+
+      <section id="slOpeningView" class="alp-view">
+        <lex-text tag="h1" size="h4" weight="semibold">Opening the shared item</lex-text>
+        <lex-spinner size="sm" label="Checking the link"></lex-spinner>
+      </section>
+
+      <section id="slPasswordView" class="alp-view" hidden>
+        <lex-text tag="h1" size="h4" weight="semibold" icon="lock">This shared item has a password</lex-text>
+        <lex-text tag="p" size="body-sm" variant="secondary">The person who shared it gave you the password separately.</lex-text>
+        <lex-form id="slForm" class="alp-form">
+          <lex-input id="slPassword" name="password" type="password" label="Password" required></lex-input>
+          <div id="slPasswordError" class="alp-error" role="alert" hidden></div>
+          <lex-btn id="slSubmit" type="submit" variant="primary" class="alp-submit">Open</lex-btn>
+        </lex-form>
+      </section>
+
+      <section id="slProblemView" class="alp-view" hidden>
+        <lex-text tag="h1" size="h4" weight="semibold" icon="alert-circle" variant="danger">This link cannot be opened</lex-text>
+        <div id="slProblem"></div>
+        <div class="sl-actions">
+          <lex-btn id="slRetry" variant="secondary" hidden>Try again</lex-btn>
+          <lex-btn id="slHome" variant="primary">Go to dashboard</lex-btn>
+        </div>
+      </section>
+    </lex-card>
+  </main>
+
+  <script src="js/lex/lex.core.js"></script>
+  <script src="js/lex/lex.icons.js"></script>
+  <script src="js/lex/lex.forms.js"></script>
+  <script src="js/lex/index.js"></script>
+  <script src="js/lex/components/foundation/lex-card.js"></script>
+  <script src="js/lex/components/foundation/lex-text.js"></script>
+  <script src="js/lex/components/foundation/lex-btn.js"></script>
+  <script src="js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="js/lex/components/form/lex-input.js"></script>
+  <script src="js/lex/components/form/lex-form.js"></script>
+  <script src="js/vendor/lottie_light.min.js"></script>
+  <script src="js/lex/brand/lex-brand-animations.js"></script>
+  <script src="js/lex/components/foundation/lex-brand-mark.js"></script>
+  <script src="js/shared/app-link-pages.model.js"></script>
+  <script src="js/shared/app-link-page-kit.js"></script>
+  <script src="js/pages/shared-link.js"></script>
+</body>
+</html>

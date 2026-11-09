@@ -38,6 +38,9 @@
 
     <!-- Login Card -->
     <div class="bg-white rounded-2xl shadow-xl p-8">
+      <!-- Shown when a link from an email waits for this sign-in (electron-app-links.js) -->
+      <p id="appLinkNote" class="hidden text-sm text-indigo-700 bg-indigo-50 rounded-lg p-3 mb-6"></p>
+
       <!-- Step 1: Organization Discovery -->
       <div id="step1" class="step-content">
         <h2 class="text-2xl font-semibold text-gray-900 mb-6">Connect to your organization</h2>
@@ -415,6 +418,78 @@
       }
     }
 
+    // App links (electron-app-links.js): a link from an email (a share link, a
+    // signature request, a password reset for a firm not yet connected) may be
+    // waiting for this firm to be connected or for this sign-in. The page only
+    // learns which firm and that a link waits, never the link's token.
+    const appLinks = window.electronAPI && window.electronAPI.appLinks;
+    const appLinkNote = document.getElementById('appLinkNote');
+    const emailFromLink = new URLSearchParams(window.location.search).get('email');
+    if (emailFromLink) emailInput.value = emailFromLink;
+
+    function showAppLinkNote(text) {
+      appLinkNote.textContent = text;
+      appLinkNote.classList.remove('hidden');
+    }
+
+    async function continueAppLink(stage) {
+      if (!appLinks) return false;
+      try {
+        const next = await appLinks.takePending(stage);
+        if (next && next.page) {
+          window.location.replace(next.page);
+          return true;
+        }
+      } catch (e) {
+        console.warn('[Login] The waiting link could not continue:', e && e.message);
+      }
+      return false;
+    }
+
+    async function applyAppLinkContext() {
+      if (!appLinks) return;
+      let context = null;
+      try { context = await appLinks.loginContext(); } catch (_) { return; }
+      if (!context || !context.pending) return;
+
+      if (context.needsFirm) {
+        // Connect the link's firm first: its org ID and address are filled in.
+        localStorage.removeItem('lana_saved_server');
+        if (context.orgIdHint) orgIdInput.value = context.orgIdHint;
+        const wantsCustom = Boolean(context.domain) && context.domain !== generateServerUrl(orgIdInput.value);
+        if (wantsCustom !== isCustomUrl) toggleCustomUrlMode();
+        if (wantsCustom) serverUrlInput.value = context.domain;
+        else updateServerUrl();
+        showStep1();
+        showAppLinkNote(context.domain
+          ? `Connect to your firm (${context.domain}) to open the link from your email. Check the organization ID with your administrator if it is not right.`
+          : 'Connect to your firm to open the link from your email.');
+        return;
+      }
+
+      // The link's firm is already connected: sign in to it.
+      try {
+        const result = await window.electronAPI.getSavedServer();
+        const server = result && result.server ? { ...result.server } : null;
+        if (server && server.url) {
+          if (server.chefUrl) {
+            server.url = server.chefUrl;
+            delete server.chefUrl;
+            delete server.localEngine;
+          }
+          server.enabledApps = normalizeEnabledApps(server.enabledApps);
+          localStorage.setItem('lana_saved_server', JSON.stringify(server));
+          api.baseUrl = server.url;
+          showStep2(server);
+        }
+      } catch (e) {
+        console.warn('[Login] Could not read the connected firm:', e && e.message);
+      }
+      showAppLinkNote('Sign in to open the link from your email.');
+    }
+
+    applyAppLinkContext();
+
     // Toggle password visibility
     togglePassword.addEventListener('click', () => {
       const type = passwordInput.type === 'password' ? 'text' : 'password';
@@ -703,6 +778,10 @@
 
         Toast.success(`Connected to ${serverInfo.orgName || serverInfo.orgId}`);
 
+        // A waiting link that needs no sign-in (password reset, invitation,
+        // activation) continues now that its firm is connected.
+        if (await continueAppLink('connected')) return;
+
         // Show Step 2 (Login)
         showStep2(serverInfo);
 
@@ -794,6 +873,9 @@
             console.warn('[Login] Desktop notification permission check failed:', notificationError);
           }
         }
+
+        // A waiting link (share link, signature request) continues instead of the dashboard.
+        if (await continueAppLink('signed-in')) return;
 
         goToDashboardAfterLogin(500);
       } catch (error) {

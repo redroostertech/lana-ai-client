@@ -77,6 +77,65 @@ async function refreshHostedDiscovery(savedServer, options = {}) {
 }
 
 /**
+ * The server a discovery answer points at, shaped as the sign-in page saves
+ * it (login.html resolveOrganization): the address comes from static_ip,
+ * port and is_secure_ssl. Null when the answer is not a healthy server.
+ */
+function serverFromDiscovery(data) {
+  if (!data || data.status !== 'healthy' || !data.server || !data.discovery) return null;
+  const discovery = data.discovery;
+  if (!discovery.static_ip || !discovery.port) return null;
+  const isSecure = discovery.is_secure_ssl === true;
+  return {
+    url: `${isSecure ? 'https' : 'http'}://${discovery.static_ip}:${discovery.port}`,
+    host: discovery.static_ip,
+    port: discovery.port,
+    orgId: data.server.org_id,
+    orgName: data.server.org_name,
+    version: data.server.version,
+    apiVersion: data.server.api_version,
+    domain: data.domain,
+    vpn: discovery.vpn || null,
+    burstApiKey: data.burst_api_key || null,
+    burstUrl: data.burst_url || null,
+    forgeApiKey: data.forge_api_key || null,
+    forgeUrl: data.forge_url || null,
+    forgeSovereign: data.forge_sovereign || null,
+    tier: data.tier || 'standard',
+    rateLimit: data.rate_limit || 100,
+    enabledApps: Array.isArray(data.enabled_apps) ? data.enabled_apps : []
+  };
+}
+
+/**
+ * Find a firm's server from an app link's domain (electron-app-links.js).
+ * Hosted discovery needs the org id beside the domain; orgIdHint is the
+ * caller's guess. Returns the server only once its health endpoint answers,
+ * otherwise null (the person then connects on the sign-in page).
+ */
+async function discoverByDomain(domain, orgIdHint, options = {}) {
+  if (!domain || !orgIdHint) return null;
+  const http = options.http || axios;
+  const endpoint = options.endpoint || HOSTED_DISCOVERY_URL;
+  const verify = options.verify || verifyServer;
+  try {
+    logInfo(`[Discovery] Looking up the firm for ${domain}`);
+    const response = await http.post(endpoint, { org_id: orgIdHint, domain }, {
+      timeout: options.timeout || 5000,
+      headers: { 'Content-Type': 'application/json', 'User-Agent': 'LanaAI-Client/1.0' }
+    });
+    if (response.status !== 200) return null;
+    const server = serverFromDiscovery(response.data);
+    if (!server) return null;
+    const reachable = await verify(server.url);
+    return reachable ? server : null;
+  } catch (error) {
+    logError(`[Discovery] No firm found for ${domain}`, error);
+    return null;
+  }
+}
+
+/**
  * Verify server is reachable and return updated info with retry
  * @param {string} serverUrl - Full server URL (e.g., 'http://192.168.1.100:8080')
  * @param {number} retries - Number of retry attempts (default: 2)
@@ -134,5 +193,7 @@ module.exports = {
   HOSTED_DISCOVERY_URL,
   mergeHostedDiscovery,
   refreshHostedDiscovery,
+  serverFromDiscovery,
+  discoverByDomain,
   verifyServer
 };

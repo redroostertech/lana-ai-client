@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Join your firm - LANA</title>
+  <!-- Opened by an invitation link (lana-ai://accept-invite, electron-app-links.js). -->
+  <link rel="stylesheet" href="css/lex-tokens.css">
+  <link rel="stylesheet" href="css/tailwind-output.css">
+  <link rel="stylesheet" href="css/app-link-pages.css">
+  <link rel="stylesheet" href="css/accept-invite.css">
+</head>
+<body class="alp-body">
+  <main class="alp-page">
+    <lex-card class="alp-panel">
+      <lex-brand-mark animation="idle" size="56" class="alp-mark"></lex-brand-mark>
+
+      <section id="aiFormView" class="alp-view">
+        <div id="aiHeading" class="alp-heading"></div>
+        <lex-text tag="p" size="body-sm" variant="secondary">Choose a password for your LANA account. You will use it with your email to sign in.</lex-text>
+
+        <lex-form id="aiForm" class="alp-form">
+          <div class="ai-names">
+            <lex-input id="aiFirstName" name="first_name" label="First name (optional)" maxlength="100"></lex-input>
+            <lex-input id="aiLastName" name="last_name" label="Last name (optional)" maxlength="100"></lex-input>
+          </div>
+          <lex-input id="aiPassword" name="password" type="password" label="Password" required></lex-input>
+          <lex-input id="aiConfirm" name="confirm" type="password" label="Type it again" required></lex-input>
+          <div id="aiRules" class="alp-rules" aria-live="polite"></div>
+          <div id="aiError" class="alp-error" role="alert" hidden></div>
+          <lex-btn id="aiSubmit" type="submit" variant="primary" class="alp-submit">Join and set password</lex-btn>
+        </lex-form>
+      </section>
+
+      <section id="aiDoneView" class="alp-view" hidden>
+        <lex-text tag="h1" size="h4" weight="semibold" icon="check-circle" variant="success">You have joined</lex-text>
+        <lex-text tag="p" size="body-sm" variant="secondary">Your password is set. Sign in with your email and the password you just chose.</lex-text>
+        <lex-btn id="aiSignIn" variant="primary" class="alp-submit">Go to sign in</lex-btn>
+      </section>
+
+      <section id="aiInvalidView" class="alp-view" hidden>
+        <lex-text tag="h1" size="h4" weight="semibold" icon="alert-circle" variant="danger">This invitation link is incomplete</lex-text>
+        <lex-text tag="p" size="body-sm" variant="secondary">Open the link from your invitation email again, or ask your firm's administrator to send a new one.</lex-text>
+        <lex-btn id="aiInvalidSignIn" variant="secondary" class="alp-submit">Go to sign in</lex-btn>
+      </section>
+    </lex-card>
+  </main>
+
+  <script src="js/lex/lex.core.js"></script>
+  <script src="js/lex/lex.icons.js"></script>
+  <script src="js/lex/lex.forms.js"></script>
+  <script src="js/lex/index.js"></script>
+  <script src="js/lex/components/foundation/lex-card.js"></script>
+  <script src="js/lex/components/foundation/lex-text.js"></script>
+  <script src="js/lex/components/foundation/lex-btn.js"></script>
+  <script src="js/lex/components/form/lex-input.js"></script>
+  <script src="js/lex/components/form/lex-form.js"></script>
+  <script src="js/vendor/lottie_light.min.js"></script>
+  <script src="js/lex/brand/lex-brand-animations.js"></script>
+  <script src="js/lex/components/foundation/lex-brand-mark.js"></script>
+  <script src="js/shared/app-link-pages.model.js"></script>
+  <script src="js/shared/app-link-page-kit.js"></script>
+  <script src="js/pages/accept-invite.js"></script>
+</body>
+</html>

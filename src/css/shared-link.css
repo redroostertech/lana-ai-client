@@ -1,0 +1,12 @@
+/* Opening a share link (shared-link.html). Layout and theme: css/app-link-pages.css. */
+
+.sl-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-top: 0.5rem;
+}
+
+.sl-actions [hidden] {
+  display: none;
+}

@@ -60,7 +60,7 @@ function makeStorage() {
   };
 }
 
-async function runLoginScenario({ permission }) {
+async function runLoginScenario({ permission, electronAPI = undefined, search = '', onLoaded = null }) {
   const loginHtml = fs.readFileSync(path.join(ROOT, 'src/login.html'), 'utf8');
   const notificationsJs = fs.readFileSync(
     path.join(ROOT, 'src/js/notifications.js'),
@@ -78,6 +78,7 @@ async function runLoginScenario({ permission }) {
   const osNotifications = [];
   const timeouts = [];
   let permissionRequests = 0;
+  const replaced = [];
 
   const elements = new Map();
   const doc = {
@@ -125,6 +126,7 @@ async function runLoginScenario({ permission }) {
     fetch: async () => ({ ok: false, status: 503, json: async () => ({}) }),
     AbortSignal: { timeout: () => undefined },
     URL,
+    URLSearchParams,
     btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
     navigator: { platform: 'MacIntel' },
     Notification: NotificationStub,
@@ -141,7 +143,8 @@ async function runLoginScenario({ permission }) {
       isTokenExpired: () => true,
       login: async () => ({ token: 't', user: { id: 'u1', email: 'qa@example.com' } }),
     },
-    location: { href: '', replace() {} },
+    location: { href: '', search, replace(url) { replaced.push(url); } },
+    electronAPI,
     Date,
     JSON,
     Promise,
@@ -155,6 +158,7 @@ async function runLoginScenario({ permission }) {
 
   const loginForm = elements.get('loginForm');
   expect(loginForm && loginForm._handlers.submit).toBeTruthy();
+  if (onLoaded) onLoaded(elements);
 
   doc.getElementById('email').value = 'qa@example.com';
   doc.getElementById('password').value = 'hunter2!';
@@ -164,7 +168,7 @@ async function runLoginScenario({ permission }) {
   await new Promise((resolve) => setImmediate(resolve));
   await new Promise((resolve) => setImmediate(resolve));
 
-  return { toasts, osNotifications, timeouts, localStorage, permissionRequests: () => permissionRequests };
+  return { toasts, osNotifications, timeouts, localStorage, replaced, elements, permissionRequests: () => permissionRequests };
 }
 
 describe('SCRUM-234: successful login shows exactly one toast', () => {
@@ -196,5 +200,48 @@ describe('SCRUM-234: successful login shows exactly one toast', () => {
     expect(loginHtml).not.toContain('Desktop notifications enabled.');
     expect(loginHtml).not.toContain('requestPermissionAndTest');
     expect(loginHtml).toContain('DesktopNotifications.enableFromUserGesture');
+  });
+});
+
+// App links (electron-app-links.js): a link from an email that waited for
+// sign-in continues instead of the dashboard; the sign-in page never sees its token.
+describe('a link waiting for sign-in', () => {
+  function appLinksApi(page) {
+    const stages = [];
+    return {
+      stages,
+      api: {
+        getSavedServer: async () => ({ success: true, server: { url: 'http://127.0.0.1:3001', orgId: 'testorg', orgName: 'Test Org', domain: 'testorg.lanaai.io' } }),
+        saveSettings: async () => ({ success: true }),
+        getConfig: async () => ({}),
+        appLinks: {
+          loginContext: async () => ({ pending: true, action: 'shared', needsFirm: false, domain: null, orgIdHint: null }),
+          takePending: async (stage) => { stages.push(stage); return { page }; }
+        }
+      }
+    };
+  }
+
+  test('continues to the waiting page after sign-in, not the dashboard', async () => {
+    const links = appLinksApi('shared-link.html?token=abc');
+    const result = await runLoginScenario({ permission: 'granted', electronAPI: links.api });
+    expect(links.stages).toEqual(['signed-in']);
+    expect(result.replaced).toEqual(['shared-link.html?token=abc']);
+    expect(result.timeouts.some((t) => t.ms === 500)).toBe(false);
+    expect(result.elements.get('appLinkNote').textContent).toBe('Sign in to open the link from your email.');
+  });
+
+  test('goes to the dashboard as before when nothing waits', async () => {
+    const links = appLinksApi(null);
+    const result = await runLoginScenario({ permission: 'granted', electronAPI: links.api });
+    expect(links.stages).toEqual(['signed-in']);
+    expect(result.replaced).toEqual([]);
+    expect(result.timeouts.some((t) => t.ms === 500)).toBe(true);
+  });
+
+  test('fills the email in from the address (after an invitation or activation)', async () => {
+    let emailOnLoad = null;
+    await runLoginScenario({ permission: 'granted', search: '?email=pat%40norton.law', onLoaded: (els) => { emailOnLoad = els.get('email').value; } });
+    expect(emailOnLoad).toBe('pat@norton.law');
   });
 });

@@ -1,0 +1,90 @@
+/* Pages opened by app links from Chef's emails: accept-invite.html, activate.html,
+   shared-link.html (each adds its own stylesheet). One centred Lex card on the page
+   background, light or dark as the computer is set (app-link-page-kit.js sets
+   data-lex-theme on <html>). The dark tokens match the first-launch screen's. */
+
+[data-lex-theme="dark"] .alp-body {
+  color-scheme: dark;
+  --lex-bg-primary: #151715;
+  --lex-bg-secondary: #1e211e;
+  --lex-bg-tertiary: #232723;
+  --lex-text-primary: #eef1ee;
+  --lex-text-secondary: #b2b9b2;
+  --lex-text-tertiary: #8b938b;
+  --lex-border-default: #343a34;
+  --lex-border-subtle: #2a2f2a;
+  --lex-border-strong: #4a514a;
+  --lex-color-gray-50: #232723;
+  --lex-color-gray-100: #232723;
+  --lex-color-gray-200: #2e332e;
+  --lex-color-gray-300: #3b413b;
+  --lex-bg-accent: #e8ece8;
+  --lex-bg-accent-hover: #ffffff;
+  --lex-text-on-accent: #151715;
+  --lex-bg-accent-soft: rgba(103, 201, 160, 0.16);
+  --lex-status-success-text: #67c9a0;
+  --lex-status-danger-text: #f19a92;
+  --lex-input-text: #eef1ee;
+  --lex-input-placeholder: #8b938b;
+}
+
+.alp-body {
+  background: var(--lex-bg-secondary);
+  color: var(--lex-text-primary);
+}
+
+.alp-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 2rem 1rem;
+  box-sizing: border-box;
+}
+
+.alp-panel {
+  display: block;
+  width: 100%;
+  max-width: 28rem;
+  border-radius: var(--lex-radius-xl, 16px);
+  overflow: hidden;
+}
+
+.alp-mark {
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.alp-view {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.alp-view[hidden],
+.alp-error[hidden] {
+  display: none;
+}
+
+.alp-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  margin-top: 0.5rem;
+}
+
+.alp-rules {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.alp-submit {
+  display: block;
+  margin-top: 0.25rem;
+}
+
+.alp-submit button {
+  width: 100%;
+  justify-content: center;
+}

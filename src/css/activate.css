@@ -1,0 +1,11 @@
+/* Account activation (activate.html). Layout and theme: css/app-link-pages.css. */
+
+.ac-back {
+  align-self: center;
+}
+
+#acCodeField[hidden],
+#acIntroCode[hidden],
+#acIntroLink[hidden] {
+  display: none;
+}
