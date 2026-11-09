@@ -160,6 +160,8 @@
    * @param {Object} [input.redactor]  { memoryBytes }: the redactor runs whenever the app is open
    *                                  (electron-redactor.js REDACTOR_MEMORY_BYTES); none when it
    *                                  is not on this computer
+   * @param {Object} [input.docling]  { memoryBytes }: Docling runs whenever the app is open when it
+   *                                  is on this computer (electron-docling.js DOCLING_MEMORY_BYTES)
    * @param {string[]} [input.installed]  ids already on disk and checked (they need no space)
    * @param {string} [input.chosenChatId]  the person's choice; ignored when it won't fit
    * @returns {Object} { computer, chatChoices, defaultChatId, plan, download }
@@ -195,6 +197,10 @@
     // 1b. The redactor: always on when it is here, so always set aside. It is part of the app,
     //     not a download.
     if (input.redactor && input.redactor.memoryBytes) {reserved += input.redactor.memoryBytes;}
+
+    // 1c. Docling: runs whenever the app is open when it is on this computer, so the organization's
+    //     server can hand it uploaded files to read (electron-docling.js DOCLING_MEMORY_BYTES).
+    if (input.docling && input.docling.memoryBytes) {reserved += input.docling.memoryBytes;}
 
     // 2. Speech and voice: set aside only when they fit beside embedding. Disk is checked
     //    after chat, below, because chat comes first on the disk.

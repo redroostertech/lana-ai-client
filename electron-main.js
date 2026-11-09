@@ -161,10 +161,34 @@ const redactor = createRedactor({
   }
 });
 
-// What the engine is given for this computer's own servers: Pip's and the redactor's together.
-const localServers = { pip: {}, redactor: {} };
+// Docling on this computer, if there is one (electron-docling.js): the organization's server
+// offers uploaded files to it first, and reads them itself when it is not running.
+const { createDocling, resolveDoclingCommand, doclingEndpoints, DOCLING_MEMORY_BYTES } = require('./electron-docling');
+const doclingCommand = resolveDoclingCommand({ env: process.env, userDataDir: app.getPath('userData'), home: app.getPath('home'), fileExists: (file) => fs.existsSync(file) });
+const docling = createDocling({
+  command: doclingCommand,
+  spawn: require('child_process').spawn,
+  fetch: (url, { timeoutMs = 3000, ...init } = {}) => fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) }),
+  pickPort: pickLoopbackPort,
+  baseEnv: process.env,
+  openLog: () => {
+    try {
+      fs.mkdirSync(path.join(app.getPath('userData'), 'docling'), { recursive: true });
+      return fs.createWriteStream(path.join(app.getPath('userData'), 'docling', 'docling.log'), { flags: 'w' });
+    } catch (_error) { return null; }
+  },
+  log: { info: logInfo, warn: logWarn, error: (message) => logError(message) },
+  onAddress: (url) => {
+    logInfo(`[docling] ${url ? `ready on ${url}` : 'not running'}`);
+    localServers.docling = doclingEndpoints(url);
+    pushLocalServers();
+  }
+});
+
+// What the engine is given for this computer's own servers: Pip's, the redactor's and Docling's together.
+const localServers = { pip: {}, redactor: {}, docling: {} };
 function pushLocalServers() {
-  localEngine.setModelEndpoints({ ...localServers.pip, ...localServers.redactor })
+  localEngine.setModelEndpoints({ ...localServers.pip, ...localServers.redactor, ...localServers.docling })
     .catch((error) => logError('[electron-main] Local AI engine did not restart for its local servers', error));
 }
 
@@ -176,6 +200,7 @@ const firstLaunch = createFirstLaunch({
   userDataDir: app.getPath('userData'),
   state: firstLaunchPersistence,
   redactorMemoryBytes: redactorCommand ? REDACTOR_MEMORY_BYTES : 0,
+  doclingMemoryBytes: doclingCommand && !doclingCommand.external ? DOCLING_MEMORY_BYTES : 0,
   onStatus: (status) => {
     if (status.phase === 'failed') {logWarn(`[first-launch] setup stopped: ${status.error && status.error.code}`);}
   },
@@ -2216,6 +2241,7 @@ app.whenReady().then(async () => {
 
   // Model downloads cut off last time pick up again in the background.
   void redactor.start().catch((error) => logError('[electron-main] The redactor did not start', error));
+  void docling.start().catch((error) => logError('[electron-main] Docling did not start', error));
   void firstLaunch.resume();
 
   // macOS dock icon. On packaged builds Electron reads from the .app bundle's
@@ -2424,7 +2450,7 @@ app.on('before-quit', async (event) => {
       .catch((error) => logError('[electron-main] Failed to stop the local AI engine', error))
       // Pip last: the engine may still be handing a job off through it.
       .then(() => firstLaunch.pause())
-      .then(() => Promise.all([pip.stop(), redactor.stop()]))
+      .then(() => Promise.all([pip.stop(), redactor.stop(), docling.stop()]))
       .catch((error) => logError('[electron-main] Failed to stop Pip', error))
       .finally(() => app.quit());
     return;

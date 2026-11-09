@@ -45,6 +45,10 @@ const ENGINE_MODEL_ENV = Object.freeze(['LANA_TIER', 'EMBEDDING_MODEL', 'LANA_EN
 // names a redactor, otherwise the client's own.
 const REDACTOR_ENV = Object.freeze(['REDACTOR_URL', 'INTERNAL_SERVICE_SECRET']);
 
+// Docling on this computer (electron-docling.js): its address and how long one file may take.
+// The engine reads uploaded files with it when the organization's server offers them.
+const DOCLING_ENV = Object.freeze(['DOCLING_API_URL', 'DOC_PARSER_TIMEOUT_DOCLING_MS', 'DOCLING_TIMEOUT_MS']);
+
 // The engine will not start without an engine level (LANA_TIER). When neither the environment
 // nor anything else names one, the client gives demo: it budgets 8192 tokens, which never
 // exceeds a planned Pip slot (8192 at the least) or a cloud model's window, so it is safe for
@@ -197,7 +201,7 @@ function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = proces
     const extra = { LANA_ENGINE_ID: engineId() };
     // Phase 10: the engine's offline copy folder, in this app's own data folder.
     if (offlineKey) {extra.LANA_ENGINE_OFFLINE_DIR = path.join(cwd, 'offline');}
-    for (const name of ENGINE_MODEL_ENV) {
+    for (const name of [...ENGINE_MODEL_ENV, ...DOCLING_ENV]) {
       if (typeof env[name] === 'string' && env[name]) {extra[name] = env[name];}
       else if (typeof modelEndpoints[name] === 'string' && modelEndpoints[name]) {extra[name] = modelEndpoints[name];}
     }
@@ -219,14 +223,14 @@ function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = proces
    */
   async function setModelEndpoints(values) {
     const next = {};
-    for (const name of [...ENGINE_MODEL_ENV, ...REDACTOR_ENV]) {
+    for (const name of [...ENGINE_MODEL_ENV, ...REDACTOR_ENV, ...DOCLING_ENV]) {
       if (typeof values[name] === 'string' && values[name]) {next[name] = values[name];}
     }
     if (JSON.stringify(next) === JSON.stringify(modelEndpoints)) {return;}
     modelEndpoints = next;
     const state = supervisor.getState();
     if (state.mode === 'spawn' && state.process !== 'stopped') {
-      log.info('[local-engine] the AI servers on this computer changed (Pip or the redactor); restarting the engine');
+      log.info('[local-engine] the AI servers on this computer changed (Pip, the redactor or Docling); restarting the engine');
       await supervisor.restart();
     }
   }
@@ -391,4 +395,4 @@ function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = proces
   };
 }
 
-module.exports = { createLocalEngineHost, bundledEngineRoot, DEFAULT_ENGINE_TIER, REDACTOR_ENV, statusView, pickLoopbackPort, backgroundJobsEnabled, CHANNELS, ENGINE_MODEL_ENV, pushOfflineKeyFor, canOpenOffline };
+module.exports = { createLocalEngineHost, bundledEngineRoot, DEFAULT_ENGINE_TIER, REDACTOR_ENV, DOCLING_ENV, statusView, pickLoopbackPort, backgroundJobsEnabled, CHANNELS, ENGINE_MODEL_ENV, pushOfflineKeyFor, canOpenOffline };

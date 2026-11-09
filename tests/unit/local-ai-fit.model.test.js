@@ -197,6 +197,16 @@ describe('plain words', () => {
   });
 });
 
+test('Docling is set aside when it is on this computer (1 GiB), so a 12 GB computer drops from the 4B', () => {
+  const input = (doclingBytes) => ({
+    hardware: { totalMemoryBytes: 12 * 1024 ** 3, accelerator: { backend: 'metal' }, freeDiskBytes: 1024 ** 4, cores: 12 },
+    catalog: parseCatalog(BUILT_IN), embedding: embeddingModel(), speech: speechSizes(),
+    docling: { memoryBytes: doclingBytes }, installed: []
+  });
+  expect(fit.planLocalAi(input(0)).plan.chat.id).toBe('qwen3.5-4b-q4');
+  expect(fit.planLocalAi(input(require('../../electron-docling').DOCLING_MEMORY_BYTES)).plan.chat.id).toBe('qwen3.5-0.8b-q4');
+});
+
 test('the redactor is always set aside when it is on this computer, so a 12 GB computer drops from the 4B', () => {
   const input = (redactorBytes) => ({
     hardware: { totalMemoryBytes: 12 * 1024 ** 3, accelerator: { backend: 'metal' }, freeDiskBytes: 1024 ** 4, cores: 12 },
