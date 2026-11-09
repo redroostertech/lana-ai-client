@@ -1,7 +1,8 @@
 /*
  * LANA File Editor - collaboration-tools.js
  *
- * Pure helpers for signature staging and persisted review-comment anchors.
+ * Pure helpers for signature staging, opening a signature packet from a link,
+ * and persisted review-comment anchors.
  */
 (function (global) {
   'use strict';
@@ -103,7 +104,44 @@
     };
   }
 
+  var PACKET_MESSAGES = {
+    notFound: 'This signature request is not on this document. It may have been cancelled or replaced. The document is open.',
+    notSigner: 'You are not a signer on this signature request. The document is open.',
+    loadFailed: 'The signature request could not be loaded. The document is open.'
+  };
+
+  /**
+   * What File Editor does with ?signature_packet=<id> (sign links from Chef's
+   * emails and Chef's in-app signature notification) once the document's
+   * packets are loaded:
+   *   { action: 'none' }                    no packet in the link
+   *   { action: 'open', packetId }          open the signature panel on it
+   *   { action: 'message', reason, message } say why, leave the document open
+   */
+  function signaturePacketFocus(input) {
+    var options = input || {};
+    var packetId = toText(options.packetId).trim();
+    if (!packetId) return { action: 'none' };
+    if (options.loadFailed) return { action: 'message', reason: 'load_failed', message: PACKET_MESSAGES.loadFailed };
+    var packets = Array.isArray(options.packets) ? options.packets : [];
+    var packet = null;
+    for (var i = 0; i < packets.length; i += 1) {
+      if (packets[i] && toText(packets[i].id) === packetId) {
+        packet = packets[i];
+        break;
+      }
+    }
+    if (!packet) return { action: 'message', reason: 'not_found', message: PACKET_MESSAGES.notFound };
+    var email = normalizeEmail(options.currentEmail);
+    var isSigner = Boolean(email) && (Array.isArray(packet.signers) ? packet.signers : []).some(function (signer) {
+      return normalizeEmail(signer && signer.email) === email;
+    });
+    if (!isSigner) return { action: 'message', reason: 'not_signer', message: PACKET_MESSAGES.notSigner };
+    return { action: 'open', packetId: packetId };
+  }
+
   var api = {
+    signaturePacketFocus: signaturePacketFocus,
     normalizeEmail: normalizeEmail,
     hasDuplicateSigner: hasDuplicateSigner,
     buildCommentAnchor: buildCommentAnchor,

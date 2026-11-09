@@ -3005,6 +3005,12 @@
   grid-template-columns: minmax(0, 1fr) auto auto;
 }
 
+/* Sign and Decline get their own row so the signer's name and email keep the width. */
+.office-signer-list li > .office-inline-actions {
+  grid-column: 1 / -1;
+  margin-top: 0;
+}
+
 .office-pill {
   background: var(--lex-status-neutral-bg);
   border: 1px solid var(--office-line);

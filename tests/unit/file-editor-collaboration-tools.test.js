@@ -12,6 +12,56 @@ const editorHtml = fs.readFileSync(path.join(__dirname, '../../src/file-editor.h
 const routerPages = fs.readFileSync(path.join(__dirname, '../../src/js/lex/lex-router.pages.js'), 'utf8');
 
 describe('file-editor collaboration tools', () => {
+  describe('signature packet from a link (?signature_packet=)', () => {
+    const packets = [
+      { id: 'pk-1', signers: [{ email: 'pat.lee@example.com' }] },
+      { id: 'pk-2', signers: [{ email: 'Alex.Smith@Example.com' }, { email: 'pat.lee@example.com' }] }
+    ];
+    const focus = (input) => collaborationTools.signaturePacketFocus(input);
+
+    test('the packet in the link opens the panel on that packet for its signer', () => {
+      expect(focus({ packetId: 'pk-2', packets, currentEmail: ' alex.smith@example.com ' }))
+        .toEqual({ action: 'open', packetId: 'pk-2' });
+    });
+
+    test('a packet that is not on this document says so and leaves the document open', () => {
+      const result = focus({ packetId: 'pk-9', packets, currentEmail: 'alex.smith@example.com' });
+      expect(result).toMatchObject({ action: 'message', reason: 'not_found' });
+      expect(result.message).toBe('This signature request is not on this document. It may have been cancelled or replaced. The document is open.');
+    });
+
+    test('someone who is not a signer is told plainly', () => {
+      const result = focus({ packetId: 'pk-1', packets, currentEmail: 'alex.smith@example.com' });
+      expect(result).toMatchObject({ action: 'message', reason: 'not_signer' });
+      expect(result.message).toBe('You are not a signer on this signature request. The document is open.');
+      expect(focus({ packetId: 'pk-1', packets, currentEmail: '' }).reason).toBe('not_signer');
+    });
+
+    test('packets that could not load say so', () => {
+      expect(focus({ packetId: 'pk-1', packets: [], currentEmail: 'pat.lee@example.com', loadFailed: true }))
+        .toMatchObject({ action: 'message', reason: 'load_failed' });
+    });
+
+    test('no packet in the link keeps today\'s behaviour', () => {
+      expect(focus({ packetId: '', packets, currentEmail: 'pat.lee@example.com' })).toEqual({ action: 'none' });
+      expect(focus({ packets, currentEmail: 'pat.lee@example.com', loadFailed: true })).toEqual({ action: 'none' });
+      expect(focus(undefined)).toEqual({ action: 'none' });
+    });
+
+    test('File Editor reads signature_packet once and acts on it after the packets load', () => {
+      expect(editorSource).toContain("routeSignaturePacketId = String(routeParams().get('signature_packet') || '').trim();");
+      const loader = editorSource.slice(
+        editorSource.indexOf('async function loadRemoteWorkflows(file, options)'),
+        editorSource.indexOf('function setUpdated(file)')
+      );
+      expect(loader.indexOf('focusRouteSignaturePacket(remote);')).toBeGreaterThan(loader.indexOf('} finally {'));
+      expect(loader).toContain('tools.signaturePacketFocus({');
+      expect(loader).toContain("routeSignaturePacketId = '';");
+      expect(loader).toMatch(/focus\.action === 'open'\) \{\s*remote\.selectedPacketId = focus\.packetId;\s*activateOfficePanel\('signatures'\);/);
+      expect(loader).toMatch(/focus\.action === 'message'\) \{\s*notice\(focus\.message\);/);
+    });
+  });
+
   describe('signature signer staging', () => {
     test('rejects duplicate emails case-insensitively after trimming', () => {
       const signers = [

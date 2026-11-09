@@ -40,6 +40,9 @@
   var KIND_LABELS = { doc: 'Text document', sheet: 'Spreadsheet', deck: 'Slide deck' };
   var KIND_ICONS = { doc: 'file-text', sheet: 'table-2', deck: 'monitor' };
   var activePanel = 'editor';
+  // ?signature_packet=<id> from a sign link or Chef's signature notification:
+  // handled once, after the document's packets load.
+  var routeSignaturePacketId = '';
   var activeFilter = 'all';
   var rightRailMode = 'review';
   var reviewRailTab = 'changes';
@@ -3009,7 +3012,29 @@
       renderChrome();
       renderRemotePanels(file);
     }
+    focusRouteSignaturePacket(remote);
     return remote;
+  }
+
+  // Opens the signature panel on the link's packet, or says plainly why not
+  // and leaves the document open (collaboration-tools.js decides).
+  function focusRouteSignaturePacket(remote) {
+    var tools = collaborationTools();
+    if (!routeSignaturePacketId || !remote || !tools || typeof tools.signaturePacketFocus !== 'function') return;
+    var currentUser = currentUserRecord() || {};
+    var focus = tools.signaturePacketFocus({
+      packetId: routeSignaturePacketId,
+      packets: remote.signaturePackets,
+      currentEmail: currentUser.email || currentUser.username || '',
+      loadFailed: !remote.loaded || Boolean(remote.error)
+    });
+    routeSignaturePacketId = '';
+    if (focus.action === 'open') {
+      remote.selectedPacketId = focus.packetId;
+      activateOfficePanel('signatures');
+    } else if (focus.action === 'message') {
+      notice(focus.message);
+    }
   }
 
   function setUpdated(file) {
@@ -5278,6 +5303,14 @@
   function toast(message) {
     if (window.Lex && Lex.Toast && Lex.Toast.success) {
       Lex.Toast.success(message);
+      return;
+    }
+    console.log('[file-editor] ' + message);
+  }
+
+  function notice(message) {
+    if (window.Lex && Lex.Toast && Lex.Toast.warning) {
+      Lex.Toast.warning(message, { duration: 10000 });
       return;
     }
     console.log('[file-editor] ' + message);
@@ -8335,6 +8368,7 @@
     state = loadState();
     bindEvents();
     var ctx = window.Lex && Lex.Nav && typeof Lex.Nav.consume === 'function' ? Lex.Nav.consume() : null;
+    routeSignaturePacketId = String(routeParams().get('signature_packet') || '').trim();
     applyFileEditorContext(ctx);
     if (!activeFile()) {
       editorRouteLoading = Boolean(routeParams().get('id'));
