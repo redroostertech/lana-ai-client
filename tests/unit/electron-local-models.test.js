@@ -9,7 +9,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
-const { CATALOG, SPEECH_CATALOG, speechPackages, embeddingModel, downloadModel, isInstalled, embeddingEngineEnv } = require('../../electron-local-models');
+const { CATALOG, SPEECH_CATALOG, speechPackages, embeddingModel, downloadModel, isInstalled } = require('../../electron-local-models');
 
 // The firm's embedding identity (LANA-AI deploy/railway/embed/embed-pin.json).
 const FIRM_IDENTITY = {
@@ -108,12 +108,5 @@ describe('verified download', () => {
     const fetchImpl = jest.fn();
     await expect(downloadModel(entry, dir, { fetchImpl })).rejects.toThrow(/catalog/);
     expect(fetchImpl).not.toHaveBeenCalled();
-  });
-
-  test('the engine gets the embedding settings only when the pinned file is installed (a file of the right name but wrong content does not count)', async () => {
-    const dir = tempDir();
-    expect(await embeddingEngineEnv(dir)).toEqual({});
-    fs.writeFileSync(path.join(dir, embeddingModel().filename), 'not the model');
-    expect(await embeddingEngineEnv(dir)).toEqual({});
   });
 });

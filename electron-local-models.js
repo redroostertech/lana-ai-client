@@ -225,19 +225,4 @@ async function downloadModel(entry, dir, { fetchImpl = (...args) => fetch(...arg
   }
 }
 
-/**
- * The engine settings for this computer's embedding model, when the pinned
- * file is installed: the file the engine hashes to verify its identity, and
- * the model id and version that file is. Empty when it is not installed.
- */
-async function embeddingEngineEnv(dir) {
-  const entry = embeddingModel();
-  if (!(await isInstalled(entry, dir))) {return {};}
-  return {
-    LANA_ENGINE_EMBEDDING_MODEL_FILE: path.join(dir, entry.filename),
-    EMBEDDING_MODEL: entry.modelId,
-    EMBEDDING_VERSION: entry.modelVersion
-  };
-}
-
-module.exports = { CATALOG, SPEECH_CATALOG, speechPackages, embeddingModel, modelsDir, isInstalled, downloadModel, embeddingEngineEnv, sha256OfFile };
+module.exports = { CATALOG, SPEECH_CATALOG, speechPackages, embeddingModel, modelsDir, isInstalled, downloadModel, sha256OfFile };
