@@ -21,7 +21,8 @@
  *
  * Where the program is, in this order:
  *   LANA_REDACTOR_BIN    a built program (developers)
- *   <resources>/redactor/lana-redactor (lana-redactor.exe on Windows), in an installed app
+ *   <resources>/redactor/lana-redactor/lana-redactor (lana-redactor.exe on Windows), in an installed app:
+ *                        one folder (scripts/build-redactor.sh), so it starts without unpacking
  *   LANA_REDACTOR_SRC    a lana-redactor checkout, run with the uvicorn of LANA_REDACTOR_VENV
  *                        or ~/.lananode/redactor/venv (development; the checkout comes first on
  *                        PYTHONPATH, so its code is what runs)
@@ -44,9 +45,9 @@ const INHERITED_ENV = [
 ];
 
 // What the redactor holds in memory, set aside when sizing this computer. Measured on an Apple
-// M4 Pro with the lighter layers: 427 MB after the first request, 458 MB at the peak while
-// redacting a 54,265-character text three times (about 5 seconds each).
-const REDACTOR_MEMORY_BYTES = 0.5 * 1024 ** 3;
+// M4 Pro with the lighter layers: 458 MiB at the peak from the development checkout and 533 MiB
+// from the packaged program, redacting a 54,265-character text three times (about 6 seconds each).
+const REDACTOR_MEMORY_BYTES = 0.6 * 1024 ** 3;
 
 const REDACTOR_DEFAULTS = Object.freeze({
   ...DEFAULTS,
@@ -67,7 +68,7 @@ function resolveRedactorCommand({ env = {}, resourcesPath = null, isPackaged = f
   }
   if (isPackaged && resourcesPath) {
     const root = path.join(resourcesPath, 'redactor');
-    const file = path.join(root, platform === 'win32' ? 'lana-redactor.exe' : 'lana-redactor');
+    const file = path.join(root, 'lana-redactor', platform === 'win32' ? 'lana-redactor.exe' : 'lana-redactor');
     if (!fileExists(file)) {return null;}
     const ocr = path.join(root, 'ocr');
     const tesseract = path.join(ocr, 'bin', platform === 'win32' ? 'tesseract.exe' : 'tesseract');

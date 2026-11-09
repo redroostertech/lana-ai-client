@@ -88,7 +88,7 @@
     "binaries": [
       "Contents/Resources/screen-voice/lana-screen-voice",
       "Contents/Resources/briefs/LanaBleWake",
-      "Contents/Resources/redactor/lana-redactor"
+      "Contents/Resources/redactor/lana-redactor/lana-redactor"
     ],
     "extendInfo": {
       "NSMicrophoneUsageDescription": "LANA uses the microphone when you dictate, talk with LANA, or record a meeting.",
@@ -124,8 +124,8 @@
     "icon": "build/icons/icon.ico",
     "extraResources": [
       {
-        "from": "build/redactor/lana-redactor.exe",
-        "to": "redactor/lana-redactor.exe"
+        "from": "build/redactor/lana-redactor",
+        "to": "redactor/lana-redactor"
       }
     ]
   },

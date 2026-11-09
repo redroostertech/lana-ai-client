@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Builds build/redactor/lana-redactor (lana-redactor.exe on Windows): one program holding Python,
-# the redactor at the commit in redactor/redactor-pin.json, Presidio, spaCy and en_core_web_lg.
-# It is how BLOT packages the same redactor (blot-framework sidecar/redactor/build-sidecar.sh).
+# Builds build/redactor/lana-redactor/: one folder holding the program lana-redactor (lana-redactor.exe
+# on Windows) with Python,
+# the redactor at the commit in redactor/redactor-pin.json, Presidio, spaCy and en_core_web_lg beside it.
+# Packaged the way BLOT packages the same redactor (blot-framework sidecar/redactor/build-sidecar.sh),
+# but as one folder, not one file: a one-file build unpacks about 670 MB into the temp folder on every
+# launch (30 to 47 seconds, measured 2026-11-09) and leaves it behind after a crash.
 # Run it on each target OS and processor before packaging; the package step refuses to build
 # without it (scripts/redactor-before-pack.js).
 #
@@ -47,7 +50,8 @@ fi
 mkdir -p "$output_dir"
 work_dir="$(mktemp -d)"
 trap 'rm -rf "$work_dir"' EXIT
-"$python_bin" -m PyInstaller --noconfirm --clean --onefile \
+rm -rf "$output_dir/lana-redactor"
+"$python_bin" -m PyInstaller --noconfirm --clean --onedir \
   --name lana-redactor \
   --paths "$source_dir" \
   --collect-all redactor \
@@ -61,4 +65,4 @@ trap 'rm -rf "$work_dir"' EXIT
   --specpath "$work_dir" \
   --distpath "$output_dir" \
   "$root_dir/redactor/lana_redactor.py"
-echo "Built $(ls "$output_dir"/lana-redactor*)"
+echo "Built $(ls -d "$output_dir"/lana-redactor/lana-redactor*)"

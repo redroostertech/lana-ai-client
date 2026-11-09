@@ -76,13 +76,13 @@ describe('where the redactor is', () => {
 
   test('the installed app\'s own program, with its OCR runtime when it is there', () => {
     const res = '/app/res';
-    const bin = path.join(res, 'redactor', 'lana-redactor');
+    const bin = path.join(res, 'redactor', 'lana-redactor', 'lana-redactor');
     const tesseract = path.join(res, 'redactor', 'ocr', 'bin', 'tesseract');
     const tessdata = path.join(res, 'redactor', 'ocr', 'tessdata');
     expect(resolveRedactorCommand({ isPackaged: true, resourcesPath: res, platform: 'darwin', fileExists: exists(bin, tesseract, tessdata) }))
       .toMatchObject({ command: bin, env: { LANA_TESSERACT_PATH: tesseract, LANA_TESSDATA_DIR: tessdata } });
     expect(resolveRedactorCommand({ isPackaged: true, resourcesPath: res, platform: 'darwin', fileExists: exists(bin) }).env).toEqual({});
-    const win = path.join('C:\\app', 'redactor', 'lana-redactor.exe');
+    const win = path.join('C:\\app', 'redactor', 'lana-redactor', 'lana-redactor.exe');
     expect(resolveRedactorCommand({ isPackaged: true, resourcesPath: 'C:\\app', platform: 'win32', fileExists: exists(win) }).command).toBe(win);
     expect(resolveRedactorCommand({ isPackaged: true, resourcesPath: res, fileExists: exists() })).toBeNull();
   });
@@ -184,8 +184,8 @@ describe('packaging', () => {
 
   test('the package step refuses a build without the redactor program for its platform', async () => {
     const root = path.resolve(__dirname, '../..');
-    expect(beforePack.redactorFile(root, 'win32')).toBe(path.join(root, 'build', 'redactor', 'lana-redactor.exe'));
-    expect(beforePack.redactorFile(root, 'darwin')).toBe(path.join(root, 'build', 'redactor', 'lana-redactor'));
+    expect(beforePack.redactorFile(root, 'win32')).toBe(path.join(root, 'build', 'redactor', 'lana-redactor', 'lana-redactor.exe'));
+    expect(beforePack.redactorFile(root, 'darwin')).toBe(path.join(root, 'build', 'redactor', 'lana-redactor', 'lana-redactor'));
     const exists = jest.spyOn(fs, 'existsSync');
     exists.mockReturnValue(false);
     await expect(beforePack({ electronPlatformName: 'darwin' })).rejects.toThrow(/redactor program is missing/);
@@ -198,8 +198,8 @@ describe('packaging', () => {
     const placed = (section) => (config[section].extraResources || []).map((entry) => entry.to);
     expect(placed('mac')).toContain('redactor/lana-redactor');
     expect(placed('linux')).toContain('redactor/lana-redactor');
-    expect(placed('win')).toContain('redactor/lana-redactor.exe');
-    expect(config.mac.binaries).toContain('Contents/Resources/redactor/lana-redactor');
+    expect(placed('win')).toContain('redactor/lana-redactor');
+    expect(config.mac.binaries).toContain('Contents/Resources/redactor/lana-redactor/lana-redactor');
     expect(config.beforePack).toBe('scripts/before-pack.js');
   });
 
