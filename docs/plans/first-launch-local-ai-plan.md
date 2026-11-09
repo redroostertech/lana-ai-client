@@ -15,13 +15,26 @@
 The first time someone opens LANA on a computer, LANA should:
 
 1. Look at the computer: memory, graphics chip and its memory, free disk space, processor.
-2. Show which AI models this computer can run, which ones run comfortably, and how much each one can remember at once (its context window).
-3. Pick a good setup for this computer, and let the person change it.
-4. Download the chosen models, checking every file, and keep going if the app is closed and opened again.
-5. Start Pip (LANA's AI server) for chat and embedding on this computer, plus vision when it fits.
-6. Use Forge in the cloud for anything this computer cannot run, unless the firm's admin has set up their own cloud provider. Then it uses that provider instead.
+2. Show which chat models this computer can run, which ones run comfortably, and how much each one can remember at once (its context window).
+3. Pick a chat model for this computer by default. The person can keep it or choose another chat model. That is the only choice they make.
+4. Choose everything else itself: the vision file that goes with the chat model, the embedding model, and the speech and voice models. LANA decides these, and installs each one only if it fits this computer and there is room on the disk.
+5. Download the models, checking every file, and keep going if the app is closed and opened again.
+6. Start Pip (LANA's AI server) for chat and embedding on this computer, plus vision when it fits.
+7. Use Forge in the cloud for chat and embedding when this computer cannot run them, unless the firm's admin has set up their own cloud provider. Then it uses that provider instead.
 
-After the first launch, the same facts live in **Settings > Capabilities**, so the person can see them and change models later.
+The whole flow must be simple enough for anyone. Someone who does not know what a model is should be able to press one button and be done.
+
+After the first launch, the same facts live in **Settings > Capabilities**, so the person can see them and change the chat model later.
+
+### Who chooses what
+
+| Model | Who chooses | How |
+|---|---|---|
+| Chat | **The person**, with a default already picked | Default is the best chat model that fits comfortably |
+| Vision (images) | LANA | The vision file paired with the chosen chat model, added only if it still fits |
+| Embedding (search and memory) | LANA | Always the pinned nomic file. Never offered as a choice. |
+| Speech (listening) | LANA | The Briefs speech models, installed if there is room |
+| Voice (speaking) | LANA | The Briefs voice model, installed if there is room |
 
 ### The fallback rule
 
@@ -88,16 +101,16 @@ What not to use from LANA One: Postgres, MinIO, the bundled backend, its secrets
 | D1 | Who starts Pip | **The LANA client**, as a child process it supervises | No Pip account needed. Works the same on every platform. Pip Desktop's supervisor is untested on macOS. |
 | D2 | Where `lqe` comes from | **Bundled in the installer** per platform, from the LANA.cpp `v3.0.0` release, checked by SHA-256 | Works offline on first launch. Same build the backend pins. |
 | D3 | Which model list | **The published Pip catalog** (`models.lanaai.io/llm/catalog.json`), filtered to the models LANA supports, with a bundled copy as fallback | One list for Pip Desktop and LANA. New models show up without a client release. |
-| D4 | Who chooses models | **LANA picks a recommended setup and the person can change it** on the first-launch screen and in Settings | Most people should just press Continue. |
+| D4 | Who chooses models | **The person chooses only the chat model, with a default already selected.** LANA chooses vision, embedding, speech and voice. Any user can change the chat model, on the first-launch screen and in Settings. (Decided 2026-11-09.) | Most people should just press Continue. LANA controls the models it depends on, so they are always the ones it requires. |
 | D5 | Context window | **The largest step that stays comfortable**: 32768, then 16384, then 8192 tokens. Below 8192, chat uses the cloud. | LANA answers from documents and needs room. 8192 is LANA One's floor. |
 | D6 | Ports | **A LANA band**: chat 8081, embedding 8082, vision on the chat server. Use the next free port if one is taken, and pass the real address to the engine. | Matches today's dev setup and LANA One, and avoids Pip Desktop's bands. |
 | D7 | When setup runs | **Before sign-in**, in its own window. Downloads keep going in the background after the person moves on. | Models do not need an account. Sign-in should not wait on a 5 GB download. |
 | D8 | Where state is kept | electron-store key `firstLaunch` (plan, versions, step done), model files in `<userData>/models` | Survives restarts. One place to reset. |
 
-Open questions for Michael:
-- **Q1.** Can a regular user change models, or only an admin? (Recommended: anyone, because it only affects their own computer.)
-- **Q2.** Should first launch also offer the speech and voice downloads (about 1 GB more), or leave them in Settings as today? (Recommended: offer them as a checkbox, off by default.)
-- **Q3.** Does each firm's admin want to lock a model per firm (for example, always Qwen3.5 9B)? (Recommended: not now.)
+Answered by Michael on 2026-11-09:
+- Any user can change the chat model, because it only affects their own computer. Nothing else is a choice.
+- Speech and voice are not a checkbox. LANA installs them itself when they fit and there is room.
+- A firm cannot lock a chat model for now.
 
 ---
 
@@ -119,19 +132,24 @@ New module `electron-hardware.js` (main process, pure functions with injected re
 
 New module `src/js/local-ai-fit.model.js` (pure, shared by the main process and Settings):
 
+The models LANA requires are priced first, so the chat choices shown are only ones that leave room for them.
+
 1. Set aside memory first: system 3 GB and the LANA app 2 GB (from LANA One).
-2. For each chat model and each context step (32768, 16384, 8192), estimate with Pip Desktop's `estimateImpact`: model + conversation memory + working memory, plus vision if a vision file pairs with it.
-3. Call it **comfortable** if the estimate is under 55% of usable memory, **tight** under 75%, otherwise **won't fit**.
-4. Add embedding (always 2048 tokens, 1 slot) and check the total stays under 88%.
-5. Check free disk: all chosen files plus 512 MiB.
+2. Set aside the required models:
+   - **Embedding** runs all the time (2048 tokens, 1 slot), so its memory is always set aside.
+   - **Speech and voice** run inside the app only while someone is recording or talking. Set aside the memory of the largest one in use at a time (meeting transcription), so a chat model is never chosen that leaves no room to record.
+3. For each chat model and each context step (32768, 16384, 8192), estimate with Pip Desktop's `estimateImpact`: model + conversation memory + working memory, plus vision if a vision file pairs with it.
+4. Call it **comfortable** if the estimate is under 55% of usable memory, **tight** under 75%, otherwise **won't fit**. Everything together must stay under 88%.
+5. Check free disk, in this order, and stop adding when the disk runs out (keeping 512 MiB free): embedding, the chosen chat model, its vision file, speech, voice.
 
 The result for each model: `{ id, name, role, sizeBytes, fit: comfortable | tight | wont_fit, contextTokens, reason }`. Reasons are plain sentences, for example "This computer needs at least 16 GB of memory for this model."
 
-### 4.3 Pick the recommended setup
+### 4.3 Pick the setup
 
-- **Chat:** the biggest model the client supports that is comfortable at 16384 tokens or more. If none, the biggest one comfortable at 8192. If none, chat uses the cloud.
-- **Vision:** add the paired vision file only if the chat model stays comfortable with it.
-- **Embedding:** nomic f16 (the pinned file) whenever it fits, which is almost always.
+- **Chat (the default the person sees):** the biggest model the client supports that is comfortable at 16384 tokens or more. If none, the biggest one comfortable at 8192. If none, chat uses the cloud and there is nothing to choose.
+- **Vision:** added by LANA only if the chosen chat model stays comfortable with it. If the person picks a different chat model, LANA decides again.
+- **Embedding:** nomic f16 (the pinned file) whenever it fits, which is almost always. Otherwise embedding uses the cloud.
+- **Speech and voice:** installed by LANA when they fit and there is room. If they do not, the Briefs features that need them say so plainly and point to Settings (the existing rule).
 - **Engine tier:** set `LANA_TIER` from the plan (the engine refuses to start without it). The mapping goes in one table next to the fit code, using the backend's tier names.
 
 The pinned embedding file must stay exactly the pin (`deploy/railway/embed/embed-pin.json`). The catalog is never allowed to change it.
@@ -143,14 +161,15 @@ The pinned embedding file must stay exactly the pin (`deploy/railway/embed/embed
 One window, built with Lex components, with its own `first-launch.html`, `.js` and `.css` (page hygiene rule). It is not a modal.
 
 1. **Checking this computer.** A short progress line while hardware is read. Under a second.
-2. **Your AI setup.** A card per job (Chat, Search and memory, Images), each showing:
-   - the recommended model, its size, and the fit word ("Good fit for this computer")
-   - how much it can remember: "About 24 pages at once" next to "32,768 tokens"
+2. **Your AI setup.** One card, for chat, with the default already selected:
+   - the chat model, its size, and the fit word ("Good fit for this computer")
+   - how much it can remember: "About 24 pages at once"
    - where it runs: "On this computer" or "In the cloud (Forge)"
-   - a "Change" link that lists every model with its fit word, and greys out the ones that won't fit, with the reason
-   - a line at the bottom with space needed and space free: "Needs 6.1 GB. This computer has 210 GB free."
-   - When nothing fits: "This computer is too small to run LANA's AI. LANA will use the cloud instead." No error styling. It is a normal outcome.
-3. **Continue.** Downloads start in the background and the person goes to sign-in. A small status chip in the app shows download progress until it is done. Closing the app pauses the download, and opening it again picks up where it stopped.
+   - a "Choose a different model" link that lists the chat models with their fit words and how much each remembers. Models that won't fit are greyed out with the reason.
+   - Below the card, one short line lists what LANA adds by itself, with no controls: "LANA also sets up search, image reading, listening and speaking for you." Anything that does not fit is left out of that line.
+   - A line with space needed and space free: "Needs 7.4 GB. This computer has 210 GB free."
+   - When no chat model fits: "This computer is too small to run LANA's chat. LANA will use the cloud instead." No error styling and no choice to make. It is a normal outcome.
+3. **Continue.** One button. Downloads start in the background and the person goes to sign-in. A small status chip in the app shows download progress until it is done. Closing the app pauses the download, and opening it again picks up where it stopped.
 4. **Ready.** When the files are checked, the client starts Pip and the engine and shows a one-line notification: "LANA's AI is ready on this computer."
 
 Copy rules: plain words a 6th grader can follow, "computer" not a brand name, no emojis or dashes.
@@ -177,7 +196,7 @@ Add to the AI card that is there today (no new page):
 
 - **This computer** row: memory, chip and graphics memory, free disk. Example: "36 GB memory, Apple M3 Pro, 210 GB free."
 - **Each local model row** keeps today's facts in today's order and adds two: **Fits this computer** (the fit word) and **Remembers** (context window, in pages and tokens). Model size already shows; Pip's `/health` `model_file.bytes` replaces "Not reported by Pip".
-- **Change model** button on Chat and Images rows. It opens the same chooser as first launch, downloads the new file, then restarts that one Pip server.
+- **Change model** button on the Chat row only. It opens the same chooser as first launch, downloads the new file (and its vision file when it fits), then restarts the chat Pip server. Embedding, Images, Speech and Voice rows show facts only.
 - Rows for jobs running in the cloud say why: "This computer is too small for chat, so LANA uses Forge."
 
 Removing models stays off (decision from 2026-11-08).
@@ -187,6 +206,8 @@ Removing models stays off (decision from 2026-11-08).
 ## 8. Speech and voice (stay on sherpa, get ready for Squeak)
 
 Squeak is not ready for LANA yet: Pip Desktop v2.0.0 runs it on Windows only (`docs/VOICE-API.md`: "macOS and Linux builds of Squeak do not exist yet"), and its pack has no speaker labeling, which Briefs needs. So speech stays on `sherpa-onnx` for now. The work here is to make the swap a one-file change later.
+
+**It must work the same on Windows, macOS and Linux.** `sherpa-onnx-node` already ships native packages for all three (`sherpa-onnx-win-x64`, `sherpa-onnx-darwin-arm64`, `sherpa-onnx-linux-x64` and others), and `scripts/briefs-before-pack.js` refuses to build an installer that is missing the one for its platform. The speech port below adds nothing tied to one platform: no platform audio APIs, paths built with `path.join` under `userData`, and the speech engine chosen by what is installed, not by the operating system. Tests run the fake engine, so they pass on all three. The swap waits until Squeak runs on all three as well.
 
 What Squeak will offer, from `VOICE-API.md`: speech-to-text `POST /v1/audio/transcriptions` (16-bit PCM WAV, 16 kHz), voice `POST /v1/audio/speech` (WAV or PCM, 24 kHz), voice activity, turn detection, on a port in 8200 to 8209 with a Bearer token. No timestamps, no streaming, no speaker labels yet.
 
@@ -214,7 +235,7 @@ The backend `@voice` app already goes through one adapter (`voice.service.js` wi
 | C | `electron-pip-supervisor.js`; engine root set in installed builds | Packaged app on a clean computer starts Pip and the engine with no settings typed |
 | D | First-launch screen | Screenshots in light and dark; a run on this Mac from an empty `userData` |
 | E | Settings > Capabilities additions and Change model | Screenshots; changing chat model restarts only the chat server |
-| F | Speech port (section 8) | Briefs and Talk tests pass unchanged; a fake speech engine can replace sherpa in tests |
+| F | Speech port (section 8) | Briefs and Talk tests pass unchanged; a fake speech engine can replace sherpa in tests; no code tied to one operating system |
 | G | Bundle `lqe` per platform in the installer, signed | Signed macOS build launches Pip from inside the app |
 
 Phase 3 of the custom cloud endpoint plan (backend routing) must land before cloud fallback for chat is done end to end. Chat end-to-end runs are Michael's call.
