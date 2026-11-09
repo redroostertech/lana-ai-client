@@ -428,6 +428,20 @@ describe('lex-form submit', () => {
     expect(submits.length).toBe(2);
   });
 
+  test('a submit lex-btn inside the form keeps only its own label (lex-btn.js loaded first)', async () => {
+    const window = boot(['btn', 'form'], markup);
+    await tick(window);
+    const form = window.document.getElementById('f');
+    const inside = window.document.querySelector('#inside button');
+    expect(inside.querySelector('lex-input')).toBeNull();
+    expect(inside.textContent.trim()).toBe('In');
+    expect(form.querySelectorAll('lex-input').length).toBe(1);
+    form.novalidate = true;
+    await tick(window);
+    expect(window.document.querySelector('#inside button').querySelector('lex-input')).toBeNull();
+    expect(form.querySelectorAll('lex-input').length).toBe(1);
+  });
+
   test('a disabled external button does not submit', async () => {
     const window = boot(['btn', 'form'], markup);
     await tick(window);

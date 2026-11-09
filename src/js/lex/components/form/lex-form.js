@@ -39,6 +39,12 @@
       return null;
     }
 
+    // Nor copy them back on update: the base class would pour every captured
+    // child into the first <slot-content> it finds, and with render() null that
+    // is a descendant's (a submit <lex-btn> inside this form renders one), so
+    // the whole form ended up inside its own button.
+    _restoreContent() {}
+
     // Listeners are wired in updated() (not connected()) because every update
     // clears the listener list; updated() runs after each one.
     updated() {
