@@ -39,14 +39,13 @@
     });
   }
 
-  // Straight to fetch rather than api.post: Chef may answer a password
-  // problem with 401, which api.js would take for a signed-out session.
+  // Straight to fetch rather than api.post, so only a real signed-out 401
+  // opens the session-expired dialog, never a refused link.
   function redeemRequest(password) {
     var body = password ? { password: password } : {};
     var path = '/api/v1/sharing/links/' + encodeURIComponent(token) + '/redeem';
     return Kit.postJson(api.baseUrl + path, body, api.getHeaders()).catch(function (error) {
-      var kind = Model.sharedLinkOutcome(error).kind;
-      if (error && error.status === 401 && kind !== 'password-required' && kind !== 'password-wrong') {
+      if (Model.sharedLinkOutcome(error).kind === 'signed-out') {
         api.showSessionExpiredModal();
       }
       throw error;

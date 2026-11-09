@@ -62,7 +62,8 @@
 }
 
 .alp-view[hidden],
-.alp-error[hidden] {
+.alp-error[hidden],
+.alp-submit[hidden] {
   display: none;
 }
 

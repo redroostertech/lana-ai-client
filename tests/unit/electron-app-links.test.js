@@ -13,6 +13,7 @@ const {
   decideServer,
   orgIdHintFromDomain,
   normalizeDomain,
+  discoveryTarget,
   targetFor,
   createPendingStore,
   createAppLinkRouter,
@@ -35,13 +36,27 @@ describe('parseAppLink', () => {
     ['sign', `lana-ai://sign?document=${DOC}&packet=${PACKET}`, { document: DOC, packet: PACKET }],
     ['shared', `lana-ai://shared?token=${TOKEN}`, { token: TOKEN }]
   ])('accepts a valid %s link', (action, url, params) => {
-    expect(parseAppLink(url)).toEqual({ ok: true, action, params, domain: null });
+    expect(parseAppLink(url)).toEqual({ ok: true, action, params, domain: null, org: null });
   });
 
   test('reads and lowercases the firm domain on any action', () => {
     const link = parseAppLink(`lana-ai://shared?token=${TOKEN}&domain=Norton.LanaAI.io`);
     expect(link.ok).toBe(true);
     expect(link.domain).toBe('norton.lanaai.io');
+  });
+
+  test.each(['reset-password', 'accept-invite', 'activate', 'sign', 'shared'])('%s also accepts org (lowercased)', (action) => {
+    const params = action === 'activate' ? `code=${CODE}` : action === 'sign' ? `document=${DOC}&packet=${PACKET}` : `token=${TOKEN}`;
+    const link = parseAppLink(`lana-ai://${action}?${params}&org=Norton-Law&domain=norton.lanaai.io`);
+    expect(link.ok).toBe(true);
+    expect(link.org).toBe('norton-law');
+    expect(link.domain).toBe('norton.lanaai.io');
+  });
+
+  test('an org id of the wrong shape rejects the link', () => {
+    expect(parseAppLink(`lana-ai://shared?token=${TOKEN}&org=norton_law`).reason).toBe('invalid_org');
+    expect(parseAppLink(`lana-ai://shared?token=${TOKEN}&org=`).reason).toBe('invalid_org');
+    expect(parseAppLink(`lana-ai://shared?token=${TOKEN}&org=a&org=b`).reason).toBe('repeated_param');
   });
 
   test('a trailing slash before the query is allowed', () => {
@@ -82,7 +97,7 @@ describe('logging never carries a token or code', () => {
   test('describeForLog names the action, keys and domain only', () => {
     const link = parseAppLink(`lana-ai://reset-password?token=${TOKEN}&domain=norton.lanaai.io`);
     const line = describeForLog(link);
-    expect(line).toBe('app link action=reset-password keys=token domain=norton.lanaai.io');
+    expect(line).toBe('app link action=reset-password keys=token domain=norton.lanaai.io org=none');
     expect(line).not.toContain(TOKEN);
   });
 
@@ -113,6 +128,38 @@ describe('decideServer', () => {
   test('no saved firm resolves the domain, or waits for setup without one', () => {
     expect(decideServer({ domain: 'smith.lanaai.io' }, null)).toBe('resolve');
     expect(decideServer({ domain: null }, null)).toBe('needs-setup');
+  });
+});
+
+describe('decideServer with org', () => {
+  const saved = { url: 'https://10.0.0.5:8080', orgId: 'norton', domain: 'norton.lanaai.io' };
+  test('org alone compares with the saved org id', () => {
+    expect(decideServer({ domain: null, org: 'norton' }, saved)).toBe('use-saved');
+    expect(decideServer({ domain: null, org: 'smith' }, saved)).toBe('mismatch');
+  });
+  test('the domain decides when both sides have one', () => {
+    expect(decideServer({ domain: 'norton.lanaai.io', org: 'other-id' }, saved)).toBe('use-saved');
+  });
+  test('the org decides when the saved firm has no domain', () => {
+    expect(decideServer({ domain: 'smith.lanaai.io', org: 'smith' }, { url: 'u', orgId: 'norton' })).toBe('mismatch');
+  });
+  test('org alone with no saved firm resolves', () => {
+    expect(decideServer({ domain: null, org: 'smith' }, null)).toBe('resolve');
+  });
+});
+
+describe('discoveryTarget', () => {
+  test('org present is used for discovery', () => {
+    expect(discoveryTarget({ domain: 'smithlaw.com', org: 'smith-law' })).toEqual({ domain: 'smithlaw.com', orgId: 'smith-law' });
+  });
+  test('org absent falls back to the guess from the domain', () => {
+    expect(discoveryTarget({ domain: 'smithlaw.com', org: null })).toEqual({ domain: 'smithlaw.com', orgId: 'smithlaw' });
+  });
+  test('org with no domain asks for the hosted name, as sign in does', () => {
+    expect(discoveryTarget({ domain: null, org: 'smith-law' })).toEqual({ domain: 'smith-law.lanaai.io', orgId: 'smith-law' });
+  });
+  test('neither: nothing to ask', () => {
+    expect(discoveryTarget({ domain: null, org: null })).toBeNull();
   });
 });
 
@@ -228,6 +275,29 @@ describe('createAppLinkRouter', () => {
     expect(deps.calls.discover).toEqual([['smith.lanaai.io', 'smith']]);
     expect(deps.calls.connected).toEqual([found]);
     expect(deps.calls.opened).toEqual([`accept-invite.html?token=${TOKEN}`]);
+  });
+
+  test('the link\'s org is what discovery is asked for', async () => {
+    const found = { url: 'https://100.64.0.9:8080', orgId: 'smith-law', domain: 'smithlaw.com' };
+    const deps = fakeDeps({ saved: null, signedIn: false, discovered: found });
+    const router = createAppLinkRouter(deps);
+    expect(await router.handleUrl(`lana-ai://reset-password?token=${TOKEN}&domain=smithlaw.com&org=smith-law`)).toBe('opened');
+    expect(deps.calls.discover).toEqual([['smithlaw.com', 'smith-law']]);
+  });
+
+  test('org with no domain: discovery uses the hosted name and sign in gets the org id', async () => {
+    const deps = fakeDeps({ saved: null, signedIn: false, discovered: null });
+    const router = createAppLinkRouter(deps);
+    expect(await router.handleUrl(`lana-ai://activate?code=${CODE}&org=smith-law`)).toBe('connect-firm');
+    expect(deps.calls.discover).toEqual([['smith-law.lanaai.io', 'smith-law']]);
+    expect(router.loginContext()).toEqual({ pending: true, action: 'activate', needsFirm: true, domain: null, orgIdHint: 'smith-law' });
+  });
+
+  test('org with no domain for another firm than the saved one asks first', async () => {
+    const deps = fakeDeps({ signedIn: true, switchChoice: 'stay' });
+    const router = createAppLinkRouter(deps);
+    expect(await router.handleUrl(`lana-ai://shared?token=${TOKEN}&org=smith`)).toBe('stayed');
+    expect(deps.calls.askSwitch).toEqual([{ domain: 'smith', firmName: 'Norton Law' }]);
   });
 
   test('no saved firm and discovery finds nothing: sign in shows the firm to connect, then the link continues', async () => {

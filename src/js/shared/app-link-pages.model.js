@@ -13,95 +13,129 @@
   'use strict';
 
   var MIN_PASSWORD_LENGTH = 8;
+  // The special characters Chef's user-creation rule counts (admin-users.service.js).
+  var SPECIAL_CHARACTERS = '!@#$%^&*()_+-=[]{}|;:,.<>?';
 
-  /** The rules shown under the password fields, each with whether it is met. */
-  function passwordRules(password, confirm) {
-    var first = String(password == null ? '' : password);
-    var second = String(confirm == null ? '' : confirm);
-    return [
-      { id: 'length', label: 'At least ' + MIN_PASSWORD_LENGTH + ' characters', met: first.length >= MIN_PASSWORD_LENGTH },
-      { id: 'match', label: 'Both entries match', met: first.length > 0 && first === second }
-    ];
+  function hasCharBetween(text, low, high) {
+    for (var i = 0; i < text.length; i += 1) {
+      if (text.charAt(i) >= low && text.charAt(i) <= high) return true;
+    }
+    return false;
   }
 
-  function passwordReady(password, confirm) {
-    return passwordRules(password, confirm).every(function (rule) { return rule.met; });
+  function hasSpecial(text) {
+    for (var i = 0; i < text.length; i += 1) {
+      if (SPECIAL_CHARACTERS.indexOf(text.charAt(i)) !== -1) return true;
+    }
+    return false;
+  }
+
+  /**
+   * The rules shown under the password fields, each with whether it is met.
+   * policy 'basic' (activate): 8 characters. policy 'strong' (accept-invite,
+   * which uses Chef's user-creation rule): also an uppercase letter, a
+   * lowercase letter, a number and a special character.
+   */
+  function passwordRules(password, confirm, policy) {
+    var first = String(password == null ? '' : password);
+    var second = String(confirm == null ? '' : confirm);
+    var rules = [
+      { id: 'length', label: 'At least ' + MIN_PASSWORD_LENGTH + ' characters', met: first.length >= MIN_PASSWORD_LENGTH }
+    ];
+    if (policy === 'strong') {
+      rules.push(
+        { id: 'upper', label: 'An uppercase letter', met: hasCharBetween(first, 'A', 'Z') },
+        { id: 'lower', label: 'A lowercase letter', met: hasCharBetween(first, 'a', 'z') },
+        { id: 'number', label: 'A number', met: hasCharBetween(first, '0', '9') },
+        { id: 'special', label: 'A special character, such as ! ? # or @', met: hasSpecial(first) }
+      );
+    }
+    rules.push({ id: 'match', label: 'Both entries match', met: first.length > 0 && first === second });
+    return rules;
+  }
+
+  function passwordReady(password, confirm, policy) {
+    return passwordRules(password, confirm, policy).every(function (rule) { return rule.met; });
   }
 
   /** The error body (ApiError.data, or a parsed response), the code and status. */
   function problemOf(error) {
     var body = error && (error.data || error.body) ? (error.data || error.body) : null;
     var nested = body && body.error && typeof body.error === 'object' ? body.error : null;
-    var code = String((body && body.code) || (nested && nested.code) || (error && error.code) || '').toUpperCase();
+    var code = String((body && body.code) || (nested && nested.code) || (error && error.code) || '');
     var detail = (body && body.detail) || (nested && nested.message) || (body && typeof body.error === 'string' ? body.error : '') || (body && body.message) || '';
     var status = Number((error && error.status) || (body && body.status) || 0);
     return { code: code, detail: String(detail || '').trim(), status: status };
   }
 
-  function has(code, part) { return code.indexOf(part) !== -1; }
+  var UNREACHABLE = 'LANA could not reach your firm. Check your connection and try again.';
+  var TOO_MANY = 'Too many tries. Wait a few minutes and try again.';
+  var FALLBACK = 'Something went wrong. Try again in a moment.';
 
-  function lower(text) { return String(text || '').toLowerCase(); }
+  // POST /api/v1/auth/accept-invite refusals. signIn: offer sign in instead.
+  var INVITE_PROBLEMS = {
+    INVITE_NOT_FOUND: { message: 'This invitation was not found. Open the link from your email again, or ask for a new one.' },
+    INVITE_EXPIRED: { message: 'This invitation has expired. Ask your firm\'s administrator for a new one.' },
+    INVITE_CANCELLED: { message: 'This invitation was withdrawn by your firm\'s administrator.' },
+    INVITE_ALREADY_ACCEPTED: { message: 'This invitation has already been used. Sign in with your email and password.', signIn: true },
+    INVITE_EMAIL_IN_USE: { message: 'You already have an account with this email. Sign in with your email and password.', signIn: true },
+    INVITE_NO_LONGER_VALID: { message: 'This invitation is no longer valid. Ask your firm\'s administrator for a new one.' },
+    INVITE_ROLE_UNAVAILABLE: { message: 'The role in this invitation is no longer available. Ask your firm\'s administrator for a new invitation.' },
+    TOO_MANY_ATTEMPTS: { message: TOO_MANY }
+  };
 
   /**
-   * Plain words for a failed set-password call (accept-invite, activate).
-   * kind is 'invite' or 'activate'.
+   * Plain words for a failed set-password call, and whether to offer sign in.
+   * kind 'invite': Chef's accept-invite codes. kind 'activate': the activate
+   * endpoint has no codes; its messages are already plain sentences.
+   * Unknown codes show Chef's own message.
    */
-  function setPasswordError(error, kind) {
+  function setPasswordProblem(error, kind) {
     var problem = problemOf(error);
-    var what = kind === 'activate' ? 'activation code' : 'invitation';
-    var text = lower(problem.detail);
-    if (problem.status === 0) {
-      return 'LANA could not reach your firm. Check your connection and try again.';
+    if (problem.status === 0) return { message: UNREACHABLE, signIn: false };
+    if (kind === 'invite' && Object.prototype.hasOwnProperty.call(INVITE_PROBLEMS, problem.code)) {
+      var known = INVITE_PROBLEMS[problem.code];
+      return { message: known.message, signIn: Boolean(known.signIn) };
     }
-    if (has(problem.code, 'EXPIRED') || text.indexOf('expired') !== -1) {
-      return 'This ' + what + ' has expired. Ask your firm\'s administrator for a new one.';
+    if (problem.code === 'PASSWORD_TOO_WEAK') {
+      return { message: problem.detail || 'Choose a stronger password.', signIn: false };
     }
-    if (has(problem.code, 'USED') || has(problem.code, 'ACCEPTED') || text.indexOf('already') !== -1) {
-      return 'This ' + what + ' has already been used. Sign in with your email and password.';
-    }
-    if (has(problem.code, 'REVOKED') || text.indexOf('revoked') !== -1) {
-      return 'This ' + what + ' was withdrawn. Ask your firm\'s administrator for a new one.';
-    }
-    if (has(problem.code, 'PASSWORD') || (text.indexOf('password') !== -1 && text.indexOf('character') !== -1)) {
-      return problem.detail || 'Choose a password with at least ' + MIN_PASSWORD_LENGTH + ' characters.';
-    }
-    if (problem.status === 404 || has(problem.code, 'NOT_FOUND') || has(problem.code, 'INVALID') || text.indexOf('invalid') !== -1) {
-      return 'This ' + what + ' is not valid. Open the link from your email again, or ask for a new one.';
-    }
-    if (problem.status === 429) {
-      return 'Too many tries. Wait a few minutes and try again.';
-    }
-    return problem.detail || 'Something went wrong. Try again in a moment.';
+    if (problem.status === 429) return { message: TOO_MANY, signIn: false };
+    return { message: problem.detail || FALLBACK, signIn: false };
   }
+
+  function setPasswordError(error, kind) {
+    return setPasswordProblem(error, kind).message;
+  }
+
+  // POST /api/v1/sharing/links/:token/redeem refusals.
+  var SHARE_PROBLEMS = {
+    SHARE_LINK_NOT_FOUND: { kind: 'not-found', message: 'This link was not found at your firm. It may belong to another firm or have been removed.' },
+    SHARE_LINK_REVOKED: { kind: 'revoked', message: 'This link was turned off by the person who shared it.' },
+    SHARE_LINK_EXPIRED: { kind: 'expired', message: 'This link has expired. Ask the person who shared it for a new one.' },
+    SHARE_LINK_USED_UP: { kind: 'used-up', message: 'This link has been used as many times as it allows. Ask for a new one.' },
+    SHARE_LINK_UNAVAILABLE: { kind: 'unavailable', message: 'This item can no longer be shared through this link. It may have been removed, or the person who shared it no longer can.' },
+    SHARE_LINK_PASSWORD_REQUIRED: { kind: 'password-required', message: 'This link is protected. Enter the password you were given.' },
+    SHARE_LINK_PASSWORD_INCORRECT: { kind: 'password-wrong', message: 'That password is not right. Check it and try again.' }
+  };
 
   /**
    * What a failed share-link redeem means for the page.
-   * kind: password-required | password-wrong | expired | revoked | used-up | not-found | other
+   * kind: password-required | password-wrong | expired | revoked | used-up |
+   *       unavailable | not-found | signed-out | other
    */
   function sharedLinkOutcome(error) {
     var problem = problemOf(error);
-    var code = problem.code;
-    if (has(code, 'PASSWORD') && (has(code, 'REQUIRED') || has(code, 'MISSING'))) {
-      return { kind: 'password-required', message: 'This link is protected. Enter the password you were given.' };
+    if (Object.prototype.hasOwnProperty.call(SHARE_PROBLEMS, problem.code)) {
+      var known = SHARE_PROBLEMS[problem.code];
+      return { kind: known.kind, message: known.message };
     }
-    if (has(code, 'PASSWORD')) {
-      return { kind: 'password-wrong', message: 'That password is not right. Check it and try again.' };
+    if (problem.status === 401) {
+      return { kind: 'signed-out', message: 'Your session has ended. Sign in again to open this link.' };
     }
-    if (has(code, 'EXPIRED')) {
-      return { kind: 'expired', message: 'This link has expired. Ask the person who shared it for a new one.' };
-    }
-    if (has(code, 'REVOKED')) {
-      return { kind: 'revoked', message: 'This link was turned off by the person who shared it.' };
-    }
-    if (has(code, 'USED') || has(code, 'EXHAUSTED') || has(code, 'LIMIT')) {
-      return { kind: 'used-up', message: 'This link has been used as many times as it allows. Ask for a new one.' };
-    }
-    if (problem.status === 404) {
-      return { kind: 'not-found', message: 'This link was not found at your firm. It may belong to another firm or have been removed.' };
-    }
-    if (problem.status === 0) {
-      return { kind: 'other', message: 'LANA could not reach your firm. Check your connection and try again.' };
-    }
+    if (problem.status === 404) return { kind: 'not-found', message: SHARE_PROBLEMS.SHARE_LINK_NOT_FOUND.message };
+    if (problem.status === 0) return { kind: 'other', message: UNREACHABLE };
+    if (problem.status === 429) return { kind: 'other', message: TOO_MANY };
     return { kind: 'other', message: problem.detail || 'This link could not be opened. Try again in a moment.' };
   }
 
@@ -174,6 +208,7 @@
     passwordRules: passwordRules,
     passwordReady: passwordReady,
     problemOf: problemOf,
+    setPasswordProblem: setPasswordProblem,
     setPasswordError: setPasswordError,
     sharedLinkOutcome: sharedLinkOutcome,
     sharedResourcePage: sharedResourcePage,

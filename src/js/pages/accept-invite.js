@@ -16,20 +16,23 @@
   var token = new URLSearchParams(window.location.search).get('token') || '';
   var server = null;
   var signInEmail = '';
+  // Accepting an invitation creates the account through Chef's user-creation
+  // rule: 8 characters plus upper, lower, number and special character.
+  var PASSWORD_POLICY = 'strong';
 
   function goToSignIn() {
     window.location.replace(Model.signInPage(signInEmail));
   }
 
   function refreshRules() {
-    Kit.renderRules('aiRules', Model.passwordRules(Kit.fieldValue('aiPassword'), Kit.fieldValue('aiConfirm')));
+    Kit.renderRules('aiRules', Model.passwordRules(Kit.fieldValue('aiPassword'), Kit.fieldValue('aiConfirm'), PASSWORD_POLICY));
   }
 
   function submit() {
     var password = Kit.fieldValue('aiPassword');
-    if (!Model.passwordReady(password, Kit.fieldValue('aiConfirm'))) {
+    if (!Model.passwordReady(password, Kit.fieldValue('aiConfirm'), PASSWORD_POLICY)) {
       refreshRules();
-      Kit.showError('aiError', 'Your password needs to meet both rules above.');
+      Kit.showError('aiError', 'Your password needs to meet every rule above.');
       return;
     }
     var body = { token: token, password: password };
@@ -39,13 +42,17 @@
     if (last) body.last_name = last;
 
     Kit.showError('aiError', '');
+    Kit.show('aiErrorSignIn', false);
     Kit.setBusy('aiSubmit', true);
     Kit.postPublic(server, '/api/v1/auth/accept-invite', body).then(function (response) {
       signInEmail = Model.emailFromResponse(response);
       Kit.show('aiFormView', false);
       Kit.show('aiDoneView', true);
     }).catch(function (error) {
-      Kit.showError('aiError', Model.setPasswordError(error, 'invite'));
+      var problem = Model.setPasswordProblem(error, 'invite');
+      Kit.showError('aiError', problem.message);
+      // Already used, or the email already has an account: sign in instead.
+      Kit.show('aiErrorSignIn', problem.signIn);
     }).then(function () {
       Kit.setBusy('aiSubmit', false);
     });
@@ -55,6 +62,7 @@
     Kit.watchTheme();
     document.getElementById('aiSignIn').addEventListener('click', goToSignIn);
     document.getElementById('aiInvalidSignIn').addEventListener('click', goToSignIn);
+    document.getElementById('aiErrorSignIn').addEventListener('click', goToSignIn);
     if (!token) {
       Kit.show('aiFormView', false);
       Kit.show('aiInvalidView', true);

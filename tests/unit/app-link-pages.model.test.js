@@ -14,7 +14,7 @@ function problem(status, code, detail) {
 }
 
 describe('passwordRules', () => {
-  test('length and match are each shown with whether they are met', () => {
+  test('activate (basic): length and match, each with whether it is met', () => {
     expect(M.passwordRules('short', 'short')).toEqual([
       { id: 'length', label: 'At least 8 characters', met: false },
       { id: 'match', label: 'Both entries match', met: true }
@@ -23,39 +23,73 @@ describe('passwordRules', () => {
     expect(M.passwordReady('long enough', 'long enougH')).toBe(false);
     expect(M.passwordReady('', '')).toBe(false);
   });
-});
 
-describe('setPasswordError', () => {
-  test.each([
-    [problem(410, 'INVITE_EXPIRED', 'The invitation expired.'), 'invite', 'This invitation has expired. Ask your firm\'s administrator for a new one.'],
-    [problem(409, 'INVITE_ALREADY_ACCEPTED', 'x'), 'invite', 'This invitation has already been used. Sign in with your email and password.'],
-    [problem(404, 'INVITE_NOT_FOUND', 'x'), 'invite', 'This invitation is not valid. Open the link from your email again, or ask for a new one.'],
-    [{ status: 400, data: { error: { message: 'This activation code has expired', code: 'VALIDATION_ERROR' } } }, 'activate', 'This activation code has expired. Ask your firm\'s administrator for a new one.'],
-    [{ status: 400, data: { error: { message: 'Invalid activation code', code: 'VALIDATION_ERROR' } } }, 'activate', 'This activation code is not valid. Open the link from your email again, or ask for a new one.'],
-    [{ status: 0, data: null }, 'invite', 'LANA could not reach your firm. Check your connection and try again.'],
-    [problem(429, 'RATE_LIMITED', ''), 'invite', 'Too many tries. Wait a few minutes and try again.']
-  ])('%#: plain words', (error, kind, expected) => {
-    expect(M.setPasswordError(error, kind)).toBe(expected);
-  });
-
-  test('an unknown problem shows Chef\'s own sentence', () => {
-    expect(M.setPasswordError(problem(422, 'SEAT_LIMIT', 'Your firm has no free seats.'), 'invite')).toBe('Your firm has no free seats.');
+  test('accept-invite (strong): Chef\'s user-creation rule is shown rule by rule', () => {
+    const rules = M.passwordRules('abcdefgh', 'abcdefgh', 'strong');
+    expect(rules.map((r) => [r.id, r.met])).toEqual([
+      ['length', true], ['upper', false], ['lower', true], ['number', false], ['special', false], ['match', true]
+    ]);
+    expect(M.passwordReady('abcdefgh', 'abcdefgh', 'strong')).toBe(false);
+    expect(M.passwordReady('Abcdefg1!', 'Abcdefg1!', 'strong')).toBe(true);
+    // Only the characters Chef counts as special.
+    expect(M.passwordReady('Abcdefg1~', 'Abcdefg1~', 'strong')).toBe(false);
+    expect(M.passwordReady('Abcdefg1[', 'Abcdefg1[', 'strong')).toBe(true);
+    // Uppercase means A to Z, as Chef checks it.
+    expect(M.passwordRules('ÉBCDEFG1!', '', 'strong').find((r) => r.id === 'lower').met).toBe(false);
   });
 });
 
-describe('sharedLinkOutcome', () => {
+describe('setPasswordProblem (accept-invite codes)', () => {
   test.each([
-    [problem(401, 'SHARE_LINK_PASSWORD_REQUIRED', 'x'), 'password-required'],
-    [problem(403, 'SHARE_LINK_PASSWORD_INVALID', 'x'), 'password-wrong'],
-    [problem(410, 'SHARE_LINK_EXPIRED', 'x'), 'expired'],
+    [problem(404, 'INVITE_NOT_FOUND', 'x'), 'This invitation was not found. Open the link from your email again, or ask for a new one.', false],
+    [problem(410, 'INVITE_EXPIRED', 'x'), 'This invitation has expired. Ask your firm\'s administrator for a new one.', false],
+    [problem(410, 'INVITE_CANCELLED', 'x'), 'This invitation was withdrawn by your firm\'s administrator.', false],
+    [problem(409, 'INVITE_ALREADY_ACCEPTED', 'x'), 'This invitation has already been used. Sign in with your email and password.', true],
+    [problem(409, 'INVITE_EMAIL_IN_USE', 'x'), 'You already have an account with this email. Sign in with your email and password.', true],
+    [problem(409, 'INVITE_NO_LONGER_VALID', 'x'), 'This invitation is no longer valid. Ask your firm\'s administrator for a new one.', false],
+    [problem(409, 'INVITE_ROLE_UNAVAILABLE', 'x'), 'The role in this invitation is no longer available. Ask your firm\'s administrator for a new invitation.', false],
+    [problem(400, 'PASSWORD_TOO_WEAK', 'Password must contain at least one uppercase letter and number.'), 'Password must contain at least one uppercase letter and number.', false],
+    [{ status: 400, data: { error: { code: 'VALIDATION_ERROR', message: 'Password must be at least 8 characters' } } }, 'Password must be at least 8 characters', false],
+    [problem(429, 'TOO_MANY_ATTEMPTS', 'x'), 'Too many tries. Wait a few minutes and try again.', false],
+    [{ status: 0, data: null }, 'LANA could not reach your firm. Check your connection and try again.', false]
+  ])('%#: plain words', (error, message, signIn) => {
+    expect(M.setPasswordProblem(error, 'invite')).toEqual({ message, signIn });
+  });
+
+  test('an unknown code shows Chef\'s own sentence, never a guess from its name', () => {
+    expect(M.setPasswordError(problem(422, 'INVITE_EXPIRED_SOMEHOW', 'Your firm has no free seats.'), 'invite')).toBe('Your firm has no free seats.');
+    expect(M.setPasswordError(problem(500, 'X', ''), 'invite')).toBe('Something went wrong. Try again in a moment.');
+  });
+
+  test('activate has no codes: Chef\'s plain message is shown as is', () => {
+    expect(M.setPasswordError({ status: 400, data: { error: { message: 'This activation code has expired', code: 'VALIDATION_ERROR' } } }, 'activate'))
+      .toBe('This activation code has expired');
+    // An invite code on the activate page is not treated as an invite.
+    expect(M.setPasswordError(problem(410, 'INVITE_EXPIRED', 'Plain words.'), 'activate')).toBe('Plain words.');
+  });
+});
+
+describe('sharedLinkOutcome (redeem codes)', () => {
+  test.each([
+    [problem(404, 'SHARE_LINK_NOT_FOUND', 'x'), 'not-found'],
     [problem(410, 'SHARE_LINK_REVOKED', 'x'), 'revoked'],
+    [problem(410, 'SHARE_LINK_EXPIRED', 'x'), 'expired'],
     [problem(410, 'SHARE_LINK_USED_UP', 'x'), 'used-up'],
+    [problem(410, 'SHARE_LINK_UNAVAILABLE', 'x'), 'unavailable'],
+    [problem(400, 'SHARE_LINK_PASSWORD_REQUIRED', 'x'), 'password-required'],
+    [problem(403, 'SHARE_LINK_PASSWORD_INCORRECT', 'x'), 'password-wrong'],
+    [{ status: 401, data: { error: { code: 'AUTHENTICATION_ERROR', message: 'Not authenticated' } } }, 'signed-out'],
     [{ status: 404, data: { error: 'Not found' } }, 'not-found'],
     [{ status: 0, data: null }, 'other']
   ])('%#: %s', (error, kind) => {
     const outcome = M.sharedLinkOutcome(error);
     expect(outcome.kind).toBe(kind);
     expect(outcome.message).toEqual(expect.any(String));
+  });
+
+  test('codes match exactly: a lookalike falls back to Chef\'s message', () => {
+    expect(M.sharedLinkOutcome(problem(410, 'SHARE_LINK_EXPIRED_V2', 'Chef says so.'))).toEqual({ kind: 'other', message: 'Chef says so.' });
+    expect(M.sharedLinkOutcome(problem(403, 'SHARE_LINK_PASSWORD_WRONG', 'Nope.'))).toEqual({ kind: 'other', message: 'Nope.' });
   });
 
   test('the ApiError shape (code lifted to the error) is read too', () => {

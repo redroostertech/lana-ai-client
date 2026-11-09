@@ -12,8 +12,11 @@
  *   activate        code
  *   sign            document, packet
  *   shared          token
- * Every link may also carry `domain`, the firm's domain, which is how the app
- * finds that firm's Chef through hosted discovery.
+ * Every link may also carry `domain` (the firm's domain, LANA_ORG_DOMAIN) and
+ * `org` (the control plane's organization id, LANA_ORG_ID). Hosted discovery
+ * needs both; when `org` is missing the id is guessed from the domain, and
+ * when `domain` is missing the hosted name `<org>.lanaai.io` is used, as the
+ * sign-in page does by default.
  *
  * Tokens and codes are bearer credentials. They are never logged, never
  * written to disk and never handed to the login page; a pending link lives in
@@ -61,13 +64,19 @@ function normalizeDomain(value) {
   return labels.every((label) => DOMAIN_LABEL.test(label)) ? domain : null;
 }
 
+/** A control plane organization id, lowercased, or null when it has the wrong shape. */
+function normalizeOrgId(value) {
+  const org = String(value == null ? '' : value).trim().toLowerCase();
+  return ORG_ID_PATTERN.test(org) ? org : null;
+}
+
 /**
  * Parse and validate one app link. Only the contract's keys are accepted for
  * each action; anything else (an unknown key, a repeated key, a path, a value
  * of the wrong shape) rejects the whole link.
  *
  * @param {string} rawUrl
- * @returns {{ ok: true, action: string, params: Object, domain: string|null }
+ * @returns {{ ok: true, action: string, params: Object, domain: string|null, org: string|null }
  *   | { ok: false, reason: string, action?: string }}
  */
 function parseAppLink(rawUrl) {
@@ -87,6 +96,7 @@ function parseAppLink(rawUrl) {
   const spec = APP_LINK_ACTIONS[action];
   const params = {};
   let domain = null;
+  let org = null;
   const seen = new Set();
   for (const [key, value] of url.searchParams) {
     if (seen.has(key)) {return { ok: false, reason: 'repeated_param', action };}
@@ -96,6 +106,11 @@ function parseAppLink(rawUrl) {
       if (!domain) {return { ok: false, reason: 'invalid_domain', action };}
       continue;
     }
+    if (key === 'org') {
+      org = normalizeOrgId(value);
+      if (!org) {return { ok: false, reason: 'invalid_org', action };}
+      continue;
+    }
     if (!spec.params.includes(key)) {return { ok: false, reason: 'unexpected_param', action };}
     if (!PARAM_PATTERNS[key].test(value)) {return { ok: false, reason: 'invalid_param', action };}
     params[key] = value;
@@ -103,14 +118,14 @@ function parseAppLink(rawUrl) {
   for (const key of spec.params) {
     if (!params[key]) {return { ok: false, reason: 'missing_param', action };}
   }
-  return { ok: true, action, params, domain };
+  return { ok: true, action, params, domain, org };
 }
 
-/** What may be logged about a link: the action, its keys and the domain. Never a value. */
+/** What may be logged about a link: the action, its keys, the domain and org. Never a token or code. */
 function describeForLog(link) {
   if (!link || !link.action) {return 'app link';}
   const keys = Object.keys(link.params || {}).sort().join(',');
-  return `app link action=${link.action} keys=${keys || 'none'} domain=${link.domain || 'none'}`;
+  return `app link action=${link.action} keys=${keys || 'none'} domain=${link.domain || 'none'} org=${link.org || 'none'}`;
 }
 
 function requiresSignIn(link) {
@@ -127,13 +142,17 @@ function requiresSignIn(link) {
 function decideServer(link, savedServer) {
   const saved = savedServer && savedServer.url ? savedServer : null;
   const domain = link && link.domain ? link.domain : null;
-  if (!saved) {return domain ? 'resolve' : 'needs-setup';}
-  if (!domain) {return 'use-saved';}
+  const org = link && link.org ? link.org : null;
+  if (!saved) {return domain || org ? 'resolve' : 'needs-setup';}
+  if (!domain && !org) {return 'use-saved';}
+  // The domain decides when both sides have one; otherwise the org id does.
   const savedDomain = normalizeDomain(saved.domain);
-  // A connection saved before domains were stored cannot be compared; it is
+  if (domain && savedDomain) {return savedDomain === domain ? 'use-saved' : 'mismatch';}
+  const savedOrg = normalizeOrgId(saved.orgId);
+  if (org && savedOrg) {return savedOrg === org ? 'use-saved' : 'mismatch';}
+  // Nothing to compare (a connection saved before domains were stored): it is
   // still the firm this person set up, so the link runs against it.
-  if (!savedDomain || savedDomain === domain) {return 'use-saved';}
-  return 'mismatch';
+  return 'use-saved';
 }
 
 /**
@@ -146,6 +165,21 @@ function orgIdHintFromDomain(domain) {
   if (!normalized) {return null;}
   const first = normalized.split('.')[0];
   return ORG_ID_PATTERN.test(first) ? first : null;
+}
+
+/**
+ * What hosted discovery is asked for a link: the link's org id (or the guess
+ * from its domain) and its domain (or the hosted name for its org id).
+ * Null when neither is known.
+ */
+function discoveryTarget(link) {
+  const domain = link && link.domain ? link.domain : null;
+  const org = link && link.org ? link.org : null;
+  if (!domain && !org) {return null;}
+  return {
+    domain: domain || `${org}.lanaai.io`,
+    orgId: org || orgIdHintFromDomain(domain)
+  };
 }
 
 /** The page (relative to public_html) and query an accepted link opens. */
@@ -215,6 +249,15 @@ function createAppLinkRouter(deps) {
   const pending = deps.pending || createPendingStore({ now: deps.now });
   const log = deps.log || (() => {});
 
+  function discover(link) {
+    const target = discoveryTarget(link);
+    return target ? deps.discover(target.domain, target.orgId) : Promise.resolve(null);
+  }
+
+  function linkFirm(link) {
+    return link.domain || link.org;
+  }
+
   function firmName(server) {
     return (server && (server.orgName || server.orgId || server.domain)) || 'your firm';
   }
@@ -254,25 +297,25 @@ function createAppLinkRouter(deps) {
     if (decision === 'needs-setup') {return waitForFirm(link);}
 
     if (decision === 'resolve') {
-      const server = await deps.discover(link.domain, orgIdHintFromDomain(link.domain));
+      const server = await discover(link);
       if (!server) {return waitForFirm(link);}
       await deps.connect(server);
       return continueWith(link);
     }
 
     // mismatch: the link is for another firm. Never switch on its own.
-    const choice = await deps.askSwitch({ domain: link.domain, firmName: firmName(saved) });
+    const choice = await deps.askSwitch({ domain: linkFirm(link), firmName: firmName(saved) });
     if (choice !== 'switch') {
       log(`${describeForLog(link)}: stayed with the saved firm`);
       return 'stayed';
     }
-    const server = await deps.discover(link.domain, orgIdHintFromDomain(link.domain));
+    const server = await discover(link);
     if (server) {
       await deps.signOut();
       await deps.connect(server);
       return continueWith(link);
     }
-    const next = await deps.askNotFound({ domain: link.domain, firmName: firmName(saved) });
+    const next = await deps.askNotFound({ domain: linkFirm(link), firmName: firmName(saved) });
     if (next !== 'sign-in') {return 'stayed';}
     await deps.signOut();
     return waitForFirm(link);
@@ -291,7 +334,7 @@ function createAppLinkRouter(deps) {
       action: entry.link.action,
       needsFirm: entry.needsFirm,
       domain,
-      orgIdHint: domain ? orgIdHintFromDomain(domain) : null
+      orgIdHint: entry.link.org || (domain ? orgIdHintFromDomain(domain) : null)
     };
   }
 
@@ -374,6 +417,8 @@ module.exports = {
   IPC_CHANNELS,
   isAppLinkAction,
   normalizeDomain,
+  normalizeOrgId,
+  discoveryTarget,
   parseAppLink,
   describeForLog,
   requiresSignIn,

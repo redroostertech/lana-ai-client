@@ -80,10 +80,10 @@ Password reset, invitation, activation, signature and share emails link to an ht
 | `sign` | `document`, `packet` | `file-editor.html?id=<document>&signature_packet=<packet>`, after sign-in |
 | `shared` | `token` | `shared-link.html`, after sign-in; redeems `POST /api/v1/sharing/links/<token>/redeem` and opens the document, matter or folder |
 
-Every action also accepts `domain`, the firm's domain. Any other key, a repeated key or a value of the wrong shape rejects the link. Tokens and codes are never logged or written to disk.
+Every action also accepts `domain` (the firm's domain, Chef's `LANA_ORG_DOMAIN`) and `org` (the control plane organization id, Chef's `LANA_ORG_ID`). Any other key, a repeated key or a value of the wrong shape rejects the link. Tokens and codes are never logged or written to disk.
 
-- No saved firm: the domain is looked up through hosted discovery (org id guessed from the first label, as in `<org-id>.lanaai.io`). If that fails, sign in shows the firm to connect with the domain filled in, and the link continues once it is connected.
-- The domain names another firm than the saved one: the person is asked. Staying changes nothing; switching signs them out of the saved firm and connects the other one.
+- No saved firm: the firm is looked up through hosted discovery with the link's `org` and `domain`. Without `org` the id is guessed from the domain's first label (as in `<org-id>.lanaai.io`); without `domain` the hosted name `<org>.lanaai.io` is used. If that fails, sign in shows the firm to connect with the domain filled in, and the link continues once it is connected.
+- The domain (or, without one, the org id) names another firm than the saved one: the person is asked. Staying changes nothing; switching signs them out of the saved firm and connects the other one.
 - `sign` and `shared` while signed out: the link waits in memory (30 minutes) and continues right after sign-in.
 - A link that launches the app waits until the first window has loaded (macOS `open-url`, Windows and Linux command line).
 
