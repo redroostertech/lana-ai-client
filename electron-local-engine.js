@@ -226,7 +226,7 @@ function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = proces
     modelEndpoints = next;
     const state = supervisor.getState();
     if (state.mode === 'spawn' && state.process !== 'stopped') {
-      log.info('[local-engine] this computer's AI servers changed (Pip or the redactor); restarting the engine');
+      log.info('[local-engine] the AI servers on this computer changed (Pip or the redactor); restarting the engine');
       await supervisor.restart();
     }
   }
