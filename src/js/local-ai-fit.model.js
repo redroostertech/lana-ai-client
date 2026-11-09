@@ -272,13 +272,16 @@
     }
 
     // 4b. Docling, after chat and vision in memory and on the disk, and before speech on the disk.
-    //     It must fit comfortably beside everything already set aside plus chat and vision (on a
-    //     graphics card chat and vision use the card, not system memory).
+    //     It must fit, under the tight line rather than the comfortable one, beside everything
+    //     already set aside plus chat and vision (on a graphics card chat and vision use the card,
+    //     not system memory). Docling only reaches its peak while it reads a file and the server is
+    //     the fallback, so a 16 GB computer with the 4B and image reading (about 60 percent at the
+    //     worst moment) runs it, as the 16 GB Mac mini does today.
     if (doclingAvailable) {
       var chatModel = plan.chat.where === 'local' ? catalog.chat.find(function (m) { return m.id === plan.chat.id; }) : null;
       var visionModel = plan.vision.id ? catalog.vision.find(function (v) { return v.id === plan.vision.id; }) : null;
       var aiOnSystem = pool.gpuBytes || !chatModel ? 0 : chatBytes(chatModel, plan.chat.contextTokens) + (visionModel ? visionBytes(visionModel) : 0);
-      doclingFitsMemory = level((reserved + aiOnSystem + (docling.memoryBytes || 0)) / pool.systemBytes, COMFORTABLE, TIGHT) === 'comfortable';
+      doclingFitsMemory = level((reserved + aiOnSystem + (docling.memoryBytes || 0)) / pool.systemBytes, COMFORTABLE, TIGHT) !== 'wont_fit';
     }
     if (!docling) {
       plan.docling = { install: false, reason: null };

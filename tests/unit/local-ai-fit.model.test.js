@@ -236,17 +236,21 @@ describe('Docling', () => {
     expect(exact.plan.speech).toMatchObject({ install: false, reason: expect.stringMatching(/free space/) });
   });
 
-  test('memory: installed only when it fits comfortably beside chat and vision', () => {
+  test('memory: installed when it fits under the tight line beside chat and vision', () => {
     expect(plan(computer(2, 'cpu'), docling()).plan.docling).toMatchObject({ install: false, reason: expect.stringMatching(/memory/) });
     const big = plan(computer(36), docling());
     const none = plan(computer(36));
     expect(big.plan.docling.install).toBe(true);
     expect(none.plan.docling).toEqual({ install: false, reason: null });
-    // A 16 GB computer runs the 4B with image reading; 1.8 GB more for Docling is not comfortable there,
-    // so the organization's server reads its documents and chat is unchanged.
+    // A 16 GB computer (the Mac mini running Docling today) keeps the 4B with image reading and
+    // gets Docling too; an 8 GB one is past the tight line, so the server reads its documents.
     const sixteen = plan(computer(16), docling());
     expect(sixteen.plan.chat.id).toBe(plan(computer(16)).plan.chat.id);
-    expect(sixteen.plan.docling).toMatchObject({ install: false, reason: expect.stringMatching(/server reads them/) });
+    expect(sixteen.plan.vision.id).toBe(plan(computer(16)).plan.vision.id);
+    expect(sixteen.plan.docling).toEqual({ install: true, reason: null });
+    const eight = plan(computer(8), docling());
+    expect(eight.plan.chat.id).toBe(plan(computer(8)).plan.chat.id);
+    expect(eight.plan.docling).toMatchObject({ install: false, reason: expect.stringMatching(/server reads them/) });
   });
 
   test('nothing published for this kind of computer: no memory set aside, nothing downloaded', () => {
