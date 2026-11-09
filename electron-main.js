@@ -119,6 +119,10 @@ localEngine.registerIpc();
 // plan picked, and hands their addresses to the local engine.
 const { createPip, resolvePipBinary, engineEndpoints } = require('./electron-pip-supervisor');
 const { pickLoopbackPort } = require('./electron-local-engine');
+// The redactor on this computer, if there is one (electron-redactor.js). Found first: sizing
+// sets its memory aside and the engine is given its address.
+const { createRedactor, resolveRedactorCommand, redactorEndpoints, REDACTOR_MEMORY_BYTES } = require('./electron-redactor');
+const redactorCommand = process.env.REDACTOR_URL ? null : resolveRedactorCommand({ env: process.env, resourcesPath: process.resourcesPath, isPackaged: app.isPackaged, home: app.getPath('home'), fileExists: (file) => fs.existsSync(file) });
 const pip = createPip({
   binary: resolvePipBinary({ env: process.env, resourcesPath: process.resourcesPath, isPackaged: app.isPackaged, fileExists: (file) => fs.existsSync(file) }),
   dir: path.join(app.getPath('userData'), 'pip'),
@@ -129,10 +133,40 @@ const pip = createPip({
   log: { info: logInfo, warn: logWarn, error: (message) => logError(message) },
   onAddresses: (addresses) => {
     logInfo(`[pip] addresses: chat ${addresses.chat || 'none'}, embedding ${addresses.embedding || 'none'}`);
-    localEngine.setModelEndpoints(engineEndpoints(addresses))
-      .catch((error) => logError('[electron-main] Local AI engine did not restart for Pip', error));
+    localServers.pip = engineEndpoints(addresses);
+    pushLocalServers();
   }
 });
+
+// The redactor on this computer (first-launch plan, section 6a): turns sent to the cloud are
+// redacted here first. Started at launch, before sign-in: it holds no data and needs no account.
+// Skipped when the environment already names a redactor.
+const redactor = createRedactor({
+  command: redactorCommand,
+  spawn: require('child_process').spawn,
+  fetch: (url, { timeoutMs = 3000, ...init } = {}) => fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) }),
+  pickPort: pickLoopbackPort,
+  baseEnv: process.env,
+  openLog: () => {
+    try {
+      fs.mkdirSync(path.join(app.getPath('userData'), 'redactor'), { recursive: true });
+      return fs.createWriteStream(path.join(app.getPath('userData'), 'redactor', 'redactor.log'), { flags: 'w' });
+    } catch (_error) { return null; }
+  },
+  log: { info: logInfo, warn: logWarn, error: (message) => logError(message) },
+  onAddress: (address) => {
+    logInfo(`[redactor] ${address ? `ready on ${address.url}` : 'not running'}`);
+    localServers.redactor = redactorEndpoints(address);
+    pushLocalServers();
+  }
+});
+
+// What the engine is given for this computer's own servers: Pip's and the redactor's together.
+const localServers = { pip: {}, redactor: {} };
+function pushLocalServers() {
+  localEngine.setModelEndpoints({ ...localServers.pip, ...localServers.redactor })
+    .catch((error) => logError('[electron-main] Local AI engine did not restart for its local servers', error));
+}
 
 // First-launch local AI setup (first-launch plan, phases B and C): sizes this computer and
 // downloads its model files after the person presses Continue on the setup screen (phase D).
@@ -141,6 +175,7 @@ const { createFirstLaunch } = require('./electron-first-launch');
 const firstLaunch = createFirstLaunch({
   userDataDir: app.getPath('userData'),
   state: firstLaunchPersistence,
+  redactorMemoryBytes: redactorCommand ? REDACTOR_MEMORY_BYTES : 0,
   onStatus: (status) => {
     if (status.phase === 'failed') {logWarn(`[first-launch] setup stopped: ${status.error && status.error.code}`);}
   },
@@ -2180,6 +2215,7 @@ app.whenReady().then(async () => {
   logInfo('App ready, starting thin client initialization...');
 
   // Model downloads cut off last time pick up again in the background.
+  void redactor.start().catch((error) => logError('[electron-main] The redactor did not start', error));
   void firstLaunch.resume();
 
   // macOS dock icon. On packaged builds Electron reads from the .app bundle's
@@ -2388,7 +2424,7 @@ app.on('before-quit', async (event) => {
       .catch((error) => logError('[electron-main] Failed to stop the local AI engine', error))
       // Pip last: the engine may still be handing a job off through it.
       .then(() => firstLaunch.pause())
-      .then(() => pip.stop())
+      .then(() => Promise.all([pip.stop(), redactor.stop()]))
       .catch((error) => logError('[electron-main] Failed to stop Pip', error))
       .finally(() => app.quit());
     return;

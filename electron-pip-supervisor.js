@@ -12,9 +12,8 @@
  *
  * Each server gets its own settings file in <userData>/pip, listens on 127.0.0.1 only (chat
  * prefers 8081, embedding 8082, any free port when one is taken), and is checked on /health
- * until it answers "ok" with the planned model file. A server that exits or stops answering
- * is restarted, waiting 1 second, then 2, 4 and so on up to 60. On quit each gets SIGTERM, and
- * SIGKILL after a grace period.
+ * until it answers "ok" with the planned model file. Restarts and stopping are
+ * electron-process-keeper.js.
  *
  * When every server it started has answered once, onAddresses gets their addresses and the chat
  * model file, which the local engine passes on as LANA_ENGINE_CHAT_URL,
@@ -28,23 +27,12 @@
  */
 
 const path = require('path');
+const { createKeptProcess, DEFAULTS } = require('./electron-process-keeper');
 
 const LOOPBACK_HOST = '127.0.0.1';
 const PREFERRED_PORTS = Object.freeze({ chat: 8081, embedding: 8082 });
 const ADDRESS_ENV = Object.freeze({ chat: 'LANA_ENGINE_CHAT_URL', embedding: 'LANA_ENGINE_EMBEDDING_URL' });
 
-const DEFAULTS = Object.freeze({
-  minBackoffMs: 1000,
-  maxBackoffMs: 60000,
-  stableResetMs: 60000,
-  // A big model read from a cold disk takes a while before /health answers.
-  startTimeoutMs: 180000,
-  healthIntervalStartingMs: 500,
-  healthIntervalRunningMs: 5000,
-  healthTimeoutMs: 3000,
-  maxHealthFailures: 3,
-  stopGraceMs: 5000
-});
 
 /** Processor threads: leave two for the rest of the computer, at most 10 (Pip Desktop's default). */
 function threadsFor(cores) {
@@ -154,170 +142,15 @@ function wantedServers({ result, modelsDir, env = {} }) {
   return wanted;
 }
 
-/**
- * One Pip server process, kept running.
- * @returns {{ start(spec): void, stop(): Promise<void>, getState(): Object }}
- */
-function createPipServer({ role, spawn, fetch, timers, now, log, openLog, onChange, options }) {
-  const opts = { ...DEFAULTS, ...options };
-  const state = { role, process: 'stopped', port: null, url: null, pid: null, healthy: false, answeredOnce: false, restarts: 0, lastExit: null, lastHealthError: null };
-  let spec = null;
-  let child = null;
-  let generation = 0;
-  let healthFailures = 0;
-  const timer = { health: null, restart: null, start: null, stable: null };
-
-  const emit = () => { try { onChange({ ...state }); } catch (_error) { /* listener errors are not ours */ } };
-  const clear = (name) => { if (timer[name]) {timers.clearTimeout(timer[name]);} timer[name] = null; };
-  const clearAll = () => { for (const name of Object.keys(timer)) {clear(name);} };
-
-  function kill(target) {
-    if (!target || (target.exitCode !== null && target.exitCode !== undefined)) {return Promise.resolve();}
-    return new Promise((resolve) => {
-      let done = false;
-      let grace = null;
-      const finish = () => { if (!done) { done = true; if (grace) {timers.clearTimeout(grace);} resolve(); } };
-      target.once('exit', finish);
-      try { target.kill('SIGTERM'); } catch (_error) { finish(); return; }
-      grace = timers.setTimeout(() => {
-        try { target.kill('SIGKILL'); } catch (_error) { /* already gone */ }
-        finish();
-      }, opts.stopGraceMs);
-    });
-  }
-
-  function scheduleHealth(gen, delay) {
-    clear('health');
-    timer.health = timers.setTimeout(() => { checkHealth(gen); }, delay);
-  }
-
-  async function checkHealth(gen) {
-    timer.health = null;
-    if (gen !== generation) {return;}
-    let problem = null;
-    try {
-      const response = await fetch(`${state.url}/health`, { method: 'GET', timeoutMs: opts.healthTimeoutMs });
-      if (!response.ok) {throw new Error(`health answered ${response.status}`);}
-      const body = await response.json();
-      const file = body && body.model_file && body.model_file.name;
-      if (!body || body.status !== 'ok') {problem = `status ${body && body.status}`;}
-      else if (file !== spec.expectFile) {problem = `serving ${file || 'no model'}, expected ${spec.expectFile}`;}
-    } catch (error) {
-      problem = error.message;
-    }
-    if (gen !== generation) {return;}
-    if (!problem) {
-      healthFailures = 0;
-      const first = !state.healthy;
-      Object.assign(state, { healthy: true, answeredOnce: true, lastHealthError: null });
-      if (state.process === 'starting') {
-        state.process = 'running';
-        clear('start');
-        clear('stable');
-        timer.stable = timers.setTimeout(() => { state.restarts = 0; emit(); }, opts.stableResetMs);
-        log.info(`[pip] ${role} server is ready on ${state.url}`);
-      }
-      if (first) {emit();}
-      scheduleHealth(gen, opts.healthIntervalRunningMs);
-      return;
-    }
-    healthFailures += 1;
-    const wasHealthy = state.healthy;
-    Object.assign(state, { healthy: false, lastHealthError: problem });
-    if (state.process === 'running' && healthFailures >= opts.maxHealthFailures) {
-      log.warn(`[pip] ${role} server stopped answering (${problem}); restarting`);
-      restart(gen, 'unhealthy');
-      return;
-    }
-    if (wasHealthy) {emit();}
-    scheduleHealth(gen, state.process === 'starting' ? opts.healthIntervalStartingMs : opts.healthIntervalRunningMs);
-  }
-
-  function scheduleRestart(gen) {
-    state.restarts += 1;
-    const delay = Math.min(opts.maxBackoffMs, opts.minBackoffMs * 2 ** (state.restarts - 1));
-    state.process = 'restarting';
-    emit();
-    log.warn(`[pip] restarting the ${role} server in ${delay} ms (restart ${state.restarts})`);
-    clear('restart');
-    timer.restart = timers.setTimeout(() => {
-      timer.restart = null;
-      if (gen === generation) {launch(gen);}
-    }, delay);
-  }
-
-  function restart(gen, why) {
-    const target = child;
-    child = null;
-    clear('health');
-    clear('start');
-    clear('stable');
-    Object.assign(state, { healthy: false, pid: null, lastExit: { reason: why, at: new Date(now()).toISOString() } });
-    kill(target).then(() => { if (gen === generation) {scheduleRestart(gen);} });
-  }
-
-  function launch(gen) {
-    Object.assign(state, { process: 'starting', healthy: false });
-    healthFailures = 0;
-    let spawned;
-    try {
-      spawned = spawn(spec.binary, ['serve', '--config', spec.configFile], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
-    } catch (error) {
-      log.error(`[pip] could not start the ${role} server: ${error.message}`);
-      state.lastExit = { reason: 'spawn_failed', message: error.message, at: new Date(now()).toISOString() };
-      scheduleRestart(gen);
-      return;
-    }
-    child = spawned;
-    state.pid = spawned.pid || null;
-    log.info(`[pip] ${role} server started (pid ${state.pid}) on ${state.url}`);
-    const sink = openLog(role);
-    if (sink) {
-      if (spawned.stdout) {spawned.stdout.pipe(sink, { end: false });}
-      if (spawned.stderr) {spawned.stderr.pipe(sink, { end: false });}
-    }
-    spawned.on('error', (error) => log.error(`[pip] ${role} server process error: ${error.message}`));
-    spawned.on('exit', (code, signal) => {
-      if (sink) {sink.end();}
-      if (child !== spawned) {return;} // stopped or replaced on purpose
-      child = null;
-      clear('health');
-      clear('start');
-      clear('stable');
-      Object.assign(state, { pid: null, healthy: false, lastExit: { reason: 'exited', code, signal, at: new Date(now()).toISOString() } });
-      log.warn(`[pip] ${role} server exited (code ${code}, signal ${signal})`);
-      if (gen === generation) {scheduleRestart(gen);}
-    });
-    timer.start = timers.setTimeout(() => {
-      timer.start = null;
-      if (gen === generation && child === spawned && state.process === 'starting') {
-        log.warn(`[pip] ${role} server did not answer in ${opts.startTimeoutMs} ms; restarting`);
-        restart(gen, 'start_timeout');
-      }
-    }, opts.startTimeoutMs);
-    emit();
-    scheduleHealth(gen, opts.healthIntervalStartingMs);
-  }
-
-  /** Run with these settings: { binary, configFile, expectFile, port }. */
-  function start(next) {
-    generation += 1;
-    spec = next;
-    Object.assign(state, { port: next.port, url: `http://${LOOPBACK_HOST}:${next.port}`, restarts: 0, lastExit: null, answeredOnce: false });
-    launch(generation);
-  }
-
-  async function stop() {
-    generation += 1;
-    clearAll();
-    const target = child;
-    child = null;
-    await kill(target);
-    Object.assign(state, { process: 'stopped', pid: null, healthy: false, port: null, url: null, answeredOnce: false });
-    emit();
-  }
-
-  return { start, stop, getState: () => ({ ...state }) };
+/** Pip is ready when /health says "ok" and names the planned model file. */
+async function checkPipHealth(fetch, url, expectFile, options = {}) {
+  const response = await fetch(`${url}/health`, { method: 'GET', timeoutMs: options.healthTimeoutMs || DEFAULTS.healthTimeoutMs });
+  if (!response.ok) {return `health answered ${response.status}`;}
+  const body = await response.json();
+  const file = body && body.model_file && body.model_file.name;
+  if (!body || body.status !== 'ok') {return `status ${body && body.status}`;}
+  if (file !== expectFile) {return `serving ${file || 'no model'}, expected ${expectFile}`;}
+  return null;
 }
 
 /**
@@ -413,9 +246,9 @@ function createPip(deps) {
       const port = await pickPort(PREFERRED_PORTS[role]);
       const configFile = path.join(dir, `${role}.json`);
       fsImpl.writeFileSync(configFile, `${JSON.stringify(want.settings(port), null, 2)}\n`);
-      const server = createPipServer({ role, spawn, fetch, timers, now, log, openLog, onChange: changed, options });
+      const server = createKeptProcess({ name: role, label: 'pip', spawn, timers, now, log, openLog, onChange: changed, options });
       running[role] = { server, key, modelFile: want.modelFile };
-      server.start({ binary, configFile, expectFile: want.expectFile, port });
+      server.start({ command: binary, args: ['serve', '--config', configFile], port, check: (url) => checkPipHealth(fetch, url, want.expectFile, options) });
     }
     changed();
     return getState();
@@ -441,7 +274,6 @@ function engineEndpoints(addresses) {
 module.exports = {
   createPip,
   engineEndpoints,
-  createPipServer,
   chatConfig,
   embeddingConfig,
   wantedServers,

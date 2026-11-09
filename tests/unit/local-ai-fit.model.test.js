@@ -196,3 +196,13 @@ describe('plain words', () => {
     expect(texts.join(' ')).not.toMatch(/[\u2013\u2014]|\p{Extended_Pictographic}/u);
   });
 });
+
+test('the redactor is always set aside when it is on this computer, so a 12 GB computer drops from the 4B', () => {
+  const input = (redactorBytes) => ({
+    hardware: { totalMemoryBytes: 12 * 1024 ** 3, accelerator: { backend: 'metal' }, freeDiskBytes: 1024 ** 4, cores: 12 },
+    catalog: parseCatalog(BUILT_IN), embedding: embeddingModel(), speech: speechSizes(),
+    redactor: { memoryBytes: redactorBytes }, installed: []
+  });
+  expect(fit.planLocalAi(input(0)).plan.chat.id).toBe('qwen3.5-4b-q4');
+  expect(fit.planLocalAi(input(0.5 * 1024 ** 3)).plan.chat.id).toBe('qwen3.5-0.8b-q4');
+});

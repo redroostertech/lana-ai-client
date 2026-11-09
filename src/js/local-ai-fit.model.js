@@ -157,6 +157,9 @@
    * @param {Object} input.speech     { transcriptionBytes, voiceBytes, memoryBytes }: speech runs inside
    *                                  the app only while recording or talking, and memoryBytes is its
    *                                  measured peak (electron-local-models.js speechSizes)
+   * @param {Object} [input.redactor]  { memoryBytes }: the redactor runs whenever the app is open
+   *                                  (electron-redactor.js REDACTOR_MEMORY_BYTES); none when it
+   *                                  is not on this computer
    * @param {string[]} [input.installed]  ids already on disk and checked (they need no space)
    * @param {string} [input.chosenChatId]  the person's choice; ignored when it won't fit
    * @returns {Object} { computer, chatChoices, defaultChatId, plan, download }
@@ -188,6 +191,10 @@
       reserved += embedMemory;
       take(input.embedding, 'embedding');
     }
+
+    // 1b. The redactor: always on when it is here, so always set aside. It is part of the app,
+    //     not a download.
+    if (input.redactor && input.redactor.memoryBytes) {reserved += input.redactor.memoryBytes;}
 
     // 2. Speech and voice: set aside only when they fit beside embedding. Disk is checked
     //    after chat, below, because chat comes first on the disk.

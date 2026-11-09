@@ -1,0 +1,16 @@
+{
+  "_comment": "The lana-redactor build the client packages (electron-redactor.js, scripts/build-redactor.sh). Change the commit only together with a rebuild and a check that /healthz and a signed /redact still answer.",
+  "repo": "redroostertech/lana-redactor",
+  "commit": "e4ea4861f9fc3528f7fe6bfbcf058c9b4f0ef552",
+  "version": "0.2.0",
+  "layers": [
+    "pattern rules (SSN, EIN, card, IBAN, case numbers)",
+    "health record rules (ICD-10, labs, MRN)",
+    "spaCy en_core_web_lg 3.7.1 (names, organisations, places)"
+  ],
+  "spacyModel": {
+    "name": "en_core_web_lg",
+    "version": "3.7.1",
+    "url": "https://models.lanaai.io/redactor/en_core_web_lg-3.7.1.tar.gz"
+  }
+}

@@ -40,6 +40,11 @@ const CHANNELS = Object.freeze({
 // LANA_TOKENIZER_GGUF: the chat model file, so the engine counts tokens with its vocabulary.
 const ENGINE_MODEL_ENV = Object.freeze(['LANA_TIER', 'EMBEDDING_MODEL', 'LANA_ENGINE_EMBEDDING_URL', 'LANA_ENGINE_CHAT_URL', 'LANA_FORGE_URL', 'LANA_TOKENIZER_GGUF']);
 
+// The redactor on this computer (electron-redactor.js): its address and the secret it checks on
+// every request. They only work together, so they come from one place: the environment when it
+// names a redactor, otherwise the client's own.
+const REDACTOR_ENV = Object.freeze(['REDACTOR_URL', 'INTERNAL_SERVICE_SECRET']);
+
 // The engine will not start without an engine level (LANA_TIER). When neither the environment
 // nor anything else names one, the client gives demo: it budgets 8192 tokens, which never
 // exceeds a planned Pip slot (8192 at the least) or a cloud model's window, so it is safe for
@@ -197,24 +202,31 @@ function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = proces
       else if (typeof modelEndpoints[name] === 'string' && modelEndpoints[name]) {extra[name] = modelEndpoints[name];}
     }
     if (!extra.LANA_TIER) {extra.LANA_TIER = DEFAULT_ENGINE_TIER;}
+    const redactor = typeof env.REDACTOR_URL === 'string' && env.REDACTOR_URL ? env : modelEndpoints;
+    if (redactor.REDACTOR_URL) {
+      for (const name of REDACTOR_ENV) {
+        if (typeof redactor[name] === 'string' && redactor[name]) {extra[name] = redactor[name];}
+      }
+    }
     return extra;
   }
 
   /**
-   * Pip's servers changed (started, moved port, or stopped). A running engine is restarted so it
-   * picks up the new addresses; one not yet started reads them when it starts.
-   * @param {Object} values - ENGINE_MODEL_ENV names to values (missing or null means none)
+   * Pip's servers or the redactor changed (started, moved port, or stopped). The engine reads
+   * these once at start, so a running engine is restarted; one not yet started reads them when
+   * it starts. Pass every current value each time: a name left out means none.
+   * @param {Object} values - ENGINE_MODEL_ENV and REDACTOR_ENV names to values
    */
   async function setModelEndpoints(values) {
     const next = {};
-    for (const name of ENGINE_MODEL_ENV) {
+    for (const name of [...ENGINE_MODEL_ENV, ...REDACTOR_ENV]) {
       if (typeof values[name] === 'string' && values[name]) {next[name] = values[name];}
     }
     if (JSON.stringify(next) === JSON.stringify(modelEndpoints)) {return;}
     modelEndpoints = next;
     const state = supervisor.getState();
     if (state.mode === 'spawn' && state.process !== 'stopped') {
-      log.info('[local-engine] Pip addresses changed; restarting the engine');
+      log.info('[local-engine] this computer's AI servers changed (Pip or the redactor); restarting the engine');
       await supervisor.restart();
     }
   }
@@ -379,4 +391,4 @@ function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = proces
   };
 }
 
-module.exports = { createLocalEngineHost, bundledEngineRoot, DEFAULT_ENGINE_TIER, statusView, pickLoopbackPort, backgroundJobsEnabled, CHANNELS, ENGINE_MODEL_ENV, pushOfflineKeyFor, canOpenOffline };
+module.exports = { createLocalEngineHost, bundledEngineRoot, DEFAULT_ENGINE_TIER, REDACTOR_ENV, statusView, pickLoopbackPort, backgroundJobsEnabled, CHANNELS, ENGINE_MODEL_ENV, pushOfflineKeyFor, canOpenOffline };

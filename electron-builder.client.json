@@ -67,7 +67,7 @@
       "schemes": ["lana-ai"]
     }
   ],
-  "beforePack": "scripts/briefs-before-pack.js",
+  "beforePack": "scripts/before-pack.js",
   "asar": true,
   "asarUnpack": [
     "node_modules/sherpa-onnx-node/**/*",
@@ -87,7 +87,8 @@
     "notarize": true,
     "binaries": [
       "Contents/Resources/screen-voice/lana-screen-voice",
-      "Contents/Resources/briefs/LanaBleWake"
+      "Contents/Resources/briefs/LanaBleWake",
+      "Contents/Resources/redactor/lana-redactor"
     ],
     "extendInfo": {
       "NSMicrophoneUsageDescription": "LANA uses the microphone when you dictate, talk with LANA, or record a meeting.",
@@ -101,6 +102,10 @@
       {
         "from": "build/briefs/LanaBleWake",
         "to": "briefs/LanaBleWake"
+      },
+      {
+        "from": "build/redactor/lana-redactor",
+        "to": "redactor/lana-redactor"
       }
     ]
   },
@@ -116,7 +121,13 @@
         "arch": ["x64"]
       }
     ],
-    "icon": "build/icons/icon.ico"
+    "icon": "build/icons/icon.ico",
+    "extraResources": [
+      {
+        "from": "build/redactor/lana-redactor.exe",
+        "to": "redactor/lana-redactor.exe"
+      }
+    ]
   },
   "linux": {
     "artifactName": "LanaAI--genesis--${version}.${ext}",
@@ -125,7 +136,13 @@
       "deb"
     ],
     "category": "Office",
-    "icon": "build/icons/"
+    "icon": "build/icons/",
+    "extraResources": [
+      {
+        "from": "build/redactor/lana-redactor",
+        "to": "redactor/lana-redactor"
+      }
+    ]
   },
   "nsis": {
     "oneClick": false,

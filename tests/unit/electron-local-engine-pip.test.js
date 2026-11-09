@@ -107,6 +107,34 @@ test('names other than the engine model settings are ignored', async () => {
   expect(spawned[0].env.DATABASE_URL).toBeUndefined();
 });
 
+describe('the redactor', () => {
+  const REDACTOR = { REDACTOR_URL: 'http://127.0.0.1:51234', INTERNAL_SERVICE_SECRET: 'b'.repeat(64) };
+
+  test('its address and secret reach the engine together, and a running engine restarts for them', async () => {
+    makeHost({ LANA_ENGINE_ROOT: root });
+    await host.sync();
+    expect(spawned[0].env.REDACTOR_URL).toBeUndefined();
+    await host.setModelEndpoints({ ...PIP, ...REDACTOR });
+    expect(spawned).toHaveLength(2);
+    expect(spawned[1].env).toMatchObject({ ...PIP, ...REDACTOR });
+  });
+
+  test('a redactor the environment names wins, address and secret both; the client\'s secret never pairs with it', async () => {
+    makeHost({ LANA_ENGINE_ROOT: root, REDACTOR_URL: 'http://127.0.0.1:9999', INTERNAL_SERVICE_SECRET: 'env-secret' });
+    await host.setModelEndpoints(REDACTOR);
+    await host.sync();
+    expect(spawned[0].env).toMatchObject({ REDACTOR_URL: 'http://127.0.0.1:9999', INTERNAL_SERVICE_SECRET: 'env-secret' });
+  });
+
+  test('a secret alone is never passed: without an address there is no redactor', async () => {
+    makeHost({ LANA_ENGINE_ROOT: root, INTERNAL_SERVICE_SECRET: 'stray' });
+    await host.setModelEndpoints({ INTERNAL_SERVICE_SECRET: 'stray-too' });
+    await host.sync();
+    expect(spawned[0].env.INTERNAL_SERVICE_SECRET).toBeUndefined();
+    expect(spawned[0].env.REDACTOR_URL).toBeUndefined();
+  });
+});
+
 describe('the engine inside the installed app', () => {
   test('an installed app with <resources>/engine starts that engine with nothing typed', async () => {
     makeHost({}, { getPath: () => tmp, isPackaged: true }, tmp);
