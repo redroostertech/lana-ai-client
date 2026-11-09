@@ -282,15 +282,23 @@ describe('Docling', () => {
     expect(downloads).toEqual(['nomic-embed-text-v1.5-f16']);
   });
 
-  test('a cut-off Docling install fails the run, and the next start installs only Docling', async () => {
-    const error = new DownloadError('stalled', 'The model download stopped moving. It will pick up where it stopped.');
+  test('a failed Docling install does not stop chat: setup finishes, Pip starts, and the next start retries only Docling', async () => {
+    const error = new DownloadError('http', 'The model download failed (HTTP 404).');
     const run = setup({ doclingKey: 'macos-arm64', failOn: { id: 'docling', error } });
     await run.firstLaunch.start();
-    expect(run.firstLaunch.status()).toMatchObject({ phase: 'failed', error: { code: 'stalled' } });
-    expect(run.ready).not.toHaveBeenCalled();
+    expect(run.firstLaunch.status()).toMatchObject({ phase: 'ready', error: null, docling: { installed: false, error: { code: 'http' } } });
+    expect(run.ready).toHaveBeenCalledTimes(1);
+    expect(run.doclingReady).not.toHaveBeenCalled();
     const again = setup({ doclingKey: 'macos-arm64', state: run.state, installed: ['nomic-embed-text-v1.5-f16', 'qwen3.5-9b-q4', 'mmproj-qwen3.5-9b'] });
     await again.firstLaunch.start();
     expect(again.downloads).toEqual(['docling']);
     expect(again.ready).toHaveBeenCalledTimes(1);
+  });
+
+  test('pausing during the Docling install still pauses', async () => {
+    const run = setup({ doclingKey: 'macos-arm64', failOn: { id: 'docling', error: new DownloadError('cancelled', 'paused') } });
+    await run.firstLaunch.start();
+    expect(run.firstLaunch.status()).toMatchObject({ phase: 'paused' });
+    expect(run.ready).not.toHaveBeenCalled();
   });
 });

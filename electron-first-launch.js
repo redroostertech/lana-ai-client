@@ -163,15 +163,26 @@ function createFirstLaunch({ userDataDir, state, env = process.env, home = requi
       const startAt = doneBytes;
       if (file.kind === 'docling') {
         publish({ current: { id: file.id, kind: file.kind, name: 'Docling' } });
-        await dl.install({
-          userDataDir,
-          key: doclingKey,
-          signal: controller.signal,
-          freeBytes: () => read({ modelsDir }).freeDiskBytes,
-          onProgress: ({ received }) => publish({ receivedBytes: startAt + Math.min(received, fetched(file)) })
-        });
+        try {
+          await dl.install({
+            userDataDir,
+            key: doclingKey,
+            signal: controller.signal,
+            freeBytes: () => read({ modelsDir }).freeDiskBytes,
+            onProgress: ({ received }) => publish({ receivedBytes: startAt + Math.min(received, fetched(file)) })
+          });
+        } catch (error) {
+          // Docling is optional: without it the organization's server reads documents. A failed
+          // install (no download yet, a cut connection, a full disk) must not stop chat, so setup
+          // goes on and Pip starts. The next launch runs setup again and retries it. A pause still
+          // pauses.
+          if (error && error.code === 'cancelled') {throw error;}
+          doneBytes += fetched(file);
+          publish({ receivedBytes: doneBytes, docling: { installed: false, error: { code: (error && error.code) || 'failed', message: error && error.message } } });
+          continue;
+        }
         doneBytes += fetched(file);
-        publish({ receivedBytes: doneBytes });
+        publish({ receivedBytes: doneBytes, docling: { installed: true, error: null } });
         try { onDoclingReady(result); } catch (_error) { /* listener errors are not ours */ }
         continue;
       }
