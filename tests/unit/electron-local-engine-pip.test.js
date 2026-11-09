@@ -135,6 +135,29 @@ describe('the redactor', () => {
   });
 });
 
+describe('Docling', () => {
+  const DOCLING = { DOCLING_API_URL: 'http://127.0.0.1:51300', DOC_PARSER_TIMEOUT_DOCLING_MS: '240000', DOCLING_TIMEOUT_MS: '240000' };
+
+  test('its address and reading timeouts reach the engine, a running engine restarts for them, and stopping it removes them', async () => {
+    makeHost({ LANA_ENGINE_ROOT: root });
+    await host.sync();
+    expect(spawned[0].env.DOCLING_API_URL).toBeUndefined();
+    await host.setModelEndpoints({ ...PIP, ...DOCLING });
+    expect(spawned).toHaveLength(2);
+    expect(spawned[1].env).toMatchObject({ ...PIP, ...DOCLING });
+    await host.setModelEndpoints(PIP);
+    expect(spawned).toHaveLength(3);
+    expect(spawned[2].env.DOCLING_API_URL).toBeUndefined();
+  });
+
+  test('a Docling the environment names wins over the client\'s', async () => {
+    makeHost({ LANA_ENGINE_ROOT: root, DOCLING_API_URL: 'http://127.0.0.1:8085' });
+    await host.setModelEndpoints(DOCLING);
+    await host.sync();
+    expect(spawned[0].env.DOCLING_API_URL).toBe('http://127.0.0.1:8085');
+  });
+});
+
 describe('the engine inside the installed app', () => {
   test('an installed app with <resources>/engine starts that engine with nothing typed', async () => {
     makeHost({}, { getPath: () => tmp, isPackaged: true }, tmp);

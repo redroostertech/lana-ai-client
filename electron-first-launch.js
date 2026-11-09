@@ -44,12 +44,13 @@ const LOCAL_KINDS = new Set(['embedding', 'chat', 'vision']);
  * @param {{ read(): Object, write(changes: Object): Object }} deps.state - electron-storage.js firstLaunchPersistence
  * @param {Object} [deps.env]
  * @param {number} [deps.redactorMemoryBytes] - set aside when the redactor runs on this computer
+ * @param {number} [deps.doclingMemoryBytes] - set aside when Docling runs on this computer
  * @param {(status: Object) => void} [deps.onStatus]
  * @param {(plan: Object) => void} [deps.onReady] - every local file is in place
  * @param {string} [deps.home] - the person's home folder, where other apps keep model files
  * @param {Object} [deps.io] - { readHardware, loadModelCatalog, localModels, reuse, now } for tests
  */
-function createFirstLaunch({ userDataDir, state, env = process.env, home = require('os').homedir(), redactorMemoryBytes = 0, onStatus = () => {}, onReady = () => {}, io = {} }) {
+function createFirstLaunch({ userDataDir, state, env = process.env, home = require('os').homedir(), redactorMemoryBytes = 0, doclingMemoryBytes = 0, onStatus = () => {}, onReady = () => {}, io = {} }) {
   const read = io.readHardware || readHardware;
   const loadCatalog = io.loadModelCatalog || loadModelCatalog;
   const models = io.localModels || localModels;
@@ -99,6 +100,7 @@ function createFirstLaunch({ userDataDir, state, env = process.env, home = requi
       embedding: models.embeddingModel(),
       speech: models.speechSizes(),
       redactor: { memoryBytes: redactorMemoryBytes },
+      docling: { memoryBytes: doclingMemoryBytes },
       installed: await installedIds(byId),
       chosenChatId: state.read().chatId
     });
