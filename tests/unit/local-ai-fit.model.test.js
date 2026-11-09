@@ -197,14 +197,18 @@ describe('plain words', () => {
   });
 });
 
-test('Docling is set aside when it is on this computer (1 GiB), so a 12 GB computer drops from the 4B', () => {
-  const input = (doclingBytes) => ({
-    hardware: { totalMemoryBytes: 12 * 1024 ** 3, accelerator: { backend: 'metal' }, freeDiskBytes: 1024 ** 4, cores: 12 },
-    catalog: parseCatalog(BUILT_IN), embedding: embeddingModel(), speech: speechSizes(),
-    docling: { memoryBytes: doclingBytes, provided: true }, installed: []
-  });
-  expect(fit.planLocalAi(input(0)).plan.chat.id).toBe('qwen3.5-4b-q4');
-  expect(fit.planLocalAi(input(require('../../electron-docling').DOCLING_MEMORY_BYTES)).plan.chat.id).toBe('qwen3.5-0.8b-q4');
+test('Docling never pushes chat to a smaller model: chat is chosen first, Docling only when it still fits', () => {
+  const DOCLING = require('../../electron-docling').DOCLING_MEMORY_BYTES;
+  for (const gb of [8, 12, 16, 24, 36]) {
+    const input = (doclingBytes) => ({
+      hardware: { totalMemoryBytes: gb * 1024 ** 3, accelerator: { backend: 'metal' }, freeDiskBytes: 1024 ** 4, cores: 12 },
+      catalog: parseCatalog(BUILT_IN), embedding: embeddingModel(), speech: speechSizes(),
+      docling: { memoryBytes: doclingBytes, provided: true }, installed: []
+    });
+    const without = fit.planLocalAi(input(0)).plan;
+    const withDocling = fit.planLocalAi(input(DOCLING)).plan;
+    expect([gb, withDocling.chat.id, withDocling.chat.contextTokens, withDocling.vision.id]).toEqual([gb, without.chat.id, without.chat.contextTokens, without.vision.id]);
+  }
 });
 
 describe('Docling', () => {
@@ -232,12 +236,17 @@ describe('Docling', () => {
     expect(exact.plan.speech).toMatchObject({ install: false, reason: expect.stringMatching(/free space/) });
   });
 
-  test('memory: set aside only when it fits beside embedding with room to spare', () => {
+  test('memory: installed only when it fits comfortably beside chat and vision', () => {
     expect(plan(computer(2, 'cpu'), docling()).plan.docling).toMatchObject({ install: false, reason: expect.stringMatching(/memory/) });
     const big = plan(computer(36), docling());
     const none = plan(computer(36));
     expect(big.plan.docling.install).toBe(true);
     expect(none.plan.docling).toEqual({ install: false, reason: null });
+    // A 16 GB computer runs the 4B with image reading; 1.8 GB more for Docling is not comfortable there,
+    // so the organization's server reads its documents and chat is unchanged.
+    const sixteen = plan(computer(16), docling());
+    expect(sixteen.plan.chat.id).toBe(plan(computer(16)).plan.chat.id);
+    expect(sixteen.plan.docling).toMatchObject({ install: false, reason: expect.stringMatching(/server reads them/) });
   });
 
   test('nothing published for this kind of computer: no memory set aside, nothing downloaded', () => {
@@ -245,9 +254,9 @@ describe('Docling', () => {
     const result = input(docling({ diskBytes: null, downloadBytes: null }));
     expect(result.plan.docling).toMatchObject({ install: false, reason: expect.stringMatching(/not ready for this kind of computer/) });
     expect(result.download.files.some((f) => f.kind === 'docling')).toBe(false);
-    // The same 12 GB computer keeps the 4B: no Docling memory was set aside.
+    // The chat model is the same with or without Docling.
     expect(result.plan.chat.id).toBe(input({}).plan.chat.id);
-    expect(input(docling()).plan.chat.id).not.toBe(result.plan.chat.id);
+    expect(input(docling()).plan.chat.id).toBe(result.plan.chat.id);
   });
 
   test('already installed, or a developer\'s Docling: no disk needed', () => {

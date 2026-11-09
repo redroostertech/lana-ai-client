@@ -40,9 +40,10 @@ const INHERITED_ENV = [
   'SYSTEMROOT', 'SystemRoot', 'WINDIR', 'COMSPEC', 'PATHEXT', 'APPDATA', 'LOCALAPPDATA', 'USERPROFILE'
 ];
 
-// Set aside when sizing this computer. Measured: 1,047 MB peak converting a 393 KB PDF
-// (36 seconds, Apple M4 Pro, docling-serve with the pinned models).
-const DOCLING_MEMORY_BYTES = 1024 ** 3;
+// Set aside when sizing this computer. Measured on an Apple M4 Pro with the pinned runtime and
+// models: 1,013 MB peak on a 68-page text PDF, 1,749 MB peak on a 5-page scanned PDF with OCR.
+// Sizing checks it after chat and vision (local-ai-fit.model.js step 4b), so it never shrinks chat.
+const DOCLING_MEMORY_BYTES = 1.8 * 1024 ** 3;
 
 // How long the engine lets one file take. Chef waits 300 seconds for this computer before it
 // reads the file itself, so a file has to finish well inside that (backend

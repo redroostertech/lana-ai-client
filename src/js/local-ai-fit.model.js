@@ -207,14 +207,13 @@
     //     not a download.
     if (input.redactor && input.redactor.memoryBytes) {reserved += input.redactor.memoryBytes;}
 
-    // 1c. Docling: runs whenever the app is open when it is on this computer, so the organization's
-    //     server can hand it uploaded files to read (electron-docling.js DOCLING_MEMORY_BYTES). Set
-    //     aside only when it is here or can be installed, and fits beside embedding with room to
-    //     spare. Disk is checked after vision, below: chat and vision come first on the disk.
+    // 1c. Docling: whether it is here or can be installed. Its memory is checked AFTER chat and
+    //     vision (step 4b): chat on this computer comes first, and when Docling does not fit, the
+    //     organization's server reads documents instead, so Docling never pushes chat to a smaller
+    //     model. Disk is checked there too: chat and vision come first on the disk.
     var docling = input.docling || null;
     var doclingAvailable = Boolean(docling && (docling.provided || installed.docling || docling.diskBytes != null));
-    var doclingFitsMemory = doclingAvailable && level((reserved + (docling.memoryBytes || 0)) / pool.systemBytes, COMFORTABLE, TIGHT) === 'comfortable';
-    if (doclingFitsMemory) {reserved += docling.memoryBytes || 0;}
+    var doclingFitsMemory = false;
 
     // 2. Speech and voice: set aside only when they fit beside embedding. Disk is checked
     //    after chat, below, because chat comes first on the disk.
@@ -272,7 +271,15 @@
       }
     }
 
-    // 4b. Docling, after chat and vision on the disk and before speech.
+    // 4b. Docling, after chat and vision in memory and on the disk, and before speech on the disk.
+    //     It must fit comfortably beside everything already set aside plus chat and vision (on a
+    //     graphics card chat and vision use the card, not system memory).
+    if (doclingAvailable) {
+      var chatModel = plan.chat.where === 'local' ? catalog.chat.find(function (m) { return m.id === plan.chat.id; }) : null;
+      var visionModel = plan.vision.id ? catalog.vision.find(function (v) { return v.id === plan.vision.id; }) : null;
+      var aiOnSystem = pool.gpuBytes || !chatModel ? 0 : chatBytes(chatModel, plan.chat.contextTokens) + (visionModel ? visionBytes(visionModel) : 0);
+      doclingFitsMemory = level((reserved + aiOnSystem + (docling.memoryBytes || 0)) / pool.systemBytes, COMFORTABLE, TIGHT) === 'comfortable';
+    }
     if (!docling) {
       plan.docling = { install: false, reason: null };
     } else if (!doclingAvailable) {
