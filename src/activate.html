@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Activate your account - LANA</title>
   <!-- Opened from sign in ("Activate here") and by an activation link
-       (lana-ai://activate?code=..., electron-app-links.js), which fills the code in. -->
+       (lana-ai://activate?code=..., electron-app-links.js), which fills the code in.
+       On a computer with no firm saved, the Organization ID from the email is asked
+       for first (js/shared/activate-flow.js). -->
   <link rel="stylesheet" href="css/lex-tokens.css">
   <link rel="stylesheet" href="css/tailwind-output.css">
   <link rel="stylesheet" href="css/app-link-pages.css">
@@ -19,9 +21,14 @@
       <section id="acFormView" class="alp-view">
         <div id="acHeading" class="alp-heading"></div>
         <lex-text id="acIntroCode" tag="p" size="body-sm" variant="secondary">Your activation code is in the email from your firm. Then choose a password; you will use it with your email to sign in.</lex-text>
+        <lex-text id="acIntroOrg" tag="p" size="body-sm" variant="secondary" hidden>Your Organization ID and activation code are in your LANA account email. Then choose a password; you will use it with your email to sign in.</lex-text>
         <lex-text id="acIntroLink" tag="p" size="body-sm" variant="secondary" hidden>Your activation code is filled in from the link. Choose a password; you will use it with your email to sign in.</lex-text>
 
         <lex-form id="acForm" class="alp-form">
+          <div id="acOrgField" hidden>
+            <lex-input id="acOrg" name="org_id" label="Organization ID" placeholder="your-organization-id" help="In your LANA account email, next to the activation code"></lex-input>
+          </div>
+          <lex-btn id="acOtherOrg" type="button" variant="ghost" size="sm" class="ac-other-org" hidden>Different organization?</lex-btn>
           <div id="acCodeField">
             <lex-input id="acCode" name="activation_code" label="Activation code" placeholder="LANA-XXXX-XXXX-XXXX" required></lex-input>
           </div>
@@ -29,6 +36,12 @@
           <lex-input id="acConfirm" name="confirm" type="password" label="Type it again" required></lex-input>
           <div id="acRules" class="alp-rules" aria-live="polite"></div>
           <div id="acError" class="alp-error" role="alert" hidden></div>
+          <div id="acOrgFailure" class="ac-org-failure" role="alert" hidden>
+            <div id="acOrgFailureTitle"></div>
+            <div id="acOrgFailureDetail"></div>
+            <div id="acOrgFailureSupport" class="ac-org-failure-support"></div>
+            <lex-btn id="acRetry" type="button" variant="secondary" size="sm" class="ac-retry">Try again</lex-btn>
+          </div>
           <lex-btn id="acSubmit" type="submit" variant="primary" class="alp-submit">Activate account</lex-btn>
         </lex-form>
         <lex-btn id="acBack" variant="ghost" size="sm" class="ac-back">Back to sign in</lex-btn>
@@ -54,6 +67,9 @@
   <script src="js/vendor/lottie_light.min.js"></script>
   <script src="js/lex/brand/lex-brand-animations.js"></script>
   <script src="js/lex/components/foundation/lex-brand-mark.js"></script>
+  <script src="js/app-catalog.js"></script>
+  <script src="js/shared/org-discovery.js"></script>
+  <script src="js/shared/activate-flow.js"></script>
   <script src="js/shared/app-link-pages.model.js"></script>
   <script src="js/shared/app-link-page-kit.js"></script>
   <script src="js/pages/activate.js"></script>

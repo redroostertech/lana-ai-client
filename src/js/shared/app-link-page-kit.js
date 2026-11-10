@@ -38,6 +38,33 @@
   }
 
   /**
+   * Save a firm found through discovery (org-discovery.js) as this app's
+   * firm, the way sign in saves it after Connect (login.html).
+   */
+  function saveFirm(serverInfo) {
+    try { global.localStorage.setItem('lana_saved_server', JSON.stringify(serverInfo)); } catch (_e) { /* storage blocked */ }
+    if (!global.electronAPI || typeof global.electronAPI.saveSettings !== 'function') return Promise.resolve();
+    return global.electronAPI.saveSettings({
+      url: serverInfo.url,
+      orgId: serverInfo.orgId,
+      orgName: serverInfo.orgName,
+      version: serverInfo.version,
+      apiVersion: serverInfo.apiVersion,
+      domain: serverInfo.domain,
+      host: serverInfo.staticIp,
+      port: serverInfo.port,
+      burstApiKey: serverInfo.burstApiKey,
+      burstUrl: serverInfo.burstUrl,
+      forgeApiKey: serverInfo.forgeApiKey,
+      forgeUrl: serverInfo.forgeUrl,
+      forgeSovereign: serverInfo.forgeSovereign,
+      tier: serverInfo.tier,
+      rateLimit: serverInfo.rateLimit,
+      enabledApps: serverInfo.enabledApps
+    });
+  }
+
+  /**
    * POST JSON and read JSON or problem+json back. Rejects with
    * { status, data } on any failure (status 0 when the firm is unreachable).
    */
@@ -123,6 +150,7 @@
   global.AppLinkPageKit = {
     watchTheme: watchTheme,
     savedServer: savedServer,
+    saveFirm: saveFirm,
     postJson: postJson,
     postPublic: postPublic,
     lexText: lexText,
