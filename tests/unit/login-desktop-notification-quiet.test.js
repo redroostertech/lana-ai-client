@@ -22,6 +22,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { loadSessionGate } = require('./helpers/session-gate');
 
 const ROOT = path.resolve(__dirname, '../..');
 
@@ -60,7 +61,7 @@ function makeStorage() {
   };
 }
 
-async function runLoginScenario({ permission, electronAPI = undefined, search = '', onLoaded = null }) {
+async function runLoginScenario({ permission, electronAPI = undefined, search = '', onLoaded = null, login = null, presetSession = null }) {
   const loginHtml = fs.readFileSync(path.join(ROOT, 'src/login.html'), 'utf8');
   const notificationsJs = fs.readFileSync(
     path.join(ROOT, 'src/js/notifications.js'),
@@ -117,6 +118,8 @@ async function runLoginScenario({ permission, electronAPI = undefined, search = 
   };
 
   const sandbox = {
+    LanaSessionGate: loadSessionGate(),
+    AccountStatus: require('../../src/js/shared/account-status.js'),
     console: { log() {}, warn() {}, error() {} },
     document: doc,
     localStorage,
@@ -141,7 +144,7 @@ async function runLoginScenario({ permission, electronAPI = undefined, search = 
       user: null,
       isAuthenticated: () => false,
       isTokenExpired: () => true,
-      login: async () => ({ token: 't', user: { id: 'u1', email: 'qa@example.com' } }),
+      login: login || (async () => ({ token: 't', user: { id: 'u1', email: 'qa@example.com' } })),
     },
     location: { href: '', search, replace(url) { replaced.push(url); } },
     electronAPI,
@@ -151,6 +154,7 @@ async function runLoginScenario({ permission, electronAPI = undefined, search = 
   };
   sandbox.window = sandbox;
   sandbox.globalThis = sandbox;
+  if (presetSession) presetSession(sandbox);
   vm.createContext(sandbox);
 
   vm.runInContext(
@@ -173,7 +177,7 @@ async function runLoginScenario({ permission, electronAPI = undefined, search = 
   await new Promise((resolve) => setImmediate(resolve));
   await new Promise((resolve) => setImmediate(resolve));
 
-  return { toasts, osNotifications, timeouts, localStorage, replaced, elements, permissionRequests: () => permissionRequests };
+  return { toasts, osNotifications, timeouts, localStorage, sessionStorage, replaced, elements, location: sandbox.location, permissionRequests: () => permissionRequests };
 }
 
 describe('SCRUM-234: successful login shows exactly one toast', () => {
@@ -248,5 +252,93 @@ describe('a link waiting for sign-in', () => {
     let emailOnLoad = null;
     await runLoginScenario({ permission: 'granted', search: '?email=pat%40norton.law', onLoaded: (els) => { emailOnLoad = els.get('email').value; } });
     expect(emailOnLoad).toBe('pat@norton.law');
+  });
+});
+
+// Chef's session policy at sign in (LanaSessionGate in api.js): required MFA
+// enrollment goes to mfa-setup.html (after a required password change), a
+// waiting link waits for it, and the MFA code prompt follows the error code.
+describe('session policy at sign in', () => {
+  function links() {
+    const stages = [];
+    return {
+      stages,
+      api: {
+        getSavedServer: async () => ({ success: true, server: { url: 'http://127.0.0.1:3001', orgId: 'testorg', orgName: 'Test Org', domain: 'testorg.lanaai.io' } }),
+        saveSettings: async () => ({ success: true }),
+        getConfig: async () => ({}),
+        appLinks: {
+          loginContext: async () => ({ pending: true, action: 'shared', needsFirm: false, domain: null, orgIdHint: null }),
+          takePending: async (stage) => { stages.push(stage); return { page: 'shared-link.html?token=abc' }; }
+        }
+      }
+    };
+  }
+  const runTimers = (result) => result.timeouts.filter((t) => t.ms === 500).forEach((t) => t.fn());
+
+  test('required enrollment opens mfa-setup.html and leaves a waiting link waiting', async () => {
+    const waiting = links();
+    const result = await runLoginScenario({
+      permission: 'granted',
+      electronAPI: waiting.api,
+      login: async () => ({ token: 't', user: { id: 'u1', mustChangePassword: false, mfaEnrollmentRequired: true }, state: 'mfa_enrollment_required', mfaEnrollmentRequired: true })
+    });
+    runTimers(result);
+    expect(result.location.href).toBe('mfa-setup.html');
+    expect(waiting.stages).toEqual([]);
+    expect(result.replaced).toEqual([]);
+  });
+
+  test('a password change comes first when both apply', async () => {
+    const result = await runLoginScenario({
+      permission: 'granted',
+      login: async () => ({ token: 't', user: { id: 'u1', mustChangePassword: true, mfaEnrollmentRequired: true }, state: 'mfa_enrollment_required' })
+    });
+    runTimers(result);
+    expect(result.location.href).toBe('change-password.html');
+  });
+
+  test('the MFA code field opens on the error code, not on message text alone', async () => {
+    const coded = await runLoginScenario({
+      permission: 'granted',
+      login: async () => { throw Object.assign(new Error('Sign in needs a code'), { status: 401, code: 'MFA_TOKEN_REQUIRED', data: { error: { code: 'MFA_TOKEN_REQUIRED' } } }); }
+    });
+    expect(coded.elements.get('mfaField').classList.contains('hidden')).toBe(false);
+
+    const textOnly = await runLoginScenario({
+      permission: 'granted',
+      login: async () => { throw new Error('MFA token required'); }
+    });
+    expect(textOnly.elements.get('mfaField').classList.contains('hidden')).toBe(true);
+  });
+
+  test('403 IP_NOT_ALLOWED at sign in shows the plain message', async () => {
+    const result = await runLoginScenario({
+      permission: 'granted',
+      login: async () => { throw Object.assign(new Error('Your account can only be used from approved network addresses. Ask your administrator.'), { status: 403, code: 'IP_NOT_ALLOWED', data: { code: 'IP_NOT_ALLOWED' } }); }
+    });
+    expect(result.toasts).toEqual([{ level: 'error', message: 'Your account can only be used from approved network addresses. Ask your administrator.' }]);
+  });
+
+  test('a stored session still to enroll goes back to mfa-setup.html', async () => {
+    const result = await runLoginScenario({
+      permission: 'granted',
+      presetSession: (sandbox) => {
+        sandbox.api.isAuthenticated = () => true;
+        sandbox.api.isTokenExpired = () => false;
+        sandbox.api.user = { id: 'u1', mfaEnrollmentRequired: true };
+      }
+    });
+    expect(result.replaced[0]).toBe('mfa-setup.html');
+  });
+
+  test('the inactivity note shows once on the sign-in page', async () => {
+    const result = await runLoginScenario({
+      permission: 'granted',
+      presetSession: (sandbox) => sandbox.sessionStorage.setItem('lana_sign_out_note', 'idle_timeout')
+    });
+    result.timeouts.filter((t) => t.ms === 0).forEach((t) => t.fn());
+    expect(result.toasts).toContainEqual({ level: 'info', message: 'You were signed out after a period of inactivity. Sign in again.' });
+    expect(result.sessionStorage.getItem('lana_sign_out_note')).toBe(null);
   });
 });

@@ -1,0 +1,76 @@
+/* Required two-step sign in setup (mfa-setup.html). Layout and theme: css/app-link-pages.css. */
+
+.mfa-loading {
+  display: flex;
+  justify-content: center;
+  padding: 1.5rem 0;
+}
+
+.mfa-key {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  border: 1px solid var(--lex-border-default);
+  border-radius: var(--lex-radius-lg, 12px);
+  background: var(--lex-bg-tertiary);
+}
+
+/* The QR code stays dark on white in both themes so phone cameras read it. */
+.mfa-qr {
+  display: block;
+  width: 11rem;
+  height: 11rem;
+  padding: 0.5rem;
+  border-radius: var(--lex-radius-md, 8px);
+  background: #ffffff;
+}
+
+.mfa-secret {
+  font-family: var(--lex-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  letter-spacing: 0.04em;
+  color: var(--lex-text-primary);
+  text-align: center;
+  word-break: break-all;
+  user-select: all;
+}
+
+.mfa-failed {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.mfa-codes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  padding: 1rem;
+  border: 1px solid var(--lex-border-default);
+  border-radius: var(--lex-radius-lg, 12px);
+  background: var(--lex-bg-tertiary);
+  font-family: var(--lex-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  color: var(--lex-text-primary);
+  user-select: text;
+}
+
+.mfa-code {
+  text-align: center;
+}
+
+.mfa-copy,
+.mfa-sign-out {
+  align-self: center;
+}
+
+.mfa-loading[hidden],
+.mfa-key[hidden],
+.mfa-qr[hidden],
+.mfa-failed[hidden],
+.alp-form[hidden] {
+  display: none;
+}

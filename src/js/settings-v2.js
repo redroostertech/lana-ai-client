@@ -484,14 +484,16 @@
     }
   }
 
+  // Setup, QR code and verify: js/shared/mfa-enrollment.js (shared with mfa-setup.html).
   function enableMfa() {
-    api.setupMfa().then(function (result) {
+    var Enrollment = window.LanaMfaEnrollment;
+    Enrollment.start(api).then(function (setup) {
       var content = document.createElement('div');
       content.style.textAlign = 'center';
       content.innerHTML =
         '<p style="margin-bottom:16px;font-size:var(--lex-body-sm-size);color:var(--lex-text-secondary);">Scan this QR code with your authenticator app:</p>' +
-        '<img src="' + esc(result.qr_code) + '" alt="MFA QR Code" style="display:block;margin:0 auto 16px;max-width:200px;">' +
-        '<p style="font-size:var(--lex-body-xs-size);color:var(--lex-text-tertiary);margin-bottom:16px;">Or enter this key manually: <strong>' + esc(result.secret) + '</strong></p>' +
+        (setup.qrCode ? '<img src="' + esc(setup.qrCode) + '" alt="MFA QR Code" style="display:block;margin:0 auto 16px;max-width:200px;">' : '') +
+        '<p style="font-size:var(--lex-body-xs-size);color:var(--lex-text-tertiary);margin-bottom:16px;">Or enter this key manually: <strong>' + esc(setup.secret) + '</strong></p>' +
         '<lex-input id="sv2-mfa-verify-input" placeholder="Enter 6-digit code" maxlength="6"></lex-input>';
 
       var modal = Lex.Modal.open({
@@ -508,24 +510,27 @@
         verifyBtn.addEventListener('click', function () {
           var tokenInput = modal.querySelector('#sv2-mfa-verify-input');
           var token = tokenInput ? tokenInput.value : '';
-          if (!token) {
-            if (tokenInput) tokenInput.error = 'Please enter the 6-digit code';
+          var problem = Enrollment.codeError(token);
+          if (problem) {
+            if (tokenInput) tokenInput.error = problem;
             return;
           }
 
           verifyBtn.loading = true;
-          api.verifyMfa(token).then(function () {
-            Lex.Toast.success('MFA enabled successfully');
-            closeOpenedModal(modal);
-            loadMfaStatus();
-          }).catch(function () {
-            if (tokenInput) tokenInput.error = 'Invalid code. Please try again.';
+          Enrollment.verify(api, token).then(function (outcome) {
+            if (outcome.ok) {
+              Lex.Toast.success('MFA enabled successfully');
+              closeOpenedModal(modal);
+              loadMfaStatus();
+              return;
+            }
+            if (tokenInput) tokenInput.error = outcome.message;
             verifyBtn.loading = false;
           });
         });
       }
     }).catch(function (error) {
-      Lex.Toast.error(error.message || 'Failed to setup MFA');
+      Lex.Toast.error(window.LanaMfaEnrollment.setupErrorMessage(error));
     });
   }
 

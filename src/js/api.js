@@ -209,23 +209,10 @@ class ApiClient {
         this.token = storedToken;
         this.user = JSON.parse(localStorage.getItem('user') || 'null');
 
-        // Start automatic token refresh if we have a valid token
-        if (this.token) {
-          this.startTokenRefresh();
-          this.setupActivityListener();
-
-          // Initialize and start session tracking for auto-login (Electron only)
-          if (window.electronAPI) {
-            this._readyPromise.then(async () => {
-              try {
-                await window.electronAPI.invoke('session-tracker:initialize', this.baseUrl, this.token);
-                await window.electronAPI.invoke('session-tracker:start');
-                this.log('Session tracking initialized and started (auto-login)');
-              } catch (error) {
-                console.warn('[LanaAPI] Failed to start session tracking (auto-login):', error);
-              }
-            });
-          }
+        // Start automatic token refresh if we have a valid token. A user who
+        // must enroll in MFA first gets them once enrollment is done.
+        if (this.token && !LanaSessionGate.holdsSession(this.user)) {
+          this.startSessionServices();
         }
       }
     }
@@ -486,7 +473,11 @@ class ApiClient {
     }
   }
 
-  showSessionExpiredModal() {
+  /**
+   * @param {{ reason?: 'idle_timeout' }} [options] - idle_timeout: the server
+   *   ended the session for inactivity (401 SESSION_IDLE_TIMEOUT)
+   */
+  showSessionExpiredModal(options = {}) {
     // A 401 inside an iframe must not tear down the parent's session.
     // The parent owns auth state; iframes share localStorage but are guests.
     // Without this guard, iframe-side polling 401s would clear the parent's
@@ -530,8 +521,9 @@ class ApiClient {
       return;
     }
 
+    const idle = options && options.reason === 'idle_timeout';
     const modal = LexModal.open({
-      heading: 'Session Expired',
+      heading: idle ? 'Signed out' : 'Session Expired',
       size: 'sm',
       closeOnOverlay: false,
       content: `
@@ -541,7 +533,7 @@ class ApiClient {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
             </svg>
           </div>
-          <p class="text-gray-600 mb-4">Your session has expired. Redirecting to login...</p>
+          <p class="text-gray-600 mb-4">${idle ? 'You were signed out after a period of inactivity. Taking you to sign in...' : 'Your session has expired. Redirecting to login...'}</p>
           <div class="text-3xl font-bold text-indigo-600" id="sessionCountdown">3</div>
         </div>
       `
@@ -721,7 +713,9 @@ class ApiClient {
         const isLoginRequest = endpoint.includes('/auth/login') || endpoint.includes('/auth/register');
         const isOnLoginPage = window.location.pathname.includes('login.html');
 
-        if (!isLoginRequest && !isOnLoginPage && (
+        // A 401 INVALID_CODE answers a wrong MFA code; the session is fine.
+        const wrongCode = LanaSessionGate.isWrongCodeAnswer(result);
+        if (!isLoginRequest && !isOnLoginPage && !wrongCode && (
             response.status === 401 ||
             errorCode === 'AUTHENTICATION_ERROR' ||
             errorCode === 'TOKEN_EXPIRED' ||
@@ -729,8 +723,11 @@ class ApiClient {
             errorMessage.toLowerCase().includes('token expired') ||
             errorMessage.toLowerCase().includes('not authenticated'))) {
 
-          // Show session expired modal and redirect
-          this.showSessionExpiredModal();
+          // Show session expired modal and redirect. Signed out for being idle
+          // (401 SESSION_IDLE_TIMEOUT) says so, here and on the sign-in page.
+          const idle = LanaSessionGate.refusalKind(result) === 'idle_timeout';
+          if (idle) LanaSessionGate.rememberSignOutNote(window.sessionStorage, 'idle_timeout');
+          this.showSessionExpiredModal(idle ? { reason: 'idle_timeout' } : undefined);
           throw new ApiError(result.error?.message || result.detail || 'Session expired', response.status, result);
         }
 
@@ -1766,28 +1763,53 @@ class ApiClient {
     if (mfaToken) data.mfa_token = mfaToken;
     const result = await this.post('/api/v1/auth/login', data);
     this.token = result.token;
-    this.user = result.user;
+    // The cached user carries the enrollment flag so every page holds off
+    // the session services until mfa-setup.html clears it.
+    this.user = LanaSessionGate.needsMfaEnrollment(result) && result.user
+      ? { ...result.user, mfaEnrollmentRequired: true }
+      : result.user;
     window.lanaAuthToken?.set(result.token);
-    localStorage.setItem('user', JSON.stringify(result.user));
+    localStorage.setItem('user', JSON.stringify(this.user));
 
-    // Start automatic token refresh and activity monitoring after login
+    // Token refresh, activity monitoring and session tracking. A user who must
+    // enroll in MFA first can reach only enrollment until then (403
+    // MFA_ENROLLMENT_REQUIRED), so they start after completeMfaEnrollment().
+    if (!LanaSessionGate.holdsSession(this.user)) {
+      await this.startSessionServices();
+    }
+
+    return result;
+  }
+
+  /**
+   * Token refresh, the activity listener and session tracking (Electron only).
+   * @returns {Promise<void>} settles once session tracking has started (or failed)
+   */
+  startSessionServices() {
     this.startTokenRefresh();
     this.setupActivityListener();
-
-    // Start session tracking (Electron client only)
-    if (window.electronAPI) {
+    if (!window.electronAPI) return Promise.resolve();
+    return Promise.resolve(this._readyPromise).then(async () => {
       try {
-        // First initialize session tracker with backend URL and token
         await window.electronAPI.invoke('session-tracker:initialize', this.baseUrl, this.token);
-        // Then start the session
         await window.electronAPI.invoke('session-tracker:start');
         this.log('Session tracking initialized and started');
       } catch (error) {
         console.warn('[LanaAPI] Failed to start session tracking:', error);
       }
-    }
+    });
+  }
 
-    return result;
+  /**
+   * MFA enrollment finished (mfa-setup.html): clear the flag on the cached
+   * user and start what sign in held off.
+   */
+  completeMfaEnrollment() {
+    if (this.user && typeof this.user === 'object') {
+      this.user = { ...this.user, mfaEnrollmentRequired: false };
+      localStorage.setItem('user', JSON.stringify(this.user));
+    }
+    return this.startSessionServices();
   }
 
   /**
@@ -3433,17 +3455,13 @@ class ApiClient {
 
   async setupMfa() {
     if (!this.user?.id) throw new Error('Not logged in');
-    if (!this.isMfaEnabled()) {
-      throw new Error('MFA is disabled for this deployment');
-    }
+    // Not gated on MFA_ENABLED: an organization that requires MFA sends its
+    // users here to enroll whatever this client's config says.
     return this.post('/api/v1/users/me/security/mfa/setup');
   }
 
   async verifyMfa(token) {
     if (!this.user?.id) throw new Error('Not logged in');
-    if (!this.isMfaEnabled()) {
-      throw new Error('MFA is disabled for this deployment');
-    }
     return this.post('/api/v1/users/me/security/mfa/verify', { code: token });
   }
 
@@ -4034,6 +4052,114 @@ class ApiError extends Error {
     this.code = (data && (data.code || (data.error && data.error.code))) || null;
   }
 }
+
+/*
+ * LanaSessionGate: what the server's session policy asks of the person.
+ * Plain functions, no DOM; loaded with api.js on every page (window.LanaSessionGate).
+ *
+ * Codes Chef answers (LANA-AI shared/auth/session-policy.service.js):
+ *   403 MFA_ENROLLMENT_REQUIRED  the organization requires MFA and this user has none
+ *   403 PASSWORD_CHANGE_REQUIRED the account must set a new password first
+ *   401 SESSION_IDLE_TIMEOUT     the session was unused for too long and has ended
+ *   403 IP_NOT_ALLOWED           the account may only be used from approved addresses
+ * The refusal body is { error: <title>, code, message }; AppErrors nest the code
+ * as { error: { code, message } }. Both shapes are read.
+ */
+const LanaSessionGate = (function () {
+  const MESSAGES = {
+    idle_timeout: 'You were signed out after a period of inactivity. Sign in again.',
+    ip_not_allowed: 'Your account can only be used from approved network addresses. Ask your administrator.'
+  };
+  const KINDS = {
+    MFA_ENROLLMENT_REQUIRED: 'mfa_enrollment_required',
+    PASSWORD_CHANGE_REQUIRED: 'password_change_required',
+    SESSION_IDLE_TIMEOUT: 'idle_timeout',
+    IP_NOT_ALLOWED: 'ip_not_allowed'
+  };
+  // Codes that mean "MFA code needed at sign in". Chef 8b50ffbda still sends
+  // the generic AUTHENTICATION_ERROR with the message "MFA token required", so
+  // that one pairing is matched too until Chef sends a code of its own.
+  const MFA_CODE_REQUIRED = ['MFA_TOKEN_REQUIRED', 'MFA_REQUIRED', 'MFA_CODE_REQUIRED'];
+  const SIGN_OUT_NOTE_KEY = 'lana_sign_out_note';
+
+  /** The server's error code from an ApiError or a response body, upper case, or ''. */
+  function codeOf(errOrBody) {
+    if (!errOrBody || typeof errOrBody !== 'object') return '';
+    const nested = (value) => value && typeof value === 'object' && (value.code || (value.error && typeof value.error === 'object' && value.error.code));
+    const code = nested(errOrBody) || nested(errOrBody.data);
+    return code ? String(code).toUpperCase() : '';
+  }
+
+  /** @returns {'mfa_enrollment_required'|'password_change_required'|'idle_timeout'|'ip_not_allowed'|null} */
+  function refusalKind(errOrBody) {
+    return KINDS[codeOf(errOrBody)] || null;
+  }
+
+  function isMfaCodeRequired(err) {
+    const code = codeOf(err);
+    if (MFA_CODE_REQUIRED.indexOf(code) !== -1) return true;
+    return code === 'AUTHENTICATION_ERROR' && /^mfa token required$/i.test(String((err && err.message) || '').trim());
+  }
+
+  /** A sign-in answer (or a cached user) that must enroll in MFA before anything else. */
+  function needsMfaEnrollment(result) {
+    if (!result) return false;
+    if (result.state === 'mfa_enrollment_required' || result.mfaEnrollmentRequired === true) return true;
+    return Boolean(result.user && result.user.mfaEnrollmentRequired === true);
+  }
+
+  function needsPasswordChange(result) {
+    return Boolean(result && result.user && result.user.mustChangePassword === true);
+  }
+
+  /**
+   * Where sign in goes next. A password change comes first when both apply:
+   * the change-password page sends the person on to enrollment.
+   * @returns {'change-password'|'mfa-setup'|'continue'}
+   */
+  function nextStepAfterSignIn(result) {
+    if (needsPasswordChange(result)) return 'change-password';
+    if (needsMfaEnrollment(result)) return 'mfa-setup';
+    return 'continue';
+  }
+
+  /** Token refresh, the activity listener and session tracking wait while this holds. */
+  function holdsSession(user) {
+    return Boolean(user && user.mfaEnrollmentRequired === true);
+  }
+
+  /** A 401 that answers a wrong code rather than ending the session. */
+  function isWrongCodeAnswer(body) {
+    return codeOf(body) === 'INVALID_CODE';
+  }
+
+  function message(kind) {
+    return MESSAGES[kind] || '';
+  }
+
+  /** Keep a note for the sign-in page (sessionStorage), e.g. after an idle sign out. */
+  function rememberSignOutNote(storage, kind) {
+    try { if (storage && MESSAGES[kind]) storage.setItem(SIGN_OUT_NOTE_KEY, kind); } catch (_e) { /* storage blocked */ }
+  }
+
+  /** The note left for the sign-in page, read once, or ''. */
+  function takeSignOutNote(storage) {
+    try {
+      if (!storage) return '';
+      const kind = storage.getItem(SIGN_OUT_NOTE_KEY);
+      storage.removeItem(SIGN_OUT_NOTE_KEY);
+      return MESSAGES[kind] || '';
+    } catch (_e) {
+      return '';
+    }
+  }
+
+  return {
+    codeOf, refusalKind, isMfaCodeRequired, needsMfaEnrollment, needsPasswordChange,
+    nextStepAfterSignIn, holdsSession, isWrongCodeAnswer, message, rememberSignOutNote, takeSignOutNote
+  };
+})();
+window.LanaSessionGate = LanaSessionGate;
 
 // Global instance — also exposed on window so IIFEs (Lex components) can access it
 const api = new ApiClient();

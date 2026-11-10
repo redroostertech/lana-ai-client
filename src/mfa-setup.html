@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Set up two-step sign in - LANA</title>
+  <!-- Required MFA enrollment. Sign in sends a user here when their organization
+       requires two-step sign in and they have none (Chef answers every other call
+       with 403 MFA_ENROLLMENT_REQUIRED until they enroll; auth-guard.js sends them
+       here too). Logic: js/pages/mfa-setup.js and js/shared/mfa-enrollment.js. -->
+  <link rel="stylesheet" href="css/lex-tokens.css">
+  <link rel="stylesheet" href="css/tailwind-output.css">
+  <link rel="stylesheet" href="css/app-link-pages.css">
+  <link rel="stylesheet" href="css/mfa-setup.css">
+</head>
+<body class="alp-body">
+  <main class="alp-page">
+    <lex-card class="alp-panel">
+      <lex-brand-mark animation="idle" size="56" class="alp-mark"></lex-brand-mark>
+
+      <section id="mfaSetupView" class="alp-view">
+        <lex-text tag="h1" size="h4" weight="semibold">Set up two-step sign in</lex-text>
+        <lex-text tag="p" size="body-sm" variant="secondary">Your organization requires two-step sign in. Scan this code with an authenticator app on your phone, then enter the 6-digit code the app shows.</lex-text>
+
+        <div id="mfaLoading" class="mfa-loading">
+          <lex-spinner size="md"></lex-spinner>
+        </div>
+
+        <div id="mfaKey" class="mfa-key" hidden>
+          <img id="mfaQr" class="mfa-qr" alt="QR code for your authenticator app" hidden>
+          <lex-text tag="p" size="caption" variant="secondary" align="center">Cannot scan it? Type this key into the app instead.</lex-text>
+          <div id="mfaSecret" class="mfa-secret"></div>
+        </div>
+
+        <lex-form id="mfaForm" class="alp-form" hidden>
+          <lex-input id="mfaCode" name="code" label="6-digit code" placeholder="123456" maxlength="6" required></lex-input>
+          <div id="mfaError" class="alp-error" role="alert" hidden></div>
+          <lex-btn id="mfaVerify" type="submit" variant="primary" class="alp-submit">Turn on two-step sign in</lex-btn>
+        </lex-form>
+
+        <div id="mfaSetupFailed" class="mfa-failed" role="alert" hidden>
+          <div id="mfaSetupFailedText"></div>
+          <lex-btn id="mfaRetry" type="button" variant="secondary" size="sm">Try again</lex-btn>
+        </div>
+
+        <lex-btn id="mfaSignOut" variant="ghost" size="sm" class="mfa-sign-out">Sign out</lex-btn>
+      </section>
+
+      <section id="mfaCodesView" class="alp-view" hidden>
+        <lex-text tag="h1" size="h4" weight="semibold" icon="check-circle" variant="success">Two-step sign in is on</lex-text>
+        <lex-text tag="p" size="body-sm" variant="secondary">Save these backup codes somewhere safe. If you lose your phone, each code signs you in once in place of the 6-digit code.</lex-text>
+        <div id="mfaBackupCodes" class="mfa-codes"></div>
+        <lex-btn id="mfaCopyCodes" type="button" variant="secondary" size="sm" leading-icon="copy" class="mfa-copy">Copy codes</lex-btn>
+        <lex-btn id="mfaContinue" variant="primary" class="alp-submit">Continue</lex-btn>
+      </section>
+    </lex-card>
+  </main>
+
+  <script src="js/error-reporter.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/mock-data.js"></script>
+  <script src="js/time-utils.js"></script>
+  <script src="js/shared/request-retry.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/lex/lex.core.js"></script>
+  <script src="js/lex/lex.icons.js"></script>
+  <script src="js/lex/lex.forms.js"></script>
+  <script src="js/lex/index.js"></script>
+  <script src="js/lex/components/foundation/lex-card.js"></script>
+  <script src="js/lex/components/foundation/lex-text.js"></script>
+  <script src="js/lex/components/foundation/lex-btn.js"></script>
+  <script src="js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="js/lex/components/foundation/lex-toast.js"></script>
+  <script src="js/lex/components/form/lex-input.js"></script>
+  <script src="js/lex/components/form/lex-form.js"></script>
+  <script src="js/vendor/lottie_light.min.js"></script>
+  <script src="js/lex/brand/lex-brand-animations.js"></script>
+  <script src="js/lex/components/foundation/lex-brand-mark.js"></script>
+  <script src="js/shared/app-link-page-kit.js"></script>
+  <script src="js/shared/mfa-enrollment.js"></script>
+  <script src="js/pages/mfa-setup.js"></script>
+</body>
+</html>

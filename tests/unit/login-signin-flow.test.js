@@ -11,6 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { loadSessionGate } = require('./helpers/session-gate');
 
 const ROOT = path.resolve(__dirname, '../..');
 
@@ -81,6 +82,7 @@ function loadLogin({ fetch }) {
     navigator: { platform: 'MacIntel' },
     ServerReachability: { buildUnreachableMessage: () => 'Server did not answer.' },
     AccountStatus: { classifyLoginFailure: () => 'unknown' },
+    LanaSessionGate: loadSessionGate(),
     Toast: {
       success: (m) => toasts.push({ level: 'success', message: m }),
       info: (m) => toasts.push({ level: 'info', message: m }),

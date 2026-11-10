@@ -74,34 +74,52 @@
   }
   checkAuth(3);
 
-  // Forced password change (belt-and-suspenders): a user who already has a
-  // stored token from a prior session — or who refreshes straight into a
-  // protected page — never passes back through login.html's flag check. While
-  // the account requires a password change, the server 403s every data endpoint
-  // with code PASSWORD_CHANGE_REQUIRED. Intercept that at the single API chokepoint
-  // (api.request) and route to the mandatory change-password screen. We re-throw
-  // so existing per-call error handling is unaffected. This only fires on a real
-  // server 403 signal, never on an absent/false flag.
-  function changePasswordPath() {
-    return (typeof getPagePath === 'function') ? getPagePath('change-password.html') : 'change-password.html';
+  // Session policy redirects (belt-and-suspenders): a user who already has a
+  // stored token from a prior session, or who refreshes straight into a
+  // protected page, never passes back through login.html's checks. While the
+  // account must change its password or enroll in MFA, the server 403s every
+  // data endpoint with PASSWORD_CHANGE_REQUIRED or MFA_ENROLLMENT_REQUIRED.
+  // Intercept that at the single API chokepoint (api.request) and route to the
+  // matching screen. 403 IP_NOT_ALLOWED gets one plain message. We re-throw so
+  // existing per-call error handling is unaffected. This only fires on a real
+  // server signal, never on an absent/false flag. Codes: LanaSessionGate (api.js).
+  function pagePath(name) {
+    return (typeof getPagePath === 'function') ? getPagePath(name) : name;
   }
-  function isPasswordChangeRequired(err) {
-    if (!err) return false;
-    if (err.code === 'PASSWORD_CHANGE_REQUIRED') return true;
-    return err.status === 403 && err.data && err.data.code === 'PASSWORD_CHANGE_REQUIRED';
+  var REDIRECTS = {
+    password_change_required: 'change-password.html',
+    mfa_enrollment_required: 'mfa-setup.html'
+  };
+  // Pages that are themselves the way out: never redirect away from them.
+  var EXEMPT_PAGES = ['change-password', 'mfa-setup', 'login'];
+  function refusalKind(err) {
+    if (!err) return null;
+    if (window.LanaSessionGate) return LanaSessionGate.refusalKind(err);
+    return err.code === 'PASSWORD_CHANGE_REQUIRED' ? 'password_change_required' : null;
   }
-  (function installPasswordChangeGuard() {
+  function showPlainMessage(text) {
+    if (window.Lex && window.Lex.Toast && typeof Lex.Toast.error === 'function') Lex.Toast.error(text);
+    else if (window.Toast && typeof Toast.error === 'function') Toast.error(text);
+  }
+  (function installSessionPolicyGuard() {
     if (!window.api || typeof api.request !== 'function' || api.__pwChangeGuardInstalled) return;
     var originalRequest = api.request.bind(api);
     var redirecting = false;
+    var ipNoticeShown = false;
     api.request = function () {
       return originalRequest.apply(api, arguments).catch(function (err) {
-        if (isPasswordChangeRequired(err) && !redirecting) {
+        var kind = refusalKind(err);
+        var target = kind && REDIRECTS[kind];
+        if (target && !redirecting) {
           var path = (window.location.pathname || '').toLowerCase();
-          if (path.indexOf('change-password') === -1 && path.indexOf('login') === -1) {
+          var exempt = EXEMPT_PAGES.some(function (page) { return path.indexOf(page) !== -1; });
+          if (!exempt) {
             redirecting = true;
-            window.location.href = changePasswordPath();
+            window.location.href = pagePath(target);
           }
+        } else if (kind === 'ip_not_allowed' && !ipNoticeShown && window.LanaSessionGate) {
+          ipNoticeShown = true;
+          showPlainMessage(LanaSessionGate.message('ip_not_allowed'));
         }
         throw err;
       });

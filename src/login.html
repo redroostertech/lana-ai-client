@@ -259,6 +259,11 @@
       }
 
       if (api.isAuthenticated() && !api.isTokenExpired()) {
+        // Signed in but not yet enrolled in required MFA: finish that first.
+        if (LanaSessionGate.holdsSession(api.user)) {
+          window.location.replace('mfa-setup.html');
+          return;
+        }
         goToDashboardAfterLogin();
       } else if (api.isAuthenticated() && api.isTokenExpired()) {
         // Token exists but is expired - clear stale auth data and stay on login
@@ -272,6 +277,12 @@
     }
 
     checkExistingAuth();
+
+    // Signed out by the server for inactivity (api.js, 401 SESSION_IDLE_TIMEOUT): say so once.
+    const signOutNote = LanaSessionGate.takeSignOutNote(window.sessionStorage);
+    if (signOutNote) {
+      setTimeout(() => Toast.info(signOutNote), 0);
+    }
 
     // DOM Elements - Step 1 (Discovery)
     const step1 = document.getElementById('step1');
@@ -795,12 +806,13 @@
       try {
         const loginResult = await api.login(email, password, mfaToken || null);
 
-        // Forced password change: if the account requires a password change,
-        // route to the mandatory change-password screen instead of the app.
-        // Strictly gate on === true so accounts without the flag (SSO users,
-        // already-reset users, regular accounts where it's null/undefined/false)
-        // proceed to the dashboard as normal.
-        const mustChangePassword = !!(loginResult && loginResult.user && loginResult.user.mustChangePassword === true);
+        // Forced password change and required MFA enrollment: route to the
+        // mandatory screen instead of the app (password first when both apply;
+        // change-password.html then sends the person on to mfa-setup.html).
+        // Strictly gated on === true / the enrollment state, so accounts
+        // without the flags proceed to the dashboard as normal.
+        const nextStep = LanaSessionGate.nextStepAfterSignIn(loginResult);
+        const mustChangePassword = nextStep === 'change-password';
 
         // Save or clear remembered credentials based on checkbox
         if (rememberMeCheckbox.checked) {
@@ -832,6 +844,17 @@
           return;
         }
 
+        if (nextStep === 'mfa-setup') {
+          // Every other call answers 403 MFA_ENROLLMENT_REQUIRED until the
+          // person enrolls. A waiting app link stays waiting: mfa-setup.html
+          // continues it once enrollment is done.
+          Toast.info('Your organization requires two-step sign in. Opening setup...');
+          setTimeout(() => {
+            window.location.href = 'mfa-setup.html';
+          }, 500);
+          return;
+        }
+
         Toast.success('Login successful! Redirecting...');
 
         // Ensure desktop notification permission quietly: the success toast
@@ -851,7 +874,7 @@
 
         goToDashboardAfterLogin(500);
       } catch (error) {
-        if (error.message === 'MFA token required') {
+        if (LanaSessionGate.isMfaCodeRequired(error)) {
           mfaRequired = true;
           mfaField.classList.remove('hidden');
           document.getElementById('mfaToken').focus();
@@ -872,6 +895,8 @@
 
           if (accountState === 'account_disabled') {
             Toast.error('This account has been deactivated. Please contact your administrator.');
+          } else if (LanaSessionGate.refusalKind(error) === 'ip_not_allowed') {
+            Toast.error(LanaSessionGate.message('ip_not_allowed'));
           } else {
             Toast.error(error.message || 'Login failed. Please check your credentials.');
           }
