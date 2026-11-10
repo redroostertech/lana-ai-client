@@ -94,14 +94,14 @@
    * kind 'invite': Chef's accept-invite codes. kind 'activate': the activate
    * endpoint has no codes; its messages are already plain sentences.
    * Unknown codes show Chef's own message. Every paid seat in use
-   * (SEAT_LIMIT_REACHED, either kind): Chef's detail and a line asking the
-   * firm's administrator to add seats; the person is not signed in, so no
-   * add-seats button.
+   * (SEAT_LIMIT_REACHED, either kind): the seats in use, that this account
+   * or invitation cannot go ahead yet, and to ask the firm's administrator;
+   * the person is not signed in, so no add-seats button.
    */
   function setPasswordProblem(error, kind) {
     var problem = problemOf(error);
     if (problem.status === 0) return { message: UNREACHABLE, signIn: false };
-    var seatLimit = SeatLimit ? SeatLimit.refusal(error, { canAddSeats: false }) : null;
+    var seatLimit = SeatLimit ? SeatLimit.refusal(error, { canAddSeats: false, context: kind === 'invite' ? 'invite' : 'activate' }) : null;
     if (seatLimit) return { message: seatLimit.message, signIn: false };
     if (kind === 'invite' && Object.prototype.hasOwnProperty.call(INVITE_PROBLEMS, problem.code)) {
       var known = INVITE_PROBLEMS[problem.code];

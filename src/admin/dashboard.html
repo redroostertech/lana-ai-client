@@ -135,7 +135,7 @@
                 <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
                     <h3 class="text-sm font-medium text-gray-500 mb-3">Quick Actions</h3>
                     <div class="flex flex-wrap gap-3">
-                        <button onclick="openModal('createUserModal')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm">
+                        <button id="dashboardCreateUserBtn" onclick="Lex.Nav.go('admin/users.html?action=create')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm">
                             <i class="fas fa-user-plus mr-2"></i>Create User
                         </button>
                         <button onclick="openModal('createOrgModal')" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm">
@@ -305,7 +305,8 @@
         </div>
     </div>
 
-    <!-- Create User Modal -->
+    <!-- Create User Modal: no longer opened. Create User goes to the Add User
+         form on admin/users.html (password, role, admin-only, seat limit). -->
     <lex-modal id="createUserModal" heading="Create New User" size="md">
             <form id="createUserForm" class="space-y-4">
                 <div>

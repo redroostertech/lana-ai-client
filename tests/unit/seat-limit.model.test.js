@@ -10,6 +10,11 @@ const AppLinkPages = require('../../src/js/shared/app-link-pages.model');
 
 const BILLING = 'https://lanaai.io/lana-ai/portal/billing/seats';
 const DETAIL = `Your firm is using all 5 of its paid seats. An administrator can add seats here: ${BILLING}`;
+// What the screens say: built from the seat count, never with the address as text.
+const ADMIN_MSG = 'Your firm is using all 5 of its paid seats. Add seats to add more people.';
+const MEMBER_MSG = 'Your firm is using all 5 of its paid seats. Ask your firm\'s administrator to add seats.';
+const ACTIVATE_MSG = 'Your firm is using all 5 of its paid seats, so this account cannot be activated yet. Ask your firm\'s administrator to add seats.';
+const INVITE_MSG = 'Your firm is using all 5 of its paid seats, so this invitation cannot be accepted yet. Ask your firm\'s administrator to add seats.';
 
 /** The refusal as Chef sends it (seat-limit.service.js), shaped as api.js or a page's fetch rejects. */
 function seatError(overrides = {}) {
@@ -40,24 +45,55 @@ function fakeUi(confirmAnswer = true) {
 }
 
 describe('refusal', () => {
-  test('the exact code: Chef\'s detail, the seat count and the add-seats address for an administrator', () => {
+  test('the exact code, administrator: the seats in use and "Add seats to add more people", with the add-seats address', () => {
     expect(S.refusal(seatError(), { canAddSeats: true })).toEqual({
-      heading: 'No seats left', detail: DETAIL, message: DETAIL, seats: 5, canAddSeats: true, billingUrl: BILLING
+      heading: 'No seats left', detail: DETAIL, message: ADMIN_MSG, seats: 5, canAddSeats: true, billingUrl: BILLING
     });
   });
 
-  test('everyone else: Chef\'s detail plus "ask your administrator", and no address for a button', () => {
+  test('everyone else: the seats in use and "ask your administrator", and no address for a button', () => {
     for (const opts of [{ canAddSeats: false }, undefined]) {
       const found = S.refusal(seatError(), opts);
-      expect(found.message).toBe(`${DETAIL} Ask your firm's administrator to add seats.`);
+      expect(found.message).toBe(MEMBER_MSG);
       expect(found.canAddSeats).toBe(false);
       expect(found.billingUrl).toBe('');
+    }
+  });
+
+  test('activation and invitation say what cannot happen yet', () => {
+    expect(S.refusal(seatError(), { context: 'activate' }).message).toBe(ACTIVATE_MSG);
+    expect(S.refusal(seatError(), { context: 'invite' }).message).toBe(INVITE_MSG);
+    // An unknown context gets the plain member sentence.
+    expect(S.refusal(seatError(), { context: 'other' }).message).toBe(MEMBER_MSG);
+  });
+
+  test('one paid seat reads "its 1 paid seat" for every audience', () => {
+    const one = seatError({ seats: 1 });
+    expect(S.refusal(one, { canAddSeats: true }).message).toBe('Your firm is using its 1 paid seat. Add seats to add more people.');
+    expect(S.refusal(one, { context: 'activate' }).message).toBe('Your firm is using its 1 paid seat, so this account cannot be activated yet. Ask your firm\'s administrator to add seats.');
+    expect(S.refusal(one, { context: 'invite' }).message).toBe('Your firm is using its 1 paid seat, so this invitation cannot be accepted yet. Ask your firm\'s administrator to add seats.');
+  });
+
+  test('with the seat count, no screen shows Chef\'s detail or any address as text', () => {
+    for (const opts of [{ canAddSeats: true }, {}, { context: 'activate' }, { context: 'invite' }]) {
+      const message = S.refusal(seatError(), opts).message;
+      expect(message).not.toContain('http');
+      expect(message).not.toContain('lanaai.io');
+      expect(message).not.toContain('here:');
+    }
+  });
+
+  test('without a usable seat count, Chef\'s detail is the sentence', () => {
+    for (const seats of [undefined, null, '5', 0, -2, 2.5]) {
+      expect(S.refusal(seatError({ seats, detail: 'No seats are free.' }), { canAddSeats: true })).toMatchObject({ seats: null, message: 'No seats are free.' });
+      expect(S.refusal(seatError({ seats, detail: 'No seats are free.' }), { context: 'invite' }).message).toBe(`No seats are free. ${S.ASK_ADMIN}`);
     }
   });
 
   test('the code nested under error (another envelope) is the same refusal', () => {
     const found = S.refusal({ status: 409, data: { error: { code: 'SEAT_LIMIT_REACHED', message: 'No seats.' } } }, { canAddSeats: true });
     expect(found.detail).toBe('No seats.');
+    expect(found.message).toBe('No seats.');
   });
 
   test('lookalike codes and other errors are not the refusal', () => {
@@ -71,12 +107,11 @@ describe('refusal', () => {
     expect(S.refusal({ status: 400, data: { detail: 'SEAT_LIMIT_REACHED' } }, { canAddSeats: true })).toBeNull();
   });
 
-  test('missing billing_url: no fallback address; missing detail: a sentence from the seat count', () => {
+  test('missing billing_url: no fallback address; neither count nor detail: a plain sentence', () => {
     expect(S.refusal(seatError({ billing_url: null }), { canAddSeats: true }).billingUrl).toBe('');
     expect(S.refusal(seatError({ billing_url: undefined }), { canAddSeats: true }).billingUrl).toBe('');
-    expect(S.refusal(seatError({ detail: '' }), { canAddSeats: true }).detail).toBe('Your firm is using all 5 of its paid seats.');
-    expect(S.refusal(seatError({ detail: '', seats: 1 }), { canAddSeats: true }).detail).toBe('Your firm is using its 1 paid seat.');
-    expect(S.refusal(seatError({ detail: '', seats: '5' }), { canAddSeats: true })).toMatchObject({ seats: null, detail: 'Your firm is using all of its paid seats.' });
+    expect(S.refusal(seatError({ detail: '' }), { canAddSeats: true }).message).toBe(ADMIN_MSG);
+    expect(S.refusal(seatError({ detail: '', seats: undefined }), { canAddSeats: true }).message).toBe('Your firm is using all of its paid seats.');
   });
 
   test('an address that is not absolute http(s) is refused', () => {
@@ -175,13 +210,13 @@ describe('presentToAdmin', () => {
     expect(ui.calls).toEqual({ confirm: [], alert: [], info: [], error: [] });
   });
 
-  test('administrator: Chef\'s detail with Add seats; choosing it asks Chef and opens the link', async () => {
+  test('administrator: the seats in use with Add seats; choosing it asks Chef and opens the link', async () => {
     const ui = fakeUi(true);
     const bridge = fakeBridge();
     const start = jest.fn().mockResolvedValue({ url: BILLING + '?s=1' });
     const handled = await S.presentToAdmin(seatError(), { modal: ui.modal, toast: ui.toast, bridge, canAddSeats: true, startSeatsSession: start });
     expect(handled).toBe(true);
-    expect(ui.calls.confirm).toEqual([{ heading: 'No seats left', message: DETAIL, opts: { confirmText: 'Add seats', cancelText: 'Close' } }]);
+    expect(ui.calls.confirm).toEqual([{ heading: 'No seats left', message: ADMIN_MSG, opts: { confirmText: 'Add seats', cancelText: 'Close' } }]);
     expect(bridge.opened).toEqual([BILLING + '?s=1']);
   });
 
@@ -194,20 +229,20 @@ describe('presentToAdmin', () => {
     expect(bridge.opened).toEqual([]);
   });
 
-  test('everyone else: Chef\'s detail and "ask your administrator", Close only, no Add seats', async () => {
+  test('everyone else: the seats in use and "ask your administrator", Close only, no Add seats', async () => {
     const ui = fakeUi(true);
     const start = jest.fn();
     const handled = await S.presentToAdmin(seatError(), { modal: ui.modal, toast: ui.toast, bridge: fakeBridge(), canAddSeats: false, startSeatsSession: start });
     expect(handled).toBe(true);
     expect(ui.calls.confirm).toEqual([]);
-    expect(ui.calls.alert).toEqual([{ heading: 'No seats left', message: `${DETAIL} ${S.ASK_ADMIN}`, opts: { confirmText: 'Close' } }]);
+    expect(ui.calls.alert).toEqual([{ heading: 'No seats left', message: MEMBER_MSG, opts: { confirmText: 'Close' } }]);
     expect(start).not.toHaveBeenCalled();
   });
 });
 
 describe('the activation and invitation pages (app-link-pages.model.js)', () => {
-  test.each(['activate', 'invite'])('%s: Chef\'s detail and "ask your administrator"; never a sign-in offer', (kind) => {
-    expect(AppLinkPages.setPasswordProblem(seatError(), kind)).toEqual({ message: `${DETAIL} ${S.ASK_ADMIN}`, signIn: false });
+  test.each([['activate', ACTIVATE_MSG], ['invite', INVITE_MSG]])('%s: the seats in use, what cannot happen yet, ask your administrator; never a sign-in offer', (kind, message) => {
+    expect(AppLinkPages.setPasswordProblem(seatError(), kind)).toEqual({ message, signIn: false });
   });
 
   test('other refusals keep their words', () => {

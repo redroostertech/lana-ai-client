@@ -23,6 +23,9 @@ const read = (rel) => fs.readFileSync(path.join(SRC, rel), 'utf8');
 const BILLING = 'https://lanaai.io/lana-ai/portal/billing/seats';
 const DETAIL = `Your firm is using all 5 of its paid seats. An administrator can add seats here: ${BILLING}`;
 const ASK = 'Ask your firm\'s administrator to add seats.';
+const ADMIN_MSG = 'Your firm is using all 5 of its paid seats. Add seats to add more people.';
+const ACTIVATE_MSG = `Your firm is using all 5 of its paid seats, so this account cannot be activated yet. ${ASK}`;
+const INVITE_MSG = `Your firm is using all 5 of its paid seats, so this invitation cannot be accepted yet. ${ASK}`;
 const SEAT_BODY = { type: 'urn:lana:problem:SEAT_LIMIT_REACHED', title: 'No seats left', status: 409, code: 'SEAT_LIMIT_REACHED', detail: DETAIL, seats: 5, billing_url: BILLING };
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
@@ -74,12 +77,13 @@ async function submitInvite(response) {
 }
 
 describe('activate.html', () => {
-  test('409 SEAT_LIMIT_REACHED: Chef\'s detail and "ask your administrator", no add-seats button', async () => {
+  test('409 SEAT_LIMIT_REACHED: the seats in use, cannot be activated yet, ask your administrator; no button, no address', async () => {
     const page = await submitActivate({ status: 409, body: SEAT_BODY });
     expect(page.posts).toEqual(['https://firm.test/api/v1/auth/activate']);
     expect(page.shown('acError')).toBe(true);
-    expect(page.text('acError')).toBe(`${DETAIL} ${ASK}`);
+    expect(page.text('acError')).toBe(ACTIVATE_MSG);
     expect(page.window.document.body.textContent).not.toContain('Add seats');
+    expect(page.window.document.body.textContent).not.toContain('https://');
     expect(page.shown('acDoneView')).toBe(false);
     expect(page.opened).toEqual([]);
   });
@@ -91,10 +95,11 @@ describe('activate.html', () => {
 });
 
 describe('accept-invite.html', () => {
-  test('409 SEAT_LIMIT_REACHED: Chef\'s detail and "ask your administrator", no sign-in offer, no button', async () => {
+  test('409 SEAT_LIMIT_REACHED: the seats in use, cannot be accepted yet, ask your administrator; no sign-in offer, no button', async () => {
     const page = await submitInvite({ status: 409, body: SEAT_BODY });
     expect(page.posts).toEqual(['https://firm.test/api/v1/auth/accept-invite']);
-    expect(page.text('aiError')).toBe(`${DETAIL} ${ASK}`);
+    expect(page.text('aiError')).toBe(INVITE_MSG);
+    expect(page.window.document.body.textContent).not.toContain('https://');
     expect(page.shown('aiErrorSignIn')).toBe(false);
     expect(page.window.document.body.textContent).not.toContain('Add seats');
     expect(page.opened).toEqual([]);
@@ -183,13 +188,13 @@ const CREATE_VALUES = { first_name: 'Pat', last_name: 'Lee', email: 'pat@firm.te
 const settle = async () => { for (let i = 0; i < 6; i += 1) await tick(); };
 
 describe('admin/users.html', () => {
-  test('create refused for seats: Chef\'s detail with Add seats; Add seats asks Chef and opens its link', async () => {
+  test('create refused for seats: the seats in use with Add seats; Add seats asks Chef and opens its link', async () => {
     const page = adminPage('js/admin/admin-users.js', { api: { createUser: seatRejection } });
     page.elements.addUserBtn.fire('click');
     expect(page.elements.userModal.open).toBe(true);
     page.elements.userForm.fire('lex-submit', { valid: true, values: CREATE_VALUES });
     await settle();
-    expect(page.calls.confirm).toEqual([{ heading: 'No seats left', message: DETAIL, opts: { confirmText: 'Add seats', cancelText: 'Close' } }]);
+    expect(page.calls.confirm).toEqual([{ heading: 'No seats left', message: ADMIN_MSG, opts: { confirmText: 'Add seats', cancelText: 'Close' } }]);
     expect(page.calls.session).toBe(1);
     expect(page.calls.opened).toEqual([BILLING + '?session=1']);
     expect(page.calls.toastError).toEqual([]);
@@ -242,13 +247,13 @@ describe('admin/user-details.html', () => {
   const ACTIVE = { ...INACTIVE, status: 'active' };
   const actions = (page) => page.elements.userActionsDropdown.options.map((o) => o.value + ':' + o.label);
 
-  test('Activate refused for seats: Chef\'s detail with Add seats', async () => {
+  test('Activate refused for seats: the seats in use with Add seats', async () => {
     const page = adminPage('js/admin/admin-user-details.js', { user: INACTIVE, confirmAnswer: false, api: { activateUser: seatRejection } });
     await settle();
     page.elements.userBanner.fire('lex-select', { value: 'toggle-status' });
     await settle();
     expect(page.calls.confirmModal).toEqual(['Activate User']);
-    expect(page.calls.confirm).toEqual([{ heading: 'No seats left', message: DETAIL, opts: { confirmText: 'Add seats', cancelText: 'Close' } }]);
+    expect(page.calls.confirm).toEqual([{ heading: 'No seats left', message: ADMIN_MSG, opts: { confirmText: 'Add seats', cancelText: 'Close' } }]);
     expect(page.calls.toastError).toEqual([]);
     expect(page.calls.session).toBe(0);
   });
@@ -315,6 +320,17 @@ describe('admin/user-details.html', () => {
     expect(page.calls.alert.map((a) => a.heading)).toEqual(['Only an administrator can add people', 'Only an administrator can add people']);
     expect(activateUser).not.toHaveBeenCalled();
     expect(regenerateActivationKey).not.toHaveBeenCalled();
+  });
+});
+
+// ── admin/dashboard.html: Create User uses the working Add User flow ──
+
+describe('admin/dashboard.html', () => {
+  test('Create User goes to the Add User form on admin/users.html; the old form is never opened', () => {
+    const html = read('admin/dashboard.html');
+    expect(html).toMatch(/<button id="dashboardCreateUserBtn" onclick="Lex\.Nav\.go\('admin\/users\.html\?action=create'\)"/);
+    expect(html).not.toContain("openModal('createUserModal')");
+    expect(html).toContain('<script src="../js/lex/lex-nav.js"></script>');
   });
 });
 

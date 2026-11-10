@@ -8,15 +8,17 @@
  * what the screen shows and opens the add-seats page in the person's browser.
  *
  * Only a system_admin or org_admin adds people and seats (Michael, 2026-11-09).
- * They get Chef's detail with an "Add seats" button. The button asks Chef for
+ * They read "Your firm is using all N of its paid seats. Add seats to add
+ * more people." with an "Add seats" button. The button asks Chef for
  * a signed-in portal link (POST /api/v1/billing/seats-session; Chef checks the
  * role and asks the control plane) and opens it in the browser. When Chef
  * cannot make one, it opens Chef's billing_url with a note that the portal may
  * ask them to sign in; a 403 says only an administrator can add seats.
  * Everyone else, including
  * a person on activate.html or accept-invite.html who is not signed in yet,
- * gets Chef's detail and "Ask your firm's administrator to add seats", with
- * no button.
+ * reads the seats in use (and, on those pages, that the account or invitation
+ * cannot go ahead yet) and "Ask your firm's administrator to add seats", with
+ * no button. No screen shows the add-seats address as text.
  *
  * No DOM, no network: the modal, the role check and the open-external bridge
  * are passed in. A browser global (window.SeatLimit) and a CommonJS module
@@ -29,6 +31,7 @@
   var HEADING = 'No seats left';
   var ADD_SEATS = 'Add seats';
   var ASK_ADMIN = 'Ask your firm\'s administrator to add seats.';
+  var ADD_MORE = 'Add seats to add more people.';
   var NOT_ADMIN = 'Only an administrator can add people';
   var NOT_ADMIN_DETAIL = 'Ask your firm\'s administrator to add them.';
   var NOT_ADMIN_SEATS = 'Only an administrator can add seats';
@@ -59,16 +62,39 @@
     return parsed.href;
   }
 
-  function fallbackDetail(seats) {
-    if (seats === 1) return 'Your firm is using its 1 paid seat.';
-    if (typeof seats === 'number' && seats > 1) return 'Your firm is using all ' + seats + ' of its paid seats.';
-    return 'Your firm is using all of its paid seats.';
+  // What could not happen, by screen, for a person who cannot add seats.
+  var BLOCKED = {
+    activate: 'so this account cannot be activated yet',
+    invite: 'so this invitation cannot be accepted yet'
+  };
+
+  /** "Your firm is using all 5 of its paid seats" (or "its 1 paid seat"). */
+  function seatsInUse(seats) {
+    return seats === 1 ? 'Your firm is using its 1 paid seat' : 'Your firm is using all ' + seats + ' of its paid seats';
+  }
+
+  /**
+   * The words on the screen. Built from the seat count, not Chef's detail:
+   * the detail names the add-seats address as text, which reads twice beside
+   * the button and is an address the person cannot use. Chef's detail is
+   * used only when the count is missing.
+   */
+  function messageFor(seats, detail, canAddSeats, context) {
+    if (seats === null) {
+      var said = detail || 'Your firm is using all of its paid seats.';
+      return canAddSeats ? said : said + ' ' + ASK_ADMIN;
+    }
+    if (canAddSeats) return seatsInUse(seats) + '. ' + ADD_MORE;
+    if (Object.prototype.hasOwnProperty.call(BLOCKED, context)) return seatsInUse(seats) + ', ' + BLOCKED[context] + '. ' + ASK_ADMIN;
+    return seatsInUse(seats) + '. ' + ASK_ADMIN;
   }
 
   /**
    * The refusal, or null when the error is anything else.
    * opts.canAddSeats: the person is a system_admin or org_admin. Everyone
    * else is also told to ask their administrator and gets no button.
+   * opts.context: 'activate' or 'invite' for the pages a new person sees,
+   * which also say what could not happen.
    *
    * @returns {null|{ heading: string, detail: string, message: string,
    *   seats: number|null, canAddSeats: boolean, billingUrl: string }}
@@ -82,13 +108,12 @@
     var code = (body && body.code) || (nested && nested.code) || '';
     if (code !== CODE) return null;
     var canAddSeats = Boolean(opts && opts.canAddSeats);
-    var seats = body && Number.isInteger(body.seats) ? body.seats : null;
+    var seats = body && Number.isInteger(body.seats) && body.seats > 0 ? body.seats : null;
     var detail = String((body && typeof body.detail === 'string' && body.detail) || (nested && typeof nested.message === 'string' && nested.message) || '').trim();
-    if (!detail) detail = fallbackDetail(seats);
     return {
       heading: HEADING,
       detail: detail,
-      message: canAddSeats ? detail : detail + ' ' + ASK_ADMIN,
+      message: messageFor(seats, detail, canAddSeats, opts && opts.context),
       seats: seats,
       canAddSeats: canAddSeats,
       billingUrl: canAddSeats ? safeBillingUrl(body && body.billing_url) : ''
