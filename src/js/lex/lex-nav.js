@@ -51,7 +51,6 @@
     'admin/dashboard-builder.html':           { id: 'string' },
     'admin/dashboard-detail.html':            { id: 'string' },
     'admin/dashboard-library.html':           { id: 'string' },
-    'admin/dashboard.html':                   { id: 'string' },
     'admin/data-visualization.html':          { id: 'string', metric_id: 'string' },
     'admin/health.html':                      { service: 'string' },
     'admin/index.html':                       { tab: 'string' },
@@ -236,7 +235,7 @@
 
   /**
    * Extract just the filename from a root-relative path.
-   * '/admin/dashboard.html' -> 'admin/dashboard.html'
+   * '/admin/users.html' -> 'admin/users.html'
    * '/matters.html' -> 'matters.html'
    * @param {string} pathname
    * @returns {string}
@@ -353,6 +352,24 @@
   }
 
   // =========================================================================
+  // Retired pages
+  // =========================================================================
+
+  // An old link or a saved last page to a retired page opens the page that replaced it.
+  var _retiredPages = {
+    'admin/dashboard.html': 'admin/index.html'
+  };
+
+  /**
+   * The page that replaced a retired page, or null.
+   * @param {string} pageKey - e.g. 'admin/dashboard.html'
+   * @returns {string|null}
+   */
+  function replacementFor(pageKey) {
+    return Object.prototype.hasOwnProperty.call(_retiredPages, pageKey) ? _retiredPages[pageKey] : null;
+  }
+
+  // =========================================================================
   // Core navigation
   // =========================================================================
 
@@ -399,6 +416,12 @@
     var inlineSearch = parts.search;
 
     var pageKey = extractPageKey(pathname);
+    var replacement = replacementFor(pageKey);
+    if (replacement) {
+      pageKey = replacement;
+      pathname = '/' + replacement;
+      inlineSearch = '';
+    }
     if (pageKey === 'search-results.html' || pageKey === 'global-search.html') {
       var searchParams = new URLSearchParams(inlineSearch || '');
       if (options.params) {
@@ -580,6 +603,7 @@
     peek:         peek,
     getParams:    getParams,
     updateParams: updateParams,
+    replacementFor: replacementFor,
 
     /**
      * Check if navigation context exists without consuming it.

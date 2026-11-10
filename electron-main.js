@@ -593,7 +593,6 @@ const DEEP_LINK_CLIENT_ROUTES = Object.freeze({
   'admin/dashboard-builder.html': ['id'],
   'admin/dashboard-detail.html': ['id'],
   'admin/dashboard-library.html': ['id'],
-  'admin/dashboard.html': ['id'],
   'admin/data-visualization.html': ['id', 'metric_id'],
   'admin/health.html': ['service'],
   'admin/index.html': ['tab'],
@@ -756,8 +755,14 @@ function prefixedHash(prefix, value) {
   return prefix + id;
 }
 
+// Retired pages: an old link to one opens the page that replaced it.
+const RETIRED_CLIENT_ROUTES = Object.freeze({
+  'admin/dashboard.html': 'admin/index.html'
+});
+
 function sanitizeClientRoute(route) {
-  const value = stripLeadingSlashes(route).trim();
+  const asked = stripLeadingSlashes(route).trim();
+  const value = Object.prototype.hasOwnProperty.call(RETIRED_CLIENT_ROUTES, asked) ? RETIRED_CLIENT_ROUTES[asked] : asked;
   if (!Object.prototype.hasOwnProperty.call(DEEP_LINK_CLIENT_ROUTES, value)) {
     throw new Error('Unsupported LANA destination');
   }

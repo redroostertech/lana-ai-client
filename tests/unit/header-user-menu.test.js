@@ -134,7 +134,6 @@ describe('pages use the shared header menu', () => {
     'index.html',
     'blank.html',
     'admin/relevance-labeling.html',
-    'admin/dashboard.html',
     'admin/integrations.html',
     'admin/onboarding_management.html',
     'admin/search-analytics.html',

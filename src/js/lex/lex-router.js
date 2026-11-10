@@ -72,7 +72,7 @@
 
   /**
    * Normalize any href (relative, absolute, file://) to a root-relative path
-   * like '/matters.html' or '/admin/dashboard.html'.
+   * like '/matters.html' or '/admin/users.html'.
    */
   function normalizePath(href) {
     if (!href) return '/dashboard.html';
@@ -119,7 +119,7 @@
   }
 
   /**
-   * Get just the filename from a path: '/admin/dashboard.html' -> 'admin/dashboard.html'
+   * Get just the filename from a path: '/admin/users.html' -> 'admin/users.html'
    */
   function pathKey(path) {
     if (!path) return '';
@@ -475,6 +475,9 @@
 
   function navigate(path, options) {
     options = options || {};
+    // A retired page (an old link, a saved last page) opens the page that replaced it (Lex.Nav.replacementFor).
+    var replacement = global.Lex && global.Lex.Nav && global.Lex.Nav.replacementFor ? global.Lex.Nav.replacementFor(pathKey(path)) : null;
+    if (replacement) path = '/' + replacement;
     var pushState = options.pushState !== false;
 
     if (_navigating) {

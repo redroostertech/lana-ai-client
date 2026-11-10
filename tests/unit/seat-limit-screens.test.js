@@ -323,17 +323,6 @@ describe('admin/user-details.html', () => {
   });
 });
 
-// ── admin/dashboard.html: Create User uses the working Add User flow ──
-
-describe('admin/dashboard.html', () => {
-  test('Create User goes to the Add User form on admin/users.html; the old form is never opened', () => {
-    const html = read('admin/dashboard.html');
-    expect(html).toMatch(/<button id="dashboardCreateUserBtn" onclick="Lex\.Nav\.go\('admin\/users\.html\?action=create'\)"/);
-    expect(html).not.toContain("openModal('createUserModal')");
-    expect(html).toContain('<script src="../js/lex/lex-nav.js"></script>');
-  });
-});
-
 // ── Each page loads the seat module before the script that uses it ──
 
 describe('script order', () => {
