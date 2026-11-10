@@ -918,8 +918,8 @@
     return user && (user.id || user.user_id || user.userId) ? String(user.id || user.user_id || user.userId) : '';
   }
 
-  // The editor UI address set on this computer ('' when none is); see
-  // LanaDocumentReview.editorUiBase. Document changes go to Chef, not here.
+  // The editor UI address (<API base>/editor-assets, or a developer
+  // override); see LanaDocumentReview.editorUiBase.
   function getEditorServiceBase() {
     return LanaDocumentReview.editorUiBase();
   }
@@ -1088,7 +1088,14 @@
   async function loadEditorModule(baseUrl) {
     ensureEditorImportMap(baseUrl);
     if (!state.editorModulePromise) {
-      state.editorModulePromise = import('@lana/editor-embed');
+      // Chef answers 503 when the editor is not installed; the import then
+      // fails. Say so plainly and let the next attempt try again.
+      state.editorModulePromise = import('@lana/editor-embed').catch(function (error) {
+        state.editorModulePromise = null;
+        var plain = new Error(LanaDocumentReview.EDITOR_UI_UNAVAILABLE);
+        plain.cause = error;
+        throw plain;
+      });
     }
     return state.editorModulePromise;
   }

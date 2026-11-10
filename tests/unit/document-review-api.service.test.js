@@ -987,19 +987,31 @@ function fakeDocument() {
 describe('editor UI address', () => {
   const realWindowValue = global.LANA_EDITOR_SERVICE;
   const realStorage = global.localStorage;
+  const realApi = global.api;
   afterEach(() => {
     global.LANA_EDITOR_SERVICE = realWindowValue;
     global.localStorage = realStorage;
+    global.api = realApi;
   });
 
-  test('there is no built-in address: nothing set means no editor UI', () => {
+  test('by default it is the API base plus /editor-assets (Chef serves the editor UI)', () => {
     delete global.LANA_EDITOR_SERVICE;
     global.localStorage = { getItem: () => null };
-    expect(review.editorUiBase()).toBe('');
-    expect(review.EDITOR_UI_UNAVAILABLE).not.toMatch(/fetch|4710|[–—]/);
+    global.api = { baseUrl: 'http://127.0.0.1:8079/' };
+    expect(review.editorUiBase()).toBe('http://127.0.0.1:8079/editor-assets');
+    expect(review.editorUiBase({ baseUrl: 'https://chef.example' })).toBe('https://chef.example/editor-assets');
+    expect(review.EDITOR_UI_UNAVAILABLE).not.toMatch(/fetch|4710|[\u2013\u2014]/);
   });
 
-  test('an address set on this computer is used, without a trailing slash', () => {
+  test('no API base yet means no editor UI address', () => {
+    delete global.LANA_EDITOR_SERVICE;
+    global.localStorage = { getItem: () => null };
+    global.api = { baseUrl: '' };
+    expect(review.editorUiBase()).toBe('');
+  });
+
+  test('a developer override wins over the API base', () => {
+    global.api = { baseUrl: 'https://chef.example' };
     global.LANA_EDITOR_SERVICE = '';
     global.localStorage = { getItem: (key) => (key === 'lana-editor-service' ? 'http://editor.local:9000/' : null) };
     expect(review.editorUiBase()).toBe('http://editor.local:9000');

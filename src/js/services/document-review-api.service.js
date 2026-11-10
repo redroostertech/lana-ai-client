@@ -1666,11 +1666,14 @@
   // Editor UI (the embed) and clean copies
   // =========================================================================
 
-  // The in-app editor (its embed module, fonts and pdf.js) is loaded from an
-  // address set on this computer, never from a built-in one: the editor
-  // service runs beside the organization's server, which is usually not this
-  // computer. Every call that changes a document goes to Chef instead.
-  var EDITOR_UI_UNAVAILABLE = 'The LANA document editor is not available on this computer, ' +
+  // The in-app editor (its embed module, fonts and pdf.js) is served by Chef
+  // at <API base>/editor-assets, mirroring lana-editor's own paths, so it goes
+  // the same way as every other request (through the local engine to Chef).
+  // Chef answers 503 REDLINE_EDITOR_UNAVAILABLE when the editor is not
+  // installed; the pages then fall back to read-only. Every call that changes
+  // a document goes to Chef's API, never to the editor.
+  var EDITOR_ASSETS_PATH = '/editor-assets';
+  var EDITOR_UI_UNAVAILABLE = 'The LANA document editor is not available on this server, ' +
     'so editing is not available here. The document is still readable.';
   var CLEAN_COPY_FAILED = 'A clean copy of the document could not be prepared, so nothing was released. ' +
     'Reload the document and try again.';
@@ -1679,15 +1682,26 @@
     return String(value || '').trim().replace(/\/+$/, '');
   }
 
-  /** The editor UI address set on this computer, or '' when none is. */
-  function editorUiBase() {
-    var fromWindow = normalizeBaseUrl(global.LANA_EDITOR_SERVICE);
-    if (fromWindow) return fromWindow;
-    try {
-      return normalizeBaseUrl(global.localStorage && global.localStorage.getItem('lana-editor-service'));
-    } catch (_) {
-      return '';
+  /**
+   * The editor UI address: <API base>/editor-assets. Developer override only:
+   * window.LANA_EDITOR_SERVICE or localStorage['lana-editor-service'] wins when
+   * set (for example a lana-editor checkout running on this computer).
+   * Returns '' when there is no API base yet.
+   * @param {Object} [api] - the API client (defaults to window.api)
+   */
+  function editorUiBase(api) {
+    var override = normalizeBaseUrl(global.LANA_EDITOR_SERVICE);
+    if (!override) {
+      try {
+        override = normalizeBaseUrl(global.localStorage && global.localStorage.getItem('lana-editor-service'));
+      } catch (_) {
+        override = '';
+      }
     }
+    if (override) return override;
+    var client = api || global.api;
+    var apiBase = normalizeBaseUrl(client && client.baseUrl);
+    return apiBase ? apiBase + EDITOR_ASSETS_PATH : '';
   }
 
   /**

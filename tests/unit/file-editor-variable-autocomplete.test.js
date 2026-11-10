@@ -44,7 +44,7 @@ function boot() {
     'function toast() {}',
     'function requestMentionUsers() {}',
     'function currentUserRecord() { return null; }',
-    slice('  function templateVariableEntities() {', '  // The editor UI address set on this computer'),
+    slice('  function templateVariableEntities() {', '  // The editor UI address (<API base>'),
     slice('  function fallbackDocPage() {', '  function syncActiveDocContent(options) {'),
     'return { state: function () { return templateVariableMenuState; }, update: updateTemplateVariableAutocomplete, keydown: handleTemplateVariableKeydown, hide: hideTemplateVariableMenu, openPicker: openTemplateVariablePicker, counts: function () { return { undoSnapshots: undoSnapshots, synced: synced }; } };'
   ].join('\n');
