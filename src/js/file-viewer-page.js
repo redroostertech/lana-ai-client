@@ -1196,18 +1196,7 @@
   }
 
   function formatDocumentType(type) {
-    if (!type) return null;
-    var map = {
-      'contract': 'Contract',
-      'pleading': 'Pleading',
-      'deposition': 'Deposition',
-      'medical_record': 'Medical Record',
-      'police_report': 'Police Report',
-      'email': 'Email',
-      'correspondence': 'Correspondence',
-      'other': 'Other'
-    };
-    return map[type] || type;
+    return window.LanaDocumentTypes ? window.LanaDocumentTypes.documentTypeLabel(type) : (type || null);
   }
 
   function isDemoMode() {

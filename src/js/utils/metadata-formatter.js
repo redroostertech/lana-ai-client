@@ -7,32 +7,8 @@
  * @returns {string} - Formatted document type
  */
 function formatDocumentType(documentType) {
-  if (!documentType) return '—';
-
-  const typeMap = {
-    'contract': 'Contract',
-    'deposition': 'Deposition',
-    'police_report': 'Police Report',
-    'medical_record': 'Medical Record',
-    'expert_report': 'Expert Report',
-    'email': 'Email',
-    'correspondence': 'Correspondence',
-    'pleading': 'Pleading',
-    'motion': 'Motion',
-    'brief': 'Brief',
-    'order': 'Court Order',
-    'transcript': 'Transcript',
-    'invoice': 'Invoice',
-    'receipt': 'Receipt',
-    'report': 'Report',
-    'memo': 'Memorandum',
-    'letter': 'Letter',
-    'agreement': 'Agreement',
-    'affidavit': 'Affidavit',
-    'declaration': 'Declaration'
-  };
-
-  return typeMap[documentType] || documentType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  const label = window.LanaDocumentTypes ? window.LanaDocumentTypes.documentTypeLabel(documentType) : documentType;
+  return label || '\u2014';
 }
 
 /**

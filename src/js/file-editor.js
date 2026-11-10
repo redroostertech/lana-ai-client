@@ -3712,16 +3712,7 @@
   }
 
   function formatDocumentType(type) {
-    var map = {
-      contract: 'Contract',
-      pleading: 'Pleading',
-      deposition: 'Deposition',
-      affidavit: 'Affidavit',
-      spreadsheet: 'Spreadsheet',
-      presentation: 'Presentation',
-      other: 'Other'
-    };
-    return map[type] || type || '';
+    return (window.LanaDocumentTypes ? window.LanaDocumentTypes.documentTypeLabel(type) : type) || '';
   }
 
   function officeFileMetadata(file) {
