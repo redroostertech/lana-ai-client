@@ -15,6 +15,9 @@
  * @requires library-column-filters.js - date-range filter bounds
  * @requires lex-form.js     - form.getValues(), form.reset(), form.validate()
  * @requires lex-nav.js      - Lex.Nav.go
+ * @requires lex.auth.js     - Lex.Auth.canAccessAdminPages (who may add people)
+ * @requires lex-modal.js    - Lex.Modal.confirmAsync / alertAsync
+ * @requires seat-limit.model.js - SeatLimit: who may add people, Chef's paid seat refusal
  */
 
 (function () {
@@ -64,6 +67,8 @@
 
     // ?action=create (e.g. "Invite your team" in the onboarding tour) opens the
     // Add User modal, mirroring workspaces.html?action=create.
+    // Only a system_admin or org_admin adds people; anyone else who follows
+    // the link gets the plain message instead of the modal.
     var search = (window.location && window.location.search) || '';
     if (new URLSearchParams(search).get('action') === 'create') {
       openUserModalCreate();
@@ -91,6 +96,22 @@
    */
   function el(id) {
     return document.getElementById(id);
+  }
+
+  /** system_admin or org_admin: the people who may add users and seats. */
+  function _canAddPeople() {
+    return window.SeatLimit.canAddPeople(Lex.Auth);
+  }
+
+  /** What SeatLimit.presentToAdmin needs on this page. */
+  function _seatLimitDeps() {
+    return {
+      modal: Lex.Modal,
+      toast: Lex.Toast,
+      bridge: window.electronAPI,
+      canAddSeats: _canAddPeople(),
+      startSeatsSession: function () { return api.createSeatsSession(); }
+    };
   }
 
   /**
@@ -423,6 +444,8 @@
     var addBtn = el('addUserBtn');
     if (!addBtn || addBtn._usersWired) return;
     addBtn._usersWired = true;
+    // Add User shows only for someone who may add people.
+    addBtn.hidden = !_canAddPeople();
     addBtn.addEventListener('click', function () {
       openUserModalCreate();
     });
@@ -437,6 +460,10 @@
    * Resets the form, shows the password field, sets the heading.
    */
   function openUserModalCreate() {
+    if (!_canAddPeople()) {
+      window.SeatLimit.showNotAdmin(Lex.Modal);
+      return;
+    }
     _editingUserId = null;
 
     var modal = el('userModal');
@@ -658,8 +685,14 @@
       .catch(function (err) {
         if (submitBtn) submitBtn.loading = false;
         console.error('[admin-users] save user error:', err);
-        var msg = (err && err.message) ? err.message : 'Failed to save user';
-        Lex.Toast.error(msg);
+        // Every paid seat in use: Chef's words and Add seats in a modal over
+        // this one, which stays open with what was typed.
+        window.SeatLimit.presentToAdmin(err, _seatLimitDeps())
+          .then(function (handled) {
+            if (handled) return;
+            var msg = (err && err.message) ? err.message : 'Failed to save user';
+            Lex.Toast.error(msg);
+          });
       });
   }
 

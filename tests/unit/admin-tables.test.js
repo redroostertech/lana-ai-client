@@ -29,6 +29,10 @@ function loadPage(rel, extra, opts = {}) {
   new Function('window', read('js/admin/admin-table-kit.js'))(win);
   win.Lex.Nav = { getParams: () => new URLSearchParams(''), go: () => {} };
   win.Lex.Toast = { error: () => {}, success: () => {} };
+  // Who may add people (seat-limit.model.js): an org_admin unless a test says otherwise.
+  win.Lex.Auth = { canAccessAdminPages: () => opts.canAddPeople !== false };
+  win.Lex.Modal = opts.modal || { alertAsync: () => Promise.resolve(), confirmAsync: () => Promise.resolve(false) };
+  win.SeatLimit = require('../../src/js/shared/seat-limit.model');
 
   const document = {
     getElementById: (id) => (opts.elements && opts.elements[id]) || null,
@@ -85,9 +89,9 @@ describe('AdminTableKit', () => {
 
 describe('Users page deep link', () => {
   // "Invite your team" in the onboarding tour links to admin/users.html?action=create.
-  const modalOpenedFor = (search) => {
+  const modalOpenedFor = (search, extra = {}) => {
     const modal = { open: false, addEventListener: () => {} };
-    loadPage('js/admin/admin-users.js', { AdminUsersPagination: require('../../src/js/admin/admin-users.pagination') }, { search, elements: { userModal: modal } });
+    loadPage('js/admin/admin-users.js', { AdminUsersPagination: require('../../src/js/admin/admin-users.pagination') }, { search, elements: { userModal: modal }, ...extra });
     return modal.open;
   };
 
@@ -95,6 +99,13 @@ describe('Users page deep link', () => {
     expect(modalOpenedFor('?action=create')).toBe(true);
     expect(modalOpenedFor('')).toBe(false);
     expect(modalOpenedFor('?action=edit')).toBe(false);
+  });
+
+  test('?action=create for someone who is not an administrator: the plain message, no modal', () => {
+    const alerts = [];
+    const modal = { alertAsync: (heading) => { alerts.push(heading); return Promise.resolve(); } };
+    expect(modalOpenedFor('?action=create', { canAddPeople: false, modal })).toBe(false);
+    expect(alerts).toEqual(['Only an administrator can add people']);
   });
 });
 

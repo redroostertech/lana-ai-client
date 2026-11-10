@@ -20,6 +20,8 @@
  * @requires library-column-filters.js - date-range filter bounds
  * @requires lex-form.js     - form.getValues(), form.reset(), form.validate()
  * @requires lex-nav.js      - Lex.Nav.go, Lex.Nav.getParams
+ * @requires lex.auth.js     - Lex.Auth.canAccessAdminPages (who may add people)
+ * @requires seat-limit.model.js - SeatLimit: who may add people, Chef's paid seat refusal
  */
 
 (function () {
@@ -38,6 +40,9 @@
 
   /** The user ID from the URL param. */
   var _userId = null;
+
+  /** The Actions menu as the page first had it (see _updateStatusAction). */
+  var _baseActions = null;
 
   /** Full user object after fetch. */
   var _user = null;
@@ -61,6 +66,30 @@
 
   function el(id) {
     return document.getElementById(id);
+  }
+
+  /** system_admin or org_admin: the people who may add users and seats. */
+  function _canAddPeople() {
+    return window.SeatLimit.canAddPeople(Lex.Auth);
+  }
+
+  /** What SeatLimit.presentToAdmin needs on this page. */
+  function _seatLimitDeps() {
+    return {
+      modal: Lex.Modal,
+      toast: Lex.Toast,
+      bridge: window.electronAPI,
+      canAddSeats: _canAddPeople(),
+      startSeatsSession: function () { return api.createSeatsSession(); }
+    };
+  }
+
+  /** Chef's seat refusal in its modal, or the toast this page always showed. */
+  function _showSaveError(err, fallback) {
+    window.SeatLimit.presentToAdmin(err, _seatLimitDeps()).then(function (handled) {
+      if (handled) return;
+      Lex.Toast.error((err && err.message) ? err.message : fallback);
+    });
   }
 
   function show(target) {
@@ -249,7 +278,13 @@
     var dropdown = el('userActionsDropdown');
     if (!dropdown) return;
 
-    var opts = dropdown.options || [];
+    // Built from the menu as first loaded, so an action hidden for one
+    // status comes back for the other.
+    if (!_baseActions) _baseActions = (dropdown.options || []).slice();
+    var opts = _baseActions;
+    // Only a system_admin or org_admin adds people: anyone else gets no
+    // Activate (reactivate) and no new activation key (an invitation).
+    var canAdd = _canAddPeople();
     var updated = [];
     for (var i = 0; i < opts.length; i++) {
       var opt = {};
@@ -257,6 +292,7 @@
       for (var k = 0; k < keys.length; k++) {
         opt[keys[k]] = opts[i][keys[k]];
       }
+      if (!canAdd && (opt.value === 'regen-key' || (opt.value === 'toggle-status' && !isActive))) continue;
       if (opt.value === 'toggle-status') {
         opt.label = isActive ? 'Deactivate User' : 'Activate User';
         opt.icon  = isActive ? 'toggle-left' : 'toggle-right';
@@ -548,8 +584,7 @@
       .catch(function (err) {
         if (submitBtn) submitBtn.loading = false;
         console.error('[admin-user-details] updateUser error:', err);
-        var msg = (err && err.message) ? err.message : 'Failed to save user';
-        Lex.Toast.error(msg);
+        _showSaveError(err, 'Failed to save user');
       });
   }
 
@@ -565,6 +600,10 @@
     var action     = isActive ? 'deactivate' : 'activate';
     var actionLabel = isActive ? 'Deactivate' : 'Activate';
     var name       = escHtml(userDisplayName(_user));
+    if (!isActive && !_canAddPeople()) {
+      window.SeatLimit.showNotAdmin(Lex.Modal);
+      return;
+    }
 
     Lex.Modal.confirm(
       actionLabel + ' User',
@@ -579,8 +618,7 @@
           })
           .catch(function (err) {
             console.error('[admin-user-details] toggleUserStatus error:', err);
-            var msg = (err && err.message) ? err.message : 'Failed to update user status';
-            Lex.Toast.error(msg);
+            _showSaveError(err, 'Failed to update user status');
           });
       },
       { variant: isActive ? 'danger' : 'default', confirmText: actionLabel }
@@ -694,6 +732,10 @@
   // =========================================================================
 
   function _regenActivationKey() {
+    if (!_canAddPeople()) {
+      window.SeatLimit.showNotAdmin(Lex.Modal);
+      return;
+    }
     Lex.Modal.confirm(
       'Regenerate Activation Key',
       'This will invalidate the existing key and generate a new one. Continue?',
@@ -728,8 +770,7 @@
           })
           .catch(function (err) {
             console.error('[admin-user-details] regenerateActivationKey error:', err);
-            var msg = (err && err.message) ? err.message : 'Failed to regenerate key';
-            Lex.Toast.error(msg);
+            _showSaveError(err, 'Failed to regenerate key');
           });
       },
       { confirmText: 'Regenerate' }

@@ -48,6 +48,19 @@ describe('Lex.Modal promise API', () => {
     await expect(pending).resolves.toBeUndefined();
   });
 
+  test('an alert has one button: no Cancel beside its OK', async () => {
+    const window = boot();
+    window.Lex.Modal.alertAsync('No seats left', 'Ask your firm\'s administrator to add seats.', { confirmText: 'Close' });
+    await tick(window);
+    const modal = window.document.querySelector('lex-modal');
+    expect(modal.querySelector('[data-action="confirm"]').textContent).toBe('Close');
+    expect(modal.querySelector('[data-action="cancel"]')).toBeNull();
+    // A confirm keeps its Cancel.
+    window.Lex.Modal.confirmAsync('Delete', 'Sure?');
+    await tick(window);
+    expect(Array.from(window.document.querySelectorAll('lex-modal')).pop().querySelector('[data-action="cancel"]').textContent).toBe('Cancel');
+  });
+
   test('prompt resolves the trimmed value, null on cancel, and stays open while required is empty', async () => {
     const window = boot();
     const pending = window.Lex.Modal.prompt('Rename', { label: 'Name', value: '  Draft  ', required: true });

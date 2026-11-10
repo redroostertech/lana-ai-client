@@ -805,7 +805,8 @@
       modal.heading = title;
       modal.variant = options.variant || 'default';
       modal.confirmText = options.confirmText || 'Confirm';
-      modal.cancelText = options.cancelText || 'Cancel';
+      // cancelText: null (alert) means one button; '' keeps the footer from drawing Cancel.
+      modal.cancelText = options.cancelText === null ? '' : (options.cancelText || 'Cancel');
       modal.size = options.size || 'md';
       modal.innerHTML = `<p class="lex-modal-body-text">${message}</p>`;
       modal.open = true;

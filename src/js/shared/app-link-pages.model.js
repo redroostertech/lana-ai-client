@@ -12,6 +12,11 @@
 (function (global) {
   'use strict';
 
+  // Chef's paid seat refusal (seat-limit.model.js, loaded before this file).
+  var SeatLimit = (typeof module !== 'undefined' && module.exports)
+    ? require('./seat-limit.model')
+    : global && global.SeatLimit;
+
   var MIN_PASSWORD_LENGTH = 8;
   // The special characters Chef's user-creation rule counts (admin-users.service.js).
   var SPECIAL_CHARACTERS = '!@#$%^&*()_+-=[]{}|;:,.<>?';
@@ -88,11 +93,16 @@
    * Plain words for a failed set-password call, and whether to offer sign in.
    * kind 'invite': Chef's accept-invite codes. kind 'activate': the activate
    * endpoint has no codes; its messages are already plain sentences.
-   * Unknown codes show Chef's own message.
+   * Unknown codes show Chef's own message. Every paid seat in use
+   * (SEAT_LIMIT_REACHED, either kind): Chef's detail and a line asking the
+   * firm's administrator to add seats; the person is not signed in, so no
+   * add-seats button.
    */
   function setPasswordProblem(error, kind) {
     var problem = problemOf(error);
     if (problem.status === 0) return { message: UNREACHABLE, signIn: false };
+    var seatLimit = SeatLimit ? SeatLimit.refusal(error, { canAddSeats: false }) : null;
+    if (seatLimit) return { message: seatLimit.message, signIn: false };
     if (kind === 'invite' && Object.prototype.hasOwnProperty.call(INVITE_PROBLEMS, problem.code)) {
       var known = INVITE_PROBLEMS[problem.code];
       return { message: known.message, signIn: Boolean(known.signIn) };

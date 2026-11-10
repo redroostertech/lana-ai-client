@@ -1925,6 +1925,13 @@ class ApiClient {
     return this.post(`/api/v1/admin/users/${userId}/regenerate-activation-key`);
   }
 
+  // The add-seats page for "Add seats" on a seat-limit refusal: Chef checks
+  // the caller is a system_admin or org_admin, asks the control plane, and
+  // answers { url, expires_at } (a signed-in portal link). See seat-limit.model.js.
+  async createSeatsSession() {
+    return this.post('/api/v1/billing/seats-session', {});
+  }
+
   async setTemporaryPassword(userId, password) {
     return this.post(`/api/v1/admin/users/${userId}/temporary-password`, {
       password_hash: password,
