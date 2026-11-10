@@ -555,8 +555,11 @@
         const data = await response.json();
         if (data.status !== 'healthy' || !data.server) return;
 
+        const freshPin = OrgDiscovery.chefCertPin(data);
         const merged = {
           ...savedServer,
+          // With a pin the box is reached over https only.
+          url: freshPin ? savedServer.url.replace(/^http:\/\//i, 'https://') : savedServer.url,
           orgName: data.server.org_name || savedServer.orgName,
           version: data.server.version || savedServer.version,
           apiVersion: data.server.api_version || savedServer.apiVersion,
@@ -564,6 +567,8 @@
           rateLimit: data.rate_limit || 100,
           burstApiKey: data.burst_api_key || null,
           burstUrl: data.burst_url || null,
+          // A new pin from the control plane (the box's certificate changed).
+          chefCertSha256: freshPin || savedServer.chefCertSha256 || null,
           enabledApps: normalizeEnabledApps(data.enabled_apps)
         };
 
@@ -585,7 +590,12 @@
      * Verify the resolved server is actually reachable
      * Returns: boolean (true if server is healthy and reachable)
      */
+    // Set when the last probe was answered 403 HTTPS_REQUIRED (a box reached
+    // over plain HTTP because the control plane had no pin for it).
+    let lastProbeRefusal = null;
+
     async function verifyServer(serverUrl) {
+      lastProbeRefusal = null;
       try {
         const response = await fetch(`${serverUrl}/api/health/discovery`, {
           method: 'GET',
@@ -594,6 +604,10 @@
         });
 
         if (!response.ok) {
+          if (response.status === 403) {
+            const refusal = await response.json().catch(() => null);
+            if (refusal && refusal.code === 'HTTPS_REQUIRED') lastProbeRefusal = 'https_required';
+          }
           return false;
         }
 
@@ -662,6 +676,8 @@
         serverInfo.staticIp = overrideUrl.hostname;
         serverInfo.port = overrideUrl.port || (overrideUrl.protocol === 'https:' ? '443' : '80');
         serverInfo.isSecure = overrideUrl.protocol === 'https:';
+        // The control plane's pin is for the box it named, not this address.
+        serverInfo.chefCertSha256 = null;
       }
 
       console.log('[Login] Organization resolved:', {
@@ -675,9 +691,25 @@
       // Verify the resolved server is reachable
       if (onStage) onStage('Connecting to server...');
 
+      // A hardware box's Chef has a self-signed certificate: trust it by the
+      // control plane's pin (and nothing else) before probing it.
+      const chefPinApi = window.electronAPI && window.electronAPI.chefPin;
+      if (chefPinApi) {
+        await chefPinApi.prepare(serverInfo).catch(() => null);
+      }
+
       const isReachable = await verifyServer(serverInfo.url);
 
       if (!isReachable) {
+        // The certificate (or plain HTTP to a box) was the problem: say so
+        // instead of "not reachable".
+        let refusalReason = lastProbeRefusal;
+        if (!refusalReason && chefPinApi) {
+          const refusal = await chefPinApi.refusal(serverInfo.url).catch(() => null);
+          refusalReason = refusal && refusal.reason;
+        }
+        const certificateMessage = ServerReachability.buildCertificateMessage(serverInfo, refusalReason);
+        if (certificateMessage) throw new Error(certificateMessage);
         // Server not reachable. When discovery says the org sits behind a VPN,
         // that is almost always the reason, so name it in the error instead of
         // giving the generic network message.
@@ -703,6 +735,8 @@
           domain: serverInfo.domain,
           host: serverInfo.staticIp,
           port: serverInfo.port,
+          // A hardware box's Chef certificate pin (control plane), or null.
+          chefCertSha256: serverInfo.chefCertSha256 || null,
           // Burst API configuration for direct calls
           burstApiKey: serverInfo.burstApiKey,
           burstUrl: serverInfo.burstUrl,

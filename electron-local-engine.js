@@ -348,6 +348,12 @@ function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = proces
     return server && server.url ? server.url : null;
   }
 
+  /** The box Chef's certificate pin (control plane), for the engine's upstream. */
+  function chefCertSha256() {
+    const server = storage.getSavedServer();
+    return server && server.chefCertSha256 ? server.chefCertSha256 : null;
+  }
+
   function currentApiBase(state = supervisor.getState()) {
     return resolveApiBase(chefUrl(), state);
   }
@@ -355,7 +361,7 @@ function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = proces
   /** Re-read settings and the saved server; start, restart or stop the engine. */
   async function sync() {
     config = engineConfig();
-    await supervisor.configure(config, chefUrl());
+    await supervisor.configure(config, chefUrl(), chefCertSha256());
     return status();
   }
 

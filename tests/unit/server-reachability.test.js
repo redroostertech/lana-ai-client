@@ -117,3 +117,19 @@ describe('dead vpn-setup.html navigation is gone from the client', () => {
     expect(source).not.toContain('vpn-setup.html');
   });
 });
+
+// A hardware box's Chef that could not be trusted (electron-chef-pin.js).
+describe('buildCertificateMessage', () => {
+  const info = { orgName: 'Smith Law', staticIp: '10.0.0.5', port: 8080 };
+  test('a certificate other than the pinned one', () => {
+    expect(reachability.buildCertificateMessage(info, 'mismatch')).toBe('The server at 10.0.0.5:8080 did not present the security certificate on record for Smith Law, so LANA did not connect. Ask your administrator to check the server, then try again.');
+  });
+  test('a self-signed server with no pin, or plain HTTP refused', () => {
+    for (const reason of ['untrusted', 'https_required']) {
+      expect(reachability.buildCertificateMessage(info, reason)).toMatch(/^The server at 10\.0\.0\.5:8080 needs a secure connection, and LANA has no security certificate on record for it/);
+    }
+  });
+  test('nothing for other failures', () => {
+    expect(reachability.buildCertificateMessage(info, null)).toBe('');
+  });
+});

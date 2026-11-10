@@ -11,6 +11,7 @@ const crypto = require('crypto');
 const os = require('os');
 const { logInfo, logError } = require('./electron-logger');
 const { openSettingsStore, stableKey } = require('./electron-settings-file');
+const { normalizeHexPin, chefUrlFor } = require('./electron-chef-pin');
 
 // Config version - increment this when making breaking changes to storage format
 const CONFIG_VERSION = 2;
@@ -105,8 +106,11 @@ initializeStore();
  */
 function saveServerConnection(server) {
   try {
+    // A hardware box's Chef: the control plane's pin of its self-signed
+    // certificate (electron-chef-pin.js); its address is then https.
+    const chefCertSha256 = normalizeHexPin(server.chefCertSha256);
     const connectionData = {
-      url: server.url || `http://${server.host}:${server.port}`,
+      url: chefUrlFor({ url: server.url, host: server.host, port: server.port, chefCertSha256 }),
       host: server.host,
       port: server.port,
       // Public domain (e.g. "redrooster.lanaai.io"); needed to refresh hosted
@@ -128,6 +132,7 @@ function saveServerConnection(server) {
       // Organization app entitlements. Routable entries drive the switcher;
       // capability entries gate native/background client features.
       enabledApps: Array.isArray(server.enabledApps) ? server.enabledApps : [],
+      chefCertSha256,
       connectedAt: new Date().toISOString(),
       lastVerified: new Date().toISOString()
     };

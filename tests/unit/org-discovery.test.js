@@ -56,6 +56,20 @@ describe('resolveOrganization', () => {
     });
   });
 
+  test('a hardware box carries the control plane pin and is reached over https', async () => {
+    const pin = 'AB:'.repeat(31) + 'AB';
+    const box = { ...HEALTHY, discovery: { static_ip: '10.0.0.5', port: 8080, is_secure_ssl: false, chef_cert_sha256: pin } };
+    const info = await discovery.resolveOrganization('smithlaw', 'smithlaw.lanaai.io', { fetch: fakeFetch(200, box) });
+    expect(info).toMatchObject({ url: 'https://10.0.0.5:8080', chefCertSha256: 'ab'.repeat(32), isSecure: true });
+    expect(discovery.chefCertPin({ chef_cert_sha256: 'cd'.repeat(32) })).toBe('cd'.repeat(32));
+  });
+
+  test('the box\'s own certSha256 is never taken as the pin', async () => {
+    const tofu = { ...HEALTHY, discovery: { static_ip: '10.0.0.5', port: 8080, is_secure_ssl: false, certSha256: 'ab'.repeat(32) } };
+    const info = await discovery.resolveOrganization('smithlaw', 'smithlaw.lanaai.io', { fetch: fakeFetch(200, tofu) });
+    expect(info).toMatchObject({ url: 'http://10.0.0.5:8080', chefCertSha256: null });
+  });
+
   test.each([
     [404, { error: 'Organization not found or inactive' }, 'not_found'],
     [400, { details: ['org_id is required'] }, 'invalid'],

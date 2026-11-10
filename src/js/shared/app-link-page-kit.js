@@ -53,6 +53,7 @@
       domain: serverInfo.domain,
       host: serverInfo.staticIp,
       port: serverInfo.port,
+      chefCertSha256: serverInfo.chefCertSha256 || null,
       burstApiKey: serverInfo.burstApiKey,
       burstUrl: serverInfo.burstUrl,
       forgeApiKey: serverInfo.forgeApiKey,
@@ -62,6 +63,17 @@
       rateLimit: serverInfo.rateLimit,
       enabledApps: serverInfo.enabledApps
     });
+  }
+
+  /**
+   * A firm found through discovery may be a hardware box whose Chef has a
+   * self-signed certificate: pin it by the control plane's chef_cert_sha256
+   * (electron-chef-pin.js) before talking to it. Resolves the server info.
+   */
+  function preparePin(serverInfo) {
+    var pinApi = global.electronAPI && global.electronAPI.chefPin;
+    if (!pinApi || !serverInfo) return Promise.resolve(serverInfo);
+    return pinApi.prepare(serverInfo).catch(function () { return null; }).then(function () { return serverInfo; });
   }
 
   /**
@@ -151,6 +163,7 @@
     watchTheme: watchTheme,
     savedServer: savedServer,
     saveFirm: saveFirm,
+    preparePin: preparePin,
     postJson: postJson,
     postPublic: postPublic,
     lexText: lexText,

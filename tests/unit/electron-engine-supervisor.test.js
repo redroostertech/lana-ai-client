@@ -106,6 +106,12 @@ describe('spawn', () => {
     expect(env.HOME).toBe('/home/tester');
   });
 
+  test('buildEngineEnv passes a box Chef certificate pin as LANA_CHEF_CERT_SHA256, and nothing without one', () => {
+    const pinned = buildEngineEnv({}, { chefUrl: 'https://10.0.0.5:8080', chefCertSha256: 'ab'.repeat(32), port: 1 });
+    expect(pinned.LANA_CHEF_CERT_SHA256).toBe('ab'.repeat(32));
+    expect(buildEngineEnv({}, { chefUrl: CHEF, port: 1 })).not.toHaveProperty('LANA_CHEF_CERT_SHA256');
+  });
+
   test('buildEngineEnv keeps only allowlisted variables plus the extra env of the node binary', () => {
     const env = buildEngineEnv({ DATABASE_URL: 'x', PATH: '/bin' }, { chefUrl: CHEF, port: 1, extra: { ELECTRON_RUN_AS_NODE: '1' } });
     expect(env.DATABASE_URL).toBeUndefined();

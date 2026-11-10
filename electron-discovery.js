@@ -13,6 +13,7 @@
 
 const axios = require('axios');
 const { logInfo, logError } = require('./electron-logger');
+const chefPin = require('./electron-chef-pin');
 
 const HOSTED_DISCOVERY_URL = 'https://www.redroostertec.com/lana-ai/v1/discovery';
 
@@ -29,8 +30,14 @@ function hasOwn(value, key) {
 function mergeHostedDiscovery(savedServer, data) {
   if (!savedServer || !data || data.status !== 'healthy' || !data.server) return null;
   const discovery = data.discovery && typeof data.discovery === 'object' ? data.discovery : {};
+  // The control plane's pin of a box Chef's certificate replaces the saved one
+  // (a new box certificate); with a pin the saved address moves to https.
+  const freshPin = chefPin.pinFromDiscoveryAnswer(data);
+  const chefCertSha256 = freshPin || savedServer.chefCertSha256 || null;
   return {
     ...savedServer,
+    url: chefPin.chefUrlFor({ url: savedServer.url, chefCertSha256 }),
+    chefCertSha256,
     orgId: data.server.org_id || savedServer.orgId,
     orgName: data.server.org_name || savedServer.orgName,
     version: data.server.version || savedServer.version,
@@ -85,9 +92,13 @@ function serverFromDiscovery(data) {
   if (!data || data.status !== 'healthy' || !data.server || !data.discovery) return null;
   const discovery = data.discovery;
   if (!discovery.static_ip || !discovery.port) return null;
-  const isSecure = discovery.is_secure_ssl === true;
+  // A hardware box's Chef: pinned by the control plane's chef_cert_sha256 and
+  // reached over https (electron-chef-pin.js).
+  const chefCertSha256 = chefPin.pinFromDiscoveryAnswer(data);
+  const isSecure = discovery.is_secure_ssl === true || Boolean(chefCertSha256);
   return {
     url: `${isSecure ? 'https' : 'http'}://${discovery.static_ip}:${discovery.port}`,
+    chefCertSha256,
     host: discovery.static_ip,
     port: discovery.port,
     orgId: data.server.org_id,
@@ -127,7 +138,8 @@ async function discoverByDomain(domain, orgIdHint, options = {}) {
     if (response.status !== 200) return null;
     const server = serverFromDiscovery(response.data);
     if (!server) return null;
-    const reachable = await verify(server.url);
+    // Not saved yet: verify against this answer's own pin.
+    const reachable = await verify(server.url, 2, { pin: chefPin.pinFromServer(server) });
     return reachable ? server : null;
   } catch (error) {
     logError(`[Discovery] No firm found for ${domain}`, error);
@@ -141,7 +153,12 @@ async function discoverByDomain(domain, orgIdHint, options = {}) {
  * @param {number} retries - Number of retry attempts (default: 2)
  * @returns {Promise<Object|null>} Server info or null if unreachable
  */
-async function verifyServer(serverUrl, retries = 2) {
+async function verifyServer(serverUrl, retries = 2, options = {}) {
+  // The saved Chef's pin (or the one given, for a server not saved yet); every
+  // other host keeps the default certificate checks.
+  const httpsAgent = options.pin !== undefined
+    ? chefPin.createPinnedHttpsAgent(() => options.pin)
+    : chefPin.httpsAgent();
   let lastError = null;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
@@ -149,6 +166,7 @@ async function verifyServer(serverUrl, retries = 2) {
       logInfo(`Verifying server at ${serverUrl}... (attempt ${attempt + 1}/${retries + 1})`);
 
       const response = await axios.get(`${serverUrl}/api/health/discovery`, {
+        httpsAgent,
         timeout: 5000,
         headers: {
           'User-Agent': 'LanaAI-Client/1.0'

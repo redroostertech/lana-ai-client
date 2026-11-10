@@ -9,6 +9,8 @@
 const { autoUpdater } = require('electron-updater');
 const { app, dialog, BrowserWindow, ipcMain } = require('electron');
 const axios = require('axios');
+// The box Chef's certificate pin; other hosts (the update service) keep the default checks.
+const chefPin = require('./electron-chef-pin');
 const path = require('path');
 const url = require('url');
 const { logInfo, logError, logWarn } = require('./electron-logger');
@@ -69,6 +71,7 @@ async function runUpdateCheck(serverUrl, authToken, orgId) {
     }
 
     const policyResponse = await axios.post(policyUrl, requestBody, {
+      httpsAgent: chefPin.httpsAgent(),
       headers: headers,
       timeout: 10000
     });

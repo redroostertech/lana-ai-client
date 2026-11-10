@@ -52,9 +52,12 @@ const INHERITED_ENV = [
 /**
  * The engine's environment: allowlisted OS basics plus the engine settings.
  * @param {Object} baseEnv - the client's process.env
- * @param {{ chefUrl: string, port: number, extra?: Object }} options
+ * @param {{ chefUrl: string, chefCertSha256?: string|null, port: number, extra?: Object }} options
+ *   chefCertSha256: a hardware box Chef's certificate pin (64 hex, from the
+ *   control plane); the engine trusts that certificate, and only it, for
+ *   LANA_CHEF_URL's host and port. Absent for a cloud Chef (public TLS).
  */
-function buildEngineEnv(baseEnv, { chefUrl, port, extra = {} }) {
+function buildEngineEnv(baseEnv, { chefUrl, chefCertSha256 = null, port, extra = {} }) {
   const env = {};
   for (const name of INHERITED_ENV) {
     if (typeof baseEnv[name] === 'string') {env[name] = baseEnv[name];}
@@ -65,6 +68,7 @@ function buildEngineEnv(baseEnv, { chefUrl, port, extra = {} }) {
     NODE_ENV: 'production',
     LANA_RUNTIME_ROLE: 'engine',
     LANA_CHEF_URL: chefUrl,
+    ...(chefCertSha256 ? { LANA_CHEF_CERT_SHA256: chefCertSha256 } : {}),
     LANA_ENGINE_HOST: LOOPBACK_HOST,
     LANA_ENGINE_PORT: String(port)
   };
@@ -118,6 +122,7 @@ function createEngineSupervisor(deps) {
     reason: 'not_configured',
     root: null,
     chefUrl: null,
+    chefCertSha256: null,
     port: null,
     url: null,
     process: 'stopped', // stopped | starting | running | restarting
@@ -272,7 +277,7 @@ function createEngineSupervisor(deps) {
     healthFailures = 0;
     wasHealthy = false;
     controlSecret = makeSecret();
-    const env = buildEngineEnv(baseEnv, { chefUrl: state.chefUrl, port: state.port, extra: { ...nodeEnv, ...engineEnv(), LANA_ENGINE_CONTROL_SECRET: controlSecret } });
+    const env = buildEngineEnv(baseEnv, { chefUrl: state.chefUrl, chefCertSha256: state.chefCertSha256, port: state.port, extra: { ...nodeEnv, ...engineEnv(), LANA_ENGINE_CONTROL_SECRET: controlSecret } });
     let spawned;
     try {
       spawned = spawn(nodePath, [engineEntry(state.root)], { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
@@ -324,9 +329,10 @@ function createEngineSupervisor(deps) {
    *
    * @param {{ mode: 'off'|'spawn'|'attach', reason?: string, root?: string, attachUrl?: string, preferredPort?: number|null }} config
    * @param {string|null} chefUrl
+   * @param {string|null} [chefCertSha256] - the box Chef's certificate pin, when there is one
    */
-  async function configure(config, chefUrl) {
-    const next = { mode: config.mode, root: config.root || null, attachUrl: config.attachUrl || null, chefUrl: chefUrl || null };
+  async function configure(config, chefUrl, chefCertSha256 = null) {
+    const next = { mode: config.mode, root: config.root || null, attachUrl: config.attachUrl || null, chefUrl: chefUrl || null, chefCertSha256: chefCertSha256 || null };
     if (next.mode === 'spawn' && !chefUrl) {
       next.mode = 'off';
       config = { ...config, reason: 'no_server' };
@@ -339,6 +345,7 @@ function createEngineSupervisor(deps) {
       && state.mode === next.mode
       && state.root === next.root
       && state.chefUrl === next.chefUrl
+      && state.chefCertSha256 === next.chefCertSha256
       && (next.mode !== 'attach' || state.url === next.attachUrl);
     if (same) {return getState();}
 
@@ -351,6 +358,7 @@ function createEngineSupervisor(deps) {
       reason: next.mode === 'off' ? (config.reason || 'not_configured') : null,
       root: next.root,
       chefUrl: next.chefUrl,
+      chefCertSha256: next.chefCertSha256,
       restarts: 0,
       nextRestartAt: null,
       lastExit: null,

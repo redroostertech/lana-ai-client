@@ -61,8 +61,32 @@
       '. Please check your network connection or contact your administrator.';
   }
 
+  /**
+   * The message when the server answered but could not be trusted. A hardware
+   * box's Chef has a self-signed certificate the app trusts only by the pin the
+   * control plane holds for it (electron-chef-pin.js).
+   * @param {object} serverInfo resolved discovery payload
+   * @param {'mismatch'|'untrusted'|'https_required'|null} reason
+   * @returns {string} the message, or '' when the reason is not a certificate one
+   */
+  function buildCertificateMessage(serverInfo, reason) {
+    var target = hostLabel(serverInfo);
+    var where = target ? ' at ' + target : '';
+    var org = orgLabel(serverInfo);
+    if (reason === 'mismatch') {
+      return 'The server' + where + ' did not present the security certificate on record for ' + org +
+        ', so LANA did not connect. Ask your administrator to check the server, then try again.';
+    }
+    if (reason === 'untrusted' || reason === 'https_required') {
+      return 'The server' + where + ' needs a secure connection, and LANA has no security certificate on record for it, so it did not connect.' +
+        ' Ask your administrator to finish setting up ' + org + ' in LANA, then try again.';
+    }
+    return '';
+  }
+
   var api = {
     buildUnreachableMessage: buildUnreachableMessage,
+    buildCertificateMessage: buildCertificateMessage,
     requiresVpn: requiresVpn
   };
 

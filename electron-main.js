@@ -86,8 +86,12 @@ if (process.env.NODE_ENV === 'development') {
 
 // Import thin client modules
 const { refreshHostedDiscovery, verifyServer, discoverByDomain } = require('./electron-discovery');
+// The box Chef's certificate pin (hardware boxes): one host and port, trusted by
+// the control plane's SHA-256 only; everything else keeps default checks.
+const chefPin = require('./electron-chef-pin');
 const { createAppLinkRouter, createFirmSignOut, oldSessionNotice, registerAppLinkIpc, createColdStartQueue, deepLinkFromArgv } = require('./electron-app-links');
 const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified, saveBrainchildLink, getBrainchildLink, clearBrainchildLink, setBrainchildAutoBindDisabled, isBrainchildAutoBindDisabled, authTokenPersistence, offlineKeyPersistence, getLocalEnginePreferences, updateLocalEnginePreferences, firstLaunchPersistence } = require('./electron-storage');
+chefPin.configure({ getSavedServer });
 const { createLocalEngineHost } = require('./electron-local-engine');
 const { createTokenStore, registerTokenIpc, hasLiveSession } = require('./electron-token-store');
 
@@ -1444,6 +1448,7 @@ async function applyServerConnection(settings) {
   const stored = localEngine.toStored(settings);
   const success = saveServerConnection(stored);
   if (success) {
+    chefPin.settle();
     syncScreenVoiceEntitlement();
     syncBriefs(stored);
     await localEngine.sync().catch((error) => logError('[electron-main] Local AI engine did not start', error));
@@ -1473,6 +1478,7 @@ ipcMain.handle('connect-to-server', async (event, server) => {
     // start or retarget the local engine at it.
     const stored = localEngine.toStored(server);
     saveServerConnection(stored);
+    chefPin.settle();
     syncScreenVoiceEntitlement();
     syncBriefs(stored);
     await localEngine.sync().catch((error) => logError('[electron-main] Local AI engine did not start', error));
@@ -1493,6 +1499,18 @@ ipcMain.handle('connect-to-server', async (event, server) => {
 });
 
 // Verify server connection
+// The sign-in page found a firm through the control plane: pin its Chef (or
+// nothing, for a cloud firm) before the page probes it. The pin covers that
+// host and port only, and becomes the saved one when the firm is saved.
+ipcMain.handle('chef-pin:prepare', async (event, server) => {
+  const pinned = chefPin.prepare({ url: server && server.url, chefCertSha256: server && server.chefCertSha256 });
+  return { success: true, pinned };
+});
+
+// Why the renderer could not trust that server's certificate, for the sign-in
+// page's message: 'mismatch' | 'untrusted' | null.
+ipcMain.handle('chef-pin:refusal', async (event, url) => ({ success: true, reason: chefPin.refusalForUrl(url) }));
+
 ipcMain.handle('verify-server', async (event, serverUrl) => {
   logInfo(`IPC: verify-server for ${serverUrl}`);
   try {
@@ -1879,7 +1897,7 @@ ipcMain.handle('create-oauth-state', async (event, { provider, connectorId, matt
     }
 
     // Call backend to create state token
-    const response = await fetch(`${baseUrl}/api/v1/integrations/oauth/states`, {
+    const response = await chefPin.pinnedFetch()(`${baseUrl}/api/v1/integrations/oauth/states`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1926,7 +1944,7 @@ ipcMain.handle('exchange-oauth-code', async (event, { code, state, provider, con
     }
 
     // Call backend to exchange code for tokens
-    const response = await fetch(`${baseUrl}/api/v1/integrations/oauth/exchange`, {
+    const response = await chefPin.pinnedFetch()(`${baseUrl}/api/v1/integrations/oauth/exchange`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -2085,6 +2103,7 @@ ipcMain.handle('vpn-get-device-id', async () => {
 registerAiTopologyIpc(ipcMain, {
   env: process.env,
   savedServer: () => getSavedServer(),
+  fetchImpl: chefPin.pinnedFetch(),
   catalog: localModelsCatalog.CATALOG,
   speechCatalog: localModelsCatalog.SPEECH_CATALOG,
   modelsDir: () => localModelsCatalog.modelsDir(process.env, app.getPath('userData')),
@@ -2302,7 +2321,7 @@ async function appLinkMessage(options) {
 const signOutOfFirm = createFirmSignOut({
   getSavedServer: () => getSavedServer(),
   getToken: () => authTokenStore.get(),
-  fetch: (url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(5000) }),
+  fetch: (url, init) => fetch(url, chefPin.fetchInit(url, { ...init, signal: AbortSignal.timeout(5000) })),
   clearLocal: async () => {
     authTokenStore.clear();
     clearSavedServer();
@@ -2454,6 +2473,10 @@ app.whenReady().then(async () => {
     logInfo(`Version updated: ${lastVersion} -> ${currentVersion}`);
     migrationStore.set('lastVersion', currentVersion);
   }
+
+  // The box Chef's certificate check for the renderer, before any window (and
+  // so before the sign-in page's /api/health/discovery probe) exists.
+  chefPin.installCertificateVerifyProc(session.defaultSession, logInfo);
 
   // Configure session to handle CORS for API requests
   // This allows the file:// app to make requests to http:// backend

@@ -94,7 +94,8 @@ describe('discoverByDomain', () => {
     const verify = jest.fn(async () => ({ url: 'ok' }));
     const server = await discoverByDomain('redrooster.lanaai.io', 'redrooster', { http, verify });
     expect(http.post).toHaveBeenCalledWith(HOSTED_DISCOVERY_URL, { org_id: 'redrooster', domain: 'redrooster.lanaai.io' }, expect.any(Object));
-    expect(verify).toHaveBeenCalledWith('https://new-address.example:443');
+    // No pin in this answer: verified with the default certificate checks.
+    expect(verify).toHaveBeenCalledWith('https://new-address.example:443', 2, { pin: null });
     expect(server.orgId).toBe('redrooster');
   });
 
@@ -105,5 +106,36 @@ describe('discoverByDomain', () => {
     expect(await discoverByDomain('redrooster.lanaai.io', 'redrooster', { http: found, verify: async () => null })).toBeNull();
     expect(await discoverByDomain('redrooster.lanaai.io', null, { http: found })).toBeNull();
     expect(found.post).toHaveBeenCalledTimes(1);
+  });
+});
+
+// A hardware box: the control plane's chef_cert_sha256 pins its Chef's
+// self-signed certificate (electron-chef-pin.js). The box's own certSha256 is
+// never the pin.
+describe('box Chef certificate pin from the control plane', () => {
+  const PIN = 'ab'.repeat(32);
+  const box = { ...responseData, chef_cert_sha256: PIN, discovery: { static_ip: '10.0.0.5', port: 8080, is_secure_ssl: false, chef_cert_sha256: PIN } };
+
+  test('the pinned box is reached over https and verified against that pin', async () => {
+    expect(serverFromDiscovery(box)).toMatchObject({ url: 'https://10.0.0.5:8080', chefCertSha256: PIN });
+    const http = { post: jest.fn(async () => ({ status: 200, data: box })) };
+    const verify = jest.fn(async () => ({ url: 'ok' }));
+    await discoverByDomain('redrooster.lanaai.io', 'redrooster', { http, verify });
+    expect(verify).toHaveBeenCalledWith('https://10.0.0.5:8080', 2, { pin: { host: '10.0.0.5', port: 8080, sha256: PIN } });
+  });
+
+  test('the box\'s own certSha256 is not a pin', () => {
+    const tofu = { ...responseData, discovery: { static_ip: '10.0.0.5', port: 8080, certSha256: PIN } };
+    expect(serverFromDiscovery(tofu)).toMatchObject({ url: 'http://10.0.0.5:8080', chefCertSha256: null });
+  });
+
+  test('a refresh brings a new pin and moves the saved address to https', () => {
+    const merged = mergeHostedDiscovery(saved, box);
+    expect(merged.chefCertSha256).toBe(PIN);
+    expect(merged.url).toBe('https://100.100.10.20:8080');
+    // An answer without a pin keeps the saved one.
+    expect(mergeHostedDiscovery({ ...saved, url: 'https://100.100.10.20:8080', chefCertSha256: PIN }, responseData).chefCertSha256).toBe(PIN);
+    // Control: no pin anywhere, the address is left as saved.
+    expect(mergeHostedDiscovery(saved, responseData).url).toBe('http://100.100.10.20:8080');
   });
 });

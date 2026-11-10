@@ -35,6 +35,22 @@ function fakeIpc() {
   };
 }
 
+describe('electron-storage: a hardware box Chef pin', () => {
+  beforeEach(() => storage.clearAllData());
+
+  test('the control plane pin is saved and the address is https', () => {
+    storage.saveServerConnection({ url: 'http://10.0.0.5:8080', host: '10.0.0.5', port: 8080, orgId: 'smithlaw', chefCertSha256: 'AB'.repeat(32) });
+    expect(storage.getSavedServer()).toMatchObject({ url: 'https://10.0.0.5:8080', chefCertSha256: 'ab'.repeat(32) });
+  });
+
+  test('control: no pin (a cloud firm) keeps the address and saves none', () => {
+    storage.saveServerConnection({ url: CHEF, orgId: 'cloudfirm' });
+    expect(storage.getSavedServer()).toMatchObject({ url: CHEF, chefCertSha256: null });
+    storage.saveServerConnection({ host: '10.0.0.5', port: 8080, orgId: 'smithlaw', chefCertSha256: 'not-a-pin' });
+    expect(storage.getSavedServer()).toMatchObject({ url: 'http://10.0.0.5:8080', chefCertSha256: null });
+  });
+});
+
 describe('electron-storage localEngine settings', () => {
   beforeEach(() => storage.clearAllData());
 

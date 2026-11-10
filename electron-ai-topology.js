@@ -103,7 +103,7 @@ function registerAiTopologyIpc(ipcMain, deps) {
     try {
       return {
         success: true,
-        topology: await aiTopology({ env: deps.env, savedServer: deps.savedServer(), catalog: deps.catalog, speechCatalog: deps.speechCatalog, modelsDir: deps.modelsDir() })
+        topology: await aiTopology({ env: deps.env, savedServer: deps.savedServer(), fetchImpl: deps.fetchImpl, catalog: deps.catalog, speechCatalog: deps.speechCatalog, modelsDir: deps.modelsDir() })
       };
     } catch (error) {
       deps.logError('[settings] Failed to read the AI setup', error);

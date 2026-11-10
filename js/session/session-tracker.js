@@ -11,6 +11,8 @@ const { powerMonitor, ipcMain } = require('electron');
 const Store = require('electron-store');
 const https = require('https');
 const http = require('http');
+// The box Chef's certificate pin; other hosts keep the default checks.
+const chefPin = require('../../electron-chef-pin');
 
 class SessionTracker {
   constructor(options = {}) {
@@ -353,6 +355,7 @@ class SessionTracker {
           'Authorization': `Bearer ${this.authToken}`
         }
       };
+      if (isHttps) {options.agent = chefPin.httpsAgent();}
 
       const req = httpModule.request(options, (res) => {
         let body = '';

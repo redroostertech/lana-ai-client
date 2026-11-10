@@ -50,6 +50,22 @@
   }
 
   /**
+   * The control plane's pin of a box Chef's certificate: chef_cert_sha256 at
+   * the root or under discovery, 64 hex characters (colons and case ignored).
+   * The box's own certSha256 is never read: that answer is unauthenticated.
+   */
+  function chefCertPin(body) {
+    var discovery = (body && body.discovery) || {};
+    var candidates = [body && body.chef_cert_sha256, discovery.chef_cert_sha256];
+    for (var i = 0; i < candidates.length; i++) {
+      if (typeof candidates[i] !== 'string') continue;
+      var hex = candidates[i].replace(/:/g, '').trim().toLowerCase();
+      if (/^[0-9a-f]{64}$/.test(hex)) return hex;
+    }
+    return null;
+  }
+
+  /**
    * Read a discovery answer into server info, or throw a DiscoveryError.
    * Uses static_ip, port and is_secure_ssl to build the API address; the
    * domain in the answer is for reference only.
@@ -73,11 +89,16 @@
     var normalize = typeof normalizeEnabledApps === 'function'
       ? normalizeEnabledApps
       : function (apps) { return Array.isArray(apps) ? apps : []; };
-    var isSecure = body.discovery.is_secure_ssl === true;
+    // A hardware box's Chef serves HTTPS with its own certificate; the control
+    // plane's chef_cert_sha256 is the only pin the app trusts for it
+    // (electron-chef-pin.js). With a pin the address is https.
+    var chefCertSha256 = chefCertPin(body);
+    var isSecure = body.discovery.is_secure_ssl === true || Boolean(chefCertSha256);
     var protocol = isSecure ? 'https' : 'http';
 
     return {
       url: protocol + '://' + body.discovery.static_ip + ':' + body.discovery.port,
+      chefCertSha256: chefCertSha256,
       orgId: body.server.org_id,
       orgName: body.server.org_name,
       version: body.server.version,
@@ -168,6 +189,7 @@
     extractDomain: extractDomain,
     buildDiscoveryRequest: buildDiscoveryRequest,
     parseDiscoveryResponse: parseDiscoveryResponse,
+    chefCertPin: chefCertPin,
     resolveOrganization: resolveOrganization,
     describeFailure: describeFailure
   };

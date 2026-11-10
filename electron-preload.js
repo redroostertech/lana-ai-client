@@ -76,6 +76,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   loadSettings: () => ipcRenderer.invoke('load-settings'),
 
   /**
+   * A hardware box's Chef certificate pin (electron-chef-pin.js). prepare: pin
+   * the firm the sign-in page found (the control plane's chef_cert_sha256)
+   * before probing it. refusal: why its certificate was not trusted.
+   */
+  chefPin: {
+    prepare: (server) => ipcRenderer.invoke('chef-pin:prepare', { url: server && server.url, chefCertSha256: server && server.chefCertSha256 }),
+    refusal: (url) => ipcRenderer.invoke('chef-pin:refusal', url)
+  },
+
+  /**
    * Platform information
    */
   platform: process.platform,

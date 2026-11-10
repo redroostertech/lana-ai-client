@@ -50,7 +50,7 @@ function makeStorage() {
   };
 }
 
-function loadLogin({ fetch }) {
+function loadLogin({ fetch, electronAPI = undefined, reachability = null }) {
   const loginHtml = fs.readFileSync(path.join(ROOT, 'src/login.html'), 'utf8');
   const inlineScripts = [...loginHtml.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
   const mainScript = inlineScripts.reduce((a, b) => (b.length > a.length ? b : a));
@@ -80,7 +80,8 @@ function loadLogin({ fetch }) {
     URLSearchParams,
     Event: function Event(type) { this.type = type; },
     navigator: { platform: 'MacIntel' },
-    ServerReachability: { buildUnreachableMessage: () => 'Server did not answer.' },
+    ServerReachability: reachability || { buildUnreachableMessage: () => 'Server did not answer.', buildCertificateMessage: () => '' },
+    electronAPI,
     AccountStatus: { classifyLoginFailure: () => 'unknown' },
     LanaSessionGate: loadSessionGate(),
     Toast: {
@@ -162,5 +163,73 @@ describe('Step 1: the organization cannot be found or reached', () => {
     await flush();
     expect(page.el('discoveryError').classList.contains('hidden')).toBe(true);
     expect(page.sandbox.api.baseUrl).toBe('http://10.0.0.5:8080');
+  });
+});
+
+// A hardware box's Chef (electron-chef-pin.js): the control plane's pin is set
+// in the main process before the page probes the box, carried into the saved
+// server, and a refused certificate is explained rather than "not reachable".
+describe('Step 1: a hardware box with a pinned certificate', () => {
+  const PIN = 'ab'.repeat(32);
+  const reachability = require(path.join(ROOT, 'src/js/shared/server-reachability.js'));
+
+  function boxFetch(probe, order) {
+    return async (url) => {
+      if (String(url).includes('/api/health/discovery')) { order.push('probe ' + url); return probe(); }
+      return { ok: true, status: 200, json: async () => ({ status: 'healthy', chef_cert_sha256: PIN, discovery: { static_ip: '10.0.0.5', port: 8080, chef_cert_sha256: PIN }, server: { org_id: 'smithlaw', org_name: 'Smith Law' } }) };
+    };
+  }
+  function electron(order, refusal = null) {
+    const saved = [];
+    return {
+      saved,
+      api: {
+        getConfig: async () => ({}),
+        saveSettings: async (settings) => { saved.push(settings); return { success: true }; },
+        chefPin: {
+          prepare: async (server) => { order.push('prepare ' + server.url + ' ' + server.chefCertSha256); return { success: true, pinned: true }; },
+          refusal: async () => ({ success: true, reason: refusal })
+        }
+      }
+    };
+  }
+
+  test('the pin is prepared before the probe, the box is reached over https, and the pin is saved', async () => {
+    const order = [];
+    const app = electron(order);
+    const page = loadLogin({ fetch: boxFetch(async () => ({ ok: true, status: 200, json: async () => ({ status: 'healthy' }) }), order), electronAPI: app.api, reachability });
+    page.el('orgId').value = 'smithlaw';
+    page.el('serverUrl').value = 'smithlaw.lanaai.io';
+    await page.el('discoveryForm')._handlers.submit[0]({ preventDefault() {} });
+    await flush();
+    expect(order).toEqual(['prepare https://10.0.0.5:8080 ' + PIN, 'probe https://10.0.0.5:8080/api/health/discovery']);
+    expect(app.saved[0]).toMatchObject({ url: 'https://10.0.0.5:8080', chefCertSha256: PIN });
+  });
+
+  test('a certificate that is not the pinned one is named, not reported as unreachable', async () => {
+    const order = [];
+    const app = electron(order, 'mismatch');
+    const page = loadLogin({ fetch: boxFetch(async () => { throw new TypeError('Failed to fetch'); }, order), electronAPI: app.api, reachability });
+    page.el('orgId').value = 'smithlaw';
+    page.el('serverUrl').value = 'smithlaw.lanaai.io';
+    await page.el('discoveryForm')._handlers.submit[0]({ preventDefault() {} });
+    await flush();
+    expect(page.el('discoveryErrorDetail').textContent).toMatch(/did not present the security certificate on record for Smith Law/);
+    expect(app.saved).toEqual([]);
+  });
+
+  test('plain HTTP to a box with no pin (403 HTTPS_REQUIRED) says a secure connection is needed', async () => {
+    const order = [];
+    const app = electron(order);
+    const fetch = async (url) => {
+      if (String(url).includes('/api/health/discovery')) return { ok: false, status: 403, json: async () => ({ error: 'HTTPS required', code: 'HTTPS_REQUIRED' }) };
+      return { ok: true, status: 200, json: async () => ({ status: 'healthy', discovery: { static_ip: '10.0.0.5', port: 8080 }, server: { org_id: 'smithlaw', org_name: 'Smith Law' } }) };
+    };
+    const page = loadLogin({ fetch, electronAPI: app.api, reachability });
+    page.el('orgId').value = 'smithlaw';
+    page.el('serverUrl').value = 'smithlaw.lanaai.io';
+    await page.el('discoveryForm')._handlers.submit[0]({ preventDefault() {} });
+    await flush();
+    expect(page.el('discoveryErrorDetail').textContent).toMatch(/needs a secure connection, and LANA has no security certificate on record/);
   });
 });
