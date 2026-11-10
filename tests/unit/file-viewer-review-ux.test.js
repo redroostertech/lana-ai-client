@@ -209,8 +209,8 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('function hasDocxZipEnvelope');
     expect(pageJs).toContain('function assertReleaseBytesMatchFormat');
     expect(pageJs).toContain('function acceptedReleaseBytesForEditor');
-    expect(pageJs).toContain("'/v1/redline/decisions'");
-    expect(pageJs).toContain("mode: 'accept_all'");
+    expect(pageJs).toContain('LanaDocumentReview.acceptAllBytes({');
+    expect(pageJs).toContain('mountEditor: function (host, options)');
     expect(pageJs).toContain('var releaseBytes = await acceptedReleaseBytesForEditor(state.currentFile, bytes);');
     expect(pageJs).toContain('The editor did not return a valid Word document package');
     expect(pageJs).toContain('loadReviewWorkflow(file)');
@@ -652,7 +652,7 @@ describe('file-viewer review UX foundation', () => {
     expect(html).toContain('{"value":"comments","label":"Comments"}');
     expect(html).toContain('id="reviewPanelComments"');
     expect(html).toContain('id="reviewCommentsList"');
-    expect(pageJs).toContain("state.reviewTab = tab === 'releases' || tab === 'comments' || tab === 'insights' ? tab : 'changes';");
+    expect(pageJs).toContain("state.reviewTab = tab === 'releases' || tab === 'comments' || tab === 'insights' || tab === 'redlines' ? tab : 'changes';");
     expect(pageJs).toContain('function renderReviewComments()');
     expect(pageJs).toContain('LanaDocumentReview.releasedReviewThreads(state.releaseChangeGroups)');
     expect(pageJs).toContain('var annotations = LanaDocumentReview.embedAnnotationsFrom(reviewAnnotationThreads()) || [];');

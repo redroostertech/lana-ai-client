@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="css/tailwind-output.css">
   <link rel="stylesheet" href="css/companion-bridge-consent.css">
   <link rel="stylesheet" href="css/file-viewer.css">
+  <link rel="stylesheet" href="css/redline-review-panel.css">
   <script src="js/tailwind-loader.js"></script>
 </head>
 <body>
@@ -190,7 +191,7 @@
             collapsible
             value="changes"
             size="sm"
-            options='[{"value":"changes","label":"History"},{"value":"releases","label":"Versions"},{"value":"comments","label":"Comments"},{"value":"insights","label":"Insights"}]'>
+            options='[{"value":"changes","label":"History"},{"value":"redlines","label":"Redlines"},{"value":"releases","label":"Versions"},{"value":"comments","label":"Comments"},{"value":"insights","label":"Insights"}]'>
           </lex-segmented>
         </div>
 
@@ -201,6 +202,9 @@
               <p id="reviewChangesEmptyText">No tracked changes reported by the editor.</p>
             </div>
             <div id="reviewChangesList" class="file-viewer-review-list"></div>
+          </section>
+          <section id="reviewPanelRedlines" class="hidden file-viewer-review-panel" role="tabpanel" aria-labelledby="reviewTabRedlines">
+            <div id="redlineReviewPanel"></div>
           </section>
           <section id="reviewPanelComments" class="hidden file-viewer-review-panel" role="tabpanel" aria-labelledby="reviewTabComments">
             <div class="file-viewer-review-empty">
@@ -572,6 +576,7 @@
   <!-- Shared services -->
   <script src="js/services/docx-template-modal.js"></script>
   <script src="js/services/document-review-api.service.js"></script>
+  <script src="js/redline-review-panel.js"></script>
   <script src="js/services/document-enrichment.service.js"></script>
 
   <script src="js/file-viewer-citation-focus.js"></script>

@@ -3460,3 +3460,14 @@
   outline-offset: 2px;
   transition: outline-color 0.6s ease;
 }
+
+/* The hidden editor instance that makes a clean copy (LanaDocumentReview.acceptAllBytes). */
+.lana-editor-offscreen {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 816px;
+  height: 1056px;
+  overflow: hidden;
+  pointer-events: none;
+}

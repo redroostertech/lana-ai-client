@@ -1662,34 +1662,47 @@
     return payload;
   }
 
-  // The document editor service (lana-editor, port 4710) runs beside the
-  // organization's server, on loopback. The app calls it directly, so it only
-  // answers when that server runs on this same computer.
-  var EDITOR_SERVICE_UNREACHABLE = 'The LANA document editor is not reachable from this computer, ' +
-    'so editing, redlines and clean copies are not available here. The document is still readable.';
+  // =========================================================================
+  // Editor UI (the embed) and clean copies
+  // =========================================================================
 
-  /**
-   * fetch() against the editor service, with a plain message instead of a bare
-   * network error when nothing answers.
-   * @param {string} base - editor service address
-   * @param {string} path - for example '/v1/health'
-   * @param {RequestInit} [init]
-   */
-  async function editorServiceFetch(base, path, init) {
-    var url = String(base || '').replace(/\/+$/, '') + path;
+  // The in-app editor (its embed module, fonts and pdf.js) is loaded from an
+  // address set on this computer, never from a built-in one: the editor
+  // service runs beside the organization's server, which is usually not this
+  // computer. Every call that changes a document goes to Chef instead.
+  var EDITOR_UI_UNAVAILABLE = 'The LANA document editor is not available on this computer, ' +
+    'so editing is not available here. The document is still readable.';
+  var CLEAN_COPY_FAILED = 'A clean copy of the document could not be prepared, so nothing was released. ' +
+    'Reload the document and try again.';
+
+  function normalizeBaseUrl(value) {
+    return String(value || '').trim().replace(/\/+$/, '');
+  }
+
+  /** The editor UI address set on this computer, or '' when none is. */
+  function editorUiBase() {
+    var fromWindow = normalizeBaseUrl(global.LANA_EDITOR_SERVICE);
+    if (fromWindow) return fromWindow;
     try {
-      return await fetch(url, init);
-    } catch (error) {
-      var plain = new Error(EDITOR_SERVICE_UNREACHABLE);
-      plain.code = 'EDITOR_SERVICE_UNREACHABLE';
-      plain.cause = error;
-      throw plain;
+      return normalizeBaseUrl(global.localStorage && global.localStorage.getItem('lana-editor-service'));
+    } catch (_) {
+      return '';
     }
   }
 
   /**
-   * Ask the editor service for a copy of the DOCX with every tracked change
-   * accepted, so the released artifact is clean. Non-DOCX bytes pass through.
+   * A copy of a DOCX with every tracked change accepted, made in this browser
+   * by a hidden editor instance, so a released version is clean. Non-DOCX
+   * bytes pass through. Refuses (and releases nothing) when any tracked change
+   * is left over.
+   *
+   * @param {Object} options
+   * @param {Uint8Array} options.bytes
+   * @param {string} [options.contentType]
+   * @param {string} [options.filename]
+   * @param {function(HTMLElement, Object): Object} options.mountEditor - mounts an editor instance in review mode
+   * @param {Document} [options.document]
+   * @returns {Promise<Uint8Array>}
    */
   async function acceptAllBytes(options) {
     var bytes = options.bytes;
@@ -1698,23 +1711,216 @@
     if (!hasDocxZipEnvelope(bytes)) {
       throw new Error('The editor did not return a valid Word document package. Reload the document and try again.');
     }
-    var response = await editorServiceFetch(options.editorServiceBase, '/v1/redline/decisions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        docxBase64: bytesToBase64(bytes),
-        mode: 'accept_all'
-      })
+    if (typeof options.mountEditor !== 'function') throw new Error(CLEAN_COPY_FAILED);
+    var doc = options.document || global.document;
+    var host = doc.createElement('div');
+    host.className = 'lana-editor-offscreen';
+    host.setAttribute('aria-hidden', 'true');
+    doc.body.appendChild(host);
+    var editor = null;
+    try {
+      editor = options.mountEditor(host, { mode: 'review' });
+      if (!editor || typeof editor.open_file !== 'function' || typeof editor.decide !== 'function' ||
+          typeof editor.reviewState !== 'function' || typeof editor.bytes !== 'function') {
+        throw new Error(CLEAN_COPY_FAILED);
+      }
+      await editor.open_file(new File([bytes], options.filename || 'document.docx', { type: contentType }));
+      var revisions = (editor.reviewState() || {}).revisions;
+      var ids = (Array.isArray(revisions) ? revisions : []).map(function (revision) {
+        return revision && revision.id ? String(revision.id) : '';
+      }).filter(Boolean);
+      if (ids.length) {
+        await editor.decide({ decisions: ids.map(function (id) { return { id: id, action: 'accept' }; }) });
+      }
+      var left = (editor.reviewState() || {}).revisions;
+      if (Array.isArray(left) && left.length) throw new Error(CLEAN_COPY_FAILED);
+      var acceptedBytes = editor.bytes();
+      if (!hasDocxZipEnvelope(acceptedBytes)) {
+        throw new Error('The editor did not return a valid Word document package. Reload the document and try again.');
+      }
+      return acceptedBytes;
+    } finally {
+      if (editor && typeof editor.shutdown === 'function') {
+        try { editor.shutdown(); } catch (_) {}
+      }
+      if (host.parentNode) host.parentNode.removeChild(host);
+    }
+  }
+
+  // =========================================================================
+  // LANA redline review (Chef: /matters/:m/documents/:d/redline-batches)
+  // =========================================================================
+  //
+  // Redlines proposed by the Document Reviewer agent. Chef builds every copy
+  // and records every decision; this module only calls it and turns its
+  // problem codes into plain sentences.
+
+  function redlineBatchEndpoint(matterId, documentId, path) {
+    if (!documentId) throw new Error('A source document is required for this review operation.');
+    return matterEndpoint(
+      matterId,
+      '/documents/' + encodeURIComponent(documentId) + '/redline-batches' + (path || '')
+    );
+  }
+
+  function redlineBatchPath(batchId, suffix) {
+    if (!batchId) throw new Error('A redline batch is required for this review operation.');
+    return '/' + encodeURIComponent(batchId) + (suffix || '');
+  }
+
+  var REDLINE_MESSAGES = {
+    REDLINE_EDITOR_UNAVAILABLE: 'Redline review is not available on this server yet.',
+    REDLINE_BASE_DOCUMENT_CHANGED: 'The document changed since these suggestions were made. Run the review again.',
+    REDLINE_DOCUMENT_NOT_FOUND: 'This document was not found, or you do not have access to it.',
+    REDLINE_BATCH_NOT_FOUND: 'These suggestions are no longer on this document. Reload to see the current ones.',
+    REDLINE_CHANGE_NOT_FOUND: 'One of these changes is no longer part of the suggestions. Reload and try again.',
+    REDLINE_CHANGE_ALREADY_DECIDED: 'This change was already decided the other way. A decision is recorded once.',
+    REDLINE_CONFLICTING_DECISIONS: 'The same change was both accepted and rejected. Choose one.',
+    REDLINE_CHANGES_UNDECIDED: 'Accept or reject every change before releasing a new version.',
+    REDLINE_NOTHING_ACCEPTED: 'No change was accepted, so there is no new version to release.',
+    REDLINE_BATCH_RELEASED: 'These changes were already released as a new version.',
+    REDLINE_RELEASE_PENDING_APPROVAL: 'A release of these changes is waiting for approval.',
+    REDLINE_RELEASE_STALE_APPROVAL: 'The changes moved after approval was requested. Request a new release.',
+    REDLINE_EDITOR_REJECTED: 'The document could not take this change. Reject it, or run the review again.',
+    REDLINE_INVALID_REQUEST: 'That request could not be read. Reload and try again.',
+    REDLINE_CONFLICT: 'These suggestions changed while you were working. Reload and try again.'
+  };
+
+  function redlineErrorCode(error) {
+    if (!error) return '';
+    var data = error.data || error.body || null;
+    return String(error.code || (data && (data.code || (data.error && data.error.code))) || '');
+  }
+
+  /** A plain sentence for any error a redline review call raised. */
+  function redlineErrorMessage(error) {
+    var code = redlineErrorCode(error);
+    if (REDLINE_MESSAGES[code]) return REDLINE_MESSAGES[code];
+    var status = Number(error && error.status);
+    // A server older than these routes answers a plain 404.
+    if (status === 404 && code.indexOf('REDLINE_') !== 0) return REDLINE_MESSAGES.REDLINE_EDITOR_UNAVAILABLE;
+    if (status === 403) return 'You do not have permission to do this.';
+    if (status === 0) return 'The server could not be reached. Check the connection and try again.';
+    return 'Redline review did not work this time. Try again.';
+  }
+
+  function redlineError(error) {
+    var plain = new Error(redlineErrorMessage(error));
+    plain.code = redlineErrorCode(error) || null;
+    plain.status = error && error.status !== undefined ? error.status : null;
+    plain.data = error && error.data ? error.data : null;
+    plain.cause = error;
+    return plain;
+  }
+
+  async function redlineCall(run) {
+    try {
+      return await run();
+    } catch (error) {
+      throw redlineError(error);
+    }
+  }
+
+  /** GET /redline-batches: { data: [batch], metadata }. */
+  async function listRedlineBatches(options) {
+    var query = [];
+    if (options.page) query.push('page=' + encodeURIComponent(options.page));
+    if (options.limit) query.push('limit=' + encodeURIComponent(options.limit));
+    if (options.status) query.push('status=' + encodeURIComponent(options.status));
+    var endpoint = redlineBatchEndpoint(options.matterId, options.documentId, query.length ? '?' + query.join('&') : '');
+    var response = await redlineCall(function () { return options.api.get(endpoint); });
+    return {
+      data: Array.isArray(response && response.data) ? response.data : [],
+      metadata: (response && response.metadata) || {}
+    };
+  }
+
+  /** GET /redline-batches/:id: the batch with its changes. */
+  async function getRedlineBatch(options) {
+    var endpoint = redlineBatchEndpoint(options.matterId, options.documentId, redlineBatchPath(options.batchId));
+    return responseData(await redlineCall(function () { return options.api.get(endpoint); }));
+  }
+
+  /**
+   * POST /decisions. Returns { batch, applied, unchanged }: `applied` were
+   * recorded now, `unchanged` already had that decision.
+   */
+  async function decideRedlineChanges(options) {
+    var decisions = (options.decisions || []).map(function (decision) {
+      return { change_id: String(decision.change_id), action: decision.action === 'reject' ? 'reject' : 'accept' };
     });
+    if (!decisions.length) throw new Error('Choose a change to accept or reject.');
+    var endpoint = redlineBatchEndpoint(options.matterId, options.documentId, redlineBatchPath(options.batchId, '/decisions'));
+    var data = responseData(await redlineCall(function () {
+      return options.api.post(endpoint, { decisions: decisions });
+    })) || {};
+    return {
+      batch: data.batch || null,
+      applied: Array.isArray(data.applied) ? data.applied.map(String) : [],
+      unchanged: Array.isArray(data.unchanged) ? data.unchanged.map(String) : []
+    };
+  }
+
+  /**
+   * POST /release. 201 is { outcome: 'released', release, document, ingestion };
+   * 202 is { outcome: 'approval_required', approval_id, approval, batch }.
+   */
+  async function releaseRedlineBatch(options) {
+    var body = {};
+    if (options.releaseNotes) body.release_notes = String(options.releaseNotes);
+    if (options.filename) body.filename = String(options.filename);
+    if (options.retryApproval) body.retry_approval = true;
+    var endpoint = redlineBatchEndpoint(options.matterId, options.documentId, redlineBatchPath(options.batchId, '/release'));
+    var data = responseData(await redlineCall(function () { return options.api.post(endpoint, body); })) || {};
+    if (data.approval_required) {
+      return {
+        outcome: 'approval_required',
+        approval_id: data.approval_id || (data.approval && data.approval.id) || null,
+        approval: data.approval || null,
+        batch: data.batch || null
+      };
+    }
+    return {
+      outcome: 'released',
+      release: data.release || null,
+      document: data.document || null,
+      ingestion: data.ingestion || null
+    };
+  }
+
+  /**
+   * GET /document?view=redline|accepted: the DOCX bytes Chef built. Uses the
+   * API client's address and sign-in; errors are read as problem+json.
+   * @returns {Promise<{bytes: Uint8Array, view: string, changeCount: number}>}
+   */
+  async function fetchRedlineDocument(options) {
+    var api = options.api;
+    var view = options.view === 'accepted' ? 'accepted' : 'redline';
+    var endpoint = redlineBatchEndpoint(options.matterId, options.documentId,
+      redlineBatchPath(options.batchId, '/document?view=' + view));
+    var fetchImpl = options.fetch || global.fetch;
+    var headers = { Accept: DOCX_CONTENT_TYPE + ', application/problem+json' };
+    if (api && api.token) headers.Authorization = 'Bearer ' + api.token;
+    var response;
+    try {
+      response = await fetchImpl(String((api && api.baseUrl) || '') + endpoint, { method: 'GET', headers: headers, cache: 'no-store' });
+    } catch (error) {
+      throw redlineError({ status: 0, cause: error });
+    }
     if (!response.ok) {
-      throw new Error('Failed to prepare clean release document');
+      var problem = null;
+      try { problem = JSON.parse(await response.text()); } catch (_) { problem = null; }
+      throw redlineError({ status: response.status, data: problem, code: problem && problem.code });
     }
-    var buffer = await response.arrayBuffer();
-    var acceptedBytes = new Uint8Array(buffer);
-    if (!hasDocxZipEnvelope(acceptedBytes)) {
-      throw new Error('The editor did not return a valid Word document package. Reload the document and try again.');
-    }
-    return acceptedBytes;
+    var bytes = new Uint8Array(await response.arrayBuffer());
+    var headerValue = function (name) {
+      return response.headers && typeof response.headers.get === 'function' ? response.headers.get(name) : null;
+    };
+    return {
+      bytes: bytes,
+      view: headerValue('X-Lana-Redline-View') || view,
+      changeCount: Number(headerValue('X-Lana-Redline-Change-Count') || 0) || 0
+    };
   }
 
   // =========================================================================
@@ -1821,8 +2027,17 @@
     releaseFilenameFor: releaseFilenameFor,
     buildReleasePayload: buildReleasePayload,
     acceptAllBytes: acceptAllBytes,
-    editorServiceFetch: editorServiceFetch,
-    EDITOR_SERVICE_UNREACHABLE: EDITOR_SERVICE_UNREACHABLE,
+    editorUiBase: editorUiBase,
+    EDITOR_UI_UNAVAILABLE: EDITOR_UI_UNAVAILABLE,
+    CLEAN_COPY_FAILED: CLEAN_COPY_FAILED,
+    redlineBatchEndpoint: redlineBatchEndpoint,
+    redlineErrorMessage: redlineErrorMessage,
+    REDLINE_MESSAGES: Object.assign({}, REDLINE_MESSAGES),
+    listRedlineBatches: listRedlineBatches,
+    getRedlineBatch: getRedlineBatch,
+    decideRedlineChanges: decideRedlineChanges,
+    releaseRedlineBatch: releaseRedlineBatch,
+    fetchRedlineDocument: fetchRedlineDocument,
     latestActivityIso: latestActivityIso,
     DOCX_CONTENT_TYPE: DOCX_CONTENT_TYPE
   };

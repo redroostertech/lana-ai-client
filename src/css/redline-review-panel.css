@@ -1,0 +1,261 @@
+/* LANA redline review panel (js/redline-review-panel.js), File Viewer "Redlines" tab. */
+
+.redline-review {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.redline-review__empty {
+  border: 1px solid var(--lex-border-subtle, var(--lex-border-default));
+  border-radius: var(--lex-radius-lg, 8px);
+  background: var(--lex-bg-secondary);
+  padding: 16px;
+  margin: 0;
+  color: var(--lex-text-tertiary);
+  font-size: var(--lex-body-xs-size, 0.75rem);
+  line-height: 1.45;
+}
+
+.redline-review__empty h5 {
+  margin: 0 0 6px;
+  color: var(--lex-text-primary);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  font-weight: var(--lex-weight-semibold, 600);
+}
+
+.redline-review__empty p {
+  margin: 0;
+}
+
+.redline-review__batch {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid var(--lex-border-default);
+  border-radius: var(--lex-radius-lg, 8px);
+  background: var(--lex-bg-primary);
+  padding: 12px;
+}
+
+.redline-review__batch-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.redline-review__batch-title-row,
+.redline-review__change-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.redline-review__batch-title {
+  margin: 0;
+  min-width: 0;
+  color: var(--lex-text-primary);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  font-weight: var(--lex-weight-semibold, 600);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.redline-review__counts,
+.redline-review__summary,
+.redline-review__rationale,
+.redline-review__decided,
+.redline-review__hint,
+.redline-review__reason {
+  margin: 0;
+  color: var(--lex-text-tertiary);
+  font-size: var(--lex-body-xs-size, 0.75rem);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.redline-review__summary,
+.redline-review__rationale {
+  color: var(--lex-text-secondary);
+}
+
+.redline-review__status {
+  flex-shrink: 0;
+  border-radius: var(--lex-radius-full, 999px);
+  font-size: 0.625rem;
+  font-weight: var(--lex-weight-semibold, 600);
+  line-height: 1;
+  padding: 4px 6px;
+  white-space: nowrap;
+}
+
+.redline-review__status--pending {
+  background: var(--lex-color-warning-100, #fef3c7);
+  color: var(--lex-color-warning-700, #92400e);
+}
+
+.redline-review__status--accepted {
+  background: var(--lex-color-success-100, #dcfce7);
+  color: var(--lex-color-success-700, #15803d);
+}
+
+.redline-review__status--rejected {
+  background: var(--lex-color-danger-100, #fee2e2);
+  color: var(--lex-color-danger-700, #b91c1c);
+}
+
+.redline-review__status--released {
+  background: var(--lex-bg-accent-soft);
+  color: var(--lex-text-accent);
+}
+
+.redline-review__changes,
+.redline-review__unplaced-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.redline-review__change,
+.redline-review__unplaced-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  border: 1px solid var(--lex-border-subtle, var(--lex-border-default));
+  border-radius: var(--lex-radius-md, 8px);
+  background: var(--lex-bg-secondary);
+  padding: 10px;
+}
+
+.redline-review__change-title {
+  min-width: 0;
+  color: var(--lex-text-primary);
+  font-size: var(--lex-body-xs-size, 0.75rem);
+  font-weight: var(--lex-weight-semibold, 600);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.redline-review__diff {
+  display: grid;
+  gap: 3px;
+}
+
+.redline-review__diff-line {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  gap: 6px;
+  align-items: start;
+  font-size: var(--lex-body-xs-size, 0.75rem);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.redline-review__diff-line--added {
+  color: var(--lex-color-success-700, #15803d);
+}
+
+.redline-review__diff-line--removed {
+  color: var(--lex-color-danger-700, #b91c1c);
+  text-decoration: line-through;
+}
+
+.redline-review__diff-mark {
+  font-family: var(--lex-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-weight: var(--lex-weight-semibold, 600);
+  text-align: center;
+  text-decoration: none;
+}
+
+.redline-review__change-actions,
+.redline-review__batch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.redline-review__unplaced {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  border-top: 1px dashed var(--lex-border-default);
+  padding-top: 10px;
+}
+
+.redline-review__unplaced-heading {
+  margin: 0;
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-xs-size, 0.75rem);
+  font-weight: var(--lex-weight-semibold, 600);
+}
+
+.redline-review__unplaced-item {
+  border-style: dashed;
+}
+
+.redline-review__reason {
+  color: var(--lex-color-warning-700, #92400e);
+}
+
+.redline-review__batch-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.redline-review__notice {
+  margin: 0;
+  border-radius: var(--lex-radius-md, 8px);
+  padding: 8px 10px;
+  font-size: var(--lex-body-xs-size, 0.75rem);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.redline-review__notice--info {
+  background: var(--lex-bg-accent-soft);
+  color: var(--lex-text-accent);
+}
+
+.redline-review__notice--success {
+  background: var(--lex-color-success-100, #dcfce7);
+  color: var(--lex-color-success-700, #15803d);
+}
+
+.redline-review__notice--error {
+  background: var(--lex-color-danger-100, #fee2e2);
+  color: var(--lex-color-danger-700, #b91c1c);
+}
+
+/* Dark theme ([data-lex-theme="dark"] on the page): the panel's own surfaces, text and tones. */
+[data-lex-theme="dark"] .redline-review {
+  --lex-bg-primary: var(--lex-chat-dark-800, #111118);
+  --lex-bg-secondary: var(--lex-chat-dark-700, #1a1a24);
+  --lex-border-default: rgba(255, 255, 255, 0.14);
+  --lex-border-subtle: rgba(255, 255, 255, 0.08);
+  --lex-text-primary: var(--lex-chat-dark-50, #ffffff);
+  --lex-text-secondary: var(--lex-chat-dark-200, #c9cdd5);
+  --lex-text-tertiary: var(--lex-chat-dark-300, #9ca3af);
+  --lex-bg-accent-soft: rgba(255, 255, 255, 0.1);
+  --lex-text-accent: var(--lex-chat-dark-100, #e8e8f0);
+  --lex-color-success-100: rgba(16, 185, 129, 0.18);
+  --lex-color-success-700: #6ee7b7;
+  --lex-color-warning-100: rgba(234, 179, 8, 0.2);
+  --lex-color-warning-700: #fcd34d;
+  --lex-color-danger-100: rgba(239, 68, 68, 0.2);
+  --lex-color-danger-700: #fca5a5;
+  --lex-color-gray-100: rgba(255, 255, 255, 0.08);
+  --lex-color-gray-200: rgba(255, 255, 255, 0.12);
+  --lex-color-gray-300: rgba(255, 255, 255, 0.18);
+}

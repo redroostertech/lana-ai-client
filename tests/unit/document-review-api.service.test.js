@@ -962,34 +962,195 @@ describe('LanaDocumentReview dates and release payloads', () => {
   });
 });
 
-describe('editor service unreachable', () => {
-  // The editor service runs beside the organization's server on loopback; from
-  // a computer that does not run that server, nothing answers on 127.0.0.1:4710.
-  // That used to surface as a bare "Failed to fetch".
-  const realFetch = global.fetch;
-  afterEach(() => { global.fetch = realFetch; });
+// Smallest package the envelope check accepts: local header magic, then an end-of-central-directory record.
+function tinyDocx(marker) {
+  const docx = new Uint8Array(30);
+  docx.set([0x50, 0x4b, 0x03, 0x04], 0);
+  docx.set([0x50, 0x4b, 0x05, 0x06], 4);
+  docx[29] = marker || 0;
+  return docx;
+}
 
-  test('a network failure becomes the plain message', async () => {
-    global.fetch = jest.fn(async () => { throw new TypeError('Failed to fetch'); });
-    await expect(review.editorServiceFetch('http://127.0.0.1:4710/', '/v1/health'))
-      .rejects.toMatchObject({ code: 'EDITOR_SERVICE_UNREACHABLE', message: review.EDITOR_SERVICE_UNREACHABLE });
-    expect(global.fetch).toHaveBeenCalledWith('http://127.0.0.1:4710/v1/health', undefined);
-    expect(review.EDITOR_SERVICE_UNREACHABLE).not.toMatch(/fetch|4710|[\u2013\u2014]/);
+function fakeDocument() {
+  const appended = [];
+  const body = {
+    appendChild(node) { appended.push(node); node.parentNode = body; },
+    removeChild(node) { appended.splice(appended.indexOf(node), 1); node.parentNode = null; }
+  };
+  return {
+    body,
+    appended,
+    createElement: () => ({ className: '', attributes: {}, setAttribute(name, value) { this.attributes[name] = value; }, parentNode: null })
+  };
+}
+
+describe('editor UI address', () => {
+  const realWindowValue = global.LANA_EDITOR_SERVICE;
+  const realStorage = global.localStorage;
+  afterEach(() => {
+    global.LANA_EDITOR_SERVICE = realWindowValue;
+    global.localStorage = realStorage;
   });
 
-  test('preparing a clean release copy says so instead of "Failed to fetch"', async () => {
-    global.fetch = jest.fn(async () => { throw new TypeError('Failed to fetch'); });
-    // Smallest package the envelope check accepts: local header magic, then an end-of-central-directory record.
-    const docx = new Uint8Array(30);
-    docx.set([0x50, 0x4b, 0x03, 0x04], 0);
-    docx.set([0x50, 0x4b, 0x05, 0x06], 4);
-    await expect(review.acceptAllBytes({ editorServiceBase: 'http://127.0.0.1:4710', bytes: docx, contentType: DOCX_TYPE }))
-      .rejects.toThrow(review.EDITOR_SERVICE_UNREACHABLE);
+  test('there is no built-in address: nothing set means no editor UI', () => {
+    delete global.LANA_EDITOR_SERVICE;
+    global.localStorage = { getItem: () => null };
+    expect(review.editorUiBase()).toBe('');
+    expect(review.EDITOR_UI_UNAVAILABLE).not.toMatch(/fetch|4710|[–—]/);
   });
 
-  test('an answer is passed through untouched', async () => {
-    const response = { ok: true };
-    global.fetch = jest.fn(async () => response);
-    await expect(review.editorServiceFetch('http://x', '/v1/health', { method: 'GET' })).resolves.toBe(response);
+  test('an address set on this computer is used, without a trailing slash', () => {
+    global.LANA_EDITOR_SERVICE = '';
+    global.localStorage = { getItem: (key) => (key === 'lana-editor-service' ? 'http://editor.local:9000/' : null) };
+    expect(review.editorUiBase()).toBe('http://editor.local:9000');
+    global.LANA_EDITOR_SERVICE = 'http://window.local/';
+    expect(review.editorUiBase()).toBe('http://window.local');
+  });
+});
+
+describe('clean copy made in the browser (acceptAllBytes)', () => {
+  function fakeEditor(revisionsBefore, revisionsAfter, bytesOut) {
+    const editor = {
+      opened: null,
+      decided: null,
+      shutdown: jest.fn(),
+      open_file: jest.fn(async (file) => { editor.opened = file; }),
+      decide: jest.fn(async (request) => { editor.decided = request; editor.done = true; }),
+      reviewState: () => ({ revisions: editor.done ? revisionsAfter : revisionsBefore }),
+      bytes: () => bytesOut
+    };
+    return editor;
+  }
+
+  test('accepts every tracked change in a hidden editor and returns its bytes', async () => {
+    const doc = fakeDocument();
+    const clean = tinyDocx(7);
+    const editor = fakeEditor([{ id: 'r1' }, { id: 'r2' }], [], clean);
+    const mountEditor = jest.fn(() => editor);
+    const result = await review.acceptAllBytes({ bytes: tinyDocx(1), contentType: DOCX_TYPE, filename: 'a.docx', mountEditor, document: doc });
+    expect(result).toBe(clean);
+    expect(mountEditor).toHaveBeenCalledWith(expect.objectContaining({ className: 'lana-editor-offscreen' }), { mode: 'review' });
+    expect(editor.decided).toEqual({ decisions: [{ id: 'r1', action: 'accept' }, { id: 'r2', action: 'accept' }] });
+    expect(editor.opened.name).toBe('a.docx');
+    expect(editor.shutdown).toHaveBeenCalled();
+    expect(doc.appended).toEqual([]);
+  });
+
+  test('refuses when a tracked change is left over, and still cleans up', async () => {
+    const doc = fakeDocument();
+    const editor = fakeEditor([{ id: 'r1' }, { type: 'format' }], [{ type: 'format' }], tinyDocx(7));
+    await expect(review.acceptAllBytes({ bytes: tinyDocx(1), mountEditor: () => editor, document: doc }))
+      .rejects.toThrow(review.CLEAN_COPY_FAILED);
+    expect(editor.shutdown).toHaveBeenCalled();
+    expect(doc.appended).toEqual([]);
+  });
+
+  test('without an editor to mount it refuses rather than releasing tracked changes', async () => {
+    await expect(review.acceptAllBytes({ bytes: tinyDocx(1), document: fakeDocument() }))
+      .rejects.toThrow(review.CLEAN_COPY_FAILED);
+  });
+
+  test('non-DOCX bytes pass through untouched', async () => {
+    const bytes = new Uint8Array([1, 2, 3]);
+    await expect(review.acceptAllBytes({ bytes, contentType: 'text/markdown' })).resolves.toBe(bytes);
+  });
+});
+
+describe('LANA redline review on Chef', () => {
+  const BASE = '/api/v1/matters/m%201/documents/doc-1/redline-batches';
+  const scope = { matterId: 'm 1', documentId: 'doc-1' };
+
+  function problem(status, code, extra) {
+    const error = new Error('server text');
+    error.status = status;
+    error.data = Object.assign({ code, status, title: 't', detail: 'd' }, extra || {});
+    error.code = code;
+    return error;
+  }
+
+  test('lists batches with page, limit and status on the document route', async () => {
+    const api = makeApi([{ match: /^GET /, reply: { data: [{ id: 'b1' }], metadata: { total: 1 } } }]);
+    const result = await review.listRedlineBatches(Object.assign({ api, page: 2, limit: 10, status: 'proposed' }, scope));
+    expect(api.calls).toEqual([{ method: 'GET', endpoint: BASE + '?page=2&limit=10&status=proposed', payload: undefined }]);
+    expect(result).toEqual({ data: [{ id: 'b1' }], metadata: { total: 1 } });
+  });
+
+  test('gets one batch and unwraps data', async () => {
+    const api = makeApi([{ match: 'GET ' + BASE + '/b%2F1', reply: { data: { id: 'b/1', changes: [] } } }]);
+    await expect(review.getRedlineBatch(Object.assign({ api, batchId: 'b/1' }, scope))).resolves.toEqual({ id: 'b/1', changes: [] });
+  });
+
+  test('posts decisions in the route shape and reads applied and unchanged', async () => {
+    const api = makeApi([{
+      match: 'POST ' + BASE + '/b1/decisions',
+      reply: { data: { batch: { id: 'b1' }, applied: ['c1'], unchanged: ['c2'] } }
+    }]);
+    const result = await review.decideRedlineChanges(Object.assign({
+      api, batchId: 'b1', decisions: [{ change_id: 'c1', action: 'accept' }, { change_id: 'c2', action: 'reject' }]
+    }, scope));
+    expect(api.calls[0].payload).toEqual({ decisions: [{ change_id: 'c1', action: 'accept' }, { change_id: 'c2', action: 'reject' }] });
+    expect(result).toEqual({ batch: { id: 'b1' }, applied: ['c1'], unchanged: ['c2'] });
+  });
+
+  test('a decision the other way is a 409 with the plain message and its code', async () => {
+    const api = { post: jest.fn(async () => { throw problem(409, 'REDLINE_CHANGE_ALREADY_DECIDED'); }) };
+    await expect(review.decideRedlineChanges(Object.assign({ api, batchId: 'b1', decisions: [{ change_id: 'c1', action: 'reject' }] }, scope)))
+      .rejects.toMatchObject({ code: 'REDLINE_CHANGE_ALREADY_DECIDED', status: 409, message: review.REDLINE_MESSAGES.REDLINE_CHANGE_ALREADY_DECIDED });
+  });
+
+  test('release: 201 body is released, 202 body is approval required', async () => {
+    const released = makeApi([{ match: 'POST ' + BASE + '/b1/release', reply: { data: { release: { id: 'r1' }, document: { id: 'd2' }, ingestion: null } } }]);
+    await expect(review.releaseRedlineBatch(Object.assign({ api: released, batchId: 'b1', releaseNotes: 'n' }, scope)))
+      .resolves.toEqual({ outcome: 'released', release: { id: 'r1' }, document: { id: 'd2' }, ingestion: null });
+    expect(released.calls[0].payload).toEqual({ release_notes: 'n' });
+
+    const waiting = makeApi([{ match: /release$/, reply: { data: { approval_required: true, approval_id: 'a1', approval: { id: 'a1' }, batch: { id: 'b1', status: 'pending_release' } } } }]);
+    await expect(review.releaseRedlineBatch(Object.assign({ api: waiting, batchId: 'b1', retryApproval: true }, scope)))
+      .resolves.toEqual({ outcome: 'approval_required', approval_id: 'a1', approval: { id: 'a1' }, batch: { id: 'b1', status: 'pending_release' } });
+    expect(waiting.calls[0].payload).toEqual({ retry_approval: true });
+  });
+
+  test('every documented code maps to a plain sentence; the two named ones are exact', () => {
+    const codes = ['REDLINE_DOCUMENT_NOT_FOUND', 'REDLINE_BATCH_NOT_FOUND', 'REDLINE_CHANGE_NOT_FOUND', 'REDLINE_CHANGE_ALREADY_DECIDED',
+      'REDLINE_CHANGES_UNDECIDED', 'REDLINE_NOTHING_ACCEPTED', 'REDLINE_BATCH_RELEASED', 'REDLINE_RELEASE_PENDING_APPROVAL',
+      'REDLINE_RELEASE_STALE_APPROVAL', 'REDLINE_BASE_DOCUMENT_CHANGED', 'REDLINE_EDITOR_UNAVAILABLE', 'REDLINE_EDITOR_REJECTED',
+      'REDLINE_INVALID_REQUEST', 'REDLINE_CONFLICT'];
+    codes.forEach((code) => {
+      const message = review.redlineErrorMessage(problem(409, code));
+      expect(message).toBe(review.REDLINE_MESSAGES[code]);
+      expect(message).not.toMatch(/[–—]|REDLINE_/);
+    });
+    expect(review.redlineErrorMessage(problem(503, 'REDLINE_EDITOR_UNAVAILABLE'))).toBe('Redline review is not available on this server yet.');
+    expect(review.redlineErrorMessage(problem(409, 'REDLINE_BASE_DOCUMENT_CHANGED')))
+      .toBe('The document changed since these suggestions were made. Run the review again.');
+    // Control arm: an unknown failure does not borrow a specific message.
+    expect(review.redlineErrorMessage(problem(500, 'SOMETHING_ELSE'))).toBe('Redline review did not work this time. Try again.');
+    // A server without these routes answers a plain 404.
+    expect(review.redlineErrorMessage(problem(404, 'NOT_FOUND'))).toBe(review.REDLINE_MESSAGES.REDLINE_EDITOR_UNAVAILABLE);
+  });
+
+  test('downloads the redlined DOCX with the sign-in, and reads the headers', async () => {
+    const fetchImpl = jest.fn(async () => ({
+      ok: true,
+      headers: { get: (name) => ({ 'X-Lana-Redline-View': 'redline', 'X-Lana-Redline-Change-Count': '3' })[name] || null },
+      arrayBuffer: async () => tinyDocx(2).buffer
+    }));
+    const api = { baseUrl: 'https://chef.example', token: 'tok' };
+    const result = await review.fetchRedlineDocument(Object.assign({ api, batchId: 'b1', view: 'redline', fetch: fetchImpl }, scope));
+    expect(fetchImpl).toHaveBeenCalledWith('https://chef.example' + BASE + '/b1/document?view=redline',
+      expect.objectContaining({ method: 'GET', headers: expect.objectContaining({ Authorization: 'Bearer tok' }) }));
+    expect(result.view).toBe('redline');
+    expect(result.changeCount).toBe(3);
+    expect(result.bytes[29]).toBe(2);
+  });
+
+  test('a problem+json answer on the document route becomes the plain message', async () => {
+    const fetchImpl = jest.fn(async () => ({
+      ok: false,
+      status: 503,
+      text: async () => JSON.stringify({ code: 'REDLINE_EDITOR_UNAVAILABLE', status: 503 })
+    }));
+    await expect(review.fetchRedlineDocument(Object.assign({ api: { baseUrl: '' }, batchId: 'b1', fetch: fetchImpl }, scope)))
+      .rejects.toMatchObject({ code: 'REDLINE_EDITOR_UNAVAILABLE', message: 'Redline review is not available on this server yet.' });
   });
 });

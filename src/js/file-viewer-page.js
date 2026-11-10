@@ -43,6 +43,7 @@
     reviewBaselineRevisionIds: [],
     reviewBaselineAcceptedForReview: false,
     reviewTab: 'changes',
+    redlineReview: null,
     enrichment: null,
     enrichmentRerunFrom: null,
     annotateMode: null,
@@ -917,25 +918,10 @@
     return user && (user.id || user.user_id || user.userId) ? String(user.id || user.user_id || user.userId) : '';
   }
 
-  function normalizeBaseUrl(value) {
-    value = String(value || '').trim();
-    if (!value) return '';
-    return value.replace(/\/+$/, '');
-  }
-
+  // The editor UI address set on this computer ('' when none is); see
+  // LanaDocumentReview.editorUiBase. Document changes go to Chef, not here.
   function getEditorServiceBase() {
-    var fromWindow = normalizeBaseUrl(window.LANA_EDITOR_SERVICE);
-    if (fromWindow) return fromWindow;
-
-    var fromConfig = normalizeBaseUrl(window.LanaConfig && window.LanaConfig.LANA_EDITOR_SERVICE_URL);
-    if (fromConfig) return fromConfig;
-
-    try {
-      var fromStorage = normalizeBaseUrl(window.localStorage && window.localStorage.getItem('lana-editor-service'));
-      if (fromStorage) return fromStorage;
-    } catch (_) {}
-
-    return 'http://127.0.0.1:4710';
+    return LanaDocumentReview.editorUiBase();
   }
 
   function isEditorEnabled() {
@@ -1606,16 +1592,18 @@
   }
 
   function setReviewTab(tab) {
-    state.reviewTab = tab === 'releases' || tab === 'comments' || tab === 'insights' ? tab : 'changes';
+    state.reviewTab = tab === 'releases' || tab === 'comments' || tab === 'insights' || tab === 'redlines' ? tab : 'changes';
     var tabs = document.getElementById('reviewTabs');
     var changesPanel = document.getElementById('reviewPanelChanges');
     var releasesPanel = document.getElementById('reviewPanelReleases');
     var commentsPanel = document.getElementById('reviewPanelComments');
     var insightsPanel = document.getElementById('reviewPanelInsights');
+    var redlinesPanel = document.getElementById('reviewPanelRedlines');
     var isChanges = state.reviewTab === 'changes';
     var isReleases = state.reviewTab === 'releases';
     if (commentsPanel) commentsPanel.classList.toggle('hidden', state.reviewTab !== 'comments');
     if (insightsPanel) insightsPanel.classList.toggle('hidden', state.reviewTab !== 'insights');
+    if (redlinesPanel) redlinesPanel.classList.toggle('hidden', state.reviewTab !== 'redlines');
     if (state.reviewTab === 'comments') renderReviewComments();
 
     if (tabs && tabs.value !== state.reviewTab) {
@@ -3445,17 +3433,22 @@
       return bytes;
     }
     assertReleaseBytesMatchFormat(file, bytes);
-    var response = await LanaDocumentReview.editorServiceFetch(getEditorServiceBase(), '/v1/redline/decisions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        docxBase64: bytesToBase64(bytes),
-        mode: 'accept_all'
-      })
+    var baseUrl = getEditorServiceBase();
+    if (!baseUrl) throw new Error(LanaDocumentReview.EDITOR_UI_UNAVAILABLE);
+    var mod = await loadEditorModule(baseUrl);
+    var acceptedBytes = await LanaDocumentReview.acceptAllBytes({
+      mountEditor: function (host, options) {
+        return mod.LanaEditor.mount(host, Object.assign({
+          api: baseUrl,
+          fontsUrl: baseUrl + '/editor-fonts',
+          pdfWorkerUrl: baseUrl + '/pdfjs/pdf.worker.min.mjs',
+          author: currentReviewerName()
+        }, options || {}));
+      },
+      bytes: bytes,
+      contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      filename: (file && file.filename) || 'document.docx'
     });
-    await assertFetchOk(response, 'Failed to prepare clean release document');
-    var buffer = await response.arrayBuffer();
-    var acceptedBytes = new Uint8Array(buffer);
     assertReleaseBytesMatchFormat(file, acceptedBytes);
     return acceptedBytes;
   }
@@ -5073,6 +5066,43 @@
     hideLoading();
   }
 
+  /**
+   * LANA redlines on this document (Redlines tab), from Chef. Every call goes
+   * through the API client; nothing here needs the editor UI.
+   */
+  function mountRedlineReview(file) {
+    if (state.redlineReview) {
+      state.redlineReview.destroy();
+      state.redlineReview = null;
+    }
+    var rail = document.getElementById('reviewRail');
+    if (rail) rail.classList.remove('file-viewer-review-rail--redlines-only');
+    var container = document.getElementById('redlineReviewPanel');
+    var matterId = getFileMatterId(file);
+    if (!container || !matterId || !file || !file.id || !window.LanaRedlineReviewPanel) return;
+    state.redlineReview = window.LanaRedlineReviewPanel.createController({
+      container: container,
+      api: api,
+      matterId: matterId,
+      documentId: String(LanaDocumentReview.explicitSourceDocumentId(file) || file.id),
+      filename: file.filename || 'document.docx',
+      notify: notify,
+      openDocument: openDocumentHalf,
+      saveFile: function (bytes, filename) {
+        var url = URL.createObjectURL(new Blob([bytes], { type: LanaDocumentReview.DOCX_CONTENT_TYPE }));
+        var link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        notify('Download started', 'success');
+      }
+    });
+    state.redlineReview.load();
+  }
+
   async function loadDOCX(file) {
     if (isDemoMode()) {
       var demoContainer = document.getElementById('viewerDocx');
@@ -5088,9 +5118,20 @@
     await assertFetchOk(response, 'Failed to fetch file');
     var arrayBuffer = await response.arrayBuffer();
 
+    if (isEditorDocx(file)) mountRedlineReview(file);
     if (isEditorEnabled() && isEditorDocx(file)) {
       var renderedWithEditor = await loadFileInEditor(file, arrayBuffer);
       if (renderedWithEditor) return;
+    }
+    if (isEditorDocx(file) && state.redlineReview) {
+      // No editor UI on this computer: the rail still carries LANA redlines,
+      // which Chef serves without it.
+      var redlineRail = document.getElementById('reviewRail');
+      if (redlineRail && redlineRail.classList.contains('hidden')) {
+        redlineRail.classList.add('file-viewer-review-rail--redlines-only');
+        setReviewRailVisible(true);
+        setReviewTab('redlines');
+      }
     }
 
     if (typeof mammoth === 'undefined') {
@@ -5126,9 +5167,6 @@
     if (!baseUrl || !host) return false;
 
     try {
-      var health = await LanaDocumentReview.editorServiceFetch(baseUrl, '/v1/health', { method: 'GET' });
-      if (!health.ok) throw new Error('editor service unavailable');
-
       var mod = await loadEditorModule(baseUrl);
       if (!mod || !mod.LanaEditor || typeof mod.LanaEditor.mount !== 'function') {
         throw new Error('editor embed module unavailable');

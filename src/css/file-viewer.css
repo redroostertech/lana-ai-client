@@ -1514,7 +1514,8 @@ button.file-viewer-review-release:focus-visible {
    entities) and the suggestions a reviewer accepts into contacts, parties and
    deadlines. A document that cannot be reviewed still shows this rail with
    only the Insights tab; the review workflow footer stays out of the way. */
-.file-viewer-review-rail--insights-only .file-viewer-review-workflow {
+.file-viewer-review-rail--insights-only .file-viewer-review-workflow,
+.file-viewer-review-rail--redlines-only .file-viewer-review-workflow {
   display: none;
 }
 
@@ -1862,4 +1863,15 @@ html[data-lex-chrome="embedded"] lex-body {
   .file-viewer-format-notice__action {
     align-self: flex-start;
   }
+}
+
+/* The hidden editor instance that makes a clean copy (LanaDocumentReview.acceptAllBytes). */
+.lana-editor-offscreen {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 816px;
+  height: 1056px;
+  overflow: hidden;
+  pointer-events: none;
 }

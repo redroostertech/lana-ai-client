@@ -648,25 +648,26 @@
       esc(mentionUserLiteral(user.id || userId, propertyKey)) + '</span>';
   }
 
-  function normalizeBaseUrl(value) {
-    value = String(value || '').trim();
-    if (!value) return '';
-    return value.replace(/\/+$/, '');
+  // The editor UI address set on this computer ('' when none is); see
+  // LanaDocumentReview.editorUiBase. Document changes go to Chef, not here.
+  function getEditorServiceBase() {
+    var service = documentReviewService();
+    return service && typeof service.editorUiBase === 'function' ? service.editorUiBase() : '';
   }
 
-  function getEditorServiceBase() {
-    var fromWindow = normalizeBaseUrl(window.LANA_EDITOR_SERVICE);
-    if (fromWindow) return fromWindow;
-
-    var fromConfig = normalizeBaseUrl(window.LanaConfig && window.LanaConfig.LANA_EDITOR_SERVICE_URL);
-    if (fromConfig) return fromConfig;
-
-    try {
-      var fromStorage = normalizeBaseUrl(window.localStorage && window.localStorage.getItem('lana-editor-service'));
-      if (fromStorage) return fromStorage;
-    } catch (_) {}
-
-    return 'http://127.0.0.1:4710';
+  // Mounts a hidden editor instance for a clean copy (service.acceptAllBytes).
+  async function cleanCopyMount() {
+    var baseUrl = getEditorServiceBase();
+    if (!baseUrl) throw new Error(documentReviewService().EDITOR_UI_UNAVAILABLE);
+    var mod = await loadEditorModule(baseUrl);
+    return function (host, options) {
+      return mod.LanaEditor.mount(host, Object.assign({
+        api: baseUrl,
+        fontsUrl: baseUrl + '/editor-fonts',
+        pdfWorkerUrl: baseUrl + '/pdfjs/pdf.worker.min.mjs',
+        author: currentReviewerName()
+      }, options || {}));
+    };
   }
 
   function isLanaEditorEnabled() {
@@ -1126,9 +1127,7 @@
     var review = serverFile ? ensureServerReview(file) : null;
     try {
       var baseUrl = getEditorServiceBase();
-      var health = await LanaDocumentReview.editorServiceFetch(baseUrl, '/v1/health', { method: 'GET' });
-      if (!health.ok) throw new Error('editor service unavailable');
-      if (mountGeneration !== editorMountGeneration) return;
+      if (!baseUrl) throw new Error(LanaDocumentReview.EDITOR_UI_UNAVAILABLE);
       var mod = await loadEditorModule(baseUrl);
       if (!mod || !mod.LanaEditor || typeof mod.LanaEditor.mount !== 'function') {
         throw new Error('editor embed module unavailable');
@@ -2168,9 +2167,10 @@
       return false;
     }
     var accepted = await service.acceptAllBytes({
-      editorServiceBase: getEditorServiceBase(),
+      mountEditor: await cleanCopyMount(),
       bytes: editor.bytes(),
-      contentType: file.contentType || service.DOCX_CONTENT_TYPE
+      contentType: file.contentType || service.DOCX_CONTENT_TYPE,
+      filename: file.filename || file.title
     });
     await editor.open_file(new File([accepted], file.filename || file.title || 'document.docx', {
       type: file.contentType || service.DOCX_CONTENT_TYPE
@@ -2396,9 +2396,10 @@
         var bytes = editor.bytes();
         if (!bytes) throw new Error('No document bytes are available to release.');
         var accepted = await service.acceptAllBytes({
-          editorServiceBase: getEditorServiceBase(),
+          mountEditor: await cleanCopyMount(),
           bytes: bytes,
-          contentType: file.contentType || service.DOCX_CONTENT_TYPE
+          contentType: file.contentType || service.DOCX_CONTENT_TYPE,
+          filename: file.filename || file.title
         });
         var payload = service.buildReleasePayload({
           filename: file.filename || file.title,

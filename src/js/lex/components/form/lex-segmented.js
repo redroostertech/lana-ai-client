@@ -212,10 +212,14 @@
         // {value:"", label:"All"} shows through the placeholder instead
         const emptyOpt = options.find(opt => opt.value === '');
         const placeholder = emptyOpt ? emptyOpt.label : 'Select...';
+        // escapeHtml leaves double quotes alone, and the options JSON is full
+        // of them: unescaped, the attribute ended at the first one and the
+        // collapsed dropdown had no options at all.
+        const attr = (value) => this.escapeHtml(value).replace(/"/g, '&quot;');
         html += `<lex-select class="lex-seg-select" variant="outlined" size="${sz === 'lg' ? 'md' : sz}"`
-          + ` placeholder="${this.escapeHtml(placeholder)}"`
-          + ` options="${this.escapeHtml(JSON.stringify(selectOptions))}"`
-          + ` value="${this.escapeHtml(this.value || '')}"></lex-select>`;
+          + ` placeholder="${attr(placeholder)}"`
+          + ` options="${attr(JSON.stringify(selectOptions))}"`
+          + ` value="${attr(this.value || '')}"></lex-select>`;
       }
 
       if (this.label || this.error || this.help) {
