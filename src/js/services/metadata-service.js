@@ -145,43 +145,37 @@ class MetadataService {
    * @returns {Promise<object>} - Document metadata
    */
   async fetchFromAPI(documentId) {
-    const apiUrl = window.electronAPI && window.electronAPI.config
-      ? await window.electronAPI.config.getBackendUrl()
-      : 'http://localhost:8080';
-
-    const token = window.lanaAuthToken?.get();
-    if (!token) {
-      throw new Error('Authentication token not found. Please log in.');
-    }
-
-    const response = await fetch(`${apiUrl}/api/v1/documents/${documentId}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      }
-    });
-
-    if (!response.ok) {
-      if (response.status === 404) {
+    let data;
+    try {
+      data = await this.apiClient().get(`/api/v1/documents/${documentId}`);
+    } catch (error) {
+      if (error.status === 404) {
         throw new Error('Document not found');
-      } else if (response.status === 403) {
+      } else if (error.status === 403) {
         throw new Error('You do not have permission to access this document');
-      } else if (response.status === 401) {
+      } else if (error.status === 401) {
         throw new Error('Authentication failed. Please log in again.');
-      } else {
-        const errorText = await response.text();
-        throw new Error(`Failed to fetch document metadata: ${response.status} ${errorText}`);
       }
+      throw new Error(`Failed to fetch document metadata: ${error.message}`);
     }
 
-    const data = await response.json();
-
-    if (!data.document) {
+    if (!data || !data.document) {
       throw new Error('Invalid response from server: missing document data');
     }
 
     return data.document;
+  }
+
+  /**
+   * The app's API client (js/api.js): it knows the organization's server
+   * address, the sign-in token and the local engine, like every other page.
+   * @returns {object}
+   */
+  apiClient() {
+    if (!window.api || typeof window.api.get !== 'function') {
+      throw new Error('LANA is not connected to your organization yet. Sign in and try again.');
+    }
+    return window.api;
   }
 
   /**
@@ -195,30 +189,12 @@ class MetadataService {
       throw new Error('Document ID is required');
     }
 
-    const apiUrl = window.electronAPI && window.electronAPI.config
-      ? await window.electronAPI.config.getBackendUrl()
-      : 'http://localhost:8080';
-
-    const token = window.lanaAuthToken?.get();
-    if (!token) {
-      throw new Error('Authentication token not found. Please log in.');
+    let data;
+    try {
+      data = await this.apiClient().put(`/api/v1/documents/${documentId}/metadata`, metadataUpdates);
+    } catch (error) {
+      throw new Error(`Failed to update document metadata: ${error.message}`);
     }
-
-    const response = await fetch(`${apiUrl}/api/v1/documents/${documentId}/metadata`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify(metadataUpdates)
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to update document metadata: ${response.status} ${errorText}`);
-    }
-
-    const data = await response.json();
 
     // Invalidate cache for this document
     this.invalidate(documentId);
@@ -236,29 +212,12 @@ class MetadataService {
       throw new Error('Document ID is required');
     }
 
-    const apiUrl = window.electronAPI && window.electronAPI.config
-      ? await window.electronAPI.config.getBackendUrl()
-      : 'http://localhost:8080';
-
-    const token = window.lanaAuthToken?.get();
-    if (!token) {
-      throw new Error('Authentication token not found. Please log in.');
+    let data;
+    try {
+      data = await this.apiClient().post(`/api/v1/documents/${documentId}/reindex`);
+    } catch (error) {
+      throw new Error(`Failed to reindex document: ${error.message}`);
     }
-
-    const response = await fetch(`${apiUrl}/api/v1/documents/${documentId}/reindex`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      }
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to reindex document: ${response.status} ${errorText}`);
-    }
-
-    const data = await response.json();
 
     // Invalidate cache for this document
     this.invalidate(documentId);

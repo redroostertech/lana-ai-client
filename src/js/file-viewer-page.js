@@ -3445,7 +3445,7 @@
       return bytes;
     }
     assertReleaseBytesMatchFormat(file, bytes);
-    var response = await fetch(getEditorServiceBase() + '/v1/redline/decisions', {
+    var response = await LanaDocumentReview.editorServiceFetch(getEditorServiceBase(), '/v1/redline/decisions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -5126,7 +5126,7 @@
     if (!baseUrl || !host) return false;
 
     try {
-      var health = await fetch(baseUrl + '/v1/health', { method: 'GET' });
+      var health = await LanaDocumentReview.editorServiceFetch(baseUrl, '/v1/health', { method: 'GET' });
       if (!health.ok) throw new Error('editor service unavailable');
 
       var mod = await loadEditorModule(baseUrl);

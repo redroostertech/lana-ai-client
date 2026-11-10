@@ -18,7 +18,7 @@ const FIRM_IDENTITY = {
   url: 'https://models.lanaai.io/llm/nomic-embed-text-v1.5.f16.gguf',
   sha256: 'f7af6f66802f4df86eda10fe9bbcfc75c39562bed48ef6ace719a251cf1c2fdb',
   sizeBytes: 274290560,
-  runtime: { name: 'pip', version: '3.0.0', build: 'ddedf87af419' }
+  runtime: { name: 'pip', version: '3.0.0', build: 'ff965d52d578' }
 };
 
 function tempDir() {
@@ -47,6 +47,11 @@ describe('local model catalog', () => {
 
   test('the embedding model is exactly the firm\'s embedding identity', () => {
     expect(embeddingModel()).toMatchObject(FIRM_IDENTITY);
+  });
+
+  test('the embedding runtime names the Pip build this app ships', () => {
+    const pin = require('../../pip/pip-pin.json');
+    expect(embeddingModel().runtime).toEqual({ name: 'pip', version: pin.version, build: pin.build });
   });
 });
 

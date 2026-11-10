@@ -1123,7 +1123,7 @@
     var review = serverFile ? ensureServerReview(file) : null;
     try {
       var baseUrl = getEditorServiceBase();
-      var health = await fetch(baseUrl + '/v1/health', { method: 'GET' });
+      var health = await LanaDocumentReview.editorServiceFetch(baseUrl, '/v1/health', { method: 'GET' });
       if (!health.ok) throw new Error('editor service unavailable');
       if (mountGeneration !== editorMountGeneration) return;
       var mod = await loadEditorModule(baseUrl);
