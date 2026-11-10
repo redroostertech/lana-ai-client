@@ -1,3 +1,2 @@
-owner: redroostertech
-repo: lana-ai-client
-provider: github
+provider: generic
+url: https://releases.lanaai.io/client/

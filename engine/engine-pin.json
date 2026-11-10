@@ -1,0 +1,13 @@
+{
+  "_comment": "The LANA engine folder the client packages at <resources>/engine (electron-local-engine.js), built by scripts/build-engine.js from this LANA-AI commit with the backend's scripts/release/build-engine-bundle.js on a matching computer, its node_modules installed with npm ci. treeSha256 is sha256 over one line per file (path, bytes, sha256), engine-manifest.json left out. Change the commit only together with a rebuild of every platform's entry.",
+  "repo": "redroostertech/LANA-AI",
+  "branch": "engine-bundle",
+  "version": "3.0.0",
+  "commit": "d238a9c3dbe84fcc72124c90a4acafda0774245e",
+  "builds": {
+    "macos-arm64": {
+      "files": 5068,
+      "treeSha256": "c69f5fab3f438433c83b49ff1f45f04159d93b59a5c24769e89bc1810e09d393"
+    }
+  }
+}

@@ -67,8 +67,7 @@ DEV_MODE=false
 DEMO_MODE=false
 AUTO_DISCOVERY_MODE=true  # Default to auto-discovery mode
 PORT="8080"  # Default port
-PUBLISH_RELEASE=false  # Whether to create GitHub release
-RELEASE_CHANNEL="prerelease"  # prerelease | release (see --prerelease / --release)
+PUBLISH_RELEASE=false  # Whether to lay the build out for releases.lanaai.io (dist/r2); nothing is uploaded
 
 # Config file path (in public_html directory)
 CONFIG_FILE="$PROJECT_ROOT/public_html/js/config.js"
@@ -144,10 +143,9 @@ OPTIONS:
     --clean                              Clean build directories before building
     --dev                                Build in development mode
     --demo                               Enable demo mode (no server connection)
-    --publish                            Create GitHub release and upload artifacts
-                                         (defaults to the pre-release channel)
-    --prerelease                         Publish, marked as a GitHub pre-release (default)
-    --release                            Publish as a full release and mark it Latest
+    --publish                            Lay the build out for https://releases.lanaai.io/client/
+                                         in dist/r2/ and print what to upload to R2
+                                         (bucket lana-releases). Nothing is uploaded.
     --help                               Show this help message
 
 EXAMPLES:
@@ -230,16 +228,6 @@ parse_args() {
                 ;;
             --publish)
                 PUBLISH_RELEASE=true
-                shift
-                ;;
-            --prerelease|--pre-release)
-                PUBLISH_RELEASE=true
-                RELEASE_CHANNEL="prerelease"
-                shift
-                ;;
-            --release)
-                PUBLISH_RELEASE=true
-                RELEASE_CHANNEL="release"
                 shift
                 ;;
             --help)
@@ -432,6 +420,15 @@ build_css() {
     print_success "Tailwind CSS compiled"
 }
 
+# Each one-arch mac build writes dist/latest-mac.yml; keep it per arch so the
+# next build does not overwrite it. stage-client-release.js merges them.
+keep_mac_feed() {
+    local arch="$1"
+    if [ -f "$PROJECT_ROOT/dist/latest-mac.yml" ]; then
+        mv "$PROJECT_ROOT/dist/latest-mac.yml" "$PROJECT_ROOT/dist/latest-mac-${arch}.yml"
+    fi
+}
+
 build_app() {
     print_step "Building application for platform: $PLATFORM, arch: $ARCH..."
     cd "$PROJECT_ROOT"
@@ -449,9 +446,11 @@ build_app() {
             if [ "$ARCH" = "arm64" ]; then
                 print_info "Building for macOS ARM64 (Apple Silicon)..."
                 npm run build:mac-arm64
+                keep_mac_feed arm64
             elif [ "$ARCH" = "x64" ]; then
                 print_info "Building for macOS x64 (Intel)..."
                 npm run build:mac-x64
+                keep_mac_feed x64
             elif [ "$ARCH" = "all" ]; then
                 print_info "Building for macOS (all architectures)..."
                 npm run build:mac
@@ -459,8 +458,10 @@ build_app() {
                 # Detect current architecture
                 if [[ $(uname -m) == "arm64" ]]; then
                     npm run build:mac-arm64
+                    keep_mac_feed arm64
                 else
                     npm run build:mac-x64
+                    keep_mac_feed x64
                 fi
             fi
             ;;
@@ -476,8 +477,10 @@ build_app() {
             print_info "Building for ALL platforms (sequentially to avoid hdiutil conflicts)..."
             print_info "Step 1/4: Building macOS ARM64..."
             npm run build:mac-arm64
+            keep_mac_feed arm64
             print_info "Step 2/4: Building macOS x64..."
             npm run build:mac-x64
+            keep_mac_feed x64
             print_info "Step 3/4: Building Windows..."
             npm run build:win
             print_info "Step 4/4: Building Linux..."
@@ -631,187 +634,20 @@ show_summary() {
 }
 
 ###############################################################################
-# GitHub Release
+# Release files for releases.lanaai.io (R2 bucket lana-releases)
 ###############################################################################
 
-create_github_release() {
+# Lays the build out in dist/r2/ in the bucket's shape and prints what would be
+# uploaded. The upload itself is a separate step the owner runs; this never
+# uploads, tags or pushes anything.
+stage_release_for_r2_upload() {
     if [ "$PUBLISH_RELEASE" = false ]; then
         return
     fi
 
-    print_step "Creating GitHub release v${VERSION}..."
-
-    # Check if gh CLI is installed
-    if ! command -v gh &> /dev/null; then
-        print_error "GitHub CLI (gh) is not installed. Please install it first."
-        print_info "Install with: brew install gh"
-        return 1
-    fi
-
-    # Check if authenticated
-    if ! gh auth status &> /dev/null; then
-        print_error "GitHub CLI is not authenticated. Please run: gh auth login"
-        return 1
-    fi
-
-    DIST_DIR="$PROJECT_ROOT/dist"
-    RELEASE_TAG="v${VERSION}"
-
-    # -------------------------------------------------------------------------
-    # Step 1: Create and push git tag if it doesn't exist
-    # -------------------------------------------------------------------------
-    if git rev-parse "${RELEASE_TAG}" &>/dev/null; then
-        print_info "Git tag ${RELEASE_TAG} already exists"
-    else
-        print_info "Creating git tag ${RELEASE_TAG}..."
-        git tag "${RELEASE_TAG}"
-    fi
-    # Always ensure tag is pushed to remote (may exist locally but not on GitHub)
-    git push origin "${RELEASE_TAG}" 2>/dev/null || true
-    print_success "Git tag ${RELEASE_TAG} pushed to remote"
-
-    # -------------------------------------------------------------------------
-    # Step 2: Generate release notes from git history
-    # -------------------------------------------------------------------------
-    print_info "Generating release notes..."
-
-    # Find the previous tag (most recent tag before the current one)
-    PREV_TAG=$(git tag --sort=-v:refname | grep -v "^${RELEASE_TAG}$" | grep -v "pre-release" | head -1)
-
-    RELEASE_NOTES="## LANA AI Client ${RELEASE_TAG} — Release Notes"$'\n\n'
-
-    if [ -n "$PREV_TAG" ]; then
-        print_info "Generating changelog from ${PREV_TAG} to ${RELEASE_TAG}..."
-        COMMIT_RANGE="${PREV_TAG}..${RELEASE_TAG}"
-
-        # Collect features
-        FEATURES=$(git log "$COMMIT_RANGE" --pretty=format:"%s|%h" --no-merges | grep -i "^feat" | while IFS='|' read -r msg hash; do
-            # Strip conventional commit prefix
-            clean_msg=$(echo "$msg" | sed -E 's/^feat(\([^)]*\))?:\s*//')
-            echo "- ${clean_msg} (\`${hash}\`)"
-        done)
-
-        # Collect bug fixes
-        FIXES=$(git log "$COMMIT_RANGE" --pretty=format:"%s|%h" --no-merges | grep -i "^fix" | while IFS='|' read -r msg hash; do
-            clean_msg=$(echo "$msg" | sed -E 's/^fix(\([^)]*\))?:\s*//')
-            echo "- ${clean_msg} (\`${hash}\`)"
-        done)
-
-        # Collect other notable commits (exclude chore, debug, test, merge, and generic messages)
-        OTHER=$(git log "$COMMIT_RANGE" --pretty=format:"%s|%h" --no-merges | grep -iv "^feat\|^fix\|^chore\|^debug\|^test\|^Bump\|^Commiting\|^Merge" | while IFS='|' read -r msg hash; do
-            echo "- ${msg} (\`${hash}\`)"
-        done)
-
-        if [ -n "$FEATURES" ]; then
-            RELEASE_NOTES+="### Features"$'\n\n'"${FEATURES}"$'\n\n'
-        fi
-
-        if [ -n "$FIXES" ]; then
-            RELEASE_NOTES+="### Bug Fixes"$'\n\n'"${FIXES}"$'\n\n'
-        fi
-
-        if [ -n "$OTHER" ]; then
-            RELEASE_NOTES+="### Other Changes"$'\n\n'"${OTHER}"$'\n\n'
-        fi
-
-        RELEASE_NOTES+="---"$'\n'"**Full Changelog**: ${PREV_TAG}...${RELEASE_TAG}"
-    else
-        print_warning "No previous tag found, using generic notes"
-        RELEASE_NOTES+="Initial release."
-    fi
-
-    # -------------------------------------------------------------------------
-    # Step 3: Create draft release with generated notes
-    # -------------------------------------------------------------------------
-    print_info "Creating draft release ${RELEASE_TAG}..."
-    if gh release view "${RELEASE_TAG}" &>/dev/null; then
-        print_info "Release ${RELEASE_TAG} already exists, updating notes..."
-        echo "$RELEASE_NOTES" | gh release edit "${RELEASE_TAG}" --notes-file - 2>/dev/null || true
-    else
-        GH_CREATE_FLAGS=(--title "${RELEASE_TAG}" --notes-file - --draft)
-        if [ "$RELEASE_CHANNEL" = "prerelease" ]; then
-            GH_CREATE_FLAGS+=(--prerelease)
-            print_info "Channel: pre-release"
-        else
-            print_info "Channel: full release"
-        fi
-        echo "$RELEASE_NOTES" | gh release create "${RELEASE_TAG}" "${GH_CREATE_FLAGS[@]}"
-        if [ $? -ne 0 ]; then
-            print_error "Failed to create GitHub release ${RELEASE_TAG}"
-            return 1
-        fi
-        print_success "Draft release ${RELEASE_TAG} created"
-    fi
-
-    # -------------------------------------------------------------------------
-    # Step 4: Upload build artifacts
-    # -------------------------------------------------------------------------
-    print_step "Uploading build artifacts..."
-
-    # Upload macOS ARM64 files
-    if [ -d "$DIST_DIR/macos-arm64" ]; then
-        for file in "$DIST_DIR/macos-arm64/"*.dmg "$DIST_DIR/macos-arm64/"*.zip; do
-            [ -f "$file" ] && {
-                print_info "Uploading $(basename "$file")..."
-                gh release upload "${RELEASE_TAG}" "$file" --clobber
-            }
-        done
-    fi
-
-    # Upload macOS x64 files
-    if [ -d "$DIST_DIR/macos-x64" ]; then
-        for file in "$DIST_DIR/macos-x64/"*.dmg "$DIST_DIR/macos-x64/"*.zip; do
-            [ -f "$file" ] && {
-                print_info "Uploading $(basename "$file")..."
-                gh release upload "${RELEASE_TAG}" "$file" --clobber
-            }
-        done
-    fi
-
-    # Upload Windows files
-    if [ -d "$DIST_DIR/windows" ]; then
-        for file in "$DIST_DIR/windows/"*.exe; do
-            [ -f "$file" ] && {
-                print_info "Uploading $(basename "$file")..."
-                gh release upload "${RELEASE_TAG}" "$file" --clobber
-            }
-        done
-    fi
-
-    # Upload Linux files
-    if [ -d "$DIST_DIR/linux" ]; then
-        for file in "$DIST_DIR/linux/"*.AppImage "$DIST_DIR/linux/"*.deb "$DIST_DIR/linux/"*.rpm; do
-            [ -f "$file" ] && {
-                print_info "Uploading $(basename "$file")..."
-                gh release upload "${RELEASE_TAG}" "$file" --clobber
-            }
-        done
-    fi
-
-    # Upload update manifests
-    for file in "$DIST_DIR/"latest*.yml; do
-        [ -f "$file" ] && {
-            print_info "Uploading $(basename "$file")..."
-            gh release upload "${RELEASE_TAG}" "$file" --clobber
-        }
-    done
-
-    # -------------------------------------------------------------------------
-    # Step 5: Publish the release (remove draft status)
-    # -------------------------------------------------------------------------
-    print_info "Publishing release ${RELEASE_TAG}..."
-    # Set the channel explicitly here too, so an existing release that is being
-    # updated (rather than newly created) still lands on the right channel.
-    if [ "$RELEASE_CHANNEL" = "prerelease" ]; then
-        gh release edit "${RELEASE_TAG}" --draft=false --prerelease
-    else
-        gh release edit "${RELEASE_TAG}" --draft=false --prerelease=false --latest
-    fi
-
-    print_success "GitHub release ${RELEASE_TAG} published with release notes and artifacts!"
-    echo ""
-    echo -e "  ${GREEN}Release URL:${NC} https://github.com/redroostertech/lana-ai-client/releases/tag/${RELEASE_TAG}"
-    echo ""
+    print_step "Laying out v${VERSION} for https://releases.lanaai.io/client/ (no upload)..."
+    node "$PROJECT_ROOT/scripts/stage-client-release.js" --dist "$PROJECT_ROOT/dist" --version "$VERSION"
+    print_success "Release files are in $PROJECT_ROOT/dist/r2/ (nothing was uploaded)"
 }
 
 ###############################################################################
@@ -876,7 +712,7 @@ main() {
 
     show_output
     show_summary
-    create_github_release
+    stage_release_for_r2_upload
 }
 
 # Run main function

@@ -261,6 +261,23 @@ class ApiClient {
    * secret (keys, tokens, passwords, client secrets) are replaced, so debug
    * mode never prints a credential someone typed into a form.
    */
+  /**
+   * Whether a request that never reached the server should be tried again because the local
+   * engine is restarting: a read (GET or HEAD), to this computer's own engine (loopback), that
+   * failed as a network error, fewer than LOCAL_ENGINE_RETRIES times so far.
+   */
+  static retriesLocalEngineRestart(method, url, error, attempt) {
+    if (!error || error.name !== 'TypeError') return false;
+    if (method !== 'GET' && method !== 'HEAD') return false;
+    if (!(attempt < ApiClient.LOCAL_ENGINE_RETRIES)) return false;
+    try {
+      const host = new URL(url).hostname;
+      return host === '127.0.0.1' || host === 'localhost' || host === '[::1]' || host === '::1';
+    } catch (_error) {
+      return false;
+    }
+  }
+
   static redactForLog(value, depth = 0) {
     if (value === null || typeof value !== 'object') return value;
     if (typeof FormData !== 'undefined' && value instanceof FormData) return '[form data]';
@@ -774,6 +791,16 @@ class ApiClient {
         throw new ApiError('Request timeout', 408, null);
       }
       if (error instanceof ApiError) throw error;
+
+      // The local engine on this computer restarts for a few seconds when this computer's AI
+      // servers change (Pip, the redactor, Docling). A read that could not reach it at all is
+      // tried again for about 10 seconds before it is reported. Writes are not repeated: one cut
+      // off mid-flight may already have happened.
+      const engineAttempt = options.__engineRetry || 0;
+      if (ApiClient.retriesLocalEngineRestart(method, url, error, engineAttempt)) {
+        await new Promise((resolve) => setTimeout(resolve, ApiClient.LOCAL_ENGINE_RETRY_MS * (engineAttempt + 1)));
+        return this.request(method, endpoint, data, { ...options, __engineRetry: engineAttempt + 1 });
+      }
 
       // For non-ApiError exceptions, provide more context
       console.error('[LanaAPI] Unexpected error:', error);
@@ -3991,6 +4018,10 @@ class ApiClient {
     return this.get('/api/v1/command-center/pipeline-metrics' + queryStr);
   }
 }
+
+// About 10 seconds in all (0.5 + 1 + 1.5 + 2 + 2.5 + 3 s): longer than an engine restart.
+ApiClient.LOCAL_ENGINE_RETRIES = 6;
+ApiClient.LOCAL_ENGINE_RETRY_MS = 500;
 
 class ApiError extends Error {
   constructor(message, status, data) {

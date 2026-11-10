@@ -961,3 +961,35 @@ describe('LanaDocumentReview dates and release payloads', () => {
     });
   });
 });
+
+describe('editor service unreachable', () => {
+  // The editor service runs beside the organization's server on loopback; from
+  // a computer that does not run that server, nothing answers on 127.0.0.1:4710.
+  // That used to surface as a bare "Failed to fetch".
+  const realFetch = global.fetch;
+  afterEach(() => { global.fetch = realFetch; });
+
+  test('a network failure becomes the plain message', async () => {
+    global.fetch = jest.fn(async () => { throw new TypeError('Failed to fetch'); });
+    await expect(review.editorServiceFetch('http://127.0.0.1:4710/', '/v1/health'))
+      .rejects.toMatchObject({ code: 'EDITOR_SERVICE_UNREACHABLE', message: review.EDITOR_SERVICE_UNREACHABLE });
+    expect(global.fetch).toHaveBeenCalledWith('http://127.0.0.1:4710/v1/health', undefined);
+    expect(review.EDITOR_SERVICE_UNREACHABLE).not.toMatch(/fetch|4710|[\u2013\u2014]/);
+  });
+
+  test('preparing a clean release copy says so instead of "Failed to fetch"', async () => {
+    global.fetch = jest.fn(async () => { throw new TypeError('Failed to fetch'); });
+    // Smallest package the envelope check accepts: local header magic, then an end-of-central-directory record.
+    const docx = new Uint8Array(30);
+    docx.set([0x50, 0x4b, 0x03, 0x04], 0);
+    docx.set([0x50, 0x4b, 0x05, 0x06], 4);
+    await expect(review.acceptAllBytes({ editorServiceBase: 'http://127.0.0.1:4710', bytes: docx, contentType: DOCX_TYPE }))
+      .rejects.toThrow(review.EDITOR_SERVICE_UNREACHABLE);
+  });
+
+  test('an answer is passed through untouched', async () => {
+    const response = { ok: true };
+    global.fetch = jest.fn(async () => response);
+    await expect(review.editorServiceFetch('http://x', '/v1/health', { method: 'GET' })).resolves.toBe(response);
+  });
+});

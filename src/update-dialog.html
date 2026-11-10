@@ -455,8 +455,8 @@
 
     // Build platform-specific direct download URL
     function getDirectDownloadUrl() {
-      const tag = `v${newVer}`;
-      const base = `https://github.com/redroostertech/lana-ai-client/releases/download/${tag}`;
+      // releases.lanaai.io/client/<version>/ holds each version's installers (scripts/stage-client-release.js)
+      const base = `https://releases.lanaai.io/client/${newVer}`;
       const name = `LanaAI--genesis--${newVer}`;
 
       if (platform === 'darwin') {
@@ -467,8 +467,8 @@
       } else if (platform === 'linux') {
         return `${base}/${name}.AppImage`;
       }
-      // Fallback to releases page
-      return `https://github.com/redroostertech/lana-ai-client/releases/tag/${tag}`;
+      // Fallback to the download link the activation email uses
+      return 'https://releases.lanaai.io/client/latest';
     }
 
     function openManualDownload() {

@@ -32,8 +32,9 @@ const CATALOG = Object.freeze([
     // The firm's embedding identity (EMBEDDING_MODEL, EMBEDDING_VERSION on Chef).
     modelId: 'nomic-embed-text-v1.5',
     modelVersion: 'f16',
-    // The Pip build the identity names (LANA-AI infra/lib/config/lqe.pin.js).
-    runtime: Object.freeze({ name: 'pip', version: '3.0.0', build: 'ddedf87af419' }),
+    // The Pip build that serves it: the one this app ships (pip/pip-pin.json), also
+    // LANA-AI deploy/railway/embed/embed-pin.json pip.build.
+    runtime: Object.freeze({ name: 'pip', version: '3.0.0', build: 'ff965d52d578' }),
     filename: 'nomic-embed-text-v1.5.f16.gguf',
     url: `${R2_LLM}/nomic-embed-text-v1.5.f16.gguf`,
     sizeBytes: 274290560,

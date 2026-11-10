@@ -1,11 +1,11 @@
 /**
- * Settings > Capabilities > AI: the Local and Cloud groups below the local AI engine.
+ * Settings > Capabilities > AI: the Cloud group below the local AI engine, and the expandable
+ * row the "Set up by LANA" list uses.
  *
- *   Local (On this computer)   Chat and Embedding here (window.electronAPI.getAiTopology(), and the
- *                              server's own model servers when it runs on this computer, from
- *                              GET /api/v1/system/ai); Speech and Voice are rendered by
- *                              settings-briefs.js with window.LanaAiRow
- *   Cloud                      the same topology and server report
+ *   Set up by LANA   rendered by settings-capabilities.js (search, image reading, document
+ *                    reading, the privacy filter) and settings-briefs.js (Speech and Voice), each
+ *                    with window.LanaAiRow
+ *   Cloud            window.electronAPI.getAiTopology() and GET /api/v1/system/ai
  *
  * window.LanaAiRow.create(row, extras) builds one expandable row: a button with the name, a
  * one-line summary and a badge; opening it shows the row's facts and any extra controls.
@@ -126,9 +126,7 @@
 
   function render() {
     if (!topology) return;
-    fill('sv2-ai-local-rows', M.localRows(topology, serverAi).map(function (row) { return createRow(row); }));
     fill('sv2-ai-cloud-rows', kvRows(M.cloudRows(topology, serverAi)));
-    show('sv2-ai-local', true);
     show('sv2-ai-cloud', true);
     window.dispatchEvent(new CustomEvent('lana-ai-topology', { detail: topology }));
   }

@@ -55,6 +55,10 @@ const DOCLING_ENV = Object.freeze(['DOCLING_API_URL', 'DOC_PARSER_TIMEOUT_DOCLIN
 // every chat model. A level tuned for local models under 9B is a backend decision.
 const DEFAULT_ENGINE_TIER = 'demo';
 
+// Changes to this computer's AI servers that arrive within this long of each other share one
+// engine restart (electron-local-engine.js setModelEndpoints).
+const ENDPOINT_RESTART_DELAY_MS = 3000;
+
 // A sleep or quit waits this long for the engine to hand running jobs off.
 const HANDOFF_WAIT_MS = 12000;
 
@@ -173,13 +177,14 @@ function bundledEngineRoot({ app, resourcesPath, fileExists }) {
  * @param {Function} [deps.getAuthToken] - () => the signed-in person's session token or null
  * @param {Object} [deps.offlineKey] - electron-offline-key.js store (phase 10); none means no offline copy
  */
-function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = process.env, log, getAuthToken = () => null, offlineKey = null, resourcesPath = process.resourcesPath }) {
+function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = process.env, log, getAuthToken = () => null, offlineKey = null, resourcesPath = process.resourcesPath, restartDelayMs = ENDPOINT_RESTART_DELAY_MS }) {
   const cwd = path.join(app.getPath('userData'), 'local-engine');
   try { fs.mkdirSync(cwd, { recursive: true }); } catch (_error) { /* spawn reports it */ }
   const bundledRoot = bundledEngineRoot({ app, resourcesPath, fileExists: (file) => fs.existsSync(file) });
   const engineConfig = () => resolveEngineConfig(env, storage.getLocalEnginePreferences(), { bundledRoot });
   // Pip's addresses and the engine level, from electron-pip-supervisor.js. The environment wins.
   let modelEndpoints = {};
+  let pendingRestart = null;
 
   // Packaged builds have no `node` on PATH: run Electron's binary as node.
   const nodePath = env.LANA_ENGINE_NODE || (app.isPackaged ? process.execPath : 'node');
@@ -226,13 +231,25 @@ function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = proces
     for (const name of [...ENGINE_MODEL_ENV, ...REDACTOR_ENV, ...DOCLING_ENV]) {
       if (typeof values[name] === 'string' && values[name]) {next[name] = values[name];}
     }
-    if (JSON.stringify(next) === JSON.stringify(modelEndpoints)) {return;}
+    if (JSON.stringify(next) === JSON.stringify(modelEndpoints)) {return pendingRestart ? pendingRestart.promise : undefined;}
     modelEndpoints = next;
     const state = supervisor.getState();
-    if (state.mode === 'spawn' && state.process !== 'stopped') {
-      log.info('[local-engine] the AI servers on this computer changed (Pip, the redactor or Docling); restarting the engine');
-      await supervisor.restart();
+    if (!(state.mode === 'spawn' && state.process !== 'stopped')) {return undefined;}
+    // Pip, the redactor and Docling usually come up within seconds of each other, and every
+    // restart briefly cuts off the app's calls. Changes that arrive close together are folded into
+    // one restart, restartDelayMs after the last one, with the newest addresses.
+    if (!pendingRestart) {
+      let resolve;
+      pendingRestart = { timer: null, promise: new Promise((r) => { resolve = r; }), resolve: () => resolve() };
     }
+    const pending = pendingRestart;
+    if (pending.timer) {clearTimeout(pending.timer);}
+    pending.timer = setTimeout(() => {
+      pendingRestart = null;
+      log.info('[local-engine] the AI servers on this computer changed (Pip, the redactor or Docling); restarting the engine');
+      supervisor.restart().catch(() => null).then(pending.resolve);
+    }, restartDelayMs);
+    return pending.promise;
   }
 
   function backgroundJobsView() {
@@ -342,6 +359,25 @@ function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = proces
     return status();
   }
 
+  /**
+   * Wait until the engine answers its health check, or it is off, or timeoutMs passes. The main
+   * window waits on this before it loads, so its first calls do not go to an engine that is not
+   * listening yet. Never throws; resolves true when the engine is ready.
+   */
+  async function untilReady({ timeoutMs = 20000, pollMs = 250, now = () => Date.now(), sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) } = {}) {
+    const end = now() + timeoutMs;
+    for (;;) {
+      const state = supervisor.getState();
+      if (state.mode === 'off') {return false;}
+      if (state.healthy) {return true;}
+      if (now() >= end) {
+        log.warn(`[local-engine] the engine did not answer within ${timeoutMs} ms; opening the window anyway`);
+        return false;
+      }
+      await sleep(pollMs);
+    }
+  }
+
   function status() {
     const state = supervisor.getState();
     return statusView(state, config, currentApiBase(state), backgroundJobsView());
@@ -387,6 +423,7 @@ function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = proces
     toStored: (server) => toStoredServer(server, { engineUrl: supervisor.getState().url, storedUrl: chefUrl() }),
     stop: () => supervisor.stop(),
     setModelEndpoints,
+    untilReady,
     prepareQuit,
     attachOsSignals,
     sessionChanged,

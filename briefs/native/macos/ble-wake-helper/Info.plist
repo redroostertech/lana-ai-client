@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIdentifier</key><string>com.redroostertech.lana-ai-client.ble-wake</string>
+	<key>CFBundleName</key><string>LANA Bluetooth wake</string>
+	<key>NSBluetoothAlwaysUsageDescription</key><string>LANA uses Bluetooth to let your paired phone know when this computer has something for it. Nothing about your meetings is sent over Bluetooth.</string>
+</dict>
+</plist>

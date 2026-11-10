@@ -1662,6 +1662,31 @@
     return payload;
   }
 
+  // The document editor service (lana-editor, port 4710) runs beside the
+  // organization's server, on loopback. The app calls it directly, so it only
+  // answers when that server runs on this same computer.
+  var EDITOR_SERVICE_UNREACHABLE = 'The LANA document editor is not reachable from this computer, ' +
+    'so editing, redlines and clean copies are not available here. The document is still readable.';
+
+  /**
+   * fetch() against the editor service, with a plain message instead of a bare
+   * network error when nothing answers.
+   * @param {string} base - editor service address
+   * @param {string} path - for example '/v1/health'
+   * @param {RequestInit} [init]
+   */
+  async function editorServiceFetch(base, path, init) {
+    var url = String(base || '').replace(/\/+$/, '') + path;
+    try {
+      return await fetch(url, init);
+    } catch (error) {
+      var plain = new Error(EDITOR_SERVICE_UNREACHABLE);
+      plain.code = 'EDITOR_SERVICE_UNREACHABLE';
+      plain.cause = error;
+      throw plain;
+    }
+  }
+
   /**
    * Ask the editor service for a copy of the DOCX with every tracked change
    * accepted, so the released artifact is clean. Non-DOCX bytes pass through.
@@ -1673,7 +1698,7 @@
     if (!hasDocxZipEnvelope(bytes)) {
       throw new Error('The editor did not return a valid Word document package. Reload the document and try again.');
     }
-    var response = await fetch(String(options.editorServiceBase || '').replace(/\/+$/, '') + '/v1/redline/decisions', {
+    var response = await editorServiceFetch(options.editorServiceBase, '/v1/redline/decisions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1796,6 +1821,8 @@
     releaseFilenameFor: releaseFilenameFor,
     buildReleasePayload: buildReleasePayload,
     acceptAllBytes: acceptAllBytes,
+    editorServiceFetch: editorServiceFetch,
+    EDITOR_SERVICE_UNREACHABLE: EDITOR_SERVICE_UNREACHABLE,
     latestActivityIso: latestActivityIso,
     DOCX_CONTENT_TYPE: DOCX_CONTENT_TYPE
   };

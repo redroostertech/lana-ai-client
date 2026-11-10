@@ -153,6 +153,11 @@ async function runLoginScenario({ permission, electronAPI = undefined, search = 
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
 
+  vm.runInContext(
+    fs.readFileSync(path.join(ROOT, 'src/js/shared/org-discovery.js'), 'utf8'),
+    sandbox,
+    { filename: 'org-discovery.js' }
+  );
   vm.runInContext(notificationsJs, sandbox, { filename: 'notifications.js' });
   vm.runInContext(mainScript, sandbox, { filename: 'login-inline.js' });
 

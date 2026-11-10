@@ -82,45 +82,30 @@ dist/
 └── latest-linux.yml                                # Linux update manifest
 ```
 
-### Step 3: Build and Publish (Recommended)
+### Step 3: Build and Lay Out the Release
 
-The build script can automatically create the GitHub release and upload all artifacts:
+Installers and update feeds are served from https://releases.lanaai.io/client/ (R2 bucket
+`lana-releases`). The build script lays the files out for that bucket; it does not upload them.
 
 ```bash
-# Build and publish to GitHub in one step
 ./scripts/build-client.sh --publish
-
-# Or build for specific platform and publish
 ./scripts/build-client.sh --platform mac --publish
 ```
 
 This will:
 1. Build the client for the specified platform(s)
-2. Create a GitHub release tagged `vX.Y.Z`
-3. Upload all artifacts with proper naming: `LanaAI--genesis--X.Y.Z-{arch}.{ext}`
-4. Display the release URL when complete
+2. Copy the files into `dist/r2/` (`scripts/stage-client-release.js`):
+   - `client/<version>/`: every installer, zip and `.blockmap` of the version
+   - `client/latest/`: the installers under names that never change
+     (`LANA-mac-arm64.dmg`, `LANA-mac-x64.dmg`, `LANA-windows-x64-setup.exe`,
+     `LANA-linux-x86_64.AppImage`, `LANA-linux-amd64.deb`, `LANA-linux-x86_64.rpm`)
+   - `client/latest-mac.yml`, `client/latest.yml`, `client/latest-linux.yml`: the update feeds
+     (electron-updater generic provider), with file entries pointing at `<version>/<file>`
+3. Print the objects to upload and an example upload command. Upload the version folder and
+   `latest/` first and the feeds last, so no feed points at a missing file.
 
-### Step 3 (Alternative): Manual Release
-
-If you prefer to create the release manually:
-
-```bash
-cd /Users/michaelwestbrooksii/Documents/LanaAI/lana-ai-client
-
-# Get version from package.json
-VERSION=$(node -p "require('./package.json').version")
-
-# Create release
-gh release create v${VERSION} --title "v${VERSION}" --notes "Release v${VERSION}"
-
-# Upload files (filenames include version automatically)
-gh release upload v${VERSION} dist/macos-arm64/LanaAI--genesis--${VERSION}-arm64.dmg
-gh release upload v${VERSION} dist/macos-x64/LanaAI--genesis--${VERSION}-x64.dmg
-gh release upload v${VERSION} dist/windows/LanaAI--genesis--${VERSION}-setup.exe
-gh release upload v${VERSION} dist/linux/LanaAI--genesis--${VERSION}.AppImage
-gh release upload v${VERSION} dist/linux/LanaAI--genesis--${VERSION}.deb
-gh release upload v${VERSION} dist/latest*.yml
-```
+The app checks the feeds through `electron-updater-custom.js` (generic provider,
+`https://releases.lanaai.io/client/`).
 
 ### Step 4: Update Server Policy
 
@@ -148,27 +133,13 @@ curl -X POST https://www.redroostertec.com/lana-ai/v1/client/version-check \
 
 ## Quick Release Command
 
-The build script now supports automatic GitHub release with the `--publish` flag:
-
 ```bash
-# Full release for all platforms
-./scripts/build-client.sh --publish
-
-# macOS only release
-./scripts/build-client.sh --platform mac --publish
-
-# Windows only release
-./scripts/build-client.sh --platform win --publish
-
-# Linux only release
-./scripts/build-client.sh --platform linux --publish
+./scripts/build-client.sh --publish                     # all platforms
+./scripts/build-client.sh --platform mac --publish      # macOS only
 ```
 
-The `--publish` flag will:
-- Create a draft GitHub release tagged with the version from `package.json`
-- Upload all built artifacts with versioned filenames (e.g., `LanaAI--genesis--3.0.0-arm64.dmg`)
-- Upload update manifests (`latest.yml`, `latest-mac.yml`, `latest-linux.yml`)
-- Display the release URL when complete
+`--publish` lays the build out in `dist/r2/` for releases.lanaai.io and prints what to upload;
+nothing is uploaded, tagged or pushed.
 
 ---
 

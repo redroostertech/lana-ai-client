@@ -17,6 +17,7 @@
   <script src="js/time-utils.js"></script>
   <script src="js/shared/server-reachability.js"></script>
   <script src="js/shared/account-status.js"></script>
+  <script src="js/shared/org-discovery.js"></script>
   <script src="js/shared/request-retry.js"></script>
   <script src="js/api.js"></script>
   <script src="js/notifications.js"></script>
@@ -85,6 +86,17 @@
             Connect
           </button>
         </form>
+
+        <!-- Shown when the organization cannot be found or reached -->
+        <div id="discoveryError" class="hidden mt-5 p-4 rounded-lg border border-red-200 bg-red-50" role="alert">
+          <p id="discoveryErrorTitle" class="text-sm font-semibold text-red-800"></p>
+          <p id="discoveryErrorDetail" class="text-sm text-red-700 mt-1"></p>
+          <p id="discoveryErrorSupport" class="text-xs text-red-700 mt-2 select-text"></p>
+          <button type="button" id="discoveryRetryBtn"
+            class="mt-3 py-2 px-4 text-sm font-medium text-red-800 bg-white border border-red-300 rounded-lg hover:bg-red-100 transition-colors">
+            Try again
+          </button>
+        </div>
       </div>
 
       <!-- Step 2: Sign In (hidden initially) -->
@@ -168,8 +180,9 @@
     // Set app version from centralized version system
     document.getElementById('app-version').textContent = window.APP_VERSION?.getVersion() || 'v0.0.0';
 
-    // Hosted discovery endpoint
-    const HOSTED_DISCOVERY_URL = 'https://www.redroostertec.com/lana-ai/v1/discovery';
+    // Hosted discovery endpoint (js/shared/org-discovery.js)
+    const OrgDiscovery = window.LanaOrgDiscovery;
+    const HOSTED_DISCOVERY_URL = OrgDiscovery.DISCOVERY_URL;
 
     function normalizeEnabledApps(enabledApps) {
       if (window.LanaClientApps && typeof window.LanaClientApps.normalizeEnabledAppList === 'function') {
@@ -291,8 +304,7 @@
      * Generate default server URL from org ID
      */
     function generateServerUrl(orgId) {
-      if (!orgId) return '';
-      return `${orgId.trim().toLowerCase()}.lanaai.io`;
+      return OrgDiscovery.generateServerUrl(orgId);
     }
 
     /**
@@ -497,97 +509,14 @@
     });
 
     /**
-     * Extract domain from server URL (removes protocol and port)
+     * Resolve organization via hosted discovery (js/shared/org-discovery.js).
+     * Sends org_id + domain; builds the API URL from static_ip, port and is_secure_ssl.
      */
-    function extractDomain(url) {
-      let domain = url.trim();
-      // Remove protocol
-      domain = domain.replace(/^https?:\/\//, '');
-      // Remove port
-      domain = domain.split(':')[0];
-      // Remove trailing slashes and paths
-      domain = domain.split('/')[0];
-      return domain;
-    }
-
-    /**
-     * Resolve organization via hosted discovery endpoint
-     * Sends org_id + domain for validation
-     * Uses static_ip, port, and is_secure_ssl from response to build API URL
-     * (domain in response is just for reference, not used to construct URL)
-     */
-    async function resolveOrganization(orgId, serverUrl) {
-      const domain = extractDomain(serverUrl);
-
-      try {
-        const response = await fetch(HOSTED_DISCOVERY_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            org_id: orgId,
-            domain: domain
-          })
-        });
-
-        const data = await response.json();
-
-        // Handle different response statuses
-        if (response.status === 400) {
-          // Validation error
-          const details = data.details ? data.details.join(', ') : data.error;
-          throw new Error(`Invalid request: ${details}`);
-        }
-
-        if (response.status === 404) {
-          // Not found or inactive
-          throw new Error(data.error || 'Organization not found or inactive');
-        }
-
-        if (response.status === 500) {
-          throw new Error('Discovery service error. Please try again later.');
-        }
-
-        if (!response.ok || data.status !== 'healthy') {
-          throw new Error(data.error || 'Organization not available');
-        }
-
-        // Determine protocol based on is_secure_ssl flag
-        const isSecure = data.discovery.is_secure_ssl === true;
-        const protocol = isSecure ? 'https' : 'http';
-        const apiUrl = `${protocol}://${data.discovery.static_ip}:${data.discovery.port}`;
-
-        // Extract VPN info if available
-        const vpnInfo = data.discovery.vpn || null;
-
-        return {
-          url: apiUrl,
-          orgId: data.server.org_id,
-          orgName: data.server.org_name,
-          version: data.server.version,
-          apiVersion: data.server.api_version,
-          domain: data.domain,
-          staticIp: data.discovery.static_ip,
-          port: data.discovery.port,
-          isSecure: isSecure,
-          vpn: vpnInfo,  // Include VPN configuration from discovery
-          // Burst API configuration for direct calls to burst service
-          burstApiKey: data.burst_api_key || null,
-          burstUrl: data.burst_url || null,
-          // Forge agents platform configuration (Phase 1) — mirrors burst pattern.
-          forgeApiKey: data.forge_api_key || null,
-          forgeUrl: data.forge_url || null,
-          forgeSovereign: data.forge_sovereign || null,
-          tier: data.tier || 'standard',
-          rateLimit: data.rate_limit || 100,
-          // Sub-apps available to this organization (drives the client app switcher)
-          enabledApps: normalizeEnabledApps(data.enabled_apps)
-        };
-      } catch (error) {
-        if (error.message === 'Failed to fetch') {
-          throw new Error('Unable to reach discovery service. Please check your internet connection.');
-        }
-        throw error;
-      }
+    function resolveOrganization(orgId, serverUrl) {
+      return OrgDiscovery.resolveOrganization(orgId, serverUrl, {
+        fetch: (url, init) => fetch(url, init),
+        normalizeEnabledApps
+      });
     }
 
     /**
@@ -665,6 +594,132 @@
       }
     }
 
+    const discoveryError = document.getElementById('discoveryError');
+    const discoveryErrorTitle = document.getElementById('discoveryErrorTitle');
+    const discoveryErrorDetail = document.getElementById('discoveryErrorDetail');
+    const discoveryErrorSupport = document.getElementById('discoveryErrorSupport');
+    const discoveryRetryBtn = document.getElementById('discoveryRetryBtn');
+
+    /**
+     * When the organization cannot be found or reached the person has nowhere
+     * else to go: say what to check, offer a retry and name the support address.
+     */
+    function showDiscoveryFailure(error, orgId) {
+      const failure = OrgDiscovery.describeFailure(error, orgId);
+      discoveryErrorTitle.textContent = failure.title;
+      discoveryErrorDetail.textContent = failure.detail;
+      discoveryErrorSupport.textContent = failure.support;
+      discoveryError.classList.remove('hidden');
+    }
+
+    function hideDiscoveryFailure() {
+      discoveryError.classList.add('hidden');
+    }
+
+    discoveryRetryBtn.addEventListener('click', () => {
+      if (typeof discoveryForm.requestSubmit === 'function') {
+        discoveryForm.requestSubmit();
+      } else {
+        discoveryForm.dispatchEvent(new Event('submit', { cancelable: true }));
+      }
+    });
+
+    /**
+     * Find the organization, check its server answers, and save it as the
+     * server this app talks to. Used by Connect.
+     * @param {string} orgId
+     * @param {string} serverUrl
+     * @param {(label: string) => void} [onStage] - progress label for a button
+     * @returns {Promise<Object>} the server info
+     */
+    async function connectToOrganization(orgId, serverUrl, onStage) {
+      // Call hosted discovery to get static_ip and port
+      let serverInfo = await resolveOrganization(orgId, serverUrl);
+
+      // Development mode: Override API URL if provided
+      const devApiOverride = devApiOverrideInput.value.trim();
+      // Check field visibility (ensures dev mode is on) and that field has value
+      const isDevFieldVisible = !devApiOverrideContainer.classList.contains('hidden');
+      if (isDevFieldVisible && devApiOverride) {
+        console.warn('[Login] 🔧 Development mode: Overriding API URL');
+        console.warn('[Login] Original URL:', serverInfo.url);
+        console.warn('[Login] Override URL:', devApiOverride);
+
+        // Parse the override URL to extract components
+        const overrideUrl = new URL(devApiOverride);
+        serverInfo.url = devApiOverride;
+        serverInfo.staticIp = overrideUrl.hostname;
+        serverInfo.port = overrideUrl.port || (overrideUrl.protocol === 'https:' ? '443' : '80');
+        serverInfo.isSecure = overrideUrl.protocol === 'https:';
+      }
+
+      console.log('[Login] Organization resolved:', {
+        orgId: serverInfo.orgId,
+        orgName: serverInfo.orgName,
+        apiUrl: serverInfo.url,
+        staticIp: serverInfo.staticIp,
+        port: serverInfo.port
+      });
+
+      // Verify the resolved server is reachable
+      if (onStage) onStage('Connecting to server...');
+
+      const isReachable = await verifyServer(serverInfo.url);
+
+      if (!isReachable) {
+        // Server not reachable. When discovery says the org sits behind a VPN,
+        // that is almost always the reason, so name it in the error instead of
+        // giving the generic network message.
+        throw new Error(ServerReachability.buildUnreachableMessage(serverInfo));
+      }
+
+      // Set the API base URL
+      api.baseUrl = serverInfo.url;
+      console.log('[Login] Connected to server:', serverInfo.url);
+
+      // Save server connection to localStorage (persists across sessions)
+      localStorage.setItem('lana_saved_server', JSON.stringify(serverInfo));
+      console.log('[Login] Server connection saved to localStorage');
+
+      // Save server info for Electron (if running in Electron)
+      if (window.electronAPI) {
+        await window.electronAPI.saveSettings({
+          url: serverInfo.url,
+          orgId: serverInfo.orgId,
+          orgName: serverInfo.orgName,
+          version: serverInfo.version,
+          apiVersion: serverInfo.apiVersion,
+          domain: serverInfo.domain,
+          host: serverInfo.staticIp,
+          port: serverInfo.port,
+          // Burst API configuration for direct calls
+          burstApiKey: serverInfo.burstApiKey,
+          burstUrl: serverInfo.burstUrl,
+          // Forge agents platform configuration (Phase 1)
+          forgeApiKey: serverInfo.forgeApiKey,
+          forgeUrl: serverInfo.forgeUrl,
+          forgeSovereign: serverInfo.forgeSovereign,
+          tier: serverInfo.tier,
+          rateLimit: serverInfo.rateLimit,
+          enabledApps: serverInfo.enabledApps
+        });
+      }
+
+      return serverInfo;
+    }
+
+    function spinnerLabel(label) {
+      return `
+        <span class="flex items-center justify-center">
+          <svg class="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          ${label}
+        </span>
+      `;
+    }
+
     /**
      * Step 1: Discovery Form Submit Handler
      */
@@ -684,97 +739,14 @@
         return;
       }
 
+      hideDiscoveryFailure();
       connectBtn.disabled = true;
-      connectBtn.innerHTML = `
-        <span class="flex items-center justify-center">
-          <svg class="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          Looking up organization...
-        </span>
-      `;
+      connectBtn.innerHTML = spinnerLabel('Looking up organization...');
 
       try {
-        // Call hosted discovery to get static_ip and port
-        let serverInfo = await resolveOrganization(orgId, serverUrl);
-
-        // Development mode: Override API URL if provided
-        const devApiOverride = devApiOverrideInput.value.trim();
-        // Check field visibility (ensures dev mode is on) and that field has value
-        const isDevFieldVisible = !devApiOverrideContainer.classList.contains('hidden');
-        if (isDevFieldVisible && devApiOverride) {
-          console.warn('[Login] 🔧 Development mode: Overriding API URL');
-          console.warn('[Login] Original URL:', serverInfo.url);
-          console.warn('[Login] Override URL:', devApiOverride);
-
-          // Parse the override URL to extract components
-          const overrideUrl = new URL(devApiOverride);
-          serverInfo.url = devApiOverride;
-          serverInfo.staticIp = overrideUrl.hostname;
-          serverInfo.port = overrideUrl.port || (overrideUrl.protocol === 'https:' ? '443' : '80');
-          serverInfo.isSecure = overrideUrl.protocol === 'https:';
-        }
-
-        console.log('[Login] Organization resolved:', {
-          orgId: serverInfo.orgId,
-          orgName: serverInfo.orgName,
-          apiUrl: serverInfo.url,
-          staticIp: serverInfo.staticIp,
-          port: serverInfo.port
+        const serverInfo = await connectToOrganization(orgId, serverUrl, (label) => {
+          connectBtn.innerHTML = spinnerLabel(label);
         });
-
-        // Verify the resolved server is reachable
-        connectBtn.innerHTML = `
-          <span class="flex items-center justify-center">
-            <svg class="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            Connecting to server...
-          </span>
-        `;
-
-        const isReachable = await verifyServer(serverInfo.url);
-
-        if (!isReachable) {
-          // Server not reachable. When discovery says the org sits behind a VPN,
-          // that is almost always the reason, so name it in the error instead of
-          // giving the generic network message.
-          throw new Error(ServerReachability.buildUnreachableMessage(serverInfo));
-        }
-
-        // Set the API base URL
-        api.baseUrl = serverInfo.url;
-        console.log('[Login] Connected to server:', serverInfo.url);
-
-        // Save server connection to localStorage (persists across sessions)
-        localStorage.setItem('lana_saved_server', JSON.stringify(serverInfo));
-        console.log('[Login] Server connection saved to localStorage');
-
-        // Save server info for Electron (if running in Electron)
-        if (window.electronAPI) {
-          await window.electronAPI.saveSettings({
-            url: serverInfo.url,
-            orgId: serverInfo.orgId,
-            orgName: serverInfo.orgName,
-            version: serverInfo.version,
-            apiVersion: serverInfo.apiVersion,
-            domain: serverInfo.domain,
-            host: serverInfo.staticIp,
-            port: serverInfo.port,
-            // Burst API configuration for direct calls
-            burstApiKey: serverInfo.burstApiKey,
-            burstUrl: serverInfo.burstUrl,
-            // Forge agents platform configuration (Phase 1)
-            forgeApiKey: serverInfo.forgeApiKey,
-            forgeUrl: serverInfo.forgeUrl,
-            forgeSovereign: serverInfo.forgeSovereign,
-            tier: serverInfo.tier,
-            rateLimit: serverInfo.rateLimit,
-            enabledApps: serverInfo.enabledApps
-          });
-        }
 
         Toast.success(`Connected to ${serverInfo.orgName || serverInfo.orgId}`);
 
@@ -786,7 +758,7 @@
         showStep2(serverInfo);
 
       } catch (error) {
-        Toast.error(error.message || 'Failed to connect to organization.');
+        showDiscoveryFailure(error, orgId);
       } finally {
         connectBtn.disabled = false;
         connectBtn.textContent = 'Connect';

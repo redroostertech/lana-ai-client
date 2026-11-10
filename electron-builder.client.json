@@ -11,10 +11,8 @@
   },
   "artifactName": "LanaAI--genesis--${version}.${ext}",
   "publish": {
-    "provider": "github",
-    "owner": "redroostertech",
-    "repo": "lana-ai-client",
-    "releaseType": "release"
+    "provider": "generic",
+    "url": "https://releases.lanaai.io/client/"
   },
   "files": [
     {
@@ -68,6 +66,7 @@
     }
   ],
   "beforePack": "scripts/before-pack.js",
+  "afterPack": "scripts/after-pack.js",
   "asar": true,
   "asarUnpack": [
     "node_modules/sherpa-onnx-node/**/*",
@@ -88,7 +87,12 @@
     "binaries": [
       "Contents/Resources/screen-voice/lana-screen-voice",
       "Contents/Resources/briefs/LanaBleWake",
-      "Contents/Resources/redactor/lana-redactor/lana-redactor"
+      "Contents/Resources/redactor/lana-redactor/lana-redactor",
+      "Contents/Resources/pip/lqe",
+      "Contents/Resources/engine/node_modules/bare-fs/prebuilds/darwin-arm64/bare-fs.bare",
+      "Contents/Resources/engine/node_modules/bare-path/prebuilds/darwin-arm64/bare-path.bare",
+      "Contents/Resources/engine/node_modules/bare-url/prebuilds/darwin-arm64/bare-url.bare",
+      "Contents/Resources/engine/node_modules/bcrypt/prebuilds/darwin-arm64/bcrypt.node"
     ],
     "extendInfo": {
       "NSMicrophoneUsageDescription": "LANA uses the microphone when you dictate, talk with LANA, or record a meeting.",
@@ -106,6 +110,18 @@
       {
         "from": "build/redactor/lana-redactor",
         "to": "redactor/lana-redactor"
+      },
+      {
+        "from": "build/pip/lqe",
+        "to": "pip/lqe"
+      },
+      {
+        "from": "build/engine",
+        "to": "engine"
+      },
+      {
+        "from": "build/engine/node_modules",
+        "to": "engine/node_modules"
       }
     ]
   },
@@ -126,6 +142,18 @@
       {
         "from": "build/redactor/lana-redactor",
         "to": "redactor/lana-redactor"
+      },
+      {
+        "from": "build/pip/lqe.exe",
+        "to": "pip/lqe.exe"
+      },
+      {
+        "from": "build/engine",
+        "to": "engine"
+      },
+      {
+        "from": "build/engine/node_modules",
+        "to": "engine/node_modules"
       }
     ]
   },
@@ -141,6 +169,18 @@
       {
         "from": "build/redactor/lana-redactor",
         "to": "redactor/lana-redactor"
+      },
+      {
+        "from": "build/pip/lqe",
+        "to": "pip/lqe"
+      },
+      {
+        "from": "build/engine",
+        "to": "engine"
+      },
+      {
+        "from": "build/engine/node_modules",
+        "to": "engine/node_modules"
       }
     ]
   },
