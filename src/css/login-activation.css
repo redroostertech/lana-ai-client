@@ -1,0 +1,231 @@
+/* Account activation on the sign-in screen (login.html #activationScreen, js/login-activation.js).
+   Same card, type and accent as the app walkthroughs (css/app-walkthrough.css) and the setup
+   screen (css/first-launch.css). login-activation.js sets data-lex-theme on the screen from the
+   computer's light or dark setting. */
+
+.act-screen {
+  --act-accent: #2f7d5f;
+  --act-ink: var(--lex-text-primary, #171b18);
+  --act-muted: var(--lex-text-secondary, #616861);
+  --act-line: var(--lex-border-subtle, #e1e5e1);
+  --act-rule-off: var(--lex-color-gray-300, #d0d5dd);
+  --act-error-bg: var(--lex-status-danger-bg, #fef3f2);
+  --act-error-text: var(--lex-status-danger-text, #b42318);
+  --act-card-shadow: 0 18px 44px rgba(20, 30, 25, 0.12);
+
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  overflow-y: auto;
+  background: var(--lex-bg-secondary, #f9fafb);
+  color: var(--act-ink);
+  font-family: var(--lex-font-sans);
+}
+
+.act-screen[data-lex-theme="dark"] {
+  color-scheme: dark;
+  --lex-bg-primary: #151715;
+  --lex-bg-secondary: #1e211e;
+  --lex-text-primary: #eef1ee;
+  --lex-text-secondary: #b2b9b2;
+  --lex-text-tertiary: #8b938b;
+  --lex-border-default: #343a34;
+  --lex-border-subtle: #2a2f2a;
+  --lex-color-gray-50: #232723;
+  --lex-bg-tertiary: #2a2f2a;
+  --lex-input-text: #eef1ee;
+  --lex-input-placeholder: #8b938b;
+  --lex-color-gray-100: #232723;
+  --lex-color-gray-200: #2e332e;
+  --lex-color-gray-300: #3b413b;
+  --lex-bg-accent: #e8ece8;
+  --lex-bg-accent-hover: #ffffff;
+  --lex-text-on-accent: #151715;
+  --lex-bg-accent-soft: rgba(103, 201, 160, 0.16);
+  --act-accent: #67c9a0;
+  --act-error-bg: rgba(240, 68, 56, 0.14);
+  --act-error-text: #fca5a0;
+  --act-card-shadow: 0 18px 44px rgba(0, 0, 0, 0.35);
+  background: var(--lex-bg-primary);
+}
+
+.act-screen[hidden] {
+  display: none;
+}
+
+.act-screen *,
+.act-screen *::before,
+.act-screen *::after {
+  box-sizing: border-box;
+}
+
+.act-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 448px;
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 40px 16px 32px;
+}
+
+.act-logo {
+  margin-bottom: 28px;
+}
+
+.act-logo-img {
+  display: block;
+  height: 48px;
+}
+
+.act-logo-img--on-dark,
+.act-screen[data-lex-theme="dark"] .act-logo-img--on-light {
+  display: none;
+}
+
+.act-screen[data-lex-theme="dark"] .act-logo-img--on-dark {
+  display: block;
+}
+
+.act-card {
+  width: 100%;
+  padding: 28px 28px 20px;
+  border: 1px solid var(--act-line);
+  border-radius: 16px;
+  background: var(--lex-bg-primary, #fff);
+  box-shadow: var(--act-card-shadow);
+}
+
+.act-eyebrow {
+  margin: 0 0 6px;
+  color: var(--act-accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.act-title {
+  margin: 0;
+  color: var(--act-ink);
+  font-size: 22px;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.act-detail {
+  margin: 6px 0 20px;
+  color: var(--act-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.act-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* The code reads like the email shows it. */
+#actCode input {
+  font-family: var(--lex-font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+#actCode input::placeholder {
+  letter-spacing: 0.08em;
+}
+
+.act-rules {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px 12px;
+  margin: -4px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--act-line);
+  border-radius: 10px;
+  background: var(--lex-bg-secondary, #f9fafb);
+  list-style: none;
+}
+
+.act-rule {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--act-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.act-rule-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--act-rule-off);
+  transition: background-color 160ms ease;
+}
+
+.act-rule--met {
+  color: var(--act-ink);
+}
+
+.act-rule--met .act-rule-dot {
+  background: var(--act-accent);
+}
+
+.act-error {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--act-error-bg);
+  color: var(--act-error-text);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.act-error[hidden],
+.act-error [hidden] {
+  display: none;
+}
+
+.act-error p {
+  margin: 0;
+}
+
+.act-error-title {
+  font-weight: 600;
+}
+
+.act-error .act-error-detail {
+  margin-top: 2px;
+}
+
+.act-error .act-error-support {
+  margin-top: 6px;
+  user-select: text;
+}
+
+.act-submit {
+  display: block;
+  margin-top: 4px;
+}
+
+.act-submit .lex-btn-inner {
+  width: 100%;
+  justify-content: center;
+}
+
+.act-back {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+.act-footer {
+  margin: 28px 0 0;
+  color: var(--act-muted);
+  font-size: 13px;
+  text-align: center;
+}

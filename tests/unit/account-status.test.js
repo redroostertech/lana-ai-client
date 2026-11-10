@@ -175,9 +175,9 @@ describe('login.html wires the activation redirect', () => {
     expect(source).toContain('js/shared/account-status.js');
   });
 
-  test('routes activation_required to activate.html', () => {
+  test('opens the activation screen for activation_required', () => {
     expect(source).toContain('AccountStatus.classifyLoginFailure');
     expect(source).toContain("activation_required");
-    expect(source).toContain("window.location.href = 'activate.html'");
+    expect(source).toContain('window.LanaActivation.open({ email })');
   });
 });
