@@ -2,7 +2,8 @@
  * Electron Custom Updater Module
  * 
  * Handles application updates with server-controlled update policy
- * Queries the Mac Studio server for allowed version before checking GitHub releases
+ * Asks the hosted version check which version is allowed, then downloads it from
+ * https://releases.lanaai.io/client/ (electron-updater generic provider).
  */
 
 const { autoUpdater } = require('electron-updater');
@@ -131,22 +132,24 @@ async function runUpdateCheck(serverUrl, authToken, orgId) {
   }
 }
 
+// Installers and update feeds (latest-mac.yml, latest.yml, latest-linux.yml) live here;
+// scripts/stage-client-release.js lays a build out in this shape.
+const RELEASES_URL = 'https://releases.lanaai.io/client/';
+
 /**
- * Configure electron-updater for GitHub releases
+ * Configure electron-updater for releases.lanaai.io
  * @param {Object} config - Update configuration
  */
 function configureAutoUpdater(config = {}) {
   const {
-    owner = 'redroostertech',
-    repo = 'lana-ai-client',
+    url: feedUrl = RELEASES_URL,
     channel = 'latest'
   } = config;
 
   // Configure electron-updater
   autoUpdater.setFeedURL({
-    provider: 'github',
-    owner: owner,
-    repo: repo,
+    provider: 'generic',
+    url: feedUrl,
     channel: channel
   });
 
@@ -198,7 +201,7 @@ async function downloadAndInstallUpdate(serverUrl, authToken = null, orgId = nul
     configureAutoUpdater();
 
     // electron-updater requires checkForUpdates() before downloadUpdate()
-    logInfo('Checking GitHub releases for update...');
+    logInfo('Checking releases.lanaai.io for update...');
     await autoUpdater.checkForUpdates();
 
     logInfo('Downloading update...');

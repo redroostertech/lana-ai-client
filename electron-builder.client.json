@@ -11,10 +11,8 @@
   },
   "artifactName": "LanaAI--genesis--${version}.${ext}",
   "publish": {
-    "provider": "github",
-    "owner": "redroostertech",
-    "repo": "lana-ai-client",
-    "releaseType": "release"
+    "provider": "generic",
+    "url": "https://releases.lanaai.io/client/"
   },
   "files": [
     {
