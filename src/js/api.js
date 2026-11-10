@@ -718,7 +718,7 @@ class ApiClient {
         const errorMessage = extractApiErrorMessage(result, '');
 
         // Don't show session expired modal for login-related requests or on the login page
-        const isLoginRequest = endpoint.includes('/auth/login') || endpoint.includes('/auth/register') || endpoint.includes('/auth/activate');
+        const isLoginRequest = endpoint.includes('/auth/login') || endpoint.includes('/auth/register');
         const isOnLoginPage = window.location.pathname.includes('login.html');
 
         if (!isLoginRequest && !isOnLoginPage && (
@@ -1908,14 +1908,8 @@ class ApiClient {
     });
   }
 
-  /**
-   * Redeem a one-time activation code and set the first password.
-   * The body comes from LanaActivationFlow.buildActivateRequest:
-   * { email, code, new_password }. Answers { activated: true, email }; the
-   * caller then signs in with login() as usual.
-   */
-  async activateAccount(body) {
-    return this.post('/api/v1/auth/activate', body);
+  async activateAccount(activationCode, password) {
+    return this.post('/api/v1/auth/activate', { activation_code: activationCode, password });
   }
 
   // ============================================================

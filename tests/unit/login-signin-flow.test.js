@@ -1,9 +1,7 @@
 /**
  * login.html wiring for self-serve onboarding:
  * - when the organization cannot be found or reached, Step 1 shows what to
- *   check, a retry and the support address (before: one toast, then stuck);
- * - account activation signs in through the sign-in form's own path
- *   (window.LanaSignIn.signInWith -> api.login), not a copy of it.
+ *   check, a retry and the support address (before: one toast, then stuck).
  *
  * Runs the REAL login.html inline script with js/shared/org-discovery.js in a
  * vm sandbox and a hand-built DOM stub (repo convention: no jsdom).
@@ -161,24 +159,5 @@ describe('Step 1: the organization cannot be found or reached', () => {
     await flush();
     expect(page.el('discoveryError').classList.contains('hidden')).toBe(true);
     expect(page.sandbox.api.baseUrl).toBe('http://10.0.0.5:8080');
-  });
-});
-
-describe('activation signs in through the sign-in path', () => {
-  test('LanaSignIn.signInWith fills the form and runs the normal sign-in', async () => {
-    const page = loadLogin({ fetch: async () => ({ ok: false, status: 503, json: async () => ({}) }) });
-    expect(typeof page.sandbox.LanaSignIn.connect).toBe('function');
-
-    await page.sandbox.LanaSignIn.signInWith(
-      { url: 'http://10.0.0.5:8080', orgId: 'smithlaw', orgName: 'Smith Law' },
-      'dana@smithlaw.com',
-      'Harbor7!view'
-    );
-    await flush();
-
-    expect(page.logins).toEqual([{ email: 'dana@smithlaw.com', password: 'Harbor7!view' }]);
-    expect(page.el('step2').classList.contains('hidden')).toBe(false);
-    expect(page.el('orgId').value).toBe('smithlaw');
-    expect(page.toasts).toEqual([{ level: 'success', message: 'Login successful! Redirecting...' }]);
   });
 });
