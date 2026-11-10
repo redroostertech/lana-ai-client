@@ -172,16 +172,6 @@
 #heartbeatHistoryTable th:nth-child(4) { width: 120px; }
 #heartbeatHistoryTable th:nth-child(5) { width: 176px; }
 
-/* Admin dashboard previews: Name, Email|Organization, Status, Created */
-#recentUsersTable table,
-#recentMattersTable table { min-width: 640px; }
-#recentUsersTable th:nth-child(2),
-#recentMattersTable th:nth-child(2) { width: 30%; }
-#recentUsersTable th:nth-child(3),
-#recentMattersTable th:nth-child(3) { width: 110px; }
-#recentUsersTable th:nth-child(4),
-#recentMattersTable th:nth-child(4) { width: 176px; }
-
 /* Integrations: Endpoint, Service, Status, Duration, Created */
 #apiActivityTable table { min-width: 820px; }
 #apiActivityTable th:nth-child(2) { width: 150px; }

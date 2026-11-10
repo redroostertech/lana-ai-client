@@ -2,7 +2,7 @@
 
 /**
  * Hand-built admin tables converted to lex-table (docs/TABLE-STANDARD.md):
- * Search Analytics, Settings heartbeat history, admin dashboard previews,
+ * Search Analytics, Settings heartbeat history,
  * integrations API calls, block billing rules, Data Visualization connected
  * tables and the trace SSE events. Query mapping, raw rows, renderers and
  * header filters.
@@ -163,21 +163,6 @@ describe('Heartbeat run history', () => {
     expect(r.created_at(row.created_at)).toContain('1/20/2026 3:16 PM');
     expect(Object.keys(T.filterOptions()).sort()).toEqual(['created_at', 'duration_ms', 'status', 'summary', 'triggered_by']);
     expect(T.detailHtml({ plugin_results: { db: { status: 'error', pluginName: 'Database', summary: '<b>down</b>' } } })).toContain('&lt;b&gt;down');
-  });
-});
-
-describe('Admin dashboard previews', () => {
-  const win = loadPage('js/admin/admin-dashboard-tables.js');
-  const T = win.AdminDashboardTables;
-
-  test('users and matters map to raw rows with status badges and workspace links', () => {
-    const user = T.mapUser({ id: 1, first_name: 'Ann', last_name: 'Lee', email: 'a@x.io', is_active: false, created_at: '2026-01-20T20:16:00Z' });
-    expect(user).toMatchObject({ name: 'Ann Lee', status: 'inactive' });
-    expect(T.userRenderers().status('inactive')).toContain('label="Inactive"');
-    const matter = T.mapMatter({ id: 'uuid-1', matter_id: 'MATT-9', name: 'Smith v. Jones', status: 'on_hold' });
-    expect(T.matterRenderers().name(matter.name, matter)).toContain('data-matter-id="MATT-9"');
-    expect(T.matterRenderers().status('on_hold')).toContain('label="On hold"');
-    expect(Object.keys(T.matterFilters([matter])).sort()).toEqual(['created_at', 'name', 'organization_name', 'status']);
   });
 });
 

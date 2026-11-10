@@ -72,30 +72,6 @@ describe('skills-marketplace.html modals', () => {
   });
 });
 
-describe('admin/dashboard.html create modals', () => {
-  const html = read('admin/dashboard.html');
-
-  test.each([
-    ['createUserModal', 'createUserForm'],
-    ['createOrgModal', 'createOrgForm'],
-    ['createMatterModal', 'createMatterForm'],
-  ])('%s is a lex-modal submitting %s from its footer', (id, formId) => {
-    const body = block(html, id, 'lex-modal');
-    expect(body).not.toBeNull();
-    expect(body).toContain(`<form id="${formId}"`);
-    expect(body).toMatch(new RegExp(`<lex-btn data-slot="footer"[^>]*type="submit" form="${formId}"`));
-    expect(body).not.toMatch(/<button type="submit"/);
-    expectNoHandBuiltOverlay(html, id);
-  });
-
-  test('openModal/closeModal use the open property and the page loads lex-modal and lex-btn', () => {
-    expect(html).toMatch(/function openModal\(id\) \{\s*document\.getElementById\(id\)\.open = true;/);
-    expect(html).toMatch(/function closeModal\(id\) \{\s*document\.getElementById\(id\)\.open = false;/);
-    expect(html).toContain('js/lex/components/foundation/lex-modal.js');
-    expect(html).toContain('js/lex/components/foundation/lex-btn.js');
-  });
-});
-
 describe('admin/integrations.html modals', () => {
   const html = read('admin/integrations.html');
 

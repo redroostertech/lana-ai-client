@@ -261,7 +261,7 @@ A list API behind a server table must support:
 **Known leftovers:**
 - The admin/settings notification panel.
 - `bindFooterSubmit` in js/pages/my-tasks.js.
-- Errors that existed before this work: onboarding.html (`api` declared twice) and admin/dashboard.html (`isSystemAdmin` declared twice).
+- Errors that existed before this work: onboarding.html (`api` declared twice) and admin/dashboard.html (`isSystemAdmin` declared twice; the page is now retired, and old links open admin/index.html).
 - workflows/active and insights/predictions have stubbed data sources.
 
 **3.0.1:**

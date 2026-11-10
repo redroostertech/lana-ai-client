@@ -219,7 +219,6 @@ const MenuConfig = {
         title: null,
         requiredRoles: ADMIN_ROLES,
         items: [
-          { id: 'admin-dashboard', label: 'Dashboard', href: '/admin/dashboard.html', icon: 'dashboard' },
           { id: 'admin-users', label: 'Users', href: '/admin/users.html', icon: 'users' },
           { id: 'admin-roles', label: 'Roles', href: '/admin/roles.html', icon: 'roles' },
           { id: 'admin-organizations', label: 'Organizations', href: '/admin/organizations.html', icon: 'organizations' },
@@ -710,7 +709,7 @@ class MenuSystem {
     // Exact match (after normalization)
     if (itemPath === currentPath) return true;
     
-    // For subdirectory index pages (e.g., /admin/dashboard.html)
+    // For subdirectory index pages (e.g., /admin/index.html)
     // Check if the paths match when considering directory structure
     // But be strict - don't match partial paths
     

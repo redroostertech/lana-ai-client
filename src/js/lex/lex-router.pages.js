@@ -420,15 +420,6 @@
     // ── Admin ──
     // admin/index.html — standalone page (not routed)
 
-    'admin/dashboard.html': {
-      title: 'Admin Dashboard',
-      activeNav: 'admin',
-      scripts: [],
-      stylesheets: [
-        'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
-      ]
-    },
-
     // admin/users.html — standalone page (not routed)
 
     'admin/audit.html': {
