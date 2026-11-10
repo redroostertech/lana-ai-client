@@ -76,6 +76,7 @@ function loadLogin({ fetch }) {
     fetch,
     AbortSignal: { timeout: () => undefined },
     URL,
+    URLSearchParams,
     Event: function Event(type) { this.type = type; },
     navigator: { platform: 'MacIntel' },
     ServerReachability: { buildUnreachableMessage: () => 'Server did not answer.' },
@@ -96,7 +97,7 @@ function loadLogin({ fetch }) {
         return { token: 't', user: { id: 'u1', email } };
       },
     },
-    location: { href: '', replace() {} },
+    location: { href: '', search: '', replace() {} },
     Date,
     JSON,
     Promise,
