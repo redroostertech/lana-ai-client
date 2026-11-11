@@ -1,9 +1,11 @@
 'use strict';
 
-// The app never calls the lana-editor service itself: every redline and
-// decision goes through Chef (docs/plans/redline-agent-plan.md in LANA-AI,
-// item 4). A request to the editor's loopback port or its /v1/redline API
-// returning anywhere under src/js fails here.
+// The app's own code never calls the lana-editor API itself: the editor embed
+// does, against the service the main process runs on this computer
+// (electron-editor-service.js), at the address the preload bridge gives it.
+// Redline batches proposed on Chef still go through Chef
+// (docs/plans/redline-agent-plan.md in LANA-AI, item 4). A fixed editor port
+// or the /v1/redline API named anywhere under src/js fails here.
 
 const fs = require('fs');
 const path = require('path');

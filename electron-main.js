@@ -200,6 +200,28 @@ const docling = createDocling({
   }
 });
 
+// The LANA document editor on this computer (electron-editor-service.js): pages load the editor
+// from it and it reads and renders documents here. Started at launch; it needs no account.
+// Pages get its address only; its token stays here and is added to their /v1 calls below.
+const { createEditorService, resolveEditorServiceScript } = require('./electron-editor-service');
+const editorService = createEditorService({
+  script: resolveEditorServiceScript({ env: process.env, resourcesPath: process.resourcesPath, isPackaged: app.isPackaged, appRoot: __dirname, fileExists: (file) => fs.existsSync(file) }),
+  execPath: process.execPath,
+  keyDir: path.join(app.getPath('userData'), 'lana-editor', 'keys'),
+  spawn: require('child_process').spawn,
+  fetch: (url, { timeoutMs = 3000, ...init } = {}) => fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) }),
+  pickPort: pickLoopbackPort,
+  baseEnv: process.env,
+  openLog: () => {
+    try {
+      fs.mkdirSync(path.join(app.getPath('userData'), 'lana-editor'), { recursive: true });
+      return fs.createWriteStream(path.join(app.getPath('userData'), 'lana-editor', 'editor.log'), { flags: 'w' });
+    } catch (_error) { return null; }
+  },
+  log: { info: logInfo, warn: logWarn, error: (message) => logError(message) }
+});
+ipcMain.on('editor-service:base-url-sync', (event) => { event.returnValue = editorService.baseUrl(); });
+
 // What the engine is given for this computer's own servers: Pip's, the redactor's and Docling's together.
 const localServers = { pip: {}, redactor: {}, docling: {} };
 function pushLocalServers() {
@@ -2432,6 +2454,7 @@ app.whenReady().then(async () => {
   // Model downloads cut off last time pick up again in the background.
   void redactor.start().catch((error) => logError('[electron-main] The redactor did not start', error));
   void docling.start().catch((error) => logError('[electron-main] Docling did not start', error));
+  void editorService.start().catch((error) => logError('[electron-main] The LANA document editor did not start', error));
   void firstLaunch.resume();
 
   // macOS dock icon. On packaged builds Electron reads from the .app bundle's
@@ -2480,8 +2503,13 @@ app.whenReady().then(async () => {
 
   // Configure session to handle CORS for API requests
   // This allows the file:// app to make requests to http:// backend
+  // The app's own pages calling the local editor's /v1 API get its token added here.
   session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
-    callback({ requestHeaders: details.requestHeaders });
+    let pageUrl = '';
+    try {
+      pageUrl = (details.frame && details.frame.url) || (details.webContents && details.webContents.getURL()) || '';
+    } catch (_error) { pageUrl = ''; }
+    callback({ requestHeaders: editorService.requestHeaders({ url: details.url, pageUrl, headers: details.requestHeaders }) });
   });
 
   const { addMissingCorsHeaders } = require('./electron-cors');
@@ -2646,7 +2674,7 @@ app.on('before-quit', async (event) => {
       .catch((error) => logError('[electron-main] Failed to stop the local AI engine', error))
       // Pip last: the engine may still be handing a job off through it.
       .then(() => firstLaunch.pause())
-      .then(() => Promise.all([pip.stop(), redactor.stop(), docling.stop()]))
+      .then(() => Promise.all([pip.stop(), redactor.stop(), docling.stop(), editorService.stop()]))
       .catch((error) => logError('[electron-main] Failed to stop Pip', error))
       .finally(() => app.quit());
     return;

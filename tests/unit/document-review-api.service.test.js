@@ -985,38 +985,40 @@ function fakeDocument() {
 }
 
 describe('editor UI address', () => {
-  const realWindowValue = global.LANA_EDITOR_SERVICE;
+  const realBridge = global.electronAPI;
   const realStorage = global.localStorage;
   const realApi = global.api;
   afterEach(() => {
-    global.LANA_EDITOR_SERVICE = realWindowValue;
+    global.electronAPI = realBridge;
     global.localStorage = realStorage;
     global.api = realApi;
+    delete global.LANA_EDITOR_SERVICE;
   });
 
-  test('by default it is the API base plus /editor-assets (Chef serves the editor UI)', () => {
-    delete global.LANA_EDITOR_SERVICE;
-    global.localStorage = { getItem: () => null };
-    global.api = { baseUrl: 'http://127.0.0.1:8079/' };
-    expect(review.editorUiBase()).toBe('http://127.0.0.1:8079/editor-assets');
-    expect(review.editorUiBase({ baseUrl: 'https://chef.example' })).toBe('https://chef.example/editor-assets');
-    expect(review.EDITOR_UI_UNAVAILABLE).not.toMatch(/fetch|4710|[\u2013\u2014]/);
+  test('it is the address of the editor running on this computer, from the main process', () => {
+    global.api = { baseUrl: 'https://chef.example' };
+    global.electronAPI = { editorService: { getBaseUrlSync: () => 'http://127.0.0.1:53117/' } };
+    expect(review.editorUiBase()).toBe('http://127.0.0.1:53117');
+    expect(review.editorUiBase()).not.toContain('chef.example');
+    expect(review.EDITOR_UI_UNAVAILABLE).toMatch(/on this computer/);
+    expect(review.EDITOR_UI_UNAVAILABLE).not.toMatch(/server|fetch|4710|[\u2013\u2014]/);
   });
 
-  test('no API base yet means no editor UI address', () => {
-    delete global.LANA_EDITOR_SERVICE;
-    global.localStorage = { getItem: () => null };
-    global.api = { baseUrl: '' };
+  test('no editor running (or no bridge) means no editor UI address, even with an API base', () => {
+    global.api = { baseUrl: 'https://chef.example' };
+    global.electronAPI = { editorService: { getBaseUrlSync: () => '' } };
+    expect(review.editorUiBase()).toBe('');
+    global.electronAPI = { editorService: { getBaseUrlSync: () => { throw new Error('no main process'); } } };
+    expect(review.editorUiBase()).toBe('');
+    delete global.electronAPI;
     expect(review.editorUiBase()).toBe('');
   });
 
-  test('a developer override wins over the API base', () => {
-    global.api = { baseUrl: 'https://chef.example' };
-    global.LANA_EDITOR_SERVICE = '';
-    global.localStorage = { getItem: (key) => (key === 'lana-editor-service' ? 'http://editor.local:9000/' : null) };
-    expect(review.editorUiBase()).toBe('http://editor.local:9000');
-    global.LANA_EDITOR_SERVICE = 'http://window.local/';
-    expect(review.editorUiBase()).toBe('http://window.local');
+  test('a page cannot point the editor elsewhere through a global or local storage', () => {
+    global.electronAPI = { editorService: { getBaseUrlSync: () => 'http://127.0.0.1:53117' } };
+    global.LANA_EDITOR_SERVICE = 'http://evil.example';
+    global.localStorage = { getItem: (key) => (key === 'lana-editor-service' ? 'http://evil.example' : null) };
+    expect(review.editorUiBase()).toBe('http://127.0.0.1:53117');
   });
 });
 

@@ -127,6 +127,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     try { return ipcRenderer.sendSync('engine:api-base-sync') || null; } catch (_) { return null; }
   },
 
+  /**
+   * The LANA document editor on this computer (electron-editor-service.js): its loopback
+   * address, synchronously, or '' when it is not running. Its token never reaches the page.
+   */
+  editorService: {
+    getBaseUrlSync: () => {
+      try { return ipcRenderer.sendSync('editor-service:base-url-sync') || ''; } catch (_) { return ''; }
+    }
+  },
+
   /** Local AI engine status and controls (Settings, status banner). */
   engine: {
     getStatus: () => ipcRenderer.invoke('engine:status'),
