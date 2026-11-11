@@ -99,7 +99,7 @@
       "Contents/Resources/engine/node_modules/bare-url/prebuilds/darwin-arm64/bare-url.bare",
       "Contents/Resources/engine/node_modules/bcrypt/prebuilds/darwin-arm64/bcrypt.node",
       "Contents/Resources/engine/node_modules/bare-fs/prebuilds/darwin-x64/bare-fs.bare",
-      "Contents/Resources/engine/node_modules/bare-path/prebuilds/darwin-x64/bare-path.bare",
+      "Contents/Resources/engine/node_modules/bare-os/prebuilds/darwin-x64/bare-os.bare",
       "Contents/Resources/engine/node_modules/bare-url/prebuilds/darwin-x64/bare-url.bare",
       "Contents/Resources/engine/node_modules/bcrypt/prebuilds/darwin-x64/bcrypt.node"
     ],

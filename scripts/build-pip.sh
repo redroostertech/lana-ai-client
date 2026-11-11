@@ -4,7 +4,8 @@ set -euo pipefail
 # Builds build/pip/lqe (lqe.exe on Windows): Pip, the LANA.cpp engine the client starts for chat
 # and search embedding (electron-pip-supervisor.js), from the commit pinned in pip/pip-pin.json,
 # with LANA.cpp's distribution contract (portable, no build-machine-only instructions; on macOS
-# arm64 with Metal and a 13.3 floor, checked the way LANA.cpp's engine-release workflow checks it).
+# arm64 with Metal and a 13.3 floor, checked the way LANA.cpp's engine-release workflow checks it;
+# on macOS x64 on the CPU backend with the same floor, checked by scripts/verify-pip-macos-x64.js).
 # The compile date is fixed to the commit's date (SOURCE_DATE_EPOCH), so the same commit builds
 # the same bytes and the sha256 in the pin can be checked on every build.
 # Run it on each target system and processor before packaging; the package step refuses to build
@@ -59,7 +60,12 @@ if [[ "$reported" != "lqe $version ($build_id, built "* ]]; then
   echo "The build reports \"$reported\", expected lqe $version ($build_id). A -dirty build is never packaged." >&2
   exit 1
 fi
-if [[ "$key" == macos-* ]]; then
+if [[ "$key" == "macos-x64" ]]; then
+  # LANA.cpp's verifier at the pinned commit accepts only darwin-arm64, so macos-x64 gets the
+  # same checks from scripts/verify-pip-macos-x64.js (x86_64 only, 13.3 floor, pinned version
+  # and build, system libraries only). ctest has already run above.
+  node "$root_dir/scripts/verify-pip-macos-x64.js" "$binary" "$version" "$build_id" 13.3
+elif [[ "$key" == macos-* ]]; then
   arch="${key#macos-}"
   echo "$reported" > "$work_dir/version.txt"
   # The checker wants LANA.cpp's release asset name.
