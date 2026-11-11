@@ -179,8 +179,8 @@ var SkillNodeTypes = {
     // ── Document ──
     {
       type: 'action-doc-redline',
-      name: 'Generate Redline',
-      description: 'Compare two documents and generate redline',
+      name: 'Compare Versions',
+      description: 'Compare two versions of a document and show what changed',
       icon: 'document',
       color: 'red',
       inputs: 1,
