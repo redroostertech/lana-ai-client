@@ -555,6 +555,12 @@ organize_output() {
     # Move Windows files
     mv "$DIST_DIR/"*.exe "$DIST_DIR/windows/" 2>/dev/null || true
     mv "$DIST_DIR/"*win*.zip "$DIST_DIR/windows/" 2>/dev/null || true
+    # The Windows zip carries no arch or "win" in its name (artifactName
+    # LanaAI--genesis--<version>.zip); every mac zip ends in -x64 or -arm64.
+    for z in "$DIST_DIR/"*.zip; do
+        [ -e "$z" ] || continue
+        case "$z" in *-x64.zip|*-arm64.zip) ;; *) mv "$z" "$DIST_DIR/windows/" 2>/dev/null || true ;; esac
+    done
     
     # Move Linux files
     mv "$DIST_DIR/"*.AppImage "$DIST_DIR/linux/" 2>/dev/null || true
@@ -688,14 +694,21 @@ stage_release_for_r2_upload() {
 # Main Execution
 ###############################################################################
 
+# Apple signing and notarization apply only to mac targets.
+needs_apple_credentials() {
+    case "$PLATFORM" in mac|all) return 0 ;; *) return 1 ;; esac
+}
+
 main() {
     print_header
 
     # Parse command line arguments
     parse_args "$@"
 
-    # Apple Developer credentials for signing and notarization
-    # These can be set as environment variables or will be prompted interactively
+    # Apple Developer credentials for signing and notarization, only when a
+    # mac target is built. They can be set as environment variables or are
+    # prompted for interactively.
+    if needs_apple_credentials; then
     if [ -z "$APPLE_TEAM_ID" ]; then
         echo -e "${YELLOW}Apple Developer credentials required for signing/notarization${NC}"
         echo ""
@@ -716,6 +729,7 @@ main() {
     fi
 
     print_success "Apple credentials configured"
+    fi
 
     # Display configuration
     echo -e "${CYAN}Configuration:${NC}"
