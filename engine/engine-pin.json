@@ -8,6 +8,10 @@
     "macos-arm64": {
       "files": 5068,
       "treeSha256": "c69f5fab3f438433c83b49ff1f45f04159d93b59a5c24769e89bc1810e09d393"
+    },
+    "macos-x64": {
+      "files": 5011,
+      "treeSha256": "e56ad78820d9aef7af7359de6e9a3deed2340c8d0887f93143e6fc698fcf4461"
     }
   }
 }
