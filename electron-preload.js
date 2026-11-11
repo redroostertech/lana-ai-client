@@ -21,6 +21,29 @@ contextBridge.exposeInMainWorld('lanaBrand', { flavor: brandFlavor, name: brandF
 applyBrandToDocument(document, brandFlavor);
 
 /**
+ * This computer's approximate location (src/js/location-permission.model.js). Read only after
+ * the person turned Location on; the main process also refuses geolocation until then. Only the
+ * rounded reading is returned; the exact position is never logged or kept.
+ */
+const locationModel = require('./src/js/location-permission.model');
+const LOCATION_OPTIONS = { enableHighAccuracy: false, maximumAge: 10 * 60 * 1000, timeout: 15000 };
+
+async function readApproximateLocation() {
+  let choice;
+  try { choice = await ipcRenderer.invoke('location:get-choice'); } catch (_) { choice = null; }
+  const allowed = Boolean(choice && choice.success && choice.allowed);
+  if (!allowed) return locationModel.buildReading({ allowed: false });
+  if (!navigator.geolocation) return locationModel.buildReading({ allowed: true, supported: false });
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => resolve(locationModel.buildReading({ allowed: true, coords: position.coords })),
+      (error) => resolve(locationModel.buildReading({ allowed: true, error: { code: error && error.code } })),
+      LOCATION_OPTIONS
+    );
+  });
+}
+
+/**
  * Login token. It lives in the main process (electron-token-store.js), OS
  * keychain encrypted at rest; this page only holds a copy in memory. The calls
  * are synchronous so the many synchronous readers keep working and a set or
@@ -185,6 +208,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setVoiceSettings: (settings) => ipcRenderer.invoke('capabilities:set-voice-settings', { settings }),
     getVoicePermissions: () => ipcRenderer.invoke('capabilities:get-voice-permissions'),
     requestVoicePermission: (type) => ipcRenderer.invoke('capabilities:request-voice-permission', { type })
+  },
+
+  /**
+   * Settings > General > Location. getApproximate() is the seam for the office city and state:
+   * it resolves { status: 'granted'|'denied'|'unavailable'|'prompt', approx: { lat, lon } | null,
+   * accuracyKm }. The position is rounded here, so the page never gets the exact one.
+   */
+  location: {
+    getChoice: () => ipcRenderer.invoke('location:get-choice'),
+    setChoice: (allowed) => ipcRenderer.invoke('location:set-choice', { allowed: allowed === true }),
+    getApproximate: () => readApproximateLocation()
   },
 
   /**

@@ -97,7 +97,9 @@
     ],
     "extendInfo": {
       "NSMicrophoneUsageDescription": "LANA uses the microphone when you dictate, talk with LANA, or record a meeting.",
-      "NSBluetoothAlwaysUsageDescription": "LANA uses Bluetooth to let your paired phone know when this computer has something for it."
+      "NSBluetoothAlwaysUsageDescription": "LANA uses Bluetooth to let your paired phone know when this computer has something for it.",
+      "NSLocationUsageDescription": "LANA uses your approximate location to show your office's city and state. LANA never stores your exact location.",
+      "NSLocationWhenInUseUsageDescription": "LANA uses your approximate location to show your office's city and state. LANA never stores your exact location."
     },
     "extraResources": [
       {

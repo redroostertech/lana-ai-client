@@ -90,7 +90,7 @@ const { refreshHostedDiscovery, verifyServer, discoverByDomain } = require('./el
 // the control plane's SHA-256 only; everything else keeps default checks.
 const chefPin = require('./electron-chef-pin');
 const { createAppLinkRouter, createFirmSignOut, oldSessionNotice, registerAppLinkIpc, createColdStartQueue, deepLinkFromArgv } = require('./electron-app-links');
-const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified, saveBrainchildLink, getBrainchildLink, clearBrainchildLink, setBrainchildAutoBindDisabled, isBrainchildAutoBindDisabled, authTokenPersistence, offlineKeyPersistence, getLocalEnginePreferences, updateLocalEnginePreferences, firstLaunchPersistence } = require('./electron-storage');
+const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified, saveBrainchildLink, getBrainchildLink, clearBrainchildLink, setBrainchildAutoBindDisabled, isBrainchildAutoBindDisabled, authTokenPersistence, offlineKeyPersistence, getLocalEnginePreferences, updateLocalEnginePreferences, firstLaunchPersistence, locationPersistence } = require('./electron-storage');
 chefPin.configure({ getSavedServer });
 const { createLocalEngineHost } = require('./electron-local-engine');
 const { createTokenStore, registerTokenIpc, hasLiveSession } = require('./electron-token-store');
@@ -102,6 +102,7 @@ const { createOfflineKeyStore } = require('./electron-offline-key');
 const offlineKeyStore = createOfflineKeyStore({ safeStorage, persistence: offlineKeyPersistence });
 const { checkForUpdates, downloadAndInstallUpdate, showOptionalUpdateDialog, showForceUpdateDialog, shouldCheckForUpdates, configureAutoUpdater, getLastUpdateCheck, getLastCheckResult } = require('./electron-updater-custom');
 const { registerSystemInfoIpc } = require('./electron-system-info');
+const { installLocationPermissionHandlers, registerLocationIpc } = require('./electron-location');
 const { logInfo, logError, logWarn, exportLogs, getLogFilePath } = require('./electron-logger');
 
 // Local AI engine (local-ai-engine plan, phase 6). When an engine is
@@ -2144,6 +2145,9 @@ registerSystemInfoIpc(ipcMain, {
   logError
 });
 
+// Settings > General > Location: whether the person turned it on (electron-location.js).
+registerLocationIpc(ipcMain, { persistence: locationPersistence });
+
 const bridgeConsentsStore = new Store({
   name: 'bridge-consents',
   defaults: { consents: {} }
@@ -2500,6 +2504,13 @@ app.whenReady().then(async () => {
   // The box Chef's certificate check for the renderer, before any window (and
   // so before the sign-in page's /api/health/discovery probe) exists.
   chefPin.installCertificateVerifyProc(session.defaultSession, logInfo);
+
+  // Geolocation only for the app's own pages, and only after the person turned Location on
+  // in Settings. Every other permission keeps Electron's default.
+  installLocationPermissionHandlers(session.defaultSession, {
+    appRoot: path.join(__dirname, 'public_html'),
+    isAllowed: () => locationPersistence.read().allowed
+  });
 
   // Configure session to handle CORS for API requests
   // This allows the file:// app to make requests to http:// backend
