@@ -67,7 +67,8 @@ BACKEND_IP=""
 PLATFORM="all"
 ARCH="all"
 SKIP_INSTALL=false
-CLEAN=true  # Always clean for fresh builds
+CLEAN=false  # --clean empties dist/ and build caches first; off by default so one target's
+             # build never deletes the installers built before it
 DEV_MODE=false
 DEMO_MODE=false
 AUTO_DISCOVERY_MODE=true  # Default to auto-discovery mode
@@ -436,12 +437,8 @@ clean_build() {
         rm -rf node_modules/.cache/
         print_success "Build directories cleaned"
 
-        # Clear Electron app cache (ensures fresh config is loaded)
-        print_step "Clearing Electron app cache..."
-        rm -rf ~/Library/Application\ Support/LanaAI 2>/dev/null || true
-        rm -rf ~/Library/Caches/LanaAI 2>/dev/null || true
-        rm -rf ~/Library/Application\ Support/Electron 2>/dev/null || true
-        print_success "Electron cache cleared"
+        # Never delete app data under ~/Library: it is the person's own data
+        # (and Electron's default folder is shared by every unnamed Electron app).
     fi
 }
 
