@@ -37,5 +37,10 @@
       "-DLQE_VULKAN=ON"
     ]
   },
-  "builds": {}
+  "builds": {
+    "macos-arm64": {
+      "sha256": "c4e24a92f66f1c9dde3bb289d1ae7489cb693905660df22bf8d3449adfd3f8df",
+      "bytes": 5904432
+    }
+  }
 }
