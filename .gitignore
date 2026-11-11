@@ -327,5 +327,8 @@ build/briefs/
 build/redactor/
 build/pip/
 build/engine/
+# The LANA document editor (scripts/fetch-lana-editor.js)
+build/lana-editor/
+build/lana-editor.partial/
 briefs/native/macos/ble-wake-helper/.build/
 build/briefs-tools/

@@ -11,18 +11,22 @@
  *                            and search embedding cannot run on the computer.
  *   engine-before-pack.js    the LANA engine folder at its pinned build (scripts/build-engine.js).
  *                            Without it the installed app has no engine on the computer.
+ *   editor-before-pack.js    the LANA document editor at its pinned build
+ *                            (scripts/fetch-lana-editor.js). Without it documents open read-only.
  */
 
 const briefs = require('./briefs-before-pack');
 const redactor = require('./redactor-before-pack');
 const pip = require('./pip-before-pack');
 const engine = require('./engine-before-pack');
+const editor = require('./editor-before-pack');
 
 async function beforePack(context) {
   await briefs(context);
   await redactor(context);
   await pip(context);
   await engine(context);
+  await editor(context);
 }
 
 module.exports = beforePack;
