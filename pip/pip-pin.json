@@ -41,6 +41,10 @@
     "macos-arm64": {
       "sha256": "c4e24a92f66f1c9dde3bb289d1ae7489cb693905660df22bf8d3449adfd3f8df",
       "bytes": 5904432
+    },
+    "macos-x64": {
+      "sha256": "d01fcfc764f300e4617a559cc083e925931afe053d6457d46a748a18f76f311a",
+      "bytes": 5738608
     }
   }
 }
