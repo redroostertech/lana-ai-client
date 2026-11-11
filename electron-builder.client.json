@@ -30,6 +30,16 @@
       "to": "briefs/dist",
       "filter": ["*.cjs"]
     },
+    {
+      "from": "build/icons",
+      "to": "app-icons/icons",
+      "filter": ["*.png", "*.icns"]
+    },
+    {
+      "from": "build/icons-lana-one",
+      "to": "app-icons/icons-lana-one",
+      "filter": ["*.png", "*.icns"]
+    },
     "node_modules/electron-store/**/*",
     "node_modules/conf/**/*",
     "node_modules/atomically/**/*",
