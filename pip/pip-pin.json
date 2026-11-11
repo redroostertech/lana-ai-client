@@ -45,6 +45,10 @@
     "macos-x64": {
       "sha256": "d01fcfc764f300e4617a559cc083e925931afe053d6457d46a748a18f76f311a",
       "bytes": 5738608
+    },
+    "windows-x64": {
+      "sha256": "d4564f3dabcbb63bffa345b11c85044b8b7a45628781681fc2a36ec3db77c486",
+      "bytes": 79069696
     }
   }
 }
