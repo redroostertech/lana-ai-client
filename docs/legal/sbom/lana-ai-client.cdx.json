@@ -492,6 +492,214 @@
     },
     {
       "type": "library",
+      "bom-ref": "lana:lana-editor",
+      "name": "LANA document editor (lana-editor)",
+      "version": "30600b6b0600b9e8008c1c4aa76d62a9ec44d23b",
+      "licenses": [
+        {
+          "license": {
+            "name": "Proprietary (RedRooster Technologies owned code, not third-party)"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) RedRooster Technologies Inc.",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/redroostertech/lana-editor"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "build/lana-editor/editor-build.json"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana:lana-editor-pdf.js",
+      "name": "PDF.js (pdfjs-dist, in the LANA document editor)",
+      "version": "5.6.205",
+      "purl": "pkg:npm/pdfjs-dist@5.6.205",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "copyright": "Copyright 2024 Mozilla Foundation",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/mozilla/pdf.js"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "build/lana-editor/packages/redline-service/dist/vendor/pdfjs/pdf.mjs"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana:lana-editor-openjpeg",
+      "name": "OpenJPEG (pdf.js WebAssembly decoder)",
+      "version": "pdf.js 5.6.205 build",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-2-Clause"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2002-2014, Universite catholique de Louvain (UCL), Belgium; Copyright (c) 2002-2014, Professor Benoit Macq; Copyright (c) 2024, Mozilla Foundation (WebAssembly wrapper)",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/uclouvain/openjpeg"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana:lana-editor-jbig2",
+      "name": "JBIG2 decoder from PDFium (pdf.js WebAssembly decoder)",
+      "version": "pdf.js 5.6.205 build",
+      "licenses": [
+        {
+          "expression": "BSD-3-Clause AND Apache-2.0"
+        }
+      ],
+      "copyright": "Copyright 2014 The PDFium Authors; Copyright 2026 Mozilla Foundation (WebAssembly wrapper)",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://pdfium.googlesource.com/pdfium/"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana:lana-editor-qcms",
+      "name": "qcms (pdf.js WebAssembly color management)",
+      "version": "pdf.js 5.6.205 build",
+      "licenses": [
+        {
+          "expression": "MIT AND BSD-2-Clause"
+        }
+      ],
+      "copyright": "Copyright (C) 2009-2024 Mozilla Corporation; Copyright (C) 1998-2007 Marti Maria; Copyright (c) 2025, Mozilla Foundation (WebAssembly wrapper)",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/FirefoxGraphics/qcms"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana:lana-editor-cmaps",
+      "name": "Adobe CMap resources (pdf.js cmaps)",
+      "version": "pdf.js 5.6.205 build",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ],
+      "copyright": "Copyright 1990-2009 Adobe Systems Incorporated",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/adobe-type-tools/cmap-resources"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana:lana-editor-icc",
+      "name": "CGATS001Compat ICC profile (pdf.js iccs)",
+      "version": "v2 micro",
+      "licenses": [
+        {
+          "license": {
+            "id": "CC0-1.0"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/mozilla/pdf.js"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana:lana-editor-foxit-fonts",
+      "name": "Foxit standard fonts (pdf.js standard_fonts)",
+      "version": "pdf.js 5.6.205 build",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ],
+      "copyright": "Copyright 2014 PDFium Authors",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://pdfium.googlesource.com/pdfium/"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana:lana-editor-liberation-pdfjs",
+      "name": "Liberation Sans (pdf.js standard_fonts)",
+      "version": "pdf.js 5.6.205 build",
+      "licenses": [
+        {
+          "license": {
+            "id": "OFL-1.1"
+          }
+        }
+      ],
+      "copyright": "Digitized data copyright (c) 2010 Google Corporation; Copyright (c) 2012 Red Hat, Inc.",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/liberationfonts/liberation-fonts"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana:lana-editor-fonts",
+      "name": "Carlito, Caladea and Liberation Serif, Sans and Mono (editor fonts)",
+      "version": "ttf",
+      "licenses": [
+        {
+          "license": {
+            "id": "OFL-1.1"
+          }
+        }
+      ],
+      "copyright": "Carlito (c) Lukasz Dziedzic; Caladea (c) Huerta Tipografica; Liberation fonts (c) Red Hat, Inc.",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://openfontlicense.org"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:npm/%40leichtgewicht/ip-codec@2.0.5",
       "name": "@leichtgewicht/ip-codec",
       "version": "2.0.5",
@@ -2508,6 +2716,27 @@
     },
     {
       "type": "library",
+      "bom-ref": "pkg:npm/undici@7.30.0",
+      "name": "undici",
+      "version": "7.30.0",
+      "purl": "pkg:npm/undici@7.30.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) Matteo Collina and Undici contributors",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://undici.nodejs.org"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:npm/universalify@2.0.1",
       "name": "universalify",
       "version": "2.0.1",
@@ -2566,6 +2795,1896 @@
         {
           "type": "website",
           "url": "https://zod.dev"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/accepts@1.3.8",
+      "name": "accepts",
+      "version": "1.3.8",
+      "purl": "pkg:npm/accepts@1.3.8",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2014 Jonathan Ong <me@jongleberry.com>; Copyright (c) 2015 Douglas Christopher Wilson <doug@somethingdoug.com>",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/accepts"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/array-flatten@1.1.1",
+      "name": "array-flatten",
+      "version": "1.1.1",
+      "purl": "pkg:npm/array-flatten@1.1.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2014 Blake Embrey (hello@blakeembrey.com)",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/array-flatten"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/body-parser@1.20.6",
+      "name": "body-parser",
+      "version": "1.20.6",
+      "purl": "pkg:npm/body-parser@1.20.6",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2014 Jonathan Ong <me@jongleberry.com>; Copyright (c) 2014-2015 Douglas Christopher Wilson <doug@somethingdoug.com>",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/body-parser"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/bytes@3.1.2",
+      "name": "bytes",
+      "version": "3.1.2",
+      "purl": "pkg:npm/bytes@3.1.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2012-2014 TJ Holowaychuk <tj@vision-media.ca>; Copyright (c) 2015 Jed Watson <jed.watson@me.com>",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/bytes"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/call-bind-apply-helpers@1.0.2",
+      "name": "call-bind-apply-helpers",
+      "version": "1.0.2",
+      "purl": "pkg:npm/call-bind-apply-helpers@1.0.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2024 Jordan Harband",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/call-bind-apply-helpers"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/call-bound@1.0.4",
+      "name": "call-bound",
+      "version": "1.0.4",
+      "purl": "pkg:npm/call-bound@1.0.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2024 Jordan Harband",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/call-bound"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/content-disposition@0.5.4",
+      "name": "content-disposition",
+      "version": "0.5.4",
+      "purl": "pkg:npm/content-disposition@0.5.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2014-2017 Douglas Christopher Wilson",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/content-disposition"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/content-type@1.0.5",
+      "name": "content-type",
+      "version": "1.0.5",
+      "purl": "pkg:npm/content-type@1.0.5",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2015 Douglas Christopher Wilson",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/content-type"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/cookie-signature@1.0.7",
+      "name": "cookie-signature",
+      "version": "1.0.7",
+      "purl": "pkg:npm/cookie-signature@1.0.7",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2012 LearnBoost &lt;tj@learnboost.com&gt;",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/cookie-signature"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/cookie@0.7.2",
+      "name": "cookie",
+      "version": "0.7.2",
+      "purl": "pkg:npm/cookie@0.7.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2012-2014 Roman Shtylman <shtylman@gmail.com>; Copyright (c) 2015 Douglas Christopher Wilson <doug@somethingdoug.com>",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/cookie"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/debug@2.6.9",
+      "name": "debug",
+      "version": "2.6.9",
+      "purl": "pkg:npm/debug@2.6.9",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2014 TJ Holowaychuk <tj@vision-media.ca>",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/debug"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/debug@4.4.3",
+      "name": "debug",
+      "version": "4.4.3",
+      "purl": "pkg:npm/debug@4.4.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2014-2017 TJ Holowaychuk <tj@vision-media.ca>; Copyright (c) 2018-2021 Josh Junon",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/debug"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/depd@2.0.0",
+      "name": "depd",
+      "version": "2.0.0",
+      "purl": "pkg:npm/depd@2.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2014-2018 Douglas Christopher Wilson",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/depd"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/destroy@1.2.0",
+      "name": "destroy",
+      "version": "1.2.0",
+      "purl": "pkg:npm/destroy@1.2.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2014 Jonathan Ong me@jongleberry.com; Copyright (c) 2015-2022 Douglas Christopher Wilson doug@somethingdoug.com",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/destroy"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/dunder-proto@1.0.1",
+      "name": "dunder-proto",
+      "version": "1.0.1",
+      "purl": "pkg:npm/dunder-proto@1.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2024 ECMAScript Shims",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/dunder-proto"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/ee-first@1.1.1",
+      "name": "ee-first",
+      "version": "1.1.1",
+      "purl": "pkg:npm/ee-first@1.1.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2014 Jonathan Ong me@jongleberry.com",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/ee-first"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/encodeurl@2.0.0",
+      "name": "encodeurl",
+      "version": "2.0.0",
+      "purl": "pkg:npm/encodeurl@2.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2016 Douglas Christopher Wilson",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/encodeurl"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/es-define-property@1.0.1",
+      "name": "es-define-property",
+      "version": "1.0.1",
+      "purl": "pkg:npm/es-define-property@1.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2024 Jordan Harband",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/es-define-property"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/es-errors@1.3.0",
+      "name": "es-errors",
+      "version": "1.3.0",
+      "purl": "pkg:npm/es-errors@1.3.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2024 Jordan Harband",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/es-errors"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/es-object-atoms@1.1.2",
+      "name": "es-object-atoms",
+      "version": "1.1.2",
+      "purl": "pkg:npm/es-object-atoms@1.1.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2024 Jordan Harband",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/es-object-atoms"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/escape-html@1.0.3",
+      "name": "escape-html",
+      "version": "1.0.3",
+      "purl": "pkg:npm/escape-html@1.0.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2012-2013 TJ Holowaychuk; Copyright (c) 2015 Andreas Lubbe; Copyright (c) 2015 Tiancheng \"Timothy\" Gu",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/escape-html"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/etag@1.8.1",
+      "name": "etag",
+      "version": "1.8.1",
+      "purl": "pkg:npm/etag@1.8.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2014-2016 Douglas Christopher Wilson",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/etag"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/express@4.22.2",
+      "name": "express",
+      "version": "4.22.2",
+      "purl": "pkg:npm/express@4.22.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2009-2014 TJ Holowaychuk <tj@vision-media.ca>; Copyright (c) 2013-2014 Roman Shtylman <shtylman+expressjs@gmail.com>; Copyright (c) 2014-2015 Douglas Christopher Wilson <doug@somethingdoug.com>",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/express"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/finalhandler@1.3.2",
+      "name": "finalhandler",
+      "version": "1.3.2",
+      "purl": "pkg:npm/finalhandler@1.3.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2014-2022 Douglas Christopher Wilson <doug@somethingdoug.com>",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/finalhandler"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/forwarded@0.2.0",
+      "name": "forwarded",
+      "version": "0.2.0",
+      "purl": "pkg:npm/forwarded@0.2.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2014-2017 Douglas Christopher Wilson",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/forwarded"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/fresh@0.5.2",
+      "name": "fresh",
+      "version": "0.5.2",
+      "purl": "pkg:npm/fresh@0.5.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2012 TJ Holowaychuk <tj@vision-media.ca>; Copyright (c) 2016-2017 Douglas Christopher Wilson <doug@somethingdoug.com>",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/fresh"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/function-bind@1.1.2",
+      "name": "function-bind",
+      "version": "1.1.2",
+      "purl": "pkg:npm/function-bind@1.1.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2013 Raynos.",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/function-bind"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/get-intrinsic@1.3.0",
+      "name": "get-intrinsic",
+      "version": "1.3.0",
+      "purl": "pkg:npm/get-intrinsic@1.3.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2020 Jordan Harband",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/get-intrinsic"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/get-proto@1.0.1",
+      "name": "get-proto",
+      "version": "1.0.1",
+      "purl": "pkg:npm/get-proto@1.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2025 Jordan Harband",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/get-proto"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/gopd@1.2.0",
+      "name": "gopd",
+      "version": "1.2.0",
+      "purl": "pkg:npm/gopd@1.2.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2022 Jordan Harband",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/gopd"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/has-symbols@1.1.0",
+      "name": "has-symbols",
+      "version": "1.1.0",
+      "purl": "pkg:npm/has-symbols@1.1.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2016 Jordan Harband",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/has-symbols"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/hasown@2.0.4",
+      "name": "hasown",
+      "version": "2.0.4",
+      "purl": "pkg:npm/hasown@2.0.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) Jordan Harband and contributors",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/hasown"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/http-errors@2.0.1",
+      "name": "http-errors",
+      "version": "2.0.1",
+      "purl": "pkg:npm/http-errors@2.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2014 Jonathan Ong me@jongleberry.com; Copyright (c) 2016 Douglas Christopher Wilson doug@somethingdoug.com",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/http-errors"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/iconv-lite@0.4.24",
+      "name": "iconv-lite",
+      "version": "0.4.24",
+      "purl": "pkg:npm/iconv-lite@0.4.24",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2011 Alexander Shtuchkin",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/iconv-lite"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/inherits@2.0.4",
+      "name": "inherits",
+      "version": "2.0.4",
+      "purl": "pkg:npm/inherits@2.0.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "ISC"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) Isaac Z. Schlueter",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/inherits"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/ipaddr.js@1.9.1",
+      "name": "ipaddr.js",
+      "version": "1.9.1",
+      "purl": "pkg:npm/ipaddr.js@1.9.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (C) 2011-2017 whitequark <whitequark@whitequark.org>",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/ipaddr.js"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/math-intrinsics@1.1.0",
+      "name": "math-intrinsics",
+      "version": "1.1.0",
+      "purl": "pkg:npm/math-intrinsics@1.1.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2024 ECMAScript Shims",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/math-intrinsics"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/media-typer@0.3.0",
+      "name": "media-typer",
+      "version": "0.3.0",
+      "purl": "pkg:npm/media-typer@0.3.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2014 Douglas Christopher Wilson",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/media-typer"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/merge-descriptors@1.0.3",
+      "name": "merge-descriptors",
+      "version": "1.0.3",
+      "purl": "pkg:npm/merge-descriptors@1.0.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2013 Jonathan Ong <me@jongleberry.com>; Copyright (c) 2015 Douglas Christopher Wilson <doug@somethingdoug.com>",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/merge-descriptors"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/methods@1.1.2",
+      "name": "methods",
+      "version": "1.1.2",
+      "purl": "pkg:npm/methods@1.1.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2013-2014 TJ Holowaychuk <tj@vision-media.ca>; Copyright (c) 2015-2016 Douglas Christopher Wilson <doug@somethingdoug.com>",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/methods"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/mime-db@1.52.0",
+      "name": "mime-db",
+      "version": "1.52.0",
+      "purl": "pkg:npm/mime-db@1.52.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2014 Jonathan Ong <me@jongleberry.com>; Copyright (c) 2015-2022 Douglas Christopher Wilson <doug@somethingdoug.com>",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/mime-db"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/mime-types@2.1.35",
+      "name": "mime-types",
+      "version": "2.1.35",
+      "purl": "pkg:npm/mime-types@2.1.35",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2014 Jonathan Ong <me@jongleberry.com>; Copyright (c) 2015 Douglas Christopher Wilson <doug@somethingdoug.com>",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/mime-types"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/mime@1.6.0",
+      "name": "mime",
+      "version": "1.6.0",
+      "purl": "pkg:npm/mime@1.6.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2010 Benjamin Thomas, Robert Kieffer",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/mime"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/ms@2.0.0",
+      "name": "ms",
+      "version": "2.0.0",
+      "purl": "pkg:npm/ms@2.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2016 Zeit, Inc.",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/ms"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/ms@2.1.3",
+      "name": "ms",
+      "version": "2.1.3",
+      "purl": "pkg:npm/ms@2.1.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2020 Vercel, Inc.",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/ms"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/negotiator@0.6.3",
+      "name": "negotiator",
+      "version": "0.6.3",
+      "purl": "pkg:npm/negotiator@0.6.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2012-2014 Federico Romero; Copyright (c) 2012-2014 Isaac Z. Schlueter; Copyright (c) 2014-2015 Douglas Christopher Wilson",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/negotiator"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/object-inspect@1.13.4",
+      "name": "object-inspect",
+      "version": "1.13.4",
+      "purl": "pkg:npm/object-inspect@1.13.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2013 James Halliday",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/object-inspect"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/on-finished@2.4.1",
+      "name": "on-finished",
+      "version": "2.4.1",
+      "purl": "pkg:npm/on-finished@2.4.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2013 Jonathan Ong <me@jongleberry.com>; Copyright (c) 2014 Douglas Christopher Wilson <doug@somethingdoug.com>",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/on-finished"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/parseurl@1.3.3",
+      "name": "parseurl",
+      "version": "1.3.3",
+      "purl": "pkg:npm/parseurl@1.3.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2014 Jonathan Ong <me@jongleberry.com>; Copyright (c) 2014-2017 Douglas Christopher Wilson <doug@somethingdoug.com>",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/parseurl"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/path-to-regexp@0.1.13",
+      "name": "path-to-regexp",
+      "version": "0.1.13",
+      "purl": "pkg:npm/path-to-regexp@0.1.13",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2014 Blake Embrey (hello@blakeembrey.com)",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/path-to-regexp"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/proxy-addr@2.0.7",
+      "name": "proxy-addr",
+      "version": "2.0.7",
+      "purl": "pkg:npm/proxy-addr@2.0.7",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2014-2016 Douglas Christopher Wilson",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/proxy-addr"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/qs@6.15.3",
+      "name": "qs",
+      "version": "6.15.3",
+      "purl": "pkg:npm/qs@6.15.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2014, Nathan LaFreniere and other [contributors](https://github.com/ljharb/qs/graphs/contributors)",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/qs"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/range-parser@1.2.1",
+      "name": "range-parser",
+      "version": "1.2.1",
+      "purl": "pkg:npm/range-parser@1.2.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2012-2014 TJ Holowaychuk <tj@vision-media.ca>; Copyright (c) 2015-2016 Douglas Christopher Wilson <doug@somethingdoug.com",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/range-parser"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/raw-body@2.5.3",
+      "name": "raw-body",
+      "version": "2.5.3",
+      "purl": "pkg:npm/raw-body@2.5.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2013-2014 Jonathan Ong <me@jongleberry.com>; Copyright (c) 2014-2022 Douglas Christopher Wilson <doug@somethingdoug.com>",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/raw-body"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/safe-buffer@5.2.1",
+      "name": "safe-buffer",
+      "version": "5.2.1",
+      "purl": "pkg:npm/safe-buffer@5.2.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) Feross Aboukhadijeh",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/safe-buffer"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/safer-buffer@2.1.2",
+      "name": "safer-buffer",
+      "version": "2.1.2",
+      "purl": "pkg:npm/safer-buffer@2.1.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2018 Nikita Skovoroda <chalkerx@gmail.com>",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/safer-buffer"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/send@0.19.2",
+      "name": "send",
+      "version": "0.19.2",
+      "purl": "pkg:npm/send@0.19.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2012 TJ Holowaychuk; Copyright (c) 2014-2022 Douglas Christopher Wilson",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/send"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/serve-static@1.16.3",
+      "name": "serve-static",
+      "version": "1.16.3",
+      "purl": "pkg:npm/serve-static@1.16.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2010 Sencha Inc.; Copyright (c) 2011 LearnBoost; Copyright (c) 2011 TJ Holowaychuk",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/serve-static"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/setprototypeof@1.2.0",
+      "name": "setprototypeof",
+      "version": "1.2.0",
+      "purl": "pkg:npm/setprototypeof@1.2.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "ISC"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2015, Wes Todd",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/setprototypeof"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/side-channel-list@1.0.1",
+      "name": "side-channel-list",
+      "version": "1.0.1",
+      "purl": "pkg:npm/side-channel-list@1.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2024 Jordan Harband",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/side-channel-list"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/side-channel-map@1.0.1",
+      "name": "side-channel-map",
+      "version": "1.0.1",
+      "purl": "pkg:npm/side-channel-map@1.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2024 Jordan Harband",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/side-channel-map"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/side-channel-weakmap@1.0.2",
+      "name": "side-channel-weakmap",
+      "version": "1.0.2",
+      "purl": "pkg:npm/side-channel-weakmap@1.0.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2019 Jordan Harband",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/side-channel-weakmap"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/side-channel@1.1.1",
+      "name": "side-channel",
+      "version": "1.1.1",
+      "purl": "pkg:npm/side-channel@1.1.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2019 Jordan Harband",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/side-channel"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/statuses@2.0.2",
+      "name": "statuses",
+      "version": "2.0.2",
+      "purl": "pkg:npm/statuses@2.0.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2014 Jonathan Ong <me@jongleberry.com>; Copyright (c) 2016 Douglas Christopher Wilson <doug@somethingdoug.com>",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/statuses"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/toidentifier@1.0.1",
+      "name": "toidentifier",
+      "version": "1.0.1",
+      "purl": "pkg:npm/toidentifier@1.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2016 Douglas Christopher Wilson <doug@somethingdoug.com>",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/toidentifier"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/type-is@1.6.18",
+      "name": "type-is",
+      "version": "1.6.18",
+      "purl": "pkg:npm/type-is@1.6.18",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2014 Jonathan Ong <me@jongleberry.com>; Copyright (c) 2014-2015 Douglas Christopher Wilson <doug@somethingdoug.com>",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/type-is"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/unpipe@1.0.0",
+      "name": "unpipe",
+      "version": "1.0.0",
+      "purl": "pkg:npm/unpipe@1.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2015 Douglas Christopher Wilson <doug@somethingdoug.com>",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/unpipe"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/utils-merge@1.0.1",
+      "name": "utils-merge",
+      "version": "1.0.1",
+      "purl": "pkg:npm/utils-merge@1.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2013-2017 Jared Hanson",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/utils-merge"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/vary@1.1.2",
+      "name": "vary",
+      "version": "1.1.2",
+      "purl": "pkg:npm/vary@1.1.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2014-2017 Douglas Christopher Wilson",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/vary"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana-editor:pkg:npm/zod@3.25.76",
+      "name": "zod",
+      "version": "3.25.76",
+      "purl": "pkg:npm/zod@3.25.76",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2025 Colin McDonnell",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/zod"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "lana-editor"
         }
       ]
     }

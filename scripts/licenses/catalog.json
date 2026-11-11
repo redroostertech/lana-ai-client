@@ -9,7 +9,9 @@
     { "id": "models", "title": "AI models", "detail": "Models the app downloads on request for its local AI and keeps on this computer." },
     { "id": "vendored", "title": "Bundled libraries", "detail": "Browser libraries shipped as files with the app." },
     { "id": "fonts", "title": "Fonts", "detail": "Typefaces bundled with the app." },
-    { "id": "npm", "title": "JavaScript packages", "detail": "npm packages compiled into the app's main process and editor bundles, or shipped in its node_modules." }
+    { "id": "npm", "title": "JavaScript packages", "detail": "npm packages compiled into the app's main process and editor bundles, or shipped in its node_modules.", "table": true },
+    { "id": "editor", "title": "LANA document editor", "detail": "The document editor the app runs on this computer (lana-editor, shipped in the app's resources/lana-editor folder). lana-editor is RedRooster Technologies owned code; the third-party parts it bundles are listed here and below, and their license files also ship inside that folder." },
+    { "id": "editor-npm", "title": "LANA document editor: JavaScript packages", "detail": "npm packages the LANA document editor names in its own notices: those compiled into its redline service (server.bundle.mjs, listed in THIRD_PARTY_LICENSES.txt) and those in THIRD-PARTY-NOTICES.md. Read from build/lana-editor at generation time.", "table": true }
   ],
   "components": [
     {
@@ -255,6 +257,180 @@
       "copyright": "Copyright 2017 The Playfair Display Project Authors, with Reserved Font Name Playfair Display",
       "source": "https://github.com/clauseggers/Playfair-Display",
       "texts": [{ "title": "Playfair Display, SIL Open Font License 1.1", "file": "public_html/fonts/lana/PlayfairDisplay-LICENSE.txt" }]
+    },
+    {
+      "id": "lana-editor",
+      "section": "editor",
+      "name": "LANA document editor (lana-editor)",
+      "version": {
+        "lock": "editor/editor.lock.json"
+      },
+      "file": "build/lana-editor/editor-build.json",
+      "license": "Proprietary",
+      "licenseName": "Proprietary (RedRooster Technologies owned code, not third-party)",
+      "copyright": "Copyright (c) RedRooster Technologies Inc.",
+      "source": "https://github.com/redroostertech/lana-editor",
+      "notes": "Built from the commit pinned in editor/editor.lock.json by scripts/fetch-lana-editor.js. Listed here so the parts list is complete; the entries below are the third-party software it bundles.",
+      "texts": []
+    },
+    {
+      "id": "lana-editor-pdf.js",
+      "section": "editor",
+      "name": "PDF.js (pdfjs-dist, in the LANA document editor)",
+      "version": "5.6.205",
+      "file": "build/lana-editor/packages/redline-service/dist/vendor/pdfjs/pdf.mjs",
+      "license": "Apache-2.0",
+      "copyright": "Copyright 2024 Mozilla Foundation",
+      "source": "https://github.com/mozilla/pdf.js",
+      "purl": "pkg:npm/pdfjs-dist",
+      "notes": "The editor's redline service ships the pdfjs-dist build in dist/vendor/pdfjs, with its WebAssembly decoders, standard fonts, CMaps and ICC profile listed below.",
+      "texts": [
+        {
+          "title": "PDF.js (LANA document editor), Apache License 2.0",
+          "file": "build/lana-editor/packages/redline-service/dist/vendor/pdfjs/LICENSE"
+        }
+      ]
+    },
+    {
+      "id": "lana-editor-openjpeg",
+      "section": "editor",
+      "name": "OpenJPEG (pdf.js WebAssembly decoder)",
+      "version": "pdf.js 5.6.205 build",
+      "license": "BSD-2-Clause",
+      "copyright": "Copyright (c) 2002-2014, Universite catholique de Louvain (UCL), Belgium; Copyright (c) 2002-2014, Professor Benoit Macq; Copyright (c) 2024, Mozilla Foundation (WebAssembly wrapper)",
+      "source": "https://github.com/uclouvain/openjpeg",
+      "notes": "Shipped as openjpeg.wasm and openjpeg_nowasm_fallback.js in the editor's pdf.js wasm folder.",
+      "texts": [
+        {
+          "title": "OpenJPEG, BSD 2-Clause License",
+          "file": "build/lana-editor/packages/redline-service/dist/vendor/pdfjs/wasm/LICENSE_OPENJPEG"
+        },
+        {
+          "title": "pdf.js OpenJPEG wrapper, BSD 2-Clause License",
+          "file": "build/lana-editor/packages/redline-service/dist/vendor/pdfjs/wasm/LICENSE_PDFJS_OPENJPEG"
+        }
+      ]
+    },
+    {
+      "id": "lana-editor-jbig2",
+      "section": "editor",
+      "name": "JBIG2 decoder from PDFium (pdf.js WebAssembly decoder)",
+      "version": "pdf.js 5.6.205 build",
+      "license": "BSD-3-Clause AND Apache-2.0",
+      "licenseName": "BSD-3-Clause and Apache-2.0 (PDFium); Apache-2.0 (pdf.js wrapper)",
+      "copyright": "Copyright 2014 The PDFium Authors; Copyright 2026 Mozilla Foundation (WebAssembly wrapper)",
+      "source": "https://pdfium.googlesource.com/pdfium/",
+      "notes": "Shipped as jbig2.wasm in the editor's pdf.js wasm folder.",
+      "texts": [
+        {
+          "title": "PDFium JBIG2, BSD 3-Clause and Apache License 2.0",
+          "file": "build/lana-editor/packages/redline-service/dist/vendor/pdfjs/wasm/LICENSE_JBIG2"
+        },
+        {
+          "title": "pdf.js JBIG2 wrapper, Apache License 2.0 notice",
+          "file": "build/lana-editor/packages/redline-service/dist/vendor/pdfjs/wasm/LICENSE_PDFJS_JBIG2"
+        }
+      ]
+    },
+    {
+      "id": "lana-editor-qcms",
+      "section": "editor",
+      "name": "qcms (pdf.js WebAssembly color management)",
+      "version": "pdf.js 5.6.205 build",
+      "license": "MIT AND BSD-2-Clause",
+      "licenseName": "MIT (qcms); BSD-2-Clause (pdf.js wrapper)",
+      "copyright": "Copyright (C) 2009-2024 Mozilla Corporation; Copyright (C) 1998-2007 Marti Maria; Copyright (c) 2025, Mozilla Foundation (WebAssembly wrapper)",
+      "source": "https://github.com/FirefoxGraphics/qcms",
+      "notes": "Shipped as qcms_bg.wasm in the editor's pdf.js wasm folder.",
+      "texts": [
+        {
+          "title": "qcms, MIT License",
+          "file": "build/lana-editor/packages/redline-service/dist/vendor/pdfjs/wasm/LICENSE_QCMS"
+        },
+        {
+          "title": "pdf.js qcms wrapper, BSD 2-Clause License",
+          "file": "build/lana-editor/packages/redline-service/dist/vendor/pdfjs/wasm/LICENSE_PDFJS_QCMS"
+        }
+      ]
+    },
+    {
+      "id": "lana-editor-cmaps",
+      "section": "editor",
+      "name": "Adobe CMap resources (pdf.js cmaps)",
+      "version": "pdf.js 5.6.205 build",
+      "license": "BSD-3-Clause",
+      "copyright": "Copyright 1990-2009 Adobe Systems Incorporated",
+      "source": "https://github.com/adobe-type-tools/cmap-resources",
+      "texts": [
+        {
+          "title": "Adobe CMap resources, BSD 3-Clause License",
+          "file": "build/lana-editor/packages/redline-service/dist/vendor/pdfjs/cmaps/LICENSE"
+        }
+      ]
+    },
+    {
+      "id": "lana-editor-icc",
+      "section": "editor",
+      "name": "CGATS001Compat ICC profile (pdf.js iccs)",
+      "version": "v2 micro",
+      "license": "CC0-1.0",
+      "source": "https://github.com/mozilla/pdf.js",
+      "texts": [
+        {
+          "title": "ICC profile, CC0 1.0 Universal",
+          "file": "build/lana-editor/packages/redline-service/dist/vendor/pdfjs/iccs/LICENSE"
+        }
+      ]
+    },
+    {
+      "id": "lana-editor-foxit-fonts",
+      "section": "editor",
+      "name": "Foxit standard fonts (pdf.js standard_fonts)",
+      "version": "pdf.js 5.6.205 build",
+      "license": "BSD-3-Clause",
+      "copyright": "Copyright 2014 PDFium Authors",
+      "source": "https://pdfium.googlesource.com/pdfium/",
+      "texts": [
+        {
+          "title": "Foxit fonts (PDFium), BSD 3-Clause License",
+          "file": "build/lana-editor/packages/redline-service/dist/vendor/pdfjs/standard_fonts/LICENSE_FOXIT"
+        }
+      ]
+    },
+    {
+      "id": "lana-editor-liberation-pdfjs",
+      "section": "editor",
+      "name": "Liberation Sans (pdf.js standard_fonts)",
+      "version": "pdf.js 5.6.205 build",
+      "license": "OFL-1.1",
+      "copyright": "Digitized data copyright (c) 2010 Google Corporation; Copyright (c) 2012 Red Hat, Inc.",
+      "source": "https://github.com/liberationfonts/liberation-fonts",
+      "texts": [
+        {
+          "title": "Liberation fonts, SIL Open Font License 1.1",
+          "file": "build/lana-editor/packages/redline-service/dist/vendor/pdfjs/standard_fonts/LICENSE_LIBERATION"
+        }
+      ]
+    },
+    {
+      "id": "lana-editor-fonts",
+      "section": "editor",
+      "name": "Carlito, Caladea and Liberation Serif, Sans and Mono (editor fonts)",
+      "version": "ttf",
+      "license": "OFL-1.1",
+      "copyright": "Carlito (c) Lukasz Dziedzic; Caladea (c) Huerta Tipografica; Liberation fonts (c) Red Hat, Inc.",
+      "source": "https://openfontlicense.org",
+      "notes": "Metric-compatible substitutes the editor uses when a document's own fonts (Calibri, Cambria, Times New Roman, Arial, Courier New) are not available. The SIL Open Font License 1.1 text is reproduced with the Liberation fonts entry above.",
+      "texts": [
+        {
+          "title": "LANA document editor fonts, license summary",
+          "file": "build/lana-editor/packages/editor/assets/fonts/LICENSE.md"
+        },
+        {
+          "title": "Liberation fonts, SIL Open Font License 1.1",
+          "file": "build/lana-editor/packages/redline-service/dist/vendor/pdfjs/standard_fonts/LICENSE_LIBERATION"
+        }
+      ]
     }
   ]
 }

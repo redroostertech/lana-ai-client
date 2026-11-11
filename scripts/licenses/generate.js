@@ -3,7 +3,9 @@
  * Generates the LANA AI client open-source inventory. Offline: reads catalog.json, the
  * vendored files, node_modules and an esbuild metafile of the same bundles the build makes
  * (scripts/bundle-electron.js and scripts/build-tiptap.js), plus the electron-store chain
- * that electron-builder.client.json copies as node_modules.
+ * that electron-builder.client.json copies as node_modules, plus the LANA document editor
+ * in build/lana-editor (node scripts/fetch-lana-editor.js) and the packages its own
+ * notices name.
  *
  *   node scripts/licenses/generate.js           write every output
  *   node scripts/licenses/generate.js --check   exit 1 if any output is stale
@@ -14,7 +16,8 @@
  *   public_html/js/pages/open-source-licenses.data.js   data for the Open-source licenses page
  *
  * Fails when a vendored file no longer contains its catalog version, when a license text is
- * missing, or when a shipped package states no license.
+ * missing, when a shipped package states no license, or when build/lana-editor is missing or
+ * is not the commit editor/editor.lock.json pins.
  */
 'use strict';
 
@@ -27,6 +30,10 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const CHECK = process.argv.includes('--check');
 const catalog = readJSON(path.join(ROOT, 'scripts', 'licenses', 'catalog.json'));
 const problems = [];
+
+// The LANA document editor build that electron-builder.client.json packages as resources/lana-editor.
+const EDITOR_DIR = path.join(ROOT, 'build', 'lana-editor');
+const EDITOR_LOCK = path.join(ROOT, 'editor', 'editor.lock.json');
 
 // Entry points bundled by scripts/bundle-electron.js (electron and electron-store stay external).
 const ELECTRON_ENTRIES = ['electron-main.js', 'electron-preload.js', 'screen-voice-preload.js', 'electron-discovery.js', 'electron-storage.js', 'electron-updater-custom.js', 'electron-logger.js'];
@@ -102,6 +109,7 @@ function npmPurl(name, version) {
 
 function resolveVersion(version) {
   if (typeof version === 'string') return version;
+  if (version.lock) return readJSON(path.join(ROOT, version.lock)).commit;
   return readJSON(path.join(ROOT, 'node_modules', version.npm, 'package.json')).version + (version.suffix || '');
 }
 
@@ -110,9 +118,11 @@ function resolveVersion(version) {
 function catalogItems(store) {
   return catalog.components.map((component) => {
     const version = resolveVersion(component.version);
-    if (component.file !== undefined && typeof component.version === 'string') {
+    if (component.file !== undefined && !fs.existsSync(path.join(ROOT, component.file))) {
+      fail(`${component.id}: ${component.file} is missing`);
+    } else if (component.file !== undefined && (typeof component.version === 'string' || component.version.lock)) {
       const shipped = fs.readFileSync(path.join(ROOT, component.file), 'utf8');
-      if (!shipped.includes(component.version) && !component.version.startsWith('not recorded')) fail(`${component.id}: ${component.file} no longer contains version ${component.version}; update catalog.json`);
+      if (!shipped.includes(version) && !version.startsWith('not recorded')) fail(`${component.id}: ${component.file} no longer contains version ${version}; update catalog.json`);
     }
     const texts = component.texts.map((text) => store.addFile(text.title, path.join(ROOT, text.file))).filter(Boolean);
     return {
@@ -241,6 +251,67 @@ async function npmItems(store) {
   return items;
 }
 
+// MARK: - LANA document editor packages
+
+/** name@version (license) headers and their texts from the editor's two notices files. */
+function editorPackages() {
+  const packages = new Map();
+  const txtFile = path.join(EDITOR_DIR, 'packages', 'redline-service', 'dist', 'THIRD_PARTY_LICENSES.txt');
+  const mdFile = path.join(EDITOR_DIR, 'THIRD-PARTY-NOTICES.md');
+  for (const file of [txtFile, mdFile]) if (!fs.existsSync(file)) fail(`missing editor notices: ${rel(file)}`);
+  if (!fs.existsSync(txtFile) || !fs.existsSync(mdFile)) return [];
+  // THIRD_PARTY_LICENSES.txt: blocks split by dashed lines, each "name@version (license)", the
+  // license file path, a blank line, then the text.
+  for (const block of fs.readFileSync(txtFile, 'utf8').split(/\n-{20,}\n/)) {
+    const match = block.trim().match(/^(\S+)@(\d\S*) \(([^)]+)\)\n(node_modules\/\S+)\n\n([\s\S]*)$/);
+    if (match === null) continue;
+    const [, name, version, license, licenseFile, body] = match;
+    if (!packages.has(`${name}@${version}`)) packages.set(`${name}@${version}`, { name, version, license, title: `${name}, ${path.basename(licenseFile)}`, body });
+  }
+  // THIRD-PARTY-NOTICES.md: "## name@version (license)" then the text in a fenced block.
+  const md = fs.readFileSync(mdFile, 'utf8');
+  for (const match of md.matchAll(/^## (\S+)@(\d\S*) \(([^)]+)\)\n\n```\n([\s\S]*?)\n```$/gm)) {
+    const [, name, version, license, body] = match;
+    if (!packages.has(`${name}@${version}`)) packages.set(`${name}@${version}`, { name, version, license, title: `${name}, license`, body });
+  }
+  return [...packages.values()].sort((a, b) => `${a.name}@${a.version}`.localeCompare(`${b.name}@${b.version}`));
+}
+
+function editorItems(store) {
+  if (!fs.existsSync(path.join(EDITOR_DIR, 'editor-build.json'))) {
+    fail('build/lana-editor is missing; run node scripts/fetch-lana-editor.js');
+    return [];
+  }
+  const built = readJSON(path.join(EDITOR_DIR, 'editor-build.json')).commit;
+  const pinned = readJSON(EDITOR_LOCK).commit;
+  if (built !== pinned) fail(`build/lana-editor is ${built}, editor/editor.lock.json pins ${pinned}; run node scripts/fetch-lana-editor.js`);
+  // Packages the catalog already lists in its editor section (pdfjs-dist is the PDF.js entry).
+  const covered = new Set(catalog.components.filter((component) => component.section === 'editor' && component.purl).map((component) => component.purl.slice('pkg:npm/'.length)));
+  return editorPackages()
+    .filter((pkg) => !covered.has(pkg.name))
+    .map((pkg) => {
+      const text = store.add(pkg.title, pkg.body);
+      const copyright = copyrightLines(pkg.body).join('; ') || null;
+      const source = `https://www.npmjs.com/package/${pkg.name}`;
+      const purl = npmPurl(pkg.name, pkg.version);
+      return {
+        section: 'editor-npm',
+        item: { id: `editor-npm:${pkg.name}@${pkg.version}`, name: pkg.name, version: pkg.version, license: pkg.license, licenseName: pkg.license, copyright, attribution: null, source, modified: null, notes: null, shippedAs: null, texts: [text] },
+        cdx: {
+          type: 'library',
+          'bom-ref': `lana-editor:${purl}`,
+          name: pkg.name,
+          version: pkg.version,
+          purl,
+          licenses: cdxLicenses(pkg.license),
+          ...(copyright ? { copyright } : {}),
+          externalReferences: [{ type: 'website', url: source }],
+          properties: [{ name: 'lana:shippedAs', value: 'lana-editor' }],
+        },
+      };
+    });
+}
+
 // MARK: - Outputs
 
 function markdown(data) {
@@ -254,7 +325,7 @@ function markdown(data) {
   ];
   for (const section of data.sections) {
     lines.push(`## ${section.title}`, '', section.detail, '');
-    if (section.id === 'npm') {
+    if (section.table) {
       lines.push('| Package | Version | License | Copyright |', '|---|---|---|---|');
       for (const item of section.items) lines.push(`| ${item.name} | ${item.version} | ${item.licenseName} | ${(item.copyright || '').split('|').join('/')} |`);
       lines.push('');
@@ -279,10 +350,10 @@ function markdown(data) {
 
 async function main() {
   const store = new TextStore();
-  const entries = [...catalogItems(store), ...(await npmItems(store))];
+  const entries = [...catalogItems(store), ...(await npmItems(store)), ...editorItems(store)];
   const version = readJSON(path.join(ROOT, 'package.json')).version;
   const sections = catalog.sections
-    .map((section) => ({ id: section.id, title: section.title, detail: section.detail, items: entries.filter((entry) => entry.section === section.id).map((entry) => entry.item) }))
+    .map((section) => ({ id: section.id, title: section.title, detail: section.detail, ...(section.table ? { table: true } : {}), items: entries.filter((entry) => entry.section === section.id).map((entry) => entry.item) }))
     .filter((section) => section.items.length > 0);
   const data = {
     product: catalog.product.name,
