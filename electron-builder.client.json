@@ -78,6 +78,10 @@
   "mac": {
     "category": "public.app-category.business",
     "artifactName": "LanaAI--genesis--${version}-${arch}.${ext}",
+    "files": [
+      "!node_modules/sherpa-onnx-@(win|linux)-*/**/*",
+      "!node_modules/sherpa-onnx-darwin-!(${arch})/**/*"
+    ],
     "target": ["dmg", "zip"],
     "icon": "build/icons/icon.icns",
     "hardenedRuntime": true,
@@ -93,7 +97,11 @@
       "Contents/Resources/engine/node_modules/bare-fs/prebuilds/darwin-arm64/bare-fs.bare",
       "Contents/Resources/engine/node_modules/bare-path/prebuilds/darwin-arm64/bare-path.bare",
       "Contents/Resources/engine/node_modules/bare-url/prebuilds/darwin-arm64/bare-url.bare",
-      "Contents/Resources/engine/node_modules/bcrypt/prebuilds/darwin-arm64/bcrypt.node"
+      "Contents/Resources/engine/node_modules/bcrypt/prebuilds/darwin-arm64/bcrypt.node",
+      "Contents/Resources/engine/node_modules/bare-fs/prebuilds/darwin-x64/bare-fs.bare",
+      "Contents/Resources/engine/node_modules/bare-path/prebuilds/darwin-x64/bare-path.bare",
+      "Contents/Resources/engine/node_modules/bare-url/prebuilds/darwin-x64/bare-url.bare",
+      "Contents/Resources/engine/node_modules/bcrypt/prebuilds/darwin-x64/bcrypt.node"
     ],
     "extendInfo": {
       "NSMicrophoneUsageDescription": "LANA uses the microphone when you dictate, talk with LANA, or record a meeting.",
@@ -128,6 +136,10 @@
   },
   "win": {
     "artifactName": "LanaAI--genesis--${version}.${ext}",
+    "files": [
+      "!node_modules/sherpa-onnx-@(darwin|linux)-*/**/*",
+      "!node_modules/sherpa-onnx-win-!(${arch})/**/*"
+    ],
     "target": [
       {
         "target": "nsis",
@@ -160,6 +172,10 @@
   },
   "linux": {
     "artifactName": "LanaAI--genesis--${version}.${ext}",
+    "files": [
+      "!node_modules/sherpa-onnx-@(darwin|win)-*/**/*",
+      "!node_modules/sherpa-onnx-linux-!(${arch})/**/*"
+    ],
     "target": [
       "AppImage",
       "deb"

@@ -41,6 +41,11 @@
 #   # Demo mode
 #   ./scripts/build-client.sh --demo --platform mac
 #
+#   # Every installer on one computer (macOS arm64, macOS x64, Windows x64), from
+#   # native parts built on the matching computers. The file lists one
+#   # "<target>/<part> <url>" per line (scripts/fetch-client-parts.js):
+#   LANA_CLIENT_PARTS_URLS=<file> ./scripts/build-client.sh --platform all --arch all
+#
 ###############################################################################
 
 set -e  # Exit on error
@@ -166,6 +171,19 @@ EXAMPLES:
 
     Clean build and rebuild:
         ./scripts/build-client.sh --ip --clean
+
+    Every installer on one computer (macOS arm64, macOS x64, Windows x64):
+        LANA_CLIENT_PARTS_URLS=<file> ./scripts/build-client.sh --platform all --arch all
+
+ENVIRONMENT:
+    LANA_CLIENT_PARTS_URLS   A file of download links for each target's native parts,
+                             one "<target>/<part> <url>" per line. When set, the build first
+                             runs scripts/fetch-client-parts.js: each part is checked against
+                             its .sha256 and its pin and unpacked into build/parts/<target>/,
+                             and each target's Briefs speech package is installed. The links
+                             are never printed. Each package step then uses its own target's
+                             parts (scripts/parts-before-pack.js). Without build/parts the build
+                             uses build/pip, build/redactor and build/engine as they are.
 
 OUTPUT:
     Built applications will be in: ./dist/
@@ -384,6 +402,20 @@ install_dependencies() {
     print_success "Dependencies installed"
 }
 
+# Downloads each target's native parts into build/parts/<target>/ (checked
+# against their .sha256 and pins) and each target's Briefs speech package.
+# Runs after npm install, which would remove another platform's package again.
+fetch_client_parts() {
+    if [ -z "$LANA_CLIENT_PARTS_URLS" ]; then
+        return
+    fi
+
+    print_step "Fetching each target's native parts (links from LANA_CLIENT_PARTS_URLS)..."
+    cd "$PROJECT_ROOT"
+    node scripts/fetch-client-parts.js
+    print_success "Native parts are in build/parts/"
+}
+
 bundle_electron() {
     print_step "Bundling Electron files with current version..."
     cd "$PROJECT_ROOT"
@@ -483,8 +515,13 @@ build_app() {
             keep_mac_feed x64
             print_info "Step 3/4: Building Windows..."
             npm run build:win
-            print_info "Step 4/4: Building Linux..."
-            npm run build:linux
+            # With per-target parts, Linux is built only when its parts were fetched.
+            if [ -d "$PROJECT_ROOT/build/parts" ] && [ ! -d "$PROJECT_ROOT/build/parts/linux-x64" ]; then
+                print_info "Step 4/4: Skipping Linux (build/parts has no linux-x64)."
+            else
+                print_info "Step 4/4: Building Linux..."
+                npm run build:linux
+            fi
             ;;
         current)
             print_info "Building for current platform..."
@@ -702,6 +739,7 @@ main() {
     update_config
     clean_build
     install_dependencies
+    fetch_client_parts
     build_css
     bundle_electron
     build_app
