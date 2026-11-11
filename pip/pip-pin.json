@@ -5,11 +5,24 @@
   "version": "3.0.0",
   "commit": "ff965d52d578c88ef42f76f4015ded43cd522eaf",
   "build": "ff965d52d578",
+  "cmakeNotes": {
+    "macos-x64": "Not a LANA.cpp engine-release target at v3.0.0; flags come from its x64 release builds. LQE_DISTRIBUTION=ON and LQE_BUILD_TESTS=ON as in the linux-x64 and windows-x64 jobs of .github/workflows/engine-release.yml (GGML_NATIVE OFF, GGML_LLAMAFILE ON, static libraries are set by CMakeLists.txt). LQE_METAL=OFF: Intel Mac GPUs are not a LANA.cpp target, so this is the CPU backend like the x64 release builds; Accelerate stays on as in every Apple build. GGML_AVX2/FMA/F16C ON and AVX512 OFF: the x86-64-v3 baseline CMakeLists.txt pins for x64 distribution builds but applies only when NOT APPLE, so it is given here (every Mac that runs macOS 13.3 has AVX2). CMAKE_OSX_ARCHITECTURES=x86_64 states what CMakeLists.txt would detect. The macOS floor is 13.3, forced by CMakeLists.txt for any LQE_DISTRIBUTION Apple build and the same as macos-arm64; Electron 44 runs on macOS 12, so an Intel Mac on macOS 12 gets the app without local Pip. Checked by scripts/verify-pip-macos-x64.js in place of LANA.cpp scripts/verify_release_artifact.py, which accepts only darwin-arm64."
+  },
   "cmake": {
     "macos-arm64": [
       "-DLQE_DISTRIBUTION=ON",
       "-DLQE_BUILD_TESTS=ON",
       "-DLQE_METAL=ON"
+    ],
+    "macos-x64": [
+      "-DLQE_DISTRIBUTION=ON",
+      "-DLQE_BUILD_TESTS=ON",
+      "-DLQE_METAL=OFF",
+      "-DCMAKE_OSX_ARCHITECTURES=x86_64",
+      "-DGGML_AVX2=ON",
+      "-DGGML_FMA=ON",
+      "-DGGML_F16C=ON",
+      "-DGGML_AVX512=OFF"
     ],
     "linux-x64": [
       "-DLQE_DISTRIBUTION=ON",
@@ -27,6 +40,10 @@
     "macos-arm64": {
       "sha256": "0eb7c3a1d6dc3c9ebd1caacb0b1aa284f8722f53afc06357e8de1ef0cbf065ab",
       "bytes": 5904432
+    },
+    "macos-x64": {
+      "sha256": "f2875848581b0300aea93c8491907793f406baae94adc50ff47f5b585ca186d3",
+      "bytes": 5738608
     }
   }
 }
