@@ -494,7 +494,7 @@
       "type": "library",
       "bom-ref": "lana:lana-editor",
       "name": "LANA document editor (lana-editor)",
-      "version": "30600b6b0600b9e8008c1c4aa76d62a9ec44d23b",
+      "version": "974d0a2091092be4cdc9f9429b21cbc6280e1dae",
       "licenses": [
         {
           "license": {

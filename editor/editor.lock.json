@@ -1,5 +1,5 @@
 {
   "_doc": "The lana-editor commit the client packages and runs on the person's computer (electron-editor-service.js). scripts/fetch-lana-editor.js builds exactly this commit into build/lana-editor, and the package step refuses any other (scripts/editor-before-pack.js). Same shape as the backend's release/editor.lock.json; change the commit only together with a rebuild and a check that /v1/health still answers.",
   "repo": "https://github.com/redroostertech/lana-editor.git",
-  "commit": "30600b6b0600b9e8008c1c4aa76d62a9ec44d23b"
+  "commit": "974d0a2091092be4cdc9f9429b21cbc6280e1dae"
 }

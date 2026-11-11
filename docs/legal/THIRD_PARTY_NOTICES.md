@@ -276,7 +276,7 @@ npm packages compiled into the app's main process and editor bundles, or shipped
 
 The document editor the app runs on this computer (lana-editor, shipped in the app's resources/lana-editor folder). lana-editor is RedRooster Technologies owned code; the third-party parts it bundles are listed here and below, and their license files also ship inside that folder.
 
-### LANA document editor (lana-editor) 30600b6b0600b9e8008c1c4aa76d62a9ec44d23b
+### LANA document editor (lana-editor) 974d0a2091092be4cdc9f9429b21cbc6280e1dae
 
 - License: Proprietary (RedRooster Technologies owned code, not third-party)
 - Copyright: Copyright (c) RedRooster Technologies Inc.
