@@ -208,6 +208,10 @@
         "to": "pip/lqe"
       },
       {
+        "from": "build/pip/vulkan-fallback/libvulkan.so.1",
+        "to": "pip/vulkan-fallback/libvulkan.so.1"
+      },
+      {
         "from": "build/engine",
         "to": "engine"
       },

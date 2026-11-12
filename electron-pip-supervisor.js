@@ -182,66 +182,95 @@ const MISSING_FILE_MESSAGE = 'LANA\'s local engine could not start: a required s
 const DLL_NOT_FOUND = [0xC0000135, -1073741515];
 
 /**
- * The bundled Vulkan loader's folder, beside lqe.exe (pip/pip-pin.json vulkanLoader). Not lqe.exe's
- * own folder on purpose: Windows looks there before System32, which would put every computer with
- * a graphics driver on this older loader instead of its own.
+ * The bundled Vulkan loader's folder, beside lqe (pip/pip-pin.json vulkanLoader). Not lqe's own
+ * folder on purpose: Windows looks there before System32, and the Linux lqe has RUNPATH $ORIGIN,
+ * so a copy there would put every computer with its own loader on this one instead.
  */
 const VULKAN_FALLBACK_DIR = 'vulkan-fallback';
 
-/** True when a --version run failed because Windows could not find a DLL (0xC0000135). */
+/**
+ * What the fallback looks like on each platform: the loader file, the variable that puts its
+ * folder in the search, how that variable joins folders, and how a missing loader shows.
+ */
+const FALLBACK = Object.freeze({
+  win32: {
+    loader: 'vulkan-1.dll',
+    variable: 'PATH',
+    separator: ';',
+    missing: (run) => Boolean(run && (DLL_NOT_FOUND.includes(run.status) || (run.error && /0xC0000135|dll/i.test(String(run.error.message || ''))))),
+    explain: 'Windows could not load a DLL it needs (0xC0000135)'
+  },
+  linux: {
+    loader: 'libvulkan.so.1',
+    variable: 'LD_LIBRARY_PATH',
+    separator: ':',
+    missing: (run) => Boolean(run && /error while loading shared libraries: libvulkan\.so\.1/.test(`${run.stderr || ''}\n${run.error ? run.error.message : ''}`)),
+    explain: 'the system could not load libvulkan.so.1 ("error while loading shared libraries")'
+  }
+});
+
+/** True when a --version run on Windows failed because a DLL was missing (0xC0000135). */
 function dllNotFound(run) {
-  if (!run) {return false;}
-  if (DLL_NOT_FOUND.includes(run.status)) {return true;}
-  return Boolean(run.error && /0xC0000135|dll/i.test(String(run.error.message || '')));
+  return FALLBACK.win32.missing(run);
 }
 
 /**
- * `env` with `dir` first on PATH, whatever case the PATH name has (Windows keeps it as "Path").
- * PATH is searched after System32, so the bundled loader only fills in where there is none.
+ * `env` with `dir` first on `variable`, whatever case the name has (Windows keeps PATH as "Path").
+ * Windows searches PATH after System32, and Linux searches LD_LIBRARY_PATH before RUNPATH; either
+ * way it is set only when lqe found no loader of its own, so it only fills the gap.
  */
-function withFallbackPath(env, dir) {
+function withFallbackPath(env, dir, variable = 'PATH', separator = ';') {
   const out = { ...env };
-  const key = Object.keys(out).find((name) => name.toUpperCase() === 'PATH') || 'PATH';
-  out[key] = out[key] ? `${dir};${out[key]}` : dir;
+  const key = Object.keys(out).find((name) => name.toUpperCase() === variable) || variable;
+  out[key] = out[key] ? `${dir}${separator}${out[key]}` : dir;
   return out;
 }
 
 /**
- * Before any server starts on Windows: (a) lqe.exe --version as it is, so a computer with a
- * driver-installed loader uses its own; (b) only when that fails because a DLL is missing, again
- * with the bundled loader's folder first on PATH; (c) when that answers, the servers start with
- * the same environment. Returns { env } (null env: nothing changed) or { problem: { warning,
- * message } } when lqe.exe still cannot start, so no server starts and nothing restarts.
+ * Before any server starts on Windows and Linux: (a) lqe --version as it is, so a computer with
+ * its own Vulkan loader uses it; (b) only when that fails because the loader is missing, again
+ * with the bundled loader's folder first on PATH (Windows) or LD_LIBRARY_PATH (Linux); (c) when
+ * that answers, the servers start with the same environment. Returns { env } (null env: nothing
+ * changed) or { problem: { warning, message } } when lqe still cannot start, so no server starts
+ * and nothing restarts.
  *
  * @param {string} binary
  * @param {Function} runVersion - (binary, env|undefined) => spawnSync result
  * @param {Object} baseEnv - the environment servers would otherwise get
+ * @param {string} [platform] - 'win32' or 'linux'
  */
-function windowsStart(binary, runVersion, baseEnv) {
+function fallbackStart(binary, runVersion, baseEnv, platform = 'win32') {
+  const rules = FALLBACK[platform];
   const first = runVersion(binary, undefined);
   if (first && !first.error && first.status === 0) {return { env: null, fallback: false };}
   const fallbackDir = path.join(path.dirname(binary), VULKAN_FALLBACK_DIR);
-  if (dllNotFound(first)) {
-    const env = withFallbackPath(baseEnv, fallbackDir);
+  if (rules && rules.missing(first)) {
+    const env = withFallbackPath(baseEnv, fallbackDir, rules.variable, rules.separator);
     const second = runVersion(binary, env);
     if (second && !second.error && second.status === 0) {return { env, fallback: true };}
-    return { problem: versionProblem(binary, second, fallbackDir) };
+    return { problem: versionProblem(binary, second, fallbackDir, platform) };
   }
-  return { problem: versionProblem(binary, first, fallbackDir) };
+  return { problem: versionProblem(binary, first, fallbackDir, platform) };
+}
+
+/** fallbackStart on Windows. */
+function windowsStart(binary, runVersion, baseEnv) {
+  return fallbackStart(binary, runVersion, baseEnv, 'win32');
 }
 
 /**
- * The warning and status for a lqe.exe that would not start: Windows refuses it (0xC0000135) every
- * time, so starting servers would only restart forever.
+ * The warning and status for a lqe that would not start: it fails the same way every time, so
+ * starting servers would only restart forever.
  *
  * @param {{ status: number|null, error?: Error, stderr?: string }} run - spawnSync(binary, ['--version'])
  */
-function versionProblem(binary, run, fallbackDir = path.join(path.dirname(binary), VULKAN_FALLBACK_DIR)) {
+function versionProblem(binary, run, fallbackDir = path.join(path.dirname(binary), VULKAN_FALLBACK_DIR), platform = 'win32') {
   if (run && !run.error && run.status === 0) {return null;}
-  const dll = path.join(fallbackDir, 'vulkan-1.dll');
-  const why = dllNotFound(run)
-    ? `Windows could not load a DLL it needs (0xC0000135), even with the bundled Vulkan loader's folder on PATH. lqe.exe imports vulkan-1.dll; the installer carries it at ${dll} (pip/pip-pin.json vulkanLoader)`
-    : `it exited with ${run && run.error ? run.error.message : `code ${run && run.status}`}${run && run.stderr ? `: ${String(run.stderr).trim().slice(0, 200)}` : ''}; if it is a missing DLL, lqe.exe needs vulkan-1.dll, which the installer carries at ${dll}`;
+  const rules = FALLBACK[platform] || FALLBACK.win32;
+  const loader = path.join(fallbackDir, rules.loader);
+  const why = rules.missing(run)
+    ? `${rules.explain}, even with the bundled Vulkan loader's folder on ${rules.variable}. lqe needs ${rules.loader}; the installer carries it at ${loader} (pip/pip-pin.json vulkanLoader)`
+    : `it exited with ${run && run.error ? run.error.message : `code ${run && run.status}`}${run && run.stderr ? `: ${String(run.stderr).trim().slice(0, 200)}` : ''}; if a library is missing, lqe needs ${rules.loader}, which the installer carries at ${loader}`;
   return {
     warning: `[pip] ${binary} --version failed, so Pip is not started and chat and search use the cloud: ${why}`,
     message: MISSING_FILE_MESSAGE
@@ -281,7 +310,7 @@ async function checkPipHealth(fetch, url, expectFile, options = {}) {
  * @param {Function} [deps.readWiredLimitMb] - () => iogpu.wired_limit_mb on Apple silicon, or null
  * @param {string} [deps.platform] - process.platform
  * @param {Function} [deps.runVersion] - (binary, env) => spawnSync(binary, ['--version'], { env })
- *   result; asked on Windows before any server starts (windowsStart)
+ *   result; asked on Windows and Linux before any server starts (fallbackStart)
  * @param {Function} [deps.onProblem] - (message|null) => void, for the engine status
  */
 function createPip(deps) {
@@ -479,8 +508,8 @@ function createPip(deps) {
     lastApply = { result, modelsDir };
     let wanted = binary ? wantedServers({ result, modelsDir, env, accepts, cpuOnly: vulkanFailed }) : { chat: null, embedding: null };
     if (!binary) {log.warn('[pip] Pip is not installed on this computer; chat and embedding use the cloud');}
-    if (binary && platform === 'win32' && (wanted.chat || wanted.embedding)) {
-      const start = windowsStart(binary, runVersion, env);
+    if (binary && FALLBACK[platform] && (wanted.chat || wanted.embedding)) {
+      const start = fallbackStart(binary, runVersion, env, platform);
       serverEnv = start.env || null;
       if (start.problem) {
         log.warn(start.problem.warning);
@@ -561,6 +590,7 @@ module.exports = {
   DEFAULTS,
   versionProblem,
   windowsStart,
+  fallbackStart,
   withFallbackPath,
   leverHardware,
   VULKAN_FALLBACK_DIR,

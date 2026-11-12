@@ -102,6 +102,27 @@
     },
     {
       "type": "library",
+      "bom-ref": "lana:vulkan-loader-linux",
+      "name": "Vulkan loader (Linux, beside the local AI engine)",
+      "version": "1.4.350.0",
+      "purl": "pkg:github/KhronosGroup/Vulkan-Loader@1.4.350.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2015-2026 The Khronos Group Inc.; Copyright (c) 2015-2026 Valve Corporation; Copyright (c) 2015-2026 LunarG, Inc.",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/KhronosGroup/Vulkan-Loader"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "lana:model-nomic-embed-text",
       "name": "Nomic Embed Text v1.5 (search embeddings)",
       "version": "v1.5 (F16 GGUF)",

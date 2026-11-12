@@ -2,18 +2,19 @@
 'use strict';
 
 /**
- * Places build/pip/vulkan-fallback/vulkan-1.dll, the Khronos Vulkan loader the Windows package
- * ships in a folder beside lqe.exe (pip/pip-pin.json vulkanLoader; electron-pip-supervisor.js
- * windowsStart puts the folder on PATH only when lqe.exe cannot find a loader of its own).
- * Build time only; the app never downloads it.
+ * Places the Khronos Vulkan loader a package ships in pip/vulkan-fallback (pip/pip-pin.json
+ * vulkanLoader): build/pip/vulkan-fallback/vulkan-1.dll for Windows, libvulkan.so.1 for Linux.
+ * electron-pip-supervisor.js puts the folder on PATH (Windows) or LD_LIBRARY_PATH (Linux) only
+ * when lqe cannot find a loader of its own. Build time only; the app never downloads it.
  *
- * Takes the pinned LunarG Vulkan Runtime components archive, refuses it unless its sha256 is the
- * pinned one (the one LunarG publishes at sha256Source), unpacks the pinned member with tar
- * (bsdtar, which reads zip, ships with Windows 10 and later and with macOS), and refuses the file
- * unless its sha256 is the pinned one. Run by scripts/build-pip.sh on Windows; checked again
- * before packing (scripts/local-ai-pins.js checkPip) and after (checkPackaged).
+ * Takes the pinned LunarG archive (the Windows Vulkan Runtime components zip, the Linux SDK
+ * tarball), refuses it unless its sha256 is the pinned one (the one LunarG publishes at
+ * sha256Source), unpacks the pinned member with tar (bsdtar on Windows 10 and later and macOS,
+ * GNU tar on Linux; both read the archive types used), and refuses the file unless its sha256 is
+ * the pinned one. Run by scripts/build-pip.sh on Windows and Linux; checked again before packing
+ * (scripts/local-ai-pins.js checkPip) and after (checkPackaged).
  *
- *   node scripts/fetch-vulkan-loader.js [--archive <a downloaded copy of the archive>]
+ *   node scripts/fetch-vulkan-loader.js [--platform windows-x64|linux-x64] [--archive <a downloaded copy>]
  */
 
 const fs = require('fs');
@@ -21,6 +22,7 @@ const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
 const { execFileSync } = require('child_process');
+const { platformKey } = require('./local-ai-pins');
 
 const ROOT = path.resolve(__dirname, '..');
 
@@ -42,16 +44,19 @@ async function download(url) {
 }
 
 async function main(argv = process.argv.slice(2)) {
-  const loader = require('../pip/pip-pin.json').vulkanLoader;
+  const p = argv.indexOf('--platform');
+  const key = p >= 0 ? argv[p + 1] : platformKey(process.platform, process.arch);
+  const loader = (require('../pip/pip-pin.json').vulkanLoader || {})[key];
+  if (!loader || typeof loader !== 'object') {throw new Error(`pip/pip-pin.json has no Vulkan loader for ${key}.`);}
   const at = argv.indexOf('--archive');
   const archive = at >= 0 ? fs.readFileSync(argv[at + 1]) : await download(loader.archive.url);
-  const archiveProblems = checkBytes(archive, loader.archive.sha256, `the Vulkan Runtime archive ${loader.version}`);
+  const archiveProblems = checkBytes(archive, loader.archive.sha256, `the Vulkan archive ${loader.version} for ${key}`);
   if (archiveProblems.length) {throw new Error(archiveProblems.join(' '));}
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'vulkan-loader-'));
   try {
-    const zip = path.join(work, 'runtime.zip');
-    fs.writeFileSync(zip, archive);
-    execFileSync('tar', ['-xf', zip, '-C', work, loader.member], { stdio: 'inherit' });
+    const packed = path.join(work, path.basename(new URL(loader.archive.url).pathname));
+    fs.writeFileSync(packed, archive);
+    execFileSync('tar', ['-xf', packed, '-C', work, loader.member], { stdio: 'inherit' });
     const dll = fs.readFileSync(path.join(work, loader.member));
     const dllProblems = checkBytes(dll, loader.sha256, `${loader.member}`);
     if (dllProblems.length) {throw new Error(dllProblems.join(' '));}

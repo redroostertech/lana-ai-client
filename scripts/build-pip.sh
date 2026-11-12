@@ -127,8 +127,9 @@ fi
 mkdir -p "$root_dir/build/pip"
 cp "$binary" "$root_dir/build/pip/$exe"
 chmod 755 "$root_dir/build/pip/$exe"
-if [[ "$key" == windows-* ]]; then
-  # lqe.exe imports vulkan-1.dll; the package ships the pinned loader in pip/vulkan-fallback.
+if [[ "$key" == windows-* || "$key" == linux-* ]]; then
+  # lqe needs the Vulkan loader (vulkan-1.dll, libvulkan.so.1); the package ships the pinned one
+  # in pip/vulkan-fallback.
   node "$root_dir/scripts/fetch-vulkan-loader.js"
 fi
 sha="$(node -p "require('$root_dir/scripts/local-ai-pins.js').sha256File('$root_dir/build/pip/$exe')")"

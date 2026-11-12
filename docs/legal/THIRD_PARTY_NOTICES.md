@@ -39,6 +39,14 @@ The application runtime.
 - Notes: Unmodified binary from the LunarG Vulkan Runtime components archive 1.3.296.0, pinned by sha256 in pip/pip-pin.json. Windows installers only.
 - Source: https://github.com/KhronosGroup/Vulkan-Loader
 
+### Vulkan loader (Linux, beside the local AI engine) 1.4.350.0
+
+- License: Apache-2.0
+- Copyright: Copyright (c) 2015-2026 The Khronos Group Inc.; Copyright (c) 2015-2026 Valve Corporation; Copyright (c) 2015-2026 LunarG, Inc.
+- Attribution: On Linux the app ships libvulkan.so.1, the Khronos Vulkan loader as distributed in the LunarG Vulkan SDK, in a folder beside its local AI engine (lqe), used only when the computer has no Vulkan loader of its own, so the engine starts on computers without one.
+- Notes: Unmodified binary from the LunarG Vulkan SDK for Linux 1.4.350.0 (x86_64/lib/VulkanLoader/lib), pinned by sha256 in pip/pip-pin.json. Linux installers only.
+- Source: https://github.com/KhronosGroup/Vulkan-Loader
+
 ## AI models
 
 Models the app downloads on request for its local AI and keeps on this computer.
@@ -758,7 +766,7 @@ USE OR OTHER DEALINGS IN THE MATERIALS.
 
 ### Apache License 2.0
 
-Applies to: Nomic Embed Text v1.5 (search embeddings) v1.5 (F16 GGUF).
+Applies to: Vulkan loader (Linux, beside the local AI engine) 1.4.350.0, Nomic Embed Text v1.5 (search embeddings) v1.5 (F16 GGUF).
 
 ~~~~text
 

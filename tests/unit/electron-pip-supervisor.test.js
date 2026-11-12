@@ -331,14 +331,77 @@ describe('Windows: lqe.exe is asked for its version before any server starts', (
     expect(versionProblem('/x/lqe', { status: 0 })).toBeNull();
   });
 
-  test('control: macOS and Linux do not ask', async () => {
-    for (const platform of ['darwin', 'linux']) {
-      const r = runs(DLL);
-      const h = harness({ platform, runVersion: r.run });
-      await h.pip.apply(result(), MODELS);
-      expect(r.seen).toEqual([]);
-      expect(h.spawns).toHaveLength(2);
+  test('control: macOS does not ask', async () => {
+    const r = runs(DLL);
+    const h = harness({ platform: 'darwin', runVersion: r.run });
+    await h.pip.apply(result(), MODELS);
+    expect(r.seen).toEqual([]);
+    expect(h.spawns).toHaveLength(2);
+  });
+});
+
+describe('Linux: lqe is asked for its version before any server starts', () => {
+  const LIN_BINARY = path.join('/opt', 'LANA', 'resources', 'pip', 'lqe');
+  const FALLBACK = path.join(path.dirname(LIN_BINARY), 'vulkan-fallback');
+  const NO_LOADER = { status: 127, stderr: `${LIN_BINARY}: error while loading shared libraries: libvulkan.so.1: cannot open shared object file: No such file or directory\n` };
+  const OK = { status: 0, stdout: 'lqe 3.0.0 (396ca2c1d643)' };
+  const runs = (...answers) => {
+    const seen = [];
+    const run = (_file, env) => { seen.push(env); return answers[Math.min(seen.length, answers.length) - 1]; };
+    return { run, seen };
+  };
+
+  test('control: a first check that answers never sets LD_LIBRARY_PATH, and the servers keep the app\'s environment', async () => {
+    const r = runs(OK);
+    const h = harness({ platform: 'linux', binary: LIN_BINARY, env: { PATH: '/usr/bin' }, runVersion: r.run });
+    await h.pip.apply(result(), MODELS);
+    expect(r.seen).toEqual([undefined]);
+    expect(h.spawns).toHaveLength(2);
+    expect(h.spawnOptions.every((options) => options.env === undefined)).toBe(true);
+    expect(h.problems).toEqual([]);
+  });
+
+  test('libvulkan.so.1 missing: retried with the fallback folder first on LD_LIBRARY_PATH, and that env reaches every server', async () => {
+    const r = runs(NO_LOADER, OK);
+    const h = harness({ platform: 'linux', binary: LIN_BINARY, env: { PATH: '/usr/bin', LD_LIBRARY_PATH: '/usr/local/lib' }, runVersion: r.run });
+    await h.pip.apply(result(), MODELS);
+    expect(r.seen).toHaveLength(2);
+    expect(r.seen[0]).toBeUndefined();
+    expect(r.seen[1]).toEqual({ PATH: '/usr/bin', LD_LIBRARY_PATH: `${FALLBACK}:/usr/local/lib` });
+    expect(h.spawns).toHaveLength(2);
+    for (const options of h.spawnOptions) {expect(options.env).toEqual(r.seen[1]);}
+    expect(h.infos.filter((line) => /uses the bundled one/.test(line))).toHaveLength(1);
+    expect(h.problems).toEqual([]);
+    // Without one set before, LD_LIBRARY_PATH is just the fallback folder.
+    const { fallbackStart } = require('../../electron-pip-supervisor');
+    expect(fallbackStart(LIN_BINARY, runs(NO_LOADER, OK).run, { PATH: '/usr/bin' }, 'linux').env).toEqual({ PATH: '/usr/bin', LD_LIBRARY_PATH: FALLBACK });
+  });
+
+  test('only that failure is retried: another missing library or a crash goes straight to the status', () => {
+    const { fallbackStart } = require('../../electron-pip-supervisor');
+    for (const first of [
+      { status: 127, stderr: 'error while loading shared libraries: libgomp.so.1: cannot open shared object file' },
+      { status: 1, stderr: 'boom' },
+      { status: 0xC0000135 }
+    ]) {
+      const r = runs(first, OK);
+      const started = fallbackStart(LIN_BINARY, r.run, {}, 'linux');
+      expect(r.seen).toHaveLength(1);
+      expect(started.problem.message).toBe(MISSING_FILE_MESSAGE);
     }
+  });
+
+  test('a double failure: no server starts, the warning names libvulkan.so.1, the status says it plainly, nothing restarts', async () => {
+    const r = runs(NO_LOADER, NO_LOADER);
+    const h = harness({ platform: 'linux', binary: LIN_BINARY, runVersion: r.run });
+    const state = await h.pip.apply(result(), MODELS);
+    expect(r.seen).toHaveLength(2);
+    expect(h.spawns).toEqual([]);
+    expect(h.warnings.join('\n')).toMatch(/--version failed.*libvulkan\.so\.1.*LD_LIBRARY_PATH.*vulkan-fallback\/libvulkan\.so\.1/);
+    expect(h.problems).toEqual([MISSING_FILE_MESSAGE]);
+    expect(state.problem).toBe(MISSING_FILE_MESSAGE);
+    await settle(60000);
+    expect(h.spawns).toEqual([]);
   });
 });
 

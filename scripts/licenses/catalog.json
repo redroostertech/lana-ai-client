@@ -73,6 +73,21 @@
       ]
     },
     {
+      "id": "vulkan-loader-linux",
+      "section": "runtime",
+      "name": "Vulkan loader (Linux, beside the local AI engine)",
+      "version": "1.4.350.0",
+      "license": "Apache-2.0",
+      "copyright": "Copyright (c) 2015-2026 The Khronos Group Inc.; Copyright (c) 2015-2026 Valve Corporation; Copyright (c) 2015-2026 LunarG, Inc.",
+      "attribution": "On Linux the app ships libvulkan.so.1, the Khronos Vulkan loader as distributed in the LunarG Vulkan SDK, in a folder beside its local AI engine (lqe), used only when the computer has no Vulkan loader of its own, so the engine starts on computers without one.",
+      "source": "https://github.com/KhronosGroup/Vulkan-Loader",
+      "purl": "pkg:github/KhronosGroup/Vulkan-Loader",
+      "notes": "Unmodified binary from the LunarG Vulkan SDK for Linux 1.4.350.0 (x86_64/lib/VulkanLoader/lib), pinned by sha256 in pip/pip-pin.json. Linux installers only.",
+      "texts": [
+        { "title": "Apache License 2.0", "file": "scripts/licenses/texts/Apache-2.0.txt" }
+      ]
+    },
+    {
       "id": "model-nomic-embed-text",
       "section": "models",
       "name": "Nomic Embed Text v1.5 (search embeddings)",
