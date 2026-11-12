@@ -22,8 +22,11 @@
  *     so the engine's D-41 busy chunk of 512 rows applies.
  *   NVIDIA (CUDA, DGX Spark GB10 included): --flash-attn as the server deploy runs it; batching
  *     stays off (unmeasured on CUDA), and prefill is the engine's own choice.
- *   Vulkan (Windows without NVIDIA, Linux AMD): as NVIDIA, one or two slots, never gpu_inexact,
- *     no adaptive prefill (unmeasured).
+ *   Vulkan (AMD and Intel graphics on Windows and Linux, electron-gpu.js): as NVIDIA but one
+ *     slot, never gpu_inexact or batching, no adaptive prefill (unmeasured). Only when the plan
+ *     fits the model and its pool on the chip (local-ai-fit.model.js); otherwise processor only.
+ *     After start the model must be placed on the GPU (gpuUnused), or the supervisor restarts
+ *     chat once with the processor-only settings.
  *   Processor only: gpu_layers 0, the engine's own thread count (its physical cores), ubatch 512,
  *     --repack, prefix_share_mb 256, and batch_decode on dense models (exact on the processor). A
  *     mixture-of-experts model would need gpu_inexact to batch, so it does not batch here.
@@ -60,7 +63,7 @@ const DEFAULT_UBATCH = 512;
 const FAIR_CHUNK = 64;
 /** Under --repack a step of 4 rows would not match solo decode, so the engine caps lanes at 3. */
 const REPACK_MAX_LANES = 3;
-const VULKAN_MAX_SLOTS = 2;
+const VULKAN_MAX_SLOTS = 1;
 
 /** Which flags this binary's usage text names. Nothing is assumed: unknown means off. */
 function parseAccepts(helpText) {
@@ -125,7 +128,7 @@ function chatLevers({ hardware = {}, contextTokens, slots, poolTokens = null, mo
     const n = Math.max(1, Math.min(slots || 2, 2));
     Object.assign(config, { ctx: contextTokens, parallel: n, kv_type: 'q8_0', gpu_layers: gpu ? 99 : 0, ubatch: DEFAULT_UBATCH, fair_chunk: FAIR_CHUNK });
     if (gpu && accepts.gpuOutput) {config.gpu_output = true;}
-    return { config, args, slots: n, expectedContext: contextTokens, requested, backend, stale: true, expect: { startupLines: [], execTag: null, adaptivePrefill: false, batching: false } };
+    return { config, args, slots: n, expectedContext: contextTokens, requested, backend, stale: true, expect: { startupLines: [], execTag: null, adaptivePrefill: false, batching: false, gpuPlacement: false } };
   }
 
   const memory = hardware.totalMemoryBytes || 0;
@@ -142,7 +145,7 @@ function chatLevers({ hardware = {}, contextTokens, slots, poolTokens = null, mo
     if (accepts.gpuOutput) {config.gpu_output = true;}
   }
 
-  const expect = { startupLines: [], execTag: null, adaptivePrefill: false, batching: false };
+  const expect = { startupLines: [], execTag: null, adaptivePrefill: false, batching: false, gpuPlacement: backend === 'vulkan' };
   if (backend === 'metal') {
     if (accepts.adaptivePrefill && !accepts.adaptiveAutoMetal) {config.adaptive_prefill = true;}
     expect.adaptivePrefill = Boolean(accepts.adaptivePrefill);
@@ -203,9 +206,27 @@ function lineScanner(onLine) {
 /** Startup lines LANA expects to see (batched decode and shared prefixes) that did not appear. */
 function verifyStartup(lines, levers) {
   const text = (lines || []).join('\n');
-  return levers.expect.startupLines
+  const problems = levers.expect.startupLines
     .filter((pattern) => !new RegExp(`serve: ${pattern}`).test(text))
     .map((pattern) => `Pip did not log "${pattern.replace(/ - up to \[0-9\]\+ slots\.\*/, ' ...')}", which LANA asked for`);
+  if (levers.expect.gpuPlacement && !/model: placement /.test(text)) {problems.push('Pip did not log where it placed the model, so the graphics chip could not be confirmed');}
+  return problems;
+}
+
+/**
+ * Whether Pip on Vulkan left the model off the graphics chip, from its startup lines: lqe logs
+ * "no GPU backend available; running on CPU" when Vulkan finds no device, and "model: placement
+ * X MiB GPU + ..." when the model is on the chip ("model: placement X MiB CPU-mapped" when not).
+ * Returns the reason, or null when the chip is used, nothing was asked of it, or no placement line
+ * was seen (verifyStartup warns about that; it is not proof the chip went unused).
+ */
+function gpuUnused(lines, levers) {
+  if (!levers.expect.gpuPlacement) {return null;}
+  const text = (lines || []).join('\n');
+  if (/no GPU backend available/.test(text)) {return 'Pip found no Vulkan device ("no GPU backend available")';}
+  if (/model: placement [0-9.]+ MiB GPU/.test(text)) {return null;}
+  if (/model: placement /.test(text)) {return 'Pip placed the model on the processor, not the graphics chip';}
+  return null;
 }
 
 /**
@@ -297,6 +318,7 @@ module.exports = {
   offWarning,
   lineScanner,
   verifyStartup,
+  gpuUnused,
   verifyHealth,
   batchMetricsProblem,
   BATCH_CHECK_MIN_REQUESTS,

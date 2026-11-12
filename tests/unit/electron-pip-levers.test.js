@@ -45,9 +45,9 @@ describe('per platform (measured on b7debcdd3410)', () => {
       { backend: 'cuda', slots: 2 },
       { ...GPU_ALWAYS, parallel: 2, ctx_pool: 65536, fair_chunk: 64 },
       ['--flash-attn'], []],
-    ['Vulkan: at most two slots, never gpu_inexact',
+    ['Vulkan (AMD or Intel, unmeasured): one slot, no pool, never gpu_inexact, flash attention as the server deploy',
       { backend: 'vulkan', slots: 4 },
-      { ...GPU_ALWAYS, parallel: 2 },
+      { ...GPU_ALWAYS, parallel: 1 },
       ['--flash-attn'], []],
     ['processor only: engine threads, repack, shared prompts, exact batching',
       { backend: 'cpu', slots: 2 },
@@ -65,12 +65,15 @@ describe('per platform (measured on b7debcdd3410)', () => {
     expect(chosen.stale).toBe(false);
   });
 
-  test('never more than two slots, and q8_0 never on a new engine', () => {
+  test('never more than two slots (one on Vulkan), and q8_0 never on a new engine', () => {
     for (const backend of ['metal', 'cuda', 'vulkan', 'cpu']) {
       const chosen = pick({ backend, slots: 4 });
-      expect(chosen.slots).toBe(2);
-      expect(chosen.config.parallel).toBe(2);
+      const most = backend === 'vulkan' ? 1 : 2;
+      expect(chosen.slots).toBe(most);
+      expect(chosen.config.parallel).toBe(most);
       expect(chosen.config.kv_type).toBe('f16');
+      expect(chosen.config).not.toHaveProperty(backend === 'vulkan' ? 'ctx_pool' : 'nothing');
+      expect(chosen.expect.gpuPlacement).toBe(backend === 'vulkan');
     }
   });
 

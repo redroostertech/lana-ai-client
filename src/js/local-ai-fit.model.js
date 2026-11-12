@@ -18,6 +18,13 @@
  * set aside for them. On a computer with an NVIDIA card, chat and vision live in the card's
  * memory instead, and the card has nothing else to share it with, so its limits are higher.
  *
+ * AMD and Intel graphics on Windows and Linux (Vulkan, speed unmeasured) are run carefully: one
+ * slot, and every layer on the chip only when the model plus its conversation memory fits there.
+ * A card with its own memory is sized like an NVIDIA card; a chip that shares system memory is
+ * sized against system memory and must also fit in INTEGRATED_GPU_SHARE of it, the share Windows
+ * and Linux let such a chip address by default. A card whose memory cannot be read, or one too
+ * small for any chat model, gets the processor-only plan instead.
+ *
  * Conversation memory per token is measured for the Qwen3 and Qwen3.5 families only, which is
  * why electron-model-catalog.js offers only those.
  */
@@ -63,6 +70,9 @@
   var GPU_COMFORTABLE = 0.85;
   var GPU_TIGHT = 1.0;
   var GPU_RESERVE_BYTES = 1 * GIB;
+  // A chip that shares system memory (Intel UHD, Iris, Arc 140V; AMD Radeon ... Graphics) may
+  // address about half of it by default (Windows shared GPU memory; Linux GTT).
+  var INTEGRATED_GPU_SHARE = 0.5;
 
   // Conversation memory per token, f16 (Pip runs f16 KV: quantized KV turns batched decode off
   // and decoded slower on Apple silicon). Pip Desktop's q8_0 figures (17400 and 57344, at 1.0625
@@ -169,6 +179,15 @@
   /** What the computer offers models: one shared pool, or a graphics card beside system memory. */
   function pools(hardware) {
     var accel = hardware.accelerator || { backend: 'cpu' };
+    if (accel.backend === 'vulkan') {
+      if (accel.shared) {
+        return { gpuBytes: null, systemBytes: hardware.totalMemoryBytes, backend: 'vulkan', gpuShareBytes: Math.floor(hardware.totalMemoryBytes * INTEGRATED_GPU_SHARE) };
+      }
+      if (accel.vramBytes > GPU_RESERVE_BYTES) {
+        return { gpuBytes: accel.vramBytes - GPU_RESERVE_BYTES, systemBytes: hardware.totalMemoryBytes, backend: 'vulkan' };
+      }
+      return processorPool(hardware);
+    }
     if (accel.backend === 'cuda' && accel.vramBytes > GPU_RESERVE_BYTES) {
       return { gpuBytes: accel.vramBytes - GPU_RESERVE_BYTES, systemBytes: hardware.totalMemoryBytes, backend: 'cuda' };
     }
@@ -178,8 +197,13 @@
     return { gpuBytes: null, systemBytes: hardware.totalMemoryBytes, backend: shared };
   }
 
+  function processorPool(hardware) {
+    return { gpuBytes: null, systemBytes: hardware.totalMemoryBytes, backend: 'cpu' };
+  }
+
   /** How well chat (with optional vision) fits, given what is already set aside in system memory. */
   function chatLevel(pool, reservedSystemBytes, bytes) {
+    if (pool.gpuShareBytes && bytes > pool.gpuShareBytes) {return 'wont_fit';}
     if (pool.gpuBytes) {return level(bytes / pool.gpuBytes, GPU_COMFORTABLE, GPU_TIGHT);}
     return level((reservedSystemBytes + bytes) / pool.systemBytes, COMFORTABLE, TIGHT);
   }
@@ -230,6 +254,8 @@
    * @returns {{ slots: number, poolTokens: number|null }}
    */
   function chooseSlots(input) {
+    // Vulkan is unmeasured: one slot, no shared pool.
+    if (input.backend === 'vulkan') {return { slots: 1, poolTokens: null };}
     var memory = input.pool.systemBytes;
     var one = chatBytes(input.model, input.contextTokens, 1, input.backend, memory) + input.visionBytes;
     var floor = LEVEL[chatLevel(input.pool, input.reservedSystemBytes, one)];
@@ -270,10 +296,18 @@
    * @returns {Object} { computer, chatChoices, defaultChatId, plan, download }
    */
   function planLocalAi(input) {
+    var pool = pools(input.hardware);
+    var result = planOn(input, pool);
+    // No chat model fits on an AMD or Intel chip: the processor-only plan instead.
+    if (pool.backend === 'vulkan' && result.plan.chat.where !== 'local') {return planOn(input, processorPool(input.hardware));}
+    return result;
+  }
+
+  /** planLocalAi on one pool of memory (pools()). */
+  function planOn(input, pool) {
     var hardware = input.hardware;
     var catalog = input.catalog;
     var installed = installedSet(input.installed);
-    var pool = pools(hardware);
     var diskLeft = hardware.freeDiskBytes == null ? Infinity : Math.max(0, hardware.freeDiskBytes - DISK_RESERVE_BYTES);
     var plan = {};
     var files = [];
@@ -458,7 +492,8 @@
     CTX_CHUNK: CTX_CHUNK,
     MAX_SLOTS: MAX_SLOTS,
     CONTEXT_STEPS: CONTEXT_STEPS,
-    TOKENS_PER_PAGE: TOKENS_PER_PAGE
+    TOKENS_PER_PAGE: TOKENS_PER_PAGE,
+    INTEGRATED_GPU_SHARE: INTEGRATED_GPU_SHARE
   };
   if (typeof module !== 'undefined' && module.exports) {module.exports = api;}
   else {root.LanaLocalAiFit = api;}

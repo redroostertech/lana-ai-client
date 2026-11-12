@@ -342,6 +342,125 @@ describe('Windows: lqe.exe is asked for its version before any server starts', (
   });
 });
 
+describe('AMD or Intel graphics (Vulkan): one fallback to the processor, never a loop', () => {
+  const NEW = levers.parseAccepts(Object.values(levers.NEW_FLAGS).join(' '));
+  const CHAT = path.join('/user', 'pip', 'chat.json');
+  const GPU_LINE = '[lqe INF] model: placement 2400.0 MiB GPU + 0.0 MiB CPU-mapped (32 layers from layer 0)';
+  const vulkan = ({ platform = 'linux', computerBackend = 'vulkan' } = {}) => {
+    const r = result({ embedding: 'cloud', platform, backend: 'vulkan' });
+    r.plan.chat.parallel = 1;
+    r.hardware.totalMemoryBytes = 32 * 1024 ** 3;
+    r.computer = { backend: computerBackend };
+    return r;
+  };
+  const chatSpawns = (h) => h.spawns.filter((spawn) => spawn.args.includes(CHAT));
+  const print = (h, lines) => h.children[h.children.length - 1].stdout.pipe.mock.calls[0][0].write(`${lines.join('\n')}\n`);
+  function vharness() {
+    const h = harness({ accepts: NEW, props: { 8081: { total_slots: 1, default_generation_settings: { n_ctx: 32768 } } } });
+    h.launches = [];
+    return h;
+  }
+  // chat.json is rewritten at each start; keep the settings each launch was given.
+  const record = (h) => { h.launches.push({ ...h.files[CHAT] }); };
+
+  test('the Vulkan profile is what starts: every layer on the chip, one slot, flash attention', async () => {
+    const h = vharness();
+    await h.pip.apply(vulkan(), MODELS);
+    expect(h.spawns[0].args).toEqual(['serve', '--config', CHAT, '--flash-attn']);
+    expect(h.files[CHAT]).toMatchObject({ gpu_layers: 99, parallel: 1, kv_type: 'f16' });
+    for (const key of ['gpu_inexact', 'batch_decode', 'adaptive_prefill', 'ctx_pool']) {expect(h.files[CHAT]).not.toHaveProperty(key);}
+  });
+
+  test('control: the model placed on the chip gives no restart and no warning', async () => {
+    const h = vharness();
+    await h.pip.apply(vulkan(), MODELS);
+    print(h, [GPU_LINE]);
+    h.serveFromSettings();
+    await settle();
+    await settle(DEFAULTS.healthIntervalRunningMs * 3);
+    expect(h.spawns).toHaveLength(1);
+    expect(h.warnings).toEqual([]);
+    expect(h.addresses).toHaveLength(1);
+  });
+
+  test('a Vulkan start failure gives exactly one processor retry, and Vulkan is never tried again', async () => {
+    const h = vharness();
+    await h.pip.apply(vulkan(), MODELS);
+    record(h);
+    h.children[0].exitCode = 3221225477;
+    h.children[0].emit('exit', 3221225477, null);
+    await settle(DEFAULTS.minBackoffMs * 4);
+    record(h);
+    expect(chatSpawns(h)).toHaveLength(2);
+    expect(h.spawns[1].args).toEqual(['serve', '--config', CHAT, '--repack']);
+    expect(h.launches[0]).toMatchObject({ gpu_layers: 99 });
+    expect(h.launches[1]).toMatchObject({ gpu_layers: 0 });
+    expect(h.warnings.filter((w) => /Vulkan .* did not work/.test(w))).toHaveLength(1);
+    expect(h.warnings.join('\n')).toMatch(/exited with code 3221225477 before answering\); restarting chat once on the processor/);
+    // The processor server failing too is restarted as any server is, on the processor: no switch back.
+    h.children[1].exitCode = 1;
+    h.children[1].emit('exit', 1, null);
+    await settle(DEFAULTS.minBackoffMs * 2);
+    expect(h.spawns.slice(2).every((spawn) => spawn.args.includes('--repack'))).toBe(true);
+    expect(h.warnings.filter((w) => /Vulkan .* did not work/.test(w))).toHaveLength(1);
+    // A later plan in the same run stays on the processor.
+    await h.pip.apply(vulkan(), MODELS);
+    expect(h.spawns.filter((spawn) => spawn.args.includes('--flash-attn'))).toHaveLength(1);
+  });
+
+  test.each([
+    ['no Vulkan device', ['[lqe WRN] no GPU backend available; running on CPU', '[lqe INF] model: placement 2400.0 MiB CPU-mapped'], /found no Vulkan device/],
+    ['the model left on the processor', ['[lqe INF] model: placement 2400.0 MiB CPU-mapped'], /placed the model on the processor/]
+  ])('%s in the startup log: one processor retry, and the Vulkan address is never handed on', async (_label, lines, why) => {
+    const h = vharness();
+    await h.pip.apply(vulkan(), MODELS);
+    print(h, lines);
+    h.serveFromSettings();
+    await settle();
+    await settle(DEFAULTS.minBackoffMs);
+    expect(h.warnings.join('\n')).toMatch(why);
+    expect(chatSpawns(h)).toHaveLength(2);
+    expect(h.spawns[1].args).toContain('--repack');
+    expect(h.files[CHAT]).toMatchObject({ gpu_layers: 0 });
+    // Only the processor server ever answered, so it is the one address handed on.
+    expect(h.infos.filter((line) => /chat server is ready/.test(line))).toHaveLength(1);
+    expect(h.addresses).toHaveLength(1);
+    expect(chatSpawns(h)).toHaveLength(2);
+  });
+
+  test('a start timeout on Vulkan also falls back once', async () => {
+    const h = vharness();
+    await h.pip.apply(vulkan(), MODELS);
+    await settle(DEFAULTS.startTimeoutMs);
+    await settle(DEFAULTS.minBackoffMs);
+    expect(chatSpawns(h)).toHaveLength(2);
+    expect(h.spawns[1].args).toContain('--repack');
+    expect(h.warnings.join('\n')).toMatch(/start timeout before answering/);
+  });
+
+  test('a plan sized for the processor (nothing fit on the chip) starts on the processor', async () => {
+    const h = vharness();
+    await h.pip.apply(vulkan({ computerBackend: 'cpu' }), MODELS);
+    expect(h.spawns[0].args).toContain('--repack');
+    expect(h.files[CHAT]).toMatchObject({ gpu_layers: 0 });
+  });
+
+  test('Windows: the processor retry keeps the bundled Vulkan loader start order (lqe.exe still imports vulkan-1.dll)', async () => {
+    // A computer with no Vulkan loader of its own: lqe.exe starts only with the bundled one on PATH.
+    const runVersion = (_file, env) => (env ? { status: 0 } : { status: 0xC0000135, stderr: '' });
+    const WIN_BINARY = path.join('C:', 'LANA', 'resources', 'pip', 'lqe.exe');
+    const h = harness({ accepts: NEW, platform: 'win32', binary: WIN_BINARY, env: { Path: 'C:\\Windows\\System32' }, runVersion });
+    await h.pip.apply(vulkan({ platform: 'win32' }), MODELS);
+    h.children[0].exitCode = 1;
+    h.children[0].emit('exit', 1, null);
+    await settle(DEFAULTS.minBackoffMs * 4);
+    expect(h.spawns).toHaveLength(2);
+    const fallbackPath = `${path.join(path.dirname(WIN_BINARY), 'vulkan-fallback')};C:\\Windows\\System32`;
+    expect(h.spawnOptions.map((options) => options.env && options.env.Path)).toEqual([fallbackPath, fallbackPath]);
+    expect(h.spawns[1].args).toContain('--repack');
+  });
+});
+
 describe('where Pip is', () => {
   const exists = (...present) => (file) => present.includes(file);
   test('a developer build from LANA_PIP_BINARY; the installed app from its resources; otherwise none', () => {

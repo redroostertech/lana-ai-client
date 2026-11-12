@@ -102,11 +102,27 @@ function resolvePipBinary({ env = {}, resourcesPath = null, isPackaged = false, 
 }
 
 /**
- * What the plan asks Pip to run: { chat, embedding }, each null or { settings without a port,
- * expectFile }. Roles whose address the environment names are left to that server.
+ * The computer as chat's speed settings see it: an AMD or Intel chip (vulkan) counts as processor
+ * only when the plan was sized for the processor (local-ai-fit.model.js found no fit on the chip)
+ * or Vulkan already failed in this run (cpuOnly). Every other computer is as read.
  */
-function wantedServers({ result, modelsDir, env = {}, accepts = {} }) {
-  const { plan, entries, hardware } = result;
+function leverHardware(result, cpuOnly) {
+  const hardware = result.hardware || {};
+  const accel = hardware.accelerator || {};
+  if (accel.backend !== 'vulkan') {return hardware;}
+  const planned = result.computer && result.computer.backend;
+  if (!cpuOnly && (!planned || planned === 'vulkan')) {return hardware;}
+  return { ...hardware, accelerator: { ...accel, backend: 'cpu' } };
+}
+
+/**
+ * What the plan asks Pip to run: { chat, embedding }, each null or { settings without a port,
+ * expectFile }. Roles whose address the environment names are left to that server. cpuOnly: run
+ * chat on the processor even where the plan chose Vulkan (after Vulkan failed once).
+ */
+function wantedServers({ result, modelsDir, env = {}, accepts = {}, cpuOnly = false }) {
+  const { plan, entries } = result;
+  const hardware = leverHardware(result, cpuOnly);
   const fileOf = (id) => {
     const entry = id && entries.get(id);
     return entry ? path.join(modelsDir, entry.filename) : null;
@@ -290,6 +306,10 @@ function createPip(deps) {
   // loader is needed (windowsStart).
   let serverEnv = null;
   let fallbackLogged = false;
+  // Vulkan (AMD or Intel graphics) failed once in this run: chat runs on the processor from then
+  // on, so a chip that cannot run Pip costs one restart, never a loop.
+  let vulkanFailed = false;
+  let lastApply = null;
 
   function setProblem(next) {
     if (next === problem) {return;}
@@ -366,12 +386,41 @@ function createPip(deps) {
    * lines, /health and /props against what it was asked for, and later (lazily) /metrics.
    * A mismatch is logged, not a restart.
    */
+  /**
+   * Chat on Vulkan did not start, found no device, or left the model off the chip: warn, and run
+   * chat once more with the processor-only settings. Only once per run.
+   */
+  function vulkanFallback(why) {
+    if (vulkanFailed || !lastApply) {return;}
+    vulkanFailed = true;
+    log.warn(`[pip] chat: Vulkan on this computer's graphics chip did not work (${why}); restarting chat once on the processor`);
+    const { result, modelsDir } = lastApply;
+    Promise.resolve().then(() => apply(result, modelsDir)).catch((error) => log.error(`[pip] chat: could not restart on the processor: ${error.message}`));
+  }
+
+  /** A Vulkan chat server that exits, fails to spawn or times out before it ever answered. */
+  function watchVulkanStart(want) {
+    if (!want.levers || want.levers.backend !== 'vulkan') {return () => {}; }
+    return (state) => {
+      if (state.process === 'restarting' && !state.answeredOnce && state.lastExit) {
+        const exit = state.lastExit;
+        vulkanFallback(exit.reason === 'exited' ? `it exited with code ${exit.code}${exit.signal ? `, signal ${exit.signal}` : ''} before answering` : `${exit.reason.replace('_', ' ')} before answering`);
+      }
+    };
+  }
+
   function readyCheck(want) {
     return async (url, { starting = false } = {}) => {
       const problem = await checkPipHealth(fetch, url, want.expectFile, options);
       // The check that first passes after a launch is the one made while starting.
       if (problem || !starting || !want.levers) {return problem;}
       const warn = (issue) => log.warn(`[pip] chat: ${issue}`);
+      const unused = levers.gpuUnused(startupLines, want.levers);
+      if (unused) {
+        // Not ready: its address is never handed on, and the processor-only server replaces it.
+        vulkanFallback(unused);
+        return unused;
+      }
       levers.verifyStartup(startupLines, want.levers).forEach(warn);
       try {
         levers.verifyHealth(await getJson(`${url}/health`), want.levers, startupLines).forEach(warn);
@@ -427,7 +476,8 @@ function createPip(deps) {
    * @param {string} modelsDir
    */
   async function apply(result, modelsDir) {
-    let wanted = binary ? wantedServers({ result, modelsDir, env, accepts }) : { chat: null, embedding: null };
+    lastApply = { result, modelsDir };
+    let wanted = binary ? wantedServers({ result, modelsDir, env, accepts, cpuOnly: vulkanFailed }) : { chat: null, embedding: null };
     if (!binary) {log.warn('[pip] Pip is not installed on this computer; chat and embedding use the cloud');}
     if (binary && platform === 'win32' && (wanted.chat || wanted.embedding)) {
       const start = windowsStart(binary, runVersion, env);
@@ -462,7 +512,8 @@ function createPip(deps) {
       const configFile = path.join(dir, `${role}.json`);
       fsImpl.writeFileSync(configFile, `${JSON.stringify(want.settings(port), null, 2)}\n`);
       const requested = want.levers ? want.levers.requested : null;
-      const server = createKeptProcess({ name: role, label: 'pip', spawn, timers, now, log, openLog: (name) => openLog(name, requested), onChange: changed, options });
+      const watch = watchVulkanStart(want);
+      const server = createKeptProcess({ name: role, label: 'pip', spawn, timers, now, log, openLog: (name) => openLog(name, requested), onChange: (state) => { watch(state); changed(); }, options });
       running[role] = { server, key, modelFile: want.modelFile, slots: want.levers ? want.levers.slots : null };
       server.start({ command: binary, args: ['serve', '--config', configFile, ...want.args], port, check: readyCheck(want), ...(serverEnv ? { env: serverEnv } : {}) });
     }
@@ -511,6 +562,7 @@ module.exports = {
   versionProblem,
   windowsStart,
   withFallbackPath,
+  leverHardware,
   VULKAN_FALLBACK_DIR,
   MISSING_FILE_MESSAGE
 };

@@ -13,17 +13,24 @@
  *   accelerator  how Pip would run models here:
  *                  metal  Apple silicon, unified memory: models use system memory
  *                  cuda   an NVIDIA graphics card: models use its memory (vramBytes)
+ *                  vulkan an AMD or Intel graphics chip on Windows or Linux (electron-gpu.js):
+ *                         a card with its own memory (shared false, vramBytes; null when it
+ *                         cannot be read), or the processor's chip on system memory (shared true)
  *                  cpu    no usable graphics chip: models use system memory, slowly
  *   disk         free bytes on the volume that holds the models folder
  *
  * Graphics detection follows the LANA One client (supervisor/hardware-accel.js):
- * NVIDIA through nvidia-smi on Windows and Linux. Other graphics chips count as
- * cpu until Pip is measured on them.
+ * NVIDIA through nvidia-smi on Windows and Linux. Without NVIDIA, AMD and Intel chips through
+ * electron-gpu.js (Win32_VideoController and the display registry on Windows, /sys/class/drm on
+ * Linux). Their speed is unmeasured, so local-ai-fit.model.js and electron-pip-levers.js run them
+ * with careful settings, and electron-pip-supervisor.js falls back to the processor once when
+ * Vulkan does not start or does not use the chip.
  */
 
 const os = require('os');
 const fs = require('fs');
 const path = require('path');
+const gpu = require('./electron-gpu');
 
 /**
  * nvidia-smi --query-gpu=memory.total,name --format=csv,noheader,nounits (MiB per line).
@@ -56,15 +63,24 @@ function readNvidia(execFileSync) {
   }
 }
 
-function accelerator({ platform, arch, gpus }) {
+function accelerator({ platform, arch, gpus, readOtherGpus }) {
   if (platform === 'darwin') {
     return arch === 'arm64' ? { backend: 'metal', vramBytes: null, gpus: [] } : { backend: 'cpu', vramBytes: null, gpus: [] };
   }
   if (gpus.length) {
-    const shared = gpus.some((gpu) => gpu.vramBytes === null);
-    return { backend: 'cuda', vramBytes: shared ? null : gpus.reduce((sum, gpu) => sum + gpu.vramBytes, 0), gpus };
+    const shared = gpus.some((card) => card.vramBytes === null);
+    return { backend: 'cuda', vramBytes: shared ? null : gpus.reduce((sum, card) => sum + card.vramBytes, 0), gpus };
   }
-  return { backend: 'cpu', vramBytes: null, gpus: [] };
+  const other = (platform === 'win32' || platform === 'linux') ? gpu.vulkanAccelerator(readOtherGpus()) : null;
+  return other || { backend: 'cpu', vramBytes: null, gpus: [] };
+}
+
+/** AMD and Intel chips (electron-gpu.js), read only on Windows and Linux without NVIDIA. */
+function readOtherGpus(platform, io) {
+  if (io.readOtherGpus) {return io.readOtherGpus();}
+  if (platform === 'win32') {return gpu.readWindowsGpus(io.execFileSync || require('child_process').execFileSync);}
+  if (platform === 'linux') {return gpu.readLinuxGpus(io.fs || fs);}
+  return [];
 }
 
 /** The nearest folder that exists, so free space can be read before the models folder is made. */
@@ -94,7 +110,8 @@ function freeDiskBytes(dir, { statfsSync, existsSync }) {
  * @param {string} options.modelsDir - where models are (or will be) stored
  * @param {Object} [io] - injectable readers for tests
  * @returns {{ platform: string, arch: string, totalMemoryBytes: number, freeMemoryBytes: number,
- *   chip: string|null, cores: number, accelerator: { backend: 'metal'|'cuda'|'cpu', vramBytes: number|null, gpus: Array },
+ *   chip: string|null, cores: number, accelerator: { backend: 'metal'|'cuda'|'vulkan'|'cpu', vramBytes: number|null,
+ *   gpus: Array, shared?: boolean },
  *   freeDiskBytes: number|null }}
  */
 function readHardware({ modelsDir }, io = {}) {
@@ -110,7 +127,7 @@ function readHardware({ modelsDir }, io = {}) {
     freeMemoryBytes: osApi.freemem(),
     chip: (cpus[0] && typeof cpus[0].model === 'string' && cpus[0].model.trim()) || null,
     cores: Math.max(1, cpus.length),
-    accelerator: accelerator({ platform, arch, gpus }),
+    accelerator: accelerator({ platform, arch, gpus, readOtherGpus: () => readOtherGpus(platform, io) }),
     freeDiskBytes: freeDiskBytes(modelsDir, { statfsSync: io.statfsSync || fs.statfsSync, existsSync: io.existsSync || fs.existsSync })
   };
 }

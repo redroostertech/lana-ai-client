@@ -30,6 +30,12 @@ test('an Intel Mac runs models on the processor', () => {
   expect(hw.accelerator.backend).toBe('cpu');
 });
 
+test.each(['win32', 'linux'])('%s with an AMD or Intel chip and no NVIDIA: Vulkan (electron-gpu.js)', (platform) => {
+  const gpus = [{ name: 'AMD Radeon RX 7800 XT', vendor: 'amd', deviceId: '747e', integrated: false, vramBytes: 16 * GB, driverVersion: null }];
+  const hw = readHardware({ modelsDir }, { platform, arch: 'x64', os: fakeOs(32), statfsSync: disk(50), existsSync: () => true, readNvidia: () => [], readOtherGpus: () => gpus });
+  expect(hw.accelerator).toEqual({ backend: 'vulkan', shared: false, vramBytes: 16 * GB, gpus });
+});
+
 test.each(['win32', 'linux'])('%s with an NVIDIA card: its memory is summed across cards', (platform) => {
   const gpus = [{ name: 'RTX 4070', vramBytes: 12 * GB }, { name: 'RTX 3060', vramBytes: 8 * GB }];
   const hw = readHardware({ modelsDir }, { platform, arch: 'x64', os: fakeOs(32, 16, 'AMD Ryzen 9'), statfsSync: disk(500), existsSync: () => true, readNvidia: () => gpus });
@@ -43,8 +49,8 @@ test('a DGX Spark (GB10, shared memory) runs models on the graphics chip, sized 
   expect(hw.accelerator).toEqual({ backend: 'cuda', vramBytes: null, gpus });
 });
 
-test.each(['win32', 'linux'])('%s with no NVIDIA card runs models on the processor', (platform) => {
-  const hw = readHardware({ modelsDir }, { platform, arch: 'x64', os: fakeOs(), statfsSync: disk(50), existsSync: () => true, readNvidia: () => [] });
+test.each(['win32', 'linux'])('%s with no NVIDIA, AMD or Intel graphics runs models on the processor', (platform) => {
+  const hw = readHardware({ modelsDir }, { platform, arch: 'x64', os: fakeOs(), statfsSync: disk(50), existsSync: () => true, readNvidia: () => [], readOtherGpus: () => [] });
   expect(hw.accelerator).toEqual({ backend: 'cpu', vramBytes: null, gpus: [] });
 });
 
