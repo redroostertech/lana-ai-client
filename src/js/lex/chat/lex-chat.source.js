@@ -549,7 +549,7 @@
           return { type: 'thinking', message: data.message, phase: humanizePhase(data.phase) };
 
         case 'status':
-          return { type: 'thinking', message: data.message, phase: humanizePhase(data.phase) };
+          return { type: 'thinking', message: data.message, phase: humanizePhase(data.phase), heartbeat: data.heartbeat === true };
 
         case 'reasoning':
           return {
@@ -571,7 +571,9 @@
             message: data.message,
             status: data.status,
             phase: data.phase,
-            heartbeat: data.heartbeat === true
+            heartbeat: data.heartbeat === true,
+            // A verification's announced run time, from the turn's start.
+            deadlineMs: Number.isFinite(data.deadline_ms) ? data.deadline_ms : null
           };
 
         case 'tool_thinking':
