@@ -44,7 +44,7 @@
     "windows-x64": {
       "sha256": "99bc3137fed239447cd9c221fc4bd343a1363bfd62426586dca95569e6273533",
       "bytes": 79088640,
-      "source": "https://github.com/redroostertech/LANA.cpp/actions/runs/43278937570 artifact lqe-win32-x64 (sha256:423c0d4d76c90a732819567d5beaf60a3df5454d762fd55ca1f6bf0f675a8332)"
+      "source": "LANA.cpp CI run 43278937570 (head 396ca2c1d643), job windows-shipping, exe lqe-win32-x64.exe. The GitHub artifact was purged 2026-11-12; the exe is kept unchanged in the LANA Azure parts store at windows-x64/lqe-396ca2c1d643/lqe-win32-x64.exe (sha256 above)."
     },
     "macos-x64": {
       "sha256": "ad6ed844298950edd7c00412e0b77ee1a9018baeecafd238ff624c332eeffea2",
