@@ -35,8 +35,25 @@
    * default, not the 9B with 16384 and no images (decided 2026-11-09). Bigger models stay choices.
    */
   var DEFAULT_MIN_CONTEXT = 32768;
-  /** Conversations Pip keeps ready (Pip Desktop's default). Context is per conversation. */
-  var PARALLEL = 2;
+  /**
+   * Models are priced with one conversation slot, so the model and context LANA picks do not
+   * depend on how many slots run (one f16 slot costs what Pip Desktop's two q8_0 slots did). The
+   * slot count that runs is then chosen from what is left (chooseSlots). Context is per
+   * conversation.
+   */
+  var PRICED_SLOTS = 1;
+  /**
+   * Slots a personal computer runs: two, chat plus one background lane (the engine is told to
+   * keep background work to one call, electron-pip-supervisor.js engineEndpoints). Measured on
+   * b7debcd (Norton, 2026-11-12): two streams decode 95 tok/s together against 76 for one.
+   * One only when two do not fit. A server for a whole firm sizes slots differently (LANA-AI
+   * infra/lib/config/lqe-args.js).
+   */
+  var MAX_SLOTS = 2;
+  /** Pip's shared context pool (engine D-38) grows a conversation in chunks of this many tokens. */
+  var CTX_CHUNK = 4096;
+  /** The pool on a Mac with 16 GB or less: half the room, so the 9B still fits beside the rest. */
+  var SMALL_MAC_POOL_TOKENS = 32768;
   /** About 500 words. */
   var TOKENS_PER_PAGE = 750;
 
@@ -47,9 +64,15 @@
   var GPU_TIGHT = 1.0;
   var GPU_RESERVE_BYTES = 1 * GIB;
 
-  // estimateImpact constants: q8_0 conversation memory, ubatch 512.
-  var KV_BYTES_PER_TOKEN = { 'qwen3.5': 17400, qwen3: 57344 };
+  // Conversation memory per token, f16 (Pip runs f16 KV: quantized KV turns batched decode off
+  // and decoded slower on Apple silicon). Pip Desktop's q8_0 figures (17400 and 57344, at 1.0625
+  // bytes per value) doubled to 2 bytes per value: the Qwen3.5 9B keeps K and V for 8 attention
+  // layers x 4 heads x 256, 32 KiB a token.
+  var KV_BYTES_PER_TOKEN = { 'qwen3.5': 32768, qwen3: 107940 };
   var RECURRENT_BYTES_PER_SLOT = { 'qwen3.5': 0.05 * GIB, qwen3: 0 };
+  // Models whose shape differs from their family's: the 35B-A3B has 10 attention layers x 2 heads
+  // (20 KiB a token) and about 140 MiB of recurrent state per slot (engine measurements).
+  var MODEL_SHAPES = { 'qwen3.5-35b-a3b-q4km': { kvBytesPerToken: 20480, recurrentBytesPerSlot: 140 * MIB } };
   var SCRATCH_BYTES = 0.8 * GIB;
   var VISION_WORKING_BYTES = 0.25 * GIB;
   // Embedding: context and ubatch 2048, one slot (Pip Desktop embedModelSettings).
@@ -74,10 +97,61 @@
     return ratio < comfortable ? 'comfortable' : ratio < tight ? 'tight' : 'wont_fit';
   }
 
-  /** Chat memory at a context size: model + conversation memory + working memory. */
-  function chatBytes(model, contextTokens) {
-    var kv = KV_BYTES_PER_TOKEN[model.family];
-    return model.sizeBytes + contextTokens * kv * PARALLEL + RECURRENT_BYTES_PER_SLOT[model.family] * PARALLEL + SCRATCH_BYTES;
+  function shapeOf(model) {
+    var shape = MODEL_SHAPES[model.id] || {};
+    return {
+      kvBytesPerToken: shape.kvBytesPerToken || KV_BYTES_PER_TOKEN[model.family],
+      recurrentBytesPerSlot: shape.recurrentBytesPerSlot != null ? shape.recurrentBytesPerSlot : RECURRENT_BYTES_PER_SLOT[model.family]
+    };
+  }
+
+  /**
+   * Conversation memory in tokens. One slot holds its own context. Two or more share a pool of
+   * a full context per slot (65536 for two at 32768, as measured), except on a Mac with 16 GB or
+   * less, where the pool is 32768: there one conversation reaches 32768 - 4096 = 28672 tokens
+   * while the other holds its first chunk. Idle slots give their room back.
+   */
+  function poolTokens(contextTokens, slots, backend, totalMemoryBytes) {
+    if (!(slots > 1)) {return contextTokens;}
+    var pool = contextTokens * slots;
+    if (backend === 'metal' && totalMemoryBytes && totalMemoryBytes <= 16 * GIB) {pool = Math.min(pool, SMALL_MAC_POOL_TOKENS);}
+    return pool;
+  }
+
+  /**
+   * What /props reports as n_ctx: -c, capped at what is left of the pool when every other slot
+   * holds a chunk. `pool` defaults to poolTokens().
+   */
+  function perConversationTokens(contextTokens, slots, backend, totalMemoryBytes, pool) {
+    if (!(slots > 1)) {return contextTokens;}
+    var chunk = Math.min(CTX_CHUNK, contextTokens);
+    var tokens = pool || poolTokens(contextTokens, slots, backend, totalMemoryBytes);
+    return Math.min(contextTokens, tokens - (slots - 1) * chunk);
+  }
+
+  /**
+   * Host memory Pip keeps for computed system prompts (engine D-40, --prefix-share-mb), in MiB.
+   * Apple silicon shares them on the graphics chip only with more than one slot (under
+   * --gpu-inexact): 1024 MiB from 64 GB up, else 512. On a processor-only computer sharing is
+   * exact, so it is always on at the engine's default 256. NVIDIA and other graphics chips do not
+   * share (unmeasured there).
+   */
+  function prefixShareMb(backend, slots, totalMemoryBytes) {
+    if (backend === 'metal') {return slots > 1 ? (totalMemoryBytes >= 64 * GIB ? 1024 : 512) : 0;}
+    if (backend === 'cpu') {return 256;}
+    return 0;
+  }
+
+  /**
+   * Chat memory: model + the shared conversation pool + recurrent state per slot + working
+   * memory, plus the shared system-prompt memory when `backend` is given.
+   */
+  function chatBytes(model, contextTokens, slots, backend, totalMemoryBytes, pool) {
+    var count = slots || PRICED_SLOTS;
+    var shape = shapeOf(model);
+    var share = backend ? prefixShareMb(backend, count, totalMemoryBytes || 0) * MIB : 0;
+    var tokens = count > 1 && pool ? pool : poolTokens(contextTokens, count, backend, totalMemoryBytes);
+    return model.sizeBytes + tokens * shape.kvBytesPerToken + shape.recurrentBytesPerSlot * count + SCRATCH_BYTES + share;
   }
 
   function visionBytes(vision) {
@@ -98,7 +172,10 @@
     if (accel.backend === 'cuda' && accel.vramBytes > GPU_RESERVE_BYTES) {
       return { gpuBytes: accel.vramBytes - GPU_RESERVE_BYTES, systemBytes: hardware.totalMemoryBytes, backend: 'cuda' };
     }
-    return { gpuBytes: null, systemBytes: hardware.totalMemoryBytes, backend: accel.backend === 'metal' ? 'metal' : 'cpu' };
+    // NVIDIA without its own memory figure (DGX Spark GB10 shares system memory) still runs on the
+    // graphics chip.
+    var shared = accel.backend === 'metal' || (accel.backend === 'cuda' && !accel.vramBytes) ? accel.backend : 'cpu';
+    return { gpuBytes: null, systemBytes: hardware.totalMemoryBytes, backend: shared };
   }
 
   /** How well chat (with optional vision) fits, given what is already set aside in system memory. */
@@ -142,6 +219,27 @@
         : 'This model needs a computer with about ' + gb(neededBytes + reservedSystemBytes / TIGHT) + ' GB of memory.' };
     }
     return { fit: best.fit, contextTokens: best.contextTokens, reason: null };
+  }
+
+  /**
+   * How many conversations Pip keeps ready for the chosen model, and their shared pool: two
+   * (MAX_SLOTS) when they fit, that is when the pool and shared system-prompt memory two bring
+   * keep the setup as good a fit as one slot (a comfortable choice stays comfortable, a tight one
+   * stays tight). A Mac up to 24 GB that cannot hold the full pool tries the 32768-token pool
+   * before giving up the second slot. One slot when neither fits.
+   * @returns {{ slots: number, poolTokens: number|null }}
+   */
+  function chooseSlots(input) {
+    var memory = input.pool.systemBytes;
+    var one = chatBytes(input.model, input.contextTokens, 1, input.backend, memory) + input.visionBytes;
+    var floor = LEVEL[chatLevel(input.pool, input.reservedSystemBytes, one)];
+    var pools = [poolTokens(input.contextTokens, MAX_SLOTS, input.backend, memory)];
+    if (input.backend === 'metal' && memory <= 24 * GIB) {pools.push(Math.min(pools[0], SMALL_MAC_POOL_TOKENS));}
+    for (var i = 0; i < pools.length; i += 1) {
+      var bytes = chatBytes(input.model, input.contextTokens, MAX_SLOTS, input.backend, memory, pools[i]) + input.visionBytes;
+      if (LEVEL[chatLevel(input.pool, input.reservedSystemBytes, bytes)] >= floor) {return { slots: MAX_SLOTS, poolTokens: pools[i] };}
+    }
+    return { slots: 1, poolTokens: null };
   }
 
   function chatWhere(where, reason) {
@@ -255,7 +353,7 @@
       plan.vision = { id: null, reason: 'Image reading uses the cloud with chat.' };
     } else {
       var model = catalog.chat.find(function (m) { return m.id === chosen.id; });
-      plan.chat = { id: model.id, where: 'local', contextTokens: chosen.contextTokens, parallel: PARALLEL, reason: null };
+      plan.chat = { id: model.id, where: 'local', contextTokens: chosen.contextTokens, parallel: PRICED_SLOTS, reason: null };
       take(model, 'chat');
       var vision = catalog.vision.find(function (v) { return v.pairsWith === model.id; }) || null;
       var withVision = vision && chatLevel(pool, chatReserved, chatBytes(model, chosen.contextTokens) + visionBytes(vision));
@@ -269,6 +367,12 @@
         plan.vision = { id: vision.id, reason: null };
         take(vision, 'vision');
       }
+      var slots = chooseSlots({
+        model: model, contextTokens: chosen.contextTokens, backend: pool.backend, pool: pool,
+        reservedSystemBytes: chatReserved, visionBytes: plan.vision.id ? visionBytes(vision) : 0
+      });
+      plan.chat.parallel = slots.slots;
+      plan.chat.poolTokens = slots.poolTokens;
     }
 
     // 4b. Docling, after chat and vision in memory and on the disk, and before speech on the disk.
@@ -280,7 +384,7 @@
     if (doclingAvailable) {
       var chatModel = plan.chat.where === 'local' ? catalog.chat.find(function (m) { return m.id === plan.chat.id; }) : null;
       var visionModel = plan.vision.id ? catalog.vision.find(function (v) { return v.id === plan.vision.id; }) : null;
-      var aiOnSystem = pool.gpuBytes || !chatModel ? 0 : chatBytes(chatModel, plan.chat.contextTokens) + (visionModel ? visionBytes(visionModel) : 0);
+      var aiOnSystem = pool.gpuBytes || !chatModel ? 0 : chatBytes(chatModel, plan.chat.contextTokens, plan.chat.parallel, pool.backend, pool.systemBytes, plan.chat.poolTokens) + (visionModel ? visionBytes(visionModel) : 0);
       doclingFitsMemory = level((reserved + aiOnSystem + (docling.memoryBytes || 0)) / pool.systemBytes, COMFORTABLE, TIGHT) !== 'wont_fit';
     }
     if (!docling) {
@@ -348,6 +452,11 @@
     fitLabel: fitLabel,
     remembersLabel: remembersLabel,
     chatBytes: chatBytes,
+    poolTokens: poolTokens,
+    perConversationTokens: perConversationTokens,
+    prefixShareMb: prefixShareMb,
+    CTX_CHUNK: CTX_CHUNK,
+    MAX_SLOTS: MAX_SLOTS,
     CONTEXT_STEPS: CONTEXT_STEPS,
     TOKENS_PER_PAGE: TOKENS_PER_PAGE
   };

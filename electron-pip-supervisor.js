@@ -28,6 +28,8 @@
 
 const path = require('path');
 const { createKeptProcess, DEFAULTS } = require('./electron-process-keeper');
+const levers = require('./electron-pip-levers');
+const fit = require('./src/js/local-ai-fit.model');
 
 const LOOPBACK_HOST = '127.0.0.1';
 const PREFERRED_PORTS = Object.freeze({ chat: 8081, embedding: 8082 });
@@ -40,31 +42,25 @@ function threadsFor(cores) {
   return Math.max(1, Math.min(10, count - 2));
 }
 
-function usesGraphics(hardware) {
-  const backend = hardware && hardware.accelerator && hardware.accelerator.backend;
-  return backend === 'metal' || backend === 'cuda';
-}
-
 /**
- * The chat server's settings, from Pip Desktop v2's defaults and the plan. `ctx` is per slot.
- * No session folder: conversations are not written to disk.
+ * The chat server's settings: the plan's model, context per slot and slot count, with this
+ * computer's speed settings (electron-pip-levers.js). No session folder: conversations are not
+ * written to disk. `chosen` is chatLevers() for these inputs; flags without a settings-file key
+ * (--flash-attn, --repack) are in chosen.args.
  */
-function chatConfig({ modelPath, mmprojPath = null, port, contextTokens, parallel, hardware = {} }) {
+function chatConfig({ modelPath, mmprojPath = null, port, contextTokens, parallel, hardware = {}, accepts = {}, chosen = null }) {
+  const picked = chosen || levers.chatLevers({ hardware, contextTokens, slots: parallel, modelFile: modelPath, accepts });
   const config = {
     model: modelPath,
     host: LOOPBACK_HOST,
     port,
-    ctx: contextTokens,
-    parallel,
-    kv_type: 'q8_0',
-    gpu_layers: usesGraphics(hardware) ? 99 : 0,
-    gpu_output: usesGraphics(hardware),
-    threads: threadsFor(hardware.cores),
-    ubatch: 512,
-    fair_chunk: 64,
+    ...picked.config,
     queue_timeout: 300,
     max_body_mb: 32
   };
+  // An old engine keeps the old thread count; otherwise the levers set 4 on a graphics chip and
+  // leave the processor-only count to the engine (its physical cores).
+  if (picked.stale) {config.threads = threadsFor(hardware.cores);}
   if (mmprojPath) {config.mmproj = mmprojPath;}
   // Keeps the model in graphics memory between questions (Apple only); without it the first
   // question after a few idle minutes waited 15 to 32 seconds.
@@ -109,7 +105,7 @@ function resolvePipBinary({ env = {}, resourcesPath = null, isPackaged = false, 
  * What the plan asks Pip to run: { chat, embedding }, each null or { settings without a port,
  * expectFile }. Roles whose address the environment names are left to that server.
  */
-function wantedServers({ result, modelsDir, env = {} }) {
+function wantedServers({ result, modelsDir, env = {}, accepts = {} }) {
   const { plan, entries, hardware } = result;
   const fileOf = (id) => {
     const entry = id && entries.get(id);
@@ -118,16 +114,20 @@ function wantedServers({ result, modelsDir, env = {} }) {
   const wanted = { chat: null, embedding: null };
   const chatFile = plan.chat.where === 'local' ? fileOf(plan.chat.id) : null;
   if (chatFile && !env[ADDRESS_ENV.chat]) {
+    const chosen = levers.chatLevers({ hardware, contextTokens: plan.chat.contextTokens, slots: plan.chat.parallel, poolTokens: plan.chat.poolTokens, modelFile: chatFile, accepts });
     wanted.chat = {
       modelFile: chatFile,
       expectFile: path.basename(chatFile),
+      levers: chosen,
+      args: chosen.args,
       settings: (port) => chatConfig({
         modelPath: chatFile,
         mmprojPath: fileOf(plan.vision.id),
         port,
         contextTokens: plan.chat.contextTokens,
         parallel: plan.chat.parallel,
-        hardware
+        hardware,
+        chosen
       })
     };
   }
@@ -136,10 +136,100 @@ function wantedServers({ result, modelsDir, env = {} }) {
     wanted.embedding = {
       modelFile: embeddingFile,
       expectFile: path.basename(embeddingFile),
+      args: [],
       settings: (port) => embeddingConfig({ modelPath: embeddingFile, port, hardware })
     };
   }
   return wanted;
+}
+
+/**
+ * Memory the graphics chip must keep for Pip on Apple silicon: chat (model, pool, recurrent state,
+ * shared prompts), its image file and the embedding model. Null when a file's size is unknown.
+ */
+function metalNeedBytes({ result, wanted }) {
+  const { plan, entries, hardware } = result;
+  const entry = (id) => (id && entries.get(id)) || null;
+  const chat = wanted.chat && entry(plan.chat.id);
+  if (!chat || !chat.sizeBytes || !chat.family) {return null;}
+  let bytes = fit.chatBytes(chat, plan.chat.contextTokens, wanted.chat.levers.slots, 'metal', hardware.totalMemoryBytes, wanted.chat.levers.config.ctx_pool);
+  const vision = entry(plan.vision && plan.vision.id);
+  if (vision && vision.sizeBytes) {bytes += vision.sizeBytes;}
+  const embedding = wanted.embedding && entry(plan.embedding.id);
+  if (embedding && embedding.sizeBytes) {bytes += embedding.sizeBytes;}
+  return bytes;
+}
+
+/** What the engine status shows when Pip cannot start on this computer. */
+const MISSING_FILE_MESSAGE = 'LANA\'s local engine could not start: a required system file is missing.';
+/** Windows' "a DLL it needs was not found" (STATUS_DLL_NOT_FOUND), as an unsigned and a signed exit. */
+const DLL_NOT_FOUND = [0xC0000135, -1073741515];
+
+/**
+ * The bundled Vulkan loader's folder, beside lqe.exe (pip/pip-pin.json vulkanLoader). Not lqe.exe's
+ * own folder on purpose: Windows looks there before System32, which would put every computer with
+ * a graphics driver on this older loader instead of its own.
+ */
+const VULKAN_FALLBACK_DIR = 'vulkan-fallback';
+
+/** True when a --version run failed because Windows could not find a DLL (0xC0000135). */
+function dllNotFound(run) {
+  if (!run) {return false;}
+  if (DLL_NOT_FOUND.includes(run.status)) {return true;}
+  return Boolean(run.error && /0xC0000135|dll/i.test(String(run.error.message || '')));
+}
+
+/**
+ * `env` with `dir` first on PATH, whatever case the PATH name has (Windows keeps it as "Path").
+ * PATH is searched after System32, so the bundled loader only fills in where there is none.
+ */
+function withFallbackPath(env, dir) {
+  const out = { ...env };
+  const key = Object.keys(out).find((name) => name.toUpperCase() === 'PATH') || 'PATH';
+  out[key] = out[key] ? `${dir};${out[key]}` : dir;
+  return out;
+}
+
+/**
+ * Before any server starts on Windows: (a) lqe.exe --version as it is, so a computer with a
+ * driver-installed loader uses its own; (b) only when that fails because a DLL is missing, again
+ * with the bundled loader's folder first on PATH; (c) when that answers, the servers start with
+ * the same environment. Returns { env } (null env: nothing changed) or { problem: { warning,
+ * message } } when lqe.exe still cannot start, so no server starts and nothing restarts.
+ *
+ * @param {string} binary
+ * @param {Function} runVersion - (binary, env|undefined) => spawnSync result
+ * @param {Object} baseEnv - the environment servers would otherwise get
+ */
+function windowsStart(binary, runVersion, baseEnv) {
+  const first = runVersion(binary, undefined);
+  if (first && !first.error && first.status === 0) {return { env: null, fallback: false };}
+  const fallbackDir = path.join(path.dirname(binary), VULKAN_FALLBACK_DIR);
+  if (dllNotFound(first)) {
+    const env = withFallbackPath(baseEnv, fallbackDir);
+    const second = runVersion(binary, env);
+    if (second && !second.error && second.status === 0) {return { env, fallback: true };}
+    return { problem: versionProblem(binary, second, fallbackDir) };
+  }
+  return { problem: versionProblem(binary, first, fallbackDir) };
+}
+
+/**
+ * The warning and status for a lqe.exe that would not start: Windows refuses it (0xC0000135) every
+ * time, so starting servers would only restart forever.
+ *
+ * @param {{ status: number|null, error?: Error, stderr?: string }} run - spawnSync(binary, ['--version'])
+ */
+function versionProblem(binary, run, fallbackDir = path.join(path.dirname(binary), VULKAN_FALLBACK_DIR)) {
+  if (run && !run.error && run.status === 0) {return null;}
+  const dll = path.join(fallbackDir, 'vulkan-1.dll');
+  const why = dllNotFound(run)
+    ? `Windows could not load a DLL it needs (0xC0000135), even with the bundled Vulkan loader's folder on PATH. lqe.exe imports vulkan-1.dll; the installer carries it at ${dll} (pip/pip-pin.json vulkanLoader)`
+    : `it exited with ${run && run.error ? run.error.message : `code ${run && run.status}`}${run && run.stderr ? `: ${String(run.stderr).trim().slice(0, 200)}` : ''}; if it is a missing DLL, lqe.exe needs vulkan-1.dll, which the installer carries at ${dll}`;
+  return {
+    warning: `[pip] ${binary} --version failed, so Pip is not started and chat and search use the cloud: ${why}`,
+    message: MISSING_FILE_MESSAGE
+  };
 }
 
 /** Pip is ready when /health says "ok" and names the planned model file. */
@@ -170,6 +260,13 @@ async function checkPipHealth(fetch, url, expectFile, options = {}) {
  * @param {Function} [deps.now]
  * @param {Object} [deps.log]
  * @param {Object} [deps.options] - overrides for DEFAULTS
+ * @param {Object} [deps.accepts] - electron-pip-levers.js readAccepts() for `binary`, read once per
+ *   app start (so again after every update)
+ * @param {Function} [deps.readWiredLimitMb] - () => iogpu.wired_limit_mb on Apple silicon, or null
+ * @param {string} [deps.platform] - process.platform
+ * @param {Function} [deps.runVersion] - (binary, env) => spawnSync(binary, ['--version'], { env })
+ *   result; asked on Windows before any server starts (windowsStart)
+ * @param {Function} [deps.onProblem] - (message|null) => void, for the engine status
  */
 function createPip(deps) {
   const {
@@ -181,30 +278,126 @@ function createPip(deps) {
     timers = { setTimeout, clearTimeout },
     now = () => Date.now(),
     log = { info() {}, warn() {}, error() {} },
-    options = {}
+    options = {},
+    accepts = {},
+    readWiredLimitMb = () => null,
+    platform = process.platform,
+    runVersion = (file, runEnv) => require('child_process').spawnSync(file, ['--version'], { encoding: 'utf8', timeout: 10000, windowsHide: true, ...(runEnv ? { env: runEnv } : {}) }),
+    onProblem = () => {}
   } = deps;
+  let problem = null;
+  // The environment the servers start with: null keeps the app's own; set when the bundled Vulkan
+  // loader is needed (windowsStart).
+  let serverEnv = null;
+  let fallbackLogged = false;
+
+  function setProblem(next) {
+    if (next === problem) {return;}
+    problem = next;
+    try { onProblem(problem); } catch (_error) { /* listener errors are not ours */ }
+  }
 
   const running = { chat: null, embedding: null }; // { server, key }
-  let lastAddresses = JSON.stringify({ chat: null, embedding: null, chatModelFile: null });
+  let lastAddresses = JSON.stringify({ chat: null, embedding: null, chatModelFile: null, chatSlots: null });
 
-  function openLog(role) {
-    try { return fsImpl.createWriteStream(path.join(dir, `${role}.log`), { flags: 'w' }); } catch (_error) { return null; }
+  /**
+   * The server's log file. For chat, every line is also read for an "is off:" line that turns off
+   * a lever LANA asked for, which becomes a logged warning.
+   */
+  // The chat server's first lines since its latest launch, for the startup checks.
+  const STARTUP_LINES = 400;
+  let startupLines = [];
+
+  function openLog(role, requested = null) {
+    let file;
+    try { file = fsImpl.createWriteStream(path.join(dir, `${role}.log`), { flags: 'w' }); } catch (_error) { return null; }
+    if (!requested) {return file;}
+    startupLines = [];
+    const { Writable } = require('stream');
+    const scanner = levers.lineScanner((line) => {
+      if (startupLines.length < STARTUP_LINES) {startupLines.push(line);}
+      const warning = levers.offWarning(line, requested);
+      if (warning) {log.warn(warning);}
+    });
+    const tee = new Writable({
+      write(chunk, _encoding, done) { scanner.write(chunk); file.write(chunk); done(); },
+      final(done) { scanner.end(); file.end(); done(); }
+    });
+    return tee;
+  }
+
+  async function getJson(url) {
+    const response = await fetch(url, { method: 'GET', timeoutMs: options.healthTimeoutMs || DEFAULTS.healthTimeoutMs });
+    return response.ok ? response.json() : null;
+  }
+
+  /** How often /metrics is read until enough traffic has run to judge batching (lazily). */
+  const METRICS_EVERY_MS = options.batchMetricsEveryMs || 5 * 60 * 1000;
+  let metricsTimer = null;
+
+  function stopMetricsCheck() {
+    if (metricsTimer) {timers.clearTimeout(metricsTimer);}
+    metricsTimer = null;
+  }
+
+  /** Once real traffic has run, check once that batched decode took a step; never blocks start. */
+  function scheduleMetricsCheck(url, chosen) {
+    stopMetricsCheck();
+    if (!chosen.expect.batching) {return;}
+    const tick = async () => {
+      metricsTimer = null;
+      let verdict = { ready: false, problem: null };
+      try {
+        const response = await fetch(`${url}/metrics`, { method: 'GET', timeoutMs: options.healthTimeoutMs || DEFAULTS.healthTimeoutMs });
+        if (response.ok) {verdict = levers.batchMetricsProblem(await response.text(), chosen);}
+      } catch (_error) { /* not answering now; the health check reports that */ }
+      if (verdict.problem) {log.warn(`[pip] chat: ${verdict.problem}`);}
+      if (!verdict.ready) {
+        metricsTimer = timers.setTimeout(tick, METRICS_EVERY_MS);
+        if (metricsTimer && metricsTimer.unref) {metricsTimer.unref();}
+      }
+    };
+    metricsTimer = timers.setTimeout(tick, METRICS_EVERY_MS);
+    if (metricsTimer && metricsTimer.unref) {metricsTimer.unref();}
+  }
+
+  /**
+   * Ready check for one server: /health first; then, once per launch, the chat server's startup
+   * lines, /health and /props against what it was asked for, and later (lazily) /metrics.
+   * A mismatch is logged, not a restart.
+   */
+  function readyCheck(want) {
+    return async (url, { starting = false } = {}) => {
+      const problem = await checkPipHealth(fetch, url, want.expectFile, options);
+      // The check that first passes after a launch is the one made while starting.
+      if (problem || !starting || !want.levers) {return problem;}
+      const warn = (issue) => log.warn(`[pip] chat: ${issue}`);
+      levers.verifyStartup(startupLines, want.levers).forEach(warn);
+      try {
+        levers.verifyHealth(await getJson(`${url}/health`), want.levers, startupLines).forEach(warn);
+        levers.verifyProps(await getJson(`${url}/props`), want.levers).forEach(warn);
+      } catch (error) {
+        warn(`/health or /props could not be read (${error.message})`);
+      }
+      scheduleMetricsCheck(url, want.levers);
+      return null;
+    };
   }
 
   function addresses() {
-    const out = { chat: null, embedding: null, chatModelFile: null };
+    const out = { chat: null, embedding: null, chatModelFile: null, chatSlots: null };
     for (const role of Object.keys(running)) {
       const item = running[role];
       if (item && item.server.getState().answeredOnce) {
         out[role] = item.server.getState().url;
-        if (role === 'chat') {out.chatModelFile = item.modelFile;}
+        if (role === 'chat') {Object.assign(out, { chatModelFile: item.modelFile, chatSlots: item.slots });}
       }
     }
     return out;
   }
 
   function getState() {
-    const out = { installed: Boolean(binary), servers: {} };
+    const out = { installed: Boolean(binary), problem, servers: {} };
     for (const role of Object.keys(running)) {out.servers[role] = running[role] ? running[role].server.getState() : null;}
     return out;
   }
@@ -223,6 +416,7 @@ function createPip(deps) {
   async function stopRole(role) {
     const item = running[role];
     running[role] = null;
+    if (role === 'chat') {stopMetricsCheck();}
     if (item) {await item.server.stop();}
   }
 
@@ -233,22 +427,44 @@ function createPip(deps) {
    * @param {string} modelsDir
    */
   async function apply(result, modelsDir) {
-    const wanted = binary ? wantedServers({ result, modelsDir, env }) : { chat: null, embedding: null };
+    let wanted = binary ? wantedServers({ result, modelsDir, env, accepts }) : { chat: null, embedding: null };
     if (!binary) {log.warn('[pip] Pip is not installed on this computer; chat and embedding use the cloud');}
+    if (binary && platform === 'win32' && (wanted.chat || wanted.embedding)) {
+      const start = windowsStart(binary, runVersion, env);
+      serverEnv = start.env || null;
+      if (start.problem) {
+        log.warn(start.problem.warning);
+        wanted = { chat: null, embedding: null };
+      } else if (start.fallback && !fallbackLogged) {
+        fallbackLogged = true;
+        log.info(`[pip] this computer has no Vulkan loader of its own, so Pip uses the bundled one (${path.join(path.dirname(binary), VULKAN_FALLBACK_DIR)})`);
+      }
+      setProblem(start.problem ? start.problem.message : null);
+    }
     fsImpl.mkdirSync(dir, { recursive: true });
+    if (wanted.chat) {
+      const chosen = wanted.chat.levers;
+      log.info(`[pip] chat: ${chosen.backend}, ${chosen.slots} slot(s)${chosen.stale ? ', an older Pip without the newer speed settings' : ''}; flags ${JSON.stringify(chosen.config)} ${chosen.args.join(' ')}`.trim());
+      if (chosen.backend === 'metal') {
+        const needBytes = metalNeedBytes({ result, wanted });
+        const warning = needBytes && levers.wiredLimitProblem({ wiredLimitMb: readWiredLimitMb(), totalMemoryBytes: result.hardware.totalMemoryBytes, needBytes });
+        if (warning) {log.warn(warning);}
+      }
+    }
     for (const role of Object.keys(running)) {
       const want = wanted[role];
-      // Settings without the port: the same model and sizes mean the same server.
-      const key = want ? JSON.stringify(want.settings(0)) : null;
+      // Settings and flags without the port: the same model, sizes and levers mean the same server.
+      const key = want ? JSON.stringify([want.settings(0), want.args, Boolean(serverEnv)]) : null;
       if (running[role] && running[role].key === key) {continue;}
       await stopRole(role);
       if (!want) {continue;}
       const port = await pickPort(PREFERRED_PORTS[role]);
       const configFile = path.join(dir, `${role}.json`);
       fsImpl.writeFileSync(configFile, `${JSON.stringify(want.settings(port), null, 2)}\n`);
-      const server = createKeptProcess({ name: role, label: 'pip', spawn, timers, now, log, openLog, onChange: changed, options });
-      running[role] = { server, key, modelFile: want.modelFile };
-      server.start({ command: binary, args: ['serve', '--config', configFile], port, check: (url) => checkPipHealth(fetch, url, want.expectFile, options) });
+      const requested = want.levers ? want.levers.requested : null;
+      const server = createKeptProcess({ name: role, label: 'pip', spawn, timers, now, log, openLog: (name) => openLog(name, requested), onChange: changed, options });
+      running[role] = { server, key, modelFile: want.modelFile, slots: want.levers ? want.levers.slots : null };
+      server.start({ command: binary, args: ['serve', '--config', configFile, ...want.args], port, check: readyCheck(want), ...(serverEnv ? { env: serverEnv } : {}) });
     }
     changed();
     return getState();
@@ -262,11 +478,21 @@ function createPip(deps) {
   return { apply, stop, getState, addresses };
 }
 
-/** What the engine is given for Pip: the servers that answered, and the chat model's vocabulary. */
+/**
+ * What the engine is given for Pip: the servers that answered, the chat model's vocabulary, and
+ * how many model calls it may run at once. The engine's queue (LANA-AI
+ * src/shared/llm/llm-request-queue.js) otherwise takes its concurrency from its tier, which for
+ * this app is one call at a time, so Pip's second slot would never be used. Chat may use every
+ * slot; background work (summaries, classifiers) holds at most one, so a chat always has a slot.
+ */
 function engineEndpoints(addresses) {
   const out = {};
   if (addresses.chat) {out.LANA_ENGINE_CHAT_URL = addresses.chat;}
   if (addresses.chat && addresses.chatModelFile) {out.LANA_TOKENIZER_GGUF = addresses.chatModelFile;}
+  if (addresses.chat && addresses.chatSlots) {
+    out.LLM_QUEUE_CONCURRENCY = String(addresses.chatSlots);
+    out.LLM_QUEUE_MAX_BACKGROUND_CONCURRENCY = '1';
+  }
   if (addresses.embedding) {out.LANA_ENGINE_EMBEDDING_URL = addresses.embedding;}
   return out;
 }
@@ -281,5 +507,10 @@ module.exports = {
   threadsFor,
   PREFERRED_PORTS,
   ADDRESS_ENV,
-  DEFAULTS
+  DEFAULTS,
+  versionProblem,
+  windowsStart,
+  withFallbackPath,
+  VULKAN_FALLBACK_DIR,
+  MISSING_FILE_MESSAGE
 };

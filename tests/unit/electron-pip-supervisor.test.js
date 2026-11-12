@@ -8,8 +8,11 @@
 const path = require('path');
 const { EventEmitter } = require('events');
 const {
-  createPip, chatConfig, embeddingConfig, wantedServers, resolvePipBinary, threadsFor, engineEndpoints, DEFAULTS
+  createPip, chatConfig, embeddingConfig, wantedServers, resolvePipBinary, threadsFor, engineEndpoints, DEFAULTS,
+  versionProblem, MISSING_FILE_MESSAGE
 } = require('../../electron-pip-supervisor');
+
+const levers = require('../../electron-pip-levers');
 
 const MODELS = path.join('/data', 'models');
 const BINARY = path.join('/app', 'pip', 'lqe');
@@ -50,7 +53,7 @@ function result({ chat = 'local', vision = true, embedding = 'local', platform =
   };
 }
 
-function harness({ env = {}, binary = BINARY, busyPorts = [] } = {}) {
+function harness({ env = {}, binary = BINARY, busyPorts = [], accepts = {}, props = {}, health = {}, metrics = {}, wiredLimitMb = null, options = {}, platform = 'darwin', runVersion = () => ({ status: 0 }) } = {}) {
   const children = [];
   const spawns = [];
   const files = {};
@@ -58,12 +61,24 @@ function harness({ env = {}, binary = BINARY, busyPorts = [] } = {}) {
   const serving = {}; // port -> model file name /health reports
   const down = new Set(); // ports that refuse connections
   const logs = [];
+  const warnings = [];
+  const problems = [];
+  const versionRuns = [];
+  const spawnOptions = [];
+  const infos = [];
   const pip = createPip({
     binary,
+    platform,
+    runVersion: (file, runEnv) => { versionRuns.push(file); return runVersion(file, runEnv); },
+    onProblem: (message) => problems.push(message),
+    accepts,
+    readWiredLimitMb: () => wiredLimitMb,
+    log: { info: (message) => infos.push(message), warn: (message) => warnings.push(message), error() {} },
     dir: path.join('/user', 'pip'),
     env,
-    spawn: jest.fn((command, args) => {
+    spawn: jest.fn((command, args, spawnOpts) => {
       spawns.push({ command, args });
+      spawnOptions.push(spawnOpts || {});
       const child = fakeChild(2000 + children.length);
       children.push(child);
       return child;
@@ -71,21 +86,25 @@ function harness({ env = {}, binary = BINARY, busyPorts = [] } = {}) {
     fetch: jest.fn(async (url) => {
       const port = Number(new URL(url).port);
       if (down.has(port) || !serving[port]) {throw new Error('connect ECONNREFUSED');}
-      return { ok: true, status: 200, json: async () => ({ status: 'ok', model_file: { name: serving[port] } }) };
+      const where = new URL(url).pathname;
+      if (where === '/props') {return { ok: true, status: 200, json: async () => props[port] || null };}
+      if (where === '/metrics') {return { ok: true, status: 200, text: async () => (typeof metrics[port] === 'function' ? metrics[port]() : metrics[port] || '') };}
+      return { ok: true, status: 200, json: async () => ({ status: 'ok', model_file: { name: serving[port] }, ...(health[port] || {}) }) };
     }),
     pickPort: jest.fn(async (preferred) => (busyPorts.includes(preferred) ? 50000 + preferred : preferred)),
     fsImpl: {
       mkdirSync: jest.fn(),
       writeFileSync: (file, text) => { files[file] = JSON.parse(text); },
-      createWriteStream: jest.fn(() => { const sink = { end: jest.fn() }; logs.push(sink); return sink; })
+      createWriteStream: jest.fn(() => { const sink = { write: jest.fn(), end: jest.fn() }; logs.push(sink); return sink; })
     },
-    onAddresses: (value) => addresses.push(value)
+    onAddresses: (value) => addresses.push(value),
+    options
   });
   /** Pretend each started server loaded its settings file's model. */
   const serveFromSettings = () => {
     for (const settings of Object.values(files)) {serving[settings.port] = path.basename(settings.model);}
   };
-  return { pip, children, spawns, files, addresses, serving, down, logs, serveFromSettings };
+  return { pip, children, spawns, spawnOptions, infos, files, addresses, serving, down, logs, warnings, problems, versionRuns, serveFromSettings };
 }
 
 const settle = async (ms = DEFAULTS.healthIntervalStartingMs) => {
@@ -96,8 +115,8 @@ beforeEach(() => { jest.useFakeTimers(); });
 afterEach(() => { jest.useRealTimers(); });
 
 describe('settings from the plan', () => {
-  test('chat: the planned model, image file, size per slot and slots, on loopback, graphics on Apple', () => {
-    const config = chatConfig({ modelPath: '/m/chat.gguf', mmprojPath: '/m/mm.gguf', port: 8081, contextTokens: 16384, parallel: 2, hardware: { platform: 'darwin', cores: 12, accelerator: { backend: 'metal' } } });
+  test('chat on an older Pip (no context pool): the planned model, image file, size per slot and slots, on loopback, graphics on Apple', () => {
+    const config = chatConfig({ modelPath: '/m/chat.gguf', mmprojPath: '/m/mm.gguf', port: 8081, contextTokens: 16384, parallel: 2, hardware: { platform: 'darwin', cores: 12, accelerator: { backend: 'metal' } }, accepts: { gpuOutput: true } });
     expect(config).toMatchObject({ model: '/m/chat.gguf', mmproj: '/m/mm.gguf', host: '127.0.0.1', port: 8081, ctx: 16384, parallel: 2, kv_type: 'q8_0', gpu_layers: 99, gpu_output: true, threads: 10, metal_residency_keep_alive_s: 86400 });
     // Conversations are never written to disk.
     expect(config).not.toHaveProperty('session_dir');
@@ -105,7 +124,8 @@ describe('settings from the plan', () => {
 
   test('chat on a computer with no graphics chip runs on the processor; no Apple-only setting elsewhere', () => {
     const config = chatConfig({ modelPath: '/m/c.gguf', port: 8081, contextTokens: 8192, parallel: 2, hardware: { platform: 'linux', cores: 8, accelerator: { backend: 'cpu' } } });
-    expect(config).toMatchObject({ gpu_layers: 0, gpu_output: false, threads: 6 });
+    expect(config).toMatchObject({ gpu_layers: 0, threads: 6 });
+    expect(config).not.toHaveProperty('gpu_output');
     expect(config).not.toHaveProperty('mmproj');
     expect(config).not.toHaveProperty('metal_residency_keep_alive_s');
     expect(chatConfig({ modelPath: '/m/c.gguf', port: 1, contextTokens: 8192, parallel: 2, hardware: { platform: 'win32', accelerator: { backend: 'cuda' } } }).gpu_layers).toBe(99);
@@ -131,6 +151,194 @@ describe('settings from the plan', () => {
     expect(dev.chat).toBeNull();
     expect(dev.embedding).not.toBeNull();
     expect(wantedServers({ result: result({ chat: 'cloud', embedding: 'cloud' }), modelsDir: MODELS })).toEqual({ chat: null, embedding: null });
+  });
+});
+
+describe('this computer\'s speed settings (electron-pip-levers.js)', () => {
+  const NEW = levers.parseAccepts(Object.values(levers.NEW_FLAGS).join(' '));
+  const CHAT = path.join('/user', 'pip', 'chat.json');
+  const metal = (parallel) => {
+    const r = result({ embedding: 'cloud' });
+    r.plan.chat.parallel = parallel;
+    r.plan.chat.poolTokens = parallel > 1 ? 65536 : null;
+    r.hardware.totalMemoryBytes = 36 * 1024 ** 3;
+    return r;
+  };
+  const STARTUP = [
+    '[lqe INF] serve: computation identity 422dee4d4c530750 (model=/m/x.gguf;kv=f16;exec=gpu-inexact:bdec=2:pshare=1)',
+    '[lqe INF] serve: shared prefixes on - system prompts of 512+ tokens kept in up to 512 MiB (D-40)',
+    "[lqe INF] serve: batched decode on - up to 2 slots' tokens per forward (D-39) on the GPU (--gpu-inexact: value-equivalent, not bit-identical)"
+  ];
+  const GOOD = {
+    health: { 8081: { computation: '422dee4d4c530750', adaptive_prefill: true } },
+    props: { 8081: { total_slots: 2, default_generation_settings: { n_ctx: 32768 } } }
+  };
+  /** Start chat on Apple silicon, print `lines`, and let it answer once. */
+  async function started(lines, more = {}, parallel = 2) {
+    const h = harness({ accepts: NEW, ...GOOD, ...more });
+    await h.pip.apply(metal(parallel), MODELS);
+    h.children[0].stdout.pipe.mock.calls[0][0].write(`${lines.join('\n')}\n`);
+    h.serveFromSettings();
+    await settle();
+    return h;
+  }
+
+  test('a new Pip on Apple silicon with 2 slots: the measured settings in the file, no extra flags', async () => {
+    const h = harness({ accepts: NEW });
+    await h.pip.apply(metal(2), MODELS);
+    expect(h.spawns[0].args).toEqual(['serve', '--config', CHAT]);
+    expect(h.files[CHAT]).toMatchObject({ parallel: 2, kv_type: 'f16', gpu_inexact: true, batch_decode: 2, prefix_share_mb: 512, ctx_pool: 65536, ctx_chunk: 4096, ubatch: 2048, threads: 4, gpu_output: true });
+    expect(h.files[CHAT]).not.toHaveProperty('adaptive_prefill');
+  });
+
+  test('a true single slot: no batching settings and no --flash-attn', async () => {
+    const h = harness({ accepts: NEW });
+    await h.pip.apply(metal(1), MODELS);
+    expect(h.spawns[0].args).toEqual(['serve', '--config', CHAT]);
+    for (const key of ['gpu_inexact', 'batch_decode', 'prefix_share_mb', 'ctx_pool']) {expect(h.files[CHAT]).not.toHaveProperty(key);}
+  });
+
+  test('control: everything as asked gives no warning', async () => {
+    const h = await started(STARTUP);
+    expect(h.warnings).toEqual([]);
+    expect(h.addresses).toHaveLength(1);
+  });
+
+  test('an "is off:" line for a lever LANA asked for is logged as a warning', async () => {
+    const h = await started([...STARTUP, '[lqe WRN] serve: --batch-decode 2 is off: there is only one slot']);
+    expect(h.warnings.join('\n')).toMatch(/turned off --batch-decode, which LANA asked for: there is only one slot/);
+    expect(h.logs[0].write).toHaveBeenCalled();
+  });
+
+  test('a missing "batched decode on ... on the GPU" or "shared prefixes on" line is a warning', async () => {
+    const h = await started([STARTUP[0], STARTUP[1]]);
+    expect(h.warnings.join('\n')).toMatch(/did not log "batched decode on/);
+    const share = await started([STARTUP[0], STARTUP[2]]);
+    expect(share.warnings.join('\n')).toMatch(/did not log "shared prefixes on"/);
+  });
+
+  test('/health: no ;exec=gpu-inexact:bdec=2:pshare=1 in the served computation, or adaptive prefill off, is a warning', async () => {
+    const h = await started([STARTUP[0].replace(';exec=gpu-inexact:bdec=2:pshare=1', ''), STARTUP[1], STARTUP[2]]);
+    expect(h.warnings.join('\n')).toMatch(/does not include ;exec=gpu-inexact:bdec=2:pshare=1/);
+    const off = await started(STARTUP, { health: { 8081: { computation: '422dee4d4c530750', adaptive_prefill: false } } });
+    expect(off.warnings.join('\n')).toMatch(/adaptive prefill off/);
+  });
+
+  test('/props must report the slots asked for; a mismatch is a warning, the server still serves', async () => {
+    const h = await started(STARTUP, { props: { 8081: { total_slots: 1, default_generation_settings: { n_ctx: 32768 } } } });
+    expect(h.warnings.join('\n')).toMatch(/reports 1 slots, LANA asked for 2/);
+    expect(h.addresses).toHaveLength(1);
+  });
+
+  test('/metrics is read lazily after start, and judged once real traffic has run', async () => {
+    let text = 'lqe_requests_total 2\nlqe_batch_decode_steps_total 0\n';
+    const h = await started(STARTUP, { metrics: { 8081: () => text }, options: { batchMetricsEveryMs: 1000 } });
+    expect(h.warnings).toEqual([]);
+    await settle(1000);
+    expect(h.warnings).toEqual([]); // too little traffic to judge
+    text = 'lqe_requests_total 25\nlqe_batch_decode_steps_total 0\n';
+    await settle(1000);
+    expect(h.warnings.join('\n')).toMatch(/batched decode took no step in 25 requests/);
+    const count = h.warnings.length;
+    await settle(5000);
+    expect(h.warnings).toHaveLength(count); // checked once
+  });
+
+  test('control: batching that took steps gives no /metrics warning', async () => {
+    const h = await started(STARTUP, { metrics: { 8081: 'lqe_requests_total 25\nlqe_batch_decode_steps_total 9\n' }, options: { batchMetricsEveryMs: 1000 } });
+    await settle(3000);
+    expect(h.warnings).toEqual([]);
+  });
+
+  test('the Metal memory limit is checked against the models plus the pool', async () => {
+    const r = metal(2);
+    r.entries.set('qwen4b', { id: 'qwen4b', family: 'qwen3.5', sizeBytes: 20 * 1024 ** 3, filename: 'Qwen3.5-4B-Q4_K_M.gguf' });
+    const h = harness({ accepts: NEW, wiredLimitMb: 16384 });
+    await h.pip.apply(r, MODELS);
+    expect(h.warnings.join('\n')).toMatch(/iogpu.wired_limit_mb 16384/);
+    const roomy = harness({ accepts: NEW, wiredLimitMb: 32768 });
+    await roomy.pip.apply(r, MODELS);
+    expect(roomy.warnings).toEqual([]);
+  });
+});
+
+describe('Windows: lqe.exe is asked for its version before any server starts', () => {
+  const DLL = { status: 0xC0000135, stderr: '' };
+  const WIN_BINARY = path.join('C:', 'LANA', 'resources', 'pip', 'lqe.exe');
+  const FALLBACK = path.join(path.dirname(WIN_BINARY), 'vulkan-fallback');
+  const OK = { status: 0, stdout: 'lqe 3.0.0' };
+  /** First run as given, retries as given; records the env each run had. */
+  const runs = (...answers) => {
+    const seen = [];
+    const run = (_file, env) => { seen.push(env); return answers[Math.min(seen.length, answers.length) - 1]; };
+    return { run, seen };
+  };
+
+  test('control: a first check that answers never touches PATH, and the servers keep the app\'s environment', async () => {
+    const r = runs(OK);
+    const h = harness({ platform: 'win32', binary: WIN_BINARY, env: { Path: 'C:\\Windows\\System32' }, runVersion: r.run });
+    await h.pip.apply(result(), MODELS);
+    expect(r.seen).toEqual([undefined]);
+    expect(h.spawns).toHaveLength(2);
+    expect(h.children).toHaveLength(2);
+    expect(h.spawnOptions.every((options) => options.env === undefined)).toBe(true);
+    expect(h.problems).toEqual([]);
+  });
+
+  test('a missing DLL: retried with the fallback folder first on PATH, and that PATH reaches every server', async () => {
+    const r = runs(DLL, OK);
+    const h = harness({ platform: 'win32', binary: WIN_BINARY, env: { Path: 'C:\\Windows\\System32', OTHER: 'kept' }, runVersion: r.run });
+    await h.pip.apply(result(), MODELS);
+    expect(r.seen).toHaveLength(2);
+    expect(r.seen[0]).toBeUndefined();
+    expect(r.seen[1]).toEqual({ Path: `${FALLBACK};C:\\Windows\\System32`, OTHER: 'kept' });
+    expect(h.spawns).toHaveLength(2);
+    for (const options of h.spawnOptions) {expect(options.env).toEqual(r.seen[1]);}
+    expect(h.infos.join('\n')).toMatch(/uses the bundled one/);
+    expect(h.problems).toEqual([]);
+  });
+
+  test('the signed exit and a DLL launch error are retried the same way; other failures are not', () => {
+    const { windowsStart } = require('../../electron-pip-supervisor');
+    expect(windowsStart(WIN_BINARY, runs({ status: -1073741515 }, OK).run, {}).fallback).toBe(true);
+    expect(windowsStart(WIN_BINARY, runs({ status: null, error: new Error('The specified module could not be found (vulkan-1.dll)') }, OK).run, {}).fallback).toBe(true);
+    const other = runs({ status: 1, stderr: 'boom' }, OK);
+    const started = windowsStart(WIN_BINARY, other.run, {});
+    expect(other.seen).toHaveLength(1);
+    expect(started.problem.message).toBe(MISSING_FILE_MESSAGE);
+    expect(started.problem.warning).toMatch(/exited with code 1: boom.*vulkan-fallback/);
+  });
+
+  test('a double failure: no server starts, the warning names vulkan-1.dll, the status says it plainly, nothing restarts', async () => {
+    const r = runs(DLL, DLL);
+    const h = harness({ platform: 'win32', binary: WIN_BINARY, runVersion: r.run });
+    const state = await h.pip.apply(result(), MODELS);
+    expect(r.seen).toHaveLength(2);
+    expect(h.spawns).toEqual([]);
+    expect(h.warnings.join('\n')).toMatch(/--version failed.*0xC0000135.*vulkan-fallback.*vulkan-1\.dll/);
+    expect(h.problems).toEqual([MISSING_FILE_MESSAGE]);
+    expect(MISSING_FILE_MESSAGE).toBe('LANA\'s local engine could not start: a required system file is missing.');
+    expect(state.problem).toBe(MISSING_FILE_MESSAGE);
+    await settle(60000);
+    expect(h.spawns).toEqual([]);
+  });
+
+  test('PATH is extended under whatever name it has', () => {
+    const { withFallbackPath } = require('../../electron-pip-supervisor');
+    expect(withFallbackPath({ Path: 'A' }, 'F')).toEqual({ Path: 'F;A' });
+    expect(withFallbackPath({ PATH: 'A' }, 'F')).toEqual({ PATH: 'F;A' });
+    expect(withFallbackPath({}, 'F')).toEqual({ PATH: 'F' });
+    expect(versionProblem('/x/lqe', { status: 0 })).toBeNull();
+  });
+
+  test('control: macOS and Linux do not ask', async () => {
+    for (const platform of ['darwin', 'linux']) {
+      const r = runs(DLL);
+      const h = harness({ platform, runVersion: r.run });
+      await h.pip.apply(result(), MODELS);
+      expect(r.seen).toEqual([]);
+      expect(h.spawns).toHaveLength(2);
+    }
   });
 });
 
@@ -163,7 +371,7 @@ describe('running the servers', () => {
     expect(h.addresses).toEqual([]);
     h.serving[8081] = 'Qwen3.5-4B-Q4_K_M.gguf';
     await settle();
-    expect(h.addresses).toEqual([{ chat: 'http://127.0.0.1:8081', embedding: 'http://127.0.0.1:8082', chatModelFile: path.join(MODELS, 'Qwen3.5-4B-Q4_K_M.gguf') }]);
+    expect(h.addresses).toEqual([{ chat: 'http://127.0.0.1:8081', embedding: 'http://127.0.0.1:8082', chatModelFile: path.join(MODELS, 'Qwen3.5-4B-Q4_K_M.gguf'), chatSlots: 2 }]);
     expect(h.pip.getState().servers.chat).toMatchObject({ process: 'running', healthy: true });
   });
 
@@ -190,7 +398,7 @@ describe('running the servers', () => {
     expect(h.spawns).toHaveLength(1);
     h.serveFromSettings();
     await settle();
-    expect(h.addresses).toEqual([{ chat: null, embedding: 'http://127.0.0.1:8082', chatModelFile: null }]);
+    expect(h.addresses).toEqual([{ chat: null, embedding: 'http://127.0.0.1:8082', chatModelFile: null, chatSlots: null }]);
   });
 
   test('no Pip installed: nothing starts', async () => {
@@ -269,7 +477,7 @@ describe('running the servers', () => {
     await stopping;
     expect(h.children[0].signals).toEqual(['SIGTERM', 'SIGKILL']);
     expect(h.children[1].signals).toEqual(['SIGTERM']);
-    expect(h.addresses[h.addresses.length - 1]).toEqual({ chat: null, embedding: null, chatModelFile: null });
+    expect(h.addresses[h.addresses.length - 1]).toEqual({ chat: null, embedding: null, chatModelFile: null, chatSlots: null });
     // Nothing restarts after a stop.
     await settle(DEFAULTS.maxBackoffMs);
     expect(h.spawns).toHaveLength(2);
@@ -278,6 +486,9 @@ describe('running the servers', () => {
 
 test('what the engine is given: the addresses of the servers that answered, and the chat vocabulary', () => {
   expect(engineEndpoints({ chat: 'http://127.0.0.1:8081', embedding: 'http://127.0.0.1:8082', chatModelFile: '/m/chat.gguf' })).toEqual({ LANA_ENGINE_CHAT_URL: 'http://127.0.0.1:8081', LANA_ENGINE_EMBEDDING_URL: 'http://127.0.0.1:8082', LANA_TOKENIZER_GGUF: '/m/chat.gguf' });
+  // The engine's queue runs as many calls as Pip has chat slots, background work at most one.
+  expect(engineEndpoints({ chat: 'http://127.0.0.1:8081', embedding: null, chatModelFile: '/m/chat.gguf', chatSlots: 2 })).toMatchObject({ LLM_QUEUE_CONCURRENCY: '2', LLM_QUEUE_MAX_BACKGROUND_CONCURRENCY: '1' });
+  expect(engineEndpoints({ chat: null, embedding: 'http://127.0.0.1:8082', chatSlots: 2 })).not.toHaveProperty('LLM_QUEUE_MAX_BACKGROUND_CONCURRENCY');
   expect(engineEndpoints({ chat: null, embedding: 'http://127.0.0.1:8082' })).toEqual({ LANA_ENGINE_EMBEDDING_URL: 'http://127.0.0.1:8082' });
   expect(engineEndpoints({ chat: null, embedding: null })).toEqual({});
 });

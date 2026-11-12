@@ -38,6 +38,16 @@ if [[ "$have" != "$want" ]]; then
   echo "LANA.cpp is at $have, the client pins $want ($version). Check out the pinned commit." >&2
   exit 1
 fi
+# The tag is moved on purpose (pip/pip-pin.json), so a checkout fetched before a move still has
+# the old tag. Refuse one whose tag names a different commit rather than build beside it.
+tag="$(node -p "require('$pin').tag || ''")"
+if [[ -n "$tag" ]]; then
+  tagged="$(git -C "$source_dir" rev-parse --verify --quiet "refs/tags/$tag^{commit}" || true)"
+  if [[ -n "$tagged" && "$tagged" != "$want" ]]; then
+    echo "LANA.cpp's $tag is at $tagged here, the client pins $want. The tag was moved: run git fetch --tags --force." >&2
+    exit 1
+  fi
+fi
 if [[ -n "$(git -C "$source_dir" status --porcelain --untracked-files=no)" ]]; then
   echo "LANA.cpp has local changes. Build from a clean checkout." >&2
   exit 1
@@ -76,6 +86,10 @@ fi
 mkdir -p "$root_dir/build/pip"
 cp "$binary" "$root_dir/build/pip/$exe"
 chmod 755 "$root_dir/build/pip/$exe"
+if [[ "$key" == windows-* ]]; then
+  # lqe.exe imports vulkan-1.dll; the package ships the pinned loader in pip/vulkan-fallback.
+  node "$root_dir/scripts/fetch-vulkan-loader.js"
+fi
 sha="$(node -p "require('$root_dir/scripts/local-ai-pins.js').sha256File('$root_dir/build/pip/$exe')")"
 bytes="$(wc -c < "$root_dir/build/pip/$exe" | tr -d ' ')"
 echo "Built build/pip/$exe: $reported, $bytes bytes, sha256 $sha"

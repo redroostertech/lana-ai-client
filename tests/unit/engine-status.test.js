@@ -120,6 +120,12 @@ describe('controller', () => {
 });
 
 describe('settingsView', () => {
+  test('the local AI models could not start: the message says so plainly (control: none without a problem)', () => {
+    const problem = 'LANA\'s local engine could not start: a required system file is missing.';
+    expect(status.settingsView(engineStatus({ localAiProblem: problem })).message).toBe(problem);
+    expect(status.settingsView(engineStatus()).message).toBe('');
+  });
+
   test('running engine: the badge only, no port or version rows', () => {
     const view = status.settingsView(engineStatus());
     expect(view.statusLabel).toBe('Running');

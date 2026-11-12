@@ -141,11 +141,14 @@
       version_refused: 'Version not supported'
     };
     var tones = { ok: 'green', restarting: 'blue', chef_unavailable: 'yellow', version_refused: 'red' };
+    var message = isQuiet(described.state) ? '' : described.message;
+    // The local AI models could not start (a file Pip needs is missing): said in plain words.
+    if (status.localAiProblem) {message = message ? message + ' ' + status.localAiProblem : status.localAiProblem;}
     return {
       available: true,
       statusLabel: labels[described.state] || 'Unknown',
       tone: tones[described.state] || 'gray',
-      message: isQuiet(described.state) ? '' : described.message,
+      message: message,
       // No detail rows: the badge and the message say when the server or a version is the problem.
       rows: [],
       note: '',

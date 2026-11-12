@@ -129,14 +129,22 @@ const { pickLoopbackPort } = require('./electron-local-engine');
 // sets its memory aside and the engine is given its address.
 const { createRedactor, resolveRedactorCommand, redactorEndpoints, REDACTOR_MEMORY_BYTES } = require('./electron-redactor');
 const redactorCommand = process.env.REDACTOR_URL ? null : resolveRedactorCommand({ env: process.env, resourcesPath: process.resourcesPath, isPackaged: app.isPackaged, home: app.getPath('home'), fileExists: (file) => fs.existsSync(file) });
+const pipBinary = resolvePipBinary({ env: process.env, resourcesPath: process.resourcesPath, isPackaged: app.isPackaged, fileExists: (file) => fs.existsSync(file) });
 const pip = createPip({
-  binary: resolvePipBinary({ env: process.env, resourcesPath: process.resourcesPath, isPackaged: app.isPackaged, fileExists: (file) => fs.existsSync(file) }),
+  binary: pipBinary,
+  // Asked on every start, so an updated app's Pip is asked again (electron-pip-levers.js).
+  accepts: require('./electron-pip-levers').readAccepts(pipBinary, require('child_process').spawnSync, { warn: logWarn }),
+  readWiredLimitMb: () => {
+    if (process.platform !== 'darwin') {return null;}
+    try { return Number(require('child_process').execFileSync('sysctl', ['-n', 'iogpu.wired_limit_mb'], { encoding: 'utf8', timeout: 3000 }).trim()); } catch (_error) { return null; }
+  },
   dir: path.join(app.getPath('userData'), 'pip'),
   spawn: require('child_process').spawn,
   fetch: (url, { timeoutMs = 3000, ...init } = {}) => fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) }),
   pickPort: pickLoopbackPort,
   env: process.env,
   log: { info: logInfo, warn: logWarn, error: (message) => logError(message) },
+  onProblem: (message) => localEngine.setLocalAiProblem(message),
   onAddresses: (addresses) => {
     logInfo(`[pip] addresses: chat ${addresses.chat || 'none'}, embedding ${addresses.embedding || 'none'}`);
     localServers.pip = engineEndpoints(addresses);
