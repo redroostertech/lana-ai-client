@@ -4,6 +4,9 @@
  * electron-builder beforePack hook: refuses to package an app that would be missing a part it
  * needs on the person's computer.
  *
+ *   parts-before-pack.js     first: stages this target's parts from build/parts/<target>/ into
+ *                            build/pip, build/redactor and build/engine when build/parts is there
+ *                            (one computer packaging every target), so the checks below see them
  *   briefs-before-pack.js    the LANA Briefs speech engine for this platform
  *   redactor-before-pack.js  the redactor program (scripts/build-redactor.sh). Without it the
  *                            engine cannot send any turn to the cloud.
@@ -15,6 +18,7 @@
  *                            (scripts/fetch-lana-editor.js). Without it documents open read-only.
  */
 
+const parts = require('./parts-before-pack');
 const briefs = require('./briefs-before-pack');
 const redactor = require('./redactor-before-pack');
 const pip = require('./pip-before-pack');
@@ -22,6 +26,7 @@ const engine = require('./engine-before-pack');
 const editor = require('./editor-before-pack');
 
 async function beforePack(context) {
+  await parts(context);
   await briefs(context);
   await redactor(context);
   await pip(context);

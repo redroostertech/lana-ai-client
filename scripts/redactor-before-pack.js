@@ -16,14 +16,21 @@ function redactorFile(root, platformName) {
   return path.join(root, 'build', 'redactor', 'lana-redactor', platformName === 'win32' ? 'lana-redactor.exe' : 'lana-redactor');
 }
 
-async function beforePack(context) {
-  const root = path.resolve(__dirname, '..');
-  const file = redactorFile(root, context.electronPlatformName);
+/** Problems with the redactor for a platform under root, in plain words; empty when it is there. */
+function checkRedactor({ root, platformName }) {
+  const file = redactorFile(root, platformName);
   if (file && !fs.existsSync(file)) {
-    throw new Error(`The redactor program is missing for this build (${context.electronPlatformName}): ${path.relative(root, file)}. Build it on a matching machine with scripts/build-redactor.sh first.`);
+    return [`The redactor program is missing for this build (${platformName}): ${path.relative(root, file)}. Build it on a matching machine with scripts/build-redactor.sh first.`];
   }
+  return [];
+}
+
+async function beforePack(context) {
+  const problems = checkRedactor({ root: path.resolve(__dirname, '..'), platformName: context.electronPlatformName });
+  if (problems.length) {throw new Error(problems.join(' '));}
 }
 
 module.exports = beforePack;
 module.exports.default = beforePack;
 module.exports.redactorFile = redactorFile;
+module.exports.checkRedactor = checkRedactor;

@@ -16,6 +16,8 @@ set -euo pipefail
 #                           PYTHON=python "$LANA_REDACTOR_SRC/install-models.sh"
 
 root_dir="$(cd "$(dirname "$0")/.." && pwd)"
+# Node and the Windows Python read C:/... paths, not Git Bash's /c/... ones.
+if [[ "$(uname -s)" == MINGW* || "$(uname -s)" == MSYS* ]]; then root_dir="$(cygpath -m "$root_dir")"; fi
 pin="$root_dir/redactor/redactor-pin.json"
 source_dir="${LANA_REDACTOR_SRC:?Set LANA_REDACTOR_SRC to a lana-redactor checkout}"
 python_bin="${LANA_REDACTOR_PYTHON:-python3}"

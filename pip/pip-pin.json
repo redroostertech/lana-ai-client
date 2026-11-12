@@ -5,6 +5,9 @@
   "version": "3.0.0",
   "commit": "396ca2c1d6432040e9fe136f7a0ece718c14ac70",
   "build": "396ca2c1d643",
+  "cmakeNotes": {
+    "macos-x64": "Not a LANA.cpp engine-release target at v3.0.0; flags come from its x64 release builds. LQE_DISTRIBUTION=ON and LQE_BUILD_TESTS=ON as in the linux-x64 and windows-x64 jobs of .github/workflows/engine-release.yml (GGML_NATIVE OFF, GGML_LLAMAFILE ON, static libraries are set by CMakeLists.txt). LQE_METAL=OFF: Intel Mac GPUs are not a LANA.cpp target, so this is the CPU backend like the x64 release builds; Accelerate stays on as in every Apple build. GGML_AVX2/FMA/F16C ON and AVX512 OFF: the x86-64-v3 baseline CMakeLists.txt pins for x64 distribution builds but applies only when NOT APPLE, so it is given here (every Mac that runs macOS 13.3 has AVX2). CMAKE_OSX_ARCHITECTURES=x86_64 states what CMakeLists.txt would detect. The macOS floor is 13.3, forced by CMakeLists.txt for any LQE_DISTRIBUTION Apple build and the same as macos-arm64; Electron 44 runs on macOS 12, so an Intel Mac on macOS 12 gets the app without local Pip. Checked by scripts/verify-pip-macos-x64.js in place of LANA.cpp scripts/verify_release_artifact.py, which accepts only darwin-arm64."
+  },
   "cmake": {
     "macos-arm64": [
       "-DLQE_DISTRIBUTION=ON",
@@ -21,6 +24,16 @@
       "-DLQE_BUILD_TESTS=ON",
       "-DLQE_REPRODUCIBLE=ON",
       "-DLQE_VULKAN=ON"
+    ],
+    "macos-x64": [
+      "-DLQE_DISTRIBUTION=ON",
+      "-DLQE_BUILD_TESTS=ON",
+      "-DLQE_METAL=OFF",
+      "-DCMAKE_OSX_ARCHITECTURES=x86_64",
+      "-DGGML_AVX2=ON",
+      "-DGGML_FMA=ON",
+      "-DGGML_F16C=ON",
+      "-DGGML_AVX512=OFF"
     ]
   },
   "builds": {
@@ -32,6 +45,10 @@
       "sha256": "99bc3137fed239447cd9c221fc4bd343a1363bfd62426586dca95569e6273533",
       "bytes": 79088640,
       "source": "https://github.com/redroostertech/LANA.cpp/actions/runs/43278937570 artifact lqe-win32-x64 (sha256:423c0d4d76c90a732819567d5beaf60a3df5454d762fd55ca1f6bf0f675a8332)"
+    },
+    "macos-x64": {
+      "sha256": "ad6ed844298950edd7c00412e0b77ee1a9018baeecafd238ff624c332eeffea2",
+      "bytes": 5801960
     }
   },
   "vulkanLoader": {

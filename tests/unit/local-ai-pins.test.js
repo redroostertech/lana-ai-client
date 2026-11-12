@@ -223,13 +223,15 @@ describe('the package step', () => {
   test('before-pack runs the Pip and engine checks and stops the build on a problem', async () => {
     jest.resetModules();
     const calls = [];
+    jest.doMock('../../scripts/parts-before-pack', () => async () => calls.push('parts'));
     jest.doMock('../../scripts/briefs-before-pack', () => async () => calls.push('briefs'));
     jest.doMock('../../scripts/redactor-before-pack', () => async () => calls.push('redactor'));
     jest.doMock('../../scripts/pip-before-pack', () => async () => calls.push('pip'));
     jest.doMock('../../scripts/engine-before-pack', () => async () => { calls.push('engine'); throw new Error('engine missing'); });
     const beforePack = require('../../scripts/before-pack');
     await expect(beforePack({ electronPlatformName: 'darwin', arch: 3 })).rejects.toThrow('engine missing');
-    expect(calls).toEqual(['briefs', 'redactor', 'pip', 'engine']);
+    expect(calls).toEqual(['parts', 'briefs', 'redactor', 'pip', 'engine']);
+    jest.dontMock('../../scripts/parts-before-pack');
     jest.dontMock('../../scripts/briefs-before-pack');
     jest.dontMock('../../scripts/redactor-before-pack');
     jest.dontMock('../../scripts/pip-before-pack');

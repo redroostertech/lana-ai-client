@@ -16,6 +16,7 @@
 const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { missingMacArchs } = require('./client-parts');
 
 const root = path.resolve(__dirname, '..');
 const pkg = path.join(root, 'briefs', 'native', 'macos', 'ble-wake-helper');
@@ -43,21 +44,40 @@ function fail(message) {
   process.exit(1);
 }
 
-if (process.platform !== 'darwin') {
-  console.log('Briefs Bluetooth helper: skipped (macOS only).');
-  process.exit(0);
+/** Both Mac processors in one binary, so an arm64 and an x64 build each get a helper that runs. */
+function swiftBuildArgs() {
+  return ['swift', 'build', '-c', 'release', '--arch', 'arm64', '--arch', 'x86_64'];
 }
 
-if (fs.existsSync(output) && fs.statSync(output).mtimeMs >= newestSource(pkg)) {
-  console.log('Briefs Bluetooth helper: up to date.');
-  process.exit(0);
+/** The processors the helper at file is missing ([] when it has both), by lipo. */
+function missingArchs(file) {
+  const lipo = spawnSync('/usr/bin/xcrun', ['lipo', '-archs', file], { encoding: 'utf8' });
+  return lipo.status === 0 ? missingMacArchs(lipo.stdout) : ['arm64', 'x86_64'];
 }
 
-const result = spawnSync('/usr/bin/xcrun', ['swift', 'build', '-c', 'release', '--arch', 'arm64', '--arch', 'x86_64'], { cwd: pkg, stdio: 'inherit' });
-if (result.status !== 0) fail('the Swift build failed.');
-const built = path.join(pkg, '.build', 'apple', 'Products', 'Release', 'LanaBleWake');
-if (!fs.existsSync(built)) fail('the Swift build produced no helper.');
-fs.mkdirSync(outputDir, { recursive: true });
-fs.copyFileSync(built, output);
-fs.chmodSync(output, 0o755);
-console.log(`Briefs Bluetooth helper: ${output}`);
+function main() {
+  if (process.platform !== 'darwin') {
+    console.log('Briefs Bluetooth helper: skipped (macOS only).');
+    process.exit(0);
+  }
+
+  if (fs.existsSync(output) && fs.statSync(output).mtimeMs >= newestSource(pkg) && missingArchs(output).length === 0) {
+    console.log('Briefs Bluetooth helper: up to date.');
+    process.exit(0);
+  }
+
+  const result = spawnSync('/usr/bin/xcrun', swiftBuildArgs(), { cwd: pkg, stdio: 'inherit' });
+  if (result.status !== 0) fail('the Swift build failed.');
+  const built = path.join(pkg, '.build', 'apple', 'Products', 'Release', 'LanaBleWake');
+  if (!fs.existsSync(built)) fail('the Swift build produced no helper.');
+  const missing = missingArchs(built);
+  if (missing.length) fail(`the Swift build has no ${missing.join(' or ')} slice.`);
+  fs.mkdirSync(outputDir, { recursive: true });
+  fs.copyFileSync(built, output);
+  fs.chmodSync(output, 0o755);
+  console.log(`Briefs Bluetooth helper: ${output}`);
+}
+
+if (require.main === module) main();
+
+module.exports = { swiftBuildArgs, missingArchs };
