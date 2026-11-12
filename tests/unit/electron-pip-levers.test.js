@@ -66,6 +66,12 @@ describe('per platform', () => {
     }
   });
 
+  test('Apple silicon leaves fair_chunk to the engine (D-41: 512); everywhere else, and an older engine, keeps 64', () => {
+    for (const slots of [1, 3]) {expect(pick({ backend: 'metal', slots }).config).not.toHaveProperty('fair_chunk');}
+    for (const backend of ['cuda', 'vulkan', 'cpu']) {expect(pick({ backend, slots: 2 }).config.fair_chunk).toBe(64);}
+    expect(pick({ backend: 'metal', slots: 3, accepts: STALE }).config.fair_chunk).toBe(64);
+  });
+
   test('NVIDIA, Vulkan and the processor keep the engine\'s own prefill choice; one slot has no pool', () => {
     for (const backend of ['cuda', 'vulkan', 'cpu']) {expect(pick({ backend, slots: 2 }).config).not.toHaveProperty('adaptive_prefill');}
     expect(pick({ backend: 'cpu', slots: 2 }).config).not.toHaveProperty('threads');

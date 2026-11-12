@@ -11,7 +11,11 @@
  *
  *   Apple silicon (Metal), the only platform measured (an M3 Ultra, 35B-A3B, 2026-11-12):
  *     always      gpu_layers 99, gpu_output, 4 threads, f16 KV, ubatch 2048, adaptive prefill on
- *                 (a 1.8k prompt read at 1739 tok/s instead of 538)
+ *                 (a 1.8k prompt read at 1739 tok/s instead of 538; the engine's default on Metal
+ *                 since D-41, 8f1970cdd11e, and still passed for an engine before it), and no
+ *                 fair_chunk, so the engine's D-41 busy chunk of 512 rows applies (a 4k prompt
+ *                 beside a streaming slot answered first in 10 s instead of 14.8 s); every other
+ *                 platform keeps 64
  *     2+ slots    batch_decode N, prefix_share_mb (1024 from 64 GB up, else 512), gpu_inexact,
  *                 no flash attention: batching took 9 users from 47 to 103 tok/s in total and the
  *                 worst first token from 89 s to 1 s, and the batched graph refuses flash attention
@@ -51,6 +55,8 @@ const NEW_FLAGS = Object.freeze({
 const GPU_THREADS = 4;
 const METAL_UBATCH = 2048;
 const DEFAULT_UBATCH = 512;
+/** Prefill rows per compute-lock hold while another slot decodes, off Apple silicon. */
+const FAIR_CHUNK = 64;
 /** Under --repack a step of 4 rows would not match solo decode, so the engine caps lanes at 3. */
 const REPACK_MAX_LANES = 3;
 const VULKAN_MAX_SLOTS = 2;
@@ -114,7 +120,7 @@ function chatLevers({ hardware = {}, contextTokens, slots, modelFile, accepts = 
   // An engine without the shared pool: the settings it was priced for before this module.
   if (!accepts.ctxPool) {
     const n = Math.max(1, Math.min(slots || 2, 2));
-    Object.assign(config, { ctx: contextTokens, parallel: n, kv_type: 'q8_0', gpu_layers: gpu ? 99 : 0, ubatch: DEFAULT_UBATCH });
+    Object.assign(config, { ctx: contextTokens, parallel: n, kv_type: 'q8_0', gpu_layers: gpu ? 99 : 0, ubatch: DEFAULT_UBATCH, fair_chunk: FAIR_CHUNK });
     if (gpu && accepts.gpuOutput) {config.gpu_output = true;}
     return { config, args, slots: n, expectedContext: contextTokens, requested, backend, stale: true };
   }
@@ -124,6 +130,8 @@ function chatLevers({ hardware = {}, contextTokens, slots, modelFile, accepts = 
   Object.assign(config, { ctx: contextTokens, parallel: n, kv_type: 'f16', gpu_layers: gpu ? 99 : 0 });
   if (n > 1) {Object.assign(config, { ctx_pool: fit.poolTokens(contextTokens, n), ctx_chunk: Math.min(fit.CTX_CHUNK, contextTokens) });}
   config.ubatch = backend === 'metal' ? METAL_UBATCH : DEFAULT_UBATCH;
+  // A set fair_chunk always wins over the engine's backend default, so Metal leaves it unset.
+  if (backend !== 'metal') {config.fair_chunk = FAIR_CHUNK;}
   if (gpu) {
     config.threads = GPU_THREADS;
     if (accepts.gpuOutput) {config.gpu_output = true;}

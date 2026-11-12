@@ -1,10 +1,10 @@
 {
-  "_comment": "The Pip (lqe, LANA.cpp) build the client packages at <resources>/pip (electron-pip-supervisor.js), built by scripts/build-pip.sh on a matching computer with LANA.cpp's distribution contract. The v3.0.0 tag was MOVED on 2026-11-12T13:38:39Z from d857fbf10556 to this commit (adds --gpu-inexact: batched decode and shared system-prompt state on the GPU; LANA-AI infra/lib/config/lqe.pin.js LQE_COMMIT). The tag name alone cannot tell a build before a move from one after, so scripts/build-pip.sh refuses a checkout whose v3.0.0 resolves to any other commit (fetch with git fetch --tags --force). Change the commit only together with a rebuild of every platform's sha256.",
+  "_comment": "The Pip (lqe, LANA.cpp) build the client packages at <resources>/pip (electron-pip-supervisor.js), built by scripts/build-pip.sh on a matching computer with LANA.cpp's distribution contract. The v3.0.0 tag was MOVED on 2026-11-12T14:17:11Z from bb191effb26c to this commit (D-41 Metal defaults: adaptive prefill on and a 512-row busy chunk, prefill about 538 to 1750 tok/s; --attn-window refused at start on a GPU cache). bb191effb26c had added --gpu-inexact. The tag name alone cannot tell a build before a move from one after, so scripts/build-pip.sh refuses a checkout whose v3.0.0 resolves to any other commit (fetch with git fetch --tags --force). Change the commit only together with a rebuild of every platform's sha256.",
   "repo": "redroostertech/LANA.cpp",
   "tag": "v3.0.0",
   "version": "3.0.0",
-  "commit": "bb191effb26cfac7772bea401dd572b1927ffe68",
-  "build": "bb191effb26c",
+  "commit": "8f1970cdd11e188c7520bc607e40d8cdb386212c",
+  "build": "8f1970cdd11e",
   "cmake": {
     "macos-arm64": [
       "-DLQE_DISTRIBUTION=ON",
@@ -25,8 +25,8 @@
   },
   "builds": {
     "macos-arm64": {
-      "sha256": "f497394bba79ba874be40bb520bcf80d4965a3c1e670f80b54300a37daa425a4",
-      "bytes": 5904784
+      "sha256": "25613a00e0ac472889fa66925859d5f0525dfc864f3971c94748174a8d78fa05",
+      "bytes": 5905328
     }
   }
 }

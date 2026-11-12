@@ -55,7 +55,6 @@ function chatConfig({ modelPath, mmprojPath = null, port, contextTokens, paralle
     host: LOOPBACK_HOST,
     port,
     ...picked.config,
-    fair_chunk: 64,
     queue_timeout: 300,
     max_body_mb: 32
   };
