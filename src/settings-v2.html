@@ -536,6 +536,25 @@
         </lex-card>
       </section>
 
+      <!-- Location (settings-location.js; main process side in electron-location.js)
+           ══════════════════════════════════════════════════════════════ -->
+      <section id="sv2-section-location" class="sv2-general" hidden>
+        <lex-card heading="Location" subtitle="Where this computer is, roughly">
+          <div class="sv2-general-head">
+            <div class="sv2-general-option-copy">
+              <span class="sv2-general-option-name">Approximate location</span>
+              <span class="sv2-general-option-description">Share your approximate location so LANA can show your office's city and state. LANA never stores your exact location.</span>
+            </div>
+            <div class="sv2-general-side">
+              <lex-badge id="sv2-location-badge" label="Checking" color="gray"></lex-badge>
+              <lex-btn id="sv2-location-action" variant="secondary" size="sm" label="Allow" hidden></lex-btn>
+              <lex-btn id="sv2-location-off" variant="ghost" size="sm" label="Turn off" hidden></lex-btn>
+            </div>
+          </div>
+          <p id="sv2-location-note" class="sv2-general-note"></p>
+        </lex-card>
+      </section>
+
       <!-- Language & region (settings-general.js)
            ══════════════════════════════════════════════════════════════ -->
       <section id="sv2-section-language" class="sv2-general" hidden>
@@ -917,6 +936,8 @@
   <script src="js/pages/settings-screen-diction.js"></script>
   <script src="js/settings-general.model.js"></script>
   <script src="js/pages/settings-general.js"></script>
+  <script src="js/location-permission.model.js"></script>
+  <script src="js/pages/settings-location.js"></script>
   <script src="js/engine-status.js"></script>
   <script src="js/engine-background-jobs.js"></script>
   <script src="js/pages/settings-local-engine.js"></script>
