@@ -32,9 +32,11 @@ const CATALOG = Object.freeze([
     // The firm's embedding identity (EMBEDDING_MODEL, EMBEDDING_VERSION on Chef).
     modelId: 'nomic-embed-text-v1.5',
     modelVersion: 'f16',
-    // The Pip build that serves it: the one this app ships (pip/pip-pin.json), also
-    // LANA-AI deploy/railway/embed/embed-pin.json pip.build.
-    runtime: Object.freeze({ name: 'pip', version: '3.0.0', build: 'ff965d52d578' }),
+    // The Pip build that serves it: the one this app ships (pip/pip-pin.json). It
+    // must be in LANA-AI deploy/railway/embed/embed-pin.json pip.verified_builds
+    // (396ca2c1d643 passed the embedding match check on 2026-11-12, generation 1),
+    // so its vectors count as the firm's identity and nothing is re-embedded.
+    runtime: Object.freeze({ name: 'pip', version: '3.0.0', build: '396ca2c1d643' }),
     filename: 'nomic-embed-text-v1.5.f16.gguf',
     url: `${R2_LLM}/nomic-embed-text-v1.5.f16.gguf`,
     sizeBytes: 274290560,
