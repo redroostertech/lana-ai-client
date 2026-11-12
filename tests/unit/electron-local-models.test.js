@@ -18,7 +18,7 @@ const FIRM_IDENTITY = {
   url: 'https://models.lanaai.io/llm/nomic-embed-text-v1.5.f16.gguf',
   sha256: 'f7af6f66802f4df86eda10fe9bbcfc75c39562bed48ef6ace719a251cf1c2fdb',
   sizeBytes: 274290560,
-  runtime: { name: 'pip', version: '3.0.0', build: 'ff965d52d578' }
+  runtime: { name: 'pip', version: '3.0.0', build: '396ca2c1d643' }
 };
 
 function tempDir() {
