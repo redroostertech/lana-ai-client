@@ -8,8 +8,10 @@
  *
  *   roundCoordinate(value)         one decimal place, or null when it is not a number
  *   statusFromError(error)         a GeolocationPositionError as 'denied' or 'unavailable'
- *   buildReading({ allowed, supported, coords, error })
- *       { status: 'granted'|'denied'|'unavailable'|'prompt', approx: { lat, lon } | null, accuracyKm }
+ *   buildReading({ allowed, supported, coords, error, devBuild })
+ *       { status: 'granted'|'denied'|'unavailable'|'dev_build'|'prompt', approx: { lat, lon } | null, accuracyKm }
+ *       dev_build: no position in a development build, which runs the stock Electron app with no
+ *       location usage text, so the computer does not answer it (2026-11-12: timeout, code 3)
  *   permissionView(status)         the badge, the button and the note for the Settings row
  *
  * Copy rules: words a 6th grader can follow, "computer" and never a brand of device.
@@ -56,9 +58,10 @@
   function buildReading(input) {
     var options = input || {};
     if (!options.allowed) {return { status: 'prompt', approx: null, accuracyKm: null };}
-    if (options.supported === false) {return { status: 'unavailable', approx: null, accuracyKm: null };}
+    var none = options.devBuild === true ? 'dev_build' : null;
+    if (options.supported === false) {return { status: none || 'unavailable', approx: null, accuracyKm: null };}
     if (options.error || !options.coords) {
-      return { status: options.error ? statusFromError(options.error) : 'unavailable', approx: null, accuracyKm: null };
+      return { status: none || (options.error ? statusFromError(options.error) : 'unavailable'), approx: null, accuracyKm: null };
     }
     var lat = roundCoordinate(options.coords.latitude);
     var lon = roundCoordinate(options.coords.longitude);
@@ -73,8 +76,12 @@
     prompt: { label: 'Off', color: 'gray', action: 'allow', actionLabel: 'Allow', note: '' },
     granted: { label: 'Allowed', color: 'green', action: 'turn_off', actionLabel: 'Turn off', note: 'LANA rounds your location to about 11 km (7 miles) before it uses it.' },
     denied: { label: 'Denied', color: 'red', action: 'retry', actionLabel: 'Try again', note: 'Your computer is not letting LANA see its location. Turn on location for LANA in your computer\'s privacy settings, then try again.' },
-    unavailable: { label: 'Unavailable', color: 'gray', action: 'retry', actionLabel: 'Try again', note: 'LANA could not find this computer\'s location right now.' }
+    unavailable: { label: 'Unavailable', color: 'gray', action: 'retry', actionLabel: 'Try again', note: 'LANA could not find this computer\'s location right now. If location is off for LANA, turn it on in your computer\'s settings, then try again.' },
+    dev_build: { label: 'Unavailable', color: 'gray', action: 'retry', actionLabel: 'Try again', note: 'This is a development build of LANA, and your computer does not share its location with it. Try location in the installed LANA app.' }
   };
+
+  // The statuses where the computer is not sharing its location: "Open Settings" goes to its page.
+  var SETTINGS_STATUSES = { denied: true, unavailable: true, dev_build: true };
 
   /** @param {string|null} status - a reading's status, or null while it is being read */
   function permissionView(status) {
@@ -85,7 +92,8 @@
       action: view.action,
       actionLabel: view.actionLabel,
       note: view.note,
-      canTurnOff: status === 'granted' || status === 'denied' || status === 'unavailable'
+      canTurnOff: status === 'granted' || status === 'denied' || status === 'unavailable' || status === 'dev_build',
+      canOpenSettings: SETTINGS_STATUSES[status] === true
     };
   }
 

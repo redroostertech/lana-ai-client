@@ -2146,7 +2146,7 @@ registerSystemInfoIpc(ipcMain, {
 });
 
 // Settings > General > Location: whether the person turned it on (electron-location.js).
-registerLocationIpc(ipcMain, { persistence: locationPersistence });
+registerLocationIpc(ipcMain, { persistence: locationPersistence, shell, platform: process.platform, isPackaged: app.isPackaged });
 
 const bridgeConsentsStore = new Store({
   name: 'bridge-consents',

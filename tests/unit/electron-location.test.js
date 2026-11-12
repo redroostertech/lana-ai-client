@@ -3,7 +3,7 @@
 /** Settings > General > Location: the main-process permission handlers and IPC (electron-location.js). */
 const path = require('path');
 const { pathToFileURL } = require('url');
-const { isAppPage, allowGeolocation, installLocationPermissionHandlers, registerLocationIpc } = require('../../electron-location');
+const { isAppPage, allowGeolocation, installLocationPermissionHandlers, registerLocationIpc, systemSettingsUrl } = require('../../electron-location');
 
 const appRoot = path.join(path.sep, 'Applications', 'Lana AI.app', 'Contents', 'Resources', 'app.asar', 'public_html');
 const appPage = pathToFileURL(path.join(appRoot, 'settings-v2.html')).toString() + '?section=general';
@@ -102,5 +102,47 @@ describe('registerLocationIpc', () => {
     expect((await handlers['location:set-choice']({}, { allowed: 'yes' })).success).toBe(false);
     expect((await handlers['location:set-choice']({}, null)).success).toBe(false);
     expect(persistence.write).not.toHaveBeenCalled();
+  });
+});
+
+// "Open Settings" goes to the computer's own location privacy page. The address is fixed in
+// the main process per platform; a page cannot choose it (the external-URL allowlist keeps
+// x-apple.systempreferences closed to pages).
+describe('the computer\'s location settings', () => {
+  test('a fixed page per platform, none elsewhere', () => {
+    expect(systemSettingsUrl('darwin')).toBe('x-apple.systempreferences:com.apple.preference.security?Privacy_LocationServices');
+    expect(systemSettingsUrl('win32')).toBe('ms-settings:privacy-location');
+    expect(systemSettingsUrl('linux')).toBeNull();
+    expect(systemSettingsUrl(undefined)).toBeNull();
+  });
+
+  function setup({ platform, isPackaged = true }) {
+    const handlers = {};
+    const shell = { openExternal: jest.fn(async () => {}) };
+    const persistence = { read: () => ({ allowed: true }), write: (c) => c };
+    registerLocationIpc({ handle: (channel, fn) => { handlers[channel] = fn; } }, { persistence, shell, platform, isPackaged });
+    return { handlers, shell };
+  }
+
+  test('opens the page for this platform and ignores anything the page sends', async () => {
+    const { handlers, shell } = setup({ platform: 'darwin' });
+    expect(await handlers['location:open-system-settings']({}, { url: 'smb://attacker/share' })).toEqual({ success: true });
+    expect(shell.openExternal).toHaveBeenCalledTimes(1);
+    expect(shell.openExternal).toHaveBeenCalledWith('x-apple.systempreferences:com.apple.preference.security?Privacy_LocationServices');
+    const windows = setup({ platform: 'win32' });
+    await windows.handlers['location:open-system-settings']();
+    expect(windows.shell.openExternal).toHaveBeenCalledWith('ms-settings:privacy-location');
+  });
+
+  test('control: a platform with no such page opens nothing', async () => {
+    const { handlers, shell } = setup({ platform: 'linux' });
+    expect((await handlers['location:open-system-settings']()).success).toBe(false);
+    expect(shell.openExternal).not.toHaveBeenCalled();
+  });
+
+  test('tells the page whether the button can work and whether this is a development build', async () => {
+    expect(await setup({ platform: 'darwin' }).handlers['location:system']()).toEqual({ success: true, settingsAvailable: true, devBuild: false });
+    expect(await setup({ platform: 'darwin', isPackaged: false }).handlers['location:system']()).toEqual({ success: true, settingsAvailable: true, devBuild: true });
+    expect(await setup({ platform: 'linux' }).handlers['location:system']()).toEqual({ success: true, settingsAvailable: false, devBuild: false });
   });
 });

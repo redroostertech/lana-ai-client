@@ -33,11 +33,14 @@ async function readApproximateLocation() {
   try { choice = await ipcRenderer.invoke('location:get-choice'); } catch (_) { choice = null; }
   const allowed = Boolean(choice && choice.success && choice.allowed);
   if (!allowed) return locationModel.buildReading({ allowed: false });
-  if (!navigator.geolocation) return locationModel.buildReading({ allowed: true, supported: false });
+  let system;
+  try { system = await ipcRenderer.invoke('location:system'); } catch (_) { system = null; }
+  const devBuild = Boolean(system && system.devBuild);
+  if (!navigator.geolocation) return locationModel.buildReading({ allowed: true, supported: false, devBuild });
   return new Promise((resolve) => {
     navigator.geolocation.getCurrentPosition(
-      (position) => resolve(locationModel.buildReading({ allowed: true, coords: position.coords })),
-      (error) => resolve(locationModel.buildReading({ allowed: true, error: { code: error && error.code } })),
+      (position) => resolve(locationModel.buildReading({ allowed: true, coords: position.coords, devBuild })),
+      (error) => resolve(locationModel.buildReading({ allowed: true, error: { code: error && error.code }, devBuild })),
       LOCATION_OPTIONS
     );
   });
@@ -218,7 +221,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   location: {
     getChoice: () => ipcRenderer.invoke('location:get-choice'),
     setChoice: (allowed) => ipcRenderer.invoke('location:set-choice', { allowed: allowed === true }),
-    getApproximate: () => readApproximateLocation()
+    getApproximate: () => readApproximateLocation(),
+    // { settingsAvailable, devBuild }; openSystemSettings opens the computer's own location page.
+    system: () => ipcRenderer.invoke('location:system'),
+    openSystemSettings: () => ipcRenderer.invoke('location:open-system-settings')
   },
 
   /**

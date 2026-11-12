@@ -10,8 +10,10 @@
  *   installLocationPermissionHandlers(session, { appRoot, isAllowed })
  *                                     session permission handlers; every other permission keeps
  *                                     Electron's default (allowed), as before this module
- *   registerLocationIpc(ipcMain, { persistence })
- *                                     location:get-choice, location:set-choice
+ *   systemSettingsUrl(platform)       the computer's own location privacy page, or null
+ *   registerLocationIpc(ipcMain, { persistence, shell, platform, isPackaged })
+ *                                     location:get-choice, location:set-choice,
+ *                                     location:system, location:open-system-settings
  *
  * The position itself is read in the preload (navigator.geolocation) and rounded there
  * (src/js/location-permission.model.js), so the main process never sees it. Nothing here is
@@ -22,6 +24,17 @@ const path = require('path');
 const { fileURLToPath } = require('url');
 
 const GEOLOCATION = 'geolocation';
+
+// "Open Settings" in Settings > General > Location. The address is fixed here per platform and
+// never comes from a page: the external-URL allowlist keeps these schemes closed to pages.
+const SYSTEM_SETTINGS_URLS = Object.freeze({
+  darwin: 'x-apple.systempreferences:com.apple.preference.security?Privacy_LocationServices',
+  win32: 'ms-settings:privacy-location'
+});
+
+function systemSettingsUrl(platform) {
+  return Object.prototype.hasOwnProperty.call(SYSTEM_SETTINGS_URLS, platform) ? SYSTEM_SETTINGS_URLS[platform] : null;
+}
 
 /** The file a file:// page URL points at is inside appRoot (no other origin, no path escape). */
 function isAppPage(pageUrl, appRoot) {
@@ -67,9 +80,24 @@ function installLocationPermissionHandlers(session, { appRoot, isAllowed }) {
 
 /**
  * @param {Electron.IpcMain} ipcMain
- * @param {{ persistence: { read: () => { allowed: boolean }, write: (changes: Object) => { allowed: boolean } } }} options
+ * @param {{ persistence: { read: () => { allowed: boolean }, write: (changes: Object) => { allowed: boolean } },
+ *   shell?: { openExternal: (url: string) => Promise<void> }, platform?: string, isPackaged?: boolean }} options
+ *   isPackaged false is a development build: the stock Electron app, with no location usage
+ *   text, which the computer does not share its location with (2026-11-12).
  */
-function registerLocationIpc(ipcMain, { persistence }) {
+function registerLocationIpc(ipcMain, { persistence, shell = null, platform = process.platform, isPackaged = true }) {
+  const settingsUrl = shell ? systemSettingsUrl(platform) : null;
+  ipcMain.handle('location:system', async () => ({ success: true, settingsAvailable: Boolean(settingsUrl), devBuild: isPackaged === false }));
+  // Takes nothing from the page: it opens this platform's page or nothing.
+  ipcMain.handle('location:open-system-settings', async () => {
+    if (!settingsUrl) return { success: false, error: 'LANA cannot open location settings on this computer.' };
+    try {
+      await shell.openExternal(settingsUrl);
+      return { success: true };
+    } catch (_) {
+      return { success: false, error: 'LANA could not open your computer\'s location settings.' };
+    }
+  });
   ipcMain.handle('location:get-choice', async () => {
     try {
       return { success: true, allowed: persistence.read().allowed === true };
@@ -87,4 +115,4 @@ function registerLocationIpc(ipcMain, { persistence }) {
   });
 }
 
-module.exports = { GEOLOCATION, isAppPage, allowGeolocation, installLocationPermissionHandlers, registerLocationIpc };
+module.exports = { GEOLOCATION, isAppPage, allowGeolocation, installLocationPermissionHandlers, registerLocationIpc, systemSettingsUrl };

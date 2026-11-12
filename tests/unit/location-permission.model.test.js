@@ -75,3 +75,36 @@ describe('permissionView', () => {
     });
   });
 });
+
+// A development build runs the stock Electron app, which has no location usage text, so the
+// computer does not answer it (2026-11-12: getCurrentPosition timed out, code 3). The page
+// says so plainly instead of "could not find this computer's location".
+describe('a development build', () => {
+  test('a reading that found nothing says it is a development build', () => {
+    expect(M.buildReading({ allowed: true, error: { code: 3 }, devBuild: true }).status).toBe('dev_build');
+    expect(M.buildReading({ allowed: true, error: { code: 1 }, devBuild: true }).status).toBe('dev_build');
+    expect(M.buildReading({ allowed: true, supported: false, devBuild: true }).status).toBe('dev_build');
+  });
+
+  test('control: a position found in a development build is still granted; off is still off', () => {
+    expect(M.buildReading({ allowed: true, coords: { latitude: 1, longitude: 1 }, devBuild: true }).status).toBe('granted');
+    expect(M.buildReading({ allowed: false, devBuild: true }).status).toBe('prompt');
+  });
+
+  test('the note names the development build', () => {
+    const view = M.permissionView('dev_build');
+    expect(view).toMatchObject({ label: 'Unavailable', color: 'gray', action: 'retry', canTurnOff: true });
+    expect(view.note).toContain('development build');
+  });
+});
+
+describe('Open Settings', () => {
+  test('offered when the computer is not sharing its location', () => {
+    ['denied', 'unavailable', 'dev_build'].forEach((status) => expect(M.permissionView(status).canOpenSettings).toBe(true));
+  });
+
+  test('control: not offered when location is allowed, off or being checked', () => {
+    ['granted', 'prompt', null].forEach((status) => expect(M.permissionView(status).canOpenSettings).toBe(false));
+  });
+});
+
