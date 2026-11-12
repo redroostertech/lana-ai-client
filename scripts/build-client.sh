@@ -41,6 +41,11 @@
 #   # Demo mode
 #   ./scripts/build-client.sh --demo --platform mac
 #
+#   # Every installer on one computer (macOS arm64, macOS x64, Windows x64), from
+#   # native parts built on the matching computers. The file lists one
+#   # "<target>/<part> <url>" per line (scripts/fetch-client-parts.js):
+#   LANA_CLIENT_PARTS_URLS=<file> ./scripts/build-client.sh --platform all --arch all
+#
 ###############################################################################
 
 set -e  # Exit on error
@@ -62,7 +67,8 @@ BACKEND_IP=""
 PLATFORM="all"
 ARCH="all"
 SKIP_INSTALL=false
-CLEAN=true  # Always clean for fresh builds
+CLEAN=false  # --clean empties dist/ and build caches first; off by default so one target's
+             # build never deletes the installers built before it
 DEV_MODE=false
 DEMO_MODE=false
 AUTO_DISCOVERY_MODE=true  # Default to auto-discovery mode
@@ -166,6 +172,19 @@ EXAMPLES:
 
     Clean build and rebuild:
         ./scripts/build-client.sh --ip --clean
+
+    Every installer on one computer (macOS arm64, macOS x64, Windows x64):
+        LANA_CLIENT_PARTS_URLS=<file> ./scripts/build-client.sh --platform all --arch all
+
+ENVIRONMENT:
+    LANA_CLIENT_PARTS_URLS   A file of download links for each target's native parts,
+                             one "<target>/<part> <url>" per line. When set, the build first
+                             runs scripts/fetch-client-parts.js: each part is checked against
+                             its .sha256 and its pin and unpacked into build/parts/<target>/,
+                             and each target's Briefs speech package is installed. The links
+                             are never printed. Each package step then uses its own target's
+                             parts (scripts/parts-before-pack.js). Without build/parts the build
+                             uses build/pip, build/redactor and build/engine as they are.
 
 OUTPUT:
     Built applications will be in: ./dist/
@@ -384,6 +403,20 @@ install_dependencies() {
     print_success "Dependencies installed"
 }
 
+# Downloads each target's native parts into build/parts/<target>/ (checked
+# against their .sha256 and pins) and each target's Briefs speech package.
+# Runs after npm install, which would remove another platform's package again.
+fetch_client_parts() {
+    if [ -z "$LANA_CLIENT_PARTS_URLS" ]; then
+        return
+    fi
+
+    print_step "Fetching each target's native parts (links from LANA_CLIENT_PARTS_URLS)..."
+    cd "$PROJECT_ROOT"
+    node scripts/fetch-client-parts.js
+    print_success "Native parts are in build/parts/"
+}
+
 bundle_electron() {
     print_step "Bundling Electron files with current version..."
     cd "$PROJECT_ROOT"
@@ -404,12 +437,8 @@ clean_build() {
         rm -rf node_modules/.cache/
         print_success "Build directories cleaned"
 
-        # Clear Electron app cache (ensures fresh config is loaded)
-        print_step "Clearing Electron app cache..."
-        rm -rf ~/Library/Application\ Support/LanaAI 2>/dev/null || true
-        rm -rf ~/Library/Caches/LanaAI 2>/dev/null || true
-        rm -rf ~/Library/Application\ Support/Electron 2>/dev/null || true
-        print_success "Electron cache cleared"
+        # Never delete app data under ~/Library: it is the person's own data
+        # (and Electron's default folder is shared by every unnamed Electron app).
     fi
 }
 
@@ -483,8 +512,13 @@ build_app() {
             keep_mac_feed x64
             print_info "Step 3/4: Building Windows..."
             npm run build:win
-            print_info "Step 4/4: Building Linux..."
-            npm run build:linux
+            # With per-target parts, Linux is built only when its parts were fetched.
+            if [ -d "$PROJECT_ROOT/build/parts" ] && [ ! -d "$PROJECT_ROOT/build/parts/linux-x64" ]; then
+                print_info "Step 4/4: Skipping Linux (build/parts has no linux-x64)."
+            else
+                print_info "Step 4/4: Building Linux..."
+                npm run build:linux
+            fi
             ;;
         current)
             print_info "Building for current platform..."
@@ -521,6 +555,12 @@ organize_output() {
     # Move Windows files
     mv "$DIST_DIR/"*.exe "$DIST_DIR/windows/" 2>/dev/null || true
     mv "$DIST_DIR/"*win*.zip "$DIST_DIR/windows/" 2>/dev/null || true
+    # The Windows zip carries no arch or "win" in its name (artifactName
+    # LanaAI--genesis--<version>.zip); every mac zip ends in -x64 or -arm64.
+    for z in "$DIST_DIR/"*.zip; do
+        [ -e "$z" ] || continue
+        case "$z" in *-x64.zip|*-arm64.zip) ;; *) mv "$z" "$DIST_DIR/windows/" 2>/dev/null || true ;; esac
+    done
     
     # Move Linux files
     mv "$DIST_DIR/"*.AppImage "$DIST_DIR/linux/" 2>/dev/null || true
@@ -654,14 +694,21 @@ stage_release_for_r2_upload() {
 # Main Execution
 ###############################################################################
 
+# Apple signing and notarization apply only to mac targets.
+needs_apple_credentials() {
+    case "$PLATFORM" in mac|all) return 0 ;; *) return 1 ;; esac
+}
+
 main() {
     print_header
 
     # Parse command line arguments
     parse_args "$@"
 
-    # Apple Developer credentials for signing and notarization
-    # These can be set as environment variables or will be prompted interactively
+    # Apple Developer credentials for signing and notarization, only when a
+    # mac target is built. They can be set as environment variables or are
+    # prompted for interactively.
+    if needs_apple_credentials; then
     if [ -z "$APPLE_TEAM_ID" ]; then
         echo -e "${YELLOW}Apple Developer credentials required for signing/notarization${NC}"
         echo ""
@@ -682,6 +729,7 @@ main() {
     fi
 
     print_success "Apple credentials configured"
+    fi
 
     # Display configuration
     echo -e "${CYAN}Configuration:${NC}"
@@ -702,6 +750,7 @@ main() {
     update_config
     clean_build
     install_dependencies
+    fetch_client_parts
     build_css
     bundle_electron
     build_app

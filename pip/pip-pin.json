@@ -1,15 +1,28 @@
 {
-  "_comment": "The Pip (lqe, LANA.cpp) build the client packages at <resources>/pip (electron-pip-supervisor.js), built by scripts/build-pip.sh on a matching computer with LANA.cpp's distribution contract. The v3.0.0 tag is at this commit; its /health reports the loaded model file, which the supervisor's ready check and the engine's embedding identity need. Change the commit only together with a rebuild of every platform's sha256.",
+  "_comment": "The Pip (lqe, LANA.cpp) build the client packages at <resources>/pip (electron-pip-supervisor.js), built by scripts/build-pip.sh on a matching computer with LANA.cpp's distribution contract. The v3.0.0 tag is at this commit (moved to d857fbf on LANA.cpp, which carries the Windows build fixes 430dc91 and d857fbf; Chef pins the same tag); its /health reports the loaded model file, which the supervisor's ready check and the engine's embedding identity need. Change the commit only together with a rebuild of every platform's sha256.",
   "repo": "redroostertech/LANA.cpp",
   "tag": "v3.0.0",
   "version": "3.0.0",
-  "commit": "ff965d52d578c88ef42f76f4015ded43cd522eaf",
-  "build": "ff965d52d578",
+  "commit": "d857fbf105563a1f0bc32ccc63d11c47752d73d8",
+  "build": "d857fbf10556",
+  "cmakeNotes": {
+    "macos-x64": "Not a LANA.cpp engine-release target at v3.0.0; flags come from its x64 release builds. LQE_DISTRIBUTION=ON and LQE_BUILD_TESTS=ON as in the linux-x64 and windows-x64 jobs of .github/workflows/engine-release.yml (GGML_NATIVE OFF, GGML_LLAMAFILE ON, static libraries are set by CMakeLists.txt). LQE_METAL=OFF: Intel Mac GPUs are not a LANA.cpp target, so this is the CPU backend like the x64 release builds; Accelerate stays on as in every Apple build. GGML_AVX2/FMA/F16C ON and AVX512 OFF: the x86-64-v3 baseline CMakeLists.txt pins for x64 distribution builds but applies only when NOT APPLE, so it is given here (every Mac that runs macOS 13.3 has AVX2). CMAKE_OSX_ARCHITECTURES=x86_64 states what CMakeLists.txt would detect. The macOS floor is 13.3, forced by CMakeLists.txt for any LQE_DISTRIBUTION Apple build and the same as macos-arm64; Electron 44 runs on macOS 12, so an Intel Mac on macOS 12 gets the app without local Pip. Checked by scripts/verify-pip-macos-x64.js in place of LANA.cpp scripts/verify_release_artifact.py, which accepts only darwin-arm64."
+  },
   "cmake": {
     "macos-arm64": [
       "-DLQE_DISTRIBUTION=ON",
       "-DLQE_BUILD_TESTS=ON",
       "-DLQE_METAL=ON"
+    ],
+    "macos-x64": [
+      "-DLQE_DISTRIBUTION=ON",
+      "-DLQE_BUILD_TESTS=ON",
+      "-DLQE_METAL=OFF",
+      "-DCMAKE_OSX_ARCHITECTURES=x86_64",
+      "-DGGML_AVX2=ON",
+      "-DGGML_FMA=ON",
+      "-DGGML_F16C=ON",
+      "-DGGML_AVX512=OFF"
     ],
     "linux-x64": [
       "-DLQE_DISTRIBUTION=ON",
@@ -17,16 +30,25 @@
       "-DLQE_VULKAN=ON"
     ],
     "windows-x64": [
-      "-DLQE_DISTRIBUTION=ON",
       "-DLQE_BUILD_TESTS=ON",
+      "-DLQE_WARN_ERROR=ON",
       "-DLQE_REPRODUCIBLE=ON",
+      "-DLQE_DISTRIBUTION=ON",
       "-DLQE_VULKAN=ON"
     ]
   },
   "builds": {
     "macos-arm64": {
-      "sha256": "0eb7c3a1d6dc3c9ebd1caacb0b1aa284f8722f53afc06357e8de1ef0cbf065ab",
+      "sha256": "c4e24a92f66f1c9dde3bb289d1ae7489cb693905660df22bf8d3449adfd3f8df",
       "bytes": 5904432
+    },
+    "macos-x64": {
+      "sha256": "d01fcfc764f300e4617a559cc083e925931afe053d6457d46a748a18f76f311a",
+      "bytes": 5738608
+    },
+    "windows-x64": {
+      "sha256": "d4564f3dabcbb63bffa345b11c85044b8b7a45628781681fc2a36ec3db77c486",
+      "bytes": 79069696
     }
   }
 }

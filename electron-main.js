@@ -19,14 +19,21 @@ const Store = require('electron-store');
  * process is Electron.app, whose bundle icon is the default Electron mark; use
  * the PNG master first because nativeImage loads it more reliably than ICNS.
  */
-function appIconCandidates() {
+// The icon folders. A packaged app carries them as app-icons/ (electron-builder
+// leaves its build/ resources folder out of the app); an unpackaged run reads
+// build/ in the source tree.
+function iconDirs() {
   const dir = BRAND_FLAVOR === 'lana-one' ? 'icons-lana-one' : 'icons';
-  return [
-    path.join(__dirname, 'build', dir, 'icon-1024.png'),
-    path.join(__dirname, 'build', dir, 'icon-512.png'),
-    path.join(__dirname, 'build', dir, 'icon.png'),
-    path.join(__dirname, 'build', dir, 'icon.icns'),
-  ];
+  return [path.join(__dirname, 'app-icons', dir), path.join(__dirname, 'build', dir)];
+}
+
+function appIconCandidates() {
+  return iconDirs().flatMap((d) => [
+    path.join(d, 'icon-1024.png'),
+    path.join(d, 'icon-512.png'),
+    path.join(d, 'icon.png'),
+    path.join(d, 'icon.icns'),
+  ]);
 }
 
 // Set app version from package.json (prevents app.getVersion() returning the Electron framework version)
@@ -44,7 +51,8 @@ app.setVersion(packageJson.version);
 const { resolveFlavor, readAppPackageJson } = require('./src/js/brand/lana-brand');
 const BRAND_FLAVOR = resolveFlavor({ env: process.env, packageJson: readAppPackageJson(app.getAppPath()), isPackaged: app.isPackaged });
 const BRAND_ARG = '--lana-flavor=' + BRAND_FLAVOR;
-const WINDOW_ICON = path.join(__dirname, 'build', BRAND_FLAVOR === 'lana-one' ? 'icons-lana-one' : 'icons', 'icon-256.png');
+const WINDOW_ICON = iconDirs().map((d) => path.join(d, 'icon-256.png')).find((p) => fs.existsSync(p))
+  || path.join(iconDirs()[0], 'icon-256.png');
 
 function applyDockIcon() {
   if (process.platform !== 'darwin' || !app.dock) return false;
