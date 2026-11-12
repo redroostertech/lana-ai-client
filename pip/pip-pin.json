@@ -30,7 +30,7 @@
     }
   },
   "vulkanLoader": {
-    "_comment": "The Khronos Vulkan loader (vulkan-1.dll) the Windows package ships beside lqe.exe. lqe.exe is built with LQE_VULKAN=ON and imports vulkan-1.dll, so a Windows computer without a graphics driver that installs the loader (a VM, a server, the basic display driver) could not start it (0xC0000135); with the loader beside it, lqe runs on the processor there. Built by LunarG from Khronos's Vulkan-Loader and distributed as the Vulkan Runtime components; 1.3.296.0 is the newest runtime components archive LunarG publishes. scripts/fetch-vulkan-loader.js takes it at build time only, checks the archive against the sha256 LunarG publishes (sha256Source) and the file against sha256 below; the app never downloads it.",
+    "_comment": "The Khronos Vulkan loader (vulkan-1.dll) the Windows package ships in pip/vulkan-fallback, NOT beside lqe.exe: Windows searches an application's own folder before System32, so a copy beside lqe.exe would put every computer with a graphics driver on this older loader. lqe.exe is built with LQE_VULKAN=ON and imports vulkan-1.dll, so a Windows computer without a graphics driver that installs the loader (a VM, a server, the basic display driver) could not start it (0xC0000135). electron-pip-supervisor.js windowsStart runs lqe.exe --version as it is, and only when a DLL is missing runs it again with this folder first on PATH (searched after System32, so it only fills the gap), then starts the servers with that PATH. Built by LunarG from Khronos's Vulkan-Loader and distributed as the Vulkan Runtime components; 1.3.296.0 is the newest runtime components archive LunarG publishes (approved source, 2026-11-12). scripts/fetch-vulkan-loader.js takes it at build time only, checks the archive against the sha256 LunarG publishes (sha256Source) and the file against sha256 below; the app never downloads it.",
     "platforms": [
       "windows-x64"
     ],
@@ -41,7 +41,7 @@
       "sha256Source": "https://sdk.lunarg.com/sdk/sha/1.3.296.0/windows/VulkanRT-1.3.296.0-Components.zip.txt"
     },
     "member": "VulkanRT-1.3.296.0-Components/x64/vulkan-1.dll",
-    "file": "vulkan-1.dll",
+    "file": "vulkan-fallback/vulkan-1.dll",
     "sha256": "8644669401d2c080ea10cfea2ba8a7c63d76e10a4e7ae8246837df1dfd157ea8",
     "bytes": 1424152,
     "license": "Apache-2.0 AND MIT"

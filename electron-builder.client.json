@@ -151,8 +151,8 @@
         "to": "pip/lqe.exe"
       },
       {
-        "from": "build/pip/vulkan-1.dll",
-        "to": "pip/vulkan-1.dll"
+        "from": "build/pip/vulkan-fallback/vulkan-1.dll",
+        "to": "pip/vulkan-fallback/vulkan-1.dll"
       },
       {
         "from": "build/engine",

@@ -4,7 +4,7 @@
  * Checks for the two local AI parts the installer carries, against their pins:
  *
  *   build/pip/lqe (lqe.exe on Windows)  Pip, the LANA.cpp engine, pip/pip-pin.json
- *   build/pip/vulkan-1.dll (Windows)    the Vulkan loader lqe.exe imports, pip/pip-pin.json vulkanLoader
+ *   build/pip/vulkan-fallback/vulkan-1.dll (Windows)  the Vulkan loader lqe.exe imports, pip/pip-pin.json vulkanLoader
  *   build/engine/                      the LANA engine folder, engine/engine-pin.json
  *
  * Used by scripts/build-pip.sh and scripts/build-engine.js after they place each part, and by

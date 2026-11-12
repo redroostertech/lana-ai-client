@@ -64,18 +64,21 @@ function harness({ env = {}, binary = BINARY, busyPorts = [], accepts = {}, prop
   const warnings = [];
   const problems = [];
   const versionRuns = [];
+  const spawnOptions = [];
+  const infos = [];
   const pip = createPip({
     binary,
     platform,
-    runVersion: (file) => { versionRuns.push(file); return runVersion(file); },
+    runVersion: (file, runEnv) => { versionRuns.push(file); return runVersion(file, runEnv); },
     onProblem: (message) => problems.push(message),
     accepts,
     readWiredLimitMb: () => wiredLimitMb,
-    log: { info() {}, warn: (message) => warnings.push(message), error() {} },
+    log: { info: (message) => infos.push(message), warn: (message) => warnings.push(message), error() {} },
     dir: path.join('/user', 'pip'),
     env,
-    spawn: jest.fn((command, args) => {
+    spawn: jest.fn((command, args, spawnOpts) => {
       spawns.push({ command, args });
+      spawnOptions.push(spawnOpts || {});
       const child = fakeChild(2000 + children.length);
       children.push(child);
       return child;
@@ -101,7 +104,7 @@ function harness({ env = {}, binary = BINARY, busyPorts = [], accepts = {}, prop
   const serveFromSettings = () => {
     for (const settings of Object.values(files)) {serving[settings.port] = path.basename(settings.model);}
   };
-  return { pip, children, spawns, files, addresses, serving, down, logs, warnings, problems, versionRuns, serveFromSettings };
+  return { pip, children, spawns, spawnOptions, infos, files, addresses, serving, down, logs, warnings, problems, versionRuns, serveFromSettings };
 }
 
 const settle = async (ms = DEFAULTS.healthIntervalStartingMs) => {
@@ -261,42 +264,79 @@ describe('this computer\'s speed settings (electron-pip-levers.js)', () => {
 
 describe('Windows: lqe.exe is asked for its version before any server starts', () => {
   const DLL = { status: 0xC0000135, stderr: '' };
+  const WIN_BINARY = path.join('C:', 'LANA', 'resources', 'pip', 'lqe.exe');
+  const FALLBACK = path.join(path.dirname(WIN_BINARY), 'vulkan-fallback');
+  const OK = { status: 0, stdout: 'lqe 3.0.0' };
+  /** First run as given, retries as given; records the env each run had. */
+  const runs = (...answers) => {
+    const seen = [];
+    const run = (_file, env) => { seen.push(env); return answers[Math.min(seen.length, answers.length) - 1]; };
+    return { run, seen };
+  };
 
-  test('a missing DLL (0xC0000135): no server starts, the warning names vulkan-1.dll, the status says it plainly', async () => {
-    const h = harness({ platform: 'win32', binary: 'C:\\LANA\\resources\\pip\\lqe.exe', runVersion: () => DLL });
+  test('control: a first check that answers never touches PATH, and the servers keep the app\'s environment', async () => {
+    const r = runs(OK);
+    const h = harness({ platform: 'win32', binary: WIN_BINARY, env: { Path: 'C:\\Windows\\System32' }, runVersion: r.run });
+    await h.pip.apply(result(), MODELS);
+    expect(r.seen).toEqual([undefined]);
+    expect(h.spawns).toHaveLength(2);
+    expect(h.children).toHaveLength(2);
+    expect(h.spawnOptions.every((options) => options.env === undefined)).toBe(true);
+    expect(h.problems).toEqual([]);
+  });
+
+  test('a missing DLL: retried with the fallback folder first on PATH, and that PATH reaches every server', async () => {
+    const r = runs(DLL, OK);
+    const h = harness({ platform: 'win32', binary: WIN_BINARY, env: { Path: 'C:\\Windows\\System32', OTHER: 'kept' }, runVersion: r.run });
+    await h.pip.apply(result(), MODELS);
+    expect(r.seen).toHaveLength(2);
+    expect(r.seen[0]).toBeUndefined();
+    expect(r.seen[1]).toEqual({ Path: `${FALLBACK};C:\\Windows\\System32`, OTHER: 'kept' });
+    expect(h.spawns).toHaveLength(2);
+    for (const options of h.spawnOptions) {expect(options.env).toEqual(r.seen[1]);}
+    expect(h.infos.join('\n')).toMatch(/uses the bundled one/);
+    expect(h.problems).toEqual([]);
+  });
+
+  test('the signed exit and a DLL launch error are retried the same way; other failures are not', () => {
+    const { windowsStart } = require('../../electron-pip-supervisor');
+    expect(windowsStart(WIN_BINARY, runs({ status: -1073741515 }, OK).run, {}).fallback).toBe(true);
+    expect(windowsStart(WIN_BINARY, runs({ status: null, error: new Error('The specified module could not be found (vulkan-1.dll)') }, OK).run, {}).fallback).toBe(true);
+    const other = runs({ status: 1, stderr: 'boom' }, OK);
+    const started = windowsStart(WIN_BINARY, other.run, {});
+    expect(other.seen).toHaveLength(1);
+    expect(started.problem.message).toBe(MISSING_FILE_MESSAGE);
+    expect(started.problem.warning).toMatch(/exited with code 1: boom.*vulkan-fallback/);
+  });
+
+  test('a double failure: no server starts, the warning names vulkan-1.dll, the status says it plainly, nothing restarts', async () => {
+    const r = runs(DLL, DLL);
+    const h = harness({ platform: 'win32', binary: WIN_BINARY, runVersion: r.run });
     const state = await h.pip.apply(result(), MODELS);
+    expect(r.seen).toHaveLength(2);
     expect(h.spawns).toEqual([]);
-    expect(h.warnings.join('\n')).toMatch(/--version failed.*0xC0000135.*vulkan-1\.dll/);
+    expect(h.warnings.join('\n')).toMatch(/--version failed.*0xC0000135.*vulkan-fallback.*vulkan-1\.dll/);
     expect(h.problems).toEqual([MISSING_FILE_MESSAGE]);
     expect(MISSING_FILE_MESSAGE).toBe('LANA\'s local engine could not start: a required system file is missing.');
     expect(state.problem).toBe(MISSING_FILE_MESSAGE);
-    // Never a restart loop: nothing runs, so nothing restarts.
     await settle(60000);
     expect(h.spawns).toEqual([]);
   });
 
-  test('any other failing exit is refused the same way, and names the DLL to look for', () => {
-    const found = versionProblem('C:\\app\\pip\\lqe.exe', { status: 1, stderr: 'boom' });
-    expect(found.message).toBe(MISSING_FILE_MESSAGE);
-    expect(found.warning).toMatch(/exited with code 1: boom.*vulkan-1\.dll/);
-    expect(versionProblem('C:\\app\\pip\\lqe.exe', { status: null, error: new Error('spawn UNKNOWN') }).warning).toMatch(/spawn UNKNOWN/);
-    expect(versionProblem('C:\\app\\pip\\lqe.exe', { status: -1073741515 }).warning).toMatch(/0xC0000135/);
-  });
-
-  test('control: a version that answers starts the servers and clears the status', async () => {
-    const h = harness({ platform: 'win32', runVersion: () => ({ status: 0, stdout: 'lqe 3.0.0' }) });
-    await h.pip.apply(result(), MODELS);
-    expect(h.spawns).toHaveLength(2);
-    expect(h.warnings.join('\n')).not.toMatch(/--version failed/);
-    expect(h.problems).toEqual([]);
+  test('PATH is extended under whatever name it has', () => {
+    const { withFallbackPath } = require('../../electron-pip-supervisor');
+    expect(withFallbackPath({ Path: 'A' }, 'F')).toEqual({ Path: 'F;A' });
+    expect(withFallbackPath({ PATH: 'A' }, 'F')).toEqual({ PATH: 'F;A' });
+    expect(withFallbackPath({}, 'F')).toEqual({ PATH: 'F' });
     expect(versionProblem('/x/lqe', { status: 0 })).toBeNull();
   });
 
   test('control: macOS and Linux do not ask', async () => {
     for (const platform of ['darwin', 'linux']) {
-      const h = harness({ platform, runVersion: () => DLL });
+      const r = runs(DLL);
+      const h = harness({ platform, runVersion: r.run });
       await h.pip.apply(result(), MODELS);
-      expect(h.versionRuns).toEqual([]);
+      expect(r.seen).toEqual([]);
       expect(h.spawns).toHaveLength(2);
     }
   });

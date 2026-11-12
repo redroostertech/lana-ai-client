@@ -56,21 +56,27 @@ describe('checkPip', () => {
   });
 
   describe('the Vulkan loader lqe.exe imports (Windows only)', () => {
-    const withLoader = { ...pin, vulkanLoader: { platforms: ['windows-x64'], version: '1.3.296.0', file: 'vulkan-1.dll', sha256: sha('the pinned loader') } };
+    const withLoader = { ...pin, vulkanLoader: { platforms: ['windows-x64'], version: '1.3.296.0', file: 'vulkan-fallback/vulkan-1.dll', sha256: sha('the pinned loader') } };
     const windowsRoot = (loader) => {
       const root = tmpRoot();
       write(root, 'build/pip/lqe.exe', 'the pinned lqe.exe');
       write(root, 'build/pip/lqe', 'the pinned lqe');
-      if (loader) {write(root, 'build/pip/vulkan-1.dll', loader);}
+      if (loader) {write(root, 'build/pip/vulkan-fallback/vulkan-1.dll', loader);}
       return root;
     };
 
-    test('Windows with the pinned vulkan-1.dll beside lqe.exe passes (control)', () => {
+    test('Windows with the pinned vulkan-1.dll in pip/vulkan-fallback passes (control)', () => {
       expect(pins.checkPip({ root: windowsRoot('the pinned loader'), platformName: 'win32', archName: 'x64', pin: withLoader })).toEqual([]);
     });
 
+    test('a loader beside lqe.exe instead of in the fallback folder is refused', () => {
+      const root = windowsRoot(null);
+      write(root, 'build/pip/vulkan-1.dll', 'the pinned loader');
+      expect(pins.checkPip({ root, platformName: 'win32', archName: 'x64', pin: withLoader }).join(' ')).toMatch(/vulkan-fallback\/vulkan-1.dll/);
+    });
+
     test.each([
-      ['missing', null, /The Vulkan loader is missing: build\/pip\/vulkan-1.dll/],
+      ['missing', null, /The Vulkan loader is missing: build\/pip\/vulkan-fallback\/vulkan-1.dll/],
       ['another file', 'some other dll', /is not the pinned Vulkan loader 1.3.296.0/]
     ])('Windows refuses a loader that is %s', (_name, loader, message) => {
       expect(pins.checkPip({ root: windowsRoot(loader), platformName: 'win32', archName: 'x64', pin: withLoader }).join(' ')).toMatch(message);
@@ -171,7 +177,7 @@ describe('checkPackaged (afterPack)', () => {
     expect(pins.checkPackaged(packed())).toEqual([]);
   });
 
-  test('a packed Windows app must hold the pinned vulkan-1.dll beside lqe.exe', () => {
+  test('a packed Windows app must hold the pinned vulkan-1.dll in pip/vulkan-fallback', () => {
     const args = packed();
     write(args.resourcesDir, 'pip/lqe.exe', 'the pinned lqe.exe');
     const digest = pins.treeDigest(path.join(args.resourcesDir, 'engine'));
@@ -179,11 +185,11 @@ describe('checkPackaged (afterPack)', () => {
       ...args,
       platformName: 'win32',
       archName: 'x64',
-      pipPin: { builds: { 'windows-x64': { sha256: sha('the pinned lqe.exe') } }, vulkanLoader: { platforms: ['windows-x64'], version: '1.3.296.0', file: 'vulkan-1.dll', sha256: sha('the pinned loader') } },
+      pipPin: { builds: { 'windows-x64': { sha256: sha('the pinned lqe.exe') } }, vulkanLoader: { platforms: ['windows-x64'], version: '1.3.296.0', file: 'vulkan-fallback/vulkan-1.dll', sha256: sha('the pinned loader') } },
       enginePin: { builds: { 'windows-x64': { files: digest.files, treeSha256: digest.sha256 } } }
     };
     expect(pins.checkPackaged(win).join(' ')).toMatch(/The packed app: The Vulkan loader is missing/);
-    write(args.resourcesDir, 'pip/vulkan-1.dll', 'the pinned loader');
+    write(args.resourcesDir, 'pip/vulkan-fallback/vulkan-1.dll', 'the pinned loader');
     expect(pins.checkPackaged(win)).toEqual([]);
   });
 
@@ -253,8 +259,10 @@ describe('the package step', () => {
     expect(placed('mac')).toMatchObject({ 'pip/lqe': 'build/pip/lqe', engine: 'build/engine' });
     expect(placed('linux')).toMatchObject({ 'pip/lqe': 'build/pip/lqe', engine: 'build/engine' });
     expect(placed('win')).toMatchObject({ 'pip/lqe.exe': 'build/pip/lqe.exe', engine: 'build/engine' });
-    // lqe.exe imports vulkan-1.dll: the Windows installer carries it beside lqe.exe; no other does.
-    expect(placed('win')).toMatchObject({ 'pip/vulkan-1.dll': 'build/pip/vulkan-1.dll' });
+    // lqe.exe imports vulkan-1.dll: the Windows installer carries it in pip/vulkan-fallback, never
+    // beside lqe.exe (Windows would load it there before a newer system loader); no other installer does.
+    expect(placed('win')).toMatchObject({ 'pip/vulkan-fallback/vulkan-1.dll': 'build/pip/vulkan-fallback/vulkan-1.dll' });
+    expect(placed('win')).not.toHaveProperty('pip/vulkan-1.dll');
     for (const section of ['mac', 'linux']) {expect(Object.keys(placed(section)).some((to) => /vulkan/i.test(to))).toBe(false);}
     expect((config.extraResources || []).some((entry) => /vulkan/i.test(entry.from))).toBe(false);
     expect(config.mac.binaries).toContain('Contents/Resources/pip/lqe');
@@ -280,7 +288,7 @@ describe('the package step', () => {
     expect(pip.vulkanLoader.archive.url).toMatch(/^https:\/\/sdk\.lunarg\.com\//);
     expect(pip.vulkanLoader.archive.sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(pip.vulkanLoader.sha256).toMatch(/^[0-9a-f]{64}$/);
-    expect(pip.vulkanLoader.file).toBe('vulkan-1.dll');
+    expect(pip.vulkanLoader.file).toBe('vulkan-fallback/vulkan-1.dll');
     expect(engine.commit).toMatch(/^[0-9a-f]{40}$/);
     expect(engine.builds['macos-arm64'].treeSha256).toMatch(/^[0-9a-f]{64}$/);
   });

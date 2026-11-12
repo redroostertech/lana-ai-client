@@ -2,8 +2,10 @@
 'use strict';
 
 /**
- * Places build/pip/vulkan-1.dll, the Khronos Vulkan loader the Windows package ships beside
- * lqe.exe (pip/pip-pin.json vulkanLoader). Build time only; the app never downloads it.
+ * Places build/pip/vulkan-fallback/vulkan-1.dll, the Khronos Vulkan loader the Windows package
+ * ships in a folder beside lqe.exe (pip/pip-pin.json vulkanLoader; electron-pip-supervisor.js
+ * windowsStart puts the folder on PATH only when lqe.exe cannot find a loader of its own).
+ * Build time only; the app never downloads it.
  *
  * Takes the pinned LunarG Vulkan Runtime components archive, refuses it unless its sha256 is the
  * pinned one (the one LunarG publishes at sha256Source), unpacks the pinned member with tar
@@ -53,8 +55,9 @@ async function main(argv = process.argv.slice(2)) {
     const dll = fs.readFileSync(path.join(work, loader.member));
     const dllProblems = checkBytes(dll, loader.sha256, `${loader.member}`);
     if (dllProblems.length) {throw new Error(dllProblems.join(' '));}
-    fs.mkdirSync(path.join(ROOT, 'build', 'pip'), { recursive: true });
-    fs.writeFileSync(path.join(ROOT, 'build', 'pip', loader.file), dll);
+    const out = path.join(ROOT, 'build', 'pip', loader.file);
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+    fs.writeFileSync(out, dll);
     process.stdout.write(`Placed build/pip/${loader.file}: Vulkan loader ${loader.version}, ${dll.length} bytes, sha256 ${loader.sha256}\n`);
   } finally {
     fs.rmSync(work, { recursive: true, force: true });

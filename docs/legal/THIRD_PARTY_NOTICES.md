@@ -35,7 +35,7 @@ The application runtime.
 
 - License: Apache-2.0 for the Vulkan loader; MIT for parts of the Vulkan Runtime
 - Copyright: Copyright (c) 2015-2024 The Khronos Group Inc.; Copyright (c) 2015-2024 LunarG, Inc.; Copyright (c) 2015-2024 Valve Corporation
-- Attribution: On Windows the app ships vulkan-1.dll, the Khronos Vulkan loader as distributed in LunarG's Vulkan Runtime, beside its local AI engine (lqe.exe), so the engine starts on computers without a graphics driver.
+- Attribution: On Windows the app ships vulkan-1.dll, the Khronos Vulkan loader as distributed in LunarG's Vulkan Runtime, in a folder beside its local AI engine (lqe.exe), used only when the computer has no Vulkan loader of its own, so the engine starts on computers without a graphics driver.
 - Notes: Unmodified binary from the LunarG Vulkan Runtime components archive 1.3.296.0, pinned by sha256 in pip/pip-pin.json. Windows installers only.
 - Source: https://github.com/KhronosGroup/Vulkan-Loader
 
