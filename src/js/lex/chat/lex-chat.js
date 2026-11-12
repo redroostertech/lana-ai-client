@@ -805,6 +805,7 @@
 
       const turnId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       this._activeTurnId = turnId;
+      this._partReadAnnounced = false;
 
       // Reset per-message state
       this._citations = [];
@@ -1681,6 +1682,17 @@
     // Event dispatch loop — routes ChatEvents to child components
     // ---------------------------------------------------------------------------
 
+    _progressEvents() {
+      return global.Lex && global.Lex.Chat && global.Lex.Chat.ProgressEvents || null;
+    }
+
+    // A verification's part line ("Checking part 3 of 7 of supply.pdf")
+    // stays up through the turn's liveness heartbeats.
+    _keepsActivityText(event) {
+      const progressEvents = this._progressEvents();
+      return Boolean(progressEvents) && progressEvents.keepsActivityText(event, this._partReadAnnounced === true);
+    }
+
     _handleEvent(event, responseStarted) {
       switch (event.type) {
 
@@ -1709,7 +1721,10 @@
           break;
 
         case 'thinking':
-          if (this._activityEl) {
+          if (this._progressEvents() && this._progressEvents().announcesPartRead(event)) {
+            this._partReadAnnounced = true;
+          }
+          if (this._activityEl && !this._keepsActivityText(event)) {
             this._activityEl.update(event.message, event.phase);
           }
           break;
@@ -1721,8 +1736,13 @@
           break;
 
         case 'progress':
+          if (this._progressEvents() && this._progressEvents().announcesPartRead(event)) {
+            this._partReadAnnounced = true;
+          }
           if (this._activityEl) {
-            this._activityEl.update(event.message || 'Processing...', event.category || 'progress');
+            if (!this._keepsActivityText(event)) {
+              this._activityEl.update(event.message || 'Processing...', event.category || 'progress');
+            }
             this._activityEl.addReasoningEntry(event);
           }
           break;

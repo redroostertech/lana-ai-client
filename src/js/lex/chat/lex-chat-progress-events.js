@@ -55,9 +55,24 @@
     return Boolean(nextKey && previousKey && nextKey === previousKey);
   }
 
+  // A verification reading a long document in parts announces how long it
+  // may take (deadline_ms on its first progress event, or remaining_ms on a
+  // progress or status frame, chat-turn.driver.js), then says where it is: "Checking part 3 of 7 of supply.pdf". The turn's
+  // 15 s liveness heartbeat carries only the stage label, so once a part
+  // read is announced the heartbeat must not replace the part line.
+  function announcesPartRead(event) {
+    return Boolean(event) && (Number.isFinite(event.deadlineMs) || Number.isFinite(event.remainingMs));
+  }
+
+  function keepsActivityText(event, partReadAnnounced) {
+    return partReadAnnounced === true && Boolean(event) && event.heartbeat === true;
+  }
+
   var api = {
     getProgressEventKey: getProgressEventKey,
-    shouldReplaceConsecutive: shouldReplaceConsecutive
+    shouldReplaceConsecutive: shouldReplaceConsecutive,
+    announcesPartRead: announcesPartRead,
+    keepsActivityText: keepsActivityText
   };
 
   global.Lex = global.Lex || {};

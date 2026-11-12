@@ -549,7 +549,10 @@
           return { type: 'thinking', message: data.message, phase: humanizePhase(data.phase) };
 
         case 'status':
-          return { type: 'thinking', message: data.message, phase: humanizePhase(data.phase) };
+          // remainingMs: a verification's time left, when the runtime's own
+          // progress event says (LANA-AI 97a72dc8f).
+          return { type: 'thinking', message: data.message, phase: humanizePhase(data.phase), heartbeat: data.heartbeat === true,
+            remainingMs: Number.isFinite(data.remaining_ms) ? data.remaining_ms : null };
 
         case 'reasoning':
           return {
@@ -571,7 +574,11 @@
             message: data.message,
             status: data.status,
             phase: data.phase,
-            heartbeat: data.heartbeat === true
+            heartbeat: data.heartbeat === true,
+            // A verification's announced run time: deadline_ms from the
+            // turn's start, or remaining_ms from now.
+            deadlineMs: Number.isFinite(data.deadline_ms) ? data.deadline_ms : null,
+            remainingMs: Number.isFinite(data.remaining_ms) ? data.remaining_ms : null
           };
 
         case 'tool_thinking':
