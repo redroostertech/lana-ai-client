@@ -38,7 +38,9 @@ const CHANNELS = Object.freeze({
 // The engine reads its embedding identity from its Pip's /health (backend
 // src/engine/local-embedding-identity.js), so no model file, id or version is passed.
 // LANA_TOKENIZER_GGUF: the chat model file, so the engine counts tokens with its vocabulary.
-const ENGINE_MODEL_ENV = Object.freeze(['LANA_TIER', 'EMBEDDING_MODEL', 'LANA_ENGINE_EMBEDDING_URL', 'LANA_ENGINE_CHAT_URL', 'LANA_FORGE_URL', 'LANA_TOKENIZER_GGUF']);
+// LLM_QUEUE_*: the engine's model-call queue sized to Pip's chat slots, background work held to
+// one call (electron-pip-supervisor.js engineEndpoints).
+const ENGINE_MODEL_ENV = Object.freeze(['LANA_TIER', 'EMBEDDING_MODEL', 'LANA_ENGINE_EMBEDDING_URL', 'LANA_ENGINE_CHAT_URL', 'LANA_FORGE_URL', 'LANA_TOKENIZER_GGUF', 'LLM_QUEUE_CONCURRENCY', 'LLM_QUEUE_MAX_BACKGROUND_CONCURRENCY']);
 
 // The redactor on this computer (electron-redactor.js): its address and the secret it checks on
 // every request. They only work together, so they come from one place: the environment when it

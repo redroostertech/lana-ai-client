@@ -52,7 +52,7 @@ function result({ chat = 'local', vision = true, embedding = 'local', platform =
   };
 }
 
-function harness({ env = {}, binary = BINARY, busyPorts = [], accepts = {}, props = {}, wiredLimitMb = null } = {}) {
+function harness({ env = {}, binary = BINARY, busyPorts = [], accepts = {}, props = {}, health = {}, metrics = {}, wiredLimitMb = null, options = {} } = {}) {
   const children = [];
   const spawns = [];
   const files = {};
@@ -77,8 +77,10 @@ function harness({ env = {}, binary = BINARY, busyPorts = [], accepts = {}, prop
     fetch: jest.fn(async (url) => {
       const port = Number(new URL(url).port);
       if (down.has(port) || !serving[port]) {throw new Error('connect ECONNREFUSED');}
-      if (new URL(url).pathname === '/props') {return { ok: true, status: 200, json: async () => props[port] || null };}
-      return { ok: true, status: 200, json: async () => ({ status: 'ok', model_file: { name: serving[port] } }) };
+      const where = new URL(url).pathname;
+      if (where === '/props') {return { ok: true, status: 200, json: async () => props[port] || null };}
+      if (where === '/metrics') {return { ok: true, status: 200, text: async () => (typeof metrics[port] === 'function' ? metrics[port]() : metrics[port] || '') };}
+      return { ok: true, status: 200, json: async () => ({ status: 'ok', model_file: { name: serving[port] }, ...(health[port] || {}) }) };
     }),
     pickPort: jest.fn(async (preferred) => (busyPorts.includes(preferred) ? 50000 + preferred : preferred)),
     fsImpl: {
@@ -86,7 +88,8 @@ function harness({ env = {}, binary = BINARY, busyPorts = [], accepts = {}, prop
       writeFileSync: (file, text) => { files[file] = JSON.parse(text); },
       createWriteStream: jest.fn(() => { const sink = { write: jest.fn(), end: jest.fn() }; logs.push(sink); return sink; })
     },
-    onAddresses: (value) => addresses.push(value)
+    onAddresses: (value) => addresses.push(value),
+    options
   });
   /** Pretend each started server loaded its settings file's model. */
   const serveFromSettings = () => {
@@ -148,53 +151,98 @@ describe('this computer\'s speed settings (electron-pip-levers.js)', () => {
   const metal = (parallel) => {
     const r = result({ embedding: 'cloud' });
     r.plan.chat.parallel = parallel;
+    r.plan.chat.poolTokens = parallel > 1 ? 65536 : null;
     r.hardware.totalMemoryBytes = 36 * 1024 ** 3;
     return r;
   };
+  const STARTUP = [
+    '[lqe INF] serve: computation identity 422dee4d4c530750 (model=/m/x.gguf;kv=f16;exec=gpu-inexact:bdec=2:pshare=1)',
+    '[lqe INF] serve: shared prefixes on - system prompts of 512+ tokens kept in up to 512 MiB (D-40)',
+    "[lqe INF] serve: batched decode on - up to 2 slots' tokens per forward (D-39) on the GPU (--gpu-inexact: value-equivalent, not bit-identical)"
+  ];
+  const GOOD = {
+    health: { 8081: { computation: '422dee4d4c530750', adaptive_prefill: true } },
+    props: { 8081: { total_slots: 2, default_generation_settings: { n_ctx: 32768 } } }
+  };
+  /** Start chat on Apple silicon, print `lines`, and let it answer once. */
+  async function started(lines, more = {}, parallel = 2) {
+    const h = harness({ accepts: NEW, ...GOOD, ...more });
+    await h.pip.apply(metal(parallel), MODELS);
+    h.children[0].stdout.pipe.mock.calls[0][0].write(`${lines.join('\n')}\n`);
+    h.serveFromSettings();
+    await settle();
+    return h;
+  }
 
-  test('a new Pip on Apple silicon with several slots: batching settings in the file, no extra flags', async () => {
+  test('a new Pip on Apple silicon with 2 slots: the measured settings in the file, no extra flags', async () => {
     const h = harness({ accepts: NEW });
-    await h.pip.apply(metal(3), MODELS);
+    await h.pip.apply(metal(2), MODELS);
     expect(h.spawns[0].args).toEqual(['serve', '--config', CHAT]);
-    expect(h.files[CHAT]).toMatchObject({ parallel: 3, kv_type: 'f16', gpu_inexact: true, batch_decode: 3, prefix_share_mb: 512, ubatch: 2048, threads: 4, adaptive_prefill: true });
+    expect(h.files[CHAT]).toMatchObject({ parallel: 2, kv_type: 'f16', gpu_inexact: true, batch_decode: 2, prefix_share_mb: 512, ctx_pool: 65536, ctx_chunk: 4096, ubatch: 2048, threads: 4, gpu_output: true });
+    expect(h.files[CHAT]).not.toHaveProperty('adaptive_prefill');
   });
 
-  test('one slot: --flash-attn on the command line (it has no settings-file key)', async () => {
+  test('a true single slot: no batching settings and no --flash-attn', async () => {
     const h = harness({ accepts: NEW });
     await h.pip.apply(metal(1), MODELS);
-    expect(h.spawns[0].args).toEqual(['serve', '--config', CHAT, '--flash-attn']);
-    expect(h.files[CHAT]).not.toHaveProperty('gpu_inexact');
+    expect(h.spawns[0].args).toEqual(['serve', '--config', CHAT]);
+    for (const key of ['gpu_inexact', 'batch_decode', 'prefix_share_mb', 'ctx_pool']) {expect(h.files[CHAT]).not.toHaveProperty(key);}
+  });
+
+  test('control: everything as asked gives no warning', async () => {
+    const h = await started(STARTUP);
+    expect(h.warnings).toEqual([]);
+    expect(h.addresses).toHaveLength(1);
   });
 
   test('an "is off:" line for a lever LANA asked for is logged as a warning', async () => {
-    const h = harness({ accepts: NEW });
-    await h.pip.apply(metal(3), MODELS);
-    const sink = h.children[0].stdout.pipe.mock.calls[0][0];
-    sink.write('[lqe INF] serve: listening\n[lqe WRN] serve: --batch-decode 3 is off: there is only one slot\n');
-    await Promise.resolve();
+    const h = await started([...STARTUP, '[lqe WRN] serve: --batch-decode 2 is off: there is only one slot']);
     expect(h.warnings.join('\n')).toMatch(/turned off --batch-decode, which LANA asked for: there is only one slot/);
     expect(h.logs[0].write).toHaveBeenCalled();
   });
 
+  test('a missing "batched decode on ... on the GPU" or "shared prefixes on" line is a warning', async () => {
+    const h = await started([STARTUP[0], STARTUP[1]]);
+    expect(h.warnings.join('\n')).toMatch(/did not log "batched decode on/);
+    const share = await started([STARTUP[0], STARTUP[2]]);
+    expect(share.warnings.join('\n')).toMatch(/did not log "shared prefixes on"/);
+  });
+
+  test('/health: no ;exec=gpu-inexact:bdec=2:pshare=1 in the served computation, or adaptive prefill off, is a warning', async () => {
+    const h = await started([STARTUP[0].replace(';exec=gpu-inexact:bdec=2:pshare=1', ''), STARTUP[1], STARTUP[2]]);
+    expect(h.warnings.join('\n')).toMatch(/does not include ;exec=gpu-inexact:bdec=2:pshare=1/);
+    const off = await started(STARTUP, { health: { 8081: { computation: '422dee4d4c530750', adaptive_prefill: false } } });
+    expect(off.warnings.join('\n')).toMatch(/adaptive prefill off/);
+  });
+
   test('/props must report the slots asked for; a mismatch is a warning, the server still serves', async () => {
-    const h = harness({ accepts: NEW, props: { 8081: { total_slots: 1, default_generation_settings: { n_ctx: 32768 } } } });
-    await h.pip.apply(metal(3), MODELS);
-    h.serveFromSettings();
-    await settle();
-    expect(h.warnings.join('\n')).toMatch(/reports 1 slots, LANA asked for 3/);
+    const h = await started(STARTUP, { props: { 8081: { total_slots: 1, default_generation_settings: { n_ctx: 32768 } } } });
+    expect(h.warnings.join('\n')).toMatch(/reports 1 slots, LANA asked for 2/);
     expect(h.addresses).toHaveLength(1);
   });
 
-  test('control: matching /props gives no warning', async () => {
-    const h = harness({ accepts: NEW, props: { 8081: { total_slots: 3, default_generation_settings: { n_ctx: 32768 } } } });
-    await h.pip.apply(metal(3), MODELS);
-    h.serveFromSettings();
-    await settle();
+  test('/metrics is read lazily after start, and judged once real traffic has run', async () => {
+    let text = 'lqe_requests_total 2\nlqe_batch_decode_steps_total 0\n';
+    const h = await started(STARTUP, { metrics: { 8081: () => text }, options: { batchMetricsEveryMs: 1000 } });
+    expect(h.warnings).toEqual([]);
+    await settle(1000);
+    expect(h.warnings).toEqual([]); // too little traffic to judge
+    text = 'lqe_requests_total 25\nlqe_batch_decode_steps_total 0\n';
+    await settle(1000);
+    expect(h.warnings.join('\n')).toMatch(/batched decode took no step in 25 requests/);
+    const count = h.warnings.length;
+    await settle(5000);
+    expect(h.warnings).toHaveLength(count); // checked once
+  });
+
+  test('control: batching that took steps gives no /metrics warning', async () => {
+    const h = await started(STARTUP, { metrics: { 8081: 'lqe_requests_total 25\nlqe_batch_decode_steps_total 9\n' }, options: { batchMetricsEveryMs: 1000 } });
+    await settle(3000);
     expect(h.warnings).toEqual([]);
   });
 
   test('the Metal memory limit is checked against the models plus the pool', async () => {
-    const r = metal(3);
+    const r = metal(2);
     r.entries.set('qwen4b', { id: 'qwen4b', family: 'qwen3.5', sizeBytes: 20 * 1024 ** 3, filename: 'Qwen3.5-4B-Q4_K_M.gguf' });
     const h = harness({ accepts: NEW, wiredLimitMb: 16384 });
     await h.pip.apply(r, MODELS);
@@ -234,7 +282,7 @@ describe('running the servers', () => {
     expect(h.addresses).toEqual([]);
     h.serving[8081] = 'Qwen3.5-4B-Q4_K_M.gguf';
     await settle();
-    expect(h.addresses).toEqual([{ chat: 'http://127.0.0.1:8081', embedding: 'http://127.0.0.1:8082', chatModelFile: path.join(MODELS, 'Qwen3.5-4B-Q4_K_M.gguf') }]);
+    expect(h.addresses).toEqual([{ chat: 'http://127.0.0.1:8081', embedding: 'http://127.0.0.1:8082', chatModelFile: path.join(MODELS, 'Qwen3.5-4B-Q4_K_M.gguf'), chatSlots: 2 }]);
     expect(h.pip.getState().servers.chat).toMatchObject({ process: 'running', healthy: true });
   });
 
@@ -261,7 +309,7 @@ describe('running the servers', () => {
     expect(h.spawns).toHaveLength(1);
     h.serveFromSettings();
     await settle();
-    expect(h.addresses).toEqual([{ chat: null, embedding: 'http://127.0.0.1:8082', chatModelFile: null }]);
+    expect(h.addresses).toEqual([{ chat: null, embedding: 'http://127.0.0.1:8082', chatModelFile: null, chatSlots: null }]);
   });
 
   test('no Pip installed: nothing starts', async () => {
@@ -340,7 +388,7 @@ describe('running the servers', () => {
     await stopping;
     expect(h.children[0].signals).toEqual(['SIGTERM', 'SIGKILL']);
     expect(h.children[1].signals).toEqual(['SIGTERM']);
-    expect(h.addresses[h.addresses.length - 1]).toEqual({ chat: null, embedding: null, chatModelFile: null });
+    expect(h.addresses[h.addresses.length - 1]).toEqual({ chat: null, embedding: null, chatModelFile: null, chatSlots: null });
     // Nothing restarts after a stop.
     await settle(DEFAULTS.maxBackoffMs);
     expect(h.spawns).toHaveLength(2);
@@ -349,6 +397,9 @@ describe('running the servers', () => {
 
 test('what the engine is given: the addresses of the servers that answered, and the chat vocabulary', () => {
   expect(engineEndpoints({ chat: 'http://127.0.0.1:8081', embedding: 'http://127.0.0.1:8082', chatModelFile: '/m/chat.gguf' })).toEqual({ LANA_ENGINE_CHAT_URL: 'http://127.0.0.1:8081', LANA_ENGINE_EMBEDDING_URL: 'http://127.0.0.1:8082', LANA_TOKENIZER_GGUF: '/m/chat.gguf' });
+  // The engine's queue runs as many calls as Pip has chat slots, background work at most one.
+  expect(engineEndpoints({ chat: 'http://127.0.0.1:8081', embedding: null, chatModelFile: '/m/chat.gguf', chatSlots: 2 })).toMatchObject({ LLM_QUEUE_CONCURRENCY: '2', LLM_QUEUE_MAX_BACKGROUND_CONCURRENCY: '1' });
+  expect(engineEndpoints({ chat: null, embedding: 'http://127.0.0.1:8082', chatSlots: 2 })).not.toHaveProperty('LLM_QUEUE_MAX_BACKGROUND_CONCURRENCY');
   expect(engineEndpoints({ chat: null, embedding: 'http://127.0.0.1:8082' })).toEqual({ LANA_ENGINE_EMBEDDING_URL: 'http://127.0.0.1:8082' });
   expect(engineEndpoints({ chat: null, embedding: null })).toEqual({});
 });

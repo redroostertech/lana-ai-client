@@ -35,12 +35,12 @@ describe('the default chat model for a computer', () => {
     ['an 8 GB laptop', computer(8), 'qwen3.5-0.8b-q4', 32768, null, 1],
     ['a 12 GB laptop', computer(12), 'qwen3.5-4b-q4', 32768, null, 1],
     // A smaller model that holds 32768 tokens beats a bigger one that does not (decided 2026-11-09).
-    ['a 16 GB Mac', computer(16), 'qwen3.5-4b-q4', 32768, 'mmproj-qwen3.5-4b', 4],
-    ['a 24 GB Mac', computer(24), 'qwen3.5-9b-q4', 32768, 'mmproj-qwen3.5-9b', 4],
-    ['a 36 GB Mac', computer(36), 'qwen3.5-9b-q4', 32768, 'mmproj-qwen3.5-9b', 4],
-    ['a 64 GB Mac', computer(64), 'qwen3.5-35b-a3b-q4km', 32768, 'mmproj-qwen3.5-35b-a3b', 4],
-    ['a 16 GB computer with a 12 GB NVIDIA card', computer(16, 'cuda', { vramGb: 12 }), 'qwen3.5-9b-q4', 32768, 'mmproj-qwen3.5-9b', 4],
-    ['a 16 GB computer with no graphics chip', computer(16, 'cpu'), 'qwen3-1.7b-q4km', 32768, null, 4]
+    ['a 16 GB Mac', computer(16), 'qwen3.5-4b-q4', 32768, 'mmproj-qwen3.5-4b', 2],
+    ['a 24 GB Mac', computer(24), 'qwen3.5-9b-q4', 32768, 'mmproj-qwen3.5-9b', 2],
+    ['a 36 GB Mac', computer(36), 'qwen3.5-9b-q4', 32768, 'mmproj-qwen3.5-9b', 2],
+    ['a 64 GB Mac', computer(64), 'qwen3.5-35b-a3b-q4km', 32768, 'mmproj-qwen3.5-35b-a3b', 2],
+    ['a 16 GB computer with a 12 GB NVIDIA card', computer(16, 'cuda', { vramGb: 12 }), 'qwen3.5-9b-q4', 32768, 'mmproj-qwen3.5-9b', 2],
+    ['a 16 GB computer with no graphics chip', computer(16, 'cpu'), 'qwen3-1.7b-q4km', 32768, null, 1]
   ])('%s', (_label, hardware, chatId, contextTokens, visionId, parallel) => {
     const result = plan(hardware);
     expect(result.defaultChatId).toBe(chatId);
@@ -49,35 +49,57 @@ describe('the default chat model for a computer', () => {
     expect(result.plan.embedding).toMatchObject({ id: embedding.id, where: 'local' });
   });
 
-  test('slots come from memory: the most, up to four, that stay comfortable with the shared prompts counted', () => {
+  test('slots come from memory: two (chat plus a background lane) when two keep the fit, else one', () => {
     const nine = catalog.chat.find((m) => m.id === 'qwen3.5-9b-q4');
-    const counts = {};
-    for (const memoryGb of [12, 18, 19, 20, 24, 64]) {
+    const seen = {};
+    for (const memoryGb of [12, 16, 18, 20, 22, 24, 64]) {
       const result = plan(computer(memoryGb), { chosenChatId: nine.id });
-      const n = result.plan.chat.parallel;
-      counts[memoryGb] = n;
-      const vision = result.plan.vision.id ? catalog.vision.find((v) => v.id === result.plan.vision.id).sizeBytes + 0.25 * GB : 0;
-      const reserved = embedding.sizeBytes + (0.0625 * 2 + 0.05) * GB + speech.memoryBytes;
-      const used = (slots) => reserved + fit.chatBytes(nine, result.plan.chat.contextTokens, slots, 'metal', memoryGb * GB) + vision;
-      if (n > 1) {expect(used(n) / (memoryGb * GB)).toBeLessThan(0.55);}
-      if (n < fit.MAX_SLOTS) {expect(used(n + 1) / (memoryGb * GB)).toBeGreaterThanOrEqual(0.55);}
+      seen[memoryGb] = [result.plan.chat.parallel, result.plan.chat.poolTokens];
+      expect(result.plan.chat.parallel).toBeLessThanOrEqual(2);
     }
-    // 19 GB keeps image reading (chosen first, at the priced two slots) and so has room for one slot.
-    expect(counts).toEqual({ 12: 1, 18: 3, 19: 1, 20: 3, 24: 4, 64: 4 });
+    // 18 and 20 GB hold two slots only with the 32768-token pool; from 22 GB the full 65536.
+    expect(seen).toEqual({ 12: [1, null], 16: [1, null], 18: [2, 32768], 20: [2, 32768], 22: [2, 65536], 24: [2, 65536], 64: [2, 65536] });
+    // Two slots are kept only when they keep the setup comfortable here.
+    const twenty = plan(computer(20), { chosenChatId: nine.id });
+    const reserved = embedding.sizeBytes + (0.0625 * 2 + 0.05) * GB + speech.memoryBytes;
+    const vision = catalog.vision.find((v) => v.id === twenty.plan.vision.id).sizeBytes + 0.25 * GB;
+    const used = (pool) => reserved + fit.chatBytes(nine, 32768, 2, 'metal', 20 * GB, pool) + vision;
+    expect(used(32768) / (20 * GB)).toBeLessThan(0.55);
+    expect(used(65536) / (20 * GB)).toBeGreaterThanOrEqual(0.55);
   });
 
-  test('the shared pool holds one full conversation plus a chunk per other slot', () => {
-    expect(fit.poolTokens(32768, 1)).toBe(32768);
-    expect(fit.poolTokens(32768, 4)).toBe(32768 + 3 * fit.CTX_CHUNK);
+  test('a choice that is already tight keeps two slots while they stay tight (the 35B-A3B on a 36 GB Mac)', () => {
+    const result = plan(computer(36), { chosenChatId: 'qwen3.5-35b-a3b-q4km' });
+    expect(choice(result, 'qwen3.5-35b-a3b-q4km').fit).toBe('tight');
+    expect(result.plan.chat).toMatchObject({ id: 'qwen3.5-35b-a3b-q4km', parallel: 2, poolTokens: 65536 });
+  });
+
+  test('the shared pool: a full context per slot, 32768 on a Mac with 16 GB or less; one slot has none', () => {
+    expect(fit.MAX_SLOTS).toBe(2);
+    expect(fit.poolTokens(32768, 1, 'metal', 36 * GB)).toBe(32768);
+    expect(fit.poolTokens(32768, 2, 'metal', 36 * GB)).toBe(65536);
+    expect(fit.poolTokens(32768, 2, 'metal', 16 * GB)).toBe(32768);
+    expect(fit.poolTokens(32768, 2, 'cuda', 16 * GB)).toBe(65536);
+    expect(fit.perConversationTokens(32768, 2, 'metal', 16 * GB)).toBe(28672);
+    expect(fit.perConversationTokens(32768, 2, 'metal', 36 * GB)).toBe(32768);
     const nine = catalog.chat.find((m) => m.id === 'qwen3.5-9b-q4');
-    // Each slot past the first costs one chunk of f16 KV (32 KiB a token on the 9B) and its recurrent state.
-    expect(fit.chatBytes(nine, 32768, 3) - fit.chatBytes(nine, 32768, 2)).toBeCloseTo(fit.CTX_CHUNK * 32768 + 0.05 * GB, 0);
+    // The second slot's cost: a second context of f16 KV (32 KiB a token on the 9B), recurrent state, shared prompts.
+    expect(fit.chatBytes(nine, 32768, 2, 'metal', 36 * GB) - fit.chatBytes(nine, 32768, 1, 'metal', 36 * GB)).toBeCloseTo(32768 * 32768 + 0.05 * GB + 512 * 1024 * 1024, 0);
     // Apple silicon keeps shared prompts only with more than one slot: 512 MiB under 64 GB, 1024 from it.
     expect(fit.prefixShareMb('metal', 1, 24 * GB)).toBe(0);
     expect(fit.prefixShareMb('metal', 2, 24 * GB)).toBe(512);
     expect(fit.prefixShareMb('metal', 2, 64 * GB)).toBe(1024);
     expect(fit.prefixShareMb('cpu', 1, 8 * GB)).toBe(256);
-    expect(fit.prefixShareMb('cuda', 4, 64 * GB)).toBe(0);
+    expect(fit.prefixShareMb('cuda', 2, 64 * GB)).toBe(0);
+  });
+
+  test('Macs from 16 to 24 GB run the 9B or smaller; the 35B-A3B needs 32 GB or more', () => {
+    for (const memoryGb of [16, 18, 20, 24, 28, 30]) {
+      const result = plan(computer(memoryGb));
+      expect(['qwen3.5-9b-q4', 'qwen3.5-4b-q4', 'qwen3-1.7b-q4km', 'qwen3.5-0.8b-q4']).toContain(result.defaultChatId);
+      expect(choice(result, 'qwen3.5-35b-a3b-q4km').fit).toBe('wont_fit');
+    }
+    expect(choice(plan(computer(32)), 'qwen3.5-35b-a3b-q4km').fit).not.toBe('wont_fit');
   });
 
   test('NVIDIA sharing system memory (DGX Spark GB10, no card memory figure) runs on the graphics chip', () => {

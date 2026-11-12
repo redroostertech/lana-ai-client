@@ -114,7 +114,7 @@ function wantedServers({ result, modelsDir, env = {}, accepts = {} }) {
   const wanted = { chat: null, embedding: null };
   const chatFile = plan.chat.where === 'local' ? fileOf(plan.chat.id) : null;
   if (chatFile && !env[ADDRESS_ENV.chat]) {
-    const chosen = levers.chatLevers({ hardware, contextTokens: plan.chat.contextTokens, slots: plan.chat.parallel, modelFile: chatFile, accepts });
+    const chosen = levers.chatLevers({ hardware, contextTokens: plan.chat.contextTokens, slots: plan.chat.parallel, poolTokens: plan.chat.poolTokens, modelFile: chatFile, accepts });
     wanted.chat = {
       modelFile: chatFile,
       expectFile: path.basename(chatFile),
@@ -152,7 +152,7 @@ function metalNeedBytes({ result, wanted }) {
   const entry = (id) => (id && entries.get(id)) || null;
   const chat = wanted.chat && entry(plan.chat.id);
   if (!chat || !chat.sizeBytes || !chat.family) {return null;}
-  let bytes = fit.chatBytes(chat, plan.chat.contextTokens, wanted.chat.levers.slots, 'metal', hardware.totalMemoryBytes);
+  let bytes = fit.chatBytes(chat, plan.chat.contextTokens, wanted.chat.levers.slots, 'metal', hardware.totalMemoryBytes, wanted.chat.levers.config.ctx_pool);
   const vision = entry(plan.vision && plan.vision.id);
   if (vision && vision.sizeBytes) {bytes += vision.sizeBytes;}
   const embedding = wanted.embedding && entry(plan.embedding.id);
@@ -208,18 +208,24 @@ function createPip(deps) {
   } = deps;
 
   const running = { chat: null, embedding: null }; // { server, key }
-  let lastAddresses = JSON.stringify({ chat: null, embedding: null, chatModelFile: null });
+  let lastAddresses = JSON.stringify({ chat: null, embedding: null, chatModelFile: null, chatSlots: null });
 
   /**
    * The server's log file. For chat, every line is also read for an "is off:" line that turns off
    * a lever LANA asked for, which becomes a logged warning.
    */
-  function openLog(role, requested = []) {
+  // The chat server's first lines since its latest launch, for the startup checks.
+  const STARTUP_LINES = 400;
+  let startupLines = [];
+
+  function openLog(role, requested = null) {
     let file;
     try { file = fsImpl.createWriteStream(path.join(dir, `${role}.log`), { flags: 'w' }); } catch (_error) { return null; }
-    if (!requested.length) {return file;}
+    if (!requested) {return file;}
+    startupLines = [];
     const { Writable } = require('stream');
     const scanner = levers.lineScanner((line) => {
+      if (startupLines.length < STARTUP_LINES) {startupLines.push(line);}
       const warning = levers.offWarning(line, requested);
       if (warning) {log.warn(warning);}
     });
@@ -230,33 +236,71 @@ function createPip(deps) {
     return tee;
   }
 
+  async function getJson(url) {
+    const response = await fetch(url, { method: 'GET', timeoutMs: options.healthTimeoutMs || DEFAULTS.healthTimeoutMs });
+    return response.ok ? response.json() : null;
+  }
+
+  /** How often /metrics is read until enough traffic has run to judge batching (lazily). */
+  const METRICS_EVERY_MS = options.batchMetricsEveryMs || 5 * 60 * 1000;
+  let metricsTimer = null;
+
+  function stopMetricsCheck() {
+    if (metricsTimer) {timers.clearTimeout(metricsTimer);}
+    metricsTimer = null;
+  }
+
+  /** Once real traffic has run, check once that batched decode took a step; never blocks start. */
+  function scheduleMetricsCheck(url, chosen) {
+    stopMetricsCheck();
+    if (!chosen.expect.batching) {return;}
+    const tick = async () => {
+      metricsTimer = null;
+      let verdict = { ready: false, problem: null };
+      try {
+        const response = await fetch(`${url}/metrics`, { method: 'GET', timeoutMs: options.healthTimeoutMs || DEFAULTS.healthTimeoutMs });
+        if (response.ok) {verdict = levers.batchMetricsProblem(await response.text(), chosen);}
+      } catch (_error) { /* not answering now; the health check reports that */ }
+      if (verdict.problem) {log.warn(`[pip] chat: ${verdict.problem}`);}
+      if (!verdict.ready) {
+        metricsTimer = timers.setTimeout(tick, METRICS_EVERY_MS);
+        if (metricsTimer && metricsTimer.unref) {metricsTimer.unref();}
+      }
+    };
+    metricsTimer = timers.setTimeout(tick, METRICS_EVERY_MS);
+    if (metricsTimer && metricsTimer.unref) {metricsTimer.unref();}
+  }
+
   /**
-   * Ready check for one server: /health first; then, once per launch, the chat server's /props
-   * against the slots and context it was asked for. A mismatch is logged, not a restart.
+   * Ready check for one server: /health first; then, once per launch, the chat server's startup
+   * lines, /health and /props against what it was asked for, and later (lazily) /metrics.
+   * A mismatch is logged, not a restart.
    */
   function readyCheck(want) {
     return async (url, { starting = false } = {}) => {
       const problem = await checkPipHealth(fetch, url, want.expectFile, options);
       // The check that first passes after a launch is the one made while starting.
       if (problem || !starting || !want.levers) {return problem;}
+      const warn = (issue) => log.warn(`[pip] chat: ${issue}`);
+      levers.verifyStartup(startupLines, want.levers).forEach(warn);
       try {
-        const response = await fetch(`${url}/props`, { method: 'GET', timeoutMs: options.healthTimeoutMs || DEFAULTS.healthTimeoutMs });
-        const props = response.ok ? await response.json() : null;
-        for (const issue of levers.verifyProps(props, want.levers)) {log.warn(`[pip] chat: ${issue}`);}
+        levers.verifyHealth(await getJson(`${url}/health`), want.levers, startupLines).forEach(warn);
+        levers.verifyProps(await getJson(`${url}/props`), want.levers).forEach(warn);
       } catch (error) {
-        log.warn(`[pip] chat: /props could not be read (${error.message})`);
+        warn(`/health or /props could not be read (${error.message})`);
       }
+      scheduleMetricsCheck(url, want.levers);
       return null;
     };
   }
 
   function addresses() {
-    const out = { chat: null, embedding: null, chatModelFile: null };
+    const out = { chat: null, embedding: null, chatModelFile: null, chatSlots: null };
     for (const role of Object.keys(running)) {
       const item = running[role];
       if (item && item.server.getState().answeredOnce) {
         out[role] = item.server.getState().url;
-        if (role === 'chat') {out.chatModelFile = item.modelFile;}
+        if (role === 'chat') {Object.assign(out, { chatModelFile: item.modelFile, chatSlots: item.slots });}
       }
     }
     return out;
@@ -282,6 +326,7 @@ function createPip(deps) {
   async function stopRole(role) {
     const item = running[role];
     running[role] = null;
+    if (role === 'chat') {stopMetricsCheck();}
     if (item) {await item.server.stop();}
   }
 
@@ -314,9 +359,9 @@ function createPip(deps) {
       const port = await pickPort(PREFERRED_PORTS[role]);
       const configFile = path.join(dir, `${role}.json`);
       fsImpl.writeFileSync(configFile, `${JSON.stringify(want.settings(port), null, 2)}\n`);
-      const requested = want.levers ? want.levers.requested : [];
+      const requested = want.levers ? want.levers.requested : null;
       const server = createKeptProcess({ name: role, label: 'pip', spawn, timers, now, log, openLog: (name) => openLog(name, requested), onChange: changed, options });
-      running[role] = { server, key, modelFile: want.modelFile };
+      running[role] = { server, key, modelFile: want.modelFile, slots: want.levers ? want.levers.slots : null };
       server.start({ command: binary, args: ['serve', '--config', configFile, ...want.args], port, check: readyCheck(want) });
     }
     changed();
@@ -331,11 +376,21 @@ function createPip(deps) {
   return { apply, stop, getState, addresses };
 }
 
-/** What the engine is given for Pip: the servers that answered, and the chat model's vocabulary. */
+/**
+ * What the engine is given for Pip: the servers that answered, the chat model's vocabulary, and
+ * how many model calls it may run at once. The engine's queue (LANA-AI
+ * src/shared/llm/llm-request-queue.js) otherwise takes its concurrency from its tier, which for
+ * this app is one call at a time, so Pip's second slot would never be used. Chat may use every
+ * slot; background work (summaries, classifiers) holds at most one, so a chat always has a slot.
+ */
 function engineEndpoints(addresses) {
   const out = {};
   if (addresses.chat) {out.LANA_ENGINE_CHAT_URL = addresses.chat;}
   if (addresses.chat && addresses.chatModelFile) {out.LANA_TOKENIZER_GGUF = addresses.chatModelFile;}
+  if (addresses.chat && addresses.chatSlots) {
+    out.LLM_QUEUE_CONCURRENCY = String(addresses.chatSlots);
+    out.LLM_QUEUE_MAX_BACKGROUND_CONCURRENCY = '1';
+  }
   if (addresses.embedding) {out.LANA_ENGINE_EMBEDDING_URL = addresses.embedding;}
   return out;
 }
