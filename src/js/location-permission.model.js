@@ -10,8 +10,9 @@
  *   statusFromError(error)         a GeolocationPositionError as 'denied' or 'unavailable'
  *   buildReading({ allowed, supported, coords, error, devBuild })
  *       { status: 'granted'|'denied'|'unavailable'|'dev_build'|'prompt', approx: { lat, lon } | null, accuracyKm }
- *       dev_build: no position in a development build, which runs the stock Electron app with no
- *       location usage text, so the computer does not answer it (2026-11-12: timeout, code 3)
+ *       dev_build: no position in a development build, which runs as the stock Electron app and is
+ *       listed as "Electron" in the computer's Location Services; switched off there, the request
+ *       only times out (code 3), switched on it works (2026-11-12)
  *   permissionView(status)         the badge, the button and the note for the Settings row
  *
  * Copy rules: words a 6th grader can follow, "computer" and never a brand of device.
@@ -76,8 +77,8 @@
     prompt: { label: 'Off', color: 'gray', action: 'allow', actionLabel: 'Allow', note: '' },
     granted: { label: 'Allowed', color: 'green', action: 'turn_off', actionLabel: 'Turn off', note: 'LANA rounds your location to about 11 km (7 miles) before it uses it.' },
     denied: { label: 'Denied', color: 'red', action: 'retry', actionLabel: 'Try again', note: 'Your computer is not letting LANA see its location. Turn on location for LANA in your computer\'s privacy settings, then try again.' },
-    unavailable: { label: 'Unavailable', color: 'gray', action: 'retry', actionLabel: 'Try again', note: 'LANA could not find this computer\'s location right now. If location is off for LANA, turn it on in your computer\'s settings, then try again.' },
-    dev_build: { label: 'Unavailable', color: 'gray', action: 'retry', actionLabel: 'Try again', note: 'This is a development build of LANA, and your computer does not share its location with it. Try location in the installed LANA app.' }
+    unavailable: { label: 'Unavailable', color: 'gray', action: 'retry', actionLabel: 'Try again', note: 'Your computer did not give LANA a location. Usually LANA is switched off in your computer\'s location settings: use Open Settings to switch it on, then try again.' },
+    dev_build: { label: 'Unavailable', color: 'gray', action: 'retry', actionLabel: 'Try again', note: 'This is a development build of LANA, so your computer lists it as "Electron" in its location settings. Use Open Settings to switch Electron on, then try again.' }
   };
 
   // The statuses where the computer is not sharing its location: "Open Settings" goes to its page.

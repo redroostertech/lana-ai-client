@@ -76,9 +76,9 @@ describe('permissionView', () => {
   });
 });
 
-// A development build runs the stock Electron app, which has no location usage text, so the
-// computer does not answer it (2026-11-12: getCurrentPosition timed out, code 3). The page
-// says so plainly instead of "could not find this computer's location".
+// A development build runs as the stock Electron app, so the computer lists it as "Electron"
+// in Location Services. Switched off there, the position request only times out (code 3);
+// switched on, it works (2026-11-12, checked on Michael's computer). The page names it.
 describe('a development build', () => {
   test('a reading that found nothing says it is a development build', () => {
     expect(M.buildReading({ allowed: true, error: { code: 3 }, devBuild: true }).status).toBe('dev_build');
@@ -91,10 +91,18 @@ describe('a development build', () => {
     expect(M.buildReading({ allowed: false, devBuild: true }).status).toBe('prompt');
   });
 
-  test('the note names the development build', () => {
+  test('the note says the development build is listed as Electron, and never that location cannot work', () => {
     const view = M.permissionView('dev_build');
     expect(view).toMatchObject({ label: 'Unavailable', color: 'gray', action: 'retry', canTurnOff: true });
     expect(view.note).toContain('development build');
+    expect(view.note).toContain('"Electron"');
+    expect(view.note).toContain('location settings');
+    expect(view.note).not.toContain('does not share');
+  });
+
+  test('a timeout in the installed app points at the usual cause: LANA switched off in the location settings', () => {
+    expect(M.permissionView('unavailable').note).toContain('location settings');
+    expect(M.permissionView('unavailable').note).toContain('Open Settings');
   });
 });
 
