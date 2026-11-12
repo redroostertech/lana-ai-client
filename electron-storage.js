@@ -499,6 +499,30 @@ const firstLaunchPersistence = {
   }
 };
 
+// Settings > General > Location (electron-location.js): only whether the person turned it on.
+// A position, exact or approximate, is never stored.
+//   allowed:   true after the person pressed Allow, false after Turn off (default false)
+//   decidedAt: when they last chose (ISO), or null
+const LOCATION_KEY = 'location';
+const LOCATION_DEFAULTS = Object.freeze({ allowed: false, decidedAt: null });
+
+const locationPersistence = {
+  read() {
+    try {
+      const value = store.get(LOCATION_KEY, null);
+      return { allowed: Boolean(value && value.allowed === true), decidedAt: value && typeof value.decidedAt === 'string' ? value.decidedAt : null };
+    } catch (error) {
+      logError('[electron-storage] Failed to read the location setting', error);
+      return { ...LOCATION_DEFAULTS };
+    }
+  },
+  write(changes = {}) {
+    const next = { allowed: changes.allowed === true, decidedAt: new Date().toISOString() };
+    store.set(LOCATION_KEY, next);
+    return next;
+  }
+};
+
 // Ciphertext of the login token (Electron safeStorage output, base64). The
 // plain token never reaches this store; see electron-token-store.js.
 const AUTH_TOKEN_KEY = 'authTokenEncrypted';
@@ -534,6 +558,7 @@ module.exports = {
   getLocalEnginePreferences,
   updateLocalEnginePreferences,
   firstLaunchPersistence,
+  locationPersistence,
   getAllData,
   clearAllData,
   addToConnectionHistory,
