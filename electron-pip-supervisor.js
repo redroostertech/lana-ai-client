@@ -28,6 +28,8 @@
 
 const path = require('path');
 const { createKeptProcess, DEFAULTS } = require('./electron-process-keeper');
+const levers = require('./electron-pip-levers');
+const fit = require('./src/js/local-ai-fit.model');
 
 const LOOPBACK_HOST = '127.0.0.1';
 const PREFERRED_PORTS = Object.freeze({ chat: 8081, embedding: 8082 });
@@ -40,31 +42,26 @@ function threadsFor(cores) {
   return Math.max(1, Math.min(10, count - 2));
 }
 
-function usesGraphics(hardware) {
-  const backend = hardware && hardware.accelerator && hardware.accelerator.backend;
-  return backend === 'metal' || backend === 'cuda';
-}
-
 /**
- * The chat server's settings, from Pip Desktop v2's defaults and the plan. `ctx` is per slot.
- * No session folder: conversations are not written to disk.
+ * The chat server's settings: the plan's model, context per slot and slot count, with this
+ * computer's speed settings (electron-pip-levers.js). No session folder: conversations are not
+ * written to disk. `chosen` is chatLevers() for these inputs; flags without a settings-file key
+ * (--flash-attn, --repack) are in chosen.args.
  */
-function chatConfig({ modelPath, mmprojPath = null, port, contextTokens, parallel, hardware = {} }) {
+function chatConfig({ modelPath, mmprojPath = null, port, contextTokens, parallel, hardware = {}, accepts = {}, chosen = null }) {
+  const picked = chosen || levers.chatLevers({ hardware, contextTokens, slots: parallel, modelFile: modelPath, accepts });
   const config = {
     model: modelPath,
     host: LOOPBACK_HOST,
     port,
-    ctx: contextTokens,
-    parallel,
-    kv_type: 'q8_0',
-    gpu_layers: usesGraphics(hardware) ? 99 : 0,
-    gpu_output: usesGraphics(hardware),
-    threads: threadsFor(hardware.cores),
-    ubatch: 512,
+    ...picked.config,
     fair_chunk: 64,
     queue_timeout: 300,
     max_body_mb: 32
   };
+  // An old engine keeps the old thread count; otherwise the levers set 4 on a graphics chip and
+  // leave the processor-only count to the engine (its physical cores).
+  if (picked.stale) {config.threads = threadsFor(hardware.cores);}
   if (mmprojPath) {config.mmproj = mmprojPath;}
   // Keeps the model in graphics memory between questions (Apple only); without it the first
   // question after a few idle minutes waited 15 to 32 seconds.
@@ -109,7 +106,7 @@ function resolvePipBinary({ env = {}, resourcesPath = null, isPackaged = false, 
  * What the plan asks Pip to run: { chat, embedding }, each null or { settings without a port,
  * expectFile }. Roles whose address the environment names are left to that server.
  */
-function wantedServers({ result, modelsDir, env = {} }) {
+function wantedServers({ result, modelsDir, env = {}, accepts = {} }) {
   const { plan, entries, hardware } = result;
   const fileOf = (id) => {
     const entry = id && entries.get(id);
@@ -118,16 +115,20 @@ function wantedServers({ result, modelsDir, env = {} }) {
   const wanted = { chat: null, embedding: null };
   const chatFile = plan.chat.where === 'local' ? fileOf(plan.chat.id) : null;
   if (chatFile && !env[ADDRESS_ENV.chat]) {
+    const chosen = levers.chatLevers({ hardware, contextTokens: plan.chat.contextTokens, slots: plan.chat.parallel, modelFile: chatFile, accepts });
     wanted.chat = {
       modelFile: chatFile,
       expectFile: path.basename(chatFile),
+      levers: chosen,
+      args: chosen.args,
       settings: (port) => chatConfig({
         modelPath: chatFile,
         mmprojPath: fileOf(plan.vision.id),
         port,
         contextTokens: plan.chat.contextTokens,
         parallel: plan.chat.parallel,
-        hardware
+        hardware,
+        chosen
       })
     };
   }
@@ -136,10 +137,28 @@ function wantedServers({ result, modelsDir, env = {} }) {
     wanted.embedding = {
       modelFile: embeddingFile,
       expectFile: path.basename(embeddingFile),
+      args: [],
       settings: (port) => embeddingConfig({ modelPath: embeddingFile, port, hardware })
     };
   }
   return wanted;
+}
+
+/**
+ * Memory the graphics chip must keep for Pip on Apple silicon: chat (model, pool, recurrent state,
+ * shared prompts), its image file and the embedding model. Null when a file's size is unknown.
+ */
+function metalNeedBytes({ result, wanted }) {
+  const { plan, entries, hardware } = result;
+  const entry = (id) => (id && entries.get(id)) || null;
+  const chat = wanted.chat && entry(plan.chat.id);
+  if (!chat || !chat.sizeBytes || !chat.family) {return null;}
+  let bytes = fit.chatBytes(chat, plan.chat.contextTokens, wanted.chat.levers.slots, 'metal', hardware.totalMemoryBytes);
+  const vision = entry(plan.vision && plan.vision.id);
+  if (vision && vision.sizeBytes) {bytes += vision.sizeBytes;}
+  const embedding = wanted.embedding && entry(plan.embedding.id);
+  if (embedding && embedding.sizeBytes) {bytes += embedding.sizeBytes;}
+  return bytes;
 }
 
 /** Pip is ready when /health says "ok" and names the planned model file. */
@@ -170,6 +189,9 @@ async function checkPipHealth(fetch, url, expectFile, options = {}) {
  * @param {Function} [deps.now]
  * @param {Object} [deps.log]
  * @param {Object} [deps.options] - overrides for DEFAULTS
+ * @param {Object} [deps.accepts] - electron-pip-levers.js readAccepts() for `binary`, read once per
+ *   app start (so again after every update)
+ * @param {Function} [deps.readWiredLimitMb] - () => iogpu.wired_limit_mb on Apple silicon, or null
  */
 function createPip(deps) {
   const {
@@ -181,14 +203,52 @@ function createPip(deps) {
     timers = { setTimeout, clearTimeout },
     now = () => Date.now(),
     log = { info() {}, warn() {}, error() {} },
-    options = {}
+    options = {},
+    accepts = {},
+    readWiredLimitMb = () => null
   } = deps;
 
   const running = { chat: null, embedding: null }; // { server, key }
   let lastAddresses = JSON.stringify({ chat: null, embedding: null, chatModelFile: null });
 
-  function openLog(role) {
-    try { return fsImpl.createWriteStream(path.join(dir, `${role}.log`), { flags: 'w' }); } catch (_error) { return null; }
+  /**
+   * The server's log file. For chat, every line is also read for an "is off:" line that turns off
+   * a lever LANA asked for, which becomes a logged warning.
+   */
+  function openLog(role, requested = []) {
+    let file;
+    try { file = fsImpl.createWriteStream(path.join(dir, `${role}.log`), { flags: 'w' }); } catch (_error) { return null; }
+    if (!requested.length) {return file;}
+    const { Writable } = require('stream');
+    const scanner = levers.lineScanner((line) => {
+      const warning = levers.offWarning(line, requested);
+      if (warning) {log.warn(warning);}
+    });
+    const tee = new Writable({
+      write(chunk, _encoding, done) { scanner.write(chunk); file.write(chunk); done(); },
+      final(done) { scanner.end(); file.end(); done(); }
+    });
+    return tee;
+  }
+
+  /**
+   * Ready check for one server: /health first; then, once per launch, the chat server's /props
+   * against the slots and context it was asked for. A mismatch is logged, not a restart.
+   */
+  function readyCheck(want) {
+    return async (url, { starting = false } = {}) => {
+      const problem = await checkPipHealth(fetch, url, want.expectFile, options);
+      // The check that first passes after a launch is the one made while starting.
+      if (problem || !starting || !want.levers) {return problem;}
+      try {
+        const response = await fetch(`${url}/props`, { method: 'GET', timeoutMs: options.healthTimeoutMs || DEFAULTS.healthTimeoutMs });
+        const props = response.ok ? await response.json() : null;
+        for (const issue of levers.verifyProps(props, want.levers)) {log.warn(`[pip] chat: ${issue}`);}
+      } catch (error) {
+        log.warn(`[pip] chat: /props could not be read (${error.message})`);
+      }
+      return null;
+    };
   }
 
   function addresses() {
@@ -233,22 +293,32 @@ function createPip(deps) {
    * @param {string} modelsDir
    */
   async function apply(result, modelsDir) {
-    const wanted = binary ? wantedServers({ result, modelsDir, env }) : { chat: null, embedding: null };
+    const wanted = binary ? wantedServers({ result, modelsDir, env, accepts }) : { chat: null, embedding: null };
     if (!binary) {log.warn('[pip] Pip is not installed on this computer; chat and embedding use the cloud');}
     fsImpl.mkdirSync(dir, { recursive: true });
+    if (wanted.chat) {
+      const chosen = wanted.chat.levers;
+      log.info(`[pip] chat: ${chosen.backend}, ${chosen.slots} slot(s)${chosen.stale ? ', an older Pip without the newer speed settings' : ''}; flags ${JSON.stringify(chosen.config)} ${chosen.args.join(' ')}`.trim());
+      if (chosen.backend === 'metal') {
+        const needBytes = metalNeedBytes({ result, wanted });
+        const warning = needBytes && levers.wiredLimitProblem({ wiredLimitMb: readWiredLimitMb(), totalMemoryBytes: result.hardware.totalMemoryBytes, needBytes });
+        if (warning) {log.warn(warning);}
+      }
+    }
     for (const role of Object.keys(running)) {
       const want = wanted[role];
-      // Settings without the port: the same model and sizes mean the same server.
-      const key = want ? JSON.stringify(want.settings(0)) : null;
+      // Settings and flags without the port: the same model, sizes and levers mean the same server.
+      const key = want ? JSON.stringify([want.settings(0), want.args]) : null;
       if (running[role] && running[role].key === key) {continue;}
       await stopRole(role);
       if (!want) {continue;}
       const port = await pickPort(PREFERRED_PORTS[role]);
       const configFile = path.join(dir, `${role}.json`);
       fsImpl.writeFileSync(configFile, `${JSON.stringify(want.settings(port), null, 2)}\n`);
-      const server = createKeptProcess({ name: role, label: 'pip', spawn, timers, now, log, openLog, onChange: changed, options });
+      const requested = want.levers ? want.levers.requested : [];
+      const server = createKeptProcess({ name: role, label: 'pip', spawn, timers, now, log, openLog: (name) => openLog(name, requested), onChange: changed, options });
       running[role] = { server, key, modelFile: want.modelFile };
-      server.start({ command: binary, args: ['serve', '--config', configFile], port, check: (url) => checkPipHealth(fetch, url, want.expectFile, options) });
+      server.start({ command: binary, args: ['serve', '--config', configFile, ...want.args], port, check: readyCheck(want) });
     }
     changed();
     return getState();

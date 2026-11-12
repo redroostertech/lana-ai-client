@@ -11,6 +11,8 @@ const {
   createPip, chatConfig, embeddingConfig, wantedServers, resolvePipBinary, threadsFor, engineEndpoints, DEFAULTS
 } = require('../../electron-pip-supervisor');
 
+const levers = require('../../electron-pip-levers');
+
 const MODELS = path.join('/data', 'models');
 const BINARY = path.join('/app', 'pip', 'lqe');
 
@@ -50,7 +52,7 @@ function result({ chat = 'local', vision = true, embedding = 'local', platform =
   };
 }
 
-function harness({ env = {}, binary = BINARY, busyPorts = [] } = {}) {
+function harness({ env = {}, binary = BINARY, busyPorts = [], accepts = {}, props = {}, wiredLimitMb = null } = {}) {
   const children = [];
   const spawns = [];
   const files = {};
@@ -58,8 +60,12 @@ function harness({ env = {}, binary = BINARY, busyPorts = [] } = {}) {
   const serving = {}; // port -> model file name /health reports
   const down = new Set(); // ports that refuse connections
   const logs = [];
+  const warnings = [];
   const pip = createPip({
     binary,
+    accepts,
+    readWiredLimitMb: () => wiredLimitMb,
+    log: { info() {}, warn: (message) => warnings.push(message), error() {} },
     dir: path.join('/user', 'pip'),
     env,
     spawn: jest.fn((command, args) => {
@@ -71,13 +77,14 @@ function harness({ env = {}, binary = BINARY, busyPorts = [] } = {}) {
     fetch: jest.fn(async (url) => {
       const port = Number(new URL(url).port);
       if (down.has(port) || !serving[port]) {throw new Error('connect ECONNREFUSED');}
+      if (new URL(url).pathname === '/props') {return { ok: true, status: 200, json: async () => props[port] || null };}
       return { ok: true, status: 200, json: async () => ({ status: 'ok', model_file: { name: serving[port] } }) };
     }),
     pickPort: jest.fn(async (preferred) => (busyPorts.includes(preferred) ? 50000 + preferred : preferred)),
     fsImpl: {
       mkdirSync: jest.fn(),
       writeFileSync: (file, text) => { files[file] = JSON.parse(text); },
-      createWriteStream: jest.fn(() => { const sink = { end: jest.fn() }; logs.push(sink); return sink; })
+      createWriteStream: jest.fn(() => { const sink = { write: jest.fn(), end: jest.fn() }; logs.push(sink); return sink; })
     },
     onAddresses: (value) => addresses.push(value)
   });
@@ -85,7 +92,7 @@ function harness({ env = {}, binary = BINARY, busyPorts = [] } = {}) {
   const serveFromSettings = () => {
     for (const settings of Object.values(files)) {serving[settings.port] = path.basename(settings.model);}
   };
-  return { pip, children, spawns, files, addresses, serving, down, logs, serveFromSettings };
+  return { pip, children, spawns, files, addresses, serving, down, logs, warnings, serveFromSettings };
 }
 
 const settle = async (ms = DEFAULTS.healthIntervalStartingMs) => {
@@ -96,8 +103,8 @@ beforeEach(() => { jest.useFakeTimers(); });
 afterEach(() => { jest.useRealTimers(); });
 
 describe('settings from the plan', () => {
-  test('chat: the planned model, image file, size per slot and slots, on loopback, graphics on Apple', () => {
-    const config = chatConfig({ modelPath: '/m/chat.gguf', mmprojPath: '/m/mm.gguf', port: 8081, contextTokens: 16384, parallel: 2, hardware: { platform: 'darwin', cores: 12, accelerator: { backend: 'metal' } } });
+  test('chat on an older Pip (no context pool): the planned model, image file, size per slot and slots, on loopback, graphics on Apple', () => {
+    const config = chatConfig({ modelPath: '/m/chat.gguf', mmprojPath: '/m/mm.gguf', port: 8081, contextTokens: 16384, parallel: 2, hardware: { platform: 'darwin', cores: 12, accelerator: { backend: 'metal' } }, accepts: { gpuOutput: true } });
     expect(config).toMatchObject({ model: '/m/chat.gguf', mmproj: '/m/mm.gguf', host: '127.0.0.1', port: 8081, ctx: 16384, parallel: 2, kv_type: 'q8_0', gpu_layers: 99, gpu_output: true, threads: 10, metal_residency_keep_alive_s: 86400 });
     // Conversations are never written to disk.
     expect(config).not.toHaveProperty('session_dir');
@@ -105,7 +112,8 @@ describe('settings from the plan', () => {
 
   test('chat on a computer with no graphics chip runs on the processor; no Apple-only setting elsewhere', () => {
     const config = chatConfig({ modelPath: '/m/c.gguf', port: 8081, contextTokens: 8192, parallel: 2, hardware: { platform: 'linux', cores: 8, accelerator: { backend: 'cpu' } } });
-    expect(config).toMatchObject({ gpu_layers: 0, gpu_output: false, threads: 6 });
+    expect(config).toMatchObject({ gpu_layers: 0, threads: 6 });
+    expect(config).not.toHaveProperty('gpu_output');
     expect(config).not.toHaveProperty('mmproj');
     expect(config).not.toHaveProperty('metal_residency_keep_alive_s');
     expect(chatConfig({ modelPath: '/m/c.gguf', port: 1, contextTokens: 8192, parallel: 2, hardware: { platform: 'win32', accelerator: { backend: 'cuda' } } }).gpu_layers).toBe(99);
@@ -131,6 +139,69 @@ describe('settings from the plan', () => {
     expect(dev.chat).toBeNull();
     expect(dev.embedding).not.toBeNull();
     expect(wantedServers({ result: result({ chat: 'cloud', embedding: 'cloud' }), modelsDir: MODELS })).toEqual({ chat: null, embedding: null });
+  });
+});
+
+describe('this computer\'s speed settings (electron-pip-levers.js)', () => {
+  const NEW = levers.parseAccepts(Object.values(levers.NEW_FLAGS).join(' '));
+  const CHAT = path.join('/user', 'pip', 'chat.json');
+  const metal = (parallel) => {
+    const r = result({ embedding: 'cloud' });
+    r.plan.chat.parallel = parallel;
+    r.hardware.totalMemoryBytes = 36 * 1024 ** 3;
+    return r;
+  };
+
+  test('a new Pip on Apple silicon with several slots: batching settings in the file, no extra flags', async () => {
+    const h = harness({ accepts: NEW });
+    await h.pip.apply(metal(3), MODELS);
+    expect(h.spawns[0].args).toEqual(['serve', '--config', CHAT]);
+    expect(h.files[CHAT]).toMatchObject({ parallel: 3, kv_type: 'f16', gpu_inexact: true, batch_decode: 3, prefix_share_mb: 512, ubatch: 2048, threads: 4, adaptive_prefill: true });
+  });
+
+  test('one slot: --flash-attn on the command line (it has no settings-file key)', async () => {
+    const h = harness({ accepts: NEW });
+    await h.pip.apply(metal(1), MODELS);
+    expect(h.spawns[0].args).toEqual(['serve', '--config', CHAT, '--flash-attn']);
+    expect(h.files[CHAT]).not.toHaveProperty('gpu_inexact');
+  });
+
+  test('an "is off:" line for a lever LANA asked for is logged as a warning', async () => {
+    const h = harness({ accepts: NEW });
+    await h.pip.apply(metal(3), MODELS);
+    const sink = h.children[0].stdout.pipe.mock.calls[0][0];
+    sink.write('[lqe INF] serve: listening\n[lqe WRN] serve: --batch-decode 3 is off: there is only one slot\n');
+    await Promise.resolve();
+    expect(h.warnings.join('\n')).toMatch(/turned off --batch-decode, which LANA asked for: there is only one slot/);
+    expect(h.logs[0].write).toHaveBeenCalled();
+  });
+
+  test('/props must report the slots asked for; a mismatch is a warning, the server still serves', async () => {
+    const h = harness({ accepts: NEW, props: { 8081: { total_slots: 1, default_generation_settings: { n_ctx: 32768 } } } });
+    await h.pip.apply(metal(3), MODELS);
+    h.serveFromSettings();
+    await settle();
+    expect(h.warnings.join('\n')).toMatch(/reports 1 slots, LANA asked for 3/);
+    expect(h.addresses).toHaveLength(1);
+  });
+
+  test('control: matching /props gives no warning', async () => {
+    const h = harness({ accepts: NEW, props: { 8081: { total_slots: 3, default_generation_settings: { n_ctx: 32768 } } } });
+    await h.pip.apply(metal(3), MODELS);
+    h.serveFromSettings();
+    await settle();
+    expect(h.warnings).toEqual([]);
+  });
+
+  test('the Metal memory limit is checked against the models plus the pool', async () => {
+    const r = metal(3);
+    r.entries.set('qwen4b', { id: 'qwen4b', family: 'qwen3.5', sizeBytes: 20 * 1024 ** 3, filename: 'Qwen3.5-4B-Q4_K_M.gguf' });
+    const h = harness({ accepts: NEW, wiredLimitMb: 16384 });
+    await h.pip.apply(r, MODELS);
+    expect(h.warnings.join('\n')).toMatch(/iogpu.wired_limit_mb 16384/);
+    const roomy = harness({ accepts: NEW, wiredLimitMb: 32768 });
+    await roomy.pip.apply(r, MODELS);
+    expect(roomy.warnings).toEqual([]);
   });
 });
 

@@ -37,6 +37,12 @@ test.each(['win32', 'linux'])('%s with an NVIDIA card: its memory is summed acro
   expect(hw.chip).toBe('AMD Ryzen 9');
 });
 
+test('a DGX Spark (GB10, shared memory) runs models on the graphics chip, sized against system memory', () => {
+  const gpus = [{ name: 'NVIDIA GB10', vramBytes: null }];
+  const hw = readHardware({ modelsDir }, { platform: 'linux', arch: 'arm64', os: fakeOs(128, 100, 'Cortex-X925'), statfsSync: disk(500), existsSync: () => true, readNvidia: () => gpus });
+  expect(hw.accelerator).toEqual({ backend: 'cuda', vramBytes: null, gpus });
+});
+
 test.each(['win32', 'linux'])('%s with no NVIDIA card runs models on the processor', (platform) => {
   const hw = readHardware({ modelsDir }, { platform, arch: 'x64', os: fakeOs(), statfsSync: disk(50), existsSync: () => true, readNvidia: () => [] });
   expect(hw.accelerator).toEqual({ backend: 'cpu', vramBytes: null, gpus: [] });
@@ -60,6 +66,8 @@ test('nvidia-smi output: MiB per card, blank and bad lines skipped', () => {
     { name: 'Tesla, T4', vramBytes: 8192 * 1024 * 1024 }
   ]);
   expect(parseNvidiaSmi('')).toEqual([]);
+  // DGX Spark shares system memory: kept, with no card memory of its own.
+  expect(parseNvidiaSmi('[N/A], NVIDIA GB10\n')).toEqual([{ name: 'NVIDIA GB10', vramBytes: null }]);
 });
 
 test('a missing nvidia-smi means no card, not an error', () => {

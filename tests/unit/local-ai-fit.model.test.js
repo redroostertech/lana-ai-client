@@ -32,21 +32,58 @@ function choice(result, id) {
 
 describe('the default chat model for a computer', () => {
   test.each([
-    ['an 8 GB laptop', computer(8), 'qwen3.5-0.8b-q4', 32768, null],
-    ['a 12 GB laptop', computer(12), 'qwen3.5-4b-q4', 32768, null],
+    ['an 8 GB laptop', computer(8), 'qwen3.5-0.8b-q4', 32768, null, 1],
+    ['a 12 GB laptop', computer(12), 'qwen3.5-4b-q4', 32768, null, 1],
     // A smaller model that holds 32768 tokens beats a bigger one that does not (decided 2026-11-09).
-    ['a 16 GB Mac', computer(16), 'qwen3.5-4b-q4', 32768, 'mmproj-qwen3.5-4b'],
-    ['a 24 GB Mac', computer(24), 'qwen3.5-9b-q4', 32768, 'mmproj-qwen3.5-9b'],
-    ['a 36 GB Mac', computer(36), 'qwen3.5-9b-q4', 32768, 'mmproj-qwen3.5-9b'],
-    ['a 64 GB Mac', computer(64), 'qwen3.5-35b-a3b-q4km', 32768, 'mmproj-qwen3.5-35b-a3b'],
-    ['a 16 GB computer with a 12 GB NVIDIA card', computer(16, 'cuda', { vramGb: 12 }), 'qwen3.5-9b-q4', 32768, 'mmproj-qwen3.5-9b'],
-    ['a 16 GB computer with no graphics chip', computer(16, 'cpu'), 'qwen3-1.7b-q4km', 32768, null]
-  ])('%s', (_label, hardware, chatId, contextTokens, visionId) => {
+    ['a 16 GB Mac', computer(16), 'qwen3.5-4b-q4', 32768, 'mmproj-qwen3.5-4b', 4],
+    ['a 24 GB Mac', computer(24), 'qwen3.5-9b-q4', 32768, 'mmproj-qwen3.5-9b', 4],
+    ['a 36 GB Mac', computer(36), 'qwen3.5-9b-q4', 32768, 'mmproj-qwen3.5-9b', 4],
+    ['a 64 GB Mac', computer(64), 'qwen3.5-35b-a3b-q4km', 32768, 'mmproj-qwen3.5-35b-a3b', 4],
+    ['a 16 GB computer with a 12 GB NVIDIA card', computer(16, 'cuda', { vramGb: 12 }), 'qwen3.5-9b-q4', 32768, 'mmproj-qwen3.5-9b', 4],
+    ['a 16 GB computer with no graphics chip', computer(16, 'cpu'), 'qwen3-1.7b-q4km', 32768, null, 4]
+  ])('%s', (_label, hardware, chatId, contextTokens, visionId, parallel) => {
     const result = plan(hardware);
     expect(result.defaultChatId).toBe(chatId);
-    expect(result.plan.chat).toMatchObject({ id: chatId, where: 'local', contextTokens, parallel: 2 });
+    expect(result.plan.chat).toMatchObject({ id: chatId, where: 'local', contextTokens, parallel });
     expect(result.plan.vision.id).toBe(visionId);
     expect(result.plan.embedding).toMatchObject({ id: embedding.id, where: 'local' });
+  });
+
+  test('slots come from memory: the most, up to four, that stay comfortable with the shared prompts counted', () => {
+    const nine = catalog.chat.find((m) => m.id === 'qwen3.5-9b-q4');
+    const counts = {};
+    for (const memoryGb of [12, 18, 19, 20, 24, 64]) {
+      const result = plan(computer(memoryGb), { chosenChatId: nine.id });
+      const n = result.plan.chat.parallel;
+      counts[memoryGb] = n;
+      const vision = result.plan.vision.id ? catalog.vision.find((v) => v.id === result.plan.vision.id).sizeBytes + 0.25 * GB : 0;
+      const reserved = embedding.sizeBytes + (0.0625 * 2 + 0.05) * GB + speech.memoryBytes;
+      const used = (slots) => reserved + fit.chatBytes(nine, result.plan.chat.contextTokens, slots, 'metal', memoryGb * GB) + vision;
+      if (n > 1) {expect(used(n) / (memoryGb * GB)).toBeLessThan(0.55);}
+      if (n < fit.MAX_SLOTS) {expect(used(n + 1) / (memoryGb * GB)).toBeGreaterThanOrEqual(0.55);}
+    }
+    // 19 GB keeps image reading (chosen first, at the priced two slots) and so has room for one slot.
+    expect(counts).toEqual({ 12: 1, 18: 3, 19: 1, 20: 3, 24: 4, 64: 4 });
+  });
+
+  test('the shared pool holds one full conversation plus a chunk per other slot', () => {
+    expect(fit.poolTokens(32768, 1)).toBe(32768);
+    expect(fit.poolTokens(32768, 4)).toBe(32768 + 3 * fit.CTX_CHUNK);
+    const nine = catalog.chat.find((m) => m.id === 'qwen3.5-9b-q4');
+    // Each slot past the first costs one chunk of f16 KV (32 KiB a token on the 9B) and its recurrent state.
+    expect(fit.chatBytes(nine, 32768, 3) - fit.chatBytes(nine, 32768, 2)).toBeCloseTo(fit.CTX_CHUNK * 32768 + 0.05 * GB, 0);
+    // Apple silicon keeps shared prompts only with more than one slot: 512 MiB under 64 GB, 1024 from it.
+    expect(fit.prefixShareMb('metal', 1, 24 * GB)).toBe(0);
+    expect(fit.prefixShareMb('metal', 2, 24 * GB)).toBe(512);
+    expect(fit.prefixShareMb('metal', 2, 64 * GB)).toBe(1024);
+    expect(fit.prefixShareMb('cpu', 1, 8 * GB)).toBe(256);
+    expect(fit.prefixShareMb('cuda', 4, 64 * GB)).toBe(0);
+  });
+
+  test('NVIDIA sharing system memory (DGX Spark GB10, no card memory figure) runs on the graphics chip', () => {
+    const result = plan(computer(128, 'cuda', { vramGb: null }));
+    expect(result.computer.backend).toBe('cuda');
+    expect(result.chatChoices.some((c) => c.slow)).toBe(false);
   });
 
   test('a computer too small for any chat model uses the cloud for chat, with nothing to choose', () => {
@@ -243,14 +280,18 @@ describe('Docling', () => {
     expect(big.plan.docling.install).toBe(true);
     expect(none.plan.docling).toEqual({ install: false, reason: null });
     // A 16 GB computer (the Mac mini running Docling today) keeps the 4B with image reading and
-    // gets Docling too; an 8 GB one is past the tight line, so the server reads its documents.
+    // gets Docling too. An 8 GB one runs chat with one slot, which leaves Docling under the tight
+    // line; a 7 GB one is past it, so the server reads its documents.
     const sixteen = plan(computer(16), docling());
     expect(sixteen.plan.chat.id).toBe(plan(computer(16)).plan.chat.id);
     expect(sixteen.plan.vision.id).toBe(plan(computer(16)).plan.vision.id);
     expect(sixteen.plan.docling).toEqual({ install: true, reason: null });
     const eight = plan(computer(8), docling());
     expect(eight.plan.chat.id).toBe(plan(computer(8)).plan.chat.id);
-    expect(eight.plan.docling).toMatchObject({ install: false, reason: expect.stringMatching(/server reads them/) });
+    expect(eight.plan.docling).toEqual({ install: true, reason: null });
+    const seven = plan(computer(7), docling());
+    expect(seven.plan.chat.id).toBe(plan(computer(7)).plan.chat.id);
+    expect(seven.plan.docling).toMatchObject({ install: false, reason: expect.stringMatching(/server reads them/) });
   });
 
   test('nothing published for this kind of computer: no memory set aside, nothing downloaded', () => {

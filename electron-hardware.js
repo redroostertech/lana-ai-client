@@ -25,14 +25,22 @@ const os = require('os');
 const fs = require('fs');
 const path = require('path');
 
-/** nvidia-smi --query-gpu=memory.total,name --format=csv,noheader,nounits (MiB per line). */
+/**
+ * nvidia-smi --query-gpu=memory.total,name --format=csv,noheader,nounits (MiB per line).
+ * A DGX Spark (GB10) shares system memory and reports no card memory ("[N/A]"); it is kept with
+ * vramBytes null, so models are sized against system memory and still run on the graphics chip.
+ */
 function parseNvidiaSmi(text) {
   const gpus = [];
   for (const line of String(text || '').split('\n')) {
     const parts = line.trim().split(',');
+    const name = parts.slice(1).join(',').trim();
     const mib = Number.parseFloat(parts[0]);
-    if (!Number.isFinite(mib) || mib <= 0) {continue;}
-    gpus.push({ name: parts.slice(1).join(',').trim(), vramBytes: Math.round(mib * 1024 * 1024) });
+    if (Number.isFinite(mib) && mib > 0) {
+      gpus.push({ name, vramBytes: Math.round(mib * 1024 * 1024) });
+    } else if (/\bGB10\b/i.test(name)) {
+      gpus.push({ name, vramBytes: null });
+    }
   }
   return gpus;
 }
@@ -53,7 +61,8 @@ function accelerator({ platform, arch, gpus }) {
     return arch === 'arm64' ? { backend: 'metal', vramBytes: null, gpus: [] } : { backend: 'cpu', vramBytes: null, gpus: [] };
   }
   if (gpus.length) {
-    return { backend: 'cuda', vramBytes: gpus.reduce((sum, gpu) => sum + gpu.vramBytes, 0), gpus };
+    const shared = gpus.some((gpu) => gpu.vramBytes === null);
+    return { backend: 'cuda', vramBytes: shared ? null : gpus.reduce((sum, gpu) => sum + gpu.vramBytes, 0), gpus };
   }
   return { backend: 'cpu', vramBytes: null, gpus: [] };
 }
