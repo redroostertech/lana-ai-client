@@ -1721,6 +1721,9 @@
           break;
 
         case 'thinking':
+          if (this._progressEvents() && this._progressEvents().announcesPartRead(event)) {
+            this._partReadAnnounced = true;
+          }
           if (this._activityEl && !this._keepsActivityText(event)) {
             this._activityEl.update(event.message, event.phase);
           }

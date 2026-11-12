@@ -73,6 +73,8 @@ describe('verification part progress', () => {
   test('control: a progress event without deadline_ms has none, a plain status is no heartbeat', () => {
     const source = loadSource();
     expect(source._mapEvent('progress', { message: 'Reading the documents' }).deadlineMs).toBeNull();
+    expect(source._mapEvent('progress', { message: 'Reading the documents' }).remainingMs).toBeNull();
+    expect(source._mapEvent('status', { message: 'Reading the documents', phase: 'thinking' }).remainingMs).toBeNull();
     expect(source._mapEvent('status', { message: 'Reading the documents', phase: 'thinking' }).heartbeat).toBe(false);
   });
 
@@ -82,6 +84,21 @@ describe('verification part progress', () => {
 
     const { chat, shown } = loadChat();
     [announce, part, heartbeat, statusHeartbeat].forEach((event) => chat._handleEvent(event, false));
+    expect(shown).toEqual(['Checking supply.pdf in full, 7 parts', 'Checking part 3 of 7 of supply.pdf']);
+  });
+
+  test('remaining_ms on a runtime status or progress frame announces the part read too (LANA-AI 97a72dc8f)', () => {
+    const source = loadSource();
+    const status = source._mapEvent('status', { message: 'Checking supply.pdf in full, 7 parts', phase: 'reading', remaining_ms: 840000 });
+    const progress = source._mapEvent('progress', { message: 'Checking supply.pdf in full, 7 parts', remaining_ms: 840000 });
+    expect(status.remainingMs).toBe(840000);
+    expect(progress.remainingMs).toBe(840000);
+    expect(progressEvents.announcesPartRead(status)).toBe(true);
+    expect(progressEvents.announcesPartRead(progress)).toBe(true);
+
+    const { chat, shown } = loadChat();
+    const partStatus = { type: 'thinking', message: 'Checking part 3 of 7 of supply.pdf', phase: 'Reading', heartbeat: false, remainingMs: null };
+    [status, partStatus, statusHeartbeat, heartbeat].forEach((event) => chat._handleEvent(event, false));
     expect(shown).toEqual(['Checking supply.pdf in full, 7 parts', 'Checking part 3 of 7 of supply.pdf']);
   });
 
