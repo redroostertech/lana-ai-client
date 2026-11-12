@@ -9,7 +9,7 @@
  * bridge (`briefs:` channels). Every language model call goes to LANA's runtime
  * (`lanaRuntime`): LANA picks the model and applies the matter's AI policy.
  */
-import type { App, Dialog, DesktopCapturer, IpcMainEvent, Protocol, SafeStorage, Session, Shell, SystemPreferences, WebContents } from "electron";
+import type { App, BrowserWindow, BrowserWindowConstructorOptions, Dialog, DesktopCapturer, IpcMainEvent, Protocol, SafeStorage, Session, Shell, SystemPreferences, WebContents } from "electron";
 import { ipcMain } from "electron";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -19,6 +19,7 @@ import { EventHub, registerServices } from "./ipc.js";
 import { createMainLog, type MainLog } from "./log.js";
 import { AUDIO_SCHEME } from "./services/meetingAudio.js";
 import { createRealServices } from "./services/realServices.js";
+import { createPdfRenderer, type ExportAssets } from "./services/pdfRenderer.js";
 import type { ClientSessionSnapshot } from "./gateway/clientSession.js";
 import type { SpeechModelPackage } from "@lana/core/model";
 import { spawnBleHelper } from "./services/bleWake/bleHelperProcess.js";
@@ -35,9 +36,11 @@ export interface BriefsHostOptions {
     readonly protocol: Pick<Protocol, "handle" | "unhandle">;
     readonly desktopCapturer: Pick<DesktopCapturer, "getSources">;
     readonly systemPreferences: Pick<SystemPreferences, "getMediaAccessStatus" | "askForMediaAccess">;
-    readonly shell: Pick<Shell, "openExternal">;
+    readonly shell: Pick<Shell, "openExternal" | "showItemInFolder">;
     readonly dialog: Pick<Dialog, "showSaveDialog">;
     readonly safeStorage: SafeStorage;
+    /** Opens the hidden window an export prints to PDF in. */
+    readonly createPrintWindow: (options: BrowserWindowConstructorOptions) => BrowserWindow;
   };
   /** Briefs' own folder inside the client's userData: keys, the store, logs and speech models. */
   readonly directory: string;
@@ -58,6 +61,8 @@ export interface BriefsHostOptions {
   readonly applyTheme: (theme: ThemePreference) => void;
   /** For the Phone settings: the documents folder the audit export suggests. */
   readonly documentsPath: string;
+  /** The print stylesheets and logo meeting exports are printed with (files under public_html). */
+  readonly exportAssets: ExportAssets;
   /**
    * The hidden client window that records while a recording is live (`CAPTURE_PAGE`), so
    * capture outlives page changes. Opened when a recording starts, closed once it is saved.
@@ -215,6 +220,14 @@ export async function startBriefsHost(options: BriefsHostOptions): Promise<Brief
       pickSavePath: async (suggestedName) => {
         const result = await electron.dialog.showSaveDialog({ title: "Export audit log", defaultPath: join(options.documentsPath, suggestedName), filters: [{ name: "JSON Lines", extensions: ["jsonl"] }] });
         return result.canceled || !result.filePath ? null : result.filePath;
+      },
+      exportFiles: {
+        pickPath: async (suggestedName, filter) => {
+          const result = await electron.dialog.showSaveDialog({ title: "Export meeting", defaultPath: join(options.documentsPath, suggestedName), filters: [filter] });
+          return result.canceled || !result.filePath ? null : result.filePath;
+        },
+        renderPdf: createPdfRenderer({ createWindow: (windowOptions) => electron.createPrintWindow(windowOptions), assets: options.exportAssets }),
+        showItemInFolder: (path) => electron.shell.showItemInFolder(path),
       },
       showWindow: options.showWindow,
       quit: options.quit,

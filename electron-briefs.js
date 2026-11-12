@@ -131,7 +131,7 @@ function isLoaded(window) {
 
 /**
  * @param {object} deps
- * @param {object} deps.electron - { app, session, protocol, desktopCapturer, systemPreferences, shell, dialog, safeStorage, nativeTheme }
+ * @param {object} deps.electron - { app, session, protocol, desktopCapturer, systemPreferences, shell, dialog, safeStorage, nativeTheme, BrowserWindow }
  * @param {function} deps.loadHost - () => the built host module (briefs/dist/briefs-host.cjs)
  * @param {string} deps.distDir - the folder holding the built bundles
  * @param {function} deps.engineBase - () => the local AI engine's URL while it is in use, else null
@@ -244,7 +244,9 @@ function createBriefs(deps) {
         systemPreferences: electron.systemPreferences,
         shell: electron.shell,
         dialog: electron.dialog,
-        safeStorage: electron.safeStorage
+        safeStorage: electron.safeStorage,
+        // Meeting exports print to PDF in a hidden window (scripts off, no network).
+        createPrintWindow: (options) => new electron.BrowserWindow(options)
       },
       directory,
       isTrustedURL: isClientPage,
@@ -258,6 +260,11 @@ function createBriefs(deps) {
       quit: () => electron.app.quit(),
       applyTheme: (theme) => { electron.nativeTheme.themeSource = theme; },
       documentsPath: electron.app.getPath('documents'),
+      exportAssets: {
+        stylesheet: path.join(__dirname, 'public_html', 'css', 'briefs-export-print.css'),
+        footerStylesheet: path.join(__dirname, 'public_html', 'css', 'briefs-export-footer.css'),
+        logo: path.join(__dirname, 'public_html', 'img', 'logo-dark.png')
+      },
       captureWindow
     });
     host = started;

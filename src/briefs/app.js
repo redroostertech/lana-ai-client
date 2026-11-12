@@ -14,6 +14,8 @@
   const S = M.selection;
   const R = window.BriefsRecording;
   const B = window.BriefsShare;
+  /** Export: what each export holds, the menu and file names (briefs-export.js). */
+  const X = window.BriefsExport;
   /** The top bar's phone status, Phones and the walkthrough (shared with the Dashboard). */
   const Phones = window.BriefsPhonesUI;
   /** How copy names this device (platform neutral). */
@@ -58,6 +60,9 @@
     shareOpen: false,
     shareNotice: null,
     mergeEdit: null,
+    // Export: one at a time; the OS names the toast's Show in Finder button.
+    exporting: false,
+    os: null,
     // New meeting (record here or import a recording).
     mode: 'meeting',
     recording: null,
@@ -278,6 +283,7 @@
 
   function renderMeeting() {
     renderHeader();
+    renderExport();
     renderShare();
     renderReview();
     renderReplay();
@@ -296,6 +302,43 @@
     } else {
       els.title.innerHTML = `<button type="button" class="briefs-editable briefs-title-button" data-edit-title title="Rename this meeting">${escape(record.title || 'Untitled meeting')}</button>`;
     }
+  }
+
+  // ── Export (saved on this computer) ───────────────────
+  // The text and HTML come from briefs-export.js; the Briefs host asks where to save,
+  // prints PDFs and writes the file. Nothing is uploaded, and nothing here logs content.
+
+  function renderExport() {
+    if (!els.exportMenu) return;
+    els.exportMenu.options = X.menuOptions(state.record);
+    els.exportMenu.disabled = state.exporting;
+  }
+
+  async function exportMeeting(kind) {
+    const record = state.record;
+    if (!record || state.exporting) return;
+    const api = bridge();
+    state.exporting = true;
+    renderExport();
+    let result;
+    try {
+      if (state.os === null) state.os = ((await api.app.platform()) || {}).os || 'mac';
+      result = await api.meetingExport.save(X.exportRequest(record, state.notes, kind));
+    } catch (_) {
+      result = null;
+    }
+    state.exporting = false;
+    if (onPage() && state.record) renderExport();
+    if (result && result.ok) {
+      if (result.value === null) return;
+      const { fileID, files } = result.value;
+      Lex.Toast.success(X.savedMessage(kind, files), {
+        duration: 8000,
+        action: { label: X.revealLabel(state.os), onClick: () => { api.meetingExport.showInFolder(fileID).catch(() => {}); } },
+      });
+      return;
+    }
+    Lex.Toast.error((result && result.error && result.error.message) || 'LANA could not save the export. Try again.');
   }
 
   // ── Share (Send to phone) and Needs review ────────────
@@ -1688,6 +1731,7 @@
     els.share = byId('briefs-share');
     els.shareButton = byId('briefs-share-button');
     els.sharePopover = byId('briefs-share-popover');
+    els.exportMenu = byId('briefs-export');
     els.review = byId('briefs-review');
     els.turns = byId('briefs-turns');
     els.clipbar = byId('briefs-clipbar');
@@ -1754,6 +1798,7 @@
     els.turns.addEventListener('mouseover', onTurnsMouseOver);
     els.turns.addEventListener('click', onTurnsClick);
     els.turns.addEventListener('keydown', onTurnsKey);
+    els.exportMenu.addEventListener('lex-select', (event) => exportMeeting(event.detail && event.detail.value));
     els.sideTabs.addEventListener('tab-change', (event) => {
       state.panel = event.detail.tab;
       renderSide();

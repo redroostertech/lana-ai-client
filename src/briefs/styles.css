@@ -1237,6 +1237,25 @@ body {
   min-width: 0;
 }
 
+.briefs-meeting-actions {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.briefs-export {
+  flex: none;
+  padding-top: 4px;
+}
+
+/* The Export trigger matches the small Share button beside it. */
+.briefs-export .lex-ddbtn-trigger {
+  padding: 6px 14px;
+  font-size: 12px;
+  border-radius: var(--lex-btn-radius-sm, 9px);
+}
+
 .briefs-share {
   position: relative;
   flex: none;

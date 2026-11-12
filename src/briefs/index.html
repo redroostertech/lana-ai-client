@@ -105,9 +105,12 @@
                 <h2 id="briefs-detail-title" class="briefs-meeting-title"></h2>
                 <p id="briefs-detail-meta" class="briefs-meeting-facts"></p>
               </div>
-              <div id="briefs-share" class="briefs-share hidden">
-                <lex-btn id="briefs-share-button" variant="secondary" size="sm" leading-icon="share">Share</lex-btn>
-                <div id="briefs-share-popover" class="briefs-share-popover hidden" role="dialog" aria-label="Share this meeting"></div>
+              <div class="briefs-meeting-actions">
+                <lex-dropdown-btn id="briefs-export" class="briefs-export" button-label="Export" icon="download" variant="secondary" align="end" floating aria-label="Export this meeting"></lex-dropdown-btn>
+                <div id="briefs-share" class="briefs-share hidden">
+                  <lex-btn id="briefs-share-button" variant="secondary" size="sm" leading-icon="share">Share</lex-btn>
+                  <div id="briefs-share-popover" class="briefs-share-popover hidden" role="dialog" aria-label="Share this meeting"></div>
+                </div>
               </div>
             </header>
             <section id="briefs-review" class="briefs-review hidden" aria-label="Needs review"></section>
@@ -175,6 +178,7 @@
   <script src="../js/lex/brand/lex-brand-animations.js"></script>
   <script src="../js/lex/components/foundation/lex-brand-mark.js"></script>
   <script src="../js/lex/components/form/lex-select.js"></script>
+  <script src="../js/lex/components/form/lex-dropdown-btn.js"></script>
   <script src="../js/lex/components/form/lex-input.js"></script>
   <script src="../js/lex/components/form/lex-checkbox.js"></script>
   <script src="../js/lex/components/form/lex-radio.js"></script>
@@ -213,6 +217,7 @@
   <script src="../js/briefs/briefs-replay.js"></script>
   <script src="../js/briefs/briefs-recording.js"></script>
   <script src="../js/briefs/briefs-share.js"></script>
+  <script src="../js/briefs/briefs-export.js"></script>
   <script src="../js/briefs/briefs-status.js"></script>
   <script src="../js/briefs/briefs-walkthrough.js"></script>
   <script src="../js/briefs/briefs-phones-ui.js"></script>

@@ -12,6 +12,7 @@ import { DraftDiagnostics } from "./draftDiagnostics.js";
 import { MattersService } from "./mattersService.js";
 import { AuditService, type SavePicker } from "./auditService.js";
 import { MeetingAudioService } from "./meetingAudio.js";
+import { MeetingExportService, type ExportFiles } from "./meetingExportService.js";
 import { PreferencesService } from "./preferencesService.js";
 import { SettingsService } from "./settingsService.js";
 import { AskService } from "./ask/askService.js";
@@ -31,6 +32,8 @@ export interface RealServicesOptions {
   readonly log: MainLog;
   readonly applyTheme: (theme: ThemePreference) => void;
   readonly pickSavePath: SavePicker;
+  /** Export on the meeting page: the save dialog, printing to PDF and Show in Finder. */
+  readonly exportFiles: ExportFiles;
   readonly showWindow: () => void;
   readonly quit: () => void;
   /** `walkthrough.json` from an earlier build, imported into the store once. */
@@ -190,6 +193,7 @@ export function createRealServices(options: RealServicesOptions): RealServices {
   const settings = new SettingsService(store.settings, options.applyTheme, emit, log);
   const audit = new AuditService(store, options.pickSavePath, log);
   const audio = new MeetingAudioService(store, log);
+  const meetingExport = new MeetingExportService(store.meetings, options.exportFiles, log);
   const notes = new UserNotesService(store, platform.deviceNoun, log);
   const userNotes: AllLanaServices["userNotes"] = {
     save: async (meetingID, list) => {
@@ -241,6 +245,7 @@ export function createRealServices(options: RealServicesOptions): RealServices {
     talk,
     userNotes,
     models,
+    meetingExport,
     talkAudio,
     recording,
     tone: runtime.tone,

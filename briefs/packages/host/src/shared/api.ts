@@ -995,6 +995,38 @@ export interface UserNotesApi {
   save(meetingID: string, notes: UserNote[]): Promise<Result<null>>;
 }
 
+/** What Export on the meeting page saves. The renderer builds the text and HTML (src/js/briefs/briefs-export.js). */
+export type MeetingExportKind = "transcriptPdf" | "transcriptText" | "notesPdf" | "meetingPdf" | "audio";
+
+export interface MeetingExportRequest {
+  meetingID: string;
+  kind: MeetingExportKind;
+  /** The default file name without its extension; main makes it safe and adds the extension. */
+  fileName: string;
+  /** The meeting title, for the PDF page footer. */
+  title: string;
+  /** The text (transcriptText) or the HTML body to print (the PDFs). Absent for audio: main reads the stored audio. */
+  content?: string;
+}
+
+export interface MeetingExportSaved {
+  /** Passed back to `showInFolder`; the path itself stays in main. */
+  fileID: string;
+  /** Files written: more than one when the audio is stored in several parts. */
+  files: number;
+}
+
+/**
+ * Export on the meeting page: the native save dialog, then the file is written on this
+ * computer. Nothing is uploaded. Transcript text, names and paths are never logged.
+ */
+export interface MeetingExportApi {
+  /** Null when the person cancelled the save dialog. */
+  save(request: MeetingExportRequest): Promise<Result<MeetingExportSaved | null>>;
+  /** Shows a saved export in Finder (or the system file manager). */
+  showInFolder(fileID: string): Promise<void>;
+}
+
 /** Pushes for the batch 2 screens. */
 export type LanaScreenEvent =
   | { type: "ask"; conversation: AskConversation }
@@ -1012,6 +1044,7 @@ export interface LanaScreenServices {
   talk: TalkApi;
   userNotes: UserNotesApi;
   models: ModelsApi;
+  meetingExport: MeetingExportApi;
 }
 
 /** A function so it is hoisted: `API_METHODS` above spreads it in. */
@@ -1035,6 +1068,7 @@ export function screenApiMethods() {
   talk: ["session", "start", "acceptIntro", "toggleMute", "end"],
   userNotes: ["save"],
   models: ["status", "download", "remove"],
+  meetingExport: ["save", "showInFolder"],
   } as const satisfies { [K in keyof LanaScreenServices]: ReadonlyArray<keyof LanaScreenServices[K]> };
 }
 

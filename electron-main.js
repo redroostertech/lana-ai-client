@@ -283,7 +283,7 @@ const BRIEFS_HOST_FILE = path.join(BRIEFS_DIST, 'briefs-host.cjs');
 const loadBriefsHost = () => require(BRIEFS_HOST_FILE);
 registerBriefsSchemes(protocol);
 const briefs = createBriefs({
-  electron: { app, session, protocol, desktopCapturer, systemPreferences, shell, dialog, safeStorage, nativeTheme },
+  electron: { app, session, protocol, desktopCapturer, systemPreferences, shell, dialog, safeStorage, nativeTheme, BrowserWindow },
   loadHost: loadBriefsHost,
   distDir: BRIEFS_DIST,
   engineBase: () => {

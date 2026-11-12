@@ -45,9 +45,10 @@ function electronFakes() {
     protocol: { handle: vi.fn(), unhandle: vi.fn() },
     desktopCapturer: { getSources: vi.fn() },
     systemPreferences: { getMediaAccessStatus: vi.fn(), askForMediaAccess: vi.fn() },
-    shell: { openExternal: vi.fn() },
+    shell: { openExternal: vi.fn(), showItemInFolder: vi.fn() },
     dialog: { showSaveDialog: vi.fn() },
     safeStorage: {},
+    createPrintWindow: vi.fn(),
   };
 }
 
@@ -73,6 +74,7 @@ function start(electron: ReturnType<typeof electronFakes>, captureWindow?: { ope
     quit: () => undefined,
     applyTheme: () => undefined,
     documentsPath: folder,
+    exportAssets: { stylesheet: join(folder, "print.css"), footerStylesheet: join(folder, "footer.css"), logo: join(folder, "logo.png") },
   });
 }
 

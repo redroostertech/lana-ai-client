@@ -1,0 +1,278 @@
+/* ==========================================================================
+   LANA Briefs: meeting export print stylesheet.
+   The Briefs host prints exports to PDF with this file (pdfRenderer.ts); the body
+   comes from src/js/briefs/briefs-export.js. Paper is white, ink is the Lex warm
+   earth palette, the LANA mark sits at the top of the first page. The page footer
+   (page numbers) is styled in briefs-export-footer.css.
+   ========================================================================== */
+
+@font-face {
+  font-family: 'Inter';
+  font-weight: 400;
+  src: url('../fonts/inter/Inter-Regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-weight: 500;
+  src: url('../fonts/inter/Inter-Medium.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-weight: 600;
+  src: url('../fonts/inter/Inter-SemiBold.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Montserrat';
+  font-weight: 100 900;
+  src: url('../fonts/lana/Montserrat.ttf') format('truetype');
+}
+
+:root {
+  --ex-ink: #26211c;
+  --ex-ink-soft: #595246;
+  --ex-muted: #736b5c;
+  --ex-faint: #9e9385;
+  --ex-rule: #e0dad4;
+  --ex-wash: #f7f5f3;
+  --ex-accent: #3d9a75;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #ffffff;
+  color: var(--ex-ink);
+  font-family: 'Inter', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+  font-size: 10.5pt;
+  line-height: 1.5;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* ── The LANA mark ────────────────────────────────────── */
+
+.ex-brand {
+  display: flex;
+  align-items: center;
+  gap: 10pt;
+  padding-bottom: 14pt;
+  margin-bottom: 18pt;
+  border-bottom: 0.75pt solid var(--ex-rule);
+}
+
+.ex-logo {
+  height: 20pt;
+  width: auto;
+}
+
+.ex-brand-product {
+  font-family: 'Montserrat', 'Inter', sans-serif;
+  font-size: 8pt;
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ex-muted);
+  padding-left: 10pt;
+  border-left: 0.75pt solid var(--ex-rule);
+}
+
+/* ── Header: kind, title, facts ───────────────────────── */
+
+.ex-head {
+  margin-bottom: 20pt;
+}
+
+.ex-kind {
+  margin: 0 0 4pt;
+  font-size: 7.5pt;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ex-accent);
+}
+
+.ex-title {
+  margin: 0 0 12pt;
+  font-family: 'Montserrat', 'Inter', sans-serif;
+  font-size: 24pt;
+  font-weight: 300;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--ex-ink);
+}
+
+.ex-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6pt 28pt;
+  margin: 0;
+  padding: 10pt 12pt;
+  background: var(--ex-wash);
+  border-left: 2pt solid var(--ex-accent);
+}
+
+.ex-fact dt {
+  font-size: 7pt;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ex-muted);
+}
+
+.ex-fact dd {
+  margin: 1pt 0 0;
+  font-size: 9.5pt;
+  color: var(--ex-ink);
+}
+
+/* ── Sections ─────────────────────────────────────────── */
+
+.ex-section {
+  margin-top: 18pt;
+}
+
+.ex-h2 {
+  margin: 0 0 8pt;
+  padding-bottom: 4pt;
+  font-size: 8pt;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ex-ink-soft);
+  border-bottom: 0.75pt solid var(--ex-rule);
+  break-after: avoid;
+}
+
+.ex-empty {
+  margin: 0;
+  color: var(--ex-muted);
+  font-style: italic;
+}
+
+.ex-page-break {
+  break-before: page;
+}
+
+/* ── Key points, decisions, questions, actions ────────── */
+
+.ex-points {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ex-point {
+  position: relative;
+  padding: 4pt 0 6pt 14pt;
+  break-inside: avoid;
+}
+
+.ex-point::before {
+  content: '';
+  position: absolute;
+  left: 2pt;
+  top: 10pt;
+  width: 4pt;
+  height: 4pt;
+  border-radius: 50%;
+  background: var(--ex-faint);
+}
+
+.ex-point.is-decision::before,
+.ex-point.is-action::before {
+  background: var(--ex-accent);
+}
+
+.ex-point.is-openQuestion::before {
+  background: transparent;
+  border: 1pt solid var(--ex-accent);
+}
+
+.ex-point-text {
+  display: block;
+}
+
+.ex-point-source {
+  display: block;
+  margin-top: 1pt;
+  font-size: 8pt;
+  color: var(--ex-muted);
+}
+
+/* ── The person's notes ───────────────────────────────── */
+
+.ex-note {
+  padding: 6pt 0 8pt;
+  border-bottom: 0.5pt solid var(--ex-rule);
+  break-inside: avoid;
+}
+
+.ex-note:last-child {
+  border-bottom: none;
+}
+
+.ex-note-when {
+  margin: 0;
+  font-size: 8pt;
+  color: var(--ex-muted);
+}
+
+.ex-note-title {
+  margin: 1pt 0 0;
+  font-size: 10.5pt;
+  font-weight: 600;
+}
+
+.ex-note-body {
+  margin: 2pt 0 0;
+  white-space: pre-wrap;
+  color: var(--ex-ink-soft);
+}
+
+/* ── Transcript ───────────────────────────────────────── */
+
+.ex-turn {
+  display: grid;
+  grid-template-columns: 92pt 1fr;
+  column-gap: 12pt;
+  padding-top: 8pt;
+  break-inside: avoid;
+}
+
+.ex-turn.is-continued {
+  padding-top: 3pt;
+}
+
+.ex-turn-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding-top: 1pt;
+}
+
+.ex-time {
+  font-size: 8pt;
+  font-variant-numeric: tabular-nums;
+  color: var(--ex-faint);
+}
+
+.ex-speaker {
+  order: -1;
+  font-size: 8.5pt;
+  font-weight: 600;
+  color: var(--ex-ink);
+  overflow-wrap: anywhere;
+}
+
+.ex-turn-text {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
