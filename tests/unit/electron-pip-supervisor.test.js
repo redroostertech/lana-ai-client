@@ -8,7 +8,8 @@
 const path = require('path');
 const { EventEmitter } = require('events');
 const {
-  createPip, chatConfig, embeddingConfig, wantedServers, resolvePipBinary, threadsFor, engineEndpoints, DEFAULTS
+  createPip, chatConfig, embeddingConfig, wantedServers, resolvePipBinary, threadsFor, engineEndpoints, DEFAULTS,
+  versionProblem, MISSING_FILE_MESSAGE
 } = require('../../electron-pip-supervisor');
 
 const levers = require('../../electron-pip-levers');
@@ -52,7 +53,7 @@ function result({ chat = 'local', vision = true, embedding = 'local', platform =
   };
 }
 
-function harness({ env = {}, binary = BINARY, busyPorts = [], accepts = {}, props = {}, health = {}, metrics = {}, wiredLimitMb = null, options = {} } = {}) {
+function harness({ env = {}, binary = BINARY, busyPorts = [], accepts = {}, props = {}, health = {}, metrics = {}, wiredLimitMb = null, options = {}, platform = 'darwin', runVersion = () => ({ status: 0 }) } = {}) {
   const children = [];
   const spawns = [];
   const files = {};
@@ -61,8 +62,13 @@ function harness({ env = {}, binary = BINARY, busyPorts = [], accepts = {}, prop
   const down = new Set(); // ports that refuse connections
   const logs = [];
   const warnings = [];
+  const problems = [];
+  const versionRuns = [];
   const pip = createPip({
     binary,
+    platform,
+    runVersion: (file) => { versionRuns.push(file); return runVersion(file); },
+    onProblem: (message) => problems.push(message),
     accepts,
     readWiredLimitMb: () => wiredLimitMb,
     log: { info() {}, warn: (message) => warnings.push(message), error() {} },
@@ -95,7 +101,7 @@ function harness({ env = {}, binary = BINARY, busyPorts = [], accepts = {}, prop
   const serveFromSettings = () => {
     for (const settings of Object.values(files)) {serving[settings.port] = path.basename(settings.model);}
   };
-  return { pip, children, spawns, files, addresses, serving, down, logs, warnings, serveFromSettings };
+  return { pip, children, spawns, files, addresses, serving, down, logs, warnings, problems, versionRuns, serveFromSettings };
 }
 
 const settle = async (ms = DEFAULTS.healthIntervalStartingMs) => {
@@ -250,6 +256,49 @@ describe('this computer\'s speed settings (electron-pip-levers.js)', () => {
     const roomy = harness({ accepts: NEW, wiredLimitMb: 32768 });
     await roomy.pip.apply(r, MODELS);
     expect(roomy.warnings).toEqual([]);
+  });
+});
+
+describe('Windows: lqe.exe is asked for its version before any server starts', () => {
+  const DLL = { status: 0xC0000135, stderr: '' };
+
+  test('a missing DLL (0xC0000135): no server starts, the warning names vulkan-1.dll, the status says it plainly', async () => {
+    const h = harness({ platform: 'win32', binary: 'C:\\LANA\\resources\\pip\\lqe.exe', runVersion: () => DLL });
+    const state = await h.pip.apply(result(), MODELS);
+    expect(h.spawns).toEqual([]);
+    expect(h.warnings.join('\n')).toMatch(/--version failed.*0xC0000135.*vulkan-1\.dll/);
+    expect(h.problems).toEqual([MISSING_FILE_MESSAGE]);
+    expect(MISSING_FILE_MESSAGE).toBe('LANA\'s local engine could not start: a required system file is missing.');
+    expect(state.problem).toBe(MISSING_FILE_MESSAGE);
+    // Never a restart loop: nothing runs, so nothing restarts.
+    await settle(60000);
+    expect(h.spawns).toEqual([]);
+  });
+
+  test('any other failing exit is refused the same way, and names the DLL to look for', () => {
+    const found = versionProblem('C:\\app\\pip\\lqe.exe', { status: 1, stderr: 'boom' });
+    expect(found.message).toBe(MISSING_FILE_MESSAGE);
+    expect(found.warning).toMatch(/exited with code 1: boom.*vulkan-1\.dll/);
+    expect(versionProblem('C:\\app\\pip\\lqe.exe', { status: null, error: new Error('spawn UNKNOWN') }).warning).toMatch(/spawn UNKNOWN/);
+    expect(versionProblem('C:\\app\\pip\\lqe.exe', { status: -1073741515 }).warning).toMatch(/0xC0000135/);
+  });
+
+  test('control: a version that answers starts the servers and clears the status', async () => {
+    const h = harness({ platform: 'win32', runVersion: () => ({ status: 0, stdout: 'lqe 3.0.0' }) });
+    await h.pip.apply(result(), MODELS);
+    expect(h.spawns).toHaveLength(2);
+    expect(h.warnings.join('\n')).not.toMatch(/--version failed/);
+    expect(h.problems).toEqual([]);
+    expect(versionProblem('/x/lqe', { status: 0 })).toBeNull();
+  });
+
+  test('control: macOS and Linux do not ask', async () => {
+    for (const platform of ['darwin', 'linux']) {
+      const h = harness({ platform, runVersion: () => DLL });
+      await h.pip.apply(result(), MODELS);
+      expect(h.versionRuns).toEqual([]);
+      expect(h.spawns).toHaveLength(2);
+    }
   });
 });
 

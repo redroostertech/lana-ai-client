@@ -160,6 +160,30 @@ function metalNeedBytes({ result, wanted }) {
   return bytes;
 }
 
+/** What the engine status shows when Pip cannot start on this computer. */
+const MISSING_FILE_MESSAGE = 'LANA\'s local engine could not start: a required system file is missing.';
+/** Windows' "a DLL it needs was not found" (STATUS_DLL_NOT_FOUND), as an unsigned and a signed exit. */
+const DLL_NOT_FOUND = [0xC0000135, -1073741515];
+
+/**
+ * On Windows, Pip is asked for its version before any server starts: lqe.exe imports
+ * vulkan-1.dll, and without it Windows refuses to load it (0xC0000135) every time, so starting
+ * servers would only restart forever. Returns null when it answered, else { warning, message }.
+ *
+ * @param {{ status: number|null, error?: Error, stderr?: string }} run - spawnSync(binary, ['--version'])
+ */
+function versionProblem(binary, run) {
+  if (run && !run.error && run.status === 0) {return null;}
+  const dll = path.join(path.dirname(binary), 'vulkan-1.dll');
+  const why = run && DLL_NOT_FOUND.includes(run.status)
+    ? `Windows could not load a DLL it needs (0xC0000135). lqe.exe imports vulkan-1.dll, which belongs beside it at ${dll}; the installer carries it (pip/pip-pin.json vulkanLoader)`
+    : `it exited with ${run && run.error ? run.error.message : `code ${run && run.status}`}${run && run.stderr ? `: ${String(run.stderr).trim().slice(0, 200)}` : ''}; if it is a missing DLL, lqe.exe needs vulkan-1.dll beside it at ${dll}`;
+  return {
+    warning: `[pip] ${binary} --version failed, so Pip is not started and chat and search use the cloud: ${why}`,
+    message: MISSING_FILE_MESSAGE
+  };
+}
+
 /** Pip is ready when /health says "ok" and names the planned model file. */
 async function checkPipHealth(fetch, url, expectFile, options = {}) {
   const response = await fetch(`${url}/health`, { method: 'GET', timeoutMs: options.healthTimeoutMs || DEFAULTS.healthTimeoutMs });
@@ -191,6 +215,10 @@ async function checkPipHealth(fetch, url, expectFile, options = {}) {
  * @param {Object} [deps.accepts] - electron-pip-levers.js readAccepts() for `binary`, read once per
  *   app start (so again after every update)
  * @param {Function} [deps.readWiredLimitMb] - () => iogpu.wired_limit_mb on Apple silicon, or null
+ * @param {string} [deps.platform] - process.platform
+ * @param {Function} [deps.runVersion] - (binary) => spawnSync(binary, ['--version']) result; asked on
+ *   Windows before any server starts
+ * @param {Function} [deps.onProblem] - (message|null) => void, for the engine status
  */
 function createPip(deps) {
   const {
@@ -204,8 +232,18 @@ function createPip(deps) {
     log = { info() {}, warn() {}, error() {} },
     options = {},
     accepts = {},
-    readWiredLimitMb = () => null
+    readWiredLimitMb = () => null,
+    platform = process.platform,
+    runVersion = (file) => require('child_process').spawnSync(file, ['--version'], { encoding: 'utf8', timeout: 10000, windowsHide: true }),
+    onProblem = () => {}
   } = deps;
+  let problem = null;
+
+  function setProblem(next) {
+    if (next === problem) {return;}
+    problem = next;
+    try { onProblem(problem); } catch (_error) { /* listener errors are not ours */ }
+  }
 
   const running = { chat: null, embedding: null }; // { server, key }
   let lastAddresses = JSON.stringify({ chat: null, embedding: null, chatModelFile: null, chatSlots: null });
@@ -307,7 +345,7 @@ function createPip(deps) {
   }
 
   function getState() {
-    const out = { installed: Boolean(binary), servers: {} };
+    const out = { installed: Boolean(binary), problem, servers: {} };
     for (const role of Object.keys(running)) {out.servers[role] = running[role] ? running[role].server.getState() : null;}
     return out;
   }
@@ -337,8 +375,16 @@ function createPip(deps) {
    * @param {string} modelsDir
    */
   async function apply(result, modelsDir) {
-    const wanted = binary ? wantedServers({ result, modelsDir, env, accepts }) : { chat: null, embedding: null };
+    let wanted = binary ? wantedServers({ result, modelsDir, env, accepts }) : { chat: null, embedding: null };
     if (!binary) {log.warn('[pip] Pip is not installed on this computer; chat and embedding use the cloud');}
+    if (binary && platform === 'win32' && (wanted.chat || wanted.embedding)) {
+      const found = versionProblem(binary, runVersion(binary));
+      if (found) {
+        log.warn(found.warning);
+        wanted = { chat: null, embedding: null };
+      }
+      setProblem(found ? found.message : null);
+    }
     fsImpl.mkdirSync(dir, { recursive: true });
     if (wanted.chat) {
       const chosen = wanted.chat.levers;
@@ -405,5 +451,7 @@ module.exports = {
   threadsFor,
   PREFERRED_PORTS,
   ADDRESS_ENV,
-  DEFAULTS
+  DEFAULTS,
+  versionProblem,
+  MISSING_FILE_MESSAGE
 };

@@ -99,9 +99,11 @@ async function fetchWithTimeout(url, { timeoutMs = 3000, ...init } = {}) {
 }
 
 /** What the renderer is shown: no process details beyond what Settings needs (never the control secret). */
-function statusView(state, config, apiBase, backgroundJobs = { enabled: false, setting: null }) {
+function statusView(state, config, apiBase, backgroundJobs = { enabled: false, setting: null }, localAiProblem = null) {
   const health = state.health || null;
   return {
+    // Pip (the local AI models) could not start on this computer (electron-pip-supervisor.js).
+    localAiProblem,
     configured: config.configured,
     enabled: config.enabled,
     backgroundJobs,
@@ -254,6 +256,13 @@ function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = proces
     return pending.promise;
   }
 
+  let localAiProblem = null;
+  /** Pip's start problem in plain words, or null; shown in the engine status. */
+  function setLocalAiProblem(message) {
+    localAiProblem = message || null;
+    broadcast(supervisor.getState());
+  }
+
   function backgroundJobsView() {
     const preferences = storage.getLocalEnginePreferences();
     return { enabled: backgroundJobsEnabled(preferences, config), setting: typeof preferences.backgroundJobs === 'boolean' ? preferences.backgroundJobs : null };
@@ -261,7 +270,7 @@ function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = proces
 
   function broadcast(state) {
     pushControl(state);
-    const payload = statusView(state, config, currentApiBase(state), backgroundJobsView());
+    const payload = statusView(state, config, currentApiBase(state), backgroundJobsView(), localAiProblem);
     for (const win of getWindows()) {
       if (win && !win.isDestroyed() && win.webContents && !win.webContents.isDestroyed()) {
         win.webContents.send(CHANNELS.state, payload);
@@ -388,7 +397,7 @@ function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = proces
 
   function status() {
     const state = supervisor.getState();
-    return statusView(state, config, currentApiBase(state), backgroundJobsView());
+    return statusView(state, config, currentApiBase(state), backgroundJobsView(), localAiProblem);
   }
 
   function registerIpc() {
@@ -431,6 +440,7 @@ function createLocalEngineHost({ ipcMain, app, storage, getWindows, env = proces
     toStored: (server) => toStoredServer(server, { engineUrl: supervisor.getState().url, storedUrl: chefUrl() }),
     stop: () => supervisor.stop(),
     setModelEndpoints,
+    setLocalAiProblem,
     untilReady,
     prepareQuit,
     attachOsSignals,

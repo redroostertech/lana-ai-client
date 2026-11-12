@@ -144,6 +144,7 @@ const pip = createPip({
   pickPort: pickLoopbackPort,
   env: process.env,
   log: { info: logInfo, warn: logWarn, error: (message) => logError(message) },
+  onProblem: (message) => localEngine.setLocalAiProblem(message),
   onAddresses: (addresses) => {
     logInfo(`[pip] addresses: chat ${addresses.chat || 'none'}, embedding ${addresses.embedding || 'none'}`);
     localServers.pip = engineEndpoints(addresses);

@@ -57,6 +57,22 @@
       ]
     },
     {
+      "id": "vulkan-loader",
+      "section": "runtime",
+      "name": "Vulkan loader (Windows, beside the local AI engine)",
+      "version": "1.3.296.0",
+      "license": "Apache-2.0 AND MIT",
+      "licenseName": "Apache-2.0 for the Vulkan loader; MIT for parts of the Vulkan Runtime",
+      "copyright": "Copyright (c) 2015-2024 The Khronos Group Inc.; Copyright (c) 2015-2024 LunarG, Inc.; Copyright (c) 2015-2024 Valve Corporation",
+      "attribution": "On Windows the app ships vulkan-1.dll, the Khronos Vulkan loader as distributed in LunarG's Vulkan Runtime, beside its local AI engine (lqe.exe), so the engine starts on computers without a graphics driver.",
+      "source": "https://github.com/KhronosGroup/Vulkan-Loader",
+      "purl": "pkg:github/KhronosGroup/Vulkan-Loader",
+      "notes": "Unmodified binary from the LunarG Vulkan Runtime components archive 1.3.296.0, pinned by sha256 in pip/pip-pin.json. Windows installers only.",
+      "texts": [
+        { "title": "Vulkan Runtime, license", "file": "scripts/licenses/texts/vulkan-runtime-LICENSE.txt" }
+      ]
+    },
+    {
       "id": "model-nomic-embed-text",
       "section": "models",
       "name": "Nomic Embed Text v1.5 (search embeddings)",

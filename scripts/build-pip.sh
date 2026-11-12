@@ -86,6 +86,10 @@ fi
 mkdir -p "$root_dir/build/pip"
 cp "$binary" "$root_dir/build/pip/$exe"
 chmod 755 "$root_dir/build/pip/$exe"
+if [[ "$key" == windows-* ]]; then
+  # lqe.exe imports vulkan-1.dll; the package ships the pinned loader beside it.
+  node "$root_dir/scripts/fetch-vulkan-loader.js"
+fi
 sha="$(node -p "require('$root_dir/scripts/local-ai-pins.js').sha256File('$root_dir/build/pip/$exe')")"
 bytes="$(wc -c < "$root_dir/build/pip/$exe" | tr -d ' ')"
 echo "Built build/pip/$exe: $reported, $bytes bytes, sha256 $sha"

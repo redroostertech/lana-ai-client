@@ -55,6 +55,35 @@ describe('checkPip', () => {
     expect(pins.checkPip({ root: make(tmpRoot()), platformName: 'darwin', archName: 'arm64', pin }).join(' ')).toMatch(message);
   });
 
+  describe('the Vulkan loader lqe.exe imports (Windows only)', () => {
+    const withLoader = { ...pin, vulkanLoader: { platforms: ['windows-x64'], version: '1.3.296.0', file: 'vulkan-1.dll', sha256: sha('the pinned loader') } };
+    const windowsRoot = (loader) => {
+      const root = tmpRoot();
+      write(root, 'build/pip/lqe.exe', 'the pinned lqe.exe');
+      write(root, 'build/pip/lqe', 'the pinned lqe');
+      if (loader) {write(root, 'build/pip/vulkan-1.dll', loader);}
+      return root;
+    };
+
+    test('Windows with the pinned vulkan-1.dll beside lqe.exe passes (control)', () => {
+      expect(pins.checkPip({ root: windowsRoot('the pinned loader'), platformName: 'win32', archName: 'x64', pin: withLoader })).toEqual([]);
+    });
+
+    test.each([
+      ['missing', null, /The Vulkan loader is missing: build\/pip\/vulkan-1.dll/],
+      ['another file', 'some other dll', /is not the pinned Vulkan loader 1.3.296.0/]
+    ])('Windows refuses a loader that is %s', (_name, loader, message) => {
+      expect(pins.checkPip({ root: windowsRoot(loader), platformName: 'win32', archName: 'x64', pin: withLoader }).join(' ')).toMatch(message);
+    });
+
+    test('macOS and Linux never need it (control)', () => {
+      const root = windowsRoot(null);
+      expect(pins.checkPip({ root, platformName: 'darwin', archName: 'arm64', pin: withLoader })).toEqual([]);
+      expect(pins.vulkanLoaderFor(withLoader, 'linux-x64')).toBeNull();
+      expect(pins.vulkanLoaderFor(withLoader, 'windows-x64')).toBe(withLoader.vulkanLoader);
+    });
+  });
+
   test('refuses a platform the pin has no build for', () => {
     const root = tmpRoot();
     write(root, 'build/pip/lqe', 'the pinned lqe');
@@ -142,6 +171,22 @@ describe('checkPackaged (afterPack)', () => {
     expect(pins.checkPackaged(packed())).toEqual([]);
   });
 
+  test('a packed Windows app must hold the pinned vulkan-1.dll beside lqe.exe', () => {
+    const args = packed();
+    write(args.resourcesDir, 'pip/lqe.exe', 'the pinned lqe.exe');
+    const digest = pins.treeDigest(path.join(args.resourcesDir, 'engine'));
+    const win = {
+      ...args,
+      platformName: 'win32',
+      archName: 'x64',
+      pipPin: { builds: { 'windows-x64': { sha256: sha('the pinned lqe.exe') } }, vulkanLoader: { platforms: ['windows-x64'], version: '1.3.296.0', file: 'vulkan-1.dll', sha256: sha('the pinned loader') } },
+      enginePin: { builds: { 'windows-x64': { files: digest.files, treeSha256: digest.sha256 } } }
+    };
+    expect(pins.checkPackaged(win).join(' ')).toMatch(/The packed app: The Vulkan loader is missing/);
+    write(args.resourcesDir, 'pip/vulkan-1.dll', 'the pinned loader');
+    expect(pins.checkPackaged(win)).toEqual([]);
+  });
+
   test.each([
     ['the packager dropped the engine\'s node_modules', (args) => fs.rmSync(path.join(args.resourcesDir, 'engine/node_modules'), { recursive: true }), /engine .* is not the pinned folder for macos-arm64: 1 files/],
     ['Pip is missing', (args) => fs.rmSync(path.join(args.resourcesDir, 'pip/lqe')), /has no Pip/],
@@ -208,6 +253,10 @@ describe('the package step', () => {
     expect(placed('mac')).toMatchObject({ 'pip/lqe': 'build/pip/lqe', engine: 'build/engine' });
     expect(placed('linux')).toMatchObject({ 'pip/lqe': 'build/pip/lqe', engine: 'build/engine' });
     expect(placed('win')).toMatchObject({ 'pip/lqe.exe': 'build/pip/lqe.exe', engine: 'build/engine' });
+    // lqe.exe imports vulkan-1.dll: the Windows installer carries it beside lqe.exe; no other does.
+    expect(placed('win')).toMatchObject({ 'pip/vulkan-1.dll': 'build/pip/vulkan-1.dll' });
+    for (const section of ['mac', 'linux']) {expect(Object.keys(placed(section)).some((to) => /vulkan/i.test(to))).toBe(false);}
+    expect((config.extraResources || []).some((entry) => /vulkan/i.test(entry.from))).toBe(false);
     expect(config.mac.binaries).toContain('Contents/Resources/pip/lqe');
     // electron-builder never copies a folder's own top-level node_modules, so it is a second entry.
     for (const section of ['mac', 'linux', 'win']) {expect(placed(section)).toMatchObject({ 'engine/node_modules': 'build/engine/node_modules' });}
@@ -226,6 +275,12 @@ describe('the package step', () => {
     expect(pip.commit.startsWith(pip.build)).toBe(true);
     expect(pip.builds['macos-arm64'].sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(pip.cmake['macos-arm64']).toContain('-DLQE_DISTRIBUTION=ON');
+    // The Vulkan loader: Windows only, the archive and the file each pinned by sha256.
+    expect(pip.vulkanLoader.platforms).toEqual(['windows-x64']);
+    expect(pip.vulkanLoader.archive.url).toMatch(/^https:\/\/sdk\.lunarg\.com\//);
+    expect(pip.vulkanLoader.archive.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(pip.vulkanLoader.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(pip.vulkanLoader.file).toBe('vulkan-1.dll');
     expect(engine.commit).toMatch(/^[0-9a-f]{40}$/);
     expect(engine.builds['macos-arm64'].treeSha256).toMatch(/^[0-9a-f]{64}$/);
   });

@@ -28,5 +28,22 @@
       "sha256": "6ce06ba038c9399bf6fe8eaaec6a6b2c6fdbc471377a27a495b46ffb5917446b",
       "bytes": 5923024
     }
+  },
+  "vulkanLoader": {
+    "_comment": "The Khronos Vulkan loader (vulkan-1.dll) the Windows package ships beside lqe.exe. lqe.exe is built with LQE_VULKAN=ON and imports vulkan-1.dll, so a Windows computer without a graphics driver that installs the loader (a VM, a server, the basic display driver) could not start it (0xC0000135); with the loader beside it, lqe runs on the processor there. Built by LunarG from Khronos's Vulkan-Loader and distributed as the Vulkan Runtime components; 1.3.296.0 is the newest runtime components archive LunarG publishes. scripts/fetch-vulkan-loader.js takes it at build time only, checks the archive against the sha256 LunarG publishes (sha256Source) and the file against sha256 below; the app never downloads it.",
+    "platforms": [
+      "windows-x64"
+    ],
+    "version": "1.3.296.0",
+    "archive": {
+      "url": "https://sdk.lunarg.com/sdk/download/1.3.296.0/windows/VulkanRT-1.3.296.0-Components.zip?Human=true",
+      "sha256": "e0429f91cf356fe99e381f7d22e568ac81945669f1be1772d933a0d189230452",
+      "sha256Source": "https://sdk.lunarg.com/sdk/sha/1.3.296.0/windows/VulkanRT-1.3.296.0-Components.zip.txt"
+    },
+    "member": "VulkanRT-1.3.296.0-Components/x64/vulkan-1.dll",
+    "file": "vulkan-1.dll",
+    "sha256": "8644669401d2c080ea10cfea2ba8a7c63d76e10a4e7ae8246837df1dfd157ea8",
+    "bytes": 1424152,
+    "license": "Apache-2.0 AND MIT"
   }
 }

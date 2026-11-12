@@ -4,6 +4,7 @@
  * Checks for the two local AI parts the installer carries, against their pins:
  *
  *   build/pip/lqe (lqe.exe on Windows)  Pip, the LANA.cpp engine, pip/pip-pin.json
+ *   build/pip/vulkan-1.dll (Windows)    the Vulkan loader lqe.exe imports, pip/pip-pin.json vulkanLoader
  *   build/engine/                      the LANA engine folder, engine/engine-pin.json
  *
  * Used by scripts/build-pip.sh and scripts/build-engine.js after they place each part, and by
@@ -66,6 +67,23 @@ function treeDigest(dir) {
   return { files: files.length, sha256: hash.digest('hex') };
 }
 
+/**
+ * The Vulkan loader Pip needs beside it on this platform (pin.vulkanLoader: Windows, where lqe.exe
+ * imports vulkan-1.dll), or null.
+ */
+function vulkanLoaderFor(pin, key) {
+  const loader = pin && pin.vulkanLoader;
+  return loader && (loader.platforms || []).includes(key) ? loader : null;
+}
+
+function checkVulkanLoader(file, loader, rel) {
+  if (!fs.existsSync(file)) {
+    return [`The Vulkan loader is missing: ${rel}. lqe.exe cannot start without it on a computer with no graphics driver; place it with node scripts/fetch-vulkan-loader.js.`];
+  }
+  const have = sha256File(file);
+  return have === loader.sha256 ? [] : [`${rel} is not the pinned Vulkan loader ${loader.version}: sha256 ${have}, the pin says ${loader.sha256}.`];
+}
+
 function checkPip({ root, platformName, archName, pin }) {
   const key = platformKey(platformName, archName);
   const file = pipFile(root, platformName);
@@ -78,6 +96,11 @@ function checkPip({ root, platformName, archName, pin }) {
   const have = sha256File(file);
   if (have !== want.sha256) {
     return [`${rel} is not the pinned Pip ${pin.version} (${pin.build}) for ${key}: sha256 ${have}, the pin says ${want.sha256}.`];
+  }
+  const loader = vulkanLoaderFor(pin, key);
+  if (loader) {
+    const dll = path.join(path.dirname(file), loader.file);
+    return checkVulkanLoader(dll, loader, path.relative(root, dll));
   }
   return [];
 }
@@ -132,6 +155,11 @@ function checkPackaged({ resourcesDir, platformName, archName, pipPin, enginePin
   const pipWant = pipPin.builds && pipPin.builds[key];
   if (!fs.existsSync(lqe)) {problems.push(`The packed app has no Pip at ${lqe}.`);}
   else if (!pipWant || sha256File(lqe) !== pipWant.sha256) {problems.push(`The packed app's Pip (${lqe}) is not the pinned build for ${key}.`);}
+  const loader = vulkanLoaderFor(pipPin, key);
+  if (loader) {
+    const dll = path.join(resourcesDir, 'pip', loader.file);
+    problems.push(...checkVulkanLoader(dll, loader, dll).map((problem) => `The packed app: ${problem}`));
+  }
   const engine = path.join(resourcesDir, 'engine');
   const engineWant = enginePin.builds && enginePin.builds[key];
   if (!fs.existsSync(path.join(engine, ENGINE_ENTRY))) {problems.push(`The packed app has no engine at ${engine}.`);}
@@ -144,4 +172,4 @@ function checkPackaged({ resourcesDir, platformName, archName, pipPin, enginePin
   return problems;
 }
 
-module.exports = { ENGINE_MANIFEST, ENGINE_ENTRY, platformKey, nodePlatform, pipFile, engineDir, sha256File, walkFiles, treeDigest, checkPip, checkEngine, checkPackaged };
+module.exports = { ENGINE_MANIFEST, ENGINE_ENTRY, platformKey, nodePlatform, pipFile, engineDir, sha256File, walkFiles, treeDigest, vulkanLoaderFor, checkPip, checkEngine, checkPackaged };
