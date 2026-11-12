@@ -459,6 +459,9 @@
       // Initialize notification polling
       this._startNotificationPolling();
 
+      // LANA Briefs handoff prompts (QR fallback, phone approval) on every page.
+      this._startBriefsHandoff();
+
       // Initialize backend reachability monitoring
       this._startReachabilityMonitor();
 
@@ -1087,6 +1090,30 @@
       if (this._getAppContext() === 'briefs') {
         this.setSections(this._buildSidebarSections('briefs'));
       }
+    }
+
+    /**
+     * LANA Briefs: while a phone hands off a meeting the host may need the person at this
+     * computer (the QR fallback when the tone did not reach the phone, or the firm's
+     * approval). Those prompts show over every page, so the shell loads them here
+     * (src/js/briefs/briefs-handoff-ui.js) whenever the Briefs bridge exists.
+     */
+    _startBriefsHandoff() {
+      const briefs = window.lanaBriefs;
+      if (!briefs || !briefs.handoff || typeof briefs.onEvent !== 'function') return;
+      const jsBase = docStudioAssetBase();
+      if (!jsBase) return;
+      const cssBase = jsBase.replace(/js\/$/, 'css/');
+      const qr = window.QRCode ? Promise.resolve() : loadAssetOnce('script', jsBase + 'vendor/qrcode.min.js');
+      Promise.all([
+        qr,
+        loadAssetOnce('link', cssBase + 'briefs-handoff.css'),
+        window.BriefsHandoffUI ? Promise.resolve() : loadAssetOnce('script', jsBase + 'briefs/briefs-handoff-ui.js')
+      ]).then(() => {
+        if (window.BriefsHandoffUI) window.BriefsHandoffUI.start(briefs);
+      }).catch((error) => {
+        console.warn('[briefs] handoff prompts unavailable:', error && error.message);
+      });
     }
 
     /**

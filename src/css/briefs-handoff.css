@@ -1,0 +1,35 @@
+/*
+ * LANA Briefs: the handoff prompts over every page (src/js/briefs/briefs-handoff-ui.js):
+ * the QR fallback and the approval question, inside a lex-modal. Lex tokens only.
+ */
+
+.briefs-handoff {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.briefs-handoff-qr {
+  width: 260px;
+  height: 260px;
+  padding: 12px;
+  border-radius: var(--lex-radius-lg);
+  background: #ffffff;
+  color: var(--lex-text-secondary);
+  display: grid;
+  place-items: center;
+}
+
+.briefs-handoff-qr svg {
+  width: 100%;
+  height: 100%;
+}
+
+.briefs-handoff-note {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--lex-text-secondary);
+  text-align: center;
+}
