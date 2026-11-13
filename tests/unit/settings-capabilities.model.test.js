@@ -352,9 +352,12 @@ describe('truthful status before and during setup', () => {
 describe('the setup offer in Settings', () => {
   test('Set up calls the first-launch Continue, and the section follows the downloads', async () => {
     const view = planView(24, { acceptedAt: null, completedAt: null });
+    const accepted = planView(24, { acceptedAt: '2026-11-13T00:00:00.000Z', completedAt: null });
+    let continued = false;
+    // The real first-launch:continue answers before the download publishes, so the phase is still idle.
     const api = {
-      getCapabilities: jest.fn(async () => ({ success: true, plan: view, servers: ALL_READY })),
-      continue: jest.fn(async () => ({ success: true, status: { phase: 'downloading', current: null, receivedBytes: 0, totalBytes: GB, error: null } }))
+      getCapabilities: jest.fn(async () => ({ success: true, plan: continued ? accepted : view, servers: ALL_READY })),
+      continue: jest.fn(async () => { continued = true; return { success: true, status: { phase: 'idle', current: null, receivedBytes: 0, totalBytes: 0, error: null } }; })
     };
     const frames = [];
     const c = M.createCapabilitiesController({ api, render: (f) => frames.push(f) });
@@ -363,8 +366,18 @@ describe('the setup offer in Settings', () => {
     await c.setUp();
     expect(api.continue).toHaveBeenCalledWith({ useExisting: false });
     const last = frames[frames.length - 1];
-    expect(last.view.progress).toMatchObject({ heading: 'Downloading' });
     expect(last.view.setup).toBeNull();
+    expect(api.getCapabilities).toHaveBeenCalledTimes(2);
+  });
+
+  test('a computer that already has every file but never pressed Continue is still offered setup', async () => {
+    const view = planView(24, { acceptedAt: null, completedAt: null });
+    view.download = Object.assign({}, view.download, { files: [], neededBytes: 0 });
+    const api = { getCapabilities: jest.fn(async () => ({ success: true, plan: view, servers: ALL_READY })), continue: jest.fn() };
+    const frames = [];
+    const c = M.createCapabilitiesController({ api, render: (f) => frames.push(f) });
+    await c.load();
+    expect(frames[frames.length - 1].view.setup).toMatchObject({ label: 'Set up local AI' });
   });
 
   test('the server facts can arrive after the plan and change the words', async () => {

@@ -173,14 +173,16 @@
     return serverSummary(stateKey);
   }
 
-  /** The setup offer: Continue was never pressed and this computer still needs local files. */
+  /**
+   * The setup offer: Continue was never pressed. Shown even when every model file is already on
+   * this computer, since Continue is also what installs speech and starts the local servers.
+   */
   function setupView(view, status) {
-    if (view.acceptedAt || settingUp(status)) {return null;}
+    if (view.acceptedAt || view.completedAt || settingUp(status)) {return null;}
     var files = localFiles(view);
-    if (!files.length) {return null;}
     var needed = (view.download && view.download.neededBytes) || files.reduce(function (sum, f) { return sum + (f.bytes || 0); }, 0);
     return {
-      label: 'Set up local AI: about ' + formatBytes(needed),
+      label: needed > 0 ? 'Set up local AI: about ' + formatBytes(needed) : 'Set up local AI',
       text: 'LANA downloads the AI models this computer runs on its own, in the background. You can follow the progress here.'
     };
   }
@@ -480,8 +482,9 @@
       draw();
       return api.continue({ useExisting: false }).then(unwrap).then(function (result) {
         if (result.status) {state.status = result.status;}
-        state.busy = false;
-        draw();
+        // Continue answers before the download publishes its first status, so read the plan again:
+        // it now carries acceptedAt, and the offer must not come back while setup starts.
+        return load().then(function () { state.busy = false; draw(); });
       }).catch(fail);
     }
 
