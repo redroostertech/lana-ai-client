@@ -37,7 +37,7 @@ const { Arch } = require('builder-util');
 const { checkPip, checkEngine, sha256File } = require('./local-ai-pins');
 const { checkRedactor } = require('./redactor-before-pack');
 const { requiredPackages } = require('./briefs-before-pack');
-const { PARTS, partsRoot, platformNameOf, archNameOf, swapInto, macBinariesFor } = require('./client-parts');
+const { PARTS, partsRoot, platformNameOf, archNameOf, swapInto, removeLeftover, macBinariesFor } = require('./client-parts');
 
 const ROOT = path.resolve(__dirname, '..');
 const TARGETS = Object.freeze(['macos-arm64', 'macos-x64', 'windows-x64', 'linux-x64']);
@@ -113,7 +113,7 @@ function unpack(tarball, dir, part) {
   if (entries.length === 1 && entries[0] === part && fs.statSync(path.join(dir, part)).isDirectory()) {
     const inner = `${dir}.inner`;
     fs.renameSync(path.join(dir, part), inner);
-    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     fs.renameSync(inner, dir);
   }
 }
@@ -141,7 +141,7 @@ async function fetchPart({ root, entry, pins, log }) {
     swapInto(path.join(base, entry.key, entry.part), (staging) => fs.renameSync(unpacked, staging));
     log(`Client parts: ${label} downloaded, its sha256 and pin match.`);
   } finally {
-    fs.rmSync(work, { recursive: true, force: true });
+    removeLeftover(work);
   }
 }
 
@@ -182,7 +182,7 @@ async function ensureSherpaPackages({ root = ROOT, keys, lock, download: get = d
       });
       log(`Client parts: ${name} ${pinned.version} installed for packaging.`);
     } finally {
-      fs.rmSync(work, { recursive: true, force: true });
+      removeLeftover(work);
     }
   }
 }

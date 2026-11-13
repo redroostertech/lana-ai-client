@@ -56,13 +56,41 @@ function swapInto(dest, fill) {
   const tag = `${process.pid}-${Date.now()}`;
   const staging = path.join(parent, `.${path.basename(dest)}.staging-${tag}`);
   const old = path.join(parent, `.${path.basename(dest)}.old-${tag}`);
+  let keepOld = false;
   try {
     fill(staging);
     if (fs.existsSync(dest)) {fs.renameSync(dest, old);}
-    fs.renameSync(staging, dest);
+    try {
+      fs.renameSync(staging, dest);
+    } catch (error) {
+      // Put the replaced folder back rather than deleting it below with no new folder in place.
+      if (fs.existsSync(old) && !fs.existsSync(dest)) {
+        try {
+          fs.renameSync(old, dest);
+        } catch (_rollback) {
+          keepOld = true;
+          console.warn(`client parts: the previous folder is at ${old}; move it back to ${dest}.`);
+        }
+      }
+      throw error;
+    }
   } finally {
-    fs.rmSync(staging, { recursive: true, force: true });
-    fs.rmSync(old, { recursive: true, force: true });
+    removeLeftover(staging);
+    if (!keepOld) {removeLeftover(old);}
+  }
+}
+
+/**
+ * Removes a swap's leftover folder. rmSync retries ENOTEMPTY only when maxRetries is set; on
+ * APFS (the Intel build Mac, 2026-11-13) removing a large replaced folder failed with ENOTEMPTY
+ * and the build exited although the new folder was already in place. A leftover folder is not
+ * a failed swap, so a removal that still fails is a warning, never an error.
+ */
+function removeLeftover(dir) {
+  try {
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  } catch (error) {
+    console.warn(`client parts: could not remove ${dir} (${error.code || error.message}); delete it by hand.`);
   }
 }
 
@@ -110,4 +138,4 @@ function missingMacArchs(lipoArchs) {
   return ['arm64', 'x86_64'].filter((arch) => !have.has(arch));
 }
 
-module.exports = { PARTS, partsRoot, platformNameOf, archNameOf, copyTree, swapInto, stageParts, macBinariesFor, missingMacArchs };
+module.exports = { PARTS, partsRoot, platformNameOf, archNameOf, copyTree, swapInto, removeLeftover, stageParts, macBinariesFor, missingMacArchs };

@@ -336,3 +336,96 @@ describe('Mac helpers build for both processors', () => {
     expect(parts.missingMacArchs(archs)).toEqual(missing);
   });
 });
+
+// The Intel build Mac (APFS, 2026-11-13): removing the replaced folder failed with ENOTEMPTY
+// twice and the script exited 1, although the new folder was already in place. rmSync retries
+// ENOTEMPTY only when maxRetries is set, and a leftover .old folder is not a failed swap.
+describe('swapInto cleanup', () => {
+  afterEach(() => { jest.restoreAllMocks(); });
+
+  function busyRemoval({ failOld }) {
+    const real = fs.rmSync;
+    const calls = [];
+    jest.spyOn(fs, 'rmSync').mockImplementation((target, options) => {
+      calls.push({ target: String(target), options });
+      if (failOld && String(target).includes('.old-')) {
+        throw Object.assign(new Error(`ENOTEMPTY: directory not empty, rmdir '${target}'`), { code: 'ENOTEMPTY' });
+      }
+      return real(target, options);
+    });
+    return calls;
+  }
+
+  test('removes the replaced folder with retries, and a removal that still fails is only a warning', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'swap-'));
+    dirs.push(root);
+    const dest = path.join(root, 'engine');
+    fs.mkdirSync(dest);
+    fs.writeFileSync(path.join(dest, 'old.txt'), 'old');
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const calls = busyRemoval({ failOld: true });
+    expect(() => parts.swapInto(dest, (staging) => {
+      fs.mkdirSync(staging);
+      fs.writeFileSync(path.join(staging, 'new.txt'), 'new');
+    })).not.toThrow();
+    expect(fs.readFileSync(path.join(dest, 'new.txt'), 'utf8')).toBe('new');
+    const oldRemoval = calls.find((c) => c.target.includes('.old-'));
+    expect(oldRemoval.options).toMatchObject({ recursive: true, force: true, maxRetries: 5 });
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/could not remove .*\.old-.*ENOTEMPTY/));
+  });
+
+  test('a swap whose final rename fails puts the old folder back instead of deleting it', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'swap-'));
+    dirs.push(root);
+    const dest = path.join(root, 'engine');
+    fs.mkdirSync(dest);
+    fs.writeFileSync(path.join(dest, 'old.txt'), 'old');
+    const realRename = fs.renameSync;
+    jest.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+      if (String(from).includes('.staging-') && String(to) === dest) {throw Object.assign(new Error('EXDEV: cross-device link'), { code: 'EXDEV' });}
+      return realRename(from, to);
+    });
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(() => parts.swapInto(dest, (staging) => { fs.mkdirSync(staging); fs.writeFileSync(path.join(staging, 'new.txt'), 'new'); })).toThrow('EXDEV');
+    expect(fs.readFileSync(path.join(dest, 'old.txt'), 'utf8')).toBe('old');
+    expect(fs.readdirSync(root).filter((n) => n.includes('.old-'))).toEqual([]);
+  });
+
+  test('when putting the old folder back also fails, the original error is thrown and the old folder is kept', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'swap-'));
+    dirs.push(root);
+    const dest = path.join(root, 'engine');
+    fs.mkdirSync(dest);
+    fs.writeFileSync(path.join(dest, 'old.txt'), 'old');
+    const realRename = fs.renameSync;
+    jest.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+      if (String(to) === dest) {throw Object.assign(new Error(`EXDEV: rename to dest failed ${path.basename(String(from))}`), { code: 'EXDEV' });}
+      return realRename(from, to);
+    });
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(() => parts.swapInto(dest, (staging) => { fs.mkdirSync(staging); })).toThrow(/rename to dest failed \.engine\.staging-/);
+    const kept = fs.readdirSync(root).filter((n) => n.includes('.old-'));
+    expect(kept).toHaveLength(1);
+    expect(fs.readFileSync(path.join(root, kept[0], 'old.txt'), 'utf8')).toBe('old');
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(path.join(root, kept[0])));
+  });
+
+  test('control: a failed fill still fails the swap, and dest keeps its old contents', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'swap-'));
+    dirs.push(root);
+    const dest = path.join(root, 'engine');
+    fs.mkdirSync(dest);
+    fs.writeFileSync(path.join(dest, 'old.txt'), 'old');
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    busyRemoval({ failOld: false });
+    expect(() => parts.swapInto(dest, () => { throw new Error('copy failed'); })).toThrow('copy failed');
+    expect(fs.readFileSync(path.join(dest, 'old.txt'), 'utf8')).toBe('old');
+  });
+});
+
+test('removeLeftover is shared, and fetch-client-parts uses it for its work folders', () => {
+  expect(typeof parts.removeLeftover).toBe('function');
+  const src = fs.readFileSync(path.join(__dirname, '../../scripts/fetch-client-parts.js'), 'utf8');
+  expect(src).toMatch(/removeLeftover\(work\)/);
+  expect(src).not.toMatch(/finally \{\s*fs\.rmSync\(work/);
+});
