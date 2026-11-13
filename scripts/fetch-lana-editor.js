@@ -106,6 +106,15 @@ function cloneCommands(pin, dir, repoUrl = pin.repo) {
   ];
 }
 
+// --include=dev: build-client.sh exports NODE_ENV=production before build:win, and a plain
+// `npm ci` then drops the devDependencies the editor's build needs (tsc, @types/node).
+function buildCommands() {
+  return [
+    ['npm', ['ci', '--include=dev', '--no-audit', '--no-fund']],
+    ['npm', ['run', 'build']]
+  ];
+}
+
 function run(command, args, cwd) {
   execFileSync(command, args, { cwd, stdio: 'inherit', env: process.env });
 }
@@ -138,8 +147,7 @@ function build({ force = false } = {}) {
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'lana-editor-'));
   try {
     const source = sourceCheckout(pin, work);
-    run('npm', ['ci', '--no-audit', '--no-fund'], source);
-    run('npm', ['run', 'build'], source);
+    for (const [command, args] of buildCommands()) {run(command, args, source);}
 
     const staging = `${out}.partial`;
     fs.rmSync(staging, { recursive: true, force: true });
@@ -175,4 +183,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { readPin, checkEditorBuild, cloneCommands, editorDir, REQUIRED_FILES, COPIED, SERVICE_ENTRY, PIN_FILE, BUILD_MANIFEST };
+module.exports = { readPin, checkEditorBuild, cloneCommands, buildCommands, editorDir, REQUIRED_FILES, COPIED, SERVICE_ENTRY, PIN_FILE, BUILD_MANIFEST };

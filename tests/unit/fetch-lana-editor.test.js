@@ -7,7 +7,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { readPin, checkEditorBuild, cloneCommands, REQUIRED_FILES, PIN_FILE, BUILD_MANIFEST } = require('../../scripts/fetch-lana-editor');
+const { readPin, checkEditorBuild, cloneCommands, buildCommands, REQUIRED_FILES, PIN_FILE, BUILD_MANIFEST } = require('../../scripts/fetch-lana-editor');
 
 const pin = readPin();
 
@@ -34,6 +34,16 @@ test('the clone fetches and checks out exactly the pinned commit', () => {
   expect(commands).toContainEqual(['git', ['-C', '/tmp/e', 'fetch', '-q', '--depth', '1', 'origin', pin.commit]]);
   expect(commands[commands.length - 1]).toEqual(['git', ['-C', '/tmp/e', 'checkout', '-q', '--detach', pin.commit]]);
   expect(commands).toContainEqual(['git', ['-C', '/tmp/e', 'remote', 'add', 'origin', 'git@github.com:redroostertech/lana-editor.git']]);
+});
+
+// build-client.sh exports NODE_ENV=production before build:win; a plain `npm ci` then drops
+// devDependencies, so the editor's tsc fails on @types/node in any fresh checkout (2026-11-12).
+test('the build installs devDependencies whatever NODE_ENV the caller set, then builds', () => {
+  const commands = buildCommands();
+  expect(commands[0][0]).toBe('npm');
+  expect(commands[0][1][0]).toBe('ci');
+  expect(commands[0][1]).toContain('--include=dev');
+  expect(commands[commands.length - 1]).toEqual(['npm', ['run', 'build']]);
 });
 
 test('a build of the pinned commit with every file and licence passes', () => {
