@@ -43,8 +43,9 @@
       "source": "LANA.cpp CI run 43278937570 (head 396ca2c1d643), job macos-shipping (-DLQE_DISTRIBUTION=ON -DLQE_BUILD_TESTS=ON -DLQE_METAL=ON, the macos-arm64 cmake contract above), lqe-darwin-arm64; saved before the GitHub artifact purge to the LANA Azure parts store at macos-arm64/lqe-396ca2c1d643/lqe-darwin-arm64. CI builds are reproducible; a local build embeds its checkout path and gets a different sha256. Placed as build/pip/lqe; electron-builder signs it (mac.binaries)."
     },
     "macos-x64": {
-      "sha256": "ad6ed844298950edd7c00412e0b77ee1a9018baeecafd238ff624c332eeffea2",
-      "bytes": 5801960
+      "sha256": "d1fe7aac6659ff2178d35122ba443bb4e95bb36e26f1250b54dfd38866d7d51f",
+      "bytes": 5758832,
+      "source": "Built natively on the Intel build Mac (x86_64, Apple clang 17.0.0 / Xcode 16.4, cmake 4.3.3, macOS 15.6.1) with scripts/build-pip.sh from a clean LANA.cpp checkout at 396ca2c1d643, the macos-x64 cmake contract above; 28/28 ctest; scripts/verify-pip-macos-x64.js passed (x86_64 only, floor 13.3, links only /usr/lib and /System). Replaces ad6ed844..., a Rosetta build on an Apple Mac whose binary was not kept. A local build embeds its checkout path and toolchain, so another computer gets a different sha256."
     },
     "windows-x64": {
       "sha256": "99bc3137fed239447cd9c221fc4bd343a1363bfd62426586dca95569e6273533",
