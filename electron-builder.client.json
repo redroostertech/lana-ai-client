@@ -105,7 +105,7 @@
       "Contents/Resources/redactor/lana-redactor/lana-redactor",
       "Contents/Resources/pip/lqe",
       "Contents/Resources/engine/node_modules/bare-fs/prebuilds/darwin-arm64/bare-fs.bare",
-      "Contents/Resources/engine/node_modules/bare-path/prebuilds/darwin-arm64/bare-path.bare",
+      "Contents/Resources/engine/node_modules/bare-os/prebuilds/darwin-arm64/bare-os.bare",
       "Contents/Resources/engine/node_modules/bare-url/prebuilds/darwin-arm64/bare-url.bare",
       "Contents/Resources/engine/node_modules/bcrypt/prebuilds/darwin-arm64/bcrypt.node",
       "Contents/Resources/engine/node_modules/bare-fs/prebuilds/darwin-x64/bare-fs.bare",
