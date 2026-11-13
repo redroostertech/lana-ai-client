@@ -1,21 +1,21 @@
 {
   "_comment": "The LANA engine folder the client packages at <resources>/engine (electron-local-engine.js), built by scripts/build-engine.js from this LANA-AI commit with the backend's scripts/release/build-engine-bundle.js on a matching computer, its node_modules installed with npm ci. treeSha256 is sha256 over one line per file (path, bytes, sha256), engine-manifest.json left out. Change the commit only together with a rebuild of every platform's entry.",
   "repo": "redroostertech/LANA-AI",
-  "branch": "engine-bundle",
+  "branch": "lana-runtime-merge",
   "version": "3.0.0",
-  "commit": "d238a9c3dbe84fcc72124c90a4acafda0774245e",
+  "commit": "f6bac524719ca1bd6a28d42a0a0a552bfcc9f2e6",
   "builds": {
     "macos-arm64": {
-      "files": 5068,
-      "treeSha256": "c69f5fab3f438433c83b49ff1f45f04159d93b59a5c24769e89bc1810e09d393"
+      "files": 4991,
+      "treeSha256": "1d035725c7e88d914aacf810a30d018f0c5556ffdaf1dc89c5131c90607080fc"
     },
     "macos-x64": {
-      "files": 5011,
-      "treeSha256": "e56ad78820d9aef7af7359de6e9a3deed2340c8d0887f93143e6fc698fcf4461"
+      "files": 4991,
+      "treeSha256": "4d63567b69d4279586a6e2c4e740f25be7eb9a7d12949880ddf2c081d36d0d37"
     },
     "windows-x64": {
-      "files": 4997,
-      "treeSha256": "537a8af216aa141e7272b2a28ce83c9c64ac41f7e6310bd2fee6402ae4a1d3f1"
+      "files": 4991,
+      "treeSha256": "afa9f0ad5a3ac94fbaa4fc4a5a62bab7c21999f1ce26ced80f534675d5fad452"
     }
   }
 }
