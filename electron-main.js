@@ -102,7 +102,7 @@ const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerifi
 chefPin.configure({ getSavedServer });
 const { createLocalEngineHost } = require('./electron-local-engine');
 const { createTokenStore, registerTokenIpc, hasLiveSession } = require('./electron-token-store');
-const { startPage, pageAfterSetup, signInPage } = require('./electron-start-page');
+const { startPage, pageAfterSetup, signInPage, registerDockReopen } = require('./electron-start-page');
 
 // The login token: OS-keychain encrypted at rest, memory only when no keychain.
 const authTokenStore = createTokenStore({ safeStorage, persistence: authTokenPersistence });
@@ -504,6 +504,8 @@ function getAppVersion() {
 
 // Keep a global reference of the window object to prevent garbage collection
 let mainWindow;
+// True once startup has opened its first window; dock reopen waits for it (registerDockReopen).
+let startupDone = false;
 let screenVoice = null;
 let capabilityPreferencesStore = null;
 
@@ -2615,6 +2617,17 @@ app.whenReady().then(async () => {
   // With hosted discovery, we always start at login page
   // The login page handles org resolution via lanaai.io endpoint
 
+  // On macOS, re-create a window when the dock icon is clicked and none is open. Registered here,
+  // before the saved-server start returns, so it works on every startup path.
+  registerDockReopen(app, {
+    windowOpen: () => Boolean(mainWindow && !mainWindow.isDestroyed()),
+    startupDone: () => startupDone,
+    getSavedServer,
+    acceptedAt: () => firstLaunchPersistence.read().acceptedAt,
+    createWindow,
+    createLoginWindow
+  });
+
   // Check for saved server
   const savedServer = getSavedServer();
 
@@ -2660,8 +2673,10 @@ app.whenReady().then(async () => {
       await localEngine.untilReady();
       if (firstPage === 'first-launch') {
         logInfo('[electron-main] Local AI setup was never accepted; showing the setup screen before the app');
+        startupDone = true;
         createLoginWindow('app');
       } else {
+        startupDone = true;
         createWindow(effectiveServer.url);
       }
       syncBriefs(effectiveServer);
@@ -2677,19 +2692,9 @@ app.whenReady().then(async () => {
   }
 
   // No saved server or unreachable - show login page
+  startupDone = true;
   createLoginWindow();
 
-  // On macOS, re-create window when dock icon is clicked and no windows are open
-  app.on('activate', () => {
-    if (!mainWindow || mainWindow.isDestroyed()) {
-      const savedServer = getSavedServer();
-      if (savedServer && firstLaunchPersistence.read().acceptedAt) {
-        createWindow(savedServer.url);
-      } else {
-        createLoginWindow(savedServer ? 'app' : 'login');
-      }
-    }
-  });
 });
 
 // Quit when all windows are closed (except on macOS)

@@ -34,4 +34,22 @@ function signInPage({ acceptedAt, next } = {}) {
   return next === 'app' ? 'first-launch.html?next=app' : 'first-launch.html';
 }
 
-module.exports = { startPage, pageAfterSetup, signInPage };
+/**
+ * macOS dock reopen: with no window open, a dock click reopens the app for a signed-in install
+ * that finished setup, the setup screen (then the app) for one that never pressed Continue, and
+ * sign-in otherwise. Registered once at startup, before any startup path can return.
+ */
+function registerDockReopen(app, { windowOpen, startupDone = () => true, getSavedServer, acceptedAt, createWindow, createLoginWindow }) {
+  app.on('activate', () => {
+    // Startup is about to open its own window; opening one here too would leave two.
+    if (!startupDone() || windowOpen()) {return;}
+    const savedServer = getSavedServer();
+    if (savedServer && acceptedAt()) {
+      createWindow(savedServer.url);
+    } else {
+      createLoginWindow(savedServer ? 'app' : 'login');
+    }
+  });
+}
+
+module.exports = { startPage, pageAfterSetup, signInPage, registerDockReopen };

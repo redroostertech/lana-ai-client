@@ -64,3 +64,65 @@ test('electron-main picks the start page with startPage, so a signed-in install 
   expect(main).toMatch(/require\('\.\/electron-start-page'\)/);
   expect(main).toMatch(/startPage\(\{/);
 });
+
+// 2026-11-13: on macOS the dock-reopen ('activate') handler was registered only after the login
+// path, so after a saved-server start a dock click with no window open did nothing.
+describe('dock reopen', () => {
+  const { registerDockReopen } = require('../../electron-start-page');
+  function fakeApp() {
+    const handlers = {};
+    return { on: (name, fn) => { handlers[name] = fn; }, fire: (name) => handlers[name] && handlers[name](), has: (name) => Boolean(handlers[name]) };
+  }
+  function deps(over) {
+    const calls = [];
+    return Object.assign({
+      calls,
+      windowOpen: () => false,
+      startupDone: () => true,
+      getSavedServer: () => ({ url: 'http://chef' }),
+      acceptedAt: () => '2026-11-13T00:00:00.000Z',
+      createWindow: (url) => calls.push(['app', url]),
+      createLoginWindow: (next) => calls.push(['login', next])
+    }, over);
+  }
+
+  test('a dock click with no window opens the app for a signed-in install that finished setup', () => {
+    const app = fakeApp(); const d = deps();
+    registerDockReopen(app, d);
+    app.fire('activate');
+    expect(d.calls).toEqual([['app', 'http://chef']]);
+  });
+
+  test('a signed-in install that never pressed Continue reopens on the setup screen; no saved server reopens sign-in', () => {
+    const a1 = fakeApp(); const d1 = deps({ acceptedAt: () => null });
+    registerDockReopen(a1, d1); a1.fire('activate');
+    expect(d1.calls).toEqual([['login', 'app']]);
+    const a2 = fakeApp(); const d2 = deps({ getSavedServer: () => null, acceptedAt: () => null });
+    registerDockReopen(a2, d2); a2.fire('activate');
+    expect(d2.calls).toEqual([['login', 'login']]);
+  });
+
+  test('a dock click while startup is still opening its window does nothing (no second window)', () => {
+    const app = fakeApp(); const d = deps({ startupDone: () => false });
+    registerDockReopen(app, d); app.fire('activate');
+    expect(d.calls).toEqual([]);
+  });
+
+  test('control: a dock click while a window is open does nothing', () => {
+    const app = fakeApp(); const d = deps({ windowOpen: () => true });
+    registerDockReopen(app, d); app.fire('activate');
+    expect(d.calls).toEqual([]);
+  });
+
+  test('electron-main registers it before the saved-server start can return', () => {
+    const src = require('fs').readFileSync(require('path').join(__dirname, '../../electron-main.js'), 'utf8');
+    const reg = src.indexOf('registerDockReopen(app');
+    const branch = src.indexOf('const savedServer = getSavedServer();\n\n  if (savedServer) {');
+    expect(reg).toBeGreaterThan(-1);
+    expect(branch).toBeGreaterThan(-1);
+    expect(reg).toBeLessThan(branch);
+    expect(src).not.toMatch(/app\.on\('activate'/);
+    // Startup marks itself done right before it opens each of its windows.
+    expect((src.match(/startupDone = true;/g) || []).length).toBeGreaterThanOrEqual(3);
+  });
+});
