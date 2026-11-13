@@ -20,8 +20,12 @@
     return Icons && Icons.has && Icons.has(name) ? String(Icons[name].small) : '';
   }
 
+  // Where the screen goes when it is done: the main process names it (?next=app for an install
+  // with a saved, signed-in server, which goes into the app); otherwise sign in.
+  var exit = tourPages && tourPages.exitFor ? tourPages.exitFor(window.location.search) : { href: 'login.html', label: 'Go to sign in', signedIn: false };
+
   function goToSignIn() {
-    window.location.href = 'login.html';
+    window.location.href = exit.href;
   }
 
   if (!model || !tourPages || !api) {
@@ -190,7 +194,7 @@
   }
 
   function buildPages(state, accepted) {
-    return tourPages.pages({ choice: state.choice, found: state.found, accepted: accepted });
+    return tourPages.pages({ choice: state.choice, found: state.found, accepted: accepted, exit: exit });
   }
 
   function openTour(state, accepted) {
@@ -254,9 +258,10 @@
     fill();
   }
 
-  var controller = model.createFirstLaunchController({ api: api, render: render });
+  var controller = model.createFirstLaunchController({ api: api, render: render, signedIn: exit.signedIn });
   api.onStatus(controller.onStatus);
   $('fl-load-retry').addEventListener('click', function () { controller.load(); });
+  $('fl-load-skip').label = exit.label;
   $('fl-load-skip').addEventListener('click', goToSignIn);
   controller.load();
 })();

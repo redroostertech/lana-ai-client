@@ -8,6 +8,12 @@
  *     choice:   buildChoiceView() result (cloud or a chat model)
  *     found:    buildFoundView() result, or null (no "already on this computer" page)
  *     accepted: Continue was pressed before (only the progress page)
+ *     exit:     exitFor() result: where the screen goes when it is done (default sign in)
+ *
+ *   exitFor(search)
+ *     The main process names the way on in ?next= (electron-start-page.js signInPage): 'app'
+ *     for an install with a saved, signed-in server, which goes into the app; anything else
+ *     goes to sign in.
  */
 (function (global) {
   'use strict';
@@ -92,7 +98,15 @@
     };
   }
 
-  function progress() {
+  const SIGN_IN = Object.freeze({ href: 'login.html', label: 'Go to sign in', signedIn: false });
+  const OPEN_APP = Object.freeze({ href: 'dashboard.html', label: 'Open LANA', signedIn: true });
+
+  function exitFor(search) {
+    const match = /[?&]next=([^&]*)/.exec(String(search || ''));
+    return match && match[1] === 'app' ? { ...OPEN_APP } : { ...SIGN_IN };
+  }
+
+  function progress(exit) {
     return {
       id: 'progress',
       eyebrow: 'Setting up',
@@ -101,7 +115,7 @@
       detail: 'This happens once.',
       illustration: '<lex-brand-mark id="fl-mark" class="lex-pop" animation="spinner" size="96"></lex-brand-mark>',
       back: false,
-      nextLabel: 'Go to sign in',
+      nextLabel: (exit || SIGN_IN).label,
       // The one way on from here, so the filled button.
       nextVariant: 'primary',
       content: `<div id="fl-progress-card" class="app-tour-card fl-card">
@@ -120,10 +134,10 @@
   }
 
   function pages(input) {
-    if (input.accepted) {return [progress()];}
+    if (input.accepted) {return [progress(input.exit)];}
     const list = [welcome(Boolean(input.found))];
     if (input.found) {list.push(found(input.found));}
-    list.push(chat(input.choice), progress());
+    list.push(chat(input.choice), progress(input.exit));
     return list;
   }
 
@@ -131,7 +145,7 @@
   // Every move forward is a button: no Skip, and no arrow, Return or Escape keys.
   const TOUR = Object.freeze({ className: 'app-tour fl-tour', brand: 'LANA.', skippable: false, keyboardNav: false });
 
-  const api = { pages, TOUR };
+  const api = { pages, exitFor, TOUR };
   global.LanaFirstLaunchPages = api;
   if (typeof module !== 'undefined' && module.exports) {module.exports = api;}
 })(typeof window !== 'undefined' ? window : globalThis);

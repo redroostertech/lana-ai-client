@@ -145,7 +145,13 @@
     api.get('/api/v1/system/ai', { quietStatuses: [404] }).then(function (result) {
       serverAi = result && result.routing ? result : null;
       render();
-    }).catch(function () { serverAi = null; render(); });
+      shareServerAi();
+    }).catch(function () { serverAi = null; render(); shareServerAi(); });
+  }
+
+  // settings-capabilities.js says where chat runs from the same answer, so it is fetched once.
+  function shareServerAi() {
+    window.dispatchEvent(new CustomEvent('lana-server-ai', { detail: serverAi }));
   }
 
   function boot() {
@@ -161,6 +167,8 @@
 
   /** The latest topology, for settings-briefs.js (Speech and Voice model names). */
   window.LanaAiRow.topology = function () { return topology; };
+  /** The server's own AI facts (GET /api/v1/system/ai), for settings-capabilities.js; null until known. */
+  window.LanaAiRow.serverAi = function () { return serverAi; };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();

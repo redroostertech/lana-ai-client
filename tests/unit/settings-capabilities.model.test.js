@@ -19,8 +19,12 @@ const DOCLING = { memoryBytes: DOCLING_MEMORY_BYTES, provided: false, diskBytes:
 const IDLE = { phase: 'ready', current: null, receivedBytes: 0, totalBytes: 0, error: null };
 const ALL_READY = { pipInstalled: true, chat: 'ready', embedding: 'ready', redactor: 'ready', docling: 'ready' };
 
-function planView(memoryGb, { chosenChatId = null, completedAt = '2026-11-09T12:00:00Z', status = IDLE, docling = DOCLING } = {}) {
-  const result = fit.planLocalAi({
+const LOCAL_KINDS = new Set(['embedding', 'chat', 'vision', 'docling']);
+
+// A finished setup has its local files in place, so the plan downloads none of them; an
+// unfinished one still lists them in download.files (electron-first-launch.js plan()).
+function planView(memoryGb, { chosenChatId = null, completedAt = '2026-11-09T12:00:00Z', acceptedAt = '2026-11-09T11:00:00Z', status = IDLE, docling = DOCLING, installed } = {}) {
+  const input = {
     hardware: { totalMemoryBytes: memoryGb * GB, accelerator: { backend: 'metal' }, freeDiskBytes: 200 * GB, chip: 'Test chip' },
     catalog,
     embedding: embeddingModel(),
@@ -28,8 +32,12 @@ function planView(memoryGb, { chosenChatId = null, completedAt = '2026-11-09T12:
     redactor: { memoryBytes: REDACTOR_MEMORY_BYTES },
     docling,
     chosenChatId
-  });
-  return { ...result, status, chosenChatId, acceptedAt: '2026-11-09T11:00:00Z', completedAt };
+  };
+  let result = fit.planLocalAi(input);
+  const inPlace = installed !== undefined ? installed
+    : completedAt ? result.download.files.filter((f) => LOCAL_KINDS.has(f.kind)).map((f) => f.id) : [];
+  if (inPlace.length) {result = fit.planLocalAi({ ...input, installed: inPlace });}
+  return { ...result, status, chosenChatId, acceptedAt, completedAt };
 }
 
 const rowOf = (view, id) => view.rows.find((r) => r.id === id);
@@ -68,8 +76,12 @@ describe('the section', () => {
   });
 
   test('chat in the cloud: no model, no change button, nothing to choose, image reading says why', () => {
-    const view = M.buildCapabilitiesView({ planView: planView(4), servers: { ...ALL_READY, chat: 'not_running' }, includeSpeech: true });
+    const view = M.buildCapabilitiesView({ planView: planView(4), servers: { ...ALL_READY, chat: 'not_running' }, serverAi: { relay: { enabled: true }, chat: { state: 'not_set' } }, includeSpeech: true });
     expect(fact(view.computerFacts, 'Chat runs')).toBe('In the cloud');
+    // Where it goes is said only from the server's facts.
+    const unknown = M.buildCapabilitiesView({ planView: planView(4), servers: { ...ALL_READY, chat: 'not_running' } });
+    expect(fact(unknown.computerFacts, 'Chat runs')).toBe('On your organization\'s server');
+    expect(rowOf(unknown, 'images').summary).toBe('Goes with chat, off this computer.');
     expect(view.chat).toMatchObject({ cloud: true, name: 'None on this computer', badge: null, canChange: false });
     expect(view.choices).toEqual([]);
     expect(rowOf(view, 'images')).toMatchObject({ badge: 'Off', summary: 'Uses the cloud, with chat.' });
@@ -103,22 +115,22 @@ describe('the section', () => {
     expect(rowOf(view, 'search')).toMatchObject({ badge: 'Not running', tone: 'yellow', summary: 'Set up, but not answering. LANA keeps trying.' });
   });
 
-  test('no AI server on this computer: chat uses the cloud for now, and says why', () => {
-    const view = M.buildCapabilitiesView({ planView: planView(24), servers: { ...ALL_READY, pipInstalled: false, chat: 'not_running' } });
-    expect(fact(view.computerFacts, 'Chat runs')).toBe('In the cloud for now');
-    expect(view.chat).toMatchObject({ badge: null, note: 'LANA\'s AI server is not on this computer yet, so chat uses the cloud.' });
+  test('no AI server on this computer: says so, and where chat goes only from the server\'s facts', () => {
+    const view = M.buildCapabilitiesView({ planView: planView(24), servers: { ...ALL_READY, pipInstalled: false, chat: 'not_running' }, serverAi: { relay: { enabled: true }, chat: { state: 'not_set' } } });
+    expect(fact(view.computerFacts, 'Chat runs')).toBe('Not on this computer yet. Uses the cloud for now.');
+    expect(view.chat).toMatchObject({ badge: null, note: 'LANA\'s AI server is not on this computer yet. Uses the cloud for now.' });
   });
 
-  test('a download in progress: the progress words, the cloud until setup finishes, and no change button', () => {
+  test('a download in progress: the progress words, where chat runs meanwhile, and no change button', () => {
     const status = { phase: 'downloading', current: { id: 'qwen3.5-4b-q4', kind: 'chat', name: 'Qwen3.5 4B' }, receivedBytes: 1 * GB, totalBytes: 4 * GB, error: null };
     const view = M.buildCapabilitiesView({ planView: planView(24, { chosenChatId: 'qwen3.5-4b-q4', completedAt: null, status }), servers: ALL_READY });
     expect(view.progress).toMatchObject({ heading: 'Downloading', current: 'Now getting the chat model.', bytes: '1 GB of 4 GB', percent: 25, canPause: true, canResume: false, canRetry: false });
     // The old chat server keeps answering until the new files are in place.
     expect(fact(view.computerFacts, 'Chat runs')).toBe('On this computer');
     expect(view.chat).toMatchObject({ name: 'Qwen3.5 4B', badge: null, note: 'Until this model is ready, chat keeps using the one it has now.' });
-    // On first setup no chat server runs yet, so chat uses the cloud meanwhile.
-    const first = M.buildCapabilitiesView({ planView: planView(24, { completedAt: null, status }), servers: { ...ALL_READY, chat: 'not_running' } });
-    expect(fact(first.computerFacts, 'Chat runs')).toBe('In the cloud until setup finishes');
+    // On first setup no chat server runs yet: getting ready, and the cloud meanwhile only when the server has it.
+    const first = M.buildCapabilitiesView({ planView: planView(24, { completedAt: null, status }), servers: { ...ALL_READY, chat: 'not_running' }, serverAi: { relay: { enabled: true }, chat: { state: 'not_set' } } });
+    expect(fact(first.computerFacts, 'Chat runs')).toBe('Getting ready: downloading the chat model (25%). Uses the cloud for now.');
     expect(first.chat.note).toBe('');
   });
 
@@ -242,4 +254,125 @@ describe('changing the chat model', () => {
 test('every capsule that means working says Ready: no row uses a second word for it', () => {
   const src = require('fs').readFileSync(require('path').join(__dirname, '../../src/js/settings-capabilities.model.js'), 'utf8');
   expect(src).not.toMatch(/label: 'On'/);
+});
+
+describe('truthful status before and during setup', () => {
+  const NONE_RUNNING = { pipInstalled: true, chat: 'not_running', embedding: 'not_running', redactor: 'ready', docling: 'not_installed' };
+  const RELAY_OFF = { relay: { enabled: false }, chat: { state: 'not_set' } };
+  const RELAY_ON = { relay: { enabled: true }, chat: { state: 'not_set' } };
+  const SERVER_CHAT = { relay: { enabled: false }, chat: { state: 'running' } };
+  const never = (extra = {}) => planView(24, { acceptedAt: null, completedAt: null, ...extra });
+  // The status words (not each row's fixed "What it does" line, where the privacy filter names cloud requests).
+  const shownText = (view) => JSON.stringify([view.computerFacts.map((f) => f.value), view.chat.name, view.chat.detail, view.chat.note, view.rows.map((r) => [r.badge, r.summary])]);
+
+  test('the fixture: a computer that never set up still needs its chat file', () => {
+    const view = never();
+    expect(view.download.files.map((f) => f.kind)).toEqual(expect.arrayContaining(['chat', 'embedding']));
+  });
+
+  test('never set up, no cloud, no server model: says it is not set up and chat has nowhere to run', () => {
+    const view = M.buildCapabilitiesView({ planView: never(), servers: NONE_RUNNING, serverAi: RELAY_OFF });
+    const runs = fact(view.computerFacts, 'Chat runs');
+    expect(runs).toMatch(/^Not set up on this computer yet\./);
+    expect(runs).toMatch(/Chat has nowhere to run/);
+    expect(shownText(view)).not.toMatch(/until setup finishes/);
+    expect(shownText(view)).not.toMatch(/cloud/i);
+  });
+
+  test('never set up, the server uses the cloud: "Uses the cloud for now"', () => {
+    const view = M.buildCapabilitiesView({ planView: never(), servers: NONE_RUNNING, serverAi: RELAY_ON });
+    expect(fact(view.computerFacts, 'Chat runs')).toBe('Not set up on this computer yet. Uses the cloud for now.');
+  });
+
+  test('never set up, the server runs its own chat model: "Uses your server\'s model for now"', () => {
+    const view = M.buildCapabilitiesView({ planView: never(), servers: NONE_RUNNING, serverAi: SERVER_CHAT });
+    expect(fact(view.computerFacts, 'Chat runs')).toBe('Not set up on this computer yet. Uses your server\'s model for now.');
+  });
+
+  test('downloading: says it is getting ready, with the progress', () => {
+    const status = { phase: 'downloading', current: { id: 'qwen3.5-9b-q4', kind: 'chat', name: 'Qwen3.5 9B' }, receivedBytes: 1 * GB, totalBytes: 4 * GB, error: null };
+    const view = M.buildCapabilitiesView({ planView: planView(24, { completedAt: null, status }), servers: NONE_RUNNING, serverAi: RELAY_OFF, status });
+    const runs = fact(view.computerFacts, 'Chat runs');
+    expect(runs).toMatch(/^Getting ready: downloading the chat model \(25%\)\./);
+    expect(runs).toMatch(/Chat has nowhere to run until setup finishes\./);
+    expect(runs).not.toMatch(/cloud/i);
+    expect(view.progress).toMatchObject({ percent: 25 });
+  });
+
+  test('relay off never says cloud, even when the AI server is missing or the computer is too small', () => {
+    const noPip = M.buildCapabilitiesView({ planView: never(), servers: { ...NONE_RUNNING, pipInstalled: false }, serverAi: RELAY_OFF });
+    expect(shownText(noPip)).not.toMatch(/cloud/i);
+    const small = M.buildCapabilitiesView({ planView: planView(4), servers: NONE_RUNNING, serverAi: RELAY_OFF });
+    expect(fact(small.computerFacts, 'Chat runs')).not.toMatch(/cloud/i);
+  });
+
+  test('the embedding file not here and its server not running: Search needs its model, not "not answering"', () => {
+    const view = M.buildCapabilitiesView({ planView: never(), servers: NONE_RUNNING, serverAi: RELAY_OFF });
+    const search = rowOf(view, 'search');
+    expect(search.summary).toMatch(/^Needs its model/);
+    expect(search.summary).not.toMatch(/not answering/);
+    expect(rowOf(view, 'images').summary).toMatch(/^Needs its model/);
+  });
+
+  test('during setup the rows whose files are coming say Downloading', () => {
+    const status = { phase: 'downloading', current: { id: 'x', kind: 'embedding', name: 'x' }, receivedBytes: 1, totalBytes: 4 * GB, error: null };
+    const view = M.buildCapabilitiesView({ planView: planView(24, { completedAt: null, status }), servers: NONE_RUNNING, serverAi: RELAY_OFF, status });
+    expect(rowOf(view, 'search')).toMatchObject({ badge: 'Downloading' });
+    expect(rowOf(view, 'search').summary).not.toMatch(/not answering/);
+    expect(rowOf(view, 'images')).toMatchObject({ badge: 'Downloading' });
+  });
+
+  test('files in place, the AI server installed, not running: keeps "Set up, but not answering"', () => {
+    const view = M.buildCapabilitiesView({ planView: planView(24), servers: NONE_RUNNING, serverAi: RELAY_OFF });
+    expect(rowOf(view, 'search')).toMatchObject({ badge: 'Not running', summary: 'Set up, but not answering. LANA keeps trying.' });
+    expect(rowOf(view, 'images')).toMatchObject({ badge: 'Not running', summary: 'Set up, but not answering. LANA keeps trying.' });
+  });
+
+  test('never set up with files to fetch: Settings offers setup with the size', () => {
+    const view = M.buildCapabilitiesView({ planView: never(), servers: NONE_RUNNING, serverAi: RELAY_OFF });
+    expect(view.setup).toMatchObject({ label: expect.stringMatching(/^Set up local AI: about [\d.]+ GB$/) });
+    // Once Continue was pressed, or with nothing to fetch, there is no offer.
+    expect(M.buildCapabilitiesView({ planView: planView(24, { completedAt: null }), servers: NONE_RUNNING }).setup).toBeNull();
+    expect(M.buildCapabilitiesView({ planView: planView(24, { acceptedAt: null }), servers: ALL_READY }).setup).toBeNull();
+  });
+
+  test('never set up: document reading, speech and voice do not claim they install or are ready', () => {
+    const view = M.buildCapabilitiesView({ planView: never(), servers: NONE_RUNNING, serverAi: RELAY_OFF, includeSpeech: true });
+    expect(rowOf(view, 'documents').summary).toBe('Set up local AI above to install it.');
+    expect(rowOf(view, 'speech')).toMatchObject({ badge: 'Not installed', summary: 'Set up local AI above to add it.' });
+    expect(rowOf(view, 'voice')).toMatchObject({ badge: 'Not installed', summary: 'Set up local AI above to add it.' });
+  });
+
+  test('copy says computer, never a brand of device', () => {
+    const view = M.buildCapabilitiesView({ planView: never(), servers: NONE_RUNNING, serverAi: RELAY_ON });
+    expect(JSON.stringify(view)).not.toMatch(/\bMac\b|iPhone|\u2013|\u2014/);
+  });
+});
+
+describe('the setup offer in Settings', () => {
+  test('Set up calls the first-launch Continue, and the section follows the downloads', async () => {
+    const view = planView(24, { acceptedAt: null, completedAt: null });
+    const api = {
+      getCapabilities: jest.fn(async () => ({ success: true, plan: view, servers: ALL_READY })),
+      continue: jest.fn(async () => ({ success: true, status: { phase: 'downloading', current: null, receivedBytes: 0, totalBytes: GB, error: null } }))
+    };
+    const frames = [];
+    const c = M.createCapabilitiesController({ api, render: (f) => frames.push(f) });
+    await c.load();
+    expect(frames[frames.length - 1].view.setup).not.toBeNull();
+    await c.setUp();
+    expect(api.continue).toHaveBeenCalledWith({ useExisting: false });
+    const last = frames[frames.length - 1];
+    expect(last.view.progress).toMatchObject({ heading: 'Downloading' });
+    expect(last.view.setup).toBeNull();
+  });
+
+  test('the server facts can arrive after the plan and change the words', async () => {
+    const api = { getCapabilities: jest.fn(async () => ({ success: true, plan: planView(24, { acceptedAt: null, completedAt: null }), servers: { ...ALL_READY, chat: 'not_running' } })) };
+    const frames = [];
+    const c = M.createCapabilitiesController({ api, render: (f) => frames.push(f) });
+    await c.load();
+    c.setServerAi({ relay: { enabled: true }, chat: { state: 'not_set' } });
+    expect(fact(frames[frames.length - 1].view.computerFacts, 'Chat runs')).toBe('Not set up on this computer yet. Uses the cloud for now.');
+  });
 });

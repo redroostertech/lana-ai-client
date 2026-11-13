@@ -287,3 +287,12 @@ test('a finished setup says LANA is ready, not that it is getting ready, and doe
   expect(done.current).toBe('');
   expect(done.heading).not.toMatch(/ready|all set/i);
 });
+
+test('a signed-in install is not told to sign in: the notes speak of opening LANA', () => {
+  ['downloading', 'checking', 'paused', 'failed', 'idle'].forEach((phase) => {
+    const note = fl.buildProgressView({ phase, totalBytes: 1 }, { signedIn: true }).note;
+    expect(note).not.toMatch(/sign in/);
+  });
+  expect(fl.buildProgressView({ phase: 'downloading', totalBytes: 1 }, { signedIn: true }).note).toMatch(/keeps going in the background/);
+  expect(fl.buildProgressView({ phase: 'paused', totalBytes: 1 }, { signedIn: true }).note).toMatch(/picks up again/);
+});

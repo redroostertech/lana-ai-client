@@ -164,8 +164,10 @@
   /**
    * What the progress part shows after Continue.
    * @param {Object} status - electron-first-launch.js status(): phase, current, receivedBytes, totalBytes, error
+   * @param {Object} [options] - { signedIn }: the screen goes into the app, not to sign in, so the
+   *                             notes speak of opening LANA
    */
-  function buildProgressView(status) {
+  function buildProgressView(status, options) {
     var s = status || {};
     var total = s.totalBytes || 0;
     var received = Math.min(s.receivedBytes || 0, total || Infinity);
@@ -178,7 +180,9 @@
     // finished setup does not still say it is getting ready.
     var SETTING_UP = { eyebrow: 'Setting up', title: 'Getting LANA ', accent: 'ready', detail: 'This happens once.' };
     var base = { phase: s.phase || 'idle', percent: percent, bytes: bytes, current: '', error: null, canPause: false, canResume: false, canRetry: false, tone: 'normal', mark: 'spinner', note: '', header: SETTING_UP };
-    var KEEPS_GOING = 'The download keeps going in the background after you sign in.';
+    var signedIn = Boolean(options && options.signedIn);
+    var KEEPS_GOING = signedIn ? 'The download keeps going in the background while you use LANA.' : 'The download keeps going in the background after you sign in.';
+    var GO_ON_NOW = signedIn ? 'If you open LANA now, ' : 'If you sign in now, ';
 
     switch (s.phase) {
       case 'downloading':
@@ -186,9 +190,9 @@
       case 'checking':
         return Object.assign(base, { heading: 'Checking the files', current: 'Making sure every file is complete.', percent: total ? percent : 100, note: KEEPS_GOING });
       case 'paused':
-        return Object.assign(base, { heading: 'Paused', current: 'What has downloaded so far is saved.', canResume: true, mark: 'idle', note: 'If you sign in now, LANA picks up again next time it opens.' });
+        return Object.assign(base, { heading: 'Paused', current: 'What has downloaded so far is saved.', canResume: true, mark: 'idle', note: GO_ON_NOW + 'LANA picks up again next time it opens.' });
       case 'failed':
-        return Object.assign(base, { heading: 'The download stopped', error: failedMessage(s.error), canRetry: true, tone: 'danger', mark: 'idle', note: 'If you sign in now, LANA tries again next time it opens.' });
+        return Object.assign(base, { heading: 'The download stopped', error: failedMessage(s.error), canRetry: true, tone: 'danger', mark: 'idle', note: GO_ON_NOW + 'LANA tries again next time it opens.' });
       case 'ready':
         return Object.assign(base, { heading: 'Every file is in place and checked', percent: 100, current: '', tone: 'good', mark: 'success', note: '', header: { eyebrow: 'All set', title: 'LANA is ', accent: 'ready', detail: '' } });
       default:
@@ -219,7 +223,8 @@
 
   /**
    * The screen's steps. api is window.electronAPI.firstLaunch (electron-preload.js); render
-   * gets { mode: 'loading'|'choose'|'progress', choice, progress, error }.
+   * gets { mode: 'loading'|'choose'|'progress', choice, progress, error }. options.signedIn: the
+   * screen goes into the app when done (first-launch.pages.js exitFor).
    */
   function createFirstLaunchController(options) {
     var api = options.api;
@@ -234,7 +239,7 @@
         busy: state.busy,
         error: state.error,
         choice: state.planView ? buildChoiceView(state.planView) : null,
-        progress: buildProgressView(state.status),
+        progress: buildProgressView(state.status, { signedIn: Boolean(options.signedIn) }),
         looking: state.found === null,
         found: state.found ? buildFoundView(state.found) : null,
         useExisting: state.useExisting

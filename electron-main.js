@@ -102,6 +102,7 @@ const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerifi
 chefPin.configure({ getSavedServer });
 const { createLocalEngineHost } = require('./electron-local-engine');
 const { createTokenStore, registerTokenIpc, hasLiveSession } = require('./electron-token-store');
+const { startPage, pageAfterSetup, signInPage } = require('./electron-start-page');
 
 // The login token: OS-keychain encrypted at rest, memory only when no keychain.
 const authTokenStore = createTokenStore({ safeStorage, persistence: authTokenPersistence });
@@ -1140,9 +1141,10 @@ function createWindow(serverUrl = null, startPage = 'dashboard.html') {
 }
 
 // The first-launch setup screen comes before sign-in until the person has pressed Continue
-// once (first-launch plan, phase D); it then moves on to the login page itself.
-function signInPageName() {
-  return firstLaunchPersistence.read().acceptedAt ? 'login.html' : 'first-launch.html';
+// once (first-launch plan, phase D); it then moves on by itself, into the app when next is
+// 'app' (a saved, signed-in server), else to the login page (electron-start-page.js).
+function signInPageName(next = 'login') {
+  return signInPage({ acceptedAt: firstLaunchPersistence.read().acceptedAt, next });
 }
 
 /** file:// URL of a page under public_html; relativeUrl may carry a ?query. */
@@ -1158,7 +1160,7 @@ function publicPageUrl(relativeUrl) {
  * Create login window
  * With hosted discovery, we go straight to login - org resolution happens there
  */
-function createLoginWindow() {
+function createLoginWindow(next = 'login') {
   logInfo('Creating login window (hosted discovery mode)');
 
   mainWindow = new BrowserWindow({
@@ -1186,7 +1188,7 @@ function createLoginWindow() {
   });
   watchScreenVoiceAuthentication(mainWindow);
 
-  const loginUrl = publicPageUrl(signInPageName());
+  const loginUrl = publicPageUrl(signInPageName(next));
   mainWindow.loadURL(loginUrl);
   mainWindow.webContents.once('did-finish-load', () => deepLinkQueue.markReady());
 
@@ -2635,22 +2637,33 @@ app.whenReady().then(async () => {
       syncBriefs(refreshedServer);
     }
 
-    if (isReachable) {
-      logInfo('[electron-main] Saved server is reachable, loading main app...');
-      updateLastVerified();
+    // The setup screen is the one consent step for local AI, so an install that never pressed
+    // Continue sees it first even with a saved, signed-in server; it then goes into the app.
+    const startFacts = {
+      savedServer: effectiveServer,
+      reachable: isReachable,
+      liveSession: hasLiveSession(authTokenStore.get(), Date.now()),
+      offlineReady: localEngine.canOpenOffline()
+    };
+    const firstPage = startPage({ ...startFacts, acceptedAt: firstLaunchPersistence.read().acceptedAt });
+    if (pageAfterSetup(startFacts) === 'app') {
+      if (isReachable) {
+        logInfo('[electron-main] Saved server is reachable, loading main app...');
+        updateLastVerified();
+      } else {
+        // Phase 10: offline. Keep the saved server and open with the local
+        // engine, which answers the person's own chats and documents from the
+        // offline copy until the server is back.
+        logInfo('[electron-main] Saved server is not reachable; opening with the local engine and its offline copy');
+      }
       await localEngine.sync().catch((error) => logError('[electron-main] Local AI engine did not start', error));
       await localEngine.untilReady();
-      createWindow(effectiveServer.url);
-      syncBriefs(effectiveServer);
-      return;
-    } else if (localEngine.canOpenOffline() && hasLiveSession(authTokenStore.get(), Date.now())) {
-      // Phase 10: offline. Keep the saved server and open with the local
-      // engine, which answers the person's own chats and documents from the
-      // offline copy until the server is back.
-      logInfo('[electron-main] Saved server is not reachable; opening with the local engine and its offline copy');
-      await localEngine.sync().catch((error) => logError('[electron-main] Local AI engine did not start', error));
-      await localEngine.untilReady();
-      createWindow(effectiveServer.url);
+      if (firstPage === 'first-launch') {
+        logInfo('[electron-main] Local AI setup was never accepted; showing the setup screen before the app');
+        createLoginWindow('app');
+      } else {
+        createWindow(effectiveServer.url);
+      }
       syncBriefs(effectiveServer);
       return;
     } else {
@@ -2670,10 +2683,10 @@ app.whenReady().then(async () => {
   app.on('activate', () => {
     if (!mainWindow || mainWindow.isDestroyed()) {
       const savedServer = getSavedServer();
-      if (savedServer) {
+      if (savedServer && firstLaunchPersistence.read().acceptedAt) {
         createWindow(savedServer.url);
       } else {
-        createLoginWindow();
+        createLoginWindow(savedServer ? 'app' : 'login');
       }
     }
   });

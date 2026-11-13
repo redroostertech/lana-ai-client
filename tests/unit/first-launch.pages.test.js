@@ -44,3 +44,24 @@ test('welcome with files found: says so, with a button to the found step instead
   expect(plain.content).not.toMatch(/Found AI files/);
   expect(plain.next).toBe(true);
 });
+
+describe('where the screen goes when it is done (main names it in ?next=)', () => {
+  const { exitFor } = require('../../src/js/first-launch.pages');
+
+  test('a signed-in install goes into the app, with a button that says so', () => {
+    expect(exitFor('?next=app')).toEqual({ href: 'dashboard.html', label: 'Open LANA', signedIn: true });
+  });
+
+  test('otherwise sign in; anything else in next is ignored', () => {
+    const signIn = { href: 'login.html', label: 'Go to sign in', signedIn: false };
+    expect(exitFor('')).toEqual(signIn);
+    expect(exitFor('?next=login')).toEqual(signIn);
+    expect(exitFor('?next=https://evil.example')).toEqual(signIn);
+    expect(exitFor(undefined)).toEqual(signIn);
+  });
+
+  test('the progress page button follows it', () => {
+    const [progress] = pages({ choice: local, accepted: true, exit: exitFor('?next=app') });
+    expect(progress.nextLabel).toBe('Open LANA');
+  });
+});

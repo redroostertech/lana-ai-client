@@ -96,6 +96,17 @@
     setButton(el('sv2-cap-retry'), progress.canRetry, false);
   }
 
+  /** The setup offer: Continue was never pressed (first-launch screen skipped or never shown). */
+  function renderSetup(setup, state) {
+    var box = el('sv2-cap-setup');
+    show(box, Boolean(setup));
+    if (!setup) {return;}
+    text(el('sv2-cap-setup-text'), setup.text);
+    var button = el('sv2-cap-setup-start');
+    button.setAttribute('label', setup.label);
+    setButton(button, true, state.busy);
+  }
+
   function renderRows(rows) {
     var box = el('sv2-ai-local-rows');
     if (!box || !window.LanaAiRow) {return;}
@@ -115,6 +126,7 @@
     renderComputer(state.view.computerFacts);
     renderChat(state.view.chat, state);
     renderChooser(state);
+    renderSetup(state.view.setup, state);
     renderProgress(state.view.progress);
     var notice = el('sv2-cap-notice');
     var message = state.error || state.notice;
@@ -140,6 +152,10 @@
     el('sv2-cap-pause').addEventListener('click', function () { controller.pause(); });
     el('sv2-cap-resume').addEventListener('click', function () { controller.resume(); });
     el('sv2-cap-retry').addEventListener('click', function () { controller.resume(); });
+    el('sv2-cap-setup-start').addEventListener('click', function () { controller.setUp(); });
+    // Where chat runs before setup finishes is said from the server's own facts, fetched once
+    // by settings-ai-models.js for the Cloud group.
+    window.addEventListener('lana-server-ai', function (event) { controller.setServerAi(event.detail); });
     window.addEventListener('lana-briefs-models', function () { controller.redraw(); });
     if (typeof api.onStatus === 'function') {api.onStatus(function (status) { controller.onStatus(status); });}
     document.addEventListener('lex-refresh', function () { controller.load(); });
@@ -153,6 +169,7 @@
     if (!M || !api || typeof api.getCapabilities !== 'function' || !el('sv2-cap')) {return;}
     controller = M.createCapabilitiesController({ api: api, render: render, includeSpeech: function () { return !briefsShowsSpeech(); } });
     wire();
+    if (window.LanaAiRow && typeof window.LanaAiRow.serverAi === 'function') {controller.setServerAi(window.LanaAiRow.serverAi());}
     controller.load();
   }
 
