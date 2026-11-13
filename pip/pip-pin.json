@@ -38,17 +38,23 @@
   },
   "builds": {
     "macos-arm64": {
-      "sha256": "16f42effeeba7c7fcac44d5da1c832e0a4a13ba029572713498fe99138dac001",
-      "bytes": 5923024
+      "sha256": "ab135442b23505a7aa829df00080ed453a113bfd6b215aefbc178951a50ae3ac",
+      "bytes": 5863632,
+      "source": "LANA.cpp CI run 43278937570 (head 396ca2c1d643), job macos-shipping (-DLQE_DISTRIBUTION=ON -DLQE_BUILD_TESTS=ON -DLQE_METAL=ON, the macos-arm64 cmake contract above), lqe-darwin-arm64; saved before the GitHub artifact purge to the LANA Azure parts store at macos-arm64/lqe-396ca2c1d643/lqe-darwin-arm64. CI builds are reproducible; a local build embeds its checkout path and gets a different sha256. Placed as build/pip/lqe; electron-builder signs it (mac.binaries)."
+    },
+    "macos-x64": {
+      "sha256": "ad6ed844298950edd7c00412e0b77ee1a9018baeecafd238ff624c332eeffea2",
+      "bytes": 5801960
     },
     "windows-x64": {
       "sha256": "99bc3137fed239447cd9c221fc4bd343a1363bfd62426586dca95569e6273533",
       "bytes": 79088640,
       "source": "LANA.cpp CI run 43278937570 (head 396ca2c1d643), job windows-shipping, exe lqe-win32-x64.exe. The GitHub artifact was purged 2026-11-12; the exe is kept unchanged in the LANA Azure parts store at windows-x64/lqe-396ca2c1d643/lqe-win32-x64.exe (sha256 above)."
     },
-    "macos-x64": {
-      "sha256": "ad6ed844298950edd7c00412e0b77ee1a9018baeecafd238ff624c332eeffea2",
-      "bytes": 5801960
+    "linux-x64": {
+      "sha256": "3a48ad4a9db631d8d1156c269e743504e8609580a7de777736c4fc9765ae2820",
+      "bytes": 79974736,
+      "source": "LANA.cpp CI run 43278937570 (head 396ca2c1d643), job linux-shipping, lqe-linux-x64; saved before the GitHub artifact purge to the LANA Azure parts store at linux-x64/lqe-396ca2c1d643/lqe-linux-x64. Placed as build/pip/lqe. Imports libvulkan.so.1 (fallback in pip/vulkan-fallback)."
     }
   },
   "vulkanLoader": {
