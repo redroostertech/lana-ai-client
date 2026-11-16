@@ -696,6 +696,62 @@
     }
   };
 
+  // Expand/collapse toggle shared by lex-modal and lex-drawer: a button left
+  // of the close X grows the overlay to fill the app window. Icons are the
+  // LANA dock's full screen arrows (lex-lana-dock.js).
+  const EXPAND_SVG = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" '
+    + 'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    + '<path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/></svg>';
+  const COLLAPSE_SVG = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" '
+    + 'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    + '<path d="M4 14h6v6"/><path d="M20 10h-6V4"/><path d="m14 10 7-7"/><path d="m3 21 7-7"/></svg>';
+  const EXPAND_STORE_PREFIX = 'lex-overlay-expanded:';
+
+  function defaultExpandStore() {
+    try { return global.sessionStorage || null; } catch (_) { return null; }
+  }
+
+  const OverlayExpand = {
+    // opts: { expandable, palette, size }. On unless expandable is false
+    // (property or "false" attribute), a command palette, a small (sm)
+    // dialog, or already full size.
+    isExpandable(opts) {
+      const o = opts || {};
+      if (o.expandable === false || o.expandable === 'false') return false;
+      if (o.palette) return false;
+      if (o.size === 'full' || o.size === 'sm') return false;
+      return true;
+    },
+    label(expanded) { return expanded ? 'Collapse' : 'Expand'; },
+    icon(expanded) { return expanded ? COLLAPSE_SVG : EXPAND_SVG; },
+    buttonHtml(className) {
+      return `<button type="button" class="${className}" data-action="expand" aria-pressed="false" aria-label="Expand" title="Expand">${EXPAND_SVG}</button>`;
+    },
+    sync(button, expanded) {
+      if (!button) return;
+      const text = OverlayExpand.label(expanded);
+      button.setAttribute('aria-pressed', String(!!expanded));
+      button.setAttribute('aria-label', text);
+      button.title = text;
+      button.innerHTML = OverlayExpand.icon(expanded);
+    },
+    // Session memory per overlay id: true/false, or null when unknown.
+    recall(id, store) {
+      if (!id) return null;
+      const s = store === undefined ? defaultExpandStore() : store;
+      try {
+        const v = s ? s.getItem(EXPAND_STORE_PREFIX + id) : null;
+        return v === '1' ? true : (v === '0' ? false : null);
+      } catch (_) { return null; }
+    },
+    remember(id, expanded, store) {
+      if (!id) return;
+      const s = store === undefined ? defaultExpandStore() : store;
+      try { if (s) s.setItem(EXPAND_STORE_PREFIX + id, expanded ? '1' : '0'); } catch (_) { /* storage blocked */ }
+    }
+  };
+
+  global.Lex.OverlayExpand = OverlayExpand;
   global.Lex.OverlayStack = OverlayStack;
   global.Lex.Floating = Floating;
   global.Lex.ScrollLock = ScrollLock;

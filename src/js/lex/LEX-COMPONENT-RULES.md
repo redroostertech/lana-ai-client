@@ -344,17 +344,19 @@ There is no `href`; for navigation use a link or `Lex.Nav.go()` in a click handl
 | `flush` | Boolean | `false` | No body padding (tables, lists, editors edge to edge) |
 | `width` | String | `''` | Any CSS length (`720px`, `60rem`, `90vw`); overrides the `size` max-width |
 | `palette` | Boolean | `false` | Command-palette layout: top-aligned at 12vh, no header, flush body, 640px wide unless `width` is set, no built-in confirm/cancel. Focus trap and Escape still apply; `heading` becomes the dialog's `aria-label`. Set before the first render. |
+| `expandable` | Boolean | `true` | Expand toggle left of the close X (see **Expand toggle** below). `expandable="false"` hides it. Set before the first render. |
 
-**Instance API:** `modal.contentRoot` (the element body content lives in; use it instead of querying `.lex-modal-body`), `setFooterContent(html)`, `setHeaderActions(html)`, `keepOpen()`.
+**Instance API:** `modal.contentRoot` (the element body content lives in; use it instead of querying `.lex-modal-body`), `setFooterContent(html)`, `setHeaderActions(html)`, `keepOpen()`, `expanded`, `setExpanded(bool)`, `toggleExpanded()`.
 
-**Events:** `lex-confirm`, `lex-cancel`, `lex-close`
+**Events:** `lex-confirm`, `lex-cancel`, `lex-close`, `lex-expand-change { expanded }`
 
 **Static API:**
 ```javascript
 if (await Lex.Modal.confirmAsync('Delete?', 'This cannot be undone.', { variant: 'danger' })) { ... }
 const modal = Lex.Modal.open({
   heading, content, size, hideActions, footerContent,
-  hideClose: true, closeOnEscape: false, flush: true, width: '720px'
+  hideClose: true, closeOnEscape: false, flush: true, width: '720px',
+  expandable: false   // optional: hide the expand toggle
 });
 const palette = Lex.Modal.open({ heading: 'Command palette', palette: true, content: paletteEl });
 ```
@@ -380,13 +382,26 @@ const palette = Lex.Modal.open({ heading: 'Command palette', palette: true, cont
 | `cancelText` | String | `'Cancel'` | Footer cancel button |
 | `showFooter` | Boolean | `false` | Show footer with actions |
 | `flush` | Boolean | `false` | No body padding; also `Lex.Drawer.open({ flush: true })` |
+| `expandable` | Boolean | `true` | Expand toggle left of the close X (see **Expand toggle** below). `expandable="false"` or `Lex.Drawer.open({ expandable: false })` hides it. |
 
-**Events:** `lex-confirm`, `lex-cancel`, `lex-close`
+**Instance API:** `expanded`, `setExpanded(bool)`, `toggleExpanded()` (plus the header/footer API above).
+
+**Events:** `lex-confirm`, `lex-cancel`, `lex-close`, `lex-expand-change { expanded }`
 
 **Rules:**
 - **IMPORTANT:** Drawer confirm does NOT auto-close (unlike modal). You must manually set `drawer.open = false` after handling `lex-confirm`.
 - Use drawers for editing forms, detail panels, settings panels
 - Use modals for confirmations, alerts, focused decisions
+
+### Expand toggle (`<lex-modal>` and `<lex-drawer>`)
+
+Every modal and drawer with a header gets an icon button directly left of the close X that grows the overlay to fill the app window (inside the safe area insets) and back. It uses the LANA dock's full screen arrows, is a real `<button>` with `aria-pressed` and an `Expand` / `Collapse` label, and Escape still closes. Rules and storage live in `Lex.OverlayExpand` (`lex.core.js`).
+
+- **Default on.** Small dialogs never expand: no toggle for `Lex.Modal.confirm/alert/confirmAsync/alertAsync/prompt`, `size="sm"` modals, `width="sm"` drawers, a `palette` modal, `size="full"` modals, `width="full"` drawers, or any overlay with `expandable="false"`. Add `expandable="false"` to larger confirm-like dialogs (for example a `size="md"` delete confirmation) and other fixed dialogs whose content cannot use the space.
+- **Session memory:** an overlay with an `id` reopens expanded or not as the user last left it this session (`sessionStorage`, key `lex-overlay-expanded:<id>`). Overlays without an `id` start collapsed.
+- **Styling:** the expanded panel gets `lex-modal-panel--expanded` / `lex-drawer-panel--expanded` (and the overlay `--expanded`). These win over `size`, the `width` attribute and page width overrides, so pages do not need their own fullscreen CSS. Width animates with `--lex-duration-slide`; reduced motion turns it off.
+- Initial focus skips the toggle (it goes where it did before, usually Close), so Enter right after opening keeps its old behaviour.
+- Header actions (`setHeaderActions`, `data-slot="header-actions"`) stay left of the toggle. Never query the toggle by class from page code; call `toggleExpanded()`.
 
 ### `<lex-toast>` (Static API Only)
 

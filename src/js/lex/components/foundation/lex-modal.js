@@ -30,8 +30,12 @@
                          flush body, 640px wide unless width is set, no built-in
                          confirm/cancel. Focus trap and Escape still apply;
                          heading (if any) becomes the dialog's aria-label.
+     expandable="false"  no expand toggle (default on; confirm/alert/prompt,
+                         palette, size="sm" and size="full" never show it)
    modal.contentRoot is the element the body content lives in.
-   Lex.Modal.open({ ..., hideClose, closeOnEscape, flush, width, palette })
+   modal.expanded / setExpanded(bool) / toggleExpanded(); emits
+   lex-expand-change { expanded }. State is remembered per id for the session.
+   Lex.Modal.open({ ..., hideClose, closeOnEscape, flush, width, palette, expandable })
 */
 
 (function () {
@@ -175,6 +179,7 @@
       }
 
       .lex-modal-back,
+      .lex-modal-expand,
       .lex-modal-close {
         display: flex;
         align-items: center;
@@ -195,6 +200,7 @@
       }
 
       .lex-modal-back:hover,
+      .lex-modal-expand:hover,
       .lex-modal-close:hover {
         background: var(--lex-bg-tertiary);
         color: var(--lex-text-primary);
@@ -204,6 +210,44 @@
       .lex-modal-close svg {
         width: 18px;
         height: 18px;
+      }
+
+      .lex-modal-expand svg {
+        width: 15px;
+        height: 15px;
+      }
+
+      .lex-modal-expand:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 2px var(--lex-bg-primary), 0 0 0 4px var(--lex-bg-accent);
+      }
+
+      /* ── Expanded (fills the app window) ─────────────── */
+
+      .lex-modal-panel:where(:has(> .lex-modal-header > .lex-modal-expand)) {
+        min-height: 0;
+        transition: max-width var(--lex-duration-slide, 300ms) var(--lex-ease-out, ease),
+                    max-height var(--lex-duration-slide, 300ms) var(--lex-ease-out, ease),
+                    min-height var(--lex-duration-slide, 300ms) var(--lex-ease-out, ease),
+                    border-radius var(--lex-duration-slide, 300ms) var(--lex-ease-out, ease);
+      }
+
+      .lex-modal-overlay.lex-modal-overlay--expanded {
+        padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+                 env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+      }
+
+      /* Beats size, the width attribute (inline max-width) and page overrides. */
+      lex-modal .lex-modal-panel.lex-modal-panel--expanded {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+        max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+        border-radius: 0;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .lex-modal-panel:where(:has(> .lex-modal-header > .lex-modal-expand)) { transition: none; }
       }
 
       /* ── Body ────────────────────────────────────────── */
@@ -443,7 +487,8 @@
         closeOnEscape: { type: Boolean, default: true },  // close-on-escape="false" keeps Escape from closing
         flush:       { type: Boolean, default: false },  // no body padding
         width:       { type: String, default: '' },      // CSS length; overrides the size max-width
-        palette:     { type: Boolean, default: false }   // command-palette layout (set before first render)
+        palette:     { type: Boolean, default: false },  // command-palette layout (set before first render)
+        expandable:  { type: Boolean, default: true }    // expand toggle left of close; expandable="false" hides it
       };
     }
 
@@ -479,6 +524,8 @@
 
       const palette = !!this.palette;
       const isFull = this.size === 'full' && !palette;
+      const OverlayExpand = window.Lex.OverlayExpand;
+      this._expandable = !!OverlayExpand && OverlayExpand.isExpandable({ expandable: this.expandable, palette, size: this.size });
       const sizeCls = palette && this.size === 'full' ? 'md' : (this.size || 'md');
       const overlayCls = `lex-modal-overlay${isFull ? ' lex-modal-overlay--full' : ''}${palette ? ' lex-modal-overlay--palette' : ''}`;
       const panelCls = `lex-modal-panel lex-modal-panel--${sizeCls}${palette ? ' lex-modal-panel--palette' : ''}${(this.flush || palette) ? ' lex-modal-panel--flush' : ''}`;
@@ -515,6 +562,7 @@
         if (this.headerActions) {
           html += `<div class="lex-modal-header-actions">${this.headerActions}</div>`;
         }
+        if (this._expandable) html += OverlayExpand.buttonHtml('lex-modal-expand');
         html += `<button type="button" class="lex-modal-close" data-action="close" aria-label="Close dialog"${this.hideClose ? ' hidden' : ''}>${CLOSE_SVG}</button>`;
         html += `</div>`;
       }
@@ -602,6 +650,13 @@
         }
       }
 
+      // First update after render: apply the remembered expanded state.
+      if (this._expandable && !this._expandInit) {
+        this._expandInit = true;
+        const remembered = window.Lex.OverlayExpand.recall(this.id);
+        if (remembered !== null) this._applyExpanded(remembered);
+      }
+
       const overlayStack = window.Lex && window.Lex.OverlayStack;
       if (overlayStack) {
         if (this.open) overlayStack.opened(this); else overlayStack.closed(this);
@@ -665,7 +720,10 @@
       // Activate focus trap and move initial focus to first focusable element.
       const panel = this.querySelector('.lex-modal-panel');
       if (panel) {
-        const focusable = window.Lex.FocusTrap.getFocusable(panel);
+        // The expand toggle is skipped for initial focus, so Enter right after
+        // opening does what it did before the toggle existed.
+        const focusable = window.Lex.FocusTrap.getFocusable(panel)
+          .filter((el) => el.getAttribute('data-action') !== 'expand');
         queueMicrotask(() => {
           if (focusable.length > 0) {
             focusable[0].focus();
@@ -705,6 +763,8 @@
         this.emit('lex-close');
         this.open = false;
       });
+
+      this.delegate('click', '[data-action="expand"]', () => this.toggleExpanded());
 
       if (this.closeOnOverlay) {
         this.delegate('click', '[data-action="overlay"]', () => {
@@ -769,7 +829,7 @@
       if (!actions) {
         actions = document.createElement('div');
         actions.className = 'lex-modal-header-actions';
-        const close = header.querySelector('.lex-modal-close');
+        const close = header.querySelector('.lex-modal-expand') || header.querySelector('.lex-modal-close');
         header.insertBefore(actions, close || null);
       }
       actions.innerHTML = html || '';
@@ -793,6 +853,31 @@
       return text;
     }
 
+    // Expanded: the panel fills the app window. No-op when not expandable.
+    get expanded() {
+      return !!this._expanded;
+    }
+
+    setExpanded(on) {
+      if (!this._expandable) return;
+      this._applyExpanded(!!on);
+      window.Lex.OverlayExpand.remember(this.id, this._expanded);
+      this.emit('lex-expand-change', { expanded: this._expanded });
+    }
+
+    toggleExpanded() {
+      this.setExpanded(!this._expanded);
+    }
+
+    _applyExpanded(on) {
+      this._expanded = on;
+      const panel = this.querySelector('.lex-modal-panel');
+      const overlay = this.querySelector('.lex-modal-overlay');
+      if (panel) panel.classList.toggle('lex-modal-panel--expanded', on);
+      if (overlay) overlay.classList.toggle('lex-modal-overlay--expanded', on);
+      window.Lex.OverlayExpand.sync(this.querySelector('.lex-modal-expand'), on);
+    }
+
     // Call from a lex-confirm listener to keep the modal open this time.
     keepOpen() {
       this._keepOpenOnce = true;
@@ -808,6 +893,7 @@
       // cancelText: null (alert) means one button; '' keeps the footer from drawing Cancel.
       modal.cancelText = options.cancelText === null ? '' : (options.cancelText || 'Cancel');
       modal.size = options.size || 'md';
+      modal.expandable = false;  // small confirm/alert dialogs never expand
       modal.innerHTML = `<p class="lex-modal-body-text">${message}</p>`;
       modal.open = true;
 
@@ -877,6 +963,7 @@
         const modal = document.createElement('lex-modal');
         modal.heading = title;
         modal.size = options.size || 'sm';
+        modal.expandable = false;
         modal.confirmText = options.confirmText || 'OK';
         modal.cancelText = options.cancelText || 'Cancel';
         const useLexInput = !!(window.customElements && window.customElements.get('lex-input'));
@@ -945,6 +1032,7 @@
       if (options.flush !== undefined) modal.flush = !!options.flush;
       if (options.width) modal.width = String(options.width);
       if (options.palette !== undefined) modal.palette = !!options.palette;
+      if (options.expandable !== undefined) modal.expandable = options.expandable !== false;
 
       if (options.content) {
         if (typeof options.content === 'string') {

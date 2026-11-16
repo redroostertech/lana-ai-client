@@ -17,6 +17,10 @@
    flush: no body padding (tables, lists, editors edge to edge);
    Lex.Drawer.open({ ..., flush: true }). drawer.contentRoot is the element the
    body content lives in.
+   Expand toggle (left of close, default on): expandable="false" or
+   Lex.Drawer.open({ expandable: false }) hides it; width="full" never shows it.
+   drawer.expanded / setExpanded(bool) / toggleExpanded(); emits
+   lex-expand-change { expanded }. State is remembered per id for the session.
 */
 
 // Pure helper (no DOM dependency), exported for unit tests. Builds the footer
@@ -144,6 +148,7 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
         font-weight: var(--lex-weight-regular, 400);
       }
 
+      .lex-drawer-expand,
       .lex-drawer-close {
         display: flex;
         align-items: center;
@@ -159,6 +164,7 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
         flex-shrink: 0;
       }
 
+      .lex-drawer-expand:hover,
       .lex-drawer-close:hover {
         background: var(--lex-bg-tertiary);
         color: var(--lex-text-primary);
@@ -167,6 +173,41 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
       .lex-drawer-close svg {
         width: 18px;
         height: 18px;
+      }
+
+      .lex-drawer-expand svg {
+        width: 15px;
+        height: 15px;
+      }
+
+      .lex-drawer-expand:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 2px var(--lex-bg-primary), 0 0 0 4px var(--lex-bg-accent);
+      }
+
+      /* ── Expanded (fills the app window) ─────────────── */
+
+      .lex-drawer-panel:where(:has(> .lex-drawer-header > .lex-drawer-expand)) {
+        transition: width var(--lex-duration-slide, 300ms) var(--lex-ease-out, ease);
+      }
+
+      .lex-drawer-overlay.lex-drawer-overlay--expanded {
+        box-sizing: border-box;
+        padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+                 env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+      }
+
+      lex-drawer .lex-drawer-panel.lex-drawer-panel--expanded {
+        width: 100%;
+        max-width: 100%;
+        height: auto;
+        align-self: stretch;
+        border-left: none;
+        border-right: none;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .lex-drawer-panel:where(:has(> .lex-drawer-header > .lex-drawer-expand)) { transition: none; }
       }
 
       /* ── Body ────────────────────────────────────────── */
@@ -319,7 +360,8 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
         cancelText:  { type: String, default: 'Cancel' },
         buttons:     { type: Array, default: null },
         closeOnOverlay: { type: Boolean, default: true },
-        flush:       { type: Boolean, default: false }   // no body padding
+        flush:       { type: Boolean, default: false },  // no body padding
+        expandable:  { type: Boolean, default: true }    // expand toggle left of close; expandable="false" hides it
       };
     }
 
@@ -350,6 +392,8 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
       this._rendered = true;
 
       const sideCls = this.side === 'left' ? 'lex-drawer-overlay--left' : 'lex-drawer-overlay--right';
+      const OverlayExpand = window.Lex.OverlayExpand;
+      this._expandable = !!OverlayExpand && OverlayExpand.isExpandable({ expandable: this.expandable, size: this.width });
       const widthCls = `lex-drawer-panel--${this.width || 'md'}${this.flush ? ' lex-drawer-panel--flush' : ''}`;
 
       // aria-labelledby points to the heading element when a heading is provided.
@@ -368,6 +412,7 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
         html += `<div class="lex-drawer-subtitle"${this.subtitle ? '' : ' style="display:none"'}>${this.subtitle ? this.escapeHtml(this.subtitle) : ''}</div>`;
         html += `</div>`;
         html += `<div class="lex-drawer-header-actions" style="display:flex;align-items:center;gap:4px"></div>`;
+        if (this._expandable) html += OverlayExpand.buttonHtml('lex-drawer-expand');
         html += `<button type="button" class="lex-drawer-close" data-action="close" aria-label="Close drawer">${CLOSE_SVG}</button>`;
         html += `</div>`;
       }
@@ -445,6 +490,13 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
         }
       }
 
+      // First update after render: apply the remembered expanded state.
+      if (this._expandable && !this._expandInit) {
+        this._expandInit = true;
+        const remembered = window.Lex.OverlayExpand.recall(this.id);
+        if (remembered !== null) this._applyExpanded(remembered);
+      }
+
       const overlayStack = window.Lex && window.Lex.OverlayStack;
       if (overlayStack) {
         if (this.open) overlayStack.opened(this); else overlayStack.closed(this);
@@ -507,7 +559,10 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
       // Activate focus trap and move initial focus to first focusable element.
       const panel = this.querySelector('.lex-drawer-panel');
       if (panel) {
-        const focusable = window.Lex.FocusTrap.getFocusable(panel);
+        // The expand toggle is skipped for initial focus, so Enter right after
+        // opening does what it did before the toggle existed.
+        const focusable = window.Lex.FocusTrap.getFocusable(panel)
+          .filter((el) => el.getAttribute('data-action') !== 'expand');
         queueMicrotask(() => {
           if (focusable.length > 0) {
             focusable[0].focus();
@@ -539,6 +594,8 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
       this.delegate('click', '[data-action="confirm"]', () => {
         this.emit('lex-confirm');
       });
+
+      this.delegate('click', '[data-action="expand"]', () => this.toggleExpanded());
 
       if (this.closeOnOverlay) {
         this.delegate('click', '[data-action="overlay"]', () => {
@@ -577,6 +634,31 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
     setFooterVisible(visible) {
       const footer = this.querySelector('.lex-drawer-footer');
       if (footer) footer.classList.toggle('hidden', !visible);
+    }
+
+    // Expanded: the panel fills the app window. No-op when not expandable.
+    get expanded() {
+      return !!this._expanded;
+    }
+
+    setExpanded(on) {
+      if (!this._expandable) return;
+      this._applyExpanded(!!on);
+      window.Lex.OverlayExpand.remember(this.id, this._expanded);
+      this.emit('lex-expand-change', { expanded: this._expanded });
+    }
+
+    toggleExpanded() {
+      this.setExpanded(!this._expanded);
+    }
+
+    _applyExpanded(on) {
+      this._expanded = on;
+      const panel = this.querySelector('.lex-drawer-panel');
+      const overlay = this.querySelector('.lex-drawer-overlay');
+      if (panel) panel.classList.toggle('lex-drawer-panel--expanded', on);
+      if (overlay) overlay.classList.toggle('lex-drawer-overlay--expanded', on);
+      window.Lex.OverlayExpand.sync(this.querySelector('.lex-drawer-expand'), on);
     }
 
     // The element page content lives in (inside the drawer body).
@@ -639,6 +721,7 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
       drawer.showFooter = options.showFooter || false;
       drawer.closeOnOverlay = options.closeOnOverlay !== undefined ? options.closeOnOverlay : true;
       if (options.flush !== undefined) drawer.flush = !!options.flush;
+      if (options.expandable !== undefined) drawer.expandable = options.expandable !== false;
 
       if (options.showFooter) {
         drawer.confirmText = options.confirmText || 'Save';
