@@ -5,6 +5,8 @@ import { WorkflowRunner } from "../runtime/workflowRunner.js";
 import type { NotesBackend } from "./meetingSummarizer.js";
 import { NOTES_MAX_RESPONSE_TOKENS, NOTES_SCHEMA, notesInstructions, notesPrompt, parseNotes, validateNotes, type ChunkExtraction, type ChunkRequest } from "./notesFormat.js";
 import { parseQuestionCheck, QUESTION_CHECK_INSTRUCTIONS, QUESTION_CHECK_MAX_RESPONSE_TOKENS, QUESTION_CHECK_SCHEMA, questionCheckPrompt, validateQuestionCheck, type QuestionCheckRequest, type QuestionResolution } from "./questionCheck.js";
+import { ASIDE_CHECK_INSTRUCTIONS, ASIDE_CHECK_MAX_RESPONSE_TOKENS, ASIDE_CHECK_SCHEMA, asideCheckPrompt, parseAsideCheck, validateAsideCheck, type AsideCheckRequest } from "./asideCheck.js";
+import type { ExtractedAside } from "./notesFormat.js";
 import { HEURISTIC_TOKENS, type TokenCounter } from "./transcriptChunk.js";
 
 /**
@@ -39,6 +41,21 @@ export class RuntimeNotesBackend implements NotesBackend {
     const content = run.output("extract")?.["content"];
     if (run.verdict.status !== "completed" || typeof content !== "string") throw run.modelError ?? BackendError.malformedOutput();
     return parseNotes(content, request.chunk, request.speakers);
+  }
+
+  /** The `notes.aside.v1` workflow: which lines of one part are not part of the meeting. */
+  async checkAsides(request: AsideCheckRequest, signal?: AbortSignal): Promise<ExtractedAside[]> {
+    const run = await this.runner.run("notes.aside.v1", {
+      instructions: ASIDE_CHECK_INSTRUCTIONS,
+      content: asideCheckPrompt(request),
+      maximumResponseTokens: ASIDE_CHECK_MAX_RESPONSE_TOKENS,
+      validators: { [ASIDE_CHECK_SCHEMA]: validateAsideCheck },
+      signal,
+    });
+    signal?.throwIfAborted();
+    const content = run.output("check")?.["content"];
+    if (run.verdict.status !== "completed" || typeof content !== "string") throw run.modelError ?? BackendError.malformedOutput();
+    return parseAsideCheck(content, request.chunk);
   }
 
   /** The `notes.questions.v1` workflow: one call in the question check format, retried once when unreadable. */

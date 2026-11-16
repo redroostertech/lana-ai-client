@@ -210,11 +210,21 @@ export function parseNotes(reply: string, chunk: TranscriptChunk, speakers: read
     const rowBody = formatLineValue("ROW:", line);
     if (rowBody !== undefined) {
       const parts = splitFields(rowBody);
-      if (parts.length !== 3 || isPlaceholder(parts[2]!)) continue;
-      const table = tables.find((item) => sameTitle(item.title, parts[0]!));
-      const lines = citedLines(parts[1]!, chunk);
-      const values = cells(parts[2]!);
-      if (table === undefined || lines.length === 0 || values.length === 0 || values.length > table.columns.length || table.rows.length >= MAX_ROWS) continue;
+      const table = tables.find((item) => sameTitle(item.title, parts[0] ?? ""));
+      if (table === undefined) continue;
+      let lines: number[];
+      let values: string[];
+      if (parts.length === 3 && citedLines(parts[1]!, chunk).length > 0) {
+        if (isPlaceholder(parts[2]!)) continue;
+        lines = citedLines(parts[1]!, chunk);
+        values = cells(parts[2]!);
+      } else {
+        // No line numbers: the cells as written (split by | or ;), cited to the line they repeat.
+        values = parts.length === 2 ? cells(parts[1]!) : parts.slice(1);
+        const repeated = bestLine(values.join(" "), chunk, 2);
+        lines = repeated === undefined ? [] : [chunk.segments.indexOf(repeated) + 1];
+      }
+      if (lines.length === 0 || values.length === 0 || values.length > table.columns.length || table.rows.length >= MAX_ROWS) continue;
       while (values.length < table.columns.length) values.push("");
       table.rows.push({ cells: values, lines });
       continue;
@@ -230,9 +240,48 @@ export function parseNotes(reply: string, chunk: TranscriptChunk, speakers: read
   return { points, candidates, runningSummary, tables: tables.filter((table) => table.rows.length > 0), asides };
 }
 
-/** Every `|`-separated field, trimmed. */
+/** Every `|`-separated field, trimmed, without a field label the model copied ("when: tonight"). */
 function splitFields(body: string): string[] {
-  return body.split("|").map(trimSpaces);
+  return body.split("|").map(trimSpaces).map((field) => field.replace(/^(when|who|due|owner|detail|title|lines|regarding)\s*:\s*/iu, ""));
+}
+
+/** A field naming a speaker: `S2` or "Speaker 2". */
+function isSpeakerLabel(text: string): boolean {
+  return /^(s|speaker\s*)\d+$/iu.test(trimSpaces(text));
+}
+
+/** A when field: none, a calendar date, or words a due date resolves from. */
+function isWhenField(text: string): boolean {
+  const value = trimSpaces(text).toLowerCase();
+  return value === "" || value === "none" || isCalendarDate(value)
+    || /^(by |before |on |until |this |next |end of |the end of )?(today|tonight|tomorrow|eod|cob|this week|next week|week|(the )?end of (the )?(day|week|month)|monday|tuesday|wednesday|thursday|friday|saturday|sunday|morning|afternoon|evening|asap|soon|next month|this month)\b/u.test(value);
+}
+
+/**
+ * Action shapes small models write instead of the format, read as the format's seven fields:
+ * the kind left out with the title first (`title | lines | detail | when | who | regarding`),
+ * who written before the title (`task | lines | S2 | title | when | who`), and five fields
+ * (`task | lines | title | when or detail | who`).
+ */
+function actionShape(parts: readonly string[], chunk: TranscriptChunk): string[] {
+  const typed = ACTION_TYPES[(parts[0] ?? "").toLowerCase()] !== undefined;
+  const cites = parts.length > 1 && citedLines(parts[1]!, chunk).length > 0;
+  if (!typed && cites && (parts.length === 6 || parts.length === 7)) {
+    if (isSpeakerLabel(parts[2]!)) return ["task", parts[1]!, parts[0]!, parts[3]!, parts[4]!, parts[2]!, parts[5] ?? "none"];
+    return ["task", parts[1]!, parts[0]!, parts[2]!, parts[3]!, parts[4]!, parts[5]!];
+  }
+  if (typed && cites && parts.length >= 5 && parts.length <= 7 && isSpeakerLabel(parts[2]!)) {
+    const rest = parts.slice(3);
+    const title = rest[0] ?? "";
+    const when = rest.find((field, index) => index > 0 && isWhenField(field)) ?? "none";
+    return [parts[0]!, parts[1]!, title, "", when, parts[2]!, "none"];
+  }
+  if (typed && cites && parts.length === 5) {
+    return isWhenField(parts[3]!)
+      ? [parts[0]!, parts[1]!, parts[2]!, "", parts[3]!, parts[4]!, "none"]
+      : [parts[0]!, parts[1]!, parts[2]!, parts[3]!, "none", parts[4]!, "none"];
+  }
+  return [...parts];
 }
 
 /** `a; b; c` as trimmed values (empty values kept in place, a trailing empty one dropped). */
@@ -281,10 +330,19 @@ function decider(text: string, speakers: readonly Speaker[]): { valid: boolean; 
   return { valid: false };
 }
 
+/**
+ * The point's kind. Small models often write a topic where the kind goes ("fees"): a topic
+ * naming a decision or a question is that kind, any other topic is a key point.
+ */
+function pointKind(field: string): KeyPointKind {
+  const value = field.toLowerCase();
+  if (value === "decision" || /\bdecision|\bdecided\b/u.test(value)) return "decision";
+  if (value === "question" || /\bquestion/u.test(value)) return "open_question";
+  return "summary";
+}
+
 function parsePoint(parts: readonly string[], chunk: TranscriptChunk, speakers: readonly Speaker[]): ExtractedPoint | undefined {
-  const kinds: Record<string, KeyPointKind> = { summary: "summary", decision: "decision", question: "open_question" };
-  const kind = kinds[(parts[0] ?? "").toLowerCase()];
-  if (kind === undefined) return undefined;
+  const kind = pointKind(parts[0] ?? "");
   let text: string;
   let decidedBy: string | undefined;
   if (parts.length === 3) {
@@ -308,7 +366,7 @@ function parsePoint(parts: readonly string[], chunk: TranscriptChunk, speakers: 
  * the line-number-less form `type | title | detail | when | who | regarding` (Nov 13).
  */
 function actionFrom(input: readonly string[], chunk: TranscriptChunk): QuotedCandidate | undefined {
-  let parts = [...input];
+  let parts = actionShape(input, chunk);
   if (parts.length === 6) {
     if (citedLines(parts[1]!, chunk).length === 0) return matchedAction(parts, chunk);
     parts = [...parts, "none"];
@@ -363,13 +421,13 @@ export function quoteOf(segment: TranscriptSegment, about: string): CandidateQuo
 }
 
 /** The chunk line sharing the most longer words with `text` (at least three), earliest on a tie. */
-function bestLine(text: string, chunk: TranscriptChunk): TranscriptSegment | undefined {
+function bestLine(text: string, chunk: TranscriptChunk, minimum = MINIMUM_SHARED_WORDS): TranscriptSegment | undefined {
   const wanted = matchWords(text);
   let best: { segment: TranscriptSegment; shared: number } | undefined;
   for (const segment of chunk.segments) {
     let shared = 0;
     for (const word of matchWords(segment.text)) if (wanted.has(word)) shared += 1;
-    if (shared >= MINIMUM_SHARED_WORDS && shared > (best?.shared ?? 0)) best = { segment, shared };
+    if (shared >= minimum && shared > (best?.shared ?? 0)) best = { segment, shared };
   }
   return best?.segment;
 }
@@ -395,7 +453,9 @@ function isPlaceholder(text: string): boolean {
   return PLACEHOLDERS.some((placeholder) => placeholder.toLowerCase() === wanted);
 }
 
+const EMPTY_FIELDS = new Set(["none", "not specified", "unspecified", "not stated", "not said", "n/a", "na", "tbd", "unknown", "nobody", "no one"]);
+
 function optionalField(field: string): string | undefined {
   const trimmed = trimSpaces(field);
-  return trimmed === "" || trimmed.toLowerCase() === "none" ? undefined : trimmed;
+  return trimmed === "" || EMPTY_FIELDS.has(trimmed.toLowerCase().replace(/[.]$/u, "")) ? undefined : trimmed;
 }

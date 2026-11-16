@@ -11,6 +11,8 @@ import { resolveDueText } from "./dueDates.js";
 import { groundQuotes } from "./evidenceGrounder.js";
 import { verifiedLines } from "./lineMatcher.js";
 import { quoteOf, type ChunkExtraction, type ChunkPhrasing, type ChunkRequest, type ExtractedPoint, type QuotedCandidate } from "./notesFormat.js";
+import type { AsideCheckRequest } from "./asideCheck.js";
+import type { ExtractedAside } from "./notesFormat.js";
 import { applyQuestionCheck, planQuestionCheck, type QuestionCheckRequest, type QuestionResolution } from "./questionCheck.js";
 import { normalizeText } from "./textNormalizer.js";
 import { DEFAULT_SUMMARY_LIMITS, reduceIntents, reduceKeyPoints, spansFor, unionSpans, type DraftPoint, type SummaryLimits } from "./summaryReducer.js";
@@ -24,6 +26,8 @@ export interface NotesBackend {
   extract(request: ChunkRequest, signal?: AbortSignal): Promise<ChunkExtraction>;
   /** Which open questions the given later lines answer (one call). A backend without it leaves every question open. */
   checkOpenQuestions?(request: QuestionCheckRequest, signal?: AbortSignal): Promise<QuestionResolution[]>;
+  /** Which lines of one part are not part of the meeting (one call per part). A backend without it relies on the notes' ASIDE lines. */
+  checkAsides?(request: AsideCheckRequest, signal?: AbortSignal): Promise<ExtractedAside[]>;
 }
 
 
@@ -166,6 +170,7 @@ export class MeetingSummarizer {
       runningSummary = this.cap(outcome.extraction.runningSummary);
       options.progress?.((chunk.index + 1) / chunks.length);
     }
+    if (fixed === undefined) asides.push(...await this.checkAsides(chunks, skipped, runningSummary, options.speakers, options.signal));
     const setAside = fixed ?? finalSetAside(asides, options.transcript);
     const outside = (sources: readonly SourceSpan[]): boolean => !sources.some((span) => overlapsSetAside(span.start, span.end, setAside, 0.5));
     const kept = points.filter((point) => outside(point.sources));
@@ -214,6 +219,31 @@ export class MeetingSummarizer {
       if (isAbortError(error) || signal?.aborted === true) throw error;
       return points;
     }
+  }
+
+  /** The set-aside check over every part the notes covered; a failed part adds nothing. */
+  private async checkAsides(chunks: readonly TranscriptChunk[], skipped: readonly SkippedChunk[], topic: string, speakers: readonly Speaker[], signal?: AbortSignal): Promise<SetAsidePart[]> {
+    if (this.backend.checkAsides === undefined) return [];
+    const out: SetAsidePart[] = [];
+    for (const chunk of chunks) {
+      if (skipped.some((item) => item.index === chunk.index)) continue;
+      throwIfAborted(signal);
+      let found: ExtractedAside[];
+      try {
+        found = await this.backend.checkAsides({ chunk, topic, speakers }, signal);
+      } catch (error) {
+        if (isAbortError(error) || signal?.aborted === true) throw error;
+        continue;
+      }
+      for (const aside of found) {
+        const cited = aside.lines.flatMap((line) => {
+          const segment = segmentAtLine(chunk, line);
+          return segment === undefined ? [] : [segment];
+        });
+        if (cited.length > 0) out.push({ start: Math.min(...cited.map((segment) => segment.start)), end: Math.max(...cited.map((segment) => segment.end)), reason: aside.reason });
+      }
+    }
+    return out;
   }
 
   private async extract(chunk: TranscriptChunk, runningSummary: string, speakers: readonly Speaker[], vocabulary: readonly string[], signal?: AbortSignal): Promise<{ extraction?: ChunkExtraction; failure?: BackendError; retried: boolean }> {

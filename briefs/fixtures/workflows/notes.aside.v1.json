@@ -1,0 +1,21 @@
+{
+  "initial_state": "check",
+  "states": [
+    {
+      "id": "check",
+      "type": "llm_call",
+      "sub_prompt": "List the stretches that are not part of this meeting, in the required format, or NONE.",
+      "temperature": 0.0,
+      "output_schema": "lana.notes.aside.v1",
+      "retry": {
+        "limit": 1
+      },
+      "next": "checked"
+    },
+    {
+      "id": "checked",
+      "type": "terminal",
+      "outcome": "checked"
+    }
+  ]
+}

@@ -147,7 +147,7 @@ describe("relative due dates", () => {
 
 describe("whole meeting notes", () => {
   async function run(reply: string, extra: Partial<Parameters<MeetingSummarizer["summarize"]>[0]> = {}, checkReply = "Q1: open") {
-    const model = new Scripted([reply, checkReply]);
+    const model = new Scripted(extra.fixedSetAside === undefined ? [reply, "NONE", checkReply] : [reply, checkReply]);
     const summarizer = new MeetingSummarizer(new RuntimeNotesBackend(model, undefined, words), { targetTokens: 4000, maxTokens: 6000 });
     let id = 0;
     const result = await summarizer.summarize({
@@ -229,8 +229,8 @@ describe("whole meeting notes", () => {
       {},
       "Q1: answered | 1 | The controller approves every vendor contract.",
     );
-    expect(model.calls).toHaveLength(2);
-    expect(model.calls[1]!.prompt).toContain("Q1: Who approves the vendor contract?");
+    expect(model.calls).toHaveLength(3);
+    expect(model.calls[2]!.prompt).toContain("Q1: Who approves the vendor contract?");
     expect(result.notes.keyPoints).toEqual([
       expect.objectContaining({ kind: "summary", text: "The controller approves every vendor contract.", sources: [{ start: 100, end: 108, speaker: "S1" }] }),
     ]);
@@ -279,8 +279,80 @@ describe("a pinned clip in Ask", () => {
       consent: { method: "verbal_announced", confirmedBy: [], confirmedAt: new Date(2026, 10, 11) }, userNotes: [], appVersion: "0.1.0", speakers, transcript,
     });
     const record = { ...base, notes: { keyPoints: [], gaps: [], setAside: [{ start: 33, end: 75, reason: "phone_call" as const }] } };
-    const passage = clipPassage({ id: "c1", start: 24, end: 84 }, record);
+    const passage = clipPassage({ id: "c1", start: 24, end: 84, createdAt: new Date(2026, 10, 11) }, record);
     expect(passage?.text).toContain("draft checklist");
     expect(passage?.text).not.toContain("dentist");
+  });
+});
+
+describe("action and row shapes small models write (seen on a real meeting, synthetic text here)", () => {
+  it("reads an action whose kind was left out and its title written first", () => {
+    const parsed = parseNotes("ACTION: send revised schedule | L4 | Omar sends the revised schedule and copies Priya | tonight | S2 | none", chunk);
+    expect(parsed.candidates[0]).toMatchObject({ type: "task.create", title: "send revised schedule", body: "Omar sends the revised schedule and copies Priya", dueText: "tonight", assigneeHint: "S2" });
+  });
+
+  it("reads an action with who written before the title", () => {
+    const parsed = parseNotes("ACTION: task | L4 | S2 | Send the revised schedule tonight | tonight | S2", chunk);
+    expect(parsed.candidates[0]).toMatchObject({ title: "Send the revised schedule tonight", assigneeHint: "S2", dueText: "tonight" });
+  });
+
+  it("reads a five-field action as title, when or detail, and who", () => {
+    expect(parseNotes("ACTION: task | L4 | Send the revised schedule | none | Omar Haddad", chunk).candidates[0]).toMatchObject({ title: "Send the revised schedule", assigneeHint: "Omar Haddad" });
+    const detail = parseNotes("ACTION: task | L4 | Send the revised schedule | Omar sends it and copies Priya | S2", chunk).candidates[0]!;
+    expect(detail).toMatchObject({ body: "Omar sends it and copies Priya", assigneeHint: "S2" });
+    expect(detail.dueText).toBeUndefined();
+  });
+
+  it("drops field labels the model copies from the format", () => {
+    const parsed = parseNotes("ACTION: task | L4 | Send the revised schedule | Omar sends it | when: tonight | who: S2 | none", chunk);
+    expect(parsed.candidates[0]).toMatchObject({ dueText: "tonight", assigneeHint: "S2" });
+  });
+
+  it("reads a row written with | between cells and no line numbers, citing the line it repeats", () => {
+    const parsed = parseNotes("TABLE: Fees | Item; Amount\nROW: Fees | Setup fee | 1,200 dollars\nROW: Fees | Unrelated words | nothing here", chunk);
+    expect(parsed.tables).toEqual([{ title: "Fees", columns: ["Item", "Amount"], rows: [{ cells: ["Setup fee", "1,200 dollars"], lines: [3] }] }]);
+  });
+});
+
+describe("point and action shapes, round two (synthetic)", () => {
+  it("reads a point whose kind was written as a topic as a key point, or by the kind its topic names", () => {
+    const parsed = parseNotes([
+      "POINT: fees | L3 | The setup fee is 1,200 dollars and the monthly fee is 300.",
+      "POINT: open question on approvals | L10 | Who approves the vendor contract?",
+    ].join("\n"), chunk);
+    expect(parsed.points).toEqual([
+      { kind: "summary", text: "The setup fee is 1,200 dollars and the monthly fee is 300.", lines: [3] },
+      { kind: "open_question", text: "Who approves the vendor contract?", lines: [10] },
+    ]);
+  });
+
+  it("reads an action with no kind and who before the detail, and treats 'not specified' as none", () => {
+    const parsed = parseNotes("ACTION: send revised schedule | L4 | S2 | Send the revised schedule and copy Priya | not specified | none", chunk);
+    expect(parsed.candidates[0]).toMatchObject({ title: "send revised schedule", body: "Send the revised schedule and copy Priya", assigneeHint: "S2" });
+    expect(parsed.candidates[0]!.dueText).toBeUndefined();
+  });
+});
+
+describe("the set-aside check (notes.aside.v1)", () => {
+  it("asks once per part what is not part of the meeting and sets those stretches aside", async () => {
+    const replies = ["POINT: summary | L6 | A dentist appointment moves to Friday.\nPOINT: summary | L3 | The setup fee is 1,200 dollars and the monthly fee is 300.\nSUMMARY: Onboarding fees.", "ASIDE: phone_call | L5-L7"];
+    const model = new Scripted(replies);
+    const summarizer = new MeetingSummarizer(new RuntimeNotesBackend(model, undefined, words), { targetTokens: 4000, maxTokens: 6000 });
+    const result = await summarizer.summarize({ transcript, speakers, meetingID, now: new Date(2026, 10, 11, 16, 0) });
+    expect(model.calls[1]!.instructions).toContain("not part of this meeting");
+    expect(model.calls[1]!.prompt).toContain("The meeting is about: Onboarding fees.");
+    expect(result.notes.setAside).toEqual([{ start: 33, end: 75, reason: "phone_call", speakers: ["S1", "S3"] }]);
+    expect(result.notes.keyPoints.map((point) => point.text)).toEqual(["The setup fee is 1,200 dollars and the monthly fee is 300."]);
+  });
+
+  it("reads NONE and junk as nothing set aside, and is skipped on a rewrite", async () => {
+    const { parseAsideCheck } = await import("../../src/summarizer/asideCheck.js");
+    expect(parseAsideCheck("NONE", chunk)).toEqual([]);
+    expect(parseAsideCheck("ASIDE: lunch | L2\nsomething else", chunk)).toEqual([]);
+    expect(parseAsideCheck("ASIDE: other_matter | L5, L6, L7", chunk)).toEqual([{ reason: "other_matter", lines: [5, 6, 7] }]);
+    const model = new Scripted(["SUMMARY: x"]);
+    await new MeetingSummarizer(new RuntimeNotesBackend(model, undefined, words), { targetTokens: 4000, maxTokens: 6000 })
+      .summarize({ transcript, speakers, meetingID, now: new Date(), fixedSetAside: [] });
+    expect(model.calls).toHaveLength(1);
   });
 });
