@@ -146,17 +146,35 @@ export class MacHandoffSession {
     });
 
     let plays = 0;
+    let toneFailed = false;
     let lastEmission = issuedAt;
     for (;;) {
       const { message } = await channel.receive(policy.messageTimeoutMs);
       switch (message.type) {
         case "listening": {
           if (message.payload.sessionID !== sessionID || !policy.allowedMethods.includes("acoustic")) throw new HandoffError("unexpected_message", message.type);
+          // After the tone output failed once, a queued "listening" is not played again: the
+          // phone's QR or approval fallback follows and is read sooner.
+          if (toneFailed) {
+            this.log.info("handoff.mac.tone_skipped", { plays });
+            break;
+          }
           if (plays >= policy.maxTonePlays) throw new HandoffError("attestation_failed", "too many tone attempts");
           plays += 1;
-          await this.deps.tone.play(modulateTone(nonce), STANDARD_TONE.sampleRate);
-          lastEmission = this.clock.now().getTime();
-          this.log.info("handoff.mac.tone_played", { plays });
+          // Playback that fails (the tone output times out when no page plays it) or never ends
+          // must not stop the session: the phone's QR or approval fallback comes next.
+          // The response window starts when playback ends, read at that moment.
+          let endedAt: number | undefined;
+          const playing = this.deps.tone.play(modulateTone(nonce), STANDARD_TONE.sampleRate).then(() => {
+            endedAt = this.clock.now().getTime();
+          });
+          const played = await playWithin(playing, policy.tonePlayTimeoutMs ?? TONE_PLAY_TIMEOUT_MS);
+          lastEmission = endedAt ?? this.clock.now().getTime();
+          if (played) this.log.info("handoff.mac.tone_played", { plays });
+          else {
+            toneFailed = true;
+            this.log.notice("handoff.mac.tone_not_played", { plays });
+          }
           break;
         }
         case "fallback": {
@@ -438,4 +456,20 @@ export class MacHandoffSession {
 
 function send(channel: FrameChannel, message: Parameters<FrameChannel["send"]>[0]["message"]): Promise<void> {
   return channel.send({ message, body: new Uint8Array() });
+}
+
+/** Default limit on one tone playback. */
+const TONE_PLAY_TIMEOUT_MS = 8_000;
+
+/** True when `playing` finished within `ms`; false when it failed or ran past the limit. */
+async function playWithin(playing: Promise<void>, ms: number): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<boolean>((resolve) => {
+    timer = setTimeout(() => resolve(false), ms);
+  });
+  try {
+    return await Promise.race([playing.then(() => true, () => false), timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
