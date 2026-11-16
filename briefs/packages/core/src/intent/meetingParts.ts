@@ -47,6 +47,8 @@ export interface SetAsidePart {
   readonly reason: SetAsideReason;
   /** Diarization labels heard in it; omitted when empty. */
   readonly speakers?: readonly string[] | undefined;
+  /** "person" for a part the person set aside by hand; omitted for parts LANA found. */
+  readonly by?: "person" | undefined;
 }
 
 /** A spoken list (products, prices, a schedule) as a table. Wire key on the notes: `tables`. */
@@ -135,17 +137,19 @@ export function decodeNotes(value: JsonValue, path: string): MeetingNotes {
 
 export function encodeSetAside(part: SetAsidePart): JsonObject {
   const speakers = part.speakers ?? [];
-  return { start: part.start, end: part.end, reason: part.reason, speakers: speakers.length === 0 ? undefined : [...speakers] };
+  return { start: part.start, end: part.end, reason: part.reason, speakers: speakers.length === 0 ? undefined : [...speakers], by: part.by };
 }
 
 export function decodeSetAside(value: JsonValue, path: string): SetAsidePart {
   const object = asObject(value, path);
   const speakers = optional(object, "speakers", path, arrayOf(asString)) ?? [];
+  const by = optional(object, "by", path, (v, p) => asEnum(v, ["person"] as const, p));
   return {
     start: field(object, "start", path, asNumber),
     end: field(object, "end", path, asNumber),
     reason: field(object, "reason", path, (v, p) => asEnum(v, SET_ASIDE_REASONS, p)),
     ...(speakers.length === 0 ? {} : { speakers }),
+    ...(by === undefined ? {} : { by }),
   };
 }
 

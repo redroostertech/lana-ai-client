@@ -605,3 +605,17 @@ describe("key point cap prefers figures within a part (synthetic)", () => {
     expect(kept).toContain("The guardianship fee is 3,500 dollars.");
   });
 });
+
+describe("parts set aside by hand (synthetic)", () => {
+  it("carry by: person on the wire (omitted for LANA's), and keep it through joins", async () => {
+    const { encodeSetAside, decodeSetAside } = await import("../../src/intent/meetingParts.js");
+    const { canonicalString } = await import("../../src/json/canonical.js");
+    expect(canonicalString(encodeSetAside({ start: 1, end: 30, reason: "other_matter", by: "person" }))).toBe('{"by":"person","end":30,"reason":"other_matter","start":1}');
+    expect(canonicalString(encodeSetAside({ start: 1, end: 30, reason: "other_matter" }))).toBe('{"end":30,"reason":"other_matter","start":1}');
+    expect(decodeSetAside({ start: 1, end: 30, reason: "other_matter", by: "person" }, "p")).toMatchObject({ by: "person" });
+    expect(() => decodeSetAside({ start: 1, end: 30, reason: "other_matter", by: "robot" }, "p")).toThrow();
+    const { addingSetAside, normalizeSetAside } = await import("../../src/summarizer/meetingSummarizer.js");
+    expect(addingSetAside([{ start: 0, end: 40, reason: "phone_call" }], { start: 30, end: 60, reason: "other_matter", by: "person" }, [])).toEqual([{ start: 0, end: 60, reason: "phone_call", by: "person" }]);
+    expect(normalizeSetAside([{ start: 0, end: 40, reason: "phone_call", by: "person" }, { start: 10, end: 20, reason: "logistics" }])).toEqual([{ start: 0, end: 40, reason: "phone_call", by: "person" }]);
+  });
+});

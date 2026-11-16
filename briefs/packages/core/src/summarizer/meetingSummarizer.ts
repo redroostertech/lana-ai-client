@@ -443,7 +443,7 @@ export function normalizeSetAside(parts: readonly SetAsidePart[]): SetAsidePart[
     const last = out.at(-1);
     if (last !== undefined && part.start < last.end) {
       const reason = part.end - part.start > last.end - last.start ? part.reason : last.reason;
-      out[out.length - 1] = { ...last, end: Math.max(last.end, part.end), reason };
+      out[out.length - 1] = { ...last, end: Math.max(last.end, part.end), reason, ...(part.by === "person" ? { by: "person" as const } : {}) };
     } else {
       out.push(part);
     }
@@ -454,7 +454,8 @@ export function normalizeSetAside(parts: readonly SetAsidePart[]): SetAsidePart[
 function withSpeakers(parts: readonly SetAsidePart[], transcript: readonly TranscriptSegment[]): SetAsidePart[] {
   return parts.map((part) => {
     const speakers = [...new Set(transcript.filter((segment) => segmentSetAside(segment, [part])).map((segment) => segment.speaker))].sort();
-    return speakers.length === 0 ? { start: part.start, end: part.end, reason: part.reason } : { start: part.start, end: part.end, reason: part.reason, speakers };
+    const by = part.by === "person" ? { by: "person" as const } : {};
+    return speakers.length === 0 ? { start: part.start, end: part.end, reason: part.reason, ...by } : { start: part.start, end: part.end, reason: part.reason, speakers, ...by };
   });
 }
 
@@ -466,9 +467,10 @@ function joinParts(parts: readonly SetAsidePart[], gap: number, sameReasonOnly: 
     const near = last !== undefined && gap > 0 && part.start - last.end < gap && (!sameReasonOnly || part.reason === last.reason);
     if (last !== undefined && (part.start < last.end || near)) {
       const reason = part.end - part.start > last.end - last.start ? part.reason : last.reason;
-      out[out.length - 1] = { start: last.start, end: Math.max(last.end, part.end), reason };
+      const person = last.by === "person" || part.by === "person";
+      out[out.length - 1] = { start: last.start, end: Math.max(last.end, part.end), reason, ...(person ? { by: "person" as const } : {}) };
     } else {
-      out.push({ start: part.start, end: part.end, reason: part.reason });
+      out.push({ start: part.start, end: part.end, reason: part.reason, ...(part.by === "person" ? { by: "person" as const } : {}) });
     }
   }
   return out;

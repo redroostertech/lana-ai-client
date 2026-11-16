@@ -179,6 +179,8 @@ export interface SetAsidePart {
   end: number;
   reason: SetAsideReason;
   speakers: string[];
+  /** "person" when the person set it aside by hand; absent for parts LANA found. */
+  by?: "person";
 }
 
 /** A spoken list as a table. */

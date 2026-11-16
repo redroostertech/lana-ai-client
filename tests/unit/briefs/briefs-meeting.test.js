@@ -196,3 +196,12 @@ describe('same name on two labels', () => {
     expect(M.facts(record)).toContain('Dana Reyes, Omar Haddad.');
   });
 });
+
+describe('who set a part aside', () => {
+  test('LANA and the person are counted apart, LANA first, only the lines that apply', () => {
+    expect(M.setAsideSummary([{ start: 0, end: 240, reason: 'phone_call' }, { start: 300, end: 360, reason: 'other_matter' }, { start: 400, end: 460, reason: 'other_matter', by: 'person' }]))
+      .toBe('LANA set aside 2 parts, 5 minutes. You set aside 1 part, 1 minute');
+    expect(M.setAsideSummary([{ start: 400, end: 460, reason: 'other_matter', by: 'person' }])).toBe('You set aside 1 part, 1 minute');
+    expect(M.setAsideSummary([{ start: 0, end: 25, reason: 'logistics' }])).toBe('LANA set aside 1 part, 1 minute');
+  });
+});

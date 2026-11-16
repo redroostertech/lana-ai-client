@@ -35,7 +35,7 @@ export function toApiMeeting(record: CoreMeeting, extra: { method: CoreMethod; o
       precision: point.precision,
       decidedBy: point.decidedBy ?? null,
     })),
-    setAside: (record.notes.setAside ?? []).map((part) => ({ start: part.start, end: part.end, reason: part.reason, speakers: [...(part.speakers ?? [])] })),
+    setAside: (record.notes.setAside ?? []).map((part) => ({ start: part.start, end: part.end, reason: part.reason, speakers: [...(part.speakers ?? [])], ...(part.by === "person" ? { by: "person" as const } : {}) })),
     tables: (record.notes.tables ?? []).filter((table) => !table.sources.some((span) => overlapsSetAside(span.start, span.end, record.notes.setAside, 0.5))).map((table) => ({
       title: table.title, columns: [...table.columns], rows: table.rows.map((row) => [...row]),
       sources: table.sources.map((span) => ({ start: span.start, end: span.end, speaker: span.speaker ?? null })),

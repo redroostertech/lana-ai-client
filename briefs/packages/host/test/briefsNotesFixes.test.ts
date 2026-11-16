@@ -93,11 +93,11 @@ describe("notes for a meeting recorded here, with the notes fixes", () => {
     expect(rig.store.shared.current(id).notes.setAside ?? []).toEqual([]);
 
     expect(await service.setAside(id, 3, 3, "other_matter")).toEqual({ ok: true, value: null });
-    expect(rig.store.shared.current(id).notes.setAside).toEqual([{ start: 30, end: 60, reason: "other_matter", speakers: ["S3"] }]);
+    expect(rig.store.shared.current(id).notes.setAside).toEqual([{ start: 30, end: 60, reason: "other_matter", speakers: ["S3"], by: "person" }]);
     const model = new Scripted([REPLY]);
     await new NotesWriter(rig.store, model, rig.log).write(id, () => undefined);
     expect(model.prompts[0]).not.toContain("plumber");
-    expect(rig.store.shared.current(id).notes.setAside).toEqual([{ start: 30, end: 60, reason: "other_matter", speakers: ["S3"] }]);
+    expect(rig.store.shared.current(id).notes.setAside).toEqual([{ start: 30, end: 60, reason: "other_matter", speakers: ["S3"], by: "person" }]);
     expect((await service.setAside(id, 9, 9, "phone_call")).ok).toBe(false);
     expect((await service.setAside(id, 1, 1, "lunch" as never)).ok).toBe(false);
   });

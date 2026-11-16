@@ -303,13 +303,21 @@
     return REASONS[reason] || 'not part of the meeting';
   }
 
-  /** "LANA set aside 2 parts, 7 minutes", or "" when nothing is set aside. */
-  function setAsideSummary(parts) {
-    const list = parts || [];
-    if (list.length === 0) return '';
+  function countLine(who, list) {
     const seconds = list.reduce((sum, part) => sum + Math.max(0, part.end - part.start), 0);
     const minutes = Math.max(1, Math.round(seconds / 60));
-    return `LANA set aside ${list.length} ${list.length === 1 ? 'part' : 'parts'}, ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
+    return `${who} set aside ${list.length} ${list.length === 1 ? 'part' : 'parts'}, ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
+  }
+
+  /**
+   * "LANA set aside 2 parts, 5 minutes. You set aside 1 part, 1 minute": LANA's parts and the
+   * ones the person set aside by hand counted apart, LANA first, only the lines that apply.
+   */
+  function setAsideSummary(parts) {
+    const list = parts || [];
+    const lana = list.filter((part) => part.by !== 'person');
+    const person = list.filter((part) => part.by === 'person');
+    return [lana.length > 0 ? countLine('LANA', lana) : '', person.length > 0 ? countLine('You', person) : ''].filter(Boolean).join('. ');
   }
 
   /** "21:58 to 26:09, phone call". */

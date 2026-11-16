@@ -149,7 +149,7 @@ export class RecordsService implements RecordsApi {
       const record = this.gateway.store.shared.current(id);
       const lines = record.transcript.slice(Math.min(Number(first), Number(last)), Math.max(Number(first), Number(last)) + 1);
       if (!Number.isInteger(Number(first)) || !Number.isInteger(Number(last)) || lines.length === 0 || Number(first) < 0) throw new InvalidRecordInput("Choose lines in the transcript.");
-      const part = { start: Math.min(...lines.map((line) => line.start)), end: Math.max(...lines.map((line) => line.end)), reason };
+      const part = { start: Math.min(...lines.map((line) => line.start)), end: Math.max(...lines.map((line) => line.end)), reason, by: "person" as const };
       this.gateway.store.shared.edit(id, (current) => ({
         ...current,
         notes: { ...current.notes, setAside: addingSetAside(current.notes.setAside ?? [], part, current.transcript) },
