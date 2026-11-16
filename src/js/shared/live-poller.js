@@ -105,6 +105,7 @@
   function requestedSubject() {
     var requested = null;
     return {
+      STALE: STALE,
       request: function (id) { requested = id; },
       clear: function () { requested = null; },
       current: function () { return requested; },

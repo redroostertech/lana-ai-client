@@ -573,9 +573,10 @@ function buildAutomationHash(view) {
 async function openLinkedRun() {
   if (state.currentView !== 'runs' || !state.selectedRunId || state.selectedRunDetail) return;
   const runId = state.selectedRunId;
-  try {
-    await loadRunDetail(runId);
-  } catch (_error) {
+  // A link that cannot be opened is forgotten too (runRequests.openLinkedRun),
+  // like every other way the drawer closes.
+  const result = await runRequests.openLinkedRun(runId);
+  if (!result.ok) {
     if (state.selectedRunId === runId) state.selectedRunId = null;
     flash('That run could not be opened. It may have been removed, or it is not yours to see.', true);
   }
@@ -2022,33 +2023,15 @@ async function refreshNotificationBadge() {
 // run is still the requested one: a background refresh for run A that
 // started after a click on run B, or an answer landing after the drawer
 // closed, is dropped.
-const runSubject = window.LanaLivePoller ? window.LanaLivePoller.requestedSubject() : null;
-const STALE_RUN = window.LanaLivePoller ? window.LanaLivePoller.requestedSubject.STALE : null;
+// The wiring lives in js/shared/run-detail-requests.js (unit tested).
+const runRequests = window.AutomationRunDetailRequests.createRunDetailRequests({
+  subject: window.LanaLivePoller ? window.LanaLivePoller.requestedSubject() : null,
+  fetchDetail: (executionId) => fetchJson(`/api/executions/${encodeURIComponent(executionId)}`, { headers: authHeaders() }),
+  apply: applyRunDetail
+});
+const { requestRun, forgetRequestedRun, openRunDetail, loadRunDetail } = runRequests;
 
-function requestRun(executionId) {
-  if (runSubject) runSubject.request(executionId || null);
-}
-
-function forgetRequestedRun() {
-  if (runSubject) runSubject.clear();
-}
-
-// Open a run (a click or a link): record it first, then read it.
-async function openRunDetail(executionId) {
-  if (!executionId) return;
-  requestRun(executionId);
-  await loadRunDetail(executionId);
-}
-
-// Read a run's detail: only for the requested run, applied only if it still is.
-async function loadRunDetail(executionId) {
-  if (!executionId) return;
-  if (runSubject && !runSubject.isRequested(executionId)) return;
-  const request = fetchJson(`/api/executions/${executionId}`, {
-    headers: authHeaders()
-  });
-  const payload = runSubject ? await runSubject.guard(executionId, request) : await request;
-  if (payload === STALE_RUN) return;
+function applyRunDetail(executionId, payload) {
   const opened = state.selectedRunId !== executionId;
   state.selectedRunId = executionId;
   state.selectedRunDetail = payload || null;
