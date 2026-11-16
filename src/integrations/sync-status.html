@@ -17,6 +17,7 @@
   <script src="../js/notifications.js"></script>
   <script src="../js/shared/header-user-menu.js"></script>
   <script src="../js/connectors.js"></script>
+  <script src="../js/connector-sync-queue.model.js"></script>
   <script src="../js/lex/lex.core.js"></script>
   <script src="../js/lex/lex.icons.js"></script>
   <script src="../js/lex/lex.data.js"></script>
@@ -303,10 +304,14 @@
     async function triggerSync(connectorId) {
       try {
         Toast.info('Starting sync...');
-        await Connectors.triggerSync(connectorId);
-        Toast.success('Sync completed successfully');
+        const result = await Connectors.triggerSync(connectorId);
+        Toast.success(LanaConnectorSyncQueue.startedMessage(result));
         loadData();
       } catch (error) {
+        if (LanaConnectorSyncQueue.isAlreadySyncing(error)) {
+          Toast.info('This connection is already syncing.');
+          return;
+        }
         Toast.error('Sync failed: ' + error.message);
       }
     }
@@ -329,11 +334,13 @@
 
         Toast.info(`Syncing ${connected.length} sources...`);
 
-        for (const connector of connected) {
-          await Connectors.triggerSync(connector.id);
-        }
-
-        Toast.success('All syncs completed');
+        // One connection that is already syncing (409) or fails must not stop the rest.
+        const summary = await LanaConnectorSyncQueue.syncAll(
+          connected.map(c => c.id),
+          id => Connectors.triggerSync(id)
+        );
+        const toast = LanaConnectorSyncQueue.summaryToast(summary);
+        Toast[toast.level](toast.message);
         loadData();
       } catch (error) {
         Toast.error('Sync failed: ' + error.message);
