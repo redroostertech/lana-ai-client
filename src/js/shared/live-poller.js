@@ -78,7 +78,21 @@
     return api;
   }
 
-  var moduleApi = { createLivePoller: createLivePoller };
+  /**
+   * One poller per slot on a holder (a view's state): kept while it runs for
+   * the same subject (a run id, a tab), replaced when the subject changes or
+   * when it stopped itself because its view went away and came back.
+   */
+  function ensurePoller(holder, slot, key, create) {
+    var current = holder[slot];
+    if (current && current.running && holder[slot + 'Key'] === key) return current;
+    if (current && typeof current.stop === 'function') current.stop();
+    holder[slot] = create();
+    holder[slot + 'Key'] = key;
+    return holder[slot];
+  }
+
+  var moduleApi = { createLivePoller: createLivePoller, ensurePoller: ensurePoller };
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = moduleApi;
   }

@@ -1,6 +1,6 @@
 const path = require('path');
 
-const { createLivePoller } = require(path.join(__dirname, '../../src/js/shared/live-poller.js'));
+const { createLivePoller, ensurePoller } = require(path.join(__dirname, '../../src/js/shared/live-poller.js'));
 
 function fakeDocument() {
   const listeners = {};
@@ -80,3 +80,26 @@ describe('live poller (shared by the automations and agents run lists)', () => {
     poller.stop();
   });
 });
+
+describe('ensurePoller: one poller per slot, replaced when its subject changes', () => {
+  const make = () => ({ running: true, stop: jest.fn(function stop() { this.running = false; }) });
+
+  test('the same subject keeps the running poller; a new subject replaces it; a stopped one is started again', () => {
+    const holder = {};
+    const create = jest.fn(make);
+    const first = ensurePoller(holder, 'poller', 'run-1', create);
+    expect(ensurePoller(holder, 'poller', 'run-1', create)).toBe(first);
+    expect(create).toHaveBeenCalledTimes(1);
+
+    const second = ensurePoller(holder, 'poller', 'run-2', create);
+    expect(second).not.toBe(first);
+    expect(first.stop).toHaveBeenCalled();
+    expect(holder.poller).toBe(second);
+
+    second.running = false; // stopped itself (its view went away)
+    const third = ensurePoller(holder, 'poller', 'run-2', create);
+    expect(third).not.toBe(second);
+    expect(create).toHaveBeenCalledTimes(3);
+  });
+});
+

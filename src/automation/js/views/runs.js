@@ -651,9 +651,10 @@ function fillRunTrace(context) {
 function keepRunDetailLive(context) {
   const { state } = context;
   const Poller = window.LanaLivePoller;
-  if (!Poller || !state.selectedRunId || (state.runDetailPoller && state.runDetailPoller.running)) return;
+  if (!Poller || !state.selectedRunId) return;
   const runId = state.selectedRunId;
-  state.runDetailPoller = Poller.createLivePoller({
+  // Kept for the same run; opening another run replaces it (shared ensurePoller).
+  Poller.ensurePoller(state, 'runDetailPoller', runId, () => Poller.createLivePoller({
     intervalMs: 3000,
     idleIntervalMs: 3000,
     isActive: () => state.currentView === 'runs' && state.selectedRunId === runId
@@ -672,5 +673,5 @@ function keepRunDetailLive(context) {
       }
       fillRunTrace(context);
     }
-  }).start();
+  }).start());
 }

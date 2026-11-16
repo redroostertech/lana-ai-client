@@ -716,3 +716,20 @@ describe('tools-browser view: pure helpers', () => {
     });
   });
 });
+
+describe('agent-detail view: the Runs tab follows along again when shown again', () => {
+  test('returning to the tab restarts its stopped refresh, without loading the list from scratch', () => {
+    const ctx = createContext();
+    ctx.LanaLivePoller = require(path.join(__dirname, '../../src/js/shared/live-poller.js'));
+    ctx.document.hidden = false;
+    loadView('src/agents/js/views/agent-detail.js', ctx);
+    const testApi = ctx.window.LanaAgentsApp.Views.agentDetail.__test;
+    const stopped = { running: false, stop() {} };
+    const state = { activeTab: 'capabilities', runsLoaded: true, runsPoller: stopped, destroyed: false, _unbindFns: [] };
+    testApi.switchTab(state, 'runs');
+    expect(state.runsPoller).not.toBe(stopped);
+    expect(state.runsPoller.running).toBe(true);
+    state.runsPoller.stop();
+  });
+});
+

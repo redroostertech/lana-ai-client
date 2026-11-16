@@ -880,7 +880,11 @@
         else hide(panels[k]);
       }
     });
-    if (state.activeTab === 'runs')  loadRuns(state);
+    if (state.activeTab === 'runs') {
+      loadRuns(state);
+      // Already loaded: the list stays, and its refresh starts again.
+      if (state.runsLoaded) keepRunsLive(state);
+    }
     if (state.activeTab === 'stats') loadStats(state);
   }
 
@@ -1214,14 +1218,18 @@
   // while a run is live, slower otherwise (shared LanaLivePoller).
   function keepRunsLive(state) {
     var Poller = global.LanaLivePoller;
-    if (!Poller || (state.runsPoller && state.runsPoller.running)) return;
-    state.runsPoller = Poller.createLivePoller({
-      intervalMs: 4000,
-      idleIntervalMs: 20000,
-      isActive: function () { return !state.destroyed && state.activeTab === 'runs'; },
-      isLive: function () { return Boolean(state.runsLive); },
-      refresh: function () { return loadRuns(state, { silent: true }); }
-    }).start();
+    if (!Poller) return;
+    // Kept while it runs; started again when the tab is shown again (it stops
+    // itself while another tab is open). Shared ensurePoller.
+    Poller.ensurePoller(state, 'runsPoller', 'runs', function () {
+      return Poller.createLivePoller({
+        intervalMs: 4000,
+        idleIntervalMs: 20000,
+        isActive: function () { return !state.destroyed && state.activeTab === 'runs'; },
+        isLive: function () { return Boolean(state.runsLive); },
+        refresh: function () { return loadRuns(state, { silent: true }); }
+      }).start();
+    });
   }
 
   function wireRunsList(ctx, state) {
@@ -2336,7 +2344,8 @@
       contextProviderLabel: contextProviderLabel,
       buildRunPayload: buildRunPayload,
       exposureForAgent: exposureForAgent,
-      canEditExposure: canEditExposure
+      canEditExposure: canEditExposure,
+      switchTab: switchTab
     }
   };
 })(typeof window !== 'undefined' ? window : globalThis);
