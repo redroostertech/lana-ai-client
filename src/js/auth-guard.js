@@ -43,11 +43,31 @@
     return path.indexOf('/admin/') !== -1;
   }
 
+  // A framed page reads the top window's token (the preload runs only there)
+  // and never navigates itself to login: the parent owns the session and its
+  // own guard handles sign-in, so the frame only tells the parent.
+  var Bridge = window.LanaAuthTokenBridge || null;
+  function readToken() {
+    if (Bridge) return Bridge.getToken(window);
+    return window.lanaAuthToken?.get() || null;
+  }
+  function isFramed() {
+    if (Bridge) return Bridge.isFramed(window);
+    try { return window.top !== window; } catch (_e) { return true; }
+  }
+  function requireLogin(reason) {
+    if (isFramed()) {
+      if (Bridge) Bridge.notifyAuthRequired(window, reason);
+      return;
+    }
+    window.location.href = loginPath();
+  }
+
   function checkAuth(retries) {
-    var token = window.lanaAuthToken?.get();
+    var token = readToken();
     if (!token) {
       if (retries > 0) { setTimeout(function () { checkAuth(retries - 1); }, 100); return; }
-      window.location.href = loginPath();
+      requireLogin('missing');
       return;
     }
     try {
@@ -56,6 +76,8 @@
       if (window.Lex && window.Lex.state) {
         Lex.state.setAuth(token, user);
         if (Lex.state.isTokenExpired) {
+          // A frame must not clear the parent's session.
+          if (isFramed()) { requireLogin('expired'); return; }
           Lex.state.clearAuth();
           window.location.href = loginPath();
           return;
@@ -73,6 +95,24 @@
     }
   }
   checkAuth(3);
+
+  // Host side: a page that loads app pages in iframes (connector modal, chat
+  // citation viewer, Doc Studio preview) hears lana-auth-required from its
+  // own child frames only, closes that frame's modal and runs its own check,
+  // which handles sign-in normally.
+  function onFramedAuthRequired(frame) {
+    try {
+      var modal = frame.closest ? frame.closest('lex-modal') : null;
+      frame.src = 'about:blank';
+      if (modal) modal.open = false;
+    } catch (_e) { /* noop */ }
+    checkAuth(0);
+  }
+  function installFramedAuthListener() {
+    if (!Bridge || isFramed() || window.__lanaFramedAuthListener) return;
+    window.__lanaFramedAuthListener = true;
+    Bridge.listenForFramedAuthRequired(window, onFramedAuthRequired);
+  }
 
   // Session policy redirects (belt-and-suspenders): a user who already has a
   // stored token from a prior session, or who refreshes straight into a
@@ -153,4 +193,23 @@
       (document.head || document.documentElement).appendChild(_termScript);
     }
   } catch (_e) { /* noop */ }
+
+  // Host listener for lana-auth-required (see onFramedAuthRequired above).
+  if (Bridge) {
+    installFramedAuthListener();
+  } else {
+    // Most host pages do not load the bridge; load it beside this script.
+    try {
+      var _guardEl = document.querySelector('script[src$="js/auth-guard.js"]');
+      if (_guardEl) {
+        var _bridgeScript = document.createElement('script');
+        _bridgeScript.src = _guardEl.src.replace(/auth-guard\.js$/, 'shared/auth-token-bridge.js');
+        _bridgeScript.onload = function () {
+          Bridge = window.LanaAuthTokenBridge || null;
+          installFramedAuthListener();
+        };
+        (document.head || document.documentElement).appendChild(_bridgeScript);
+      }
+    } catch (_e) { /* noop */ }
+  }
 })();

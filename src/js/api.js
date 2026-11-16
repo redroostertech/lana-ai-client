@@ -104,8 +104,38 @@ function extractApiErrorMessage(result, fallback) {
   return fallback || 'Request failed';
 }
 
+// The token store: this window's preload bridge, or, in a same-origin iframe
+// (where the preload does not run), the top window's. See
+// shared/auth-token-bridge.js; pages that do not load it use their own bridge.
+function authTokenStore() {
+  if (typeof window === 'undefined') return null;
+  if (window.LanaAuthTokenBridge) return window.LanaAuthTokenBridge.resolve(window);
+  return window.lanaAuthToken || null;
+}
+
+// True in an iframe. A framed page borrows the top window's session: it never
+// refreshes (the backend rotates the token on refresh, which would invalidate
+// the top window's token) and never owns sign out.
+function isFramedWindow() {
+  if (typeof window === 'undefined') return false;
+  if (window.LanaAuthTokenBridge) return window.LanaAuthTokenBridge.isFramed(window);
+  try { return !!window.top && window.top !== window; } catch (_e) { return true; }
+}
+
 class ApiClient {
   constructor() {
+    // In a frame, read the token from the top window's bridge on every use
+    // instead of caching it, so a refresh done by the top window is picked up.
+    // Writes are ignored: the frame never sets the top window's token.
+    this.framed = isFramedWindow();
+    if (this.framed) {
+      Object.defineProperty(this, 'token', {
+        configurable: true,
+        enumerable: true,
+        get: () => authTokenStore()?.get() || null,
+        set: () => {}
+      });
+    }
     // Get configuration from config.js (must be loaded before this script)
     this.config = window.LanaConfig || {};
 
@@ -192,15 +222,17 @@ class ApiClient {
       // In demo mode, set up fake authentication
       this.token = 'demo-token-' + LanaTime.nowMs();
       this.user = this.config.DEMO_USER || { id: 'demo', email: 'demo@lana.ai' };
-      window.lanaAuthToken?.set(this.token);
+      authTokenStore()?.set(this.token);
       localStorage.setItem('user', JSON.stringify(this.user));
       this.log('Demo mode enabled - using mock data');
     } else {
       // Load from the main-process token store, but invalidate demo tokens when not in demo mode
-      const storedToken = window.lanaAuthToken?.get();
+      const storedToken = authTokenStore()?.get();
       if (storedToken && storedToken.startsWith('demo-token-')) {
-        // Clear demo credentials when switching to live mode
-        window.lanaAuthToken?.clear();
+        // Clear demo credentials when switching to live mode. Run in a frame
+        // this would clear the top window's session; the top window's own
+        // ApiClient runs first and clears it, so a frame never sees a demo token.
+        authTokenStore()?.clear();
         localStorage.removeItem('user');
         this.token = null;
         this.user = null;
@@ -355,6 +387,7 @@ class ApiClient {
    * Refreshes token periodically before it expires
    */
   startTokenRefresh() {
+    if (this.framed) return;
     // Clear any existing timer
     this.stopTokenRefresh();
 
@@ -399,6 +432,7 @@ class ApiClient {
    * Perform token refresh and reschedule next refresh
    */
   async performTokenRefresh() {
+    if (this.framed) return;
     if (this.isRefreshing) {
       this.log('Token refresh already in progress');
       return;
@@ -437,6 +471,7 @@ class ApiClient {
    * Refreshes token if user is active and token is near expiration
    */
   setupActivityListener() {
+    if (this.framed) return;
     const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart'];
     const refreshThreshold = LanaTime.MS_PER_HOUR; // 1 hour
     const activityCheckInterval = 5 * LanaTime.MS_PER_MINUTE; // Check every 5 minutes
@@ -506,7 +541,7 @@ class ApiClient {
     if (document.getElementById('sessionExpiredModal')) return;
 
     // Clear local storage
-    window.lanaAuthToken?.clear();
+    authTokenStore()?.clear();
     localStorage.removeItem('user');
     this.token = null;
     this.user = null;
@@ -1754,7 +1789,7 @@ class ApiClient {
       // Demo mode: accept any credentials
       this.token = 'demo-token-' + LanaTime.nowMs();
       this.user = this.config.DEMO_USER;
-      window.lanaAuthToken?.set(this.token);
+      authTokenStore()?.set(this.token);
       localStorage.setItem('user', JSON.stringify(this.user));
       return { token: this.token, user: this.user };
     }
@@ -1768,7 +1803,7 @@ class ApiClient {
     this.user = LanaSessionGate.needsMfaEnrollment(result) && result.user
       ? { ...result.user, mfaEnrollmentRequired: true }
       : result.user;
-    window.lanaAuthToken?.set(result.token);
+    authTokenStore()?.set(result.token);
     localStorage.setItem('user', JSON.stringify(this.user));
 
     // Token refresh, activity monitoring and session tracking. A user who must
@@ -1786,6 +1821,9 @@ class ApiClient {
    * @returns {Promise<void>} settles once session tracking has started (or failed)
    */
   startSessionServices() {
+    // A frame borrows the top window's session: no refresh timer, no activity
+    // listener, no session tracking. The top window runs them.
+    if (this.framed) return Promise.resolve();
     this.startTokenRefresh();
     this.setupActivityListener();
     if (!window.electronAPI) return Promise.resolve();
@@ -1818,6 +1856,9 @@ class ApiClient {
    * before they are discarded (LanaOfflineCopy.beforeSignOut).
    * @returns {Promise<{ cancelled: boolean }>} cancelled when the person chose to stay signed in
    */
+  // Called inside a frame, this clears the top window's session (the frame
+  // shares its token bridge). No frame path calls logout today; sign out is
+  // the top window's.
   async logout() {
     var offline = typeof window !== 'undefined' ? window.LanaOfflineCopy : null;
     // Only the local engine keeps an offline copy; without it there is nothing to send first.
@@ -1842,19 +1883,21 @@ class ApiClient {
 
       this.token = null;
       this.user = null;
-      window.lanaAuthToken?.clear();
+      authTokenStore()?.clear();
       localStorage.removeItem('user');
     }
     return { cancelled: false };
   }
 
   async refreshToken() {
-    if (this.demoMode) {
+    // Never refresh from a frame: refresh rotates the token and would sign the
+    // top window out. The frame reads whatever token the top window holds.
+    if (this.demoMode || this.framed) {
       return { token: this.token };
     }
     const result = await this.get('/api/v1/auth/refresh');
     this.token = result.token;
-    window.lanaAuthToken?.set(result.token);
+    authTokenStore()?.set(result.token);
     return result;
   }
 
