@@ -2662,10 +2662,474 @@
 
     // Helper: Escape HTML
 
+    let currentEditFieldsMatter = null;
+    let customFieldDefinitions = [];
+    let customFieldValues = [];
+
+    // Open edit custom fields modal
+    async function openEditCustomFieldsModal(matterId) {
+      // Validate matterId is provided
+      if (!matterId || matterId === 'null' || matterId === 'undefined') {
+        console.error('[openEditCustomFieldsModal] Invalid matter ID:', matterId);
+        Lex.Toast.error('Cannot open custom fields: Invalid matter ID');
+        return;
+      }
+
+      currentEditFieldsMatter = matterId;
+
+      // Load current custom field definitions and values
+      let matter = window.currentViewedMatter;
+
+      // If matter is not loaded or doesn't match the requested matterId, fetch it
+      if (!matter || matter.matter_id !== matterId) {
+        try {
+          const result = await api.getMatter(matterId, { bustCache: true });
+
+          // Check for error response from backend: { error: { message: "...", code: "..." } }
+          if (result && result.error) {
+            console.error('[openEditCustomFieldsModal] API error:', result.error);
+            Lex.Toast.error(result.error.message || 'Failed to load matter details');
+            return;
+          }
+
+          // Backend returns { matter: {...} } on success
+          if (result && result.matter) {
+            matter = result.matter;
+            window.currentViewedMatter = matter;
+          } else {
+            console.error('[openEditCustomFieldsModal] Invalid API response:', result);
+            Lex.Toast.error('Failed to load matter details');
+            return;
+          }
+        } catch (error) {
+          console.error('[openEditCustomFieldsModal] Error loading matter:', error);
+          Lex.Toast.error(error.message || 'Failed to load matter details');
+          return;
+        }
+      }
+
+      customFieldDefinitions = [];
+      customFieldValues = [];
+
+      if (matter && matter.metadata?.custom_field_definitions && Array.isArray(matter.metadata.custom_field_definitions)) {
+        customFieldDefinitions = JSON.parse(JSON.stringify(matter.metadata.custom_field_definitions));
+      }
+
+      if (matter && matter.metadata?.custom_fields && Array.isArray(matter.metadata.custom_fields)) {
+        customFieldValues = JSON.parse(JSON.stringify(matter.metadata.custom_fields));
+      }
+
+      // Initialize values for fields that don't have them yet
+      customFieldDefinitions.forEach(def => {
+        const hasValue = customFieldValues.some(v => v.key === def.key);
+        if (!hasValue) {
+          customFieldValues.push({ key: def.key, value: def.default_value || '' });
+        }
+      });
+
+      renderCustomFieldsModal();
+
+      const modal = document.getElementById('editCustomFieldsModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    // Close custom fields modal
+    function closeEditCustomFieldsModal() {
+      const modal = document.getElementById('editCustomFieldsModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      currentEditFieldsMatter = null;
+      customFieldDefinitions = [];
+      customFieldValues = [];
+    }
+
+    // Render custom fields modal content
+    const CUSTOM_FIELD_TYPE_OPTIONS = [
+      { value: 'text', label: 'Text' },
+      { value: 'textarea', label: 'Long text' },
+      { value: 'number', label: 'Number' },
+      { value: 'currency', label: 'Currency' },
+      { value: 'date', label: 'Date' },
+      { value: 'datetime', label: 'Date and time' },
+      { value: 'boolean', label: 'Yes/No' },
+      { value: 'select', label: 'Dropdown' }
+    ];
+
+    // The type and dropdown-value controls are lex-selects (lex-change, not
+    // change): one delegated listener on the container.
+    function bindCustomFieldSelects(container) {
+      if (!container || container.dataset.customFieldSelectsBound === 'true') return;
+      container.dataset.customFieldSelectsBound = 'true';
+      container.addEventListener('lex-change', (e) => {
+        const target = e.target;
+        if (!target || !target.dataset) return;
+        const value = e.detail ? e.detail.value : target.value;
+        if (target.dataset.fieldDefIndex !== undefined) {
+          updateFieldDefinition(Number(target.dataset.fieldDefIndex), target.dataset.fieldDefProp, value);
+        } else if (target.dataset.fieldValueKey !== undefined) {
+          updateFieldValue(target.dataset.fieldValueKey, value);
+        }
+      });
+    }
+
+    function renderCustomFieldsModal() {
+      const container = document.getElementById('customFieldsContainer');
+      bindCustomFieldSelects(container);
+
+      if (customFieldDefinitions.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-8 text-gray-500">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <p class="mt-2 text-sm">No custom fields yet. Click "Add Field" to create one.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="space-y-4">
+          ${customFieldDefinitions.map((def, index) => {
+            const valueObj = customFieldValues.find(v => v.key === def.key);
+            const currentValue = valueObj ? valueObj.value : (def.default_value || '');
+
+            return `
+              <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <!-- Field Definition Row -->
+                <div class="grid grid-cols-12 gap-3 mb-3">
+                  <!-- Key (identifier) -->
+                  <div class="col-span-3">
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Field Key</label>
+                    <input
+                      type="text"
+                      value="${escapeHtml(def.key || '')}"
+                      onchange="updateFieldDefinition(${index}, 'key', this.value)"
+                      placeholder="e.g., case_number"
+                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus"
+                    />
+                  </div>
+
+                  <!-- Display Name -->
+                  <div class="col-span-4">
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Display Name</label>
+                    <input
+                      type="text"
+                      value="${escapeHtml(def.display_name || '')}"
+                      onchange="updateFieldDefinition(${index}, 'display_name', this.value)"
+                      placeholder="e.g., Case Number"
+                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus"
+                    />
+                  </div>
+
+                  <!-- Type -->
+                  <div class="col-span-2">
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Type</label>
+                    <lex-select
+                      size="sm"
+                      data-field-def-index="${index}"
+                      data-field-def-prop="type"
+                      options="${escapeHtml(JSON.stringify(CUSTOM_FIELD_TYPE_OPTIONS))}"
+                      value="${escapeHtml(def.type || 'text')}"
+                    ></lex-select>
+                  </div>
+
+                  <!-- Required -->
+                  <div class="col-span-2">
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Required</label>
+                    <label class="flex items-center px-3 py-2">
+                      <input
+                        type="checkbox"
+                        ${def.required ? 'checked' : ''}
+                        onchange="updateFieldDefinition(${index}, 'required', this.checked)"
+                        class="rounded border-gray-300 lex-text-accent lex-ring-focus"
+                      />
+                      <span class="ml-2 text-sm text-gray-700">Yes</span>
+                    </label>
+                  </div>
+
+                  <!-- Delete Button -->
+                  <div class="col-span-1 flex items-end">
+                    <button
+                      onclick="removeCustomField(${index})"
+                      class="p-2 text-red-600 hover:text-red-800 hover:bg-red-100 rounded-md transition-colors"
+                      title="Remove field"
+                    >
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Options for Select Type -->
+                ${def.type === 'select' ? `
+                  <div class="mb-3">
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Dropdown Options (comma-separated)</label>
+                    <input
+                      type="text"
+                      value="${escapeHtml((def.options || []).join(', '))}"
+                      onchange="updateFieldDefinition(${index}, 'options', this.value.split(',').map(s => s.trim()).filter(s => s))"
+                      placeholder="e.g., Active, Pending, Closed"
+                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus"
+                    />
+                  </div>
+                ` : ''}
+
+                <!-- Value Input -->
+                <div>
+                  <label class="block text-xs font-medium text-gray-700 mb-1">Value</label>
+                  ${renderValueInput(def, currentValue, index)}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    // Helper function to render the appropriate input based on field type
+    function renderValueInput(def, currentValue, index) {
+      const key = def.key;
+
+      switch (def.type) {
+        case 'textarea':
+          return `
+            <textarea
+              onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
+              placeholder="Enter ${escapeHtml(def.display_name || def.key)}"
+              rows="3"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus"
+            >${escapeHtml(currentValue || '')}</textarea>
+          `;
+
+        case 'number':
+          return `
+            <input
+              type="number"
+              value="${escapeHtml(currentValue || '')}"
+              onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
+              placeholder="Enter ${escapeHtml(def.display_name || def.key)}"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus"
+            />
+          `;
+
+        case 'currency':
+          return `
+            <div class="relative">
+              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <span class="text-gray-500 sm:text-sm">$</span>
+              </div>
+              <input
+                type="number"
+                step="0.01"
+                value="${escapeHtml(currentValue || '')}"
+                onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
+                placeholder="0.00"
+                class="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus"
+              />
+            </div>
+          `;
+
+        case 'date':
+          return `
+            <input
+              type="date"
+              value="${escapeHtml(currentValue || '')}"
+              onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus"
+            />
+          `;
+
+        case 'datetime':
+          return `
+            <input
+              type="datetime-local"
+              value="${escapeHtml(currentValue || '')}"
+              onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus"
+            />
+          `;
+
+        case 'boolean':
+          return `
+            <label class="flex items-center px-3 py-2">
+              <input
+                type="checkbox"
+                ${currentValue === true || currentValue === 'true' ? 'checked' : ''}
+                onchange="updateFieldValue('${escapeHtml(key)}', this.checked)"
+                class="rounded border-gray-300 lex-text-accent lex-ring-focus"
+              />
+              <span class="ml-2 text-sm text-gray-700">${escapeHtml(def.display_name || def.key)}</span>
+            </label>
+          `;
+
+        case 'select':
+          return `
+            <lex-select
+              size="sm"
+              data-field-value-key="${escapeHtml(key)}"
+              placeholder="${escapeHtml('Select ' + (def.display_name || def.key))}"
+              options="${escapeHtml(JSON.stringify([{ value: '', label: 'Select ' + (def.display_name || def.key) }].concat((def.options || []).map(option => ({ value: String(option), label: String(option) })))))}"
+              value="${escapeHtml(currentValue == null ? '' : String(currentValue))}"
+            ></lex-select>
+          `;
+
+        case 'text':
+        default:
+          return `
+            <input
+              type="text"
+              value="${escapeHtml(currentValue || '')}"
+              onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
+              placeholder="Enter ${escapeHtml(def.display_name || def.key)}"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus"
+            />
+          `;
+      }
+    }
+
+    // Add new custom field
+    function addCustomField() {
+      const newKey = `field_${LanaTime.nowMs()}`;
+      customFieldDefinitions.push({
+        key: newKey,
+        display_name: '',
+        type: 'text',
+        required: false,
+        options: [],
+        default_value: ''
+      });
+      customFieldValues.push({
+        key: newKey,
+        value: ''
+      });
+      renderCustomFieldsModal();
+    }
+
+    // Update field definition (metadata)
+    function updateFieldDefinition(index, property, value) {
+      if (customFieldDefinitions[index]) {
+        const oldKey = customFieldDefinitions[index].key;
+        customFieldDefinitions[index][property] = value;
+
+        // If key changed, update the corresponding value entry
+        if (property === 'key' && oldKey !== value) {
+          const valueIndex = customFieldValues.findIndex(v => v.key === oldKey);
+          if (valueIndex !== -1) {
+            customFieldValues[valueIndex].key = value;
+          }
+        }
+
+        // Re-render if type changed (to show different input)
+        if (property === 'type') {
+          renderCustomFieldsModal();
+        }
+      }
+    }
+
+    // Update field value
+    function updateFieldValue(key, value) {
+      const existingIndex = customFieldValues.findIndex(v => v.key === key);
+      if (existingIndex !== -1) {
+        customFieldValues[existingIndex].value = value;
+      } else {
+        customFieldValues.push({ key, value });
+      }
+    }
+
+    // Remove custom field (removes both definition and value)
+    function removeCustomField(index) {
+      if (customFieldDefinitions[index]) {
+        const key = customFieldDefinitions[index].key;
+        customFieldDefinitions.splice(index, 1);
+
+        // Also remove the corresponding value
+        const valueIndex = customFieldValues.findIndex(v => v.key === key);
+        if (valueIndex !== -1) {
+          customFieldValues.splice(valueIndex, 1);
+        }
+
+        renderCustomFieldsModal();
+      }
+    }
+
+    // Save custom fields
+    async function saveCustomFields() {
+      try {
+        // Validate definitions
+        const validDefinitions = customFieldDefinitions.filter(def => {
+          return def.key && def.key.trim() !== '' && def.display_name && def.display_name.trim() !== '';
+        });
+
+        if (validDefinitions.length === 0 && customFieldDefinitions.length > 0) {
+          Lex.Toast.error('Please fill in Key and Display Name for all fields');
+          return;
+        }
+
+        // Validate no duplicate keys
+        const keys = validDefinitions.map(f => f.key.toLowerCase().trim());
+        const duplicates = keys.filter((key, index) => keys.indexOf(key) !== index);
+        if (duplicates.length > 0) {
+          Lex.Toast.error(`Duplicate field keys: ${duplicates.join(', ')}`);
+          return;
+        }
+
+        // Filter values to only include those with corresponding definitions
+        const definitionKeys = validDefinitions.map(d => d.key);
+        const validValues = customFieldValues.filter(v => definitionKeys.includes(v.key));
+
+        // Validate we have a matter ID
+        if (!currentEditFieldsMatter) {
+          Lex.Toast.error('Matter ID not found');
+          return;
+        }
+
+        // Save the matter ID before closing modal (close sets currentEditFieldsMatter to null)
+        const matterId = currentEditFieldsMatter;
+
+        // Update via settings endpoint
+        const response = await api.put(`/api/v1/matters/${matterId}/settings`, {
+          custom_field_definitions: validDefinitions,
+          custom_fields: validValues
+        });
+
+        Lex.Toast.success('Custom fields updated successfully!');
+        closeEditCustomFieldsModal();
+
+        // Reload matter details - backend returns { matter: {...} }
+        const updatedMatter = await api.getMatter(matterId, { bustCache: true });
+        if (updatedMatter && updatedMatter.matter) {
+          window.currentViewedMatter = updatedMatter.matter;
+          await window.renderCustomFieldsSection(updatedMatter.matter);
+
+          // Also refresh the activity feed to show the changes
+          const activityResult = await api.getMatterActivity(matterId, 20, 0);
+          if (activityResult && activityResult.activities && window.currentMatterData) {
+            window.currentMatterData.activities = activityResult.activities;
+            window.currentMatterData.activityPagination = activityResult.pagination;
+            renderActivityTab(window.currentMatterData.matter, activityResult.activities, activityResult.pagination);
+          }
+        }
+      } catch (error) {
+        console.error('[saveCustomFields] Error:', error);
+        Lex.Toast.error(error.message || 'Failed to save custom fields');
+      }
+    }
+
+
   // ── Expose second-block functions for onclick handlers ──────────────
   window.showManualConnectModal = showManualConnectModal;
   window.closeManualConnectModal = closeManualConnectModal;
-  ['showManualConnectModal','closeManualConnectModal'].forEach(_trackGlobal);
+  window.openEditCustomFieldsModal = openEditCustomFieldsModal;
+  window.closeEditCustomFieldsModal = closeEditCustomFieldsModal;
+  window.addCustomField = addCustomField;
+  window.saveCustomFields = saveCustomFields;
+  window.renderCustomFieldsModal = renderCustomFieldsModal;
+  ['showManualConnectModal','closeManualConnectModal','openEditCustomFieldsModal',
+   'closeEditCustomFieldsModal','addCustomField','saveCustomFields','renderCustomFieldsModal'
+  ].forEach(_trackGlobal);
 
   // ── Lifecycle hooks ─────────────────────────────────────────────────
 
