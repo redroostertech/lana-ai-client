@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { loadSherpa, parakeetConfig } from "../talk/sherpa.js";
 import { mergeSpeakers, sourceOf, type HeardSegment, type MergedTranscript, type SpeakerTurn } from "./diarizationMerge.js";
+import { correctVocabulary, recognizedWords, type RecognizerResult, type TranscribedWord, type VocabularyEntry } from "./meetingVocabulary.js";
 import { channelEnergy, mixChannels, TRANSCRIPTION_SAMPLE_RATE, type TwoChannels } from "./pcm.js";
 
 /** Where the models for whole-meeting transcription live (the speech models folder). */
@@ -30,7 +31,7 @@ export const DIARIZATION_MODEL_ID = "pyannote-segmentation-3.0+titanet-small";
 
 /** The slice of `sherpa-onnx-node` 2.x whole-meeting transcription uses. */
 export interface TranscriptionSherpa {
-  OfflineRecognizer: { createAsync(config: unknown): Promise<{ createStream(): { acceptWaveform(audio: { sampleRate: number; samples: Float32Array }): void }; decodeAsync(stream: unknown): Promise<{ text: string }> }> };
+  OfflineRecognizer: { createAsync(config: unknown): Promise<{ createStream(): { acceptWaveform(audio: { sampleRate: number; samples: Float32Array }): void }; decodeAsync(stream: unknown): Promise<{ text: string } & RecognizerResult> }> };
   Vad: new (config: unknown, bufferSizeInSeconds: number) => TranscriptionVad;
   OfflineSpeakerDiarization: new (config: unknown) => { process(samples: Float32Array): SpeakerTurn[] };
 }
@@ -127,19 +128,35 @@ export class MeetingTranscriber {
 
   // MARK: - Whole meeting
 
-  /** Transcribes and labels the whole meeting. `progress` runs from 0 to 1. */
-  async transcribe(channels: TwoChannels, progress: (fraction: number) => void = () => undefined): Promise<MergedTranscript> {
+  /**
+   * Transcribes and labels the whole meeting. `progress` runs from 0 to 1. Before speakers are
+   * worked out, the vocabulary pass fixes unsure words against confident terms from the same
+   * meeting and the firm's word list (`MeetingVocabulary`); changed lines keep the recognizer's text.
+   */
+  async transcribe(channels: TwoChannels, progress: (fraction: number) => void = () => undefined, vocabulary: readonly VocabularyEntry[] = []): Promise<MergedTranscript> {
     const sherpa = await this.module();
     const mixed = mixChannels(channels);
     const speech = detectSpeech(sherpa, this.options.models.vad, mixed);
     progress(0.05);
-    const heard: HeardSegment[] = [];
+    const stretches: Array<{ start: number; end: number; text: string; words: TranscribedWord[] }> = [];
     for (const [index, stretch] of speech.entries()) {
-      const text = await this.recognize(stretch.samples);
+      const result = await this.decode(stretch.samples);
       const end = stretch.start + stretch.samples.length / TRANSCRIPTION_SAMPLE_RATE;
-      if (text !== "") heard.push({ start: stretch.start, end, text, ...channelEnergy(channels, stretch.start, end) });
+      const text = result.text.trim();
+      if (text !== "") stretches.push({ start: stretch.start, end, text, words: recognizedWords(result, stretch.start, end) });
       progress(0.05 + 0.75 * ((index + 1) / speech.length));
     }
+    const corrected = correctVocabulary(stretches.flatMap((stretch) => stretch.words), { firm: vocabulary });
+    const heard: HeardSegment[] = stretches.map((stretch) => {
+      const words = corrected.filter((word) => word.start >= stretch.start && word.start < stretch.end);
+      const changed = words.some((word) => word.recognizedText !== undefined);
+      // Without word timings the recognizer's line stands as heard.
+      const text = words.length === 0 ? stretch.text : words.map((word) => word.text).join(" ");
+      const energy = channelEnergy(channels, stretch.start, stretch.end);
+      return changed
+        ? { start: stretch.start, end: stretch.end, text, recognizedText: words.map((word) => word.recognizedText ?? word.text).join(" "), ...energy }
+        : { start: stretch.start, end: stretch.end, text: stretch.text, ...energy };
+    });
     progress(0.8);
     let turns: SpeakerTurn[] = [];
     if (heard.length > 0) {
@@ -158,12 +175,16 @@ export class MeetingTranscriber {
   }
 
   private async recognize(samples: Float32Array): Promise<string> {
+    return (await this.decode(samples)).text.trim();
+  }
+
+  private async decode(samples: Float32Array): Promise<{ text: string } & RecognizerResult> {
     const sherpa = await this.module();
     this.recognizer ??= sherpa.OfflineRecognizer.createAsync(parakeetConfig(this.options.models.parakeet, this.options.numThreads ?? 2));
     const recognizer = await this.recognizer;
     const stream = recognizer.createStream();
     stream.acceptWaveform({ sampleRate: TRANSCRIPTION_SAMPLE_RATE, samples });
-    return (await recognizer.decodeAsync(stream)).text.trim();
+    return recognizer.decodeAsync(stream);
   }
 
   private async drainLive(): Promise<LiveLine[]> {

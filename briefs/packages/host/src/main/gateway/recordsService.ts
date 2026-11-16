@@ -1,12 +1,13 @@
-import type { HandoffGateway } from "@lana/core/gateway";
+import { addSetAsideChoice, restoreSetAsideChoice, type HandoffGateway } from "@lana/core/gateway";
 import { parseLanaId, type LanaId } from "@lana/core/ids";
 import {
-  decodeIntent, removingClip, savingClip, titleOf,
+  decodeIntent, removingClip, savingClip, SET_ASIDE_REASONS, titleOf, type SetAsideReason,
   type MeetingRecord, type RecordConflict, type TranscriptClip as CoreClip,
 } from "@lana/core/intent";
 import { randomUUID } from "node:crypto";
 import type { JsonValue } from "@lana/core/json";
 import { EDITABLE_STATUSES, StoreError } from "@lana/core/store";
+import { finalSetAside } from "@lana/core/summarizer";
 import type {
   CancelSendView, ConflictChoiceView, DraftCard, DraftKind, LanaEvent, RecordConflictView, RecordsApi, Result, SharedRecordView, TranscriptClip,
 } from "../../shared/api.js";
@@ -119,6 +120,45 @@ export class RecordsService implements RecordsApi {
       ...record,
       transcript: record.transcript.map((segment, offset) => (offset === Number(index) ? { ...segment, text: trimmed } : segment)),
     }));
+  }
+
+  // MARK: - Set-aside parts
+
+  /**
+   * Puts a set-aside part back in the meeting (the part starting at `start`): it leaves the
+   * shared record's set_aside, and writing the notes again does not set it aside again.
+   */
+  async restoreSetAside(meetingID: string, start: number): Promise<Result<null>> {
+    return this.run(meetingID, (id) => {
+      const record = this.gateway.store.shared.current(id);
+      const part = (record.notes.setAside ?? []).find((item) => Math.abs(item.start - Number(start)) < 0.01);
+      if (part === undefined) throw new InvalidRecordInput("That part is no longer set aside.");
+      this.gateway.store.shared.edit(id, (current) => ({
+        ...current,
+        notes: { ...current.notes, setAside: (current.notes.setAside ?? []).filter((item) => Math.abs(item.start - part.start) >= 0.01) },
+      }));
+      restoreSetAsideChoice(this.gateway.store.settings, id, part);
+      this.changed(id, "records.set_aside_restored");
+      return null;
+    });
+  }
+
+  /** Sets transcript lines `first` to `last` (0-based) aside: they leave the notes and every export. */
+  async setAside(meetingID: string, first: number, last: number, reason: SetAsideReason): Promise<Result<null>> {
+    return this.run(meetingID, (id) => {
+      if (!(SET_ASIDE_REASONS as readonly string[]).includes(String(reason))) throw new InvalidRecordInput("Choose why this part is set aside.");
+      const record = this.gateway.store.shared.current(id);
+      const lines = record.transcript.slice(Math.min(Number(first), Number(last)), Math.max(Number(first), Number(last)) + 1);
+      if (!Number.isInteger(Number(first)) || !Number.isInteger(Number(last)) || lines.length === 0 || Number(first) < 0) throw new InvalidRecordInput("Choose lines in the transcript.");
+      const part = { start: Math.min(...lines.map((line) => line.start)), end: Math.max(...lines.map((line) => line.end)), reason };
+      this.gateway.store.shared.edit(id, (current) => ({
+        ...current,
+        notes: { ...current.notes, setAside: finalSetAside([], { restored: [], added: [...(current.notes.setAside ?? []), part] }, current.transcript) },
+      }));
+      addSetAsideChoice(this.gateway.store.settings, id, part);
+      this.changed(id, "records.set_aside_added");
+      return null;
+    });
   }
 
   // MARK: - Clips

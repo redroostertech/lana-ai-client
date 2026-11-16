@@ -7,3 +7,4 @@ export {
   type LiveLine, type TranscriptionModelPaths, type TranscriptionSherpa, type TranscriptionVad,
 } from "./transcriber.js";
 export { audioParts, localMeetingRecord, PART_SECONDS, RECORDING_BIT_RATE, RECORDING_SAMPLE_RATE, type LocalRecordInput } from "./localRecord.js";
+export { correctVocabulary, DEFAULT_VOCABULARY_THRESHOLDS, recognizedWords, soundKey, syllables, type CorrectOptions, type RecognizerResult, type TranscribedWord, type VocabularyEntry, type VocabularyThresholds } from "./meetingVocabulary.js";

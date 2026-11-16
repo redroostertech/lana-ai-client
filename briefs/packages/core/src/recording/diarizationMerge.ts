@@ -5,6 +5,8 @@ export interface HeardSegment {
   readonly start: number;
   readonly end: number;
   readonly text: string;
+  /** The recognizer's own text when the vocabulary pass changed a word. */
+  readonly recognizedText?: string | undefined;
   readonly mic: number;
   readonly system: number;
 }
@@ -130,11 +132,13 @@ export function mergeSpeakers(segments: readonly HeardSegment[], turns: readonly
   heard.forEach((segment, index) => {
     const speaker = labels[index]!;
     const text = segment.text.trim();
+    const heardText = segment.recognizedText?.trim();
     const last = transcript[transcript.length - 1];
     if (last !== undefined && last.speaker === speaker && segment.start - last.end <= joinGap && segment.end - last.start <= maxLine) {
-      transcript[transcript.length - 1] = { ...last, end: Math.max(last.end, segment.end), text: `${last.text} ${text}` };
+      const recognized = last.recognizedText !== undefined || heardText !== undefined ? `${last.recognizedText ?? last.text} ${heardText ?? text}` : undefined;
+      transcript[transcript.length - 1] = { ...last, end: Math.max(last.end, segment.end), text: `${last.text} ${text}`, ...(recognized === undefined ? {} : { recognizedText: recognized }) };
     } else {
-      transcript.push({ speaker, start: round(segment.start), end: round(segment.end), text });
+      transcript.push({ speaker, start: round(segment.start), end: round(segment.end), text, ...(heardText === undefined ? {} : { recognizedText: heardText }) });
     }
   });
   const used = [...new Set(transcript.map((line) => line.speaker))].sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)));

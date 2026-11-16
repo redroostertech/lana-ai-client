@@ -1,6 +1,6 @@
 import type { AttestationMethod as CoreMethod } from "@lana/core/handoff";
 import { parseLanaId } from "@lana/core/ids";
-import { displayTitleOf, speakerDisplayName, type MeetingRecord as CoreMeeting } from "@lana/core/intent";
+import { displayTitleOf, segmentSetAside, speakerDisplayName, type IntentParams, type MeetingRecord as CoreMeeting } from "@lana/core/intent";
 import type { GatewayStore, MeetingOrigin } from "@lana/core/store";
 import type { AttestationMethod, MeetingRecord, MeetingsApi, MeetingSummary, Result } from "../../shared/api.js";
 import type { MainLog } from "../log.js";
@@ -32,7 +32,14 @@ export function toApiMeeting(record: CoreMeeting, extra: { method: CoreMethod; o
       text: point.text,
       sources: point.sources.map((span) => ({ start: span.start, end: span.end, speaker: span.speaker ?? null })),
       precision: point.precision,
+      decidedBy: point.decidedBy ?? null,
     })),
+    setAside: (record.notes.setAside ?? []).map((part) => ({ start: part.start, end: part.end, reason: part.reason, speakers: [...(part.speakers ?? [])] })),
+    tables: (record.notes.tables ?? []).map((table) => ({
+      title: table.title, columns: [...table.columns], rows: table.rows.map((row) => [...row]),
+      sources: table.sources.map((span) => ({ start: span.start, end: span.end, speaker: span.speaker ?? null })),
+    })),
+    speakersNamed: speakersNamed(record),
     gaps: record.notes.gaps.map((gap) => ({ start: gap.start, end: gap.end, reason: gap.reason === "refused" ? "refused" : "failed" })),
     userNotes: record.userNotes.map((note) => ({ id: note.id, text: note.text, createdAt: note.createdAt.toISOString(), anchor: note.anchor ?? null })),
     clips: record.clips.map((clip) => ({ id: clip.id, start: clip.start, end: clip.end })),
@@ -41,6 +48,19 @@ export function toApiMeeting(record: CoreMeeting, extra: { method: CoreMethod; o
     attestationMethod: toApiMethod(extra.method, extra.origin),
     hasAudio: extra.hasAudio,
   };
+}
+
+/** Whether every speaker with a line outside the set-aside parts has a typed name. */
+export function speakersNamed(record: CoreMeeting): boolean {
+  const used = new Set(record.transcript.filter((segment) => segment.text.trim() !== "" && !segmentSetAside(segment, record.notes.setAside)).map((segment) => segment.speaker));
+  return record.speakers.filter((speaker) => used.has(speaker.id)).every((speaker) => speaker.name !== undefined && speaker.name.trim() !== "")
+    && [...used].every((id) => record.speakers.some((speaker) => speaker.id === id));
+}
+
+/** Owner and due date of an action, as the meeting page and the export print them. */
+export function actionFacts(params: IntentParams): { owner: string | null; dueDate: string | null; dueText: string | null } {
+  if (params.type !== "task.create") return { owner: null, dueDate: null, dueText: null };
+  return { owner: params.task.assigneeHint ?? null, dueDate: params.task.dueDate ?? null, dueText: params.task.dueText ?? null };
 }
 
 /** Received meetings from the real `GatewayStore`. */
@@ -77,12 +97,19 @@ export class MeetingsBridge implements Omit<MeetingsApi, "audio"> {
       const actions = this.store.intents
         .list({ meetingID })
         .filter((stored) => !HIDDEN_STATUSES.has(stored.intent.status))
-        .map((stored) => ({
-          id: stored.intent.id,
-          title: displayTitleOf(stored.intent.params),
-          at: stored.intent.evidence.length === 0 ? 0 : Math.min(...stored.intent.evidence.map((evidence) => evidence.tStart)),
-          confirmed: CONFIRMED_STATUSES.has(stored.intent.status),
-        }));
+        .map((stored) => {
+          const evidence = stored.intent.evidence;
+          const start = evidence.length === 0 ? 0 : Math.min(...evidence.map((item) => item.tStart));
+          return {
+            id: stored.intent.id,
+            title: displayTitleOf(stored.intent.params),
+            at: start,
+            confirmed: CONFIRMED_STATUSES.has(stored.intent.status),
+            ...actionFacts(stored.intent.params),
+            start,
+            end: evidence.length === 0 ? start : Math.max(...evidence.map((item) => item.tEnd)),
+          };
+        });
       return { ok: true, value: toApiMeeting(record, { method: summary.attestationMethod, origin: summary.origin, hasAudio: summary.audioAvailable, actions }) };
     } catch {
       this.log.error("meetings.get_failed", { meeting: meetingID });

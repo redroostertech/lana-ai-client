@@ -233,3 +233,31 @@ describe("whole meeting notes", () => {
     expect(model.calls[0]!.prompt).toContain("Spell these names exactly: Leadli.");
   });
 });
+
+describe("Ask passages sent to LANA", () => {
+  it("leave out set-aside lines and anything citing them", async () => {
+    const { PassageBuilder } = await import("../../src/ask/index.js");
+    const { localMeetingRecord } = await import("../../src/recording/index.js");
+    const base = localMeetingRecord({
+      id: meetingID, title: "Synthetic", startedAt: new Date(2026, 10, 11), durationSeconds: 108,
+      consent: { method: "verbal_announced", confirmedBy: [], confirmedAt: new Date(2026, 10, 11) }, userNotes: [], appVersion: "0.1.0", speakers, transcript,
+    });
+    const record = {
+      ...base,
+      notes: {
+        keyPoints: [
+          { id: "kp-1", kind: "summary" as const, text: "A dentist appointment moves.", sources: [{ start: 41, end: 60, speaker: "S3" }], precision: "exact" as const },
+          { id: "kp-2", kind: "summary" as const, text: "Fees were set.", sources: [{ start: 15, end: 24, speaker: "S1" }], precision: "exact" as const },
+        ],
+        gaps: [],
+        setAside: [{ start: 33, end: 75, reason: "phone_call" as const }],
+      },
+    };
+    const passages = new PassageBuilder(30, 0).passages(record);
+    const text = passages.map((passage) => passage.text).join("\n");
+    expect(text).not.toContain("dentist");
+    expect(text).not.toContain("other line");
+    expect(text).toContain("Fees were set.");
+    expect(text).toContain("bronze plan");
+  });
+});

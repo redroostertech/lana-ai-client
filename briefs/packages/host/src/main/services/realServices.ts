@@ -24,6 +24,7 @@ import { NotesWriter } from "./recording/notesWriter.js";
 import { TalkService, type TalkPartsFactory } from "./talk/talkService.js";
 import { UserNotesService } from "./userNotesService.js";
 import { BleWakeAdvertiser, type BleHelperProcess } from "./bleWake/bleWakeAdvertiser.js";
+import { seedVocabularyFromConnectors } from "./vocabularySeeding.js";
 
 export interface RealServicesOptions {
   readonly runtime: GatewayRuntime;
@@ -205,12 +206,20 @@ export function createRealServices(options: RealServicesOptions): RealServices {
     },
   };
 
+  // The meeting word list starts from the firm's connector names, once LANA can list them.
+  const seedWords = (): void => {
+    if (!runtime.isSignedIn()) return;
+    void seedVocabularyFromConnectors(store.settings, () => lana.connectorNames(), log).then((seeded) => {
+      if (seeded) void preferences.publish();
+    });
+  };
   runtime.onAccount((signedIn) => {
     if (!signedIn) {
       void talk.end();
       audio.revokeAll();
     }
     void preferences.publish();
+    if (signedIn) seedWords();
   });
   // No access (signed out of the client) ends any talk.
   runtime.onAccess((open) => {
@@ -268,6 +277,7 @@ export function createRealServices(options: RealServicesOptions): RealServices {
       preferences.startRetention();
       bleWake.start();
       void recording.recover();
+      seedWords();
       // Model downloads cut off by quitting pick up from their `.part` files.
       models.resumePending();
     },

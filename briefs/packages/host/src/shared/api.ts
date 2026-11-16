@@ -166,6 +166,27 @@ export interface KeyPoint {
   text: string;
   sources: SourceSpan[];
   precision: "exact" | "approximate";
+  /** For a decision: the speaker label of who decided, or null. */
+  decidedBy: string | null;
+}
+
+/** Why a stretch is set aside (wire values). */
+export type SetAsideReason = "phone_call" | "side_conversation" | "logistics" | "other_matter";
+
+/** A stretch LANA (or the person) set aside: kept out of the notes and every export. */
+export interface SetAsidePart {
+  start: number;
+  end: number;
+  reason: SetAsideReason;
+  speakers: string[];
+}
+
+/** A spoken list as a table. */
+export interface NotesTable {
+  title: string;
+  columns: string[];
+  rows: string[][];
+  sources: SourceSpan[];
 }
 
 export interface NotesGap {
@@ -209,6 +230,15 @@ export interface ActionMarker {
   at: number;
   /** Confirmed or done, not just proposed. */
   confirmed: boolean;
+  /** Who will do it, as said in the meeting (a name when the speaker has one), or null. */
+  owner: string | null;
+  /** `YYYY-MM-DD`, or null. */
+  dueDate: string | null;
+  /** The words for when ("tonight"), or null. */
+  dueText: string | null;
+  /** The cited stretch: earliest and latest evidence times. */
+  start: number;
+  end: number;
 }
 
 export interface MeetingRecord {
@@ -220,6 +250,11 @@ export interface MeetingRecord {
   transcript: TranscriptSegment[];
   keyPoints: KeyPoint[];
   gaps: NotesGap[];
+  /** Stretches kept out of the notes and every export, sorted. */
+  setAside: SetAsidePart[];
+  tables: NotesTable[];
+  /** False while a speaker with lines in the meeting (outside set-aside parts) has no name. */
+  speakersNamed: boolean;
   userNotes: UserNote[];
   clips: TranscriptClip[];
   actions: ActionMarker[];
@@ -309,6 +344,10 @@ export interface RecordsApi {
   /** Saves lines `first` to `last` as a clip (a highlight). Returns the clip, or the one already covering exactly those lines. */
   saveClip(meetingID: string, first: number, last: number): Promise<Result<TranscriptClip>>;
   removeClip(meetingID: string, clipID: string): Promise<Result<null>>;
+  /** Puts the set-aside part that starts at `start` back in the meeting. On a meeting recorded here, write the notes again after. */
+  restoreSetAside(meetingID: string, start: number): Promise<Result<null>>;
+  /** Sets transcript lines `first` to `last` (0-based) aside: out of the notes and every export. */
+  setAside(meetingID: string, first: number, last: number, reason: SetAsideReason): Promise<Result<null>>;
   /**
    * Clips the lines and queues LANA to draft one action or decision from them in the
    * background (clip.draft.v1). With `questionID` (an open question's key point id) the
@@ -465,7 +504,7 @@ export const API_METHODS = {
   access: ["state", "checkAgain"],
   devices: ["list", "revoke", "pairingState", "startPairing", "cancelPairing", "answerPairing", "resetPairing", "gatewayStatus"],
   meetings: ["list", "get", "audio"],
-  records: ["state", "resolve", "sendToPhone", "cancelSend", "rename", "renameSpeaker", "correctLine", "saveClip", "removeClip", "requestDraft", "drafts", "cancelDraft", "addDecision"],
+  records: ["state", "resolve", "sendToPhone", "cancelSend", "rename", "renameSpeaker", "correctLine", "saveClip", "removeClip", "restoreSetAside", "setAside", "requestDraft", "drafts", "cancelDraft", "addDecision"],
   inbox: ["pendingCount", "unreadCount", "list"],
   audit: ["list", "verify"],
   settings: ["get", "setTheme", "walkthroughCompleted", "setWalkthroughCompleted"],
@@ -836,6 +875,15 @@ export interface Preferences {
   };
   pendingOutbox: number;
   version: string;
+  /** The firm's meeting word list: names LANA spells exactly in transcripts and notes, here and on paired phones. */
+  vocabulary: VocabularyTerm[];
+}
+
+/** One entry of the meeting word list. */
+export interface VocabularyTerm {
+  term: string;
+  /** Other ways the recognizer writes it, replaced by `term` ("lead lease"). */
+  alsoHeardAs: string[];
 }
 
 export interface BackgroundUpdatesPreference {
@@ -861,6 +909,8 @@ export interface PreferencesApi {
   setEndTalkWhenInactive(value: boolean): Promise<PreferencesUpdate>;
   downloadVoice(): Promise<PreferencesUpdate>;
   removeVoiceDownload(): Promise<PreferencesUpdate>;
+  /** Replaces the meeting word list (trimmed, without repeats); paired phones get it at their next sync. */
+  setVocabulary(terms: VocabularyTerm[]): Promise<PreferencesUpdate>;
 }
 
 
@@ -1063,6 +1113,7 @@ export function screenApiMethods() {
     "setEndTalkWhenInactive",
     "downloadVoice",
     "removeVoiceDownload",
+    "setVocabulary",
   ],
   ask: ["conversation", "setScope", "send", "newConversation", "openThread", "threads", "deleteThread", "cancel", "pinClip"],
   talk: ["session", "start", "acceptIntro", "toggleMute", "end"],
