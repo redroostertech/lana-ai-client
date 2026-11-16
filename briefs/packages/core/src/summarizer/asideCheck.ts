@@ -74,7 +74,7 @@ export function parseAsideCheck(reply: string, chunk: TranscriptChunk): Extracte
     if (body === undefined) continue;
     const parts = body.split("|").map(trimSpaces);
     const reason = (parts[0] ?? "").toLowerCase();
-    if (parts.length !== 2 || !(SET_ASIDE_REASONS as readonly string[]).includes(reason)) continue;
+    if (parts.length < 2 || !(SET_ASIDE_REASONS as readonly string[]).includes(reason)) continue;
     const lines = asideLines(parts[1]!, chunk);
     if (lines.length > 0) out.push({ reason: reason as SetAsideReason, lines });
   }

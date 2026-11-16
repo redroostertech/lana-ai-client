@@ -499,3 +499,30 @@ describe("time word as owner, more cases (synthetic)", () => {
     expect(named.type === "task.create" && named.task.assigneeHint).toBe("Priya");
   });
 });
+
+describe("rules from the 9B bench rerun (synthetic)", () => {
+  it("reads an ASIDE line with a description after its lines", () => {
+    const parsed = parseNotes("ASIDE: phone_call | L5, L6, L7 | Someone takes a call about a dentist visit.", chunk);
+    expect(parsed.asides).toEqual([{ reason: "phone_call", lines: [5, 6, 7] }]);
+  });
+
+  it("reads a four-field action with the kind left out (title, lines, short title, detail); a kind with too few fields stays dropped", () => {
+    expect(parseNotes("ACTION: send revised schedule | L4 | Schedule | Omar will send the revised schedule tonight", chunk).candidates[0])
+      .toMatchObject({ type: "task.create", title: "send revised schedule", body: "Omar will send the revised schedule tonight" });
+    expect(parseNotes("ACTION: task | L4 | Send revised schedule | Omar sends it and copies Priya", chunk).candidates).toEqual([]);
+  });
+
+  it("keeps key points from every part when there are more than the cap, taking them in turn from each part", async () => {
+    const { reduceKeyPoints, DEFAULT_SUMMARY_LIMITS } = await import("../../src/summarizer/summaryReducer.js");
+    // Part 0 has 20 points, part 1 has 2; the cap for 2 parts is 12.
+    const drafts = [
+      ...Array.from({ length: 20 }, (_, index) => ({ kind: "summary" as const, text: `Early point ${index} topic ${index * 13}`, sources: [{ start: index, end: index + 1 }], precision: "exact" as const, chunk: 0 })),
+      { kind: "summary" as const, text: "The guardianship fee is 3,500 dollars.", sources: [{ start: 100, end: 101 }], precision: "exact" as const, chunk: 1 },
+      { kind: "summary" as const, text: "The probate deposit is 750 dollars.", sources: [{ start: 102, end: 103 }], precision: "exact" as const, chunk: 1 },
+    ];
+    const kept = reduceKeyPoints(drafts, [], DEFAULT_SUMMARY_LIMITS, 2).keyPoints.map((point) => point.text);
+    expect(kept).toHaveLength(12);
+    expect(kept).toContain("The guardianship fee is 3,500 dollars.");
+    expect(kept).toContain("The probate deposit is 750 dollars.");
+  });
+});

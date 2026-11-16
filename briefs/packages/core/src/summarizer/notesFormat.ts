@@ -233,7 +233,8 @@ export function parseNotes(reply: string, chunk: TranscriptChunk, speakers: read
     if (asideBody !== undefined) {
       const parts = splitFields(asideBody);
       const reason = parts[0]?.toLowerCase() ?? "";
-      const lines = parts.length === 2 ? citedLines(parts[1]!, chunk, Number.MAX_SAFE_INTEGER) : [];
+      // A description after the lines ("| Someone takes a call") is ignored.
+      const lines = parts.length >= 2 ? citedLines(parts[1]!, chunk, Number.MAX_SAFE_INTEGER) : [];
       if ((SET_ASIDE_REASONS as readonly string[]).includes(reason) && lines.length > 0) asides.push({ reason: reason as SetAsideReason, lines });
     }
   }
@@ -276,6 +277,7 @@ function actionShape(parts: readonly string[], chunk: TranscriptChunk): string[]
     const when = rest.find((field, index) => index > 0 && isWhenField(field)) ?? "none";
     return [parts[0]!, parts[1]!, title, "", when, parts[2]!, "none"];
   }
+  if (!typed && cites && parts.length === 4) return ["task", parts[1]!, parts[0]!, parts[3]!, "none", "none", "none"];
   if (typed && cites && parts.length === 5) {
     return isWhenField(parts[3]!)
       ? [parts[0]!, parts[1]!, parts[2]!, "", parts[3]!, parts[4]!, "none"]

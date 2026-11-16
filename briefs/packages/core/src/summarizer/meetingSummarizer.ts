@@ -142,7 +142,7 @@ export class MeetingSummarizer {
         if (isLogistics(point)) continue;
         const promise = point.kind === "decision" ? promiseAction(point, chunk) : undefined;
         if (promise !== undefined) candidates.push(promise);
-        else points.push(attributePoint(point, chunk));
+        else points.push({ ...attributePoint(point, chunk), chunk: chunk.index });
       }
       for (const raw of candidates) {
         const candidate = finishCandidate(raw, options.speakers, start);
