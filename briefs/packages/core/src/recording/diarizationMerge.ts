@@ -150,13 +150,17 @@ function round(seconds: number): number {
   return Math.round(seconds * 1_000) / 1_000;
 }
 
-/** Below this much talk, a diarizer cluster is folded into another: 8 s, or 2% of all talk when that is more. */
+/** Below this much talk, a diarizer cluster is folded into another voice. */
 export const SMALL_CLUSTER_SECONDS = 8;
-export const SMALL_CLUSTER_SHARE = 0.02;
+/**
+ * A cluster with more talk folds into a bigger one only at or above this voice similarity.
+ * Calibrated on synthetic voices: three distinct voices reached 0.87 between two of them, so
+ * the cutoff sits above that and three distinct voices stay three.
+ */
+export const SAME_VOICE_SIMILARITY = 0.9;
 
-export function smallClusterLimit(turns: readonly SpeakerTurn[]): number {
-  const total = turns.reduce((sum, turn) => sum + Math.max(0, turn.end - turn.start), 0);
-  return Math.max(SMALL_CLUSTER_SECONDS, SMALL_CLUSTER_SHARE * total);
+export function smallClusterLimit(_turns: readonly SpeakerTurn[]): number {
+  return SMALL_CLUSTER_SECONDS;
 }
 
 function cosine(a: Float32Array, b: Float32Array): number {
@@ -172,23 +176,50 @@ function cosine(a: Float32Array, b: Float32Array): number {
 }
 
 /**
- * Folds diarizer clusters with little talk into a bigger one. On real speech through one
- * microphone the clustering splits one person into many short clusters (a phone recording
- * came out as 45 speakers). Each cluster under `smallClusterLimit` joins the big cluster whose
- * mean voice embedding is most similar; without embeddings, the big cluster nearest in time
- * (the earlier one on a tie). Only original big clusters are targets. `allowed` limits which big
- * clusters a small one may join (on this computer: the same side, mic or meeting audio); a small
- * cluster with no allowed target stays. When every cluster is small (a very short recording)
- * nothing changes.
+ * Folds diarizer clusters into the voice they belong to. On real speech through one microphone
+ * the clustering splits one person into many clusters (a phone recording came out as 45
+ * speakers). Calling a real person someone else is worse than an extra speaker label, so:
+ * - a cluster with under 8 s of talk joins the cluster of 8 s or more with the most similar voice
+ *   embedding, or the one nearest in time when no embedding can be computed;
+ * - a cluster with 8 s or more joins a bigger cluster only when their voices are at least
+ *   `SAME_VOICE_SIMILARITY` alike (never without embeddings), smallest first, following chains.
+ * `allowed` limits which clusters may join (on this computer: the same side, mic or meeting
+ * audio). When no cluster reaches 8 s (a very short recording) nothing changes.
  */
 export function foldSmallClusters(turns: readonly SpeakerTurn[], embedding: (cluster: number) => Float32Array | null, allowed: (small: number, big: number) => boolean = () => true): SpeakerTurn[] {
   const talk = new Map<number, number>();
   for (const turn of turns) talk.set(turn.speaker, (talk.get(turn.speaker) ?? 0) + Math.max(0, turn.end - turn.start));
-  const limit = smallClusterLimit(turns);
-  const big = [...talk].filter(([, seconds]) => seconds >= limit).map(([cluster]) => cluster);
+  const big = [...talk].filter(([, seconds]) => seconds >= SMALL_CLUSTER_SECONDS).sort((a, b) => a[1] - b[1] || a[0] - b[0]).map(([cluster]) => cluster);
   if (big.length === 0) return [...turns];
   const target = new Map<number, number>();
-  const small = [...talk].filter(([, seconds]) => seconds < limit).sort((a, b) => a[1] - b[1] || a[0] - b[0]).map(([cluster]) => cluster);
+  const ordered = [...turns].sort((x, y) => x.start - y.start);
+
+  // Clusters of 8 s or more with the same voice as a bigger one (smallest first).
+  big.forEach((cluster, index) => {
+    const own = embedding(cluster);
+    if (own === null) return;
+    let best: number | undefined;
+    let score = -Infinity;
+    for (const candidate of big.slice(index + 1)) {
+      if (!allowed(cluster, candidate)) continue;
+      const other = embedding(candidate);
+      if (other === null) continue;
+      const value = cosine(own, other);
+      if (value > score) {
+        score = value;
+        best = candidate;
+      }
+    }
+    if (best !== undefined && score >= SAME_VOICE_SIMILARITY) target.set(cluster, best);
+  });
+  const resolve = (cluster: number): number => {
+    let current = cluster;
+    for (let steps = 0; target.has(current) && steps < talk.size; steps += 1) current = target.get(current)!;
+    return current;
+  };
+
+  // Clusters under 8 s: the most similar cluster of 8 s or more, else the nearest in time.
+  const small = [...talk].filter(([, seconds]) => seconds < SMALL_CLUSTER_SECONDS).map(([cluster]) => cluster);
   for (const cluster of small) {
     const targets = new Set(big.filter((candidate) => allowed(cluster, candidate)));
     if (targets.size === 0) continue;
@@ -207,8 +238,7 @@ export function foldSmallClusters(turns: readonly SpeakerTurn[], embedding: (clu
       }
     }
     if (best === undefined) {
-      // In time order, so on a tie the earlier big cluster wins.
-      const ordered = [...turns].sort((x, y) => x.start - y.start);
+      // In time order, so on a tie the earlier cluster wins.
       let gap = Infinity;
       for (const turn of ordered.filter((item) => item.speaker === cluster)) {
         for (const other of ordered) {
@@ -223,5 +253,8 @@ export function foldSmallClusters(turns: readonly SpeakerTurn[], embedding: (clu
     }
     if (best !== undefined) target.set(cluster, best);
   }
-  return turns.map((turn) => (target.has(turn.speaker) ? { ...turn, speaker: target.get(turn.speaker)! } : turn));
+  return turns.map((turn) => {
+    const speaker = resolve(turn.speaker);
+    return speaker === turn.speaker ? turn : { ...turn, speaker };
+  });
 }

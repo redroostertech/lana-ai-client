@@ -189,3 +189,10 @@ describe('speaker names and who decided', () => {
     expect(M.decidedByText(record, { kind: 'summary', decidedBy: 'S1' })).toBe('');
   });
 });
+
+describe('same name on two labels', () => {
+  test('the meeting facts list the name once', () => {
+    const record = { durationSeconds: 600, speakers: [{ id: 'S1', name: 'Dana Reyes' }, { id: 'S5', name: 'Dana Reyes' }, { id: 'S2', name: 'Omar Haddad' }], attestationMethod: 'recordedHere', consent: 'announced' };
+    expect(M.facts(record)).toContain('Dana Reyes, Omar Haddad.');
+  });
+});

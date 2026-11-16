@@ -1,7 +1,7 @@
 export { AAC_SAMPLES_PER_FRAME, aacDuration, aacLcConfig, adtsFrames, muxM4a, type M4aInput } from "./m4a.js";
 export { packFrames, RecordingJournal, unpackFrames, type JournalStream, type RecordingSealer } from "./journal.js";
 export { channelEnergy, mixChannels, packPcm, rms, softClip, TRANSCRIPTION_SAMPLE_RATE, unpackPcm, type TwoChannels } from "./pcm.js";
-export { clusterOf, foldSmallClusters, mergeSpeakers, smallClusterLimit, sourceOf, type HeardSegment, type MergedTranscript, type MergeOptions, type SpeakerTurn } from "./diarizationMerge.js";
+export { clusterOf, foldSmallClusters, mergeSpeakers, SAME_VOICE_SIMILARITY, smallClusterLimit, sourceOf, type HeardSegment, type MergedTranscript, type MergeOptions, type SpeakerTurn } from "./diarizationMerge.js";
 export {
   ASR_MODEL_ID, clusterEmbeddings, diarizationConfig, sameSide, DIARIZATION_MODEL_ID, MeetingTranscriber, meetingVadConfig, transcriptionModelPaths,
   type LiveLine, type TranscriptionModelPaths, type TranscriptionSherpa, type TranscriptionVad,

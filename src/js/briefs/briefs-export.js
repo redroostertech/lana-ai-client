@@ -223,8 +223,9 @@
     return cited ? `${cited}.${decided}` : decided.trim();
   }
 
+  /** Speaker names, each once: two labels named the same are one person. */
   function speakerList(record) {
-    return (record.speakers || []).map((speaker) => String(speaker.name || '').trim()).filter(Boolean);
+    return [...new Set((record.speakers || []).map((speaker) => String(speaker.name || '').trim()).filter(Boolean))];
   }
 
   // ── Plain text ────────────────────────────────────────
@@ -270,8 +271,10 @@ ${M.unnamedText(record) ? `  <p class="ex-notice">${escape(M.unnamedText(record)
         return `<p class="ex-set-aside">${escape(setAsideLine(row.part))}</p>`;
       }
       const segment = row.segment;
-      const same = segment.speaker === previous;
-      previous = segment.speaker;
+      // Two labels with the same name are one person: the turn runs on.
+      const who = speakerName(record, segment.speaker);
+      const same = who === previous;
+      previous = who;
       return `<div class="ex-turn${same ? ' is-continued' : ''}">
     <div class="ex-turn-meta"><span class="ex-time">${escape(M.clock(segment.start))}</span>${same ? '' : `<span class="ex-speaker">${escape(speakerName(record, segment.speaker))}</span>`}</div>
     <p class="ex-turn-text">${escape(String(segment.text || '').trim())}</p>

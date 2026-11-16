@@ -240,3 +240,25 @@ describe('owners, due dates, cited ranges and who decided', () => {
     expect(html).not.toContain('|');
   });
 });
+
+describe('two speaker labels given the same name are one person', () => {
+  const same = () => record({
+    speakers: [{ id: 'S1', name: 'Dana Reyes' }, { id: 'S2', name: 'Omar Haddad' }, { id: 'S5', name: 'Dana Reyes' }],
+    transcript: [
+      { speaker: 'S1', start: 0, end: 5, text: 'First line.' },
+      { speaker: 'S5', start: 5, end: 9, text: 'Same person, other label.' },
+      { speaker: 'S2', start: 10, end: 14, text: 'Reply.' },
+    ],
+    keyPoints: [{ id: 'k1', kind: 'decision', text: 'Use the revised plan', sources: [{ start: 5, end: 9, speaker: 'S5' }], precision: 'exact', decidedBy: 'S5' }],
+    actions: [{ id: 'a1', title: 'Send it', at: 5, start: 5, end: 9, confirmed: false, owner: 'S5', dueDate: null, dueText: null }],
+    unnamedSpeakers: [],
+  });
+  test('the header lists the name once, the transcript runs on, and decided by and owner use the name', () => {
+    const html = X.meetingHtml(same(), []);
+    expect(html).toContain('<dd>Dana Reyes, Omar Haddad</dd>');
+    expect(html.match(/class="ex-speaker">Dana Reyes</g)).toHaveLength(1);
+    expect(html).toContain('Decided by Dana Reyes.');
+    expect(html).toContain('Owner: Dana Reyes.');
+    expect(X.transcriptText(same())).toContain('Speakers: Dana Reyes, Omar Haddad');
+  });
+});

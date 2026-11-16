@@ -1,13 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { foldSmallClusters, smallClusterLimit, type SpeakerTurn } from "../../src/recording/diarizationMerge.js";
+import { foldSmallClusters, SAME_VOICE_SIMILARITY, smallClusterLimit, type SpeakerTurn } from "../../src/recording/diarizationMerge.js";
 
 // Synthetic turns and embeddings only.
 const turn = (start: number, end: number, speaker: number): SpeakerTurn => ({ start, end, speaker });
 
 describe("folding small diarizer clusters", () => {
-  it("sets the limit at 8 s or 2% of all talk, whichever is more", () => {
+  it("sets the floor at 8 s whatever the meeting length", () => {
     expect(smallClusterLimit([turn(0, 100, 0)])).toBe(8);
-    expect(smallClusterLimit([turn(0, 1000, 0)])).toBe(20);
+    expect(smallClusterLimit([turn(0, 1000, 0)])).toBe(8);
+  });
+
+  it("folds a cluster of 8 s or more only into a bigger one with the same voice (similarity at or above the cutoff)", () => {
+    // Cluster 2 talks 20 s: a real person who spoke briefly. Cluster 3 talks 20 s and is the same voice as 0.
+    const turns = [turn(0, 300, 0), turn(300, 600, 1), turn(600, 620, 2), turn(620, 640, 3)];
+    const embeddings = new Map([
+      [0, new Float32Array([1, 0, 0])],
+      [1, new Float32Array([0, 1, 0])],
+      [2, new Float32Array([0.6, 0.6, 0.53])],
+      [3, new Float32Array([0.97, 0.05, 0.24])],
+    ]);
+    expect(foldSmallClusters(turns, (cluster) => embeddings.get(cluster) ?? null).map((item) => item.speaker)).toEqual([0, 1, 2, 0]);
+    expect(SAME_VOICE_SIMILARITY).toBeGreaterThan(0.87);
+  });
+
+  it("never folds a cluster of 8 s or more without embeddings", () => {
+    const turns = [turn(0, 300, 0), turn(300, 320, 1)];
+    expect(foldSmallClusters(turns, () => null)).toEqual(turns);
   });
 
   it("folds a cluster under the limit into the most similar big cluster", () => {

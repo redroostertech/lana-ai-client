@@ -237,7 +237,7 @@
   function facts(record) {
     return [
       duration(record.durationSeconds),
-      (record.speakers || []).map((speaker) => speaker.name).join(', '),
+      [...new Set((record.speakers || []).map((speaker) => speaker.name))].join(', '),
       attestationText(record.attestationMethod),
       record.consent === 'allPartiesConfirmed' ? 'All parties confirmed' : 'Recording announced',
     ].filter(Boolean).join('. ') + '.';
