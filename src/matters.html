@@ -38,6 +38,9 @@
   <!-- Document Metadata Viewer -->
   <link rel="stylesheet" href="css/components/document-metadata.css">
   <script src="js/shared/document-type-labels.js"></script>
+  <script src="js/shared/safe-url.js"></script>
+  <script src="js/shared/safe-html.js"></script>
+  <script src="js/shared/preview-frame-policy.js"></script>
   <script src="js/utils/metadata-formatter.js"></script>
   <script src="js/services/metadata-service.js"></script>
   <script src="js/vendor/marked.min.js"></script>
@@ -3610,8 +3613,15 @@
       );
     }
 
+    // The preview's object URL, revoked when the next preview opens.
+    let viewerObjectUrl = null;
+
     // View orphaned document in file viewer modal (using storage key)
     window.viewOrphanedDocument = async function(storageKey, matterId, filename, contentType, fileSize) {
+      if (viewerObjectUrl) {
+        URL.revokeObjectURL(viewerObjectUrl);
+        viewerObjectUrl = null;
+      }
       // Show modal with loading state
       viewerModal.classList.remove('hidden');
       viewerLoading.classList.remove('hidden');
@@ -3655,7 +3665,6 @@
         }
 
         const blob = await response.blob();
-        const objectUrl = URL.createObjectURL(blob);
 
         viewerLoading.classList.add('hidden');
 
@@ -3664,11 +3673,14 @@
 
         if (type.startsWith('image/')) {
           // Image files
-          viewerImage.src = objectUrl;
+          viewerObjectUrl = URL.createObjectURL(blob);
+          viewerImage.src = viewerObjectUrl;
           viewerImage.classList.remove('hidden');
         } else if (type === 'application/pdf') {
-          // PDF files - use iframe
-          viewerIframe.src = objectUrl;
+          // PDF files - use iframe. Retyped as PDF: the blob takes the
+          // response's type, and HTML or SVG bytes would run script here.
+          viewerObjectUrl = URL.createObjectURL(window.LanaPreviewFrame.pdfBlob(blob));
+          viewerIframe.src = viewerObjectUrl;
           viewerIframe.classList.remove('hidden');
         } else if (filename.match(/\.csv$/i) || type.includes('csv')) {
           // CSV files - render as spreadsheet table
@@ -3703,7 +3715,8 @@
                 "table => table.docx-table"
               ]
             });
-            viewerDocx.innerHTML = result.value;
+            // A DOCX can carry javascript: links and handlers: sanitize first.
+            viewerDocx.innerHTML = window.LanaSafeHtml.sanitize(result.value);
             viewerDocx.classList.remove('hidden');
 
             // Log any messages/warnings from Mammoth

@@ -17,6 +17,7 @@ import {
   textCell
 } from '../shared/ui.js';
 import { escapeAttribute, escapeHtml, formatDate, getOrganizationTimezone, normalizeText } from '../shared/utils.js';
+import { safeArtifactUrl } from '../shared/api-base-url.js';
 
 const TABLE_ID = 'automationRunsTable';
 const TOOLBAR_PREFIX = 'automationRuns';
@@ -86,6 +87,23 @@ function artifactPreviewText(artifact) {
   }
 }
 
+// Agent output is untrusted: sandbox it with no script. Only a remote http(s)
+// PDF is left unsandboxed so Chromium's PDF viewer renders it; other remote
+// previews keep downloads (a DOCX redline) but never script
+// (js/shared/preview-frame-policy.js). Fails closed if the policy is missing.
+function previewSandbox(opts) {
+  const policy = typeof window !== 'undefined' ? window.LanaPreviewFrame : null;
+  return policy ? policy.sandboxAttr(opts) : ' sandbox=""';
+}
+
+// Remote previews: an API-origin PDF is framed directly, any other PDF is
+// fetched into a PDF blob by LanaPreviewFrame.hydratePdfFrames, everything
+// else is sandboxed (js/shared/preview-frame-policy.js). Fails closed.
+function remoteFrame(opts) {
+  const policy = typeof window !== 'undefined' ? window.LanaPreviewFrame : null;
+  return policy ? policy.remoteFrameAttrs(Object.assign({ apiBase: window.api && window.api.baseUrl }, opts)) : ' sandbox=""';
+}
+
 function renderArtifactPreviewBody(artifact) {
   if (!artifact) {
     return lexEmpty({
@@ -98,14 +116,14 @@ function renderArtifactPreviewBody(artifact) {
   const payload = artifactPayload(artifact);
   const type = artifactType(artifact);
   const hasInlineHtml = artifact.inline_data_is_html && typeof payload === 'string' && payload.trim();
-  const hasRemotePreview = type === 'document_redline'
-    && typeof artifact.download_url === 'string'
-    && artifact.download_url.trim();
+  // Only an http(s) URL (or an API path joined to the API base) is framed.
+  const remoteUrl = safeArtifactUrl(artifact.download_url);
+  const hasRemotePreview = type === 'document_redline' && remoteUrl;
 
   if (hasInlineHtml) {
     return `
       <iframe
-        class="run-artifact-preview-frame"
+        class="run-artifact-preview-frame"${previewSandbox({ source: 'inline-html' })}
         srcdoc="${escapeAttribute(payload)}"
         title="${escapeAttribute(artifactName(artifact))}"
       ></iframe>
@@ -115,8 +133,7 @@ function renderArtifactPreviewBody(artifact) {
   if (hasRemotePreview) {
     return `
       <iframe
-        class="run-artifact-preview-frame"
-        src="${escapeAttribute(artifact.download_url)}"
+        class="run-artifact-preview-frame"${remoteFrame({ source: 'remote', url: remoteUrl, filename: artifactName(artifact), allowDownloads: true })}
         title="${escapeAttribute(artifactName(artifact))}"
       ></iframe>
     `;
@@ -187,7 +204,7 @@ function renderSelectedArtifactPreview(context, artifacts) {
         </div>
         <div class="row-actions">
           ${selected?.workspace_url ? `<lex-btn variant="secondary" size="sm" data-run-artifact-open-workspace="${escapeAttribute(selected.workspace_url)}">Open in Workspace</lex-btn>` : ''}
-          ${selected?.download_url ? `<a href="${escapeAttribute(selected.download_url)}" target="_blank" rel="noopener noreferrer">Open in new window</a>` : ''}
+          ${safeArtifactUrl(selected?.download_url) ? `<a href="${escapeAttribute(safeArtifactUrl(selected.download_url))}" target="_blank" rel="noopener noreferrer">Open in new window</a>` : ''}
           <lex-btn variant="ghost" size="sm" data-close-run-artifact-preview>Close</lex-btn>
         </div>
       </div>

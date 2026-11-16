@@ -1,11 +1,28 @@
 import { badge, drawerSection, emptyState, lexEmpty, metaGrid, runStatusMark, surface } from '../shared/ui.js';
 import { escapeAttribute, escapeHtml, formatDate, formatLabel, getOrganizationTimezone, timeAgo } from '../shared/utils.js';
 import { describeStep, humanizeTrigger, humanizeWhen } from '../shared/step-humanizer.js';
-import { getApiUrl } from '../shared/api-base-url.js';
+import { getApiUrl, safeArtifactUrl } from '../shared/api-base-url.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+// Artifact HTML is untrusted: sandbox it with no script. The redline pane
+// keeps DOM access so the change index can scroll it. The remote HTML
+// redline is sandboxed with no script too
+// (js/shared/preview-frame-policy.js). Fails closed if the policy is missing.
+function previewSandbox(opts) {
+  const policy = typeof window !== 'undefined' ? window.LanaPreviewFrame : null;
+  return policy ? policy.sandboxAttr(opts) : ' sandbox=""';
+}
+
+// Remote previews: an API-origin PDF is framed directly, any other PDF is
+// fetched into a PDF blob by LanaPreviewFrame.hydratePdfFrames, everything
+// else is sandboxed (js/shared/preview-frame-policy.js). Fails closed.
+function remoteFrame(opts) {
+  const policy = typeof window !== 'undefined' ? window.LanaPreviewFrame : null;
+  return policy ? policy.remoteFrameAttrs(Object.assign({ apiBase: window.api && window.api.baseUrl }, opts)) : ' sandbox=""';
+}
 
 function statusTone(status) {
   const s = String(status || '').toLowerCase();
@@ -1035,7 +1052,7 @@ function renderComparedDocumentsView(documents, inlineHtml) {
                 <div class="muted">${escapeHtml(document.filename || 'Unnamed document')}</div>
               </div>
               <div class="row-actions">
-                ${document.download_url ? `<a href="${escapeAttribute(document.download_url)}" target="_blank" rel="noopener noreferrer">Download</a>` : ''}
+                ${safeArtifactUrl(document.download_url) ? `<a href="${escapeAttribute(safeArtifactUrl(document.download_url))}" target="_blank" rel="noopener noreferrer">Download</a>` : ''}
               </div>
             </header>
             <div class="ld-compared-document-pane__meta muted">
@@ -1064,7 +1081,7 @@ function renderComparedDocumentsView(documents, inlineHtml) {
             <div class="muted">${escapeHtml(originalDocument?.content_type || '')}</div>
           </div>
           <div class="row-actions">
-            ${originalDocument?.download_url ? `<a href="${escapeAttribute(originalDocument.download_url)}" target="_blank" rel="noopener noreferrer">Download</a>` : ''}
+            ${safeArtifactUrl(originalDocument?.download_url) ? `<a href="${escapeAttribute(safeArtifactUrl(originalDocument.download_url))}" target="_blank" rel="noopener noreferrer">Download</a>` : ''}
           </div>
         </section>
         <section class="ld-compare-header-card">
@@ -1074,7 +1091,7 @@ function renderComparedDocumentsView(documents, inlineHtml) {
             <div class="muted">${escapeHtml(revisedDocument?.content_type || '')}</div>
           </div>
           <div class="row-actions">
-            ${revisedDocument?.download_url ? `<a href="${escapeAttribute(revisedDocument.download_url)}" target="_blank" rel="noopener noreferrer">Download</a>` : ''}
+            ${safeArtifactUrl(revisedDocument?.download_url) ? `<a href="${escapeAttribute(safeArtifactUrl(revisedDocument.download_url))}" target="_blank" rel="noopener noreferrer">Download</a>` : ''}
           </div>
         </section>
       </div>
@@ -1549,10 +1566,11 @@ function renderArtifactModal(artifact, modalView = 'default') {
     && artifact.inline_data_is_html
     && typeof artifact.inline_data_preview === 'string'
     && artifact.inline_data_preview.length > 0;
+  // Only an http(s) URL (or an API path joined to the API base) is linked or framed.
+  const redlineUrl = safeArtifactUrl(artifact.download_url);
   const isHtmlRedline = (artifact.artifact_type || artifact.type) === 'document_redline'
     && artifact.storage_type === 'minio'
-    && typeof artifact.download_url === 'string'
-    && artifact.download_url.length > 0;
+    && redlineUrl.length > 0;
   const summary = payload && payload.summary && typeof payload.summary === 'object'
     ? payload.summary
     : null;
@@ -1716,15 +1734,15 @@ function renderArtifactModal(artifact, modalView = 'default') {
             <span class="muted">Tap an item on the right to jump inside the document.</span>
           </div>
           <div class="row-actions">
-            ${typeof artifact.download_url === 'string' && artifact.download_url
-              ? `<a href="${escapeAttribute(artifact.download_url)}" target="_blank" rel="noopener noreferrer">Open redline in new tab</a>`
+            ${redlineUrl
+              ? `<a href="${escapeAttribute(redlineUrl)}" target="_blank" rel="noopener noreferrer">Open redline in new tab</a>`
               : ''}
           </div>
         </div>
         <div class="ld-redline-modal-layout">
           <div class="ld-redline-document-pane">
             <iframe
-              class="ld-redline-document-frame"
+              class="ld-redline-document-frame"${previewSandbox({ source: 'inline-html', hostReadsDocument: true })}
               data-ld-redline-frame
               srcdoc="${escapeAttribute(artifact.inline_data_preview)}"
               title="${escapeAttribute(artifact.artifact_name || artifact.name || 'Artifact Preview')}"
@@ -1743,12 +1761,12 @@ function renderArtifactModal(artifact, modalView = 'default') {
     : hasInlineHtml
       ? `
         <div class="ld-artifact-modal-meta" style="margin-top:10px;">
-          ${typeof artifact.download_url === 'string' && artifact.download_url
-            ? `<a href="${escapeAttribute(artifact.download_url)}" target="_blank" rel="noopener noreferrer">Open redline in new tab</a>`
+          ${redlineUrl
+            ? `<a href="${escapeAttribute(redlineUrl)}" target="_blank" rel="noopener noreferrer">Open redline in new tab</a>`
             : ''}
         </div>
         <iframe
-          class="ld-artifact-modal-body"
+          class="ld-artifact-modal-body"${previewSandbox({ source: 'inline-html' })}
           srcdoc="${escapeAttribute(artifact.inline_data_preview)}"
           title="${escapeAttribute(artifact.artifact_name || artifact.name || 'Artifact Preview')}"
           style="width:100%;min-height:70vh;border:1px solid var(--lex-border-subtle, #e5e7eb);border-radius:12px;background:#fff;"
@@ -1757,11 +1775,10 @@ function renderArtifactModal(artifact, modalView = 'default') {
       : isHtmlRedline
         ? `
           <div class="ld-artifact-modal-meta" style="margin-top:10px;">
-            <a href="${escapeAttribute(artifact.download_url)}" target="_blank" rel="noopener noreferrer">Open redline in new tab</a>
+            <a href="${escapeAttribute(redlineUrl)}" target="_blank" rel="noopener noreferrer">Open redline in new tab</a>
           </div>
           <iframe
-            class="ld-artifact-modal-body"
-            src="${escapeAttribute(artifact.download_url)}"
+            class="ld-artifact-modal-body"${remoteFrame({ source: 'remote', url: redlineUrl, contentType: 'text/html' })}
             title="${escapeAttribute(artifact.artifact_name || artifact.name || 'Artifact Preview')}"
             style="width:100%;min-height:70vh;border:1px solid var(--lex-border-subtle, #e5e7eb);border-radius:12px;background:#fff;"
           ></iframe>

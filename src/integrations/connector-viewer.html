@@ -412,6 +412,8 @@
   <script src="../js/shared/auth-token-bridge.js"></script>
   <script src="../js/config.js"></script>
   <script src="../js/time-utils.js"></script>
+  <script src="../js/shared/safe-url.js"></script>
+  <script src="../js/shared/safe-html.js"></script>
   <script src="../js/shared/request-retry.js"></script>
   <script src="../js/api.js"></script>
   <script src="../js/url-utils.js"></script>
@@ -1326,7 +1328,17 @@
       return Boolean(state.catalog && state.catalog.api && state.catalog.api.base_url);
     }
 
+    // Connector manifests come from the backend: only http(s) and mailto
+    // links, as the parsed href (js/shared/safe-url.js). '' hides the link.
+    function safeExternalLink(url) {
+      return window.LanaSafeUrl && typeof url === 'string' ? window.LanaSafeUrl.safeLinkHref(url) : '';
+    }
+
     function getDocumentationLink() {
+      return safeExternalLink(getRawDocumentationLink());
+    }
+
+    function getRawDocumentationLink() {
       return state.catalog?.documentation?.api_reference_url
         || state.catalog?.documentation?.docs_url
         || state.catalog?.documentation?.documentation_url
@@ -2361,8 +2373,8 @@
                 </ol>
               ` : ''}
 
-              ${link ? `
-                <a href="${escapeHtml(link.url)}" target="_blank" rel="noreferrer" class="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-blue-700 hover:text-blue-800">
+              ${link && safeExternalLink(link.url) ? `
+                <a href="${escapeHtml(safeExternalLink(link.url))}" target="_blank" rel="noreferrer" class="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-blue-700 hover:text-blue-800">
                   ${escapeHtml(link.label || 'Open link')}
                   <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
                 </a>

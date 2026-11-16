@@ -1754,13 +1754,11 @@ createModalStructure() {
     if (text === null || text === undefined) return '';
     if (typeof text !== 'string') text = String(text);
 
-    // Drilldown content is LLM/BI-generated and untrusted: use the shared
-    // hardened parser (raw HTML escaped, links protocol-restricted, images
-    // as alt text) instead of raw marked.
-    const safe = window.Lex && window.Lex.Utils && window.Lex.Utils.renderMarkdownSafe
-      ? window.Lex.Utils.renderMarkdownSafe(text, { inline: true })
-      : null;
-    if (safe !== null) return safe;
+    // Drilldown content is LLM/BI-generated and untrusted: use the one
+    // markdown sanitizer (raw HTML escaped, links protocol-restricted,
+    // images as alt text) instead of raw marked. breaks: true keeps the
+    // single-newline breaks the marked.use({ breaks: true }) above gave it.
+    if (window.LanaSafeHtml) return window.LanaSafeHtml.renderMarkdown(text, { inline: true, breaks: true });
 
     // Fallback: escape HTML if the safe parser is not available
     return this.escapeHtml(text);
@@ -1775,21 +1773,10 @@ createModalStructure() {
     if (text === null || text === undefined) return '';
     if (typeof text !== 'string') text = String(text);
 
-    // Drilldown content is LLM/BI-generated and untrusted: use the shared
-    // hardened parser (raw HTML escaped, links protocol-restricted, images
-    // as alt text) instead of raw marked.
-    const safe = window.Lex && window.Lex.Utils && window.Lex.Utils.renderMarkdownSafe
-      ? window.Lex.Utils.renderMarkdownSafe(text)
-      : null;
-    if (safe !== null) {
-      // Remove outer <p> tags if present (for cleaner rendering in our context)
-      // But keep inner structure like lists, line breaks, bold, etc.
-      let html = safe.trim();
-      if (html.startsWith('<p>') && html.endsWith('</p>') && html.split('<p>').length === 2) {
-        html = html.slice(3, -4); // Remove outer <p></p> only
-      }
-      return html;
-    }
+    // Drilldown content is LLM/BI-generated and untrusted: use the one
+    // markdown sanitizer (raw HTML escaped, links protocol-restricted,
+    // images as alt text, outer <p> unwrapped) instead of raw marked.
+    if (window.LanaSafeHtml) return window.LanaSafeHtml.renderMarkdown(text, { unwrapParagraph: true, breaks: true });
 
     // Fallback: escape HTML and preserve line breaks if the safe parser is
     // not available

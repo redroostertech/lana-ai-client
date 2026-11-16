@@ -25,26 +25,17 @@
     });
   }
 
-  function hasMarked(method) {
-    return typeof marked !== 'undefined' && marked && typeof marked[method] === 'function';
-  }
-
   function toHtml(markdown) {
     var src = (markdown == null) ? '' : String(markdown);
     if (!src.trim()) return '';
-    if (hasMarked('parse')) {
-      try { return marked.parse(src); } catch (_e) { /* fall through */ }
-    }
-    return escapeHtml(src).replace(/\n/g, '<br>');
+    // Through the LanaSafeHtml markdown allowlist (marked inside it).
+    return window.LanaSafeHtml ? window.LanaSafeHtml.renderMarkdown(src) : escapeHtml(src).replace(/\n/g, '<br>');
   }
 
   function toInline(markdown) {
     var src = (markdown == null) ? '' : String(markdown);
     if (!src.trim()) return '';
-    if (hasMarked('parseInline')) {
-      try { return marked.parseInline(src); } catch (_e) { /* fall through */ }
-    }
-    return escapeHtml(src);
+    return window.LanaSafeHtml ? window.LanaSafeHtml.renderMarkdown(src, { inline: true }) : escapeHtml(src);
   }
 
   window.Lex.Markdown = { toHtml: toHtml, toInline: toInline };

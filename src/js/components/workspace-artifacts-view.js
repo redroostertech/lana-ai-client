@@ -18,15 +18,12 @@
   }
 
   // Artifact drafts are LLM-generated and therefore untrusted; render them
-  // through the shared hardened parser (Lex.Utils.renderMarkdownSafe: raw
+  // through the one markdown sanitizer (LanaSafeHtml.renderMarkdown: raw
   // HTML escaped, links protocol-restricted, images as alt text) and fall
   // back to an escaped pre when it is unavailable.
   function renderMarkdownContent(content) {
     if (!content) return '<p class="text-sm text-gray-500">No preview available</p>';
-    var safe = global.Lex && global.Lex.Utils && global.Lex.Utils.renderMarkdownSafe
-      ? global.Lex.Utils.renderMarkdownSafe(content)
-      : null;
-    if (safe !== null) return safe;
+    if (global.LanaSafeHtml) return global.LanaSafeHtml.renderMarkdown(content);
     return '<pre class="text-sm text-gray-700 whitespace-pre-wrap">' + fallbackEscape(content) + '</pre>';
   }
 

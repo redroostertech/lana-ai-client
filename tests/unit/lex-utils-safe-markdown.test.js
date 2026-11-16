@@ -15,31 +15,26 @@
 
 const path = require('path');
 const fs = require('fs');
+const { JSDOM } = require('jsdom');
 
-const rawMarked = require(path.resolve(__dirname, '../../src/js/vendor/marked.min.js'));
+const SRC = path.resolve(__dirname, '../../src');
+const rawMarked = require(path.join(SRC, 'js/vendor/marked.min.js'));
 
-function loadLexUtils(withMarked) {
-  const timeSrc = fs.readFileSync(path.resolve(__dirname, '../../src/js/time-utils.js'), 'utf8');
-  const src = fs.readFileSync(path.resolve(__dirname, '../../src/js/lex/lex.utils.js'), 'utf8');
-  const fakeWindow = {
-    localStorage: { getItem: () => null },
-    Intl,
-    Date
-  };
-  if (withMarked) fakeWindow.marked = rawMarked;
-  const fakeDocument = {
-    createTextNode(text) {
-      return { nodeType: 3, textContent: String(text) };
-    }
-  };
-  new Function('window', timeSrc)(fakeWindow);
-  new Function('window', 'document', src)(fakeWindow, fakeDocument);
-  return fakeWindow.Lex.Utils;
+// The one markdown sanitizer now lives in js/shared/safe-html.js
+// (LanaSafeHtml.renderMarkdown); Lex.Utils.renderMarkdownSafe was merged
+// into it and every caller points there.
+function loadSafeHtml(withMarked) {
+  const { window } = new JSDOM('<!doctype html><body></body>', { runScripts: 'outside-only' });
+  window.eval(fs.readFileSync(path.join(SRC, 'js/shared/safe-url.js'), 'utf8'));
+  if (withMarked) window.eval(fs.readFileSync(path.join(SRC, 'js/vendor/marked.min.js'), 'utf8'));
+  window.eval(fs.readFileSync(path.join(SRC, 'js/shared/safe-html.js'), 'utf8'));
+  return window.LanaSafeHtml;
 }
 
-const Utils = loadLexUtils(true);
+const SafeHtml = loadSafeHtml(true);
+const Utils = { renderMarkdownSafe: (text, options) => SafeHtml.renderMarkdown(text, options) };
 
-describe('Lex.Utils.renderMarkdownSafe', () => {
+describe('LanaSafeHtml.renderMarkdown (merged from Lex.Utils.renderMarkdownSafe)', () => {
   test('renders markdown structure', () => {
     const out = Utils.renderMarkdownSafe(
       '> **Notice:** check this.\n\n# Title\n\nBody with **bold**.\n\n- item one\n- item two'
@@ -70,7 +65,8 @@ describe('Lex.Utils.renderMarkdownSafe', () => {
     const raw = rawMarked.parse(input);
     expect(raw).toContain('javascript:'); // raw marked keeps the href
     const out = Utils.renderMarkdownSafe(input);
-    expect(out).toContain('href="https://example.com"');
+    expect(out).toContain('href="https://example.com/"');
+    expect(out).toContain('target="_blank"');
     expect(out).toContain('rel="noopener noreferrer"');
     expect(out).not.toContain('javascript:');
     expect(out).toContain('evil'); // label survives as text
@@ -88,8 +84,36 @@ describe('Lex.Utils.renderMarkdownSafe', () => {
     expect(Utils.renderMarkdownSafe(undefined)).toBe('');
   });
 
-  test('returns null when marked is not loaded (caller falls back to escaping)', () => {
-    const UtilsNoMarked = loadLexUtils(false);
-    expect(UtilsNoMarked.renderMarkdownSafe('# hi')).toBeNull();
+  test('without marked it returns escaped text, never raw HTML', () => {
+    const noMarked = loadSafeHtml(false);
+    expect(noMarked.renderMarkdown('# hi <b>x</b>')).toBe('# hi &lt;b&gt;x&lt;/b&gt;');
+  });
+
+  test('angle-bracket placeholders such as <Client Name> stay visible', () => {
+    const out = Utils.renderMarkdownSafe('Dear <Client Name>, please sign <Date>.');
+    expect(out).toContain('&lt;Client Name&gt;');
+    expect(out).toContain('&lt;Date&gt;');
+  });
+
+  test('images become alt text in block and inline rendering, never a remote fetch', () => {
+    ['![Logo](https://t.example/p.png)', 'see ![Logo](https://t.example/p.png "t")'].forEach((md) => {
+      [false, true].forEach((inline) => {
+        const out = Utils.renderMarkdownSafe(md, { inline });
+        expect(out).not.toContain('<img');
+        expect(out).not.toContain('t.example');
+        expect(out).toContain('Logo');
+      });
+    });
+  });
+
+  test('a raw <img> tag is escaped text, not an image', () => {
+    const out = Utils.renderMarkdownSafe('x <img src="https://t.example/p.png"> y');
+    expect(out).not.toContain('<img');
+    expect(out).toContain('&lt;img');
+  });
+
+  test('Lex.Utils no longer carries a second markdown sanitizer', () => {
+    const utils = fs.readFileSync(path.join(SRC, 'js/lex/lex.utils.js'), 'utf8');
+    expect(utils).not.toMatch(/renderMarkdownSafe|new markedLib\.Marked/);
   });
 });

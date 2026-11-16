@@ -24,11 +24,21 @@
   // Helpers
   // ---------------------------------------------------------------------------
 
+  // Safe for text AND attribute values: escapes & < > " '.
   function escapeHtml(text) {
     if (text === null || text === undefined) return '';
-    const div = document.createElement('div');
-    div.textContent = String(text);
-    return div.innerHTML;
+    return String(text)
+      .split('&').join('&amp;')
+      .split('<').join('&lt;')
+      .split('>').join('&gt;')
+      .split('"').join('&quot;')
+      .split("'").join('&#39;');
+  }
+
+  // A parsed href may still hold characters WHATWG leaves raw (mailto keeps
+  // '"'); percent-encode them so the value is inert even before escaping.
+  function encodeHref(href) {
+    return String(href).replace(/["'<>`\s]/g, (ch) => '%' + ch.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
   }
 
   function escapeCode(str) {
@@ -401,15 +411,84 @@
    *                             [{document_id, filename, page_number, chunk_text, relevance_score}]
    * @returns {string} HTML string
    */
+  // Raw '<' in model text becomes LT right after code blocks are pulled out,
+  // and '&lt;' at the end: model (or prompt-injected) HTML such as
+  // <img onerror> renders as text, never as markup in an app window that can
+  // read the login token. Handlers that escape their own output turn it back
+  // into '<' first (raw()).
+  //
+  // Only a few formatting tags pass, only when LanaSafeHtml is loaded, and
+  // always rewritten to their bare form (<b>, </b>, <br>) on the spot: a
+  // model tag never keeps class, title, data-* or any other attribute, so it
+  // cannot pose as a citation or an overlay. class and data-* exist only on
+  // the formatter's own markup. The whole result then goes through the
+  // LanaSafeHtml 'chat' allowlist; nothing is spliced in as a string after
+  // that (code blocks are restored into text nodes only).
+  //
+  // Code blocks wait in private-use placeholders (CODE_OPEN n CODE_CLOSE);
+  // these characters and LT are stripped from the input first.
+  const LT = '\uE000';
+  const CODE_OPEN = '\uE001';
+  const CODE_CLOSE = '\uE002';
+  const PRIVATE_MARKS = /[\uE000-\uE002]/g;
+  const CODE_MARK = /\uE001(\d+)\uE002/g;
+  const raw = (value) => String(value).split(LT).join('<');
+  const MODEL_TAGS = 'br|sup|sub|u|kbd|b|i|em|strong|code|details|summary';
+  const MODEL_TAG_OR_TEXT = new RegExp('<(?!\\/?(?:' + MODEL_TAGS + ')\\b[^<>]*>)', 'gi');
+  const MODEL_TAG = new RegExp('<(\\/?)(' + MODEL_TAGS + ')\\b[^<>]*>', 'gi');
+
+  /**
+   * Put code blocks back after sanitizing, into text nodes only. A
+   * placeholder that ended up inside an attribute value is removed, so code
+   * HTML can never land in (and break out of) an attribute.
+   */
+  function restoreCodeBlocks(html, codeBlocks) {
+    if (!codeBlocks.length || html.indexOf(CODE_OPEN) === -1) return html;
+    const doc = global.document;
+    const template = doc.createElement('template');
+    template.innerHTML = html;
+    const walker = doc.createTreeWalker(template.content, 1 | 4);
+    const textNodes = [];
+    let node = walker.nextNode();
+    while (node) {
+      if (node.nodeType === 1) {
+        Array.prototype.slice.call(node.attributes).forEach((attr) => {
+          if (/[\uE000-\uE002]/.test(attr.value)) node.setAttribute(attr.name, attr.value.replace(PRIVATE_MARKS, ''));
+        });
+      } else if (node.nodeValue.indexOf(CODE_OPEN) !== -1) {
+        textNodes.push(node);
+      }
+      node = walker.nextNode();
+    }
+    textNodes.forEach((text) => {
+      const frag = doc.createDocumentFragment();
+      let last = 0;
+      const value = text.nodeValue;
+      value.replace(CODE_MARK, (match, index, offset) => {
+        if (offset > last) frag.appendChild(doc.createTextNode(value.slice(last, offset)));
+        const block = doc.createElement('template');
+        block.innerHTML = codeBlocks[Number(index)] || '';
+        frag.appendChild(block.content);
+        last = offset + match.length;
+        return match;
+      });
+      if (last < value.length) frag.appendChild(doc.createTextNode(value.slice(last).replace(PRIVATE_MARKS, '')));
+      text.parentNode.replaceChild(frag, text);
+    });
+    const out = doc.createElement('div');
+    out.appendChild(template.content);
+    return out.innerHTML;
+  }
+
   function format(content, citations) {
     if (!content) return '';
     citations = citations || [];
 
     // 1. Extract fenced code blocks into placeholders
-    const codeBlocks = {};
+    const codeBlocks = [];
     let codeIdx = 0;
 
-    let formatted = content
+    let formatted = String(content).replace(PRIVATE_MARKS, '')
       // Fenced code blocks
       .replace(/```(\w+)?\n?([\s\S]*?)```/g, (_match, lang, code) => {
         const trimmed = code.trim();
@@ -439,14 +518,20 @@
           html = `<div class="code-block-wrapper my-3">${label}<pre class="bg-gray-800 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm font-mono whitespace-pre-wrap"><code class="whitespace-pre-wrap">${escaped}</code></pre></div>`;
         }
 
-        const ph = `__CODE_BLOCK_${codeIdx++}__`;
-        codeBlocks[ph] = html;
+        const ph = CODE_OPEN + (codeIdx++) + CODE_CLOSE;
+        codeBlocks.push(html);
         return ph;
       })
 
+      // 1b. Everything outside code blocks is text, except the allowed
+      //     formatting tags when the sanitizer is present
+      .replace(global.LanaSafeHtml ? MODEL_TAG_OR_TEXT : /</g, LT)
+      //     ...and the tags that pass lose every attribute right here
+      .replace(MODEL_TAG, (_m, slash, name) => '<' + slash + name.toLowerCase() + '>')
+
       // 2. Inline code
       .replace(/`([^`]+)`/g, (_m, code) => {
-        return `<code class="bg-gray-200 px-1.5 py-0.5 rounded text-sm font-mono text-gray-800">${escapeCode(code)}</code>`;
+        return `<code class="bg-gray-200 px-1.5 py-0.5 rounded text-sm font-mono text-gray-800">${escapeCode(raw(code))}</code>`;
       })
 
       // 3. Bold & Italic
@@ -460,7 +545,8 @@
       )
 
       // 5. Inline document references [filename.pdf:page]
-      .replace(/\[([^\]]+\.pdf)(?::(\d+)(?::(\d+))?)?\]/gi, (_match, filename, page) => {
+      .replace(/\[([^\]]+\.pdf)(?::(\d+)(?::(\d+))?)?\]/gi, (_match, rawFilename, page) => {
+        const filename = raw(rawFilename);
         const pageNum = page || 1;
         let documentId = '';
         if (citations.length > 0) {
@@ -475,7 +561,9 @@
       })
 
       // 6. Markdown links [text](url) — PDF citation or regular
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, text, url) => {
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, rawText, rawUrl) => {
+        const text = raw(rawText);
+        const url = raw(rawUrl);
         const pdfMatch = text.match(/^(.+\.pdf)[,\s]*page\s+(\d+)/i);
         if (pdfMatch) {
           const fn = pdfMatch[1].trim();
@@ -484,23 +572,36 @@
           const docId = docIdMatch ? docIdMatch[1] : '';
           return `<button class="lex-chat-citation-link text-indigo-600 hover:text-indigo-800 hover:underline font-medium cursor-pointer" data-document-id="${escapeHtml(docId)}" data-filename="${escapeHtml(fn)}" data-page="${pg}" title="Click to open ${escapeHtml(fn)} at page ${pg}">${escapeHtml(text)}</button>`;
         }
-        return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:text-indigo-800 hover:underline font-medium">${escapeHtml(text)}</a>`;
+        // http(s), mailto, plain app paths and #anchors become links (the
+        // same rule as AI text blocks), written as LanaSafeUrl returns them;
+        // anything else stays plain text.
+        const href = global.LanaSafeUrl ? global.LanaSafeUrl.safeAppOrLinkHref(url) : '';
+        if (!href) return escapeHtml(text);
+        // Only http(s) and mailto open a new tab; app paths and #anchors stay
+        // in the window so lex-router handles them.
+        const external = global.LanaSafeUrl.safeLinkHref(href) ? ' target="_blank" rel="noopener noreferrer"' : '';
+        return `<a href="${escapeHtml(encodeHref(href))}"${external} class="text-indigo-600 hover:text-indigo-800 hover:underline font-medium">${escapeHtml(text)}</a>`;
       });
 
     // 7. Block-level processing
     formatted = processBlocks(formatted);
 
-    // 8. Restore code block placeholders
-    for (const [ph, html] of Object.entries(codeBlocks)) {
-      formatted = formatted.split(ph).join(html);
-    }
+    // 7b. Raw '<' from the model is shown as text
+    formatted = formatted.split(LT).join('&lt;');
 
-    // 9. Process (extracts N, M) citation patterns
+    // 7c. (extracts N, M) citation links, before the sanitizer
     if (citations.length > 0) {
       formatted = processCitationPatterns(formatted, citations);
     }
 
-    return formatted;
+    // 8. Final allowlist: the formatter's own markup plus the bare model
+    //    formatting tags, no other elements and no unexpected attributes
+    if (global.LanaSafeHtml) {
+      formatted = global.LanaSafeHtml.sanitize(formatted, global.document, 'chat');
+    }
+
+    // 9. Code blocks back into text nodes only (never into an attribute)
+    return restoreCodeBlocks(formatted, codeBlocks);
   }
 
   /**
@@ -529,7 +630,7 @@
         const ep = escapeHtml(String(c.page_number || 1));
         const ef = escapeHtml(c.filename || '');
         const title = escapeHtml(`View ${c.filename}${c.page_number ? ', page ' + c.page_number : ''}`);
-        return `<a href="#" class="lex-chat-citation-link text-blue-600 hover:text-blue-800 underline font-medium" data-citation-num="${en}" data-document-id="${ed}" data-page="${ep}" data-filename="${ef}" title="${title}" onclick="event.preventDefault();">${en}</a>`;
+        return `<a href="#" class="lex-chat-citation-link text-blue-600 hover:text-blue-800 underline font-medium" data-citation-num="${en}" data-document-id="${ed}" data-page="${ep}" data-filename="${ef}" title="${title}">${en}</a>`;
       }).join(', ');
       return `(extracts ${links})`;
     });

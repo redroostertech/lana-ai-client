@@ -822,27 +822,20 @@
   function renderMarkdownInline(text) {
     if (text === null || text === undefined) return '';
     if (typeof text !== 'string') text = String(text);
-    if (typeof marked !== 'undefined' && marked && typeof marked.parseInline === 'function') {
-      try { return marked.parseInline(text); } catch (e) { return text; }
-    }
-    return text;
+    // Model text: marked plus the LanaSafeHtml markdown allowlist.
+    return window.LanaSafeHtml ? window.LanaSafeHtml.renderMarkdown(text, { inline: true, breaks: true }) : escapeMarkdownFallback(text);
+  }
+
+  function escapeMarkdownFallback(text) {
+    return String(text).split('&').join('&amp;').split('<').join('&lt;').split('>').join('&gt;')
+      .split('"').join('&quot;').split("'").join('&#39;');
   }
 
   function renderMarkdownBlock(text) {
     if (text === null || text === undefined) return '';
     if (typeof text !== 'string') text = String(text);
-    if (typeof marked !== 'undefined' && marked && typeof marked.parse === 'function') {
-      try {
-        var html = marked.parse(text).trim();
-        if (html.indexOf('<p>') === 0 && html.lastIndexOf('</p>') === html.length - 4 && html.split('<p>').length === 2) {
-          html = html.slice(3, -4);
-        }
-        return html;
-      } catch (e) {
-        return text.split('\n').join('<br>');
-      }
-    }
-    return text.split('\n').join('<br>');
+    // Model text: marked plus the LanaSafeHtml markdown allowlist.
+    return window.LanaSafeHtml ? window.LanaSafeHtml.renderMarkdown(text, { unwrapParagraph: true, breaks: true }) : escapeMarkdownFallback(text).split('\n').join('<br>');
   }
 
   function renderHelpTextModal(helpText, uniqueId) {

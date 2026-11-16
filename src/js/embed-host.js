@@ -87,15 +87,19 @@
     box.style.cssText = 'display:none;padding:48px 24px;text-align:center;';
     var msg = global.document.createElement('p');
     msg.textContent = app.label + ' did not load. It may be temporarily unavailable.';
-    var link = global.document.createElement('a');
-    // Never interpolate the URL into markup; DOM assignment only.
-    link.href = app.embed.url;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    link.textContent = 'Open ' + app.label + ' in your browser';
-    link.style.cssText = 'text-decoration:underline;';
     box.appendChild(msg);
-    box.appendChild(link);
+    // Never interpolate the URL into markup; DOM assignment only, and only
+    // the parsed http(s) href (js/shared/safe-url.js). No link otherwise.
+    var fallbackHref = global.LanaSafeUrl ? global.LanaSafeUrl.safeHttpUrl(app.embed.url) : '';
+    if (fallbackHref) {
+      var link = global.document.createElement('a');
+      link.href = fallbackHref;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = 'Open ' + app.label + ' in your browser';
+      link.style.cssText = 'text-decoration:underline;';
+      box.appendChild(link);
+    }
     return box;
   }
 
@@ -208,6 +212,11 @@
     var fallback = buildFallback(app);
 
     var frame = doc.createElement('iframe');
+    // Spec section 4.3 flags. allow-same-origin keeps the partner's OWN https
+    // origin (its login cookies and storage); it never grants the app's
+    // file:// origin. Checked under webSecurity:false: a cross-origin https
+    // frame with these flags gets SecurityError on window.top, unlike srcdoc,
+    // blob: or data: frames (see js/shared/preview-frame-policy.js).
     frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups');
     frame.setAttribute('allow', 'clipboard-write; microphone');
     frame.setAttribute('referrerpolicy', 'no-referrer');

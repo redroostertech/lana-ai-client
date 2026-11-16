@@ -759,8 +759,12 @@
   // ---------------------------------------------------------------------------
 
   function handlePopState(e) {
-    var path = (e.state && e.state.path) || window.location.pathname;
-    navigate(path, { pushState: false });
+    // Every router entry carries state.path (start() and navigate() set it).
+    // An entry without it is a native fragment jump (an in-page #anchor
+    // link); the page has not changed, so there is nothing to route. Falling
+    // back to location.pathname here sent the app to the file:// shell path.
+    if (!e.state || !e.state.path) return;
+    navigate(e.state.path, { pushState: false });
   }
 
   // ---------------------------------------------------------------------------

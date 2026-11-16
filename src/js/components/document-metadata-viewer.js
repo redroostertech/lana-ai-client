@@ -730,19 +730,9 @@ class DocumentMetadataViewer {
     if (text === null || text === undefined) return '';
     if (typeof text !== 'string') text = String(text);
 
-    // If marked is available, use it to render markdown
-    if (typeof marked !== 'undefined' && typeof marked.parse === 'function') {
-      try {
-        // Use parse for block-level markdown (with <p> tags, line breaks, etc.)
-        return marked.parse(text);
-      } catch (e) {
-        console.warn('[DocumentMetadataViewer] Error rendering markdown:', e);
-        return this.escapeHtml(text);
-      }
-    }
-
-    // Fallback: escape HTML if marked is not available
-    return this.escapeHtml(text);
+    // Extracted metadata is model output: marked plus the LanaSafeHtml
+    // markdown allowlist, or escaped text without it.
+    return window.LanaSafeHtml ? window.LanaSafeHtml.renderMarkdown(text) : this.escapeHtml(text);
   }
 
   /**

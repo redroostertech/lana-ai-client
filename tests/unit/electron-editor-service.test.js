@@ -116,8 +116,8 @@ describe('starting the editor service', () => {
     const service1 = createEditorService({ script: SCRIPT, execPath: 'e', keyDir: KEYS, spawn: () => fakeChild(1), fetch: async () => ({ ok: false, status: 503 }), pickPort: async () => 1, fsImpl: { mkdirSync() {} } });
     const service2 = createEditorService({ script: SCRIPT, execPath: 'e', keyDir: KEYS, spawn: () => fakeChild(2), fetch: async () => ({ ok: false, status: 503 }), pickPort: async () => 1, fsImpl: { mkdirSync() {} } });
     return Promise.all([service1.start(), service2.start()]).then(() => {
-      const t1 = service1.requestHeaders({ url: 'http://127.0.0.1:1/v1/redline', pageUrl: 'file:///app/x.html', headers: {} }).Authorization;
-      const t2 = service2.requestHeaders({ url: 'http://127.0.0.1:1/v1/redline', pageUrl: 'file:///app/x.html', headers: {} }).Authorization;
+      const t1 = service1.requestHeaders({ url: 'http://127.0.0.1:1/v1/redline', pageUrl: 'file:///app/x.html', resourceType: 'xhr', headers: {} }).Authorization;
+      const t2 = service2.requestHeaders({ url: 'http://127.0.0.1:1/v1/redline', pageUrl: 'file:///app/x.html', resourceType: 'xhr', headers: {} }).Authorization;
       expect(t1).toMatch(/^Bearer [0-9a-f]{64}$/);
       expect(t1).not.toBe(t2);
       return Promise.all([service1.stop(), service2.stop()]);
@@ -197,8 +197,29 @@ describe('which requests get the token', () => {
   const page = 'file:///Applications/LANA.app/Contents/Resources/app.asar/public_html/file-viewer.html';
 
   test('the app\'s own pages calling the editor\'s /v1 API get it, replacing any they sent', () => {
-    expect(authorizeEditorRequest({ url: 'http://127.0.0.1:53117/v1/documents/xml', pageUrl: page, headers: { 'Content-Type': 'application/octet-stream', authorization: 'Bearer chef-jwt' } }, editor))
+    expect(authorizeEditorRequest({ url: 'http://127.0.0.1:53117/v1/documents/xml', pageUrl: page, resourceType: 'xhr', headers: { 'Content-Type': 'application/octet-stream', authorization: 'Bearer chef-jwt' } }, editor))
       .toEqual({ 'Content-Type': 'application/octet-stream', Authorization: `Bearer ${TOKEN}` });
+  });
+
+  test('only xhr and fetch requests get the token; frames, images, scripts and navigations do not', () => {
+    const url = 'http://127.0.0.1:53117/v1/redline';
+    expect(authorizeEditorRequest({ url, pageUrl: page, resourceType: 'fetch', headers: {} }, editor)).toEqual({ Authorization: `Bearer ${TOKEN}` });
+    ['subFrame', 'mainFrame', 'image', 'script', 'stylesheet', 'object', 'media', 'other', undefined].forEach((resourceType) => {
+      const headers = {};
+      expect(authorizeEditorRequest({ url, pageUrl: page, resourceType, headers }, editor)).toBe(headers);
+    });
+  });
+
+  test('electron-main passes the request resource type through', () => {
+    const main = require('fs').readFileSync(require('path').resolve(__dirname, '../../electron-main.js'), 'utf8');
+    expect(main).toMatch(/editorService\.requestHeaders\(\{ url: details\.url, pageUrl, resourceType: details\.resourceType, headers: details\.requestHeaders \}\)/);
+  });
+
+  test('an untrusted preview fetch never gets the editor token, even to the editor base', () => {
+    const headers = { 'X-Lana-Untrusted-Fetch': '1' };
+    expect(authorizeEditorRequest({ url: 'http://127.0.0.1:53117/v1/redline', pageUrl: page, resourceType: 'xhr', headers }, editor)).toBe(headers);
+    const lower = { 'x-lana-untrusted-fetch': '1' };
+    expect(authorizeEditorRequest({ url: 'http://127.0.0.1:53117/v1/manifests/public-key', pageUrl: page, resourceType: 'xhr', headers: lower }, editor)).toBe(lower);
   });
 
   test('anything else is left alone', () => {

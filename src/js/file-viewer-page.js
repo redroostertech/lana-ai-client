@@ -4968,6 +4968,8 @@
     }
     if (isDemoMode()) {
       var demoIframe = document.getElementById('viewerIframe');
+      // Inert like any other preview; loadPDF clears it for the real PDF.
+      demoIframe.setAttribute('sandbox', '');
       demoIframe.srcdoc = '<html><body style="font-family:system-ui,sans-serif;padding:32px;background:#f8fafc;color:#0f172a;"><h1 style="margin-top:0;">' +
         escapeHtml(file.filename || 'Demo PDF') +
         '</h1><p>This is a demo-mode PDF placeholder rendered from local fixture data.</p><pre style="white-space:pre-wrap;background:white;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">' +
@@ -4991,9 +4993,14 @@
       var renderedWithEditor = await loadFileInEditor(file, arrayBuffer);
       if (renderedWithEditor) return;
     }
-    var blob = new Blob([arrayBuffer], { type: file.content_type || 'application/pdf' });
+    // Always typed as PDF, never the upload's content_type: a .pdf that is
+    // really HTML or SVG would otherwise run script in this unsandboxed frame
+    // (left unsandboxed so Chromium's PDF viewer can render it).
+    var blob = window.LanaPreviewFrame.pdfBlob(arrayBuffer);
     var objectUrl = URL.createObjectURL(blob);
     var iframe = document.getElementById('viewerIframe');
+    iframe.removeAttribute('srcdoc');
+    iframe.removeAttribute('sandbox');
     var citedPage = state.citationFocus && !state.citationFocusApplied ? state.citationFocus.page : null;
     iframe.src = citedPage ? objectUrl + '#page=' + citedPage : objectUrl;
     iframe.classList.remove('hidden');
@@ -5152,7 +5159,8 @@
         "table => table.docx-table"
       ]
     });
-    container.innerHTML = result.value;
+    // A DOCX can carry javascript: links and handlers: sanitize first.
+    container.innerHTML = window.LanaSafeHtml.sanitize(result.value);
     container.classList.remove('hidden');
     hideLoading();
   }

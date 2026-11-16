@@ -97,6 +97,7 @@ const { refreshHostedDiscovery, verifyServer, discoverByDomain } = require('./el
 // The box Chef's certificate pin (hardware boxes): one host and port, trusted by
 // the control plane's SHA-256 only; everything else keeps default checks.
 const chefPin = require('./electron-chef-pin');
+const { decideWindowOpen } = require('./electron-window-open-policy');
 const { createAppLinkRouter, createFirmSignOut, oldSessionNotice, registerAppLinkIpc, createColdStartQueue, deepLinkFromArgv } = require('./electron-app-links');
 const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified, saveBrainchildLink, getBrainchildLink, clearBrainchildLink, setBrainchildAutoBindDisabled, isBrainchildAutoBindDisabled, authTokenPersistence, offlineKeyPersistence, getLocalEnginePreferences, updateLocalEnginePreferences, firstLaunchPersistence, locationPersistence } = require('./electron-storage');
 chefPin.configure({ getSavedServer });
@@ -1126,19 +1127,16 @@ function createWindow(serverUrl = null, startPage = 'dashboard.html') {
 
   // Handle window open requests
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    // Allow about:blank, blob:, data:, and empty URLs (for print preview and dynamic content)
-    if (!url || url === '' || url === 'about:blank' || url.startsWith('blob:') || url.startsWith('data:')) {
-      return { action: 'allow' };
-    }
-
-    // Open external http/https links in system browser
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      require('electron').shell.openExternal(url);
+    // http(s) goes to the system browser; app pages, about:blank and blob:
+    // open isolated (no preload, web security on); javascript:, data:, other
+    // schemes and files outside public_html are denied
+    // (electron-window-open-policy.js).
+    const decision = decideWindowOpen(url, { appRoot: path.join(__dirname, 'public_html') });
+    if (decision.external) {
+      require('electron').shell.openExternal(decision.external);
       return { action: 'deny' };
     }
-
-    // Allow all other URLs
-    return { action: 'allow' };
+    return decision.response;
   });
 }
 
@@ -1229,19 +1227,16 @@ function createLoginWindow(next = 'login') {
 
   // Handle window open requests
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    // Allow about:blank, blob:, data:, and empty URLs (for print preview and dynamic content)
-    if (!url || url === '' || url === 'about:blank' || url.startsWith('blob:') || url.startsWith('data:')) {
-      return { action: 'allow' };
-    }
-
-    // Open external http/https links in system browser
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      require('electron').shell.openExternal(url);
+    // http(s) goes to the system browser; app pages, about:blank and blob:
+    // open isolated (no preload, web security on); javascript:, data:, other
+    // schemes and files outside public_html are denied
+    // (electron-window-open-policy.js).
+    const decision = decideWindowOpen(url, { appRoot: path.join(__dirname, 'public_html') });
+    if (decision.external) {
+      require('electron').shell.openExternal(decision.external);
       return { action: 'deny' };
     }
-
-    // Allow all other URLs
-    return { action: 'allow' };
+    return decision.response;
   });
 }
 
@@ -2540,7 +2535,7 @@ app.whenReady().then(async () => {
     try {
       pageUrl = (details.frame && details.frame.url) || (details.webContents && details.webContents.getURL()) || '';
     } catch (_error) { pageUrl = ''; }
-    callback({ requestHeaders: editorService.requestHeaders({ url: details.url, pageUrl, headers: details.requestHeaders }) });
+    callback({ requestHeaders: editorService.requestHeaders({ url: details.url, pageUrl, resourceType: details.resourceType, headers: details.requestHeaders }) });
   });
 
   const { addMissingCorsHeaders } = require('./electron-cors');

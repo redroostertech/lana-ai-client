@@ -30,3 +30,15 @@ export function getApiUrl(path) {
   return `${base}${prefixedPath}`;
 }
 
+
+/**
+ * An artifact or document URL from the backend, made safe to frame, open or
+ * link: absolute http(s) as is, a root path ('/api/...') joined to the API
+ * base, anything else (javascript:, data:, blob:, file:) refused as ''.
+ * The allowlist lives in js/shared/safe-url.js (window.LanaSafeUrl).
+ */
+export function safeArtifactUrl(url) {
+  const safeUrl = typeof window !== 'undefined' ? window.LanaSafeUrl : null;
+  if (!safeUrl) return '';
+  return safeUrl.safeHttpUrl(url, canonicalBaseUrl());
+}

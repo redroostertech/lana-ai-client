@@ -398,7 +398,9 @@
     var rows = store.documents.length
       ? store.documents.map(function (doc) {
         var body = '<div class="my-task-document-row__icon">' + iconHtml('file-text') + '</div><div class="my-task-document-row__body"><div class="my-task-document-row__title">' + esc(doc.name) + '</div><div class="my-task-document-row__meta">' + esc(doc.type) + '</div></div>';
-        return doc.url ? '<a class="my-task-document-row" href="' + esc(doc.url) + '" target="_blank" rel="noopener">' + body + iconHtml('external-link') + '</a>' : '<div class="my-task-document-row">' + body + '</div>';
+        // http(s), mailto or a plain app path only, as the parsed href (js/shared/safe-url.js).
+        var href = doc.url && window.LanaSafeUrl ? window.LanaSafeUrl.safeAppOrLinkHref(String(doc.url)) : '';
+        return href ? '<a class="my-task-document-row" href="' + esc(href) + '" target="_blank" rel="noopener">' + body + iconHtml('external-link') + '</a>' : '<div class="my-task-document-row">' + body + '</div>';
       }).join('')
       : '<p class="my-task-detail__muted">No documents associated with this task.</p>';
     return [

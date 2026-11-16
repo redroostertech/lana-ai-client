@@ -53,6 +53,16 @@
     else btn.textContent = label;
   }
 
+  // Preview frame for a fetched file. sandbox is from LanaPreviewFrame:
+  // null only for a PDF blob (Chromium's viewer blanks inside a sandbox).
+  function _previewFrame(src, sandbox) {
+    var frame = document.createElement('iframe');
+    if (sandbox !== null) frame.setAttribute('sandbox', sandbox);
+    frame.style.cssText = 'width:100%;height:100%;border:none;';
+    frame.src = src;
+    return frame;
+  }
+
   function _escapeHtml(text) {
     if (!text) return '';
     var str = String(text);
@@ -329,7 +339,9 @@
       fetch(api.baseUrl + '/api/v1/storage/files/' + encodeURIComponent(self.state.docId) + '/download', {
         headers: { 'Authorization': 'Bearer ' + api.token }
       }).then(function(r) { return r.blob(); }).then(function(blob) {
-        viewer.innerHTML = '<iframe src="' + URL.createObjectURL(blob) + '#toolbar=0" style="width:100%;height:100%;border:none;"></iframe>';
+        // Retyped as PDF so a .pdf name on HTML or SVG bytes cannot run script.
+        viewer.innerHTML = '';
+        viewer.appendChild(_previewFrame(URL.createObjectURL(window.LanaPreviewFrame.pdfBlob(blob)) + '#toolbar=0', null));
       }).catch(function() {
         viewer.innerHTML = '<div class="flex items-center justify-center h-full text-sm text-red-400">Failed to load preview</div>';
       });
@@ -751,8 +763,18 @@
       return resp.blob();
     })
     .then(function (blob) {
-      var blobUrl = URL.createObjectURL(blob);
-      previewBody.innerHTML = '<iframe src="' + blobUrl + '" style="width:100%;height:100%;border:none;"></iframe>';
+      // A PDF shows in Chromium's viewer (unsandboxed, retyped as PDF). Any
+      // other template (DOCX, or HTML/SVG bytes) is sandboxed with no script;
+      // downloads stay allowed so a DOCX still offers to save as before.
+      var Policy = window.LanaPreviewFrame;
+      var pdf = Policy.isPdf(blob.type, docName);
+      var blobUrl = URL.createObjectURL(pdf ? Policy.pdfBlob(blob) : blob);
+      previewBody.innerHTML = '';
+      previewBody.appendChild(_previewFrame(blobUrl, Policy.sandboxFor({
+        source: 'blob',
+        contentType: pdf ? 'application/pdf' : blob.type,
+        allowDownloads: true
+      })));
     })
     .catch(function (err) {
       previewBody.innerHTML = '<div style="color:#ef4444;font-size:14px;">Failed to load preview: ' + _escapeHtml(err.message) + '</div>';

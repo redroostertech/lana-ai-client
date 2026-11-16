@@ -131,7 +131,12 @@
 
   var escHtml = (typeof window !== 'undefined' && window.Lex && window.Lex.Utils && window.Lex.Utils.escapeHtml)
     ? window.Lex.Utils.escapeHtml
-    : function (s) { var d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; };
+    : function (s) {
+      // Attribute safe: also escapes quotes (used inside href="...").
+      return String(s == null ? '' : s)
+        .split('&').join('&amp;').split('<').join('&lt;').split('>').join('&gt;')
+        .split('"').join('&quot;').split("'").join('&#39;');
+    };
 
   var timeAgo = (typeof window !== 'undefined' && window.Lex && window.Lex.Utils && window.Lex.Utils.timeAgo)
     ? window.Lex.Utils.timeAgo
@@ -468,8 +473,10 @@
     if (target.type) labelParts.push(humanizeValue(target.type));
     labelParts.push(String(target.id));
     var label = labelParts.join(' ');
-    if (target.url) {
-      return '<a class="atd-target-link" href="' + escHtml(target.url) + '">' + escHtml(label) + '</a>';
+    // http(s), mailto or a plain app path only, as the parsed href (js/shared/safe-url.js).
+    var href = target.url && window.LanaSafeUrl ? window.LanaSafeUrl.safeAppOrLinkHref(String(target.url)) : '';
+    if (href) {
+      return '<a class="atd-target-link" href="' + escHtml(href) + '">' + escHtml(label) + '</a>';
     }
     return '<span class="atd-target-id">' + escHtml(label) + '</span>';
   }

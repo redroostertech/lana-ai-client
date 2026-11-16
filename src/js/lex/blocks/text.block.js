@@ -8,6 +8,14 @@
 
   const { SchemaRegistry } = window.Lex;
 
+  // Raw '<' in AI text becomes this placeholder before parsing and '&lt;' at
+  // the end, so model HTML such as <img onerror> renders as text. Code
+  // escaping and link URLs turn it back into '<' first.
+  var LT = '\uE000';
+  function raw(value) {
+    return String(value || '').split(LT).join('<');
+  }
+
   // ---------------------------------------------------------------------------
   // String-method markdown helpers (no regex)
   // ---------------------------------------------------------------------------
@@ -205,9 +213,17 @@
         break;
       }
       var linkText = remaining.substring(openBracket + 1, closeBracket);
-      var url = remaining.substring(openParen + 1, closeParen);
+      var url = raw(remaining.substring(openParen + 1, closeParen));
       result += remaining.substring(0, openBracket);
-      result += '<a href="' + escapeAttr(url) + '" class="lex-text-link underline" target="_blank">' + linkText + '</a>';
+      // http(s), mailto or a plain app path only, as the parsed href
+      // (js/shared/safe-url.js); anything else stays plain text.
+      var href = window.LanaSafeUrl ? window.LanaSafeUrl.safeAppOrLinkHref(url) : '';
+      result += href
+        // Only http(s) and mailto open a new tab; app paths stay in the
+        // window so lex-router handles them.
+        ? '<a href="' + escapeAttr(href) + '" class="lex-text-link underline"' +
+          (window.LanaSafeUrl.safeLinkHref(href) ? ' target="_blank" rel="noopener noreferrer"' : '') + '>' + linkText + '</a>'
+        : linkText;
       remaining = remaining.substring(closeParen + 1);
     }
 
@@ -231,7 +247,7 @@
    * @returns {string}
    */
   function escapeHtmlContent(text) {
-    return (text || '')
+    return raw(text)
       .split('&').join('&amp;')
       .split('<').join('&lt;')
       .split('>').join('&gt;');
@@ -264,7 +280,7 @@
       content: 'Here is a summary of the findings from the **Smith v. Jones** matter.'
     }
   }, function renderText(container, block) {
-    var html = block.content || '';
+    var html = String(block.content || '').split(LT).join('').split('<').join(LT);
 
     // Basic markdown processing — all steps use string methods, no regex.
     // Order matters: fenced code blocks and inline code are extracted first so
@@ -275,6 +291,7 @@
     html = processItalic(html);
     html = processLinks(html);
     html = processNewlines(html);
+    html = html.split(LT).join('&lt;');
 
     container.innerHTML = '<div class="text-sm lex-text-primary leading-relaxed">' + html + '</div>';
   });

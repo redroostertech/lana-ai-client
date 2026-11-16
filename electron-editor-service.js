@@ -97,12 +97,18 @@ async function checkEditorService(fetch, url, token, { starting, timeoutMs }) {
 }
 
 /**
- * Headers for one request from the session, with the editor's token added when the request
- * goes to the editor's /v1 API from one of the app's own pages (file://). Any other request,
- * or one from a web page the app shows, is left as it is.
+ * Headers for one request from the session, with the editor's token added when an xhr/fetch
+ * request goes to the editor's /v1 API from one of the app's own pages (file://). Any other request,
+ * one from a web page the app shows, or one the renderer marked as an untrusted fetch
+ * (X-Lana-Untrusted-Fetch, sent by the preview PDF hydrator for backend or model URLs) is
+ * left as it is.
  */
-function authorizeEditorRequest({ url, pageUrl, headers }, { baseUrl, token }) {
+function authorizeEditorRequest({ url, pageUrl, resourceType, headers }, { baseUrl, token }) {
   if (!baseUrl || !token || typeof url !== 'string' || !url.startsWith(`${baseUrl}/v1/`)) {return headers;}
+  // Only script requests (xhr/fetch) from app code; never a frame, image,
+  // script tag, navigation or anything else that could load an editor URL.
+  if (resourceType !== 'xhr' && resourceType !== 'fetch') {return headers;}
+  if (Object.keys(headers || {}).some((name) => name.toLowerCase() === 'x-lana-untrusted-fetch')) {return headers;}
   if (typeof pageUrl !== 'string' || !pageUrl.startsWith('file:')) {return headers;}
   const out = {};
   for (const [name, value] of Object.entries(headers || {})) {
