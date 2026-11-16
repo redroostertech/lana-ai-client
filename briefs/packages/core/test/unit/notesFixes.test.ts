@@ -335,7 +335,9 @@ describe("point and action shapes, round two (synthetic)", () => {
 
 describe("the set-aside check (notes.aside.v1)", () => {
   it("asks once per part what is not part of the meeting and sets those stretches aside", async () => {
-    const replies = ["POINT: summary | L6 | A dentist appointment moves to Friday.\nPOINT: summary | L3 | The setup fee is 1,200 dollars and the monthly fee is 300.\nSUMMARY: Onboarding fees.", "ASIDE: phone_call | L5-L7"];
+    // The notes mark only the middle of the call (L6); the check finds all of it (L5 to L7), and the guard keeps it because they overlap.
+    // The notes range alone is under 20 s: it still backs the checked part, because the guard runs before the 20 s drop.
+    const replies = ["ASIDE: phone_call | L6\nPOINT: summary | L6 | A dentist appointment moves to Friday.\nPOINT: summary | L3 | The setup fee is 1,200 dollars and the monthly fee is 300.\nSUMMARY: Onboarding fees.", "ASIDE: phone_call | L5-L7"];
     const model = new Scripted(replies);
     const summarizer = new MeetingSummarizer(new RuntimeNotesBackend(model, undefined, words), { targetTokens: 4000, maxTokens: 6000 });
     const result = await summarizer.summarize({ transcript, speakers, meetingID, now: new Date(2026, 10, 11, 16, 0) });
@@ -420,5 +422,80 @@ describe("rules from the desktop rerun, round two (synthetic)", () => {
     const drafts = Array.from({ length: 30 }, (_, index) => ({ kind: "summary" as const, text: `Point number ${index} about topic ${index * 7}`, sources: [{ start: index * 60, end: index * 60 + 10 }], precision: "exact" as const }));
     expect(reduceKeyPoints(drafts, [], DEFAULT_SUMMARY_LIMITS).keyPoints).toHaveLength(12);
     expect(reduceKeyPoints(drafts, [], DEFAULT_SUMMARY_LIMITS, 9).keyPoints).toHaveLength(27);
+  });
+});
+
+describe("set-aside guard (lana-app-93 decision, synthetic)", () => {
+  // S1 and S2 talk most; S3 is lightly heard (under 5% of talk) inside 600 to 640.
+  const guardTranscript: TranscriptSegment[] = [
+    { speaker: "S1", start: 0, end: 300, text: "We go over the onboarding schedule for the Harbor account." },
+    { speaker: "S2", start: 300, end: 600, text: "The setup fee is 1,200 dollars and the monthly fee is 300." },
+    { speaker: "S3", start: 600, end: 615, text: "Sorry to interrupt, a quick one about another file." },
+    { speaker: "S1", start: 615, end: 640, text: "Okay, thanks." },
+    { speaker: "S1", start: 640, end: 900, text: "Back to the schedule, kickoff is in December." },
+    { speaker: "S2", start: 900, end: 1200, text: "The silver plan is three payments over about six weeks." },
+  ];
+  async function summarize(notesReply: string, checkReply: string) {
+    const model = new Scripted([notesReply, checkReply]);
+    const result = await new MeetingSummarizer(new RuntimeNotesBackend(model, undefined, words), { targetTokens: 4000, maxTokens: 6000 })
+      .summarize({ transcript: guardTranscript, speakers, meetingID, now: new Date() });
+    return result.notes.setAside ?? [];
+  }
+
+  it("drops a checked part that no ASIDE line backs and no lightly heard speaker talks in", async () => {
+    expect(await summarize("SUMMARY: Onboarding.", "ASIDE: phone_call | L5-L6")).toEqual([]);
+  });
+
+  it("keeps a checked part that overlaps an ASIDE line from the notes", async () => {
+    expect(await summarize("ASIDE: phone_call | L6\nSUMMARY: Onboarding.", "ASIDE: phone_call | L5-L6")).toEqual([{ start: 640, end: 1200, reason: "phone_call", speakers: ["S1", "S2"] }]);
+  });
+
+  it("keeps a checked part a lightly heard speaker talks in", async () => {
+    const parts = await summarize("SUMMARY: Onboarding.", "ASIDE: other_matter | L3-L4");
+    expect(parts).toEqual([{ start: 600, end: 640, reason: "other_matter", speakers: ["S1", "S3"] }]);
+  });
+
+  it("moves a time word written as the owner to the due words, and the owner falls back", async () => {
+    const model = new Scripted(["ACTION: task | L4 | Send revised schedule | Send it and copy Priya | none | tonight | none\nSUMMARY: x", "NONE"]);
+    const result = await new MeetingSummarizer(new RuntimeNotesBackend(model, undefined, words), { targetTokens: 4000, maxTokens: 6000 })
+      .summarize({ transcript, speakers, meetingID, now: new Date(2026, 10, 11, 16), meetingStart: new Date(2026, 10, 11, 15, 4) });
+    const params = result.intents[0]!.params;
+    if (params.type !== "task.create") throw new Error("task expected");
+    expect(params.task).toMatchObject({ assigneeHint: "Omar Haddad", dueText: "tonight", dueDate: "2026-11-11" });
+  });
+});
+
+describe("set-aside guard boundaries (synthetic)", () => {
+  const lines: TranscriptSegment[] = [
+    { speaker: "S1", start: 0, end: 500, text: "Main speaker." },
+    { speaker: "S2", start: 500, end: 990, text: "Second speaker." },
+    { speaker: "S3", start: 990, end: 1000, text: "Light speaker." },
+    { speaker: "S4", start: 1000, end: 1008, text: "   " },
+  ];
+  it("needs a real overlap, a light line at least half inside, and ignores blank lines", async () => {
+    const { guardCheckedParts } = await import("../../src/summarizer/meetingSummarizer.js");
+    const notes = [{ start: 100, end: 200, reason: "phone_call" as const }];
+    expect(guardCheckedParts([{ start: 200, end: 300, reason: "phone_call" }], notes, lines)).toEqual([]);
+    expect(guardCheckedParts([{ start: 199, end: 300, reason: "phone_call" }], notes, lines)).toHaveLength(1);
+    expect(guardCheckedParts([{ start: 996, end: 1100, reason: "other_matter" }], [], lines)).toEqual([]);
+    expect(guardCheckedParts([{ start: 995, end: 1100, reason: "other_matter" }], [], lines)).toHaveLength(1);
+    expect(guardCheckedParts([{ start: 1000, end: 1100, reason: "other_matter" }], [], lines)).toEqual([]);
+  });
+});
+
+describe("time word as owner, more cases (synthetic)", () => {
+  async function task(action: string) {
+    const model = new Scripted([`${action}\nSUMMARY: x`, "NONE"]);
+    const result = await new MeetingSummarizer(new RuntimeNotesBackend(model, undefined, words), { targetTokens: 4000, maxTokens: 6000 })
+      .summarize({ transcript, speakers, meetingID, now: new Date(2026, 10, 11, 16), meetingStart: new Date(2026, 10, 11, 15, 4) });
+    return result.intents[0]!.params;
+  }
+  it("keeps due words already written, leaves unresolved words and names as the owner", async () => {
+    const kept = await task("ACTION: task | L4 | Send revised schedule | Send it | tonight | tomorrow | none");
+    expect(kept.type === "task.create" && kept.task).toMatchObject({ dueText: "tonight", assigneeHint: "Omar Haddad" });
+    const vague = await task("ACTION: task | L4 | Send revised schedule | Send it | none | next month | none");
+    expect(vague.type === "task.create" && vague.task.assigneeHint).toBe("next month");
+    const named = await task("ACTION: task | L4 | Send revised schedule | Send it | none | Priya | none");
+    expect(named.type === "task.create" && named.task.assigneeHint).toBe("Priya");
   });
 });

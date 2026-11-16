@@ -175,7 +175,10 @@ export class MeetingSummarizer {
       options.progress?.((chunk.index + 1) / chunks.length);
     }
     if (fixed === undefined) {
-      asides.push(...await this.checkAsides(chunks, skipped, runningSummary, options.speakers, options.signal));
+      // Set-aside guard (contract): a checked part stands only when an ASIDE line backs it or a lightly heard speaker talks in it.
+      const checked = await this.checkAsides(chunks, skipped, runningSummary, options.speakers, options.signal);
+      const fromNotes = [...asides];
+      asides.push(...guardCheckedParts(checked, fromNotes, visible));
       asides.push(...visitorParts(visible));
     }
     const setAside = fixed ?? finalSetAside(asides, options.transcript);
@@ -359,6 +362,26 @@ const VISITOR_MIN_SECONDS = 20;
 const VISITOR_SHARE = 0.05;
 const VISITOR_SPAN_SECONDS = 300;
 
+/**
+ * Set-aside guard (lana-app-93 decision, both devices): a part from the notes.aside.v1 check is
+ * kept only when it overlaps a range from the notes' own ASIDE lines, or a lightly heard speaker
+ * (under 5% of all talk) has a line at least half inside it. Runs before the joins and the drop.
+ */
+export function guardCheckedParts(checked: readonly SetAsidePart[], fromNotes: readonly SetAsidePart[], transcript: readonly TranscriptSegment[]): SetAsidePart[] {
+  const lines = transcript.filter((segment) => segment.text.trim() !== "");
+  const talk = new Map<string, number>();
+  let total = 0;
+  for (const line of lines) {
+    const seconds = Math.max(0, line.end - line.start);
+    total += seconds;
+    talk.set(line.speaker, (talk.get(line.speaker) ?? 0) + seconds);
+  }
+  const light = (speaker: string): boolean => total > 0 && (talk.get(speaker) ?? 0) < VISITOR_SHARE * total;
+  return checked.filter((part) =>
+    fromNotes.some((aside) => Math.min(part.end, aside.end) - Math.max(part.start, aside.start) > 0)
+    || lines.some((line) => light(line.speaker) && segmentSetAside(line, [part])));
+}
+
 /** Whether the spoken due words (or the time inside them) are said in the action's quotes. */
 function dueSaid(dueText: string, evidence: readonly { readonly quote: string }[]): boolean {
   const spoken = normalizeText(SPOKEN_WHEN.exec(dueText)?.[0] ?? dueText);
@@ -378,7 +401,14 @@ function readableTitle(title: string): string {
  * date kept only when the cited lines say it, resolved against the meeting start.
  */
 function finishCandidate(candidate: QuotedCandidate, speakers: readonly Speaker[], meetingStart: Date): QuotedCandidate {
-  let assigneeHint = candidate.assigneeHint ?? candidate.evidence.find((item) => FIRST_PERSON_PROMISE.test(item.quote))?.speaker;
+  // A time word written as the owner ("tonight") is a when, not an owner (contract).
+  let spokenWhen = candidate.dueText;
+  let owner = candidate.assigneeHint;
+  if (owner !== undefined && resolveDueText(owner.trim(), meetingStart) !== undefined) {
+    if (spokenWhen === undefined) spokenWhen = owner.trim();
+    owner = undefined;
+  }
+  let assigneeHint = owner ?? candidate.evidence.find((item) => FIRST_PERSON_PROMISE.test(item.quote))?.speaker;
   const label = assigneeHint === undefined ? null : /^s(\d+)$/iu.exec(assigneeHint.trim());
   if (label !== null) {
     const speaker = speakers.find((item) => item.id === `S${label[1]}`);
@@ -386,7 +416,7 @@ function finishCandidate(candidate: QuotedCandidate, speakers: readonly Speaker[
   }
   const title = readableTitle(candidate.title);
   if (candidate.type !== "task.create") return { ...candidate, title, assigneeHint, dueText: undefined };
-  const dueText = candidate.dueText !== undefined && dueSaid(candidate.dueText, candidate.evidence) ? candidate.dueText : undefined;
+  const dueText = spokenWhen !== undefined && dueSaid(spokenWhen, candidate.evidence) ? spokenWhen : undefined;
   const dueDate = candidate.dueDate ?? (dueText === undefined ? undefined : resolveDueText(dueText, meetingStart));
   return { ...candidate, title, assigneeHint, dueText, dueDate };
 }
