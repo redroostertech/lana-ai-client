@@ -127,8 +127,8 @@
         left: 50%;
         transform: translateX(-50%);
         padding: 6px 10px;
-        background: var(--lex-color-gray-800);
-        color: var(--lex-color-white);
+        background: var(--lex-tooltip-bg, #2D2B27);
+        color: var(--lex-tooltip-fg, #FFFFFF);
         font-size: var(--lex-form-help-size, 0.6875rem);
         font-weight: var(--lex-weight-regular, 400);
         line-height: 1.4;

@@ -99,7 +99,7 @@ const { refreshHostedDiscovery, verifyServer, discoverByDomain } = require('./el
 const chefPin = require('./electron-chef-pin');
 const { decideWindowOpen } = require('./electron-window-open-policy');
 const { createAppLinkRouter, createFirmSignOut, oldSessionNotice, registerAppLinkIpc, createColdStartQueue, deepLinkFromArgv } = require('./electron-app-links');
-const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified, saveBrainchildLink, getBrainchildLink, clearBrainchildLink, setBrainchildAutoBindDisabled, isBrainchildAutoBindDisabled, authTokenPersistence, offlineKeyPersistence, getLocalEnginePreferences, updateLocalEnginePreferences, firstLaunchPersistence, locationPersistence } = require('./electron-storage');
+const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified, saveBrainchildLink, getBrainchildLink, clearBrainchildLink, setBrainchildAutoBindDisabled, isBrainchildAutoBindDisabled, authTokenPersistence, offlineKeyPersistence, getLocalEnginePreferences, updateLocalEnginePreferences, firstLaunchPersistence, locationPersistence, appearancePersistence } = require('./electron-storage');
 chefPin.configure({ getSavedServer });
 const { createLocalEngineHost } = require('./electron-local-engine');
 const { createTokenStore, registerTokenIpc, hasLiveSession } = require('./electron-token-store');
@@ -290,6 +290,19 @@ registerFirstLaunchIpc({
   log: (error) => logError('[first-launch] the setup screen call failed', error)
 });
 
+// Settings > General > Appearance: the one Light / Dark / System setting. Applied before
+// any window opens, so nativeTheme (and prefers-color-scheme in every page) agrees from
+// the first frame; Briefs is kept in step below.
+const { createAppearance, registerAppearanceIpc } = require('./electron-appearance');
+const appearance = createAppearance({
+  nativeTheme,
+  persistence: appearancePersistence,
+  getWindows: () => BrowserWindow.getAllWindows(),
+  log: (error) => logError('[appearance] the appearance setting failed', error)
+});
+appearance.start();
+registerAppearanceIpc({ ipcMain, appearance });
+
 // LANA Briefs (Briefs integration plan): runs only while discovery lists lana-notes and
 // someone is signed in. Its model work goes to the local AI engine's runtime route.
 const { createBriefs, registerBriefsSchemes } = require('./electron-briefs');
@@ -304,6 +317,7 @@ const briefs = createBriefs({
   electron: { app, session, protocol, desktopCapturer, systemPreferences, shell, dialog, safeStorage, nativeTheme, BrowserWindow },
   loadHost: loadBriefsHost,
   distDir: BRIEFS_DIST,
+  appearance,
   engineBase: () => {
     const state = localEngine.supervisor.getState();
     return isEngineInUse(state) ? state.url : null;

@@ -1,7 +1,7 @@
 /* app-link-page-kit.js - the browser glue the app-link pages share
    (accept-invite.html, activate.html, shared-link.html).
 
-   Light or dark as the computer is set, the firm this app is connected to,
+   Light or dark from the shared theme (lex.theme.js), the firm this app is connected to,
    a POST to that firm's public auth endpoints, and the password rules list.
    The words and decisions live in app-link-pages.model.js.
 
@@ -11,20 +11,20 @@
 (function (global) {
   'use strict';
 
-  var dark = global.matchMedia ? global.matchMedia('(prefers-color-scheme: dark)') : null;
+  // Light or dark comes from the shared theme (js/lex/lex.theme.js, in each page's <head>
+  // with <html data-lex-theme="auto">), which keeps <html> current. The brand marks pick
+  // their file when they start, so they are told the theme and play again when it changes.
+  function theme() { return global.LexTheme ? global.LexTheme.current() : 'light'; }
 
-  function theme() { return dark && dark.matches ? 'dark' : 'light'; }
-
-  function applyTheme() {
-    document.documentElement.setAttribute('data-lex-theme', theme());
+  function syncMarks() {
     document.querySelectorAll('lex-brand-mark').forEach(function (mark) {
       if (mark.variant !== theme()) mark.variant = theme();
     });
   }
 
   function watchTheme() {
-    applyTheme();
-    if (dark && dark.addEventListener) dark.addEventListener('change', applyTheme);
+    syncMarks();
+    if (global.LexTheme) global.LexTheme.subscribe(syncMarks);
   }
 
   /** The firm this app is connected to, or null. url is the API base. */

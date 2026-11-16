@@ -1,25 +1,8 @@
 /* First-launch setup screen (first-launch.html). The tour is <lex-walkthrough class="app-tour">,
    so its layout, type, accent and motion are the app walkthroughs' (css/app-walkthrough.css);
    this file adds the parts a setup page needs (cards that fill the column, the progress card)
-   and the dark theme. first-launch.js sets data-lex-theme on <html> from the computer's setting. */
-
-[data-lex-theme="dark"] .fl-body {
-  color-scheme: dark;
-  --lex-bg-primary: #151715;
-  --lex-bg-secondary: #1e211e;
-  --lex-text-primary: #eef1ee;
-  --lex-text-secondary: #b2b9b2;
-  --lex-text-tertiary: #8b938b;
-  --lex-border-default: #343a34;
-  --lex-border-subtle: #2a2f2a;
-  --lex-color-gray-100: #232723;
-  --lex-color-gray-200: #2e332e;
-  --lex-color-gray-300: #3b413b;
-  --lex-bg-accent: #e8ece8;
-  --lex-bg-accent-hover: #ffffff;
-  --lex-text-on-accent: #151715;
-  --lex-bg-accent-soft: rgba(103, 201, 160, 0.16);
-}
+   and the tour's dark accents. js/lex/lex.theme.js sets data-lex-theme on <html> (the app setting,
+   else the computer's) before the first paint; the dark colors are lex-tokens.css's dark theme. */
 
 [data-lex-theme="dark"] .fl-body lex-walkthrough.app-tour {
   --lex-walkthrough-accent: #67c9a0;
@@ -40,6 +23,14 @@
 .fl-body {
   background: var(--lex-bg-primary);
   color: var(--lex-text-primary);
+  /* Light and dark swap with a short fade; none with Reduce Motion. */
+  transition: background-color 200ms ease, color 200ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fl-body {
+    transition: none;
+  }
 }
 
 /* Before the tour: reading this computer. */

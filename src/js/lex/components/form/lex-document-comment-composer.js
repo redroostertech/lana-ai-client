@@ -111,12 +111,12 @@
       }
 
       .lex-document-comment-composer-submit {
-        background: var(--lex-color-brand-800);
-        color: var(--lex-color-white);
+        background: var(--lex-btn-strong-bg, #332F2A);
+        color: var(--lex-btn-strong-fg, #FFFFFF);
       }
 
       .lex-document-comment-composer-submit:hover {
-        background: var(--lex-color-brand-900);
+        background: var(--lex-btn-strong-bg-hover, #26211C);
       }
     `;
     document.head.appendChild(style);

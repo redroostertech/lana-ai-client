@@ -1,11 +1,12 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-lex-theme="auto">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Settings - LANA AI</title>
 
   <!-- ── CSS + Tailwind in head — behavioral scripts at end of body ── -->
+  <script src="js/lex/lex.theme.js"></script>
   <link rel="stylesheet" href="css/lex-tokens.css">
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/settings-v2.css">
@@ -496,6 +497,20 @@
       <div class="sv2-panel" id="sv2-panel-general" role="tabpanel"
         aria-labelledby="sv2-tab-general" data-section="general">
 
+      <!-- Appearance (settings-appearance.js; the setting is owned by electron-appearance.js)
+           ══════════════════════════════════════════════════════════════ -->
+      <section id="sv2-section-appearance" class="sv2-general">
+        <lex-card heading="Appearance" subtitle="Light or dark, for every LANA window on this computer">
+          <div class="sv2-general-head">
+            <div class="sv2-general-option-copy">
+              <span class="sv2-general-option-name">Theme</span>
+              <span id="sv2-appearance-note" class="sv2-general-option-description"></span>
+            </div>
+            <lex-segmented id="sv2-appearance-theme" name="appearance_theme" size="sm" aria-label="Theme"></lex-segmented>
+          </div>
+        </lex-card>
+      </section>
+
       <!-- About (settings-general.js; facts from electron-system-info.js)
            ══════════════════════════════════════════════════════════════ -->
       <section id="sv2-section-about" class="sv2-general sv2-general-top" hidden>
@@ -952,6 +967,7 @@
   <script src="js/pages/settings-usage.js"></script>
   <script src="js/pages/settings-screen-diction.js"></script>
   <script src="js/settings-general.model.js"></script>
+  <script src="js/pages/settings-appearance.js"></script>
   <script src="js/pages/settings-general.js"></script>
   <script src="js/location-permission.model.js"></script>
   <script src="js/pages/settings-location.js"></script>

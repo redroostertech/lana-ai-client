@@ -2,8 +2,8 @@
  * First-launch setup screen (first-launch.html): a <lex-walkthrough> tour, the same look and
  * motion as the app walkthroughs. The words and state come from first-launch.model.js, the
  * pages from first-launch.pages.js; this file draws them and passes clicks on. Calls go to the
- * main process through window.electronAPI.firstLaunch (electron-preload.js). Follows the
- * computer's light or dark setting.
+ * main process through window.electronAPI.firstLaunch (electron-preload.js). Light or dark
+ * follows the shared theme (lex.theme.js): the app setting, else the computer's.
  */
 (function () {
   'use strict';
@@ -35,21 +35,18 @@
     return;
   }
 
-  // Light or dark, as the computer is set. The brand marks pick their file when they start,
+  // Light or dark from the shared theme (js/lex/lex.theme.js, loaded in <head>), which
+  // keeps <html data-lex-theme> current. The brand marks pick their file when they start,
   // so they are told the theme and play again when it changes.
-  var dark = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
-  function theme() { return dark && dark.matches ? 'dark' : 'light'; }
+  var themes = window.LexTheme;
+  function theme() { return themes ? themes.current() : 'light'; }
   function syncMarks() {
     document.querySelectorAll('lex-brand-mark').forEach(function (mark) {
       if (mark.variant !== theme()) {mark.variant = theme();}
     });
   }
-  function applyTheme() {
-    document.documentElement.setAttribute('data-lex-theme', theme());
-    syncMarks();
-  }
-  applyTheme();
-  if (dark && dark.addEventListener) {dark.addEventListener('change', applyTheme);}
+  syncMarks();
+  if (themes) {themes.subscribe(syncMarks);}
 
   var tour = null;
   var last = null;

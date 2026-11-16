@@ -48,7 +48,7 @@
   background: var(--lex-bg-accent);
   border: none;
   border-radius: 0.5rem;
-  color: #ffffff;
+  color: var(--lex-text-on-accent, #ffffff);
   cursor: pointer;
   display: inline-flex;
   font-size: 0.875rem;

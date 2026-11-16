@@ -781,7 +781,7 @@
   width: 28px;
   height: 28px;
   border-radius: 9px;
-  color: #fff;
+  color: var(--lex-bg-primary, #fff);
   background: var(--lex-text-primary);
   font-size: 0.6875rem;
   font-weight: 700;

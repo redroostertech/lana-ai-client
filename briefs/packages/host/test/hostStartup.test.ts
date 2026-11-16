@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const runtime = { close: vi.fn(async () => undefined), recheckAccess: vi.fn(), restore: vi.fn(async () => undefined) };
 let servicesFail = false;
+const settingsSetTheme = vi.fn(async (theme: string) => ({ theme }));
 
 vi.mock("electron", () => ({ ipcMain: { handle: vi.fn(), removeHandler: vi.fn(), on: vi.fn(), removeListener: vi.fn() } }));
 vi.mock("../src/main/gateway/gatewayRuntime.js", () => ({
@@ -19,7 +20,7 @@ vi.mock("../src/main/services/realServices.js", () => ({
   createRealServices: vi.fn(() => {
     if (servicesFail) throw new Error("store locked");
     return {
-      services: {},
+      services: { settings: { setTheme: settingsSetTheme } },
       audio: { handle: vi.fn() },
       talk: { end: vi.fn(async () => undefined), appResignedActive: vi.fn() },
       talkAudio: { frame: vi.fn() },
@@ -79,6 +80,14 @@ function start(electron: ReturnType<typeof electronFakes>, captureWindow?: { ope
 }
 
 describe("Briefs host startup", () => {
+  it("setTheme saves the client's one appearance setting through Briefs' settings service", async () => {
+    servicesFail = false;
+    const host = await start(electronFakes());
+    await host.setTheme("dark");
+    expect(settingsSetTheme).toHaveBeenCalledWith("dark");
+    await host.stop();
+  });
+
   it("a start that fails after the gateway opened undoes its handlers and closes the gateway", async () => {
     servicesFail = true;
     const electron = electronFakes();

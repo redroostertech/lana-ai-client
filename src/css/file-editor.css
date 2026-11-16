@@ -2335,11 +2335,12 @@
 }
 
 .office-doc-page {
-  background: var(--lex-color-white);
+  /* The document is paper: white with dark ink in both themes. */
+  background: var(--lex-paper-bg);
   border: 1px solid var(--office-line-subtle);
   border-radius: var(--lex-radius-sm);
   box-shadow: var(--office-surface-shadow);
-  color: var(--lex-text-primary);
+  color: var(--lex-paper-text);
   font-size: 15px;
   line-height: 1.6;
   min-height: 960px;
@@ -2851,8 +2852,9 @@
 
 .office-slide-stage {
   aspect-ratio: 16 / 9;
-  background: var(--lex-color-brand-900);
-  border: 1px solid var(--lex-color-brand-700);
+  /* The slide is a dark canvas by design, the same in both themes. */
+  background: var(--lex-hero-surface-raised);
+  border: 1px solid var(--lex-hero-border);
   border-radius: var(--lex-radius-lg);
   box-shadow: var(--office-page-shadow);
   color: var(--lex-color-white);

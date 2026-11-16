@@ -10,7 +10,7 @@
   --deck-bg: #f7f4ef;
   --deck-fg: #17201f;
   --deck-muted: #66706c;
-  --deck-surface: #ffffff;
+  --deck-surface: var(--lex-paper-bg, #ffffff); /* the deck canvas is paper in both themes */
   --deck-media: #efe7db;
   --deck-radius: 6px;
   --deck-shadow: 0 18px 44px rgba(23, 32, 31, 0.12);

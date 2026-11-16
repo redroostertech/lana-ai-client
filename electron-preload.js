@@ -178,6 +178,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }
   },
 
+  // Settings > General > Appearance (electron-appearance.js): the one Light / Dark / System
+  // setting, owned by the main process. js/lex/lex.theme.js uses it on every page.
+  appearance: {
+    get: () => ipcRenderer.invoke('appearance:get'),
+    set: (preference) => ipcRenderer.invoke('appearance:set', typeof preference === 'string' ? preference : 'system'),
+    onChange: (callback) => {
+      const handler = (_event, state) => callback(state);
+      ipcRenderer.on('appearance:changed', handler);
+      return () => ipcRenderer.removeListener('appearance:changed', handler);
+    }
+  },
   /**
    * First-launch setup screen (electron-first-launch-ipc.js): the plan for this computer, the
    * chat choice, Continue, and the downloads. No file addresses reach the page.

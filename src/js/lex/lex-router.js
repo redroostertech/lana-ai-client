@@ -582,6 +582,12 @@
         // Step 6: Load page-specific stylesheets BEFORE injecting content
         // so the page renders already-styled (prevents FOUC).
         return loadPageStylesheets(descriptor.stylesheets, path).then(function () {
+          // Step 7a: Light or dark. The fragment shares the shell's <html>, so the shell
+          // follows the theme only while a fragment marked themed: true (dark-ready) shows.
+          if (window.LexTheme && typeof window.LexTheme.setRootThemed === 'function') {
+            window.LexTheme.setRootThemed(descriptor.themed === true);
+          }
+
           // Step 7: Inject into content area after CSS is ready
           var main = _app ? _app.getContentEl() : document.getElementById('lex-main-content');
           if (main) {

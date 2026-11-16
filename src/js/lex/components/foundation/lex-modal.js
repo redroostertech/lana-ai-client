@@ -378,7 +378,7 @@
       }
 
       .lex-modal-btn--danger:hover {
-        background: var(--lex-color-danger-600);
+        background: var(--lex-fill-danger-hover, var(--lex-color-danger-600));
       }
 
       /* Variant: info */
@@ -388,7 +388,7 @@
       }
 
       .lex-modal-btn--info:hover {
-        background: var(--lex-color-info-600);
+        background: var(--lex-fill-info-hover, var(--lex-color-info-600));
       }
 
       /* Variant: success */
@@ -398,7 +398,7 @@
       }
 
       .lex-modal-btn--success:hover {
-        background: var(--lex-color-success-600);
+        background: var(--lex-fill-success-hover, var(--lex-color-success-600));
       }
 
       /* ── Animations ──────────────────────────────────── */

@@ -24,7 +24,7 @@
   height: 11rem;
   padding: 0.5rem;
   border-radius: var(--lex-radius-md, 8px);
-  background: #ffffff;
+  background: var(--lex-qr-bg, #ffffff);
 }
 
 .mfa-secret {

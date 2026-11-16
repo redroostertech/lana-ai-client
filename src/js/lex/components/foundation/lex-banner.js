@@ -76,23 +76,24 @@
 
       /* ── Dark variant (default) ─────────────────────── */
 
+      /* Dark by design in both themes: --lex-hero-* (lex-tokens.css) do not change with the theme. */
       .lex-banner--dark {
-        background: var(--lex-color-brand-950);
-        color: var(--lex-color-brand-100);
+        background: var(--lex-hero-bg, #0D0807);
+        color: var(--lex-hero-text, #F2EEEB);
         border: 1px solid rgba(255, 255, 255, 0.06);
       }
 
       .lex-banner--dark .lex-banner-heading {
-        color: var(--lex-color-brand-50);
+        color: var(--lex-hero-heading, #F7F5F3);
       }
 
       .lex-banner--dark .lex-banner-subtitle {
-        color: var(--lex-color-brand-400);
+        color: var(--lex-hero-muted, #9E9385);
       }
 
       .lex-banner--dark .lex-banner-icon {
-        background: var(--lex-color-brand-800);
-        color: var(--lex-color-brand-200);
+        background: var(--lex-hero-icon-bg, #332F2A);
+        color: var(--lex-hero-icon-text, #E0DAD4);
         border: 1px solid rgba(255, 255, 255, 0.08);
       }
 

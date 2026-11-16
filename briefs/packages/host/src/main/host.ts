@@ -89,6 +89,11 @@ export interface BriefsHost {
    * calls it with the speech and voice models it decided fit this computer.
    */
   downloadModels(ids: readonly ModelID[]): void;
+  /**
+   * The client's one appearance setting changed (or Briefs just started): saved in Briefs'
+   * store and applied, so Briefs and the client never disagree on Light, Dark or System.
+   */
+  setTheme(theme: ThemePreference): Promise<void>;
   /** Stops IPC, drains calls in flight and closes the store. */
   stop(): Promise<void>;
 }
@@ -305,6 +310,9 @@ export async function startBriefsHost(options: BriefsHostOptions): Promise<Brief
       restore: () => runtime.restore(),
       downloadModels: (ids) => {
         for (const id of ids) void created.models.download(id);
+      },
+      setTheme: async (theme) => {
+        await created.services.settings.setTheme(theme);
       },
       stop() {
         stopped ??= (async () => {

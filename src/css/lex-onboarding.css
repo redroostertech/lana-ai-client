@@ -2,8 +2,8 @@
  * <lex-onboarding>: first-run tour (src/js/lex/components/foundation/lex-onboarding.js).
  *
  * LANA AI brand: Montserrat with italic Playfair for emphasis, restrained emerald,
- * corner-bracket mark. Light by default to match the client, which has no dark
- * mode yet; theme="dark" gives the charcoal media-kit look.
+ * corner-bracket mark. theme follows the shared light or dark theme (lex.theme.js);
+ * theme="dark" gives the charcoal media-kit look.
  * Every selector is scoped under lex-onboarding so nothing leaks into the app.
  */
 

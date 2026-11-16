@@ -12,6 +12,10 @@
 
    To add a new SPA page: add an entry to PAGE_DESCRIPTORS below.
    Scripts are loaded sequentially in order. Stylesheets are loaded in parallel.
+
+   themed: true marks a fragment as checked in light and dark: while it shows, the shell's
+   <html> follows the shared theme (js/lex/lex.theme.js). Fragments without it stay light.
+   The theme batches add it page by page.
 */
 
 (function () {

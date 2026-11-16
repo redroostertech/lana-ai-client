@@ -82,6 +82,11 @@
         margin-block-end: var(--lex-card-stack-gap, 12px);
       }
       lex-card > .rounded-xl { height: inherit; display: inherit; flex-direction: inherit; min-height: inherit; overflow: inherit; flex: 1; }
+      /* The card's inner padding and corners come from Lex tokens, so a card is laid out
+         the same whether or not Tailwind's built stylesheet (tailwind-output.css) loaded. */
+      lex-card > .lex-card-box { border-radius: var(--lex-card-radius, 0.75rem); }
+      lex-card > .lex-card-box[data-pad="normal"] { padding: var(--lex-card-padding, 1.5rem); }
+      lex-card > .lex-card-box[data-pad="compact"] { padding: var(--lex-space-lg, 1rem); }
       slot-content { display: contents; }
 
       .lex-card-action-btn {
@@ -420,29 +425,25 @@
         flat:     ''
       };
 
-      const paddings = {
-        normal:  'p-6',
-        compact: 'p-4',
-        none:    ''
-      };
+      const paddings = { normal: 'normal', compact: 'compact', none: 'none' };
 
       const variantClass = variants[this.variant] || variants.default;
       const paddingClass = paddings[this.padding] || paddings.normal;
 
       // Theme colors
       const bgStyle = isDark
-        ? `background:var(--lex-color-brand-950); color:var(--lex-color-brand-100);`
+        ? `background:var(--lex-hero-bg); color:var(--lex-hero-text);`
         : `background:var(--lex-bg-primary); color:var(--lex-text-primary);`;
 
-      const headingColor = isDark ? 'color:var(--lex-color-brand-50);' : '';
-      const subtitleColor = isDark ? 'color:var(--lex-color-brand-400);' : '';
+      const headingColor = isDark ? 'color:var(--lex-hero-heading);' : '';
+      const subtitleColor = isDark ? 'color:var(--lex-hero-muted);' : '';
 
       // CSS custom properties for themed action buttons
-      const actionColor = isDark ? 'var(--lex-color-brand-400)' : 'var(--lex-text-tertiary)';
+      const actionColor = isDark ? 'var(--lex-hero-muted)' : 'var(--lex-text-tertiary)';
       const actionHoverBg = isDark ? 'rgba(255,255,255,0.08)' : 'var(--lex-bg-tertiary)';
-      const actionHoverColor = isDark ? 'var(--lex-color-brand-100)' : 'var(--lex-text-primary)';
-      const overflowBg = isDark ? 'var(--lex-color-brand-900)' : 'var(--lex-bg-primary)';
-      const overflowItemColor = isDark ? 'var(--lex-color-brand-200)' : 'var(--lex-text-primary)';
+      const actionHoverColor = isDark ? 'var(--lex-hero-text)' : 'var(--lex-text-primary)';
+      const overflowBg = isDark ? 'var(--lex-hero-surface-raised)' : 'var(--lex-bg-primary)';
+      const overflowItemColor = isDark ? 'var(--lex-hero-icon-text)' : 'var(--lex-text-primary)';
       const overflowItemHover = isDark ? 'rgba(255,255,255,0.06)' : 'var(--lex-bg-secondary)';
       const borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'var(--lex-border-subtle)';
 
@@ -520,7 +521,7 @@
       }
 
       return `
-        <div class="rounded-xl ${variantClass} ${paddingClass}" style="${bgStyle}${cardVars}">
+        <div class="lex-card-box rounded-xl ${variantClass}" data-pad="${paddingClass}" style="${bgStyle}${cardVars}">
           ${lanaBorderHtml}
           ${headerHtml}
           ${bodyHtml}

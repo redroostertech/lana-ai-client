@@ -225,25 +225,25 @@
         },
         danger: {
           bg:      'var(--lex-color-danger-500)',
-          bgHover: 'var(--lex-color-danger-600)',
+          bgHover: 'var(--lex-fill-danger-hover, var(--lex-color-danger-600))',
           text:    'var(--lex-color-white)',
           ripple:  'rgba(255,255,255,0.25)'
         },
         success: {
           bg:      'var(--lex-color-success-500)',
-          bgHover: 'var(--lex-color-success-600)',
+          bgHover: 'var(--lex-fill-success-hover, var(--lex-color-success-600))',
           text:    'var(--lex-color-white)',
           ripple:  'rgba(255,255,255,0.25)'
         },
         warning: {
           bg:      'var(--lex-color-warning-500)',
-          bgHover: 'var(--lex-color-warning-600)',
+          bgHover: 'var(--lex-fill-warning-hover, var(--lex-color-warning-600))',
           text:    'var(--lex-color-white)',
           ripple:  'rgba(255,255,255,0.25)'
         },
         info: {
           bg:      'var(--lex-color-info-500)',
-          bgHover: 'var(--lex-color-info-600)',
+          bgHover: 'var(--lex-fill-info-hover, var(--lex-color-info-600))',
           text:    'var(--lex-color-white)',
           ripple:  'rgba(255,255,255,0.25)'
         },

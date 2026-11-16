@@ -33,7 +33,8 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
-function setup({ windows = [fakeWindow()], startGate = null, stopGate = null, restoreError = null, speechModels } = {}) {
+function setup({ windows = [fakeWindow()], startGate = null, stopGate = null, restoreError = null, speechModels, appearance, briefsTheme = 'system' } = {}) {
+  const nativeTheme = {};
   const app = new EventEmitter();
   Object.assign(app, { getPath: (name) => `/tmp/${name}`, isPackaged: false, quit: jest.fn() });
   const state = { token: ALICE, windows };
@@ -42,6 +43,8 @@ function setup({ windows = [fakeWindow()], startGate = null, stopGate = null, re
   const module = {
     startBriefsHost: jest.fn(async (options) => {
       if (startGate) await startGate;
+      // Briefs applies its own saved theme while it starts.
+      options.applyTheme(briefsTheme);
       const host = {
         options,
         added: [],
@@ -55,6 +58,8 @@ function setup({ windows = [fakeWindow()], startGate = null, stopGate = null, re
         focused: jest.fn(),
         blurred: jest.fn(),
         downloadModels: jest.fn(),
+        themes: [],
+        setTheme: jest.fn(async (theme) => { host.themes.push(theme); host.options.applyTheme(theme); }),
         restore: async () => {
           host.restored += 1;
           if (restoreError) throw restoreError;
@@ -74,7 +79,7 @@ function setup({ windows = [fakeWindow()], startGate = null, stopGate = null, re
     electron: {
       app,
       session: { defaultSession: {} },
-      protocol: {}, desktopCapturer: {}, systemPreferences: {}, shell: {}, dialog: {}, safeStorage: {}, nativeTheme: {}
+      protocol: {}, desktopCapturer: {}, systemPreferences: {}, shell: {}, dialog: {}, safeStorage: {}, nativeTheme
     },
     loadHost: () => module,
     distDir: '/app/briefs/dist',
@@ -85,9 +90,10 @@ function setup({ windows = [fakeWindow()], startGate = null, stopGate = null, re
     getWindows: () => state.windows,
     showWindow: jest.fn(),
     speechModels,
+    appearance,
     log
   });
-  return { briefs, app, state, hosts, module, log };
+  return { briefs, app, state, hosts, module, log, nativeTheme };
 }
 
 const enabled = { orgId: 'org', enabledApps: [{ id: 'lana-works' }, { id: 'lana-notes', label: 'LANA Briefs' }] };
@@ -95,6 +101,50 @@ const without = { orgId: 'org', enabledApps: [{ id: 'lana-works' }] };
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 
 describe('LANA Briefs in the client', () => {
+  test('one appearance setting: Briefs\' saved theme at start is ignored, LANA\'s is pushed into Briefs, and later changes go both ways', async () => {
+    const listeners = [];
+    const appearance = {
+      value: 'dark',
+      hasSaved: () => true,
+      preference: () => appearance.value,
+      set: jest.fn((v) => { if (v === appearance.value) return; appearance.value = v; listeners.forEach((fn) => fn(v)); }),
+      subscribe: (fn) => { listeners.push(fn); return () => {}; }
+    };
+    const { briefs, hosts } = setup({ appearance });
+    await briefs.sync(enabled);
+    const [host] = hosts;
+    expect(appearance.set).not.toHaveBeenCalledWith('system'); // Briefs' own start value did not win
+    expect(host.themes).toEqual(['dark']);
+    appearance.set('light'); // changed in LANA's Settings
+    await flush();
+    expect(host.themes).toEqual(['dark', 'light']);
+    host.options.applyTheme('system'); // changed inside Briefs
+    expect(appearance.value).toBe('system');
+  });
+
+  test('without the appearance module Briefs still sets nativeTheme itself (control)', async () => {
+    const { briefs, hosts, nativeTheme } = setup({ briefsTheme: 'dark' });
+    await briefs.sync(enabled);
+    expect(hosts).toHaveLength(1);
+    expect(nativeTheme.themeSource).toBe('dark');
+  });
+
+  test('upgrade: with no saved appearance yet, Briefs\' saved theme seeds the app\'s setting', async () => {
+    const listeners = [];
+    const appearance = {
+      value: 'system',
+      saved: false,
+      hasSaved: () => appearance.saved,
+      preference: () => appearance.value,
+      set: jest.fn((v) => { appearance.saved = true; if (v === appearance.value) return; appearance.value = v; listeners.forEach((fn) => fn(v)); }),
+      subscribe: (fn) => { listeners.push(fn); return () => {}; }
+    };
+    const { briefs, hosts } = setup({ appearance, briefsTheme: 'dark' });
+    await briefs.sync(enabled);
+    expect(appearance.value).toBe('dark');
+    expect(hosts[0].themes).toEqual(['dark']);
+  });
+
   test('reads lana-notes from discovery as an object or a plain id; anything else is off (control)', () => {
     expect(isBriefsEnabled(enabled)).toBe(true);
     expect(isBriefsEnabled({ enabledApps: ['lana-notes'] })).toBe(true);

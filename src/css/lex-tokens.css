@@ -440,19 +440,27 @@
   --lex-toast-radius:  var(--lex-radius-lg);
   --lex-toast-shadow:  var(--lex-shadow-lg);
 
-  /* Sidebar */
+  /* Sidebar (literal values: the sidebar keeps this dark look while a dark page
+     theme inverts the gray ramp; the light set is in lex-sidebar[data-lex-theme="light"]) */
   --lex-sidebar-width:        256px;
-  --lex-sidebar-bg:           var(--lex-color-gray-900);
-  --lex-sidebar-text:         var(--lex-color-gray-300);
-  --lex-sidebar-text-active:  var(--lex-color-white);
-  --lex-sidebar-text-muted:   var(--lex-color-gray-500);
-  --lex-sidebar-section-text: var(--lex-color-gray-400);
-  --lex-sidebar-hover-bg:     var(--lex-color-gray-800);
-  --lex-sidebar-active-bg:    var(--lex-color-gray-800);
-  --lex-sidebar-border:       var(--lex-color-gray-800);
+  --lex-sidebar-bg:           #1D1B18;
+  --lex-sidebar-text:         #D5D2CC;
+  --lex-sidebar-text-active:  #FFFFFF;
+  --lex-sidebar-text-muted:   #7A756D;
+  --lex-sidebar-section-text: #A9A49D;
+  --lex-sidebar-hover-bg:     #2D2B27;
+  --lex-sidebar-active-bg:    #2D2B27;
+  --lex-sidebar-border:       #2D2B27;
   --lex-sidebar-logo-height:  28px;
   --lex-sidebar-item-gap:     4px;
-  --lex-sidebar-avatar-bg:    var(--lex-color-brand-600);
+  --lex-sidebar-avatar-bg:    #595246;
+  --lex-sidebar-avatar-text:  #FFFFFF;
+  --lex-sidebar-menu-bg:      #2D2B27;
+  --lex-sidebar-danger-text:  #F04438;
+  --lex-sidebar-danger-hover: #FEE4E2;
+  --lex-sidebar-menu-hover-bg: #1D1B18;
+  --lex-sidebar-warning-text: #F79009;
+  --lex-sidebar-info-text:    #528BFF;
 
   /* Topbar */
   --lex-topbar-height:        64px;
@@ -504,6 +512,335 @@
   --lex-scroll-size:        6px;
 }
 
+
+/* ==========================================================================
+   THEME BASE AND FIXED SURFACES
+   Alias names pages used without a definition (--lex-text-muted, --lex-accent, ...)
+   are NOT defined here: in light every use keeps its own fallback (or inherits)
+   exactly as before. They are defined only in the dark block below; the page batches
+   replace them with semantic tokens as each page is themed.
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+
+  /* Page body (was a literal #fff) */
+  --lex-body-bg: var(--lex-bg-primary);
+
+  /* Buttons that are a dark fill with white text in light; they flip in dark. */
+  --lex-btn-strong-bg:       #332F2A;  /* brand-800 */
+  --lex-btn-strong-bg-hover: #26211C;  /* brand-900 */
+  --lex-btn-strong-fg:       #FFFFFF;
+
+  /* Fixed in both themes: tooltips (dark chip, white text), status fill hovers under
+     white text (the light 600 shades), and the floating voice overlay (always dark). */
+  --lex-tooltip-bg:          #2D2B27;  /* gray-800 */
+  --lex-tooltip-fg:          #FFFFFF;
+  --lex-fill-danger-hover:   #D92D20;
+  --lex-fill-success-hover:  #079455;
+  --lex-fill-warning-hover:  #DC6803;
+  --lex-fill-info-hover:     #2E6CE0;
+  --lex-hud-bg:              #1D1B18;  /* gray-900 */
+
+  /* Surfaces that stay the same in both themes (Phase 0 makes them explicit):
+     document "paper" (PDF pages, the editor page, the doc-studio canvas, DOCX
+     previews), QR codes (dark on white or phones may not scan them), and the
+     always-dark hero and banner surfaces. */
+  --lex-paper-bg:        #FFFFFF;
+  --lex-paper-text:      #26211C;
+  --lex-paper-border:    #E8E5E1;
+  --lex-qr-bg:           #FFFFFF;
+  --lex-qr-fg:           #000000;
+  --lex-hero-bg:         #0D0807;  /* brand-950 */
+  --lex-hero-text:       #F2EEEB;  /* brand-100 */
+  --lex-hero-heading:    #F7F5F3;  /* brand-50 */
+  --lex-hero-muted:      #9E9385;  /* brand-400 */
+  --lex-hero-icon-bg:    #332F2A;  /* brand-800 */
+  --lex-hero-icon-text:  #E0DAD4;  /* brand-200 */
+  --lex-hero-surface-raised: #26211C;  /* brand-900 */
+  --lex-hero-border:     #44403A;  /* brand-700 */
+}
+
+
+/* ==========================================================================
+   DARK THEME: every color token, on <html data-lex-theme="dark"> only.
+   lex.theme.js sets it on pages that opt in (data-lex-theme="auto"); a component
+   carrying its own data-lex-theme (lex-sidebar, lex-chat) does not get this set.
+   Screen only, so printing is always light. The palette is the one the first-launch
+   and app-link pages used (green-gray surfaces, LANA green accent).
+   ========================================================================== */
+
+@media screen {
+  :root[data-lex-theme="dark"] {
+    color-scheme: dark;
+
+    /* Brand ramp: light tints become dark tints, dark tones become light text.
+       950 stays dark: it is the always-dark banner surface. */
+    --lex-color-brand-50:  #1F221F;
+    --lex-color-brand-100: #272B27;
+    --lex-color-brand-200: #343A34;
+    --lex-color-brand-300: #4D544D;
+    --lex-color-brand-400: #8B938B;
+    --lex-color-brand-500: #B2B9B2;
+    --lex-color-brand-600: #C9C1B3;
+    --lex-color-brand-700: #E8ECE8;
+    --lex-color-brand-800: #F3F5F3;
+    --lex-color-brand-900: #EEF1EE;
+    --lex-color-brand-950: #0D0807;
+
+    /* Gray ramp, inverted */
+    --lex-color-gray-50:  #1E211E;
+    --lex-color-gray-100: #232723;
+    --lex-color-gray-200: #2E332E;
+    --lex-color-gray-300: #3B413B;
+    --lex-color-gray-400: #5C645C;
+    --lex-color-gray-500: #8B938B;
+    --lex-color-gray-600: #A3AAA3;
+    --lex-color-gray-700: #C4CAC4;
+    --lex-color-gray-800: #DDE2DD;
+    --lex-color-gray-900: #EEF1EE;
+
+    /* Status ramps: 50/100 are tints, 600/700 are light text */
+    --lex-color-success-50:  rgba(23, 178, 106, 0.12);
+    --lex-color-success-100: rgba(23, 178, 106, 0.2);
+    --lex-color-success-500: #17B26A;
+    --lex-color-success-600: #3CCB7F;
+    --lex-color-success-700: #75E0A7;
+    --lex-color-warning-50:  rgba(247, 144, 9, 0.12);
+    --lex-color-warning-100: rgba(247, 144, 9, 0.2);
+    --lex-color-warning-500: #F79009;
+    --lex-color-warning-600: #FDB022;
+    --lex-color-warning-700: #FEC84B;
+    --lex-color-danger-50:   rgba(240, 68, 56, 0.12);
+    --lex-color-danger-100:  rgba(240, 68, 56, 0.2);
+    --lex-color-danger-500:  #F04438;
+    --lex-color-danger-600:  #F97066;
+    --lex-color-danger-700:  #FDA29B;
+    --lex-color-info-50:     rgba(82, 139, 255, 0.12);
+    --lex-color-info-100:    rgba(82, 139, 255, 0.2);
+    --lex-color-info-500:    #528BFF;
+    --lex-color-info-600:    #84ADFF;
+    --lex-color-info-700:    #B2CCFF;
+
+    /* Fixed: white stays white (text on accent fills, paper), black stays black */
+    --lex-color-white: #FFFFFF;
+    --lex-color-black: #0D0807;
+
+    /* Charts: brighter where the light value is too dark on a dark surface */
+    --lex-chart-color-1:  #C9B79A;
+    --lex-chart-color-2:  #3CCB7F;
+    --lex-chart-color-3:  #84ADFF;
+    --lex-chart-color-4:  #FDB022;
+    --lex-chart-color-5:  #F97066;
+    --lex-chart-color-6:  #9E9385;
+    --lex-chart-color-7:  #A78BFA;
+    --lex-chart-color-8:  #22D3EE;
+    --lex-chart-color-9:  #E879F9;
+    --lex-chart-color-10: #A3E635;
+
+    /* Backgrounds */
+    --lex-bg-primary:      #151715;
+    --lex-bg-secondary:    #1E211E;
+    --lex-bg-tertiary:     #232723;
+    --lex-bg-accent:       #E8ECE8;
+    --lex-bg-accent-hover: #FFFFFF;
+    --lex-bg-accent-soft:  rgba(103, 201, 160, 0.16);
+    --lex-bg-accent-muted: rgba(103, 201, 160, 0.24);
+    --lex-bg-elevated:     #1E211E;
+
+    /* Text */
+    --lex-text-primary:     #EEF1EE;
+    --lex-text-secondary:   #B2B9B2;
+    --lex-text-tertiary:    #8B938B;
+    --lex-text-disabled:    #5C645C;
+    --lex-text-accent:      #67C9A0;
+    --lex-text-accent-hover:#8FD9B9;
+    --lex-text-on-accent:   #151715;
+    --lex-text-link:        #67C9A0;
+    --lex-text-link-hover:  #8FD9B9;
+
+    /* Borders */
+    --lex-border-default: #343A34;
+    --lex-border-strong:  #4A514A;
+    --lex-border-accent:  #67C9A0;
+    --lex-border-focus:   #67C9A0;
+    --lex-border-subtle:  #2A2F2A;
+
+    /* Status semantic */
+    --lex-status-success-bg:   rgba(23, 178, 106, 0.14);
+    --lex-status-success-text: #67C9A0;
+    --lex-status-success:      #17B26A;
+    --lex-status-warning-bg:   rgba(247, 144, 9, 0.14);
+    --lex-status-warning-text: #FEC84B;
+    --lex-status-warning:      #F79009;
+    --lex-status-danger-bg:    rgba(240, 68, 56, 0.14);
+    --lex-status-danger-text:  #F19A92;
+    --lex-status-danger:       #F04438;
+    --lex-status-info-bg:      rgba(82, 139, 255, 0.14);
+    --lex-status-info-text:    #B2CCFF;
+    --lex-status-info:         #528BFF;
+    --lex-status-neutral-bg:   #232723;
+    --lex-status-neutral-text: #C4CAC4;
+
+    /* Shadows, overlays, focus */
+    --lex-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+    --lex-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.45), 0 2px 4px -2px rgba(0, 0, 0, 0.35);
+    --lex-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.45), 0 4px 6px -4px rgba(0, 0, 0, 0.35);
+    --lex-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+    --lex-modal-overlay: rgba(0, 0, 0, 0.6);
+    --lex-focus-ring-color: rgba(103, 201, 160, 0.35);
+
+    /* Components */
+    --lex-card-bg:                 #1B1E1B;
+    --lex-card-border:             #343A34;
+    --lex-card-shadow:             0 1px 2px 0 rgba(0, 0, 0, 0.4);
+    --lex-input-bg:                #1B1E1B;
+    --lex-input-border:            #343A34;
+    --lex-input-text:              #EEF1EE;
+    --lex-input-placeholder:       #8B938B;
+    --lex-input-border-hover:      #4A514A;
+    --lex-input-focus-ring:        #67C9A0;
+    --lex-input-border-focus:      #67C9A0;
+    --lex-input-border-error:      #F04438;
+    --lex-input-border-success:    #17B26A;
+    --lex-toggle-bg:               #3B413B;
+    --lex-toggle-bg-active:        #67C9A0;
+    --lex-toggle-knob:             #FFFFFF;
+    --lex-select-dropdown-bg:      #1E211E;
+    --lex-select-option-hover:     #2A2F2A;
+    --lex-badge-notification-bg:   #F04438;
+    --lex-badge-notification-text: #FFFFFF;
+    --lex-modal-shadow:            0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+    --lex-toast-shadow:            0 10px 15px -3px rgba(0, 0, 0, 0.45), 0 4px 6px -4px rgba(0, 0, 0, 0.35);
+    --lex-topbar-bg:               #151715;
+    --lex-topbar-border:           #343A34;
+    --lex-topbar-shadow:           0 1px 2px 0 rgba(0, 0, 0, 0.4);
+    --lex-topbar-text:             #EEF1EE;
+    --lex-topbar-icon-color:       #B2B9B2;
+    --lex-topbar-icon-hover:       #EEF1EE;
+    --lex-topbar-badge-bg:         #F04438;
+    --lex-topbar-badge-text:       #FFFFFF;
+    --lex-icon-secondary:          #B2B9B2;
+    --lex-icon-tertiary:           #8B938B;
+    --lex-icon-accent:             #67C9A0;
+    --lex-icon-success:            #3CCB7F;
+    --lex-icon-warning:            #FDB022;
+    --lex-icon-danger:             #F97066;
+    --lex-icon-info:               #84ADFF;
+    --lex-icon-inverse:            #151715;
+    --lex-scroll-thumb:            #3B413B;
+    --lex-scroll-thumb-hover:      #5C645C;
+
+    --lex-btn-strong-bg:           #E8ECE8;
+    --lex-btn-strong-bg-hover:     #FFFFFF;
+    --lex-btn-strong-fg:           #151715;
+
+    /* Alias tokens */
+    --lex-body-bg:            #151715;
+    --lex-bg-card:            #1B1E1B;
+    --lex-bg-muted:           #1E211E;
+    --lex-bg-hover:           #2A2F2A;
+    --lex-bg-input:           #1B1E1B;
+    --lex-bg-inverse:         #EEF1EE;
+    --lex-bg-subtle:          rgba(255, 255, 255, 0.04);
+    --lex-bg-accent-subtle:   rgba(82, 139, 255, 0.14);
+    --lex-bg-info-subtle:     rgba(82, 139, 255, 0.14);
+    --lex-bg-warning-subtle:  rgba(247, 144, 9, 0.12);
+    --lex-bg-action:          #E8ECE8;
+    --lex-surface:            #1B1E1B;
+    --lex-surface-primary:    #1B1E1B;
+    --lex-surface-secondary:  #232723;
+    --lex-surface-muted:      #1E211E;
+    --lex-surface-subtle:     #1E211E;
+    --lex-color-surface:      #1B1E1B;
+    --lex-color-surface-muted:#1E211E;
+    --lex-color-bg-card:      #1B1E1B;
+    --lex-color-bg-subtle:    #1E211E;
+    --lex-color-bg-hover:     #2A2F2A;
+    --lex-chat-bg-subtle:     #1E211E;
+    --lex-text:               #D5DBD5;
+    --lex-text-strong:        #EEF1EE;
+    --lex-text-muted:         #A3AAA3;
+    --lex-text-inverse:       #151715;
+    --lex-text-info:          #B2CCFF;
+    --lex-text-warning:       #FEC84B;
+    --lex-color-text:         #EEF1EE;
+    --lex-color-text-primary: #EEF1EE;
+    --lex-color-text-muted:   #A3AAA3;
+    --lex-empty-icon-color:   #5C645C;
+    --lex-ring-focus:         rgba(103, 201, 160, 0.35);
+    --lex-border:             #343A34;
+    --lex-border-primary:     #4A514A;
+    --lex-border-warning:     rgba(253, 176, 34, 0.4);
+    --lex-color-border:       rgba(255, 255, 255, 0.1);
+    --lex-accent:             #84ADFF;
+    --lex-accent-strong:      #B2CCFF;
+    --lex-accent-hover:       #E8ECE8;
+    --lex-accent-primary:     #C9B79A;
+    --lex-primary:            #84ADFF;
+    --lex-primary-soft:       rgba(82, 139, 255, 0.16);
+    --lex-action-bg:          #E8ECE8;
+    --lex-action-bg-hover:    #FFFFFF;
+    --lex-action-text:        #151715;
+    --lex-color-primary:      #A5B4FC;
+    --lex-color-primary-400:  #A78BFA;
+    --lex-color-primary-500:  #8B7CFF;
+    --lex-color-primary-600:  #84ADFF;
+    --lex-color-primary-700:  #C4B5FD;
+    --lex-color-accent-strong:#A5B4FC;
+    --lex-color-accent-subtle:rgba(129, 140, 248, 0.16);
+    --lex-color-accent-border:rgba(129, 140, 248, 0.35);
+    --lex-status-success-border: rgba(23, 178, 106, 0.35);
+    --lex-status-warning-border: rgba(247, 144, 9, 0.35);
+    --lex-status-danger-border:  rgba(240, 68, 56, 0.35);
+    --lex-status-info-border:    rgba(82, 139, 255, 0.35);
+    --lex-status-error-bg:       rgba(240, 68, 56, 0.14);
+    --lex-status-error-text:     #F19A92;
+    --lex-success-bg:         rgba(23, 178, 106, 0.14);
+    --lex-success-text:       #67C9A0;
+    --lex-success-border:     rgba(23, 178, 106, 0.35);
+    --lex-warning-bg:         rgba(247, 144, 9, 0.14);
+    --lex-warning-border:     rgba(247, 144, 9, 0.4);
+    --lex-danger:             #F97066;
+    --lex-danger-bg:          rgba(240, 68, 56, 0.14);
+    --lex-chat-success-text:  #75E0A7;
+    --lex-chat-success-soft:  rgba(23, 178, 106, 0.16);
+    --lex-color-danger:       #F97066;
+    --lex-color-danger-bg:    rgba(240, 68, 56, 0.14);
+    --lex-color-danger-200:   rgba(240, 68, 56, 0.3);
+    --lex-color-success-200:  rgba(23, 178, 106, 0.3);
+    --lex-color-success-800:  #A6EFC8;
+    --lex-color-success-subtle: rgba(23, 178, 106, 0.14);
+    --lex-color-success-strong: #75E0A7;
+    --lex-color-warning-200:  rgba(247, 144, 9, 0.3);
+    --lex-color-warning-300:  rgba(247, 144, 9, 0.45);
+    --lex-color-info-200:     rgba(82, 139, 255, 0.3);
+    --lex-color-blue-50:   rgba(82, 139, 255, 0.12);
+    --lex-color-blue-200:  rgba(82, 139, 255, 0.3);
+    --lex-color-blue-300:  rgba(82, 139, 255, 0.45);
+    --lex-color-blue-600:  #84ADFF;
+    --lex-color-blue-700:  #B2CCFF;
+    --lex-color-green-50:  rgba(23, 178, 106, 0.12);
+    --lex-color-green-100: rgba(23, 178, 106, 0.2);
+    --lex-color-green-200: rgba(23, 178, 106, 0.3);
+    --lex-color-green-600: #3CCB7F;
+    --lex-color-green-700: #75E0A7;
+    --lex-color-red-50:    rgba(240, 68, 56, 0.12);
+    --lex-color-red-100:   rgba(240, 68, 56, 0.2);
+    --lex-color-red-200:   rgba(240, 68, 56, 0.3);
+    --lex-color-red-600:   #F97066;
+    --lex-color-red-700:   #FDA29B;
+    --lex-color-amber-50:  rgba(247, 144, 9, 0.12);
+    --lex-color-amber-200: rgba(247, 144, 9, 0.3);
+    --lex-color-amber-600: #FDB022;
+    --lex-color-amber-700: #FEC84B;
+    --lex-color-amber-800: #FEDF89;
+    --lex-color-yellow-100:rgba(234, 179, 8, 0.2);
+    --lex-color-yellow-700:#FDE047;
+    --lex-color-purple-50: rgba(168, 85, 247, 0.12);
+    --lex-color-purple-700:#D8B4FE;
+  }
+}
 
 /* ==========================================================================
    LEX UTILITY CLASSES
@@ -565,6 +902,12 @@
 /* ── Interactive Utilities ────────────────────────────────────── */
 
 .lex-hover-bg:hover        { background-color: var(--lex-color-gray-50); }
+
+/* Paper and always-dark surfaces: the same in both themes (see --lex-paper-* and
+   --lex-hero-* above). Use on PDF pages, DOCX previews and HTML previews (paper),
+   and on banners that are dark by design (hero). */
+.lex-paper { background-color: var(--lex-paper-bg); color: var(--lex-paper-text); color-scheme: light; }
+.lex-hero-surface { background-color: var(--lex-hero-bg); color: var(--lex-hero-text); color-scheme: dark; }
 .lex-hover-bg-accent:hover { background-color: var(--lex-bg-accent-soft); }
 
 /* ── Typography Utilities ─────────────────────────────────────── */
@@ -776,6 +1119,48 @@ lex-dropdown-btn input,
   background: var(--lex-color-gray-500);
 }
 
+/* ── Sidebar light and dark ──
+   lex-sidebar carries data-lex-theme from the shared theme (lex.theme.js). The :root
+   sidebar tokens above are the dark set, kept for a sidebar with no theme yet. */
+
+lex-sidebar[data-lex-theme="dark"] {
+  --lex-sidebar-bg:           #1D1B18;
+  --lex-sidebar-text:         #D5D2CC;
+  --lex-sidebar-text-active:  #FFFFFF;
+  --lex-sidebar-text-muted:   #7A756D;
+  --lex-sidebar-section-text: #A9A49D;
+  --lex-sidebar-hover-bg:     #2D2B27;
+  --lex-sidebar-active-bg:    #2D2B27;
+  --lex-sidebar-border:       #2D2B27;
+  --lex-sidebar-avatar-bg:    #595246;
+  --lex-sidebar-avatar-text:  #FFFFFF;
+  --lex-sidebar-menu-bg:      #2D2B27;
+  --lex-sidebar-danger-text:  #F04438;
+  --lex-sidebar-danger-hover: #FEE4E2;
+  --lex-sidebar-menu-hover-bg: #1D1B18;
+  --lex-sidebar-warning-text: #F79009;
+  --lex-sidebar-info-text:    #528BFF;
+}
+
+lex-sidebar[data-lex-theme="light"] {
+  --lex-sidebar-bg:           var(--lex-color-gray-50);
+  --lex-sidebar-text:         var(--lex-color-gray-700);
+  --lex-sidebar-text-active:  var(--lex-color-gray-900);
+  --lex-sidebar-text-muted:   var(--lex-color-gray-600);
+  --lex-sidebar-section-text: var(--lex-color-gray-600);
+  --lex-sidebar-hover-bg:     var(--lex-color-gray-200);
+  --lex-sidebar-active-bg:    var(--lex-color-gray-300);
+  --lex-sidebar-border:       var(--lex-color-gray-200);
+  --lex-sidebar-avatar-bg:    var(--lex-color-brand-600);
+  --lex-sidebar-avatar-text:  var(--lex-color-white);
+  --lex-sidebar-menu-bg:      var(--lex-color-white);
+  --lex-sidebar-danger-text:  var(--lex-color-danger-700);
+  --lex-sidebar-danger-hover: var(--lex-color-danger-700);
+  --lex-sidebar-menu-hover-bg: var(--lex-color-gray-100);
+  --lex-sidebar-warning-text: var(--lex-color-warning-700);
+  --lex-sidebar-info-text:    var(--lex-color-info-700);
+}
+
 
 /* ==========================================================================
    Global body base — applied to every standalone page via lex-tokens.css.
@@ -784,14 +1169,14 @@ lex-dropdown-btn input,
 
 body {
   font-family: var(--lex-font-sans);
-  background: #fff;
+  background: var(--lex-body-bg, #fff);
   margin: 0;
   padding: 0;
   min-height: 100vh;
 }
 
 /* Prevent FOUC on standalone pages: hide everything until JS upgrades
-   the components. Body stays #fff; once the shell renders its sidebar,
+   the components. Body stays --lex-body-bg; once the shell renders its sidebar,
    topbar, and content area cover the viewport entirely — the white body
    is never visible after that. */
 lex-app:not(:defined) {

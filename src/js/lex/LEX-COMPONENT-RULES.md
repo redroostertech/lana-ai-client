@@ -264,6 +264,31 @@ Lex.state.onAuthChange(callback); // subscribe
 
 **RULE:** Never write auth data directly to `localStorage`. Use `Lex.state.setAuth()`.
 
+### 2.9 LexTheme: Light and Dark
+
+`js/lex/lex.theme.js` is the one theme resolver. It runs on its own (no Lex core needed), so load it in `<head>` before the stylesheets:
+
+```html
+<html lang="en" data-lex-theme="auto">
+<script src="js/lex/lex.theme.js"></script>
+```
+
+**The setting.** Light, Dark or System, default System. In the desktop app the main process owns it (`electron-appearance.js`, `window.electronAPI.appearance`, saved as `appearance.theme`, applied to `nativeTheme.themeSource` and kept in step with LANA Briefs). `setPreference` goes there; changes from any window or from Briefs come back to every page. The localStorage copy under `LexTheme.SETTING_KEY` (`lana:appearance.theme`) only paints the first frame right. Settings > General > Appearance is the control (`js/pages/settings-appearance.js`). System follows the computer (`prefers-color-scheme`). Never dark by default; live.
+
+**Pages opt in.** A page checked in both themes has `data-lex-theme="auto"` on `<html>`; the script keeps that attribute at `light` or `dark` before the first paint, and `lex-tokens.css` swaps every color token under `:root[data-lex-theme="dark"]` (screen only, so print stays light). A page without the marker stays light while components (`lex-sidebar`, `lex-onboarding`) still follow the theme. SPA fragments share the shell's `<html>`: mark the descriptor `themed: true` in `lex-router.pages.js` and lex-router turns the theme on while that fragment shows (`LexTheme.setRootThemed`).
+
+```javascript
+LexTheme.current();               // 'light' | 'dark'
+LexTheme.preference();            // 'system' | 'light' | 'dark'
+LexTheme.setPreference('dark');   // saves (main process in the app); every open window follows
+const stop = LexTheme.subscribe((theme, preference) => { ... });
+document.addEventListener('lex-theme-change', (e) => e.detail.theme);
+```
+
+**Surfaces that do not change:** `--lex-paper-*` (and `.lex-paper`) for PDF pages, the editor page, the doc-studio canvas, DOCX and HTML previews; `--lex-qr-*` for QR codes (dark on white); `--lex-hero-*` (and `.lex-hero-surface`) for banners that are dark by design (`lex-banner variant="dark"`, `lex-card bg="dark"`); the sidebar's own `--lex-sidebar-*` set.
+
+**RULE:** Never read `prefers-color-scheme` or write the theme setting yourself. Use `LexTheme`. Use semantic tokens (`--lex-bg-*`, `--lex-text-*`, `--lex-border-*`, `--lex-status-*`), never literal colors, so the dark set applies; any theme fade stops under `prefers-reduced-motion: reduce`.
+
 ---
 
 ## 3. Foundation Components
@@ -943,6 +968,8 @@ app.setTopbarMenuItems(items);      // Topbar action items
 ### `<lex-sidebar>`
 
 Collapsible navigation sidebar with sections, items, dynamic task/workspace lists, and version footer.
+
+**Light and dark:** follows `LexTheme` (2.9). The element carries `data-lex-theme`, which picks the light or dark `--lex-sidebar-*` set in `lex-tokens.css` (dark is the `:root` default when no theme is loaded). `logo-src` names the light logo; the light sidebar shows `logo-dark.png`. Pages with the sidebar load `lex.theme.js` in `<head>`.
 
 **Fast-path rendering:** Uses generation counters (`_sectionsGen`, `_menuItemsGen`) to skip full re-render when data hasn't changed. If all counters match, `render()` returns `null` to preserve dynamic sidebar state.
 

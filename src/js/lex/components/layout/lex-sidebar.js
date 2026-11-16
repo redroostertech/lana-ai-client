@@ -1,6 +1,9 @@
 /* Lex UI — Sidebar Component
-   Dark-themed sidebar navigation with logo, menu sections, scrollable area,
-   user profile block, and mobile slide-in behavior.
+   Sidebar navigation with logo, menu sections, scrollable area, user profile
+   block, and mobile slide-in behavior. Light or dark follows the shared theme
+   (lex.theme.js, window.LexTheme): the element carries data-lex-theme, which
+   picks the light or dark --lex-sidebar-* token set in lex-tokens.css, and the
+   logo is the one that reads on it (logo-src names the light logo for dark).
 
    Usage:
      <lex-sidebar
@@ -66,6 +69,7 @@
         --_sb-active-bg:    var(--lex-sidebar-active-bg);
         --_sb-border:       var(--lex-sidebar-border);
         --_sb-avatar-bg:    var(--lex-sidebar-avatar-bg);
+        --_sb-avatar-text:  var(--lex-sidebar-avatar-text, #fff);
 
         position: fixed;
         top: 0;
@@ -78,8 +82,16 @@
         flex-direction: column;
         z-index: var(--lex-z-overlay);
         transform: translateX(-100%);
-        transition: transform var(--lex-transition-slide), width var(--lex-transition-slide);
+        /* Light and dark swap with a short fade (none with Reduce Motion, below). */
+        transition: transform var(--lex-transition-slide), width var(--lex-transition-slide),
+                    background-color 200ms ease, color 200ms ease;
         font-family: var(--lex-font-sans);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .lex-sidebar-root {
+          transition: transform var(--lex-transition-slide), width var(--lex-transition-slide);
+        }
       }
 
       @media (min-width: 1024px) {
@@ -413,7 +425,7 @@
         top: calc(var(--lex-topbar-height) + 4.25rem);
         left: 0.5rem;
         width: min(27rem, calc(100vw - 1rem));
-        background: var(--lex-sidebar-hover-bg, #2f2b25);
+        background: var(--lex-sidebar-menu-bg, #2f2b25);
         color: var(--lex-sidebar-text-active, #f8f7f4);
         border: 1px solid var(--lex-sidebar-border, rgba(255, 255, 255, 0.08));
         border-radius: var(--lex-radius-xl, 14px);
@@ -448,7 +460,7 @@
 
       .lex-sidebar-app-option:hover,
       .lex-sidebar-app-option[data-active="true"] {
-        background: var(--lex-sidebar-bg, #1c1a17);
+        background: var(--lex-sidebar-menu-hover-bg, var(--lex-sidebar-bg, #1c1a17));
       }
 
       .lex-sidebar-app-option-copy {
@@ -784,7 +796,7 @@
       }
 
       .lex-sidebar-workspace-group-title[data-group="pinned"] {
-        color: var(--lex-status-warning, #F79009);
+        color: var(--lex-sidebar-warning-text, var(--lex-status-warning, #F79009));
       }
 
       .lex-sidebar-workspace-item {
@@ -872,15 +884,15 @@
       }
 
       .lex-sidebar-task-group-title[data-priority="urgent"] {
-        color: var(--lex-status-danger, #F04438);
+        color: var(--lex-sidebar-danger-text, var(--lex-status-danger, #F04438));
       }
 
       .lex-sidebar-task-group-title[data-priority="high"] {
-        color: var(--lex-status-warning, #F79009);
+        color: var(--lex-sidebar-warning-text, var(--lex-status-warning, #F79009));
       }
 
       .lex-sidebar-task-group-title[data-priority="normal"] {
-        color: var(--lex-status-info, #2E90FA);
+        color: var(--lex-sidebar-info-text, var(--lex-status-info, #2E90FA));
       }
 
       .lex-sidebar-task-group-title[data-priority="low"] {
@@ -1085,7 +1097,7 @@
         font-weight: var(--lex-weight-semibold);
         border-radius: var(--lex-badge-radius);
         background: var(--_sb-avatar-bg);
-        color: var(--_sb-text-active);
+        color: var(--_sb-avatar-text);
         line-height: 1.4;
       }
 
@@ -1203,7 +1215,7 @@
       .lex-sidebar-avatar-text {
         font-size: var(--lex-body-xs-size, 0.6875rem);
         font-weight: var(--lex-weight-medium);
-        color: var(--_sb-text-active);
+        color: var(--_sb-avatar-text);
       }
 
       .lex-sidebar-user-name {
@@ -1337,7 +1349,7 @@
         bottom: 0;
         left: 0;
         width: var(--lex-sidebar-width);
-        background: var(--lex-sidebar-hover-bg);
+        background: var(--lex-sidebar-menu-bg, var(--lex-sidebar-hover-bg));
         border-top-left-radius: var(--lex-radius-2xl);
         border-top-right-radius: var(--lex-radius-2xl);
         box-shadow: var(--lex-shadow-xl);
@@ -1387,7 +1399,7 @@
       .lex-sidebar-user-panel-avatar-text {
         font-size: var(--lex-body-sm-size, 0.875rem);
         font-weight: var(--lex-weight-semibold);
-        color: var(--lex-sidebar-text-active);
+        color: var(--lex-sidebar-avatar-text, #fff);
       }
 
       .lex-sidebar-user-panel-name {
@@ -1440,11 +1452,11 @@
       }
 
       .lex-sidebar-user-panel-item--danger {
-        color: var(--lex-color-danger-500);
+        color: var(--lex-sidebar-danger-text, var(--lex-color-danger-500));
       }
 
       .lex-sidebar-user-panel-item--danger:hover {
-        color: var(--lex-color-danger-100);
+        color: var(--lex-sidebar-danger-hover, var(--lex-color-danger-100));
       }
 
       .lex-sidebar-user-panel-footer {
@@ -1539,6 +1551,7 @@
     }
 
     connected() {
+      this._bindTheme();
       this._hydrateAppItemsFromElectronStorage();
       this._bindDynamicListRefreshEvents();
       if (this._hasDynamicListAuth() && this._dynamicListRefreshHandler) {
@@ -1547,11 +1560,39 @@
     }
 
     disconnected() {
+      if (this._themeUnsubscribe) this._themeUnsubscribe();
+      this._themeUnsubscribe = null;
       if (window.Lex && window.Lex.state && this._dynamicListRefreshHandler) {
         window.Lex.state.off('auth:changed', this._dynamicListRefreshHandler);
         window.Lex.state.off('connection:changed', this._dynamicListRefreshHandler);
       }
       this._dynamicListRefreshHandler = null;
+    }
+
+    /** "light" or "dark" from the shared theme; without it, no attribute and today's dark look. */
+    _theme() {
+      return window.LexTheme && typeof window.LexTheme.current === 'function' ? window.LexTheme.current() : '';
+    }
+
+    _bindTheme() {
+      this._applyTheme();
+      if (this._themeUnsubscribe || !window.LexTheme || typeof window.LexTheme.subscribe !== 'function') return;
+      this._themeUnsubscribe = window.LexTheme.subscribe(() => this._applyTheme());
+    }
+
+    _applyTheme() {
+      const theme = this._theme();
+      if (!theme) return;
+      this.setAttribute('data-lex-theme', theme);
+      const logo = this.querySelector('.lex-sidebar-logo');
+      const src = this._themedLogoSrc();
+      if (logo && src && logo.getAttribute('src') !== src) logo.setAttribute('src', src);
+    }
+
+    /** logo-src names the light logo (for the dark sidebar); the light sidebar shows the dark one. */
+    _themedLogoSrc() {
+      const src = this.logoSrc || '';
+      return this._theme() === 'light' ? src.replace(/logo-light\.png/, 'logo-dark.png') : src;
     }
 
     _hydrateAppItemsFromElectronStorage() {
@@ -1638,7 +1679,7 @@
       // ── Header ──
       html += `<div class="lex-sidebar-header">`;
       if (this.logoSrc) {
-        html += `<a href="${this.escapeHtml(this.logoHref)}"><img class="lex-sidebar-logo" src="${this.escapeHtml(this.logoSrc)}" alt="${this.escapeHtml(this.logoAlt)}"></a>`;
+        html += `<a href="${this.escapeHtml(this.logoHref)}"><img class="lex-sidebar-logo" src="${this.escapeHtml(this._themedLogoSrc())}" alt="${this.escapeHtml(this.logoAlt)}"></a>`;
       }
       html += `<button class="lex-sidebar-collapse-btn" data-action="collapse">${icon('chevrons-left', 'small')}</button>`;
       html += `<button class="lex-sidebar-close" data-action="close">${icon('x', 'normal')}</button>`;

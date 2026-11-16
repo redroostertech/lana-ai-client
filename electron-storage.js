@@ -523,6 +523,25 @@ const locationPersistence = {
   }
 };
 
+// Settings > General > Appearance (electron-appearance.js): 'system', 'light' or 'dark'.
+// The same key LANA Briefs keeps in its own store, which electron-briefs.js keeps in step.
+const APPEARANCE_KEY = 'appearance.theme';
+
+const appearancePersistence = {
+  read() {
+    try {
+      const value = store.get(APPEARANCE_KEY, null);
+      return typeof value === 'string' ? value : null;
+    } catch (error) {
+      logError('[electron-storage] Failed to read the appearance setting', error);
+      return null;
+    }
+  },
+  write(value) {
+    store.set(APPEARANCE_KEY, String(value));
+  }
+};
+
 // Ciphertext of the login token (Electron safeStorage output, base64). The
 // plain token never reaches this store; see electron-token-store.js.
 const AUTH_TOKEN_KEY = 'authTokenEncrypted';
@@ -559,6 +578,7 @@ module.exports = {
   updateLocalEnginePreferences,
   firstLaunchPersistence,
   locationPersistence,
+  appearancePersistence,
   getAllData,
   clearAllData,
   addToConnectionHistory,

@@ -15,7 +15,7 @@
   height: 260px;
   padding: 12px;
   border-radius: var(--lex-radius-lg);
-  background: #ffffff;
+  background: var(--lex-qr-bg, #ffffff);
   color: var(--lex-text-secondary);
   display: grid;
   place-items: center;

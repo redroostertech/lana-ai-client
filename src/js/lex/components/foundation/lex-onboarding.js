@@ -70,7 +70,7 @@
   class LexOnboarding extends LexElement {
     static get properties() {
       return {
-        // Light by default to match the client; "dark" is the LANA AI media-kit look.
+        // "light" or "dark", from the shared theme (lex.theme.js) when the page loads it.
         theme: { type: String, default: 'light', reflect: true },
       };
     }
@@ -89,6 +89,7 @@
     }
 
     connected() {
+      this._followTheme();
       if (this._built) return;
       this._built = true;
       this._sceneRun = 0;
@@ -101,7 +102,17 @@
     }
 
     disconnected() {
+      if (this._themeUnsubscribe) this._themeUnsubscribe();
+      this._themeUnsubscribe = null;
       this._release();
+    }
+
+    /** Light or dark as LexTheme says (the app setting, else the computer), live. */
+    _followTheme() {
+      const themes = window.LexTheme;
+      if (!themes || this._themeUnsubscribe) return;
+      this.setAttribute('theme', themes.current());
+      this._themeUnsubscribe = themes.subscribe((theme) => this.setAttribute('theme', theme));
     }
 
     // ── Markup ────────────────────────────────────────────────────────────

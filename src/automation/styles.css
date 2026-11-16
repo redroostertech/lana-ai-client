@@ -2436,7 +2436,7 @@ button:disabled {
 }
 
 .automation-detail-section lex-card {
-  --lex-card-radius: var(--lex-radius-lg, 12px);
+  --lex-card-radius: var(--lex-radius-xl, 12px);
 }
 
 .automation-detail-section-body {

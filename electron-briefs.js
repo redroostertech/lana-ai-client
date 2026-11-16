@@ -144,6 +144,7 @@ function isLoaded(window) {
  * @param {object} [deps.ipcMain] - answers the pages' "is Briefs running" question
  * @param {function} [deps.speechModels] - async () => the Briefs speech model ids first launch says to install
  * @param {function} [deps.createCaptureWindow] - () => a hidden BrowserWindow loading briefs/capture.html with the client preload
+ * @param {object} [deps.appearance] - electron-appearance.js: the one Light / Dark / System setting, kept in step with Briefs' own
  * @param {function} deps.showWindow
  * @param {object} deps.log - { info, warn, error }
  */
@@ -165,6 +166,27 @@ function createBriefs(deps) {
   // Pages ask whether Briefs runs before they switch its tone player on (always answered,
   // so pages without Briefs log nothing).
   if (deps.ipcMain) deps.ipcMain.handle(RUNNING_CHANNEL, () => host !== null);
+
+  // One appearance setting: a change in LANA's Settings is saved in Briefs' store too.
+  if (deps.appearance) deps.appearance.subscribe((preference) => syncBriefsTheme(host, preference));
+  function syncBriefsTheme(running, preference) {
+    if (running && typeof running.setTheme === 'function') {
+      Promise.resolve(running.setTheme(preference)).catch(() => log.warn('[briefs] could not save the appearance setting'));
+    }
+  }
+  /**
+   * Briefs asks to apply a theme: at its start (its saved value: LANA's setting wins and is
+   * pushed after, except on the first start after an upgrade, when LANA has no saved choice
+   * yet and Briefs' value becomes the app's), or a change made in Briefs (saved as the app's).
+   */
+  function applyBriefsTheme(theme) {
+    if (!deps.appearance) {
+      electron.nativeTheme.themeSource = theme;
+      return;
+    }
+    const seeding = typeof deps.appearance.hasSaved === 'function' && !deps.appearance.hasSaved();
+    if (host || seeding) deps.appearance.set(theme);
+  }
 
   // The hidden window that records while a recording is live (briefs/capture.html), so
   // capture keeps going when the visible window changes pages. Exists only while recording,
@@ -260,7 +282,7 @@ function createBriefs(deps) {
       bleHelper: bleHelperPath(),
       showWindow: deps.showWindow,
       quit: () => electron.app.quit(),
-      applyTheme: (theme) => { electron.nativeTheme.themeSource = theme; },
+      applyTheme: (theme) => applyBriefsTheme(theme),
       documentsPath: electron.app.getPath('documents'),
       exportAssets: {
         stylesheet: path.join(__dirname, 'public_html', 'css', 'briefs-export-print.css'),
@@ -271,6 +293,7 @@ function createBriefs(deps) {
     });
     host = started;
     hostKey = key;
+    if (deps.appearance) syncBriefsTheme(started, deps.appearance.preference());
     addOpenWindows();
     // Pages that loaded before Briefs started switch their tone player on now.
     for (const window of deps.getWindows()) {
