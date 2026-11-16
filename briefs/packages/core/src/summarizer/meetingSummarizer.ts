@@ -364,7 +364,7 @@ const VISITOR_SPAN_SECONDS = 300;
 
 /**
  * Set-aside guard (lana-app-93 decision, both devices): a part from the notes.aside.v1 check is
- * kept only when it overlaps, or lies less than 30 s from, a range from the notes' own ASIDE lines, or a lightly heard speaker
+ * kept only when it overlaps a range from the notes' own ASIDE lines, or a lightly heard speaker
  * (under 5% of all talk) has a line at least half inside it. Runs before the joins and the drop.
  */
 export function guardCheckedParts(checked: readonly SetAsidePart[], fromNotes: readonly SetAsidePart[], transcript: readonly TranscriptSegment[]): SetAsidePart[] {
@@ -378,8 +378,7 @@ export function guardCheckedParts(checked: readonly SetAsidePart[], fromNotes: r
   }
   const light = (speaker: string): boolean => total > 0 && (talk.get(speaker) ?? 0) < VISITOR_SHARE * total;
   return checked.filter((part) =>
-    // Overlapping a notes ASIDE range, or less than the bridge window (30 s) away from one, corroborates it.
-    fromNotes.some((aside) => Math.min(part.end, aside.end) - Math.max(part.start, aside.start) > -SET_ASIDE_BRIDGE_GAP)
+    fromNotes.some((aside) => Math.min(part.end, aside.end) - Math.max(part.start, aside.start) > 0)
     || lines.some((line) => light(line.speaker) && segmentSetAside(line, [part])));
 }
 
