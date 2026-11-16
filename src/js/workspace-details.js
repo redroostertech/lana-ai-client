@@ -47,6 +47,8 @@
   var customFieldsBaseline = null;
   var customFieldsLibrary = null;      // last field-library response while the picker is open
   var customFieldsSectionSeq = 0;      // guards the dock card against a stale await
+  var customFieldsOpenSeq = 0;         // guards the drawer against a late load for another matter
+  var customFieldsLibrarySearch = null; // debounced server search for the library picker
   var _navContext = null;              // navigation context (source, conversationId, etc.)
   var matterTabs = null;               // tabs from the matter's makeup (LanaMatterTabRegistry.buildTabs)
   var makeupClient = null;             // MatterMakeupAPIClient
@@ -8396,15 +8398,21 @@
     }
 
     currentEditFieldsMatter = matterId;
+    var openSeq = ++customFieldsOpenSeq;
 
-    // Definitions are org-level; values are this matter's (typed matter fields).
+    // This matter's attached fields and their values (typed matter fields).
+    var loaded;
     try {
-      customFieldsBaseline = await matterFieldsClient().loadDrawer(matterId);
+      loaded = await matterFieldsClient().loadDrawer(matterId);
     } catch (error) {
+      if (openSeq !== customFieldsOpenSeq) return;
       console.error('[openEditCustomFieldsModal] Error loading custom fields:', error);
       Lex.Toast.error(LanaMatterFields.errorMessage(error));
       return;
     }
+    // The drawer was opened again (another matter) while this load waited.
+    if (openSeq !== customFieldsOpenSeq || currentEditFieldsMatter !== matterId) return;
+    customFieldsBaseline = loaded;
     var drawerState = LanaMatterFields.cloneState(customFieldsBaseline);
     customFieldDefinitions = drawerState.definitions;
     customFieldValues = drawerState.values;
@@ -8440,6 +8448,8 @@
     customFieldValues = [];
     customFieldsBaseline = null;
     customFieldsLibrary = null;
+    customFieldsLibrarySearch = null;
+    customFieldsOpenSeq++;
   }
 
   /**
@@ -8449,6 +8459,12 @@
   function bindCustomFieldSelects(container) {
     if (container.dataset.customFieldSelectsBound === 'true') return;
     container.dataset.customFieldSelectsBound = 'true';
+    // The picker's search box: ask the server (debounced) so every library
+    // field is reachable, not only the first page.
+    container.addEventListener('input', function (e) {
+      var picker = e.target && e.target.closest ? e.target.closest('lex-select[data-library-pick]') : null;
+      if (picker && customFieldsLibrarySearch) customFieldsLibrarySearch.query(e.target.value || '');
+    });
     container.addEventListener('lex-change', function (e) {
       var target = e.target;
       if (!target || !target.dataset) return;
@@ -8501,8 +8517,16 @@
 
     var html = pickerHtml + '<div class="space-y-4">';
 
+    var canManageLibrary = !!(customFieldsBaseline && customFieldsBaseline.canManageLibrary);
+
     for (var i = 0; i < customFieldDefinitions.length; i++) {
       var def = customFieldDefinitions[i];
+      // A library field's name, required flag and options apply to every
+      // matter using it: read only unless this person manages the library.
+      var lockProps = !!def.id && !canManageLibrary;
+      var libraryNote = !def.id ? '' : (canManageLibrary
+        ? '<p class="mb-3 text-xs text-gray-500">Changes apply to every matter using this field.</p>'
+        : '<p class="mb-3 text-xs text-gray-500">Library field. Ask an admin to change its name, required setting or options.</p>');
       var valueObj = null;
       for (var j = 0; j < customFieldValues.length; j++) {
         if (customFieldValues[j].key === def.key) { valueObj = customFieldValues[j]; break; }
@@ -8518,6 +8542,7 @@
           '<div class="mb-3">' +
             '<label class="block text-xs font-medium text-gray-700 mb-1">Dropdown Options (comma-separated)</label>' +
             '<input type="text" value="' + escapeHtml(optionsJoined) + '"' +
+              (lockProps ? ' readonly' : '') +
               ' onchange="updateFieldDefinition(' + i + ', \'options\', this.value.split(\',\').map(function(s){return s.trim();}).filter(function(s){return s;}))"' +
               ' placeholder="e.g., Active, Pending, Closed"' +
               ' class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus" />' +
@@ -8526,6 +8551,7 @@
 
       html +=
         '<div class="p-4 bg-gray-50 rounded-lg border border-gray-200">' +
+          libraryNote +
           '<div class="grid grid-cols-12 gap-3 mb-3">' +
             '<div class="col-span-3">' +
               '<label class="block text-xs font-medium text-gray-700 mb-1">Field Key</label>' +
@@ -8538,6 +8564,7 @@
             '<div class="col-span-4">' +
               '<label class="block text-xs font-medium text-gray-700 mb-1">Display Name</label>' +
               '<input type="text" value="' + escapeHtml(def.display_name || '') + '"' +
+                (lockProps ? ' readonly' : '') +
                 ' onchange="updateFieldDefinition(' + i + ', \'display_name\', this.value)"' +
                 ' placeholder="e.g., Case Number"' +
                 ' class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus" />' +
@@ -8553,6 +8580,7 @@
               '<label class="block text-xs font-medium text-gray-700 mb-1">Required</label>' +
               '<label class="flex items-center px-3 py-2">' +
                 '<input type="checkbox"' + (def.required ? ' checked' : '') +
+                  (lockProps ? ' disabled' : '') +
                   ' onchange="updateFieldDefinition(' + i + ', \'required\', this.checked)"' +
                   ' class="rounded border-gray-300 lex-text-accent lex-ring-focus" />' +
                 '<span class="ml-2 text-sm text-gray-700">Yes</span>' +
@@ -8660,13 +8688,27 @@
    */
   async function openCustomFieldLibrary() {
     if (!currentEditFieldsMatter) return;
+    var matterId = currentEditFieldsMatter;
     try {
-      customFieldsLibrary = await matterFieldsClient().searchLibrary(currentEditFieldsMatter, '');
+      customFieldsLibrary = await matterFieldsClient().searchLibrary(matterId, '');
     } catch (error) {
       console.error('[openCustomFieldLibrary] Error:', error);
       Lex.Toast.error(LanaMatterFields.errorMessage(error));
       return;
     }
+    if (currentEditFieldsMatter !== matterId) return;
+    customFieldsLibrarySearch = LanaMatterFields.createLibrarySearch({
+      search: function (q) { return matterFieldsClient().searchLibrary(matterId, q); },
+      onResults: function (response) {
+        if (currentEditFieldsMatter !== matterId || !customFieldsLibrary) return;
+        customFieldsLibrary = response;
+        // Update the open picker in place so the search box keeps focus.
+        var picker = document.querySelector('#customFieldsContainer lex-select[data-library-pick]');
+        if (picker) {
+          picker.options = LanaMatterFields.libraryOptions(response, { definitions: customFieldDefinitions });
+        }
+      }
+    });
     renderCustomFieldsModal();
   }
 
@@ -8687,6 +8729,7 @@
     customFieldDefinitions = next.definitions;
     customFieldValues = next.values;
     customFieldsLibrary = null;
+    customFieldsLibrarySearch = null;
     renderCustomFieldsModal();
   }
 

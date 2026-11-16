@@ -82,8 +82,10 @@ class MatterFieldsAPIClient {
   }
 
   /**
-   * Write the drawer: library fields first (create, edit), then this matter's
-   * attachments, then its values in one transaction.
+   * Write the drawer: new library fields, this matter's attachments, then
+   * library edits (admins only; after the attach, so a picked field's edit
+   * lands on a field this matter uses), detaches, and the values in one
+   * transaction.
    * @param {string} matterId
    * @param {Object} baseline - the state loadDrawer returned
    * @param {Object} current - the edited state
@@ -101,11 +103,11 @@ class MatterFieldsAPIClient {
       for (const create of plan.creates) {
         attachIds.push(await this.createOrFind(matterId, create));
       }
-      for (const update of plan.updates) {
-        await this.send(fields.updateRequest(update));
-      }
       for (const id of attachIds) {
         await this.send(fields.attachRequest(matterId, id));
+      }
+      for (const update of plan.updates) {
+        await this.send(fields.updateRequest(update));
       }
       for (const id of plan.detaches) {
         await this.send(fields.detachRequest(matterId, id));

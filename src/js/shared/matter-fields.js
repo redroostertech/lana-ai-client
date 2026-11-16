@@ -15,11 +15,15 @@
  * A value for an unattached field is refused, so a new field is attached
  * before its value is written. PUT /matters/:id/settings refuses custom fields.
  *
- * The drawer works on a state { definitions, values }:
+ * The drawer works on a state { definitions, values, canManageLibrary }:
  *   definitions: [{ id?, key, display_name, type, required, options, default_value }]
  *                (no id = not created yet; an id not in the loaded state = picked
  *                from the library, to attach)
  *   values:      [{ key, value }]
+ *   canManageLibrary: whether this person may change library fields (label,
+ *                required, options). A change applies to every matter using
+ *                the field, so the server allows it to admins only
+ *                (matters:manage_field_library); others edit values only.
  * The server coerces and validates every value; this module maps shapes, diffs
  * the drawer against what was loaded, escapes values for display and words
  * the server's refusals.
@@ -35,6 +39,7 @@
  *   - planSave(baseline, current) -> { errors, creates, attaches, updates, detaches, values }
  *   - adoptIds(current, baseline)
  *   - displayFields(valuesResponse), displayHtml(field), placeholderFor(def)
+ *   - createLibrarySearch({ search, onResults, delayMs }) -> { query(text) }, debounced, latest wins
  *   - errorMessage(error)
  */
 (function (global) {
@@ -147,7 +152,11 @@
       var v = byKey[d.key];
       return { key: d.key, value: v === null || v === undefined ? '' : v };
     });
-    return { definitions: definitions, values: values };
+    return {
+      definitions: definitions,
+      values: values,
+      canManageLibrary: dataOf(attachedResponse).can_manage_library === true
+    };
   }
 
   function cloneState(state) {
@@ -158,6 +167,8 @@
   function addLibraryField(state, libraryDefinition) {
     var next = cloneState(state);
     var def = toDefinition(libraryDefinition);
+    // What the library holds now, so an admin's edit can be diffed after attach.
+    def.original = { display_name: def.display_name, required: def.required, options: def.options.slice(), type: def.type };
     var already = next.definitions.some(function (d) { return d.id === def.id || d.key === def.key; });
     if (!already) {
       next.definitions.push(def);
@@ -240,6 +251,18 @@
     var baseById = {};
     baseDefs.forEach(function (d) { if (d.id) baseById[d.id] = d; });
     var keptIds = {};
+    var canManage = !!(baseline && baseline.canManageLibrary);
+
+    // A library field's own properties apply to every matter using it. Only
+    // someone who may manage the library changes them, and never the type
+    // (stored values would become unreadable in every matter).
+    function libraryPatch(d, before, label, options) {
+      var patch = {};
+      if (label !== before.display_name) patch.field_label = label;
+      if ((d.required === true) !== (before.required === true)) patch.is_required = d.required === true;
+      if (hasOptions(before.type) && !sameValue(options, before.options || [])) patch.options = options;
+      return patch;
+    }
 
     defs.forEach(function (d) {
       var label = String(d.display_name).trim();
@@ -250,18 +273,15 @@
         plan.creates.push({ key: body.field_key, body: body });
         return;
       }
-      if (!baseById[d.id]) {
-        plan.attaches.push(d.id); // picked from the library
-        return;
-      }
-      keptIds[d.id] = true;
-      // A saved field's type never changes here: the stored values would
-      // become unreadable in every matter. Label, required and options do.
       var before = baseById[d.id];
-      var patch = {};
-      if (label !== before.display_name) patch.field_label = label;
-      if ((d.required === true) !== (before.required === true)) patch.is_required = d.required === true;
-      if (hasOptions(before.type) && !sameValue(options, before.options || [])) patch.options = options;
+      if (!before) {
+        plan.attaches.push(d.id); // picked from the library
+        before = d.original;
+      } else {
+        keptIds[d.id] = true;
+      }
+      if (!canManage || !before) return;
+      var patch = libraryPatch(d, before, label, options);
       if (Object.keys(patch).length) plan.updates.push({ id: d.id, body: patch });
     });
 
@@ -343,6 +363,32 @@
     return 'Enter ' + ((def && (def.display_name || def.key)) || 'a value');
   }
 
+  /**
+   * Debounced, latest-wins search for the library picker: every keystroke
+   * calls query(text); only the last text in a pause is sent, and an answer
+   * that arrives after a newer one started is dropped.
+   *
+   * @param {Object} opts - { search(q) -> Promise, onResults(response, q), delayMs? }
+   * @returns {{ query: function(string): void }}
+   */
+  function createLibrarySearch(opts) {
+    var delay = opts.delayMs === undefined ? 250 : opts.delayMs;
+    var timer = null;
+    var latest = 0;
+    return {
+      query: function (text) {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(function () {
+          timer = null;
+          var ticket = ++latest;
+          Promise.resolve(opts.search(text)).then(function (response) {
+            if (ticket === latest) opts.onResults(response, text);
+          }, function () { /* a failed search keeps the current list */ });
+        }, delay);
+      }
+    };
+  }
+
   function errorMessage(error) {
     if (!error) return 'Could not save custom fields';
     var body = error.data && error.data.error;
@@ -382,6 +428,7 @@
     displayText: displayText,
     displayHtml: displayHtml,
     placeholderFor: placeholderFor,
+    createLibrarySearch: createLibrarySearch,
     errorMessage: errorMessage
   };
 

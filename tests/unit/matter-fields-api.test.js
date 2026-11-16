@@ -14,6 +14,7 @@ const SERVER_ATTACHED = {
   status: 'success',
   data: {
     matter_id: 'MATT-1',
+    can_manage_library: true,
     fields: [
       { id: 'd-1', field_key: 'case_number', field_label: 'Case Number', field_type: 'text', is_required: true, options: [], default_value: null },
       { id: 'd-2', field_key: 'stage', field_label: 'Stage', field_type: 'select', is_required: false, options: ['Open', 'Closed'], default_value: 'Open' },
@@ -79,9 +80,40 @@ describe('matter-fields model', () => {
     ]);
   });
 
+  test('carries whether this person may change library fields', () => {
+    expect(loadedState().canManageLibrary).toBe(true);
+    const member = MatterFields.toDrawerState({ data: { fields: [], can_manage_library: false } }, SERVER_VALUES);
+    expect(member.canManageLibrary).toBe(false);
+  });
+
+  test('a person who cannot manage the library sends no field changes, only values and attachments', () => {
+    const base = Object.assign(loadedState(), { canManageLibrary: false });
+    let edit = MatterFields.cloneState(base);
+    edit.definitions[0].display_name = 'Renamed';
+    edit.definitions[1].required = true;
+    edit = MatterFields.addLibraryField(edit, SERVER_LIBRARY.data.definitions[1]);
+    edit.values[1].value = 'Closed';
+    const plan = MatterFields.planSave(base, edit);
+    expect(plan.updates).toEqual([]);
+    expect(plan.attaches).toEqual(['d-9']);
+    expect(plan.values).toEqual([{ field_key: 'stage', value: 'Closed' }]);
+  });
+
+  test('an admin\'s edit to a field just picked from the library is sent after the attach', () => {
+    const base = loadedState();
+    let edit = MatterFields.addLibraryField(base, SERVER_LIBRARY.data.definitions[1]);
+    const picked = edit.definitions.find((d) => d.id === 'd-9');
+    picked.display_name = 'Successor Trustee';
+    const plan = MatterFields.planSave(base, edit);
+    expect(plan.attaches).toEqual(['d-9']);
+    expect(plan.updates).toEqual([{ id: 'd-9', body: { field_label: 'Successor Trustee' } }]);
+  });
+
   test('an unchanged drawer plans nothing', () => {
     const base = loadedState();
     const plan = MatterFields.planSave(base, MatterFields.cloneState(base));
+    expect(plan.errors.concat(plan.creates, plan.attaches, plan.updates, plan.detaches, plan.values)).toEqual([]);
+    expect(Object.keys(plan).sort()).toEqual(['attaches', 'creates', 'detaches', 'errors', 'updates', 'values']);
     expect(plan).toEqual({ errors: [], creates: [], attaches: [], updates: [], detaches: [], values: [] });
   });
 
@@ -180,6 +212,37 @@ describe('matter-fields model', () => {
     }).errors).toEqual(['Duplicate field keys: dup']);
   });
 
+  describe('library search', () => {
+    beforeEach(() => { jest.useFakeTimers(); });
+    afterEach(() => { jest.useRealTimers(); });
+
+    test('debounces typing and asks the server with the latest text', async () => {
+      const search = jest.fn(async (q) => ({ data: { definitions: [{ id: q }] } }));
+      const onResults = jest.fn();
+      const box = MatterFields.createLibrarySearch({ search, onResults, delayMs: 250 });
+      box.query('t'); box.query('tr'); box.query('tru');
+      expect(search).not.toHaveBeenCalled();
+      jest.advanceTimersByTime(250);
+      await Promise.resolve(); await Promise.resolve();
+      expect(search.mock.calls).toEqual([['tru']]);
+      expect(onResults).toHaveBeenCalledWith({ data: { definitions: [{ id: 'tru' }] } }, 'tru');
+    });
+
+    test('a slow older answer never replaces a newer one', async () => {
+      let releaseOld;
+      const search = jest.fn((q) => (q === 'old'
+        ? new Promise((resolve) => { releaseOld = () => resolve({ data: { definitions: [{ id: 'old' }] } }); })
+        : Promise.resolve({ data: { definitions: [{ id: 'new' }] } })));
+      const onResults = jest.fn();
+      const box = MatterFields.createLibrarySearch({ search, onResults, delayMs: 10 });
+      box.query('old'); jest.advanceTimersByTime(10);
+      box.query('new'); jest.advanceTimersByTime(10);
+      await Promise.resolve(); await Promise.resolve();
+      releaseOld(); await Promise.resolve(); await Promise.resolve();
+      expect(onResults.mock.calls.map((c) => c[1])).toEqual(['new']);
+    });
+  });
+
   test('displayHtml escapes every value shape, including a stored script payload', () => {
     const payload = '<img src=x onerror=alert(1)>';
     const shapes = [
@@ -274,6 +337,42 @@ describe('MatterFieldsAPIClient', () => {
 
     expect(api.get).toHaveBeenCalledWith('/api/v1/matters/MATT-1/field-library?limit=200&q=notes');
     expect(api.post).toHaveBeenLastCalledWith('/api/v1/matters/MATT-1/field-attachments', { field_definition_id: 'd-78' });
+  });
+
+  test('a key held by an ARCHIVED field reports the server\'s message instead of looping', async () => {
+    const conflict = Object.assign(new Error('A field with key "notes" was archived. Ask an admin to restore it, or choose a different key.'), {
+      status: 409,
+      data: { error: { message: 'A field with key "notes" was archived. Ask an admin to restore it, or choose a different key.' } }
+    });
+    const api = fakeApi({
+      post: jest.fn(async () => { throw conflict; }),
+      get: jest.fn(async (path) => {
+        if (path.indexOf('/field-library') !== -1) return { data: { definitions: [] } }; // archived: not in the library
+        if (path.indexOf('/field-values') !== -1) return SERVER_VALUES;
+        return SERVER_ATTACHED;
+      })
+    });
+    const client = new MatterFieldsAPIClient(api);
+    const base = await client.loadDrawer('MATT-1');
+    const edit = MatterFields.cloneState(base);
+    edit.definitions.push({ key: 'notes', display_name: 'Notes', type: 'text', required: false, options: [] });
+
+    await expect(client.saveDrawer('MATT-1', base, edit)).rejects.toMatchObject({
+      userMessage: 'A field with key "notes" was archived. Ask an admin to restore it, or choose a different key.'
+    });
+    expect(api.post).toHaveBeenCalledTimes(1);
+  });
+
+  test('an admin edit to a picked field is PATCHed after it is attached', async () => {
+    const api = fakeApi();
+    const client = new MatterFieldsAPIClient(api);
+    const base = await client.loadDrawer('MATT-1');
+    const edit = MatterFields.addLibraryField(base, SERVER_LIBRARY.data.definitions[1]);
+    edit.definitions.find((d) => d.id === 'd-9').required = true;
+    await client.saveDrawer('MATT-1', base, edit);
+    expect(api.post).toHaveBeenCalledWith('/api/v1/matters/MATT-1/field-attachments', { field_definition_id: 'd-9' });
+    expect(api.patch).toHaveBeenCalledWith('/api/v1/matter-field-definitions/d-9', { is_required: true });
+    expect(api.post.mock.invocationCallOrder[0]).toBeLessThan(api.patch.mock.invocationCallOrder[0]);
   });
 
   test('remove detaches from this matter only; nothing is archived', async () => {
