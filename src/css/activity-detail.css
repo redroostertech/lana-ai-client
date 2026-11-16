@@ -1274,6 +1274,12 @@ button.atd-banner-action {
   background: rgba(255, 255, 255, 0.055);
 }
 
+/* The live ring of the shared status mark is a lighter success token here:
+   the default green ring is faint on this dark green panel. */
+.atd-journey-pulse .lex-run-status--running .lex-run-status__mark::after {
+  border-color: var(--lex-color-success-100);
+}
+
 .atd-journey-pulse small,
 .atd-journey-pulse strong {
   display: block;
