@@ -92,7 +92,29 @@
     return holder[slot];
   }
 
-  var moduleApi = { createLivePoller: createLivePoller, ensurePoller: ensurePoller };
+  /**
+   * Wrap requests so only the latest one's answer counts: an answer that
+   * arrives after a newer request began resolves to latestOnly.STALE, so a
+   * slow read of run A cannot overwrite run B opened after it. Failures of
+   * the latest request still reject.
+   */
+  var STALE = { stale: true };
+  function latestOnly() {
+    var sequence = 0;
+    return function guard(promise) {
+      sequence += 1;
+      var mine = sequence;
+      return Promise.resolve(promise).then(function (value) {
+        return mine === sequence ? value : STALE;
+      }, function (error) {
+        if (mine !== sequence) return STALE;
+        throw error;
+      });
+    };
+  }
+  latestOnly.STALE = STALE;
+
+  var moduleApi = { createLivePoller: createLivePoller, ensurePoller: ensurePoller, latestOnly: latestOnly };
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = moduleApi;
   }

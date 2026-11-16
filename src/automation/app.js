@@ -2013,11 +2013,16 @@ async function refreshNotificationBadge() {
   }
 }
 
+// Only the latest run detail read is applied: opening run B while run A's
+// read is still in flight must not reopen A when A answers last.
+const runDetailRequests = window.LanaLivePoller ? window.LanaLivePoller.latestOnly() : (promise) => promise;
+
 async function loadRunDetail(executionId) {
   if (!executionId) return;
-  const payload = await fetchJson(`/api/executions/${executionId}`, {
+  const payload = await runDetailRequests(fetchJson(`/api/executions/${executionId}`, {
     headers: authHeaders()
-  });
+  }));
+  if (window.LanaLivePoller && payload === window.LanaLivePoller.latestOnly.STALE) return;
   const opened = state.selectedRunId !== executionId;
   state.selectedRunId = executionId;
   state.selectedRunDetail = payload || null;

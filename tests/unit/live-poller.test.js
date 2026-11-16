@@ -1,6 +1,6 @@
 const path = require('path');
 
-const { createLivePoller, ensurePoller } = require(path.join(__dirname, '../../src/js/shared/live-poller.js'));
+const { createLivePoller, ensurePoller, latestOnly } = require(path.join(__dirname, '../../src/js/shared/live-poller.js'));
 
 function fakeDocument() {
   const listeners = {};
@@ -100,6 +100,27 @@ describe('ensurePoller: one poller per slot, replaced when its subject changes',
     const third = ensurePoller(holder, 'poller', 'run-2', create);
     expect(third).not.toBe(second);
     expect(create).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('latestOnly: a slow answer for an older request is ignored', () => {
+  test('opening run A then run B keeps B even when A answers last', async () => {
+    const guard = latestOnly();
+    let answerA;
+    const applied = [];
+    const open = (id, promise) => guard(promise).then((value) => { if (value !== latestOnly.STALE) applied.push([id, value]); });
+    const a = open('A', new Promise((resolve) => { answerA = resolve; }));
+    const b = open('B', Promise.resolve('detail-B'));
+    await b;
+    answerA('detail-A');
+    await a;
+    expect(applied).toEqual([['B', 'detail-B']]);
+  });
+
+  test('control: a single request is applied, and a failure still rejects', async () => {
+    const guard = latestOnly();
+    await expect(guard(Promise.resolve(1))).resolves.toBe(1);
+    await expect(guard(Promise.reject(new Error('gone')))).rejects.toThrow('gone');
   });
 });
 
