@@ -60,7 +60,7 @@
   // VIEW_PARENT below so the sidebar highlight stays consistent.
   // -------------------------------------------------------------------------
   var SIDEBAR_NAV_ITEMS = [
-    { id: 'catalog',  label: 'Workspace', icon: 'layout-dashboard' },
+    { id: 'catalog',  home: true }, // Dashboard, grid icon (Lex.SidebarNav.HOME)
     { id: 'activity', label: 'Outcomes',  icon: 'sparkles' }
   ];
 

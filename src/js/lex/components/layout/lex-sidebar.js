@@ -30,6 +30,8 @@
      isFooter            — pinned at the bottom above the user block
 
    Item flags:
+     home      - the app's home item: always "Dashboard" with the grid icon
+                 (Lex.SidebarNav.HOME), whatever label or icon the app passes
      isButton  — renders as <button> instead of <a>
      onClick   - global function name to call when button is clicked (e.g. 'openLanaDockNewChat')
 
@@ -40,6 +42,11 @@
   'use strict';
 
   const { LexElement, defineLex, Icons } = window.Lex;
+
+  // Every app shell's home item, defined once so the apps cannot drift: an item with
+  // home: true renders as this label and icon (the four-squares grid, never a house).
+  const HOME_NAV = Object.freeze({ label: 'Dashboard', icon: 'layout-dashboard' });
+  window.Lex.SidebarNav = Object.freeze({ HOME: HOME_NAV });
 
   let stylesInjected = false;
   const CHAT_SECTION_COLLAPSED_KEY = 'lana:sidebar:chatsCollapsed';
@@ -69,6 +76,7 @@
         --_sb-active-bg:    var(--lex-sidebar-active-bg);
         --_sb-border:       var(--lex-sidebar-border);
         --_sb-avatar-bg:    var(--lex-sidebar-avatar-bg);
+        --_sb-edge:         var(--lex-sidebar-edge, transparent);
         --_sb-avatar-text:  var(--lex-sidebar-avatar-text, #fff);
 
         position: fixed;
@@ -92,6 +100,20 @@
         .lex-sidebar-root {
           transition: transform var(--lex-transition-slide), width var(--lex-transition-slide);
         }
+      }
+
+      /* Divider against the content: a hairline in light, none in dark. Drawn above the
+         children (the footer, the scroll fades) so it runs the full height; no layout change. */
+      .lex-sidebar-root::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 1px;
+        background: var(--_sb-edge);
+        pointer-events: none;
+        z-index: 2;
       }
 
       @media (min-width: 1024px) {
@@ -1447,7 +1469,7 @@
       }
 
       .lex-sidebar-user-panel-item:hover {
-        background: var(--lex-sidebar-bg);
+        background: var(--lex-sidebar-menu-hover-bg, var(--lex-sidebar-bg));
         color: var(--lex-sidebar-text-active);
       }
 
@@ -2209,6 +2231,7 @@
     }
 
     _renderNavItem(item, isChild = false) {
+      if (item && item.home) item = Object.assign({}, item, HOME_NAV);
       // Items with children render a click-toggle group: the parent does NOT
       // navigate — clicking it expands/collapses the indented child links, and
       // a chevron on the right rotates to signal the dropdown state.

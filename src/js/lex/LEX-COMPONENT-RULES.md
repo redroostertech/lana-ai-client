@@ -971,6 +971,10 @@ Collapsible navigation sidebar with sections, items, dynamic task/workspace list
 
 **Light and dark:** follows `LexTheme` (2.9). The element carries `data-lex-theme`, which picks the light or dark `--lex-sidebar-*` set in `lex-tokens.css` (dark is the `:root` default when no theme is loaded). `logo-src` names the light logo; the light sidebar shows `logo-dark.png`. Pages with the sidebar load `lex.theme.js` in `<head>`.
 
+**Light surface and divider:** the light sidebar is white (`--lex-sidebar-bg: #FFFFFF`, the window's title bar color), so it stands apart from the off-white content. `--lex-sidebar-edge` is the 1px divider on its right edge (gray-200 in light, `transparent` in dark), drawn as a full-height `::after` above the footer and the scroll fades.
+
+**Home item:** every app shell's first nav item is its home, written `{ id: '...', home: true, href: '...' }` with no label or icon. lex-sidebar renders it from `Lex.SidebarNav.HOME`: "Dashboard" with the four-squares grid icon (`layout-dashboard`), never a house. Do not give an app's home its own label or icon.
+
 **Fast-path rendering:** Uses generation counters (`_sectionsGen`, `_menuItemsGen`) to skip full re-render when data hasn't changed. If all counters match, `render()` returns `null` to preserve dynamic sidebar state.
 
 ### `<lex-topbar>`

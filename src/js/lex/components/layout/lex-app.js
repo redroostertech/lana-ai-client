@@ -977,7 +977,7 @@
           isStaticTop: true,
           items: [
             { id: 'briefs-new', label: 'New meeting', icon: 'plus', href: 'briefs/index.html?new=1', isButton: true, variant: 'create-chat', onClick: 'briefsNewMeeting' },
-            { id: 'briefs-dashboard', label: 'Dashboard', icon: 'layout-dashboard', href: 'briefs/dashboard.html' }
+            { id: 'briefs-dashboard', home: true, href: 'briefs/dashboard.html' }
           ]
         }, {
           id: 'briefs-meetings',
@@ -999,7 +999,7 @@
           ]
         : [
             // New Chat moved into the LANA dock (rail bubble + RECENTS "+")
-            { id: 'dashboard', label: 'Dashboard', icon: 'home', href: 'dashboard.html' },
+            { id: 'dashboard', home: true, href: 'dashboard.html' }, // Dashboard, grid icon (Lex.SidebarNav.HOME)
             { id: 'library', label: 'Library', icon: 'folder', href: 'drive.html', children: [
               { id: 'library-all-sources', label: 'All Sources', href: 'drive.html' },
               { id: 'document-library', label: 'Documents', href: 'document-library.html' },

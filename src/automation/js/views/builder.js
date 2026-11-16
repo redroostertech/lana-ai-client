@@ -1293,12 +1293,12 @@ export function renderBuilder(context) {
   const editAutomationId = context.state.builder.editMode?.automationId || '';
   const breadcrumbItems = isEdit
     ? [
-        { label: 'Library', href: '#library' },
+        { label: 'Dashboard', href: '#library' },
         { label: editAutomationName, href: `#library-detail:${editAutomationId}` },
         { label: 'Edit' }
       ]
     : [
-        { label: 'Library', href: '#library' },
+        { label: 'Dashboard', href: '#library' },
         { label: 'New Automation' }
       ];
   const breadcrumb = `<lex-breadcrumb class="automations-builder-breadcrumb" items="${escapeAttribute(JSON.stringify(breadcrumbItems))}"></lex-breadcrumb>`;

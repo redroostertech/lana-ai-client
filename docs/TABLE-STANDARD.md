@@ -283,7 +283,7 @@ Status: ✓ meets the standard. ~ close. ✗ needs migration.
 | Template Library | dstTable | ✓ | Same chef branch |
 | Library (drive) | listView / filesListView | ~ / ✗ | Some scopes feed the whole set as one page plus an outside pager; the search-results table has no sort or filters |
 | Workspaces | mattersListView | ✗ | Sorts and filters one server page in the browser, outside pager, `compact`, raw status; "Created Date" label |
-| Automation: Library | libraryAutomationsTable | ✗ | Capped at `limit=100` with client sort; pre-formatted dates; raw slugs; no toolbar. Chef: the automations list ignores `page`, drops `automation_type`/`is_active`, and has no sort |
+| Automation: Dashboard | libraryAutomationsTable | ✗ | Capped at `limit=100` with client sort; pre-formatted dates; raw slugs; no toolbar. Chef: the automations list ignores `page`, drops `automation_type`/`is_active`, and has no sort |
 | Automation: Run History | automationRunsTable | ✗ | Server-paged API wrapped in a client-paged table plus outside Prev/Next; pre-formatted dates; plain-text status; matter isn't a link. The chef endpoint already pages, sorts and searches |
 | Automation: Approvals | automationApprovalsTable | ✗ | Capped at `limit=100`; priority sorts alphabetically; no badges; no Created column. Chef: the inbox has no search or sort |
 | Automation shared helper | `automation/js/shared/ui.js` `lexDataTable` | ✗ | Forces `searchable filterable compact` on every automation table |

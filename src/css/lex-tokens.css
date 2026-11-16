@@ -461,6 +461,7 @@
   --lex-sidebar-menu-hover-bg: #1D1B18;
   --lex-sidebar-warning-text: #F79009;
   --lex-sidebar-info-text:    #528BFF;
+  --lex-sidebar-edge:         transparent;
 
   /* Topbar */
   --lex-topbar-height:        64px;
@@ -1140,10 +1141,14 @@ lex-sidebar[data-lex-theme="dark"] {
   --lex-sidebar-menu-hover-bg: #1D1B18;
   --lex-sidebar-warning-text: #F79009;
   --lex-sidebar-info-text:    #528BFF;
+  --lex-sidebar-edge:         transparent;
 }
 
 lex-sidebar[data-lex-theme="light"] {
-  --lex-sidebar-bg:           var(--lex-color-gray-50);
+  /* The window's title bar color (macOS default title bar, light: #FFFFFF), so the
+     sidebar reads as its own panel next to the off-white content; the edge is its divider. */
+  --lex-sidebar-bg:           #FFFFFF;
+  --lex-sidebar-edge:         var(--lex-color-gray-200);
   --lex-sidebar-text:         var(--lex-color-gray-700);
   --lex-sidebar-text-active:  var(--lex-color-gray-900);
   --lex-sidebar-text-muted:   var(--lex-color-gray-600);

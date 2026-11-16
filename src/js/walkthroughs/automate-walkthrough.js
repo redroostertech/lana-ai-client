@@ -73,7 +73,7 @@
         eyebrow: 'All set',
         title: 'Start with ',
         accent: 'a template',
-        detail: 'Templates fill in the trigger and steps for you, so you only check the details. You can open this walkthrough again from the Library.',
+        detail: 'Templates fill in the trigger and steps for you, so you only check the details. You can open this walkthrough again from the Dashboard.',
         illustration: '<lex-brand-mark animation="success" size="170"></lex-brand-mark>',
         actions: [{ id: 'create', label: 'New automation', icon: 'plus', variant: 'primary' }],
       },

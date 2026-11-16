@@ -74,12 +74,12 @@ export const VIEW_DEFINITIONS = {
     summary: ''
   },
   library: {
-    kicker: 'Library',
-    title: 'Library',
+    kicker: 'Dashboard',
+    title: 'Dashboard',
     summary: 'Pick a template built for a common workflow, then move into the builder with the right defaults already loaded.'
   },
   'library-detail': {
-    kicker: 'Library',
+    kicker: 'Dashboard',
     title: 'Automation',
     summary: 'View steps, run history, artifacts, and settings for this automation.'
   },
@@ -101,7 +101,7 @@ export const VIEW_DEFINITIONS = {
 };
 
 export const SIDEBAR_NAV_ITEMS = [
-  { id: 'library', label: 'Library', icon: 'book-open' },
+  { id: 'library', home: true }, // the automations home: Dashboard, grid icon (Lex.SidebarNav.HOME)
   { id: 'runs', label: 'Run History', icon: 'history' },
   { id: 'approvals', label: 'Approvals', icon: 'check-circle' }
 ];

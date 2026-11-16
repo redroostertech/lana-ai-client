@@ -15,7 +15,7 @@ export function buildChecklist(context) {
       title: 'Choose a template',
       description: 'Select a workflow pattern so the builder starts with sensible defaults.',
       done: Boolean(context.state.builder.templateId),
-      actionLabel: 'Open Library',
+      actionLabel: 'Open Dashboard',
       view: 'library'
     },
     {

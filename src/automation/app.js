@@ -2305,7 +2305,7 @@ function renderUserChip() {
   if (!els.sidebar) return;
 
   // Primary nav is owned by the automation app — its own surfaces (Create
-  // + SIDEBAR_NAV_ITEMS like Library, Runs, Approvals).
+  // + SIDEBAR_NAV_ITEMS: Dashboard (the home), Runs, Approvals).
   const sections = [
     {
       id: 'main-actions',

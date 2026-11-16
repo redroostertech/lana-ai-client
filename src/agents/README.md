@@ -48,7 +48,7 @@ full-page navigation, e.g. `window.location.href = 'agents/index.html#catalog'`.
 
 | View name | URL hash | Purpose |
 |-----------|----------|---------|
-| `catalog` | `#catalog` (default) | Workspace home, agent roster, starting points, and recent outcomes. |
+| `catalog` | `#catalog` (default) | Dashboard (the Agents home), agent roster, starting points, and recent outcomes. |
 | `agentDetail` | `#agent/:slug` | View an agent's description, tools, inputs; start a run. |
 | `agentRun` | `#run/:id` | Live view of a running or completed run: streamed steps, tool calls, output. |
 | `activity` | `#activity` | Outcome-first history of all agent work. |

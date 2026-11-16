@@ -1838,7 +1838,7 @@ export function renderLibraryDetail(context) {
       body: `
         ${emptyState('No automation selected.')}
         <div class="row-actions" style="margin-top:16px;">
-          <lex-btn variant="primary" size="sm" data-ld-back>Back to Library</lex-btn>
+          <lex-btn variant="primary" size="sm" data-ld-back>Back to Dashboard</lex-btn>
         </div>
       `
     });
@@ -1853,7 +1853,7 @@ export function renderLibraryDetail(context) {
       <div class="connector-detail-shell">
         <header class="connector-detail-header">
           <div class="connector-detail-header-lead">
-            <lex-btn variant="ghost" size="sm" data-ld-back>&larr; Back to Library</lex-btn>
+            <lex-btn variant="ghost" size="sm" data-ld-back>&larr; Back to Dashboard</lex-btn>
           </div>
         </header>
         ${surface({ title: 'Loading…', body: '<div class="muted">Fetching automation details…</div>' })}
