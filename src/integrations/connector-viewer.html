@@ -416,6 +416,7 @@
   <script src="../js/menu.js"></script>
   <script src="../js/navigation-helpers.js"></script>
   <script src="../js/connectors.js"></script>
+  <script src="../js/connector-run-options.model.js"></script>
   <script src="../js/shared/connector-oauth-exchange.js"></script>
 
   <script src="../js/lex/lex.core.js"></script>
@@ -1602,8 +1603,8 @@
 
     function getRunTabModel() {
       const runBehavior = getUiBehavior().run || {};
-      const options = Array.isArray(runBehavior.options) ? runBehavior.options : [];
-      if (Object.keys(runBehavior).length) {
+      const options = LanaConnectorRunOptions.servedOptions(runBehavior);
+      if (LanaConnectorRunOptions.hasPackageRunBehavior(runBehavior)) {
         return {
           supportsDateRange: Boolean(runBehavior.supports_date_range),
           supportsValidationHarness: Boolean(runBehavior.supports_validation_harness),
@@ -1639,7 +1640,7 @@
           'After sync, use Output to search, assign, and shortlist edits instead of manually overwriting connector payloads.',
           'Use Execution Logs for server-side failures and status transitions.'
         ],
-        options: [],
+        options,
         optionsHeader: 'Advanced options',
         optionsDescription: ''
       };
