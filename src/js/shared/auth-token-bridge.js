@@ -106,13 +106,38 @@
     });
   }
 
+  // Host side, whole flow: when one of this window's iframes reports
+  // lana-auth-required, unload that frame, close the lex-modal holding it and
+  // run the page's own check. Without a check (pages that do not load
+  // auth-guard.js), go to login only when this window has no token either.
+  // Installs once per window and never in a frame.
+  function installHostAuthListener(win, runCheck) {
+    if (!win || isFramed(win) || win.__lanaFramedAuthListener) return;
+    win.__lanaFramedAuthListener = true;
+    listenForFramedAuthRequired(win, function (frame, reason) {
+      try {
+        var modal = frame.closest ? frame.closest('lex-modal') : null;
+        frame.src = 'about:blank';
+        if (modal) modal.open = false;
+      } catch (_error) { /* noop */ }
+      if (typeof runCheck === 'function') {
+        runCheck(reason);
+        return;
+      }
+      if (!getToken(win)) {
+        win.location.href = typeof win.getLoginPath === 'function' ? win.getLoginPath() : 'login.html';
+      }
+    });
+  }
+
   var api = {
     isFramed: isFramed,
     resolve: resolve,
     getToken: getToken,
     install: install,
     notifyAuthRequired: notifyAuthRequired,
-    listenForFramedAuthRequired: listenForFramedAuthRequired
+    listenForFramedAuthRequired: listenForFramedAuthRequired,
+    installHostAuthListener: installHostAuthListener
   };
 
   if (typeof module !== 'undefined' && module.exports) {

@@ -75,11 +75,17 @@
     // Auth getters
     // -----------------------------------------------------------------------
 
-    get token() { return this._token; }
+    // In a frame, api.token reads the top window's bridge on every use (api.js),
+    // so read it live too: a refresh done by the top window is picked up.
+    get token() { return this._framedApi() ? (window.api.token || null) : this._token; }
     get user() { return this._user; }
 
     get isAuthenticated() {
-      return !!this._token;
+      return !!this.token;
+    }
+
+    _framedApi() {
+      return typeof window.api !== 'undefined' && !!window.api && window.api.framed === true;
     }
 
     get isTokenExpired() {
@@ -149,7 +155,8 @@
         window.api.token = token;
         window.api.user = user;
       }
-      if (token) {
+      // A frame borrows the top window's token store; it never writes it.
+      if (token && !this._framedApi()) {
         window.lanaAuthToken?.set(token);
         localStorage.setItem('user', JSON.stringify(user));
       }
@@ -170,8 +177,12 @@
         window.api.token = null;
         window.api.user = null;
       }
-      window.lanaAuthToken?.clear();
-      localStorage.removeItem('user');
+      // A frame must not clear the top window's token store or the user
+      // record it shares through localStorage; the top window owns sign out.
+      if (!this._framedApi()) {
+        window.lanaAuthToken?.clear();
+        localStorage.removeItem('user');
+      }
 
       if (had) {
         this._emit('auth:changed', { token: null, user: null, isAuthenticated: false });
@@ -283,7 +294,10 @@
 
       var self = this;
 
-      this._interceptProperty(window.api, 'token', function (newVal) {
+      // A framed api's token is a live getter over the top window's bridge;
+      // replacing it with a fixed value would keep the old token after the top
+      // window refreshes. Leave it alone in a frame.
+      if (!this._framedApi()) this._interceptProperty(window.api, 'token', function (newVal) {
         var val = newVal || null;
         if (val !== self._token) {
           self._token = val;

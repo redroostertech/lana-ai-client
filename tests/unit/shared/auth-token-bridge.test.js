@@ -145,4 +145,57 @@ describe('auth-token-bridge', () => {
       expect(h.onAuthRequired).not.toHaveBeenCalled();
     });
   });
+
+  describe('installHostAuthListener (pages without auth-guard: index, matters)', () => {
+    function hostPage(token) {
+      const child = {};
+      const modal = { open: true };
+      const frame = { contentWindow: child, src: 'file-viewer.html?chrome=embedded', closest: (sel) => (sel === 'lex-modal' ? modal : null) };
+      const handlers = [];
+      const win = {
+        location: { href: 'file:///app/index.html', origin: 'file://' },
+        document: { querySelectorAll: (sel) => (sel === 'iframe' ? [frame] : []) },
+        addEventListener: (type, fn) => { if (type === 'message') handlers.push(fn); }
+      };
+      if (token !== undefined) win.lanaAuthToken = { get: () => token };
+      win.top = win; win.parent = win;
+      return { win, frame, modal, child, handlers, send: (e) => handlers.forEach((h) => h(e)) };
+    }
+
+    test('closes the frame modal and, with no token on the host, goes to login', () => {
+      const h = hostPage(null);
+      Bridge.installHostAuthListener(h.win);
+      h.send({ source: h.child, data: { type: 'lana-auth-required', reason: 'missing' } });
+      expect(h.modal.open).toBe(false);
+      expect(h.frame.src).toBe('about:blank');
+      expect(h.win.location.href).toBe('login.html');
+    });
+
+    test('with a token on the host, closes the modal and stays', () => {
+      const h = hostPage('host-token');
+      Bridge.installHostAuthListener(h.win);
+      h.send({ source: h.child, data: { type: 'lana-auth-required', reason: 'expired' } });
+      expect(h.modal.open).toBe(false);
+      expect(h.win.location.href).toBe('file:///app/index.html');
+    });
+
+    test('uses the page check when given, installs once, and ignores strangers', () => {
+      const h = hostPage('host-token');
+      const check = jest.fn();
+      Bridge.installHostAuthListener(h.win, check);
+      Bridge.installHostAuthListener(h.win, check);
+      expect(h.handlers).toHaveLength(1);
+      h.send({ source: {}, data: { type: 'lana-auth-required' } });
+      expect(check).not.toHaveBeenCalled();
+      h.send({ source: h.child, data: { type: 'lana-auth-required' } });
+      expect(check).toHaveBeenCalledTimes(1);
+    });
+
+    test('does nothing in a framed window', () => {
+      const h = hostPage('x');
+      h.win.top = {};
+      Bridge.installHostAuthListener(h.win);
+      expect(h.handlers).toHaveLength(0);
+    });
+  });
 });

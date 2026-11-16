@@ -100,18 +100,9 @@
   // citation viewer, Doc Studio preview) hears lana-auth-required from its
   // own child frames only, closes that frame's modal and runs its own check,
   // which handles sign-in normally.
-  function onFramedAuthRequired(frame) {
-    try {
-      var modal = frame.closest ? frame.closest('lex-modal') : null;
-      frame.src = 'about:blank';
-      if (modal) modal.open = false;
-    } catch (_e) { /* noop */ }
-    checkAuth(0);
-  }
   function installFramedAuthListener() {
-    if (!Bridge || isFramed() || window.__lanaFramedAuthListener) return;
-    window.__lanaFramedAuthListener = true;
-    Bridge.listenForFramedAuthRequired(window, onFramedAuthRequired);
+    if (!Bridge) return;
+    Bridge.installHostAuthListener(window, function () { checkAuth(0); });
   }
 
   // Session policy redirects (belt-and-suspenders): a user who already has a
@@ -194,7 +185,7 @@
     }
   } catch (_e) { /* noop */ }
 
-  // Host listener for lana-auth-required (see onFramedAuthRequired above).
+  // Host listener for lana-auth-required (see installFramedAuthListener above).
   if (Bridge) {
     installFramedAuthListener();
   } else {
