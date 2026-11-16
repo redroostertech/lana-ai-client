@@ -201,6 +201,16 @@
   }
 
   /**
+   * What the progress page shows for a buildProgressView() result. Done (ready): one centered
+   * sign-in button takes the card's place and the corner button hides, so there is only one
+   * way on. Anything else (running, paused, failed): the card, with the corner button.
+   */
+  function progressLayout(view) {
+    var done = Boolean(view && view.phase === 'ready');
+    return { card: !done, signIn: done, cornerNext: !done };
+  }
+
+  /**
    * The "already on this computer" choice. found: electron-first-launch.js findExisting()
    * ({ id, kind, name, bytes, source }). Null when nothing usable was found.
    */
@@ -353,6 +363,7 @@
     computerLine: computerLine,
     buildChoiceView: buildChoiceView,
     buildProgressView: buildProgressView,
+    progressLayout: progressLayout,
     buildFoundView: buildFoundView,
     createFirstLaunchController: createFirstLaunchController
   };

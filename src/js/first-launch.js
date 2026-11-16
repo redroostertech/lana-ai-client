@@ -154,6 +154,30 @@
     var mark = $('fl-mark');
     if (mark && mark.animation !== view.mark) {mark.animation = view.mark;}
     applyHeader(view.header);
+    applyLayout(model.progressLayout(view));
+  }
+
+  /** Done: the centered sign-in button replaces the card and the corner button hides. */
+  function applyLayout(layout) {
+    var done = $('fl-done');
+    var appearing = layout.signIn && done && done.hidden;
+    show($('fl-progress-card'), layout.card);
+    show(done, layout.signIn);
+    var corner = tour.querySelector('[data-walkthrough="next"]');
+    if (corner) {
+      corner.classList.toggle('is-hidden', !layout.cornerNext);
+      corner.disabled = !layout.cornerNext;
+    }
+    // Focus it when it appears, so Enter goes on (the tour itself takes no keys). Two frames
+    // on: a newly opened tour focuses its dialog in the next frame (lex-walkthrough connected).
+    if (appearing) {
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          var inner = done.querySelector('button');
+          if (inner && !done.hidden) {inner.focus({ preventScroll: true });}
+        });
+      });
+    }
   }
 
   /** The walkthrough page's eyebrow, headline and line, for the current setup state. */
@@ -235,7 +259,7 @@
   function onClick(event) {
     var button = event.target.closest && event.target.closest('lex-btn');
     if (!button) {return;}
-    if (button.id === 'fl-found-next') {tour.next();}
+    if (button.id === 'fl-found-next' || button.id === 'fl-done-signin') {tour.next();}
     else if (button.id === 'fl-choose-toggle') {
       choicesOpen = !choicesOpen;
       fill();

@@ -211,6 +211,31 @@
   color: #fca5a0;
 }
 
+/* Progress page, done: the one sign-in button, centered where the card was. It is the page's
+   main way on, so the Lex primary button takes the tour's green (the "ready." word and the
+   dots) with white text, and is larger than the standard lg size. Lex primary reads these
+   accent tokens; hover is the same green, deeper. */
+.fl-done {
+  display: flex;
+  justify-content: center;
+  --lex-bg-accent: var(--app-tour-accent);
+  --lex-bg-accent-hover: color-mix(in srgb, var(--app-tour-accent) 85%, black);
+  --lex-text-on-accent: var(--lex-color-white);
+}
+
+/* Dark: the tour green is lighter there, too light for white text, so the fill is that green
+   deepened to keep white text readable (about 5:1). */
+[data-lex-theme="dark"] .fl-done {
+  --lex-bg-accent: color-mix(in srgb, var(--app-tour-accent) 60%, black);
+  --lex-bg-accent-hover: color-mix(in srgb, var(--app-tour-accent) 50%, black);
+}
+
+.fl-done .lex-btn-inner {
+  min-width: calc(var(--lex-space-2xl) * 7.5);
+  min-height: calc(var(--lex-space-2xl) + var(--lex-space-lg));
+  font-weight: var(--lex-weight-semibold);
+}
+
 /* Welcome page: what was found, with the button that moves on. */
 .fl-found-cta {
   display: flex;

@@ -129,6 +129,9 @@
             <lex-btn id="fl-retry" variant="secondary" size="sm" leading-icon="refresh-cw" hidden>Try again</lex-btn>
           </div>
         </div>
+        <div id="fl-done" class="fl-done" hidden>
+          <lex-btn id="fl-done-signin" variant="primary" size="lg" label="${(exit || SIGN_IN).label}"></lex-btn>
+        </div>
         <p id="fl-progress-note" class="fl-note"></p>`
     };
   }

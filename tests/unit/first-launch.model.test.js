@@ -162,6 +162,19 @@ describe('the progress part', () => {
   });
 });
 
+describe('the progress page layout (done vs still going)', () => {
+  test('done: one centered sign-in button replaces the card, and the corner button hides', () => {
+    expect(fl.progressLayout(fl.buildProgressView({ phase: 'ready', receivedBytes: 10, totalBytes: 10 }))).toEqual({ card: false, signIn: true, cornerNext: false });
+  });
+
+  test('running, paused or failed: the card as before, with the corner button and no centered one', () => {
+    ['idle', 'downloading', 'checking', 'paused', 'failed'].forEach((phase) => {
+      expect(fl.progressLayout(fl.buildProgressView({ phase, totalBytes: 1 }))).toEqual({ card: true, signIn: false, cornerNext: true });
+    });
+    expect(fl.progressLayout(null)).toEqual({ card: true, signIn: false, cornerNext: true });
+  });
+});
+
 describe('files already on this computer', () => {
   test('one file: named, with the space it saves', () => {
     const view = fl.buildFoundView([{ id: 'qwen3.5-9b-q4', kind: 'chat', name: 'Qwen3.5 9B', bytes: 5627044256, source: 'Pip' }]);
