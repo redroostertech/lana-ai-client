@@ -965,25 +965,8 @@
       task.workspaceName ||
       (task.matter && (task.matter.matter_name || task.matter.name)) ||
       (task.workspace && task.workspace.name) ||
-      splitDashboardTaskTitle(task.title || task.name || task.task_title || '').matterName ||
       ''
     );
-  }
-
-  function splitDashboardTaskTitle(title) {
-    var value = String(title || '').trim();
-    var separators = [' — ', ' – ', ' - '];
-    for (var i = 0; i < separators.length; i += 1) {
-      var separator = separators[i];
-      var index = value.lastIndexOf(separator);
-      if (index > 0 && index < value.length - separator.length) {
-        return {
-          taskTitle: value.slice(0, index).trim(),
-          matterName: value.slice(index + separator.length).trim()
-        };
-      }
-    }
-    return { taskTitle: value, matterName: '' };
   }
 
   function renderDashboardTaskMatterKv(task, matterName) {
