@@ -74,3 +74,14 @@ describe('Needs review', () => {
     expect(B.mergeStart({ desktop: null, phone: null })).toBe('');
   });
 });
+
+describe('a meeting that went to the phone without audio', () => {
+  const B2 = require('../../../src/js/briefs/briefs-share');
+  test('the phone row says so in one plain line, only when it holds the meeting', () => {
+    const phone = { id: 'p1', name: 'Dana phone', shared: true, queued: false, declinedAt: null, snoozedAt: null, lastSyncedAt: '2026-11-15T10:00:00Z', audioWithheld: true };
+    expect(B2.phoneRow(phone).note).toBe('This meeting went to Dana phone without audio because LANA could not take the set-aside parts out.');
+    expect(B2.phoneRow({ ...phone, audioWithheld: false }).note).toBeUndefined();
+    expect(B2.phoneRow({ ...phone, queued: true }).note).toBeUndefined();
+    expect(B2.phoneRow({ ...phone, name: '' }).note).toBe('This meeting went to your phone without audio because LANA could not take the set-aside parts out.');
+  });
+});

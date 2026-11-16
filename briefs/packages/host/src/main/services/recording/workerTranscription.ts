@@ -1,5 +1,5 @@
 import { Worker } from "node:worker_threads";
-import { MeetingTranscriber, unpackPcm, type TranscriptionModelPaths } from "@lana/core/recording";
+import { MeetingTranscriber, unpackPcm, type TranscriptionModelPaths, type VocabularyEntry } from "@lana/core/recording";
 import type { MeetingTranscription } from "./recordingService.js";
 import type { WorkerReply, WorkerRequest } from "./transcriptionProtocol.js";
 
@@ -11,7 +11,7 @@ import type { WorkerReply, WorkerRequest } from "./transcriptionProtocol.js";
 export class WorkerTranscription implements MeetingTranscription {
   constructor(private readonly script: URL) {}
 
-  transcribe(models: TranscriptionModelPaths, pcm: Uint8Array[], progress: (fraction: number) => void) {
+  transcribe(models: TranscriptionModelPaths, pcm: Uint8Array[], progress: (fraction: number) => void, vocabulary: readonly VocabularyEntry[] = []) {
     return new Promise<{ speakers: WorkerReplyDone["speakers"]; transcript: WorkerReplyDone["transcript"] }>((resolve, reject) => {
       const worker = new Worker(this.script);
       let settled = false;
@@ -30,7 +30,7 @@ export class WorkerTranscription implements MeetingTranscription {
       worker.on("exit", () => settle(() => reject(new Error("transcription_worker_exited"))));
       // Copies into transferable buffers, so the journal's records are not held twice.
       const buffers = pcm.map((record) => record.slice().buffer);
-      const request: WorkerRequest = { models, pcm: buffers };
+      const request: WorkerRequest = { models, pcm: buffers, vocabulary: [...vocabulary] };
       worker.postMessage(request, buffers);
     });
   }
@@ -40,7 +40,7 @@ type WorkerReplyDone = Extract<WorkerReply, { type: "done" }>;
 
 /** The same work in this thread (tests and the opt-in integration run). */
 export class InProcessTranscription implements MeetingTranscription {
-  async transcribe(models: TranscriptionModelPaths, pcm: Uint8Array[], progress: (fraction: number) => void) {
-    return new MeetingTranscriber({ models }).transcribe(unpackPcm(pcm), progress);
+  async transcribe(models: TranscriptionModelPaths, pcm: Uint8Array[], progress: (fraction: number) => void, vocabulary: readonly VocabularyEntry[] = []) {
+    return new MeetingTranscriber({ models }).transcribe(unpackPcm(pcm), progress, vocabulary);
   }
 }

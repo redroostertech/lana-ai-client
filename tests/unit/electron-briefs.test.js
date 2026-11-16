@@ -371,3 +371,19 @@ describe('pages asking whether Briefs runs', () => {
     expect(briefs.isRunning()).toBe(false);
   });
 });
+
+describe('pages that loaded before Briefs started', () => {
+  test('every open window is told when Briefs starts, so its tone player can switch on', async () => {
+    const sent = [];
+    const window = fakeWindow();
+    window.webContents.send = (channel) => sent.push(channel);
+    const app = new (require('events').EventEmitter)();
+    Object.assign(app, { getPath: (name) => `/tmp/${name}`, isPackaged: false, quit: jest.fn() });
+    const { createBriefs: make, STARTED_CHANNEL } = require('../../electron-briefs');
+    const module = { startBriefsHost: async () => ({ addWebContents() {}, focused() {}, blurred() {}, restore: async () => {}, stop: async () => {}, sessionChanged() {}, endSession: async () => {} }) };
+    const wired = make({ electron: { app, session: { defaultSession: {} } }, ipcMain: { handle() {} }, loadHost: () => module, distDir: '/d', engineBase: () => null, apiBase: () => 'http://e', getServer: () => null, getToken: () => ALICE, getWindows: () => [window], showWindow() {}, log: { info() {}, warn() {}, error() {} } });
+    expect(STARTED_CHANNEL).toBe('briefs:started');
+    await wired.sync(enabled);
+    expect(sent).toContain('briefs:started');
+  });
+});

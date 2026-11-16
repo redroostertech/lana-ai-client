@@ -66,7 +66,11 @@ function params(candidate: CandidateIntent): IntentParams {
         due = undefined;
       }
       const assignee = candidate.assigneeHint === undefined ? undefined : trimWhitespace(candidate.assigneeHint);
-      return { type: "task.create", task: { title, detail: body, dueDate: due, assigneeHint: assignee === "" ? undefined : assignee, regarding } };
+      const spoken = candidate.dueText === undefined ? "" : trimWhitespace(candidate.dueText);
+      return {
+        type: "task.create",
+        task: { title, detail: body, dueDate: due, ...(spoken === "" ? {} : { dueText: spoken }), assigneeHint: assignee === "" ? undefined : assignee, regarding },
+      };
     }
     case "email.draft": {
       const to = candidate.recipients.map(trimWhitespace).filter((value) => value !== "").map(recipient);

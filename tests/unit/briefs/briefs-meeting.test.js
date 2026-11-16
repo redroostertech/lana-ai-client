@@ -148,3 +148,60 @@ describe('the person\'s notes', () => {
     expect(M.limitNote('short')).toBe('short');
   });
 });
+
+// Briefs notes fixes: set-aside parts, speaker names, who decided. Synthetic data only.
+describe('set-aside parts on the meeting page', () => {
+  const parts = [{ start: 1318, end: 1569, reason: 'phone_call', speakers: ['S1', 'S3'] }, { start: 1949, end: 2100, reason: 'other_matter', speakers: [] }];
+
+  test('the notice counts parts and minutes', () => {
+    expect(M.setAsideSummary(parts)).toBe('LANA set aside 2 parts, 7 minutes');
+    expect(M.setAsideSummary([{ start: 0, end: 25, reason: 'logistics' }])).toBe('LANA set aside 1 part, 1 minute');
+    expect(M.setAsideSummary([])).toBe('');
+  });
+
+  test('each part reads as its range and why', () => {
+    expect(M.setAsideLabel(parts[0])).toBe('21:58 to 26:09, phone call');
+    expect(M.setAsideLabel(parts[1])).toBe('32:29 to 35:00, another matter');
+    expect(M.reasonLabel('logistics')).toBe('meeting setup');
+    expect(M.reasonLabel('side_conversation')).toBe('side conversation');
+  });
+
+  test('transcript lines inside a part are marked', () => {
+    const lines = [line(1300, 1318), line(1318, 1400), line(1400, 1569), line(1569, 1600), line(1560, 1580)];
+    expect([...M.setAsideLines(parts, lines)]).toEqual([1, 2]);
+  });
+});
+
+describe('speaker names and who decided', () => {
+  test('asks for names only while a speaker in the meeting has none', () => {
+    expect(M.speakersNotice({ speakersNamed: false, unnamedSpeakers: ['S3'] }, true)).toBe('1 speaker has no name yet (S3). Name them in the transcript, then write the notes again.');
+    expect(M.speakersNotice({ speakersNamed: false, unnamedSpeakers: ['S2', 'S3'] }, true)).toBe('2 speakers have no names yet (S2, S3). Name them in the transcript, then write the notes again.');
+    expect(M.speakersNotice({ speakersNamed: false, unnamedSpeakers: ['S3'] }, false)).toBe('1 speaker has no name yet (S3). Name them in the transcript so notes and exports use names.');
+    expect(M.speakersNotice({ speakersNamed: true, unnamedSpeakers: [] }, true)).toBe('');
+    expect(M.speakersNotice({ unnamedSpeakers: [] }, true)).toBe('');
+    expect(M.speakersNotice({}, true)).toBe('');
+  });
+
+  test('a decision says who decided, by name', () => {
+    const record = { speakers: [{ id: 'S1', name: 'Dana Reyes' }] };
+    expect(M.decidedByText(record, { kind: 'decision', decidedBy: 'S1' })).toBe('Decided by Dana Reyes');
+    expect(M.decidedByText(record, { kind: 'decision', decidedBy: null })).toBe('');
+    expect(M.decidedByText(record, { kind: 'summary', decidedBy: 'S1' })).toBe('');
+  });
+});
+
+describe('same name on two labels', () => {
+  test('the meeting facts list the name once', () => {
+    const record = { durationSeconds: 600, speakers: [{ id: 'S1', name: 'Dana Reyes' }, { id: 'S5', name: 'Dana Reyes' }, { id: 'S2', name: 'Omar Haddad' }], attestationMethod: 'recordedHere', consent: 'announced' };
+    expect(M.facts(record)).toContain('Dana Reyes, Omar Haddad.');
+  });
+});
+
+describe('who set a part aside', () => {
+  test('LANA and the person are counted apart, LANA first, only the lines that apply', () => {
+    expect(M.setAsideSummary([{ start: 0, end: 240, reason: 'phone_call' }, { start: 300, end: 360, reason: 'other_matter' }, { start: 400, end: 460, reason: 'other_matter', by: 'person' }]))
+      .toBe('LANA set aside 2 parts, 5 minutes. You set aside 1 part, 1 minute');
+    expect(M.setAsideSummary([{ start: 400, end: 460, reason: 'other_matter', by: 'person' }])).toBe('You set aside 1 part, 1 minute');
+    expect(M.setAsideSummary([{ start: 0, end: 25, reason: 'logistics' }])).toBe('LANA set aside 1 part, 1 minute');
+  });
+});

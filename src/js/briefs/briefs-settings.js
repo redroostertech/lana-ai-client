@@ -87,7 +87,43 @@
     return SHOWN_MODELS.filter((id) => status[id]).map((id) => modelRow(status[id]));
   }
 
-  const api = { retentionChoices, leaseChoices, proximityRows, badgeColor, modelRows, daysLabel, hoursLabel };
+  // ── Meeting word list ─────────────────────────────────
+  // The host keeps the list (preferences.setVocabulary) and its limits; these only shape rows
+  // and the edits the person types.
+
+  const TERM_LIMIT = 60;
+
+  function cleanTerm(text) {
+    return String(text == null ? '' : text).replace(/\s+/g, ' ').trim().slice(0, TERM_LIMIT).trim();
+  }
+
+  /** One row per name: the name and how else it is heard. */
+  function vocabularyRows(list) {
+    return (list || []).map((entry) => {
+      const heard = (entry.alsoHeardAs || []).filter(Boolean);
+      return { term: entry.term, detail: heard.length > 0 ? `Also heard as: ${heard.join(', ')}` : '' };
+    });
+  }
+
+  /** The list with a new name (heard-as spellings comma separated), or the line to show instead. */
+  function addVocabularyTerm(list, term, heardText) {
+    const current = list || [];
+    const name = cleanTerm(term);
+    if (name === '') return { list: current, error: 'Type a name to add.' };
+    const existing = current.find((entry) => entry.term.toLowerCase() === name.toLowerCase());
+    if (existing) return { list: current, error: `${existing.term} is already on the list.` };
+    const heard = String(heardText == null ? '' : heardText).split(',').map(cleanTerm).filter(Boolean);
+    return { list: current.concat([{ term: name, alsoHeardAs: heard }]), error: null };
+  }
+
+  function removeVocabularyTerm(list, term) {
+    return (list || []).filter((entry) => entry.term !== term);
+  }
+
+  const api = {
+    retentionChoices, leaseChoices, proximityRows, badgeColor, modelRows, daysLabel, hoursLabel,
+    vocabularyRows, addVocabularyTerm, removeVocabularyTerm,
+  };
   global.BriefsSettings = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

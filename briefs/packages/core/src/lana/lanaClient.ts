@@ -116,6 +116,27 @@ export class LanaClient {
     });
   }
 
+  // MARK: - Connectors
+
+  /**
+   * The display names of the firm's connected systems (`GET /api/v1/integrations/connectors`),
+   * which seed the meeting word list. Names only; nothing else is read.
+   */
+  async connectorNames(): Promise<string[]> {
+    const object = await this.read("/api/v1/integrations/connectors");
+    const connectors = object["connectors"] ?? object["data"];
+    if (!Array.isArray(connectors)) throw new LanaError("invalidResponse");
+    return connectors.flatMap((item) => {
+      const row = asRecord(item);
+      if (row === null) return [];
+      // Only systems the firm actually connected: no disconnected, failed or catalog rows.
+      const status = (text(row["status"]) ?? text(row["auth_status"]) ?? "").toLowerCase();
+      if (status !== "" && !["active", "connected", "authorized", "authenticated", "healthy", "syncing", "ok"].includes(status)) return [];
+      const name = text(row["display_name"]) ?? text(row["name"]);
+      return name === null ? [] : [name];
+    });
+  }
+
   // MARK: - Tasks
 
   /** Creates a task on the matter. Sent once; a failure may still have landed (see `LanaError.isAmbiguous`). */

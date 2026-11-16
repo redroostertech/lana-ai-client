@@ -10,6 +10,8 @@ import type { JsonObject, JsonValue } from "../json/jsonValue.js";
 import { LanaDate } from "../json/lanaDate.js";
 import { parseJson } from "../json/parse.js";
 import { asBytes, asDate, asObject, asString, field } from "../json/read.js";
+import { decodeVocabulary, encodeVocabulary } from "../gateway/vocabularySettings.js";
+import type { VocabularyEntry } from "../recording/meetingVocabulary.js";
 import { HandoffError } from "./errors.js";
 
 export const ACCOUNT_INFO_SCHEMA = "lana.account-info/v1";
@@ -23,6 +25,11 @@ export interface AccountInfo {
   readonly email: string;
   readonly organization: string;
   readonly serverHost: string;
+  /**
+   * The firm's word list (Settings), so the phone's transcripts and notes spell the same names.
+   * Optional `vocabulary` in the sealed body; older phones ignore it. Omitted when empty.
+   */
+  readonly vocabulary?: readonly VocabularyEntry[] | undefined;
 }
 
 /**
@@ -40,7 +47,11 @@ export interface AccountInfoUpdate {
 }
 
 export function encodeAccountInfo(account: AccountInfo): JsonObject {
-  return { name: account.name, email: account.email, organization: account.organization, server_host: account.serverHost };
+  const vocabulary = account.vocabulary ?? [];
+  return {
+    name: account.name, email: account.email, organization: account.organization, server_host: account.serverHost,
+    vocabulary: vocabulary.length === 0 ? undefined : encodeVocabulary(vocabulary),
+  };
 }
 
 export function decodeAccountInfo(value: JsonValue, path = "account"): AccountInfo {
@@ -50,7 +61,13 @@ export function decodeAccountInfo(value: JsonValue, path = "account"): AccountIn
     email: field(object, "email", path, asString),
     organization: field(object, "organization", path, asString),
     serverHost: field(object, "server_host", path, asString),
+    ...vocabularyOf(object["vocabulary"]),
   };
+}
+
+function vocabularyOf(value: JsonValue | undefined): { vocabulary?: VocabularyEntry[] } {
+  const vocabulary = decodeVocabulary(value);
+  return vocabulary.length === 0 ? {} : { vocabulary };
 }
 
 export function encodeAccountInfoUpdate(update: AccountInfoUpdate): JsonObject {

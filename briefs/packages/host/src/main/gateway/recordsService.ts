@@ -1,12 +1,13 @@
 import type { HandoffGateway } from "@lana/core/gateway";
 import { parseLanaId, type LanaId } from "@lana/core/ids";
 import {
-  decodeIntent, removingClip, savingClip, titleOf,
+  decodeIntent, removingClip, savingClip, SET_ASIDE_REASONS, titleOf, type SetAsideReason,
   type MeetingRecord, type RecordConflict, type TranscriptClip as CoreClip,
 } from "@lana/core/intent";
 import { randomUUID } from "node:crypto";
 import type { JsonValue } from "@lana/core/json";
 import { EDITABLE_STATUSES, StoreError } from "@lana/core/store";
+import { addingSetAside } from "@lana/core/summarizer";
 import type {
   CancelSendView, ConflictChoiceView, DraftCard, DraftKind, LanaEvent, RecordConflictView, RecordsApi, Result, SharedRecordView, TranscriptClip,
 } from "../../shared/api.js";
@@ -121,6 +122,43 @@ export class RecordsService implements RecordsApi {
     }));
   }
 
+  // MARK: - Set-aside parts
+
+  /**
+   * Puts a set-aside part back in the meeting (the part starting at `start`): it leaves the
+   * shared record's set_aside, which a rewrite of the notes keeps as the person's list.
+   */
+  async restoreSetAside(meetingID: string, start: number): Promise<Result<null>> {
+    return this.run(meetingID, (id) => {
+      const record = this.gateway.store.shared.current(id);
+      const part = (record.notes.setAside ?? []).find((item) => Math.abs(item.start - Number(start)) < 0.01);
+      if (part === undefined) throw new InvalidRecordInput("That part is no longer set aside.");
+      this.gateway.store.shared.edit(id, (current) => ({
+        ...current,
+        notes: { ...current.notes, setAside: (current.notes.setAside ?? []).filter((item) => Math.abs(item.start - part.start) >= 0.01) },
+      }));
+      this.changed(id, "records.set_aside_restored");
+      return null;
+    });
+  }
+
+  /** Sets transcript lines `first` to `last` (0-based) aside: they leave the notes and every export. */
+  async setAside(meetingID: string, first: number, last: number, reason: SetAsideReason): Promise<Result<null>> {
+    return this.run(meetingID, (id) => {
+      if (!(SET_ASIDE_REASONS as readonly string[]).includes(String(reason))) throw new InvalidRecordInput("Choose why this part is set aside.");
+      const record = this.gateway.store.shared.current(id);
+      const lines = record.transcript.slice(Math.min(Number(first), Number(last)), Math.max(Number(first), Number(last)) + 1);
+      if (!Number.isInteger(Number(first)) || !Number.isInteger(Number(last)) || lines.length === 0 || Number(first) < 0) throw new InvalidRecordInput("Choose lines in the transcript.");
+      const part = { start: Math.min(...lines.map((line) => line.start)), end: Math.max(...lines.map((line) => line.end)), reason, by: "person" as const };
+      this.gateway.store.shared.edit(id, (current) => ({
+        ...current,
+        notes: { ...current.notes, setAside: addingSetAside(current.notes.setAside ?? [], part, current.transcript) },
+      }));
+      this.changed(id, "records.set_aside_added");
+      return null;
+    });
+  }
+
   // MARK: - Clips
 
   async saveClip(meetingID: string, first: number, last: number): Promise<Result<TranscriptClip>> {
@@ -230,6 +268,7 @@ export class RecordsService implements RecordsApi {
     const declined = new Map(store.shared.declined(id).map((entry) => [entry.phoneDeviceID, entry.declinedAt.toISOString()] as const));
     const snoozed = new Map(store.shared.snoozed(id).map((entry) => [entry.phoneDeviceID, entry.snoozedAt.toISOString()] as const));
     const synced = store.shared.lastSynced(id);
+    const withheld = new Set(store.shared.audioWithheld(id));
     return {
       meetingID: id,
       revision: record.sync?.revision ?? 0,
@@ -248,6 +287,7 @@ export class RecordsService implements RecordsApi {
         declinedAt: declined.get(device.keys.deviceID) ?? null,
         snoozedAt: snoozed.get(device.keys.deviceID) ?? null,
         lastSyncedAt: synced.get(device.keys.deviceID)?.toISOString() ?? null,
+        ...(withheld.has(device.keys.deviceID) ? { audioWithheld: true } : {}),
       })),
     };
   }

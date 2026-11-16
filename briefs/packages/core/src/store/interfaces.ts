@@ -31,6 +31,8 @@ export interface OutgoingRecord {
   readonly audio: readonly { readonly name: string; readonly data: Uint8Array }[];
   /** Queued with "Send to phone" and new to the phone (it did not list it). */
   readonly queued?: boolean;
+  /** The audio could not have its set-aside parts taken out, so the meeting goes without audio. */
+  readonly audioWithheld?: boolean;
 }
 
 /** Shared meeting records, desktop side (protocol 2). Implemented by the gateway store. */

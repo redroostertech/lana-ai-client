@@ -34,8 +34,9 @@ function fakeFiles(picked: string | null) {
   return files;
 }
 
-function audioSource(parts: Array<{ name: string; data: number[] }>) {
+function audioSource(parts: Array<{ name: string; data: number[] | Uint8Array }>, setAside: Array<{ start: number; end: number }> = []) {
   return {
+    setAside: vi.fn(() => setAside),
     audioParts: vi.fn(() => parts.map((part, index) => ({ index, name: part.name, byteCount: part.data.length }))),
     audioData: vi.fn((_id: unknown, index: number) => new Uint8Array(parts[index]!.data)),
   };
@@ -192,5 +193,32 @@ describe("pdfRenderer", () => {
     expect(existsSync(loaded)).toBe(false);
     expect(readdirSync(temp)).toEqual([]);
     rmSync(temp, { recursive: true, force: true });
+  });
+
+  it("cuts set-aside parts out of the audio it saves, leaving out a part that is all set aside (synthetic audio)", async () => {
+    const { muxM4a, parseM4a } = await import("@lana/core/recording");
+    const frames = (count: number, from: number) => Array.from({ length: count }, (_, index) => new Uint8Array([0x21, from + index, 7]));
+    const first = muxM4a({ sampleRate: 48_000, channels: 1, frames: frames(100, 0) });
+    const second = muxM4a({ sampleRate: 48_000, channels: 1, frames: frames(100, 100) });
+    const written: Array<{ path: string; data: Uint8Array }> = [];
+    const files = fakeFiles(join(folder, "a.m4a"));
+    // Set aside from the middle of part one through all of part two.
+    const source = audioSource([{ name: "seg-0000.m4a", data: first }, { name: "seg-0001.m4a", data: second }], [{ start: 1.0, end: 10 }]);
+    const service = new MeetingExportService(source, files, fakeLog().log, async (path, data) => void written.push({ path, data: data as Uint8Array }));
+    const result = await service.save(request({ kind: "audio" }));
+    expect(result).toEqual({ ok: true, value: { fileID: expect.any(String), files: 1 } });
+    expect(written.map((item) => item.path)).toEqual([join(folder, "a.m4a")]);
+    const kept = parseM4a(written[0]!.data);
+    expect(kept.duration).toBeCloseTo(1.0, 1);
+    expect(kept.frames.every((frame) => frame[1]! < 100)).toBe(true);
+  });
+
+  it("does not save audio it cannot cut while parts are set aside", async () => {
+    const files = fakeFiles(join(folder, "a.m4a"));
+    const written: string[] = [];
+    const service = new MeetingExportService(audioSource([{ name: "seg-0000.m4a", data: [1, 2, 3] }], [{ start: 0, end: 5 }]), files, fakeLog().log, async (path) => void written.push(path));
+    const result = await service.save(request({ kind: "audio" }));
+    expect(result).toEqual({ ok: false, error: { code: "io", message: "LANA could not take the set-aside parts out of this audio, so it was not saved." } });
+    expect(written).toEqual([]);
   });
 });

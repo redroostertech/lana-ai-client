@@ -1,6 +1,6 @@
 import { hostname } from "node:os";
 import { join } from "node:path";
-import { GatewayOpenError, HandoffGateway, ToneBridge } from "@lana/core/gateway";
+import { GatewayOpenError, HandoffGateway, ToneBridge, loadVocabulary } from "@lana/core/gateway";
 import type { LanaSessionAccess } from "@lana/core/lana";
 import { createSealedFileKeyVault, KeyVaultError, safeStorageSealer, type KeyVault, type SafeStorageLike } from "@lana/core/keys";
 import type { GatewayStore } from "@lana/core/store";
@@ -132,7 +132,13 @@ export async function openGatewayRuntime(options: GatewayRuntimeOptions): Promis
     if (!signedIn) void gateway.revokeLeasesOnSignOut().catch(() => log.error("gateway.lease_revoke_failed"));
   });
   // The paired phone shows who is signed in here (display only; it never signs in).
-  gateway.setAccountInfoSource(() => session.accountInfo());
+  // The meeting word list (Settings) rides in the same sealed account info, so the phone spells the same names.
+  gateway.setAccountInfoSource(() => {
+    const info = session.accountInfo();
+    if (info === null) return null;
+    const vocabulary = loadVocabulary(gateway.store.settings);
+    return vocabulary.length === 0 ? info : { ...info, vocabulary };
+  });
   const devices = new GatewayBridge(gateway, session, toneBridge, emit, log);
   const meetings = new MeetingsBridge(gateway.store, log);
   const records = new RecordsService(gateway, emit, log);

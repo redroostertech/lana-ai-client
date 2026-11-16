@@ -27,12 +27,18 @@ export const DEFAULT_SUMMARY_LIMITS: SummaryLimits = {
   noteSimilarityThreshold: 0.8,
 };
 
+const SUMMARY_BULLETS_PER_CHUNK = 3;
+
 /** A verified point before ids are assigned. */
 export interface DraftPoint {
   readonly kind: KeyPointKind;
   readonly text: string;
   readonly sources: readonly SourceSpan[];
   readonly precision: KeyPointPrecision;
+  /** For a decision: the speaker label of who decided. */
+  readonly decidedBy?: string | undefined;
+  /** The transcript part it came from, so a capped list keeps points from every part. */
+  readonly chunk?: number | undefined;
 }
 
 const WHITESPACE = /^[\s\u0085​]+|[\s\u0085​]+$/gu;
@@ -65,8 +71,12 @@ export function unionSpans(left: readonly SourceSpan[], right: readonly SourceSp
 }
 
 /** Near-identical points of one kind merge (keeping every source), each kind is capped, then numbered `kp-1`... */
-export function reduceKeyPoints(drafts: readonly DraftPoint[], gaps: readonly NotesGap[], limits: SummaryLimits = DEFAULT_SUMMARY_LIMITS): MeetingNotes {
-  const merged: Array<{ kind: KeyPointKind; text: string; sources: SourceSpan[]; precision: KeyPointPrecision }> = [];
+/**
+ * `chunkCount`: a longer meeting keeps more key points, three per transcript part and never
+ * fewer than `maxSummaryBullets` (otherwise the first parts crowd out the rest).
+ */
+export function reduceKeyPoints(drafts: readonly DraftPoint[], gaps: readonly NotesGap[], limits: SummaryLimits = DEFAULT_SUMMARY_LIMITS, chunkCount = 0): MeetingNotes {
+  const merged: Array<{ kind: KeyPointKind; text: string; sources: SourceSpan[]; precision: KeyPointPrecision; decidedBy?: string | undefined; chunk?: number | undefined }> = [];
   for (const raw of drafts) {
     const text = raw.text.replace(WHITESPACE, "");
     if (text === "" || raw.sources.length === 0) continue;
@@ -75,15 +85,53 @@ export function reduceKeyPoints(drafts: readonly DraftPoint[], gaps: readonly No
       const existing = merged[index]!;
       existing.sources = unionSpans(existing.sources, raw.sources);
       if (raw.precision === "approximate") existing.precision = "approximate";
+      existing.decidedBy ??= raw.decidedBy;
     } else {
-      merged.push({ kind: raw.kind, text, sources: [...raw.sources], precision: raw.precision });
+      merged.push({ kind: raw.kind, text, sources: [...raw.sources], precision: raw.precision, decidedBy: raw.decidedBy, chunk: raw.chunk });
     }
   }
-  const caps: Record<KeyPointKind, number> = { summary: limits.maxSummaryBullets, decision: limits.maxDecisions, open_question: limits.maxOpenQuestions };
+  const caps: Record<KeyPointKind, number> = { summary: Math.max(limits.maxSummaryBullets, SUMMARY_BULLETS_PER_CHUNK * chunkCount), decision: limits.maxDecisions, open_question: limits.maxOpenQuestions };
   const ordered = KEY_POINT_KINDS.flatMap((kind) =>
-    stableSort(merged.filter((point) => point.kind === kind).slice(0, caps[kind]), (a, b) => (a.sources[0]?.start ?? 0) - (b.sources[0]?.start ?? 0)));
-  const keyPoints: KeyPoint[] = ordered.map((point, offset) => ({ id: `kp-${offset + 1}`, kind: point.kind, text: point.text, sources: point.sources, precision: point.precision }));
+    stableSort(capped(merged.filter((point) => point.kind === kind), caps[kind]), (a, b) => (a.sources[0]?.start ?? 0) - (b.sources[0]?.start ?? 0)));
+  const keyPoints: KeyPoint[] = ordered.map((point, offset) => ({
+    id: `kp-${offset + 1}`, kind: point.kind, text: point.text, sources: point.sources, precision: point.precision,
+    ...(point.kind === "decision" && point.decidedBy !== undefined ? { decidedBy: point.decidedBy } : {}),
+  }));
   return { keyPoints, gaps: [...gaps] };
+}
+
+/**
+ * At most `cap` points. Over the cap, points are taken in turn from each transcript part
+ * (first of each part, then second of each...), so the early parts do not crowd out the rest.
+ * A point without a part number is taken last in each round (its own group after the parts).
+ */
+function capped<T extends { chunk?: number | undefined; text?: string }>(points: readonly T[], cap: number): T[] {
+  if (points.length <= cap) return [...points];
+  const byChunk = new Map<number, T[]>();
+  for (const point of points) {
+    const key = point.chunk ?? Number.MAX_SAFE_INTEGER;
+    byChunk.set(key, [...(byChunk.get(key) ?? []), point]);
+  }
+  // Within a part, points that hold a number (amounts, counts, dates) come first: figures are kept.
+  const figuresFirst = (group: T[]): T[] => [...group.filter((point) => hasFigure(point)), ...group.filter((point) => !hasFigure(point))];
+  const parts = [...byChunk.keys()].sort((a, b) => a - b).map((key) => figuresFirst(byChunk.get(key)!));
+  const kept = new Set<T>();
+  for (let round = 0; kept.size < cap; round += 1) {
+    let added = false;
+    for (const part of parts) {
+      if (kept.size >= cap) break;
+      if (round < part.length) {
+        kept.add(part[round]!);
+        added = true;
+      }
+    }
+    if (!added) break;
+  }
+  return points.filter((point) => kept.has(point));
+}
+
+function hasFigure(point: { text?: string }): boolean {
+  return /\p{N}/u.test(point.text ?? "");
 }
 
 /** Merged intents (same idempotency key, or same type, same entity and similar titles) and how many the cap removed. */

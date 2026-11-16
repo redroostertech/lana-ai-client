@@ -207,6 +207,67 @@ body {
   color: var(--ex-muted);
 }
 
+.ex-point-owner {
+  display: block;
+  margin-top: 2pt;
+  font-size: 9pt;
+  color: var(--ex-ink-soft);
+}
+
+/* ── Tables from spoken lists ──────────────────────────── */
+
+.ex-h3 {
+  margin: 10pt 0 4pt;
+  font-size: 10pt;
+  font-weight: 600;
+  color: var(--ex-ink);
+  break-after: avoid;
+}
+
+.ex-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9pt;
+  break-inside: auto;
+}
+
+.ex-table th,
+.ex-table td {
+  padding: 3pt 6pt;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 0.5pt solid var(--ex-rule);
+}
+
+.ex-table th {
+  font-weight: 600;
+  color: var(--ex-ink-soft);
+  background: var(--ex-wash);
+}
+
+.ex-table tr {
+  break-inside: avoid;
+}
+
+/* ── Set-aside parts and notices ───────────────────────── */
+
+.ex-set-aside {
+  margin: 6pt 0;
+  padding: 4pt 8pt;
+  font-size: 8.5pt;
+  font-style: italic;
+  color: var(--ex-muted);
+  background: var(--ex-wash);
+  border-left: 2pt solid var(--ex-faint);
+  break-inside: avoid;
+}
+
+.ex-notice {
+  margin: 6pt 0 0;
+  font-size: 8.5pt;
+  color: var(--ex-muted);
+}
+
 /* ── The person's notes ───────────────────────────────── */
 
 .ex-note {

@@ -43,6 +43,9 @@ describe('menu', () => {
     expect(X.menuOptions(record()).map((item) => item.value)).toEqual(['transcriptPdf', 'transcriptText', 'notesPdf', 'meetingPdf', 'audio']);
     expect(X.menuOptions(record({ hasAudio: false })).map((item) => item.value)).not.toContain('audio');
     expect(X.menuOptions(record())[0]).toEqual(expect.objectContaining({ label: 'Transcript (PDF)', icon: 'file-text' }));
+    const audio = (options) => options.find((item) => item.value === 'audio');
+    expect(audio(X.menuOptions(record())).description).toBe('The original recording');
+    expect(audio(X.menuOptions(record({ setAside: [{ start: 60, end: 120, reason: 'phone_call' }] }))).description).toBe('Set-aside parts are cut from this audio.');
   });
 });
 
@@ -96,8 +99,9 @@ describe('PDF bodies', () => {
     const order = ['Key points', 'Decisions', 'Open questions', 'Your notes'].map((title) => html.indexOf(`<h2 class="ex-h2">${title}</h2>`));
     expect(order.every((at) => at > 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
-    expect(html).toContain('Ana Ruiz, 0:04');
-    expect(html).toContain('Around 1:15');
+    expect(html).toContain('Cited 0:04 to 0:12');
+    expect(html).toContain('Cited about 1:15 to 1:20');
+    expect(html).not.toContain('Ana Ruiz, 0:04');
     expect(html.indexOf('Deed')).toBeLessThan(html.indexOf('Later thought'));
     expect(html).toContain('<p class="ex-note-when">At 1:05</p>');
     expect(html).toContain('Friday &lt;noon&gt;');
@@ -121,8 +125,9 @@ describe('PDF bodies', () => {
     expect(at('<h2 class="ex-h2">Your notes</h2>')).toBeLessThan(at('ex-page-break'));
     expect(at('ex-page-break')).toBeLessThan(at('<h2 class="ex-h2">Transcript</h2>'));
     expect(at('Call the bank')).toBeLessThan(at('Send the deed'));
-    expect(html).toContain('Confirmed, 0:09');
-    expect(html).toContain('Proposed, 0:02');
+    expect(html).toContain('Confirmed. Cited 0:09');
+    expect(html).toContain('Proposed. Cited 0:02');
+    expect(html).toContain('Owner: not said. No date given.');
     expect(X.meetingHtml(record({ actions: [], transcript: [] }), [])).toEqual(expect.stringContaining('No actions on this meeting.'));
     expect(X.meetingHtml(record({ transcript: [] }), [])).toContain('No transcript yet.');
   });
@@ -148,5 +153,112 @@ describe('the request the host saves', () => {
     expect(X.revealLabel('mac')).toBe('Show in Finder');
     expect(X.revealLabel('windows')).toBe('Show in folder');
     expect(X.revealLabel('linux')).toBe('Show in folder');
+  });
+});
+
+// Briefs notes fixes (plan step 2 to 4). Synthetic meeting text only.
+describe('owners, due dates, cited ranges and who decided', () => {
+  const fixed = () => record({
+    speakers: [{ id: 'S1', name: 'Dana Reyes' }, { id: 'S2', name: 'Omar Haddad' }, { id: 'S3', name: 'S3' }],
+    transcript: [
+      { speaker: 'S1', start: 0, end: 10, text: 'We go over the onboarding schedule.' },
+      { speaker: 'S2', start: 10, end: 20, text: 'I will send the revised schedule tonight.' },
+      { speaker: 'S1', start: 1318, end: 1330, text: 'Sorry, I have to take this call.' },
+      { speaker: 'S3', start: 1330, end: 1569, text: 'Calling about the plumber visit on Saturday.' },
+      { speaker: 'S1', start: 1792, end: 1854, text: 'The setup fee is 1,200 dollars.' },
+    ],
+    keyPoints: [
+      { id: 'k1', kind: 'decision', text: 'The setup fee is 1,200 dollars.', sources: [{ start: 1792, end: 1820, speaker: 'S1' }, { start: 1840, end: 1854, speaker: 'S1' }], precision: 'exact', decidedBy: 'S1' },
+      { id: 'k2', kind: 'summary', text: 'A plumber visit is on Saturday.', sources: [{ start: 1330, end: 1569, speaker: 'S3' }], precision: 'exact', decidedBy: null },
+      { id: 'k3', kind: 'summary', text: 'The onboarding schedule was reviewed.', sources: [{ start: 0, end: 10, speaker: 'S1' }], precision: 'exact', decidedBy: null },
+    ],
+    actions: [
+      { id: 'a1', title: 'Send the revised schedule', at: 10, start: 10, end: 20, confirmed: false, owner: 'Omar Haddad', dueDate: '2026-11-11', dueText: 'tonight' },
+      { id: 'a2', title: 'Map the payment timeline', at: 1792, start: 1792, end: 1854, confirmed: false, owner: null, dueDate: null, dueText: 'next month' },
+      { id: 'a3', title: 'Move the plumber visit', at: 1330, start: 1330, end: 1569, confirmed: false, owner: 'S3', dueDate: null, dueText: null },
+    ],
+    setAside: [{ start: 1318, end: 1569, reason: 'phone_call', speakers: ['S1', 'S3'] }],
+    tables: [{ title: 'Fees', columns: ['Item', 'Amount'], rows: [['Setup fee', '1,200 dollars'], ['Monthly <fee>', '300']], sources: [{ start: 1792, end: 1854, speaker: 'S1' }] }],
+    speakersNamed: true,
+  });
+
+  test('actions print "Owner: X. Due: Y" and the cited range, never a quoted speaker as author', () => {
+    const html = X.meetingHtml(fixed(), []);
+    expect(html).toContain('Owner: Omar Haddad. Due: Wednesday, November 11, 2026 (tonight).');
+    expect(html).toContain('Owner: not said. Due: next month.');
+    expect(html).toContain('Proposed. Cited 0:10 to 0:20.');
+  });
+
+  test('key points print the cited range from first to last source, and Decided by for decisions', () => {
+    const html = X.notesHtml(fixed(), []);
+    expect(html).toContain('Cited 29:52 to 30:54. Decided by Dana Reyes.');
+    expect(html).toContain('Cited 0:00 to 0:10.');
+    expect(html).not.toContain('Dana Reyes, 29:52');
+  });
+
+  test('set-aside parts: their lines and anything citing them are left out, with one placeholder line', () => {
+    const html = X.meetingHtml(fixed(), []);
+    for (const text of [html, X.transcriptText(fixed()), X.transcriptHtml(fixed()), X.notesHtml(fixed(), [])]) {
+      expect(text).not.toContain('plumber');
+      expect(text).not.toContain('take this call');
+    }
+    expect(html).toContain('Set aside: 21:58 to 26:09 (phone call)');
+    expect(X.transcriptText(fixed())).toContain('Set aside: 21:58 to 26:09 (phone call)');
+    expect(html.match(/Set aside: /g)).toHaveLength(1);
+    expect(X.setAsideLine({ start: 60, end: 125, reason: 'other_matter' })).toBe('Set aside: 1:00 to 2:05 (another matter)');
+    expect(X.setAsideLine({ start: 60, end: 125, reason: 'logistics' })).toBe('Set aside: 1:00 to 2:05 (meeting setup)');
+    expect(X.setAsideLine({ start: 60, end: 125, reason: 'side_conversation' })).toBe('Set aside: 1:00 to 2:05 (side conversation)');
+  });
+
+  test('an action with quotes on both sides of a set-aside part stays; a table citing one goes', () => {
+    const record = fixed();
+    record.actions = [{ id: 'a4', title: 'Compare both plans', at: 10, start: 10, end: 1854, confirmed: false, owner: null, dueDate: null, dueText: null }];
+    expect(X.meetingHtml(record, [])).toContain('Compare both plans');
+    record.tables = [{ title: 'Visits', columns: ['Day', 'Time'], rows: [['Saturday', 'Afternoon']], sources: [{ start: 1330, end: 1569, speaker: 'S3' }] }];
+    expect(X.meetingHtml(record, [])).not.toContain('Visits');
+  });
+
+  test('tables render as tables, escaped', () => {
+    const html = X.notesHtml(fixed(), []);
+    expect(html).toContain('<table class="ex-table">');
+    expect(html).toContain('<th>Item</th><th>Amount</th>');
+    expect(html).toContain('<td>Monthly &lt;fee&gt;</td><td>300</td>');
+    expect(X.meetingHtml(fixed(), [])).toContain('<h3 class="ex-h3">Fees</h3>');
+  });
+
+  test('unnamed speakers are said plainly', () => {
+    const html = X.meetingHtml(record({ speakersNamed: false, unnamedSpeakers: ['S3'] }), []);
+    expect(html).toContain('<p class="ex-notice">1 speaker has no name yet (S3).</p>');
+    expect(X.meetingHtml(record({ speakersNamed: false, unnamedSpeakers: ['S2', 'S3'] }), [])).toContain('2 speakers have no names yet (S2, S3).');
+    expect(X.meetingHtml(fixed(), [])).not.toContain('no name');
+    expect(X.meetingHtml(record({ speakersNamed: true, unnamedSpeakers: [] }), [])).not.toContain('no name');
+  });
+
+  test('no dashes or emoji in what the export adds', () => {
+    const html = X.meetingHtml(fixed(), []);
+    expect(html).not.toMatch(/[\u2013\u2014]/u);
+    expect(html).not.toContain('|');
+  });
+});
+
+describe('two speaker labels given the same name are one person', () => {
+  const same = () => record({
+    speakers: [{ id: 'S1', name: 'Dana Reyes' }, { id: 'S2', name: 'Omar Haddad' }, { id: 'S5', name: 'Dana Reyes' }],
+    transcript: [
+      { speaker: 'S1', start: 0, end: 5, text: 'First line.' },
+      { speaker: 'S5', start: 5, end: 9, text: 'Same person, other label.' },
+      { speaker: 'S2', start: 10, end: 14, text: 'Reply.' },
+    ],
+    keyPoints: [{ id: 'k1', kind: 'decision', text: 'Use the revised plan', sources: [{ start: 5, end: 9, speaker: 'S5' }], precision: 'exact', decidedBy: 'S5' }],
+    actions: [{ id: 'a1', title: 'Send it', at: 5, start: 5, end: 9, confirmed: false, owner: 'S5', dueDate: null, dueText: null }],
+    unnamedSpeakers: [],
+  });
+  test('the header lists the name once, the transcript runs on, and decided by and owner use the name', () => {
+    const html = X.meetingHtml(same(), []);
+    expect(html).toContain('<dd>Dana Reyes, Omar Haddad</dd>');
+    expect(html.match(/class="ex-speaker">Dana Reyes</g)).toHaveLength(1);
+    expect(html).toContain('Decided by Dana Reyes.');
+    expect(html).toContain('Owner: Dana Reyes.');
+    expect(X.transcriptText(same())).toContain('Speakers: Dana Reyes, Omar Haddad');
   });
 });

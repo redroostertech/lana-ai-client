@@ -1,0 +1,15 @@
+{
+  "initial_state": "check",
+  "states": [
+    {
+      "id": "check",
+      "type": "llm_call",
+      "sub_prompt": "Check each question against the later lines, in the required format.",
+      "temperature": 0.0,
+      "output_schema": "lana.notes.questions.v1",
+      "retry": { "limit": 1 },
+      "next": "checked"
+    },
+    { "id": "checked", "type": "terminal", "outcome": "checked" }
+  ]
+}

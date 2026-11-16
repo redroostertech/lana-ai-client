@@ -22,6 +22,11 @@ export interface MacHandoffPolicy {
   readonly requireMacConfirmation: boolean;
   readonly allowedMethods: readonly AttestationMethod[];
   readonly messageTimeoutMs: number;
+  /**
+   * Longest the tone may take to play. Past it the session stops waiting (no page could play
+   * it) and reads the phone again, so its QR or approval fallback can run. Optional for older callers.
+   */
+  readonly tonePlayTimeoutMs?: number;
 }
 
 export const DEFAULT_MAC_HANDOFF_POLICY: MacHandoffPolicy = Object.freeze({
@@ -31,6 +36,7 @@ export const DEFAULT_MAC_HANDOFF_POLICY: MacHandoffPolicy = Object.freeze({
   requireMacConfirmation: false,
   allowedMethods: ATTESTATION_METHODS,
   messageTimeoutMs: 60_000,
+  tonePlayTimeoutMs: 8_000,
 });
 
 /** The phone's decision window for a meeting it does not hold is 45 s; the desktop waits twice that. */

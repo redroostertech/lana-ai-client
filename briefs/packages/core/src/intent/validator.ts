@@ -64,6 +64,7 @@ export function validateIntent(intent: Intent): ValidationIssue[] {
       checkText("params.title", params.task.title, L.maxTitle, fail);
       if (graphemeCount(params.task.detail) > L.maxBody) fail("params.detail", "too long");
       if (params.task.dueDate !== undefined && !isCalendarDate(params.task.dueDate)) fail("params.due_date", "must be YYYY-MM-DD");
+      if (params.task.dueText !== undefined && graphemeCount(params.task.dueText) > L.maxTitle) fail("params.due_text", "too long");
       checkHint("params.regarding", params.task.regarding, fail);
       break;
     case "email.draft":

@@ -1,3 +1,4 @@
+import { loadVocabulary } from "@lana/core/gateway";
 import type { LanaId } from "@lana/core/ids";
 import type { TextModel } from "@lana/core/runtime";
 import type { GatewayStore } from "@lana/core/store";
@@ -24,10 +25,30 @@ export class NotesWriter implements NotesWriting {
   async write(meetingID: LanaId, progress: (fraction: number) => void): Promise<NotesOutcome> {
     const record = this.store.shared.current(meetingID);
     if (record.transcript.length === 0) return "empty";
+    const rewrite = record.provenance.notesModel !== "";
     try {
       const summarizer = new MeetingSummarizer(new RuntimeNotesBackend(this.model));
-      const result = await summarizer.summarize({ transcript: record.transcript, speakers: record.speakers, meetingID, now: new Date(), progress });
-      const added = this.store.local.applyNotes(meetingID, result.notes, result.intents, result.modelID);
+      const result = await summarizer.summarize({
+        transcript: record.transcript,
+        speakers: record.speakers,
+        meetingID,
+        now: new Date(),
+        meetingStart: record.startedAt,
+        vocabulary: loadVocabulary(this.store.settings).map((entry) => entry.term),
+        // Once notes were written, the record's set-aside parts are the person's reviewed list.
+        ...(rewrite ? { fixedSetAside: record.notes.setAside ?? [] } : {}),
+        progress,
+      });
+      // Writing the notes again replaces the actions nobody has touched yet, and never repeats
+      // one this meeting already has.
+      if (rewrite) {
+        for (const stored of this.store.intents.list({ meetingID, statuses: ["transferred"] })) {
+          this.store.intents.transition(stored.intent.id, "dismissed", "system", { reason: "notes_rewritten" });
+        }
+      }
+      const existing = new Set(this.store.intents.list({ meetingID }).filter((stored) => stored.intent.status !== "dismissed").map((stored) => stored.intent.idempotencyKey));
+      const fresh = result.intents.filter((intent) => !existing.has(intent.idempotencyKey));
+      const added = this.store.local.applyNotes(meetingID, result.notes, fresh, result.modelID);
       this.log.info("recording.notes_written", {
         meeting: meetingID, key_points: result.notes.keyPoints.length, actions: added.length, dropped: result.droppedIntentCount, chunks: result.chunkCount, skipped: result.skippedChunks.length,
       });

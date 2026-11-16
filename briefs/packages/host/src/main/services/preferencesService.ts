@@ -1,6 +1,6 @@
-import { LEASE_HOUR_CHOICES, loadBackgroundUpdates, loadHandoffSettings, RETENTION_DAYS, saveBackgroundUpdates, saveHandoffSettings } from "@lana/core/gateway";
+import { LEASE_HOUR_CHOICES, loadBackgroundUpdates, loadHandoffSettings, loadVocabulary, RETENTION_DAYS, saveBackgroundUpdates, saveHandoffSettings, saveVocabulary } from "@lana/core/gateway";
 import type { GatewayStore, SettingsRepository } from "@lana/core/store";
-import type { GatewayStatus, ListenerStatus, PlatformInfo, Preferences, PreferencesApi, PreferencesUpdate, StatusText, VoiceDownload, VoiceOption } from "../../shared/api.js";
+import type { GatewayStatus, ListenerStatus, PlatformInfo, Preferences, PreferencesApi, PreferencesUpdate, StatusText, VocabularyTerm, VoiceDownload, VoiceOption } from "../../shared/api.js";
 import type { MainLog } from "../log.js";
 
 /** Swift `SettingKey` strings, so a store moved from the Mac app reads the same. */
@@ -90,7 +90,18 @@ export class PreferencesService implements PreferencesApi {
       },
       pendingOutbox: store.outbox.pendingCount(),
       version: platform.appVersion,
+      vocabulary: loadVocabulary(store.settings).map((entry) => ({ term: entry.term, alsoHeardAs: [...(entry.alsoHeardAs ?? [])] })),
     };
+  }
+
+  async setVocabulary(terms: VocabularyTerm[]): Promise<PreferencesUpdate> {
+    const list = Array.isArray(terms) ? terms.filter((item) => item !== null && typeof item === "object") : [];
+    const saved = saveVocabulary(this.options.store.settings, list.map((item) => ({
+      term: String(item.term ?? ""),
+      alsoHeardAs: Array.isArray(item.alsoHeardAs) ? item.alsoHeardAs.map((spelling) => String(spelling ?? "")) : [],
+    })));
+    this.options.log.info("settings.vocabulary", { terms: saved.length });
+    return this.update(null);
   }
 
   async setHandoff(patch: { requireMacClick?: boolean; allowQR?: boolean; allowMacApproval?: boolean }): Promise<PreferencesUpdate> {
