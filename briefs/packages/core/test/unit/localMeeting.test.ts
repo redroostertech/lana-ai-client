@@ -128,3 +128,29 @@ describe("meetings recorded on this computer", () => {
     expect(rig.store.shared.queue(phone.publicKeys.deviceID)).toEqual([]);
   });
 });
+
+describe("set-aside parts in audio sent to a paired phone (synthetic)", () => {
+  let rig: StoreRig;
+  beforeEach(async () => {
+    rig = await openRig();
+  });
+  afterEach(() => rig.cleanup());
+
+  it("go silent in the audio that leaves, keep their times, and stay whole in the store", async () => {
+    const { parseM4a, SILENT_AAC_MONO_FRAME } = await import("../../src/recording/index.js");
+    const meeting = record(rig);
+    const few = Array.from({ length: 200 }, (_, index) => new Uint8Array([0x21, index & 0xff, 7]));
+    rig.store.local.insert(meeting, audioParts(few));
+    rig.store.shared.edit(meeting.id, (current) => ({ ...current, notes: { ...current.notes, setAside: [{ start: 1, end: 2, reason: "phone_call" as const }] } }));
+    await rig.store.pairDevice(phone.publicKeys, new Uint8Array(32).fill(7));
+    rig.store.shared.queueForPhone(meeting.id, phone.publicKeys.deviceID);
+    const sent = rig.store.shared.outgoing(phone.publicKeys, []);
+    const frames = sent[0]!.audio.flatMap((part) => parseM4a(part.data).frames);
+    expect(frames).toHaveLength(200);
+    const silent = frames.filter((frame) => Array.from(frame).join() === Array.from(SILENT_AAC_MONO_FRAME).join()).length;
+    expect(silent).toBeGreaterThanOrEqual(46);
+    expect(silent).toBeLessThanOrEqual(47);
+    const stored = rig.store.meetings.audioParts(meeting.id).flatMap((part) => parseM4a(rig.store.meetings.audioData(meeting.id, part.index)).frames);
+    expect(stored).toEqual(few);
+  });
+});

@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join } from "node:path";
 import { parseLanaId, type LanaId } from "@lana/core/ids";
+import { cutSetAsideAudio, type TimeRange } from "@lana/core/recording";
 import type { AudioPart } from "@lana/core/store";
 import type { MeetingExportApi, MeetingExportKind, MeetingExportRequest, MeetingExportSaved, Result } from "../../shared/api.js";
 import type { MainLog } from "../log.js";
@@ -19,6 +20,8 @@ export interface ExportFiles {
 export interface ExportAudioSource {
   audioParts(id: LanaId): AudioPart[];
   audioData(id: LanaId, index: number): Uint8Array;
+  /** The meeting's set-aside parts: cut from every saved audio file (the stored audio is never changed). */
+  setAside?(id: LanaId): readonly TimeRange[];
 }
 
 type Writer = (path: string, data: Uint8Array | string) => Promise<void>;
@@ -37,6 +40,7 @@ const UNSAFE = /[\u0000-\u001f\u007f<>:"/\\|?*]+/g;
 
 const FAILED = { ok: false as const, error: { code: "io", message: "LANA could not save the export. Try again." } };
 const INVALID = { ok: false as const, error: { code: "invalid", message: "LANA could not export this meeting." } };
+const NOT_CUT = { ok: false as const, error: { code: "io", message: "LANA could not take the set-aside parts out of this audio, so it was not saved." } };
 const NO_AUDIO = { ok: false as const, error: { code: "noAudio", message: "The audio for this meeting is no longer on this computer." } };
 
 /** A file name without separators, reserved characters, or leading and trailing dots; "Meeting" when nothing is left. */
@@ -123,7 +127,23 @@ export class MeetingExportService implements MeetingExportApi {
       return FAILED;
     }
     if (parts.length === 0) return NO_AUDIO;
-    const extension = audioExtension(parts[0]!.name);
+    // Set-aside parts are cut before anything is written; audio that cannot be cut is not saved.
+    let output: Array<{ name: string; data: Uint8Array }>;
+    try {
+      const ranges = this.audio.setAside?.(meetingID) ?? [];
+      const stored = parts.map((part) => ({ name: part.name, data: this.audio.audioData(meetingID, part.index) }));
+      try {
+        output = cutSetAsideAudio(stored, ranges);
+      } catch {
+        this.log.error("export.audio_cut_failed", { meeting: meetingID });
+        return NOT_CUT;
+      }
+    } catch {
+      this.log.error("export.audio_read_failed", { meeting: meetingID });
+      return FAILED;
+    }
+    if (output.length === 0) return NO_AUDIO;
+    const extension = audioExtension(output[0]!.name);
     const picked = await this.files.pickPath(`${name}.${extension}`, { name: "Audio", extensions: [extension] });
     if (picked === null) {
       this.log.info("export.cancelled", { meeting: meetingID, kind: "audio" });
@@ -132,9 +152,9 @@ export class MeetingExportService implements MeetingExportApi {
     const paths: string[] = [];
     let bytes = 0;
     try {
-      for (const [offset, part] of parts.entries()) {
-        const data = this.audio.audioData(meetingID, part.index);
-        const path = audioPartPath(picked, offset + 1, parts.length, audioExtension(part.name));
+      for (const [offset, part] of output.entries()) {
+        const data = part.data;
+        const path = audioPartPath(picked, offset + 1, output.length, audioExtension(part.name));
         await this.write(path, data);
         paths.push(path);
         bytes += data.byteLength;

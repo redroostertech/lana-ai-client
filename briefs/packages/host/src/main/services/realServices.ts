@@ -194,7 +194,11 @@ export function createRealServices(options: RealServicesOptions): RealServices {
   const settings = new SettingsService(store.settings, options.applyTheme, emit, log);
   const audit = new AuditService(store, options.pickSavePath, log);
   const audio = new MeetingAudioService(store, log);
-  const meetingExport = new MeetingExportService(store.meetings, options.exportFiles, log);
+  const meetingExport = new MeetingExportService({
+    audioParts: (id) => store.meetings.audioParts(id),
+    audioData: (id, index) => store.meetings.audioData(id, index),
+    setAside: (id) => store.shared.current(id).notes.setAside ?? [],
+  }, options.exportFiles, log);
   const notes = new UserNotesService(store, platform.deviceNoun, log);
   const userNotes: AllLanaServices["userNotes"] = {
     save: async (meetingID, list) => {

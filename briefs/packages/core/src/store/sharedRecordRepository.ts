@@ -1,3 +1,4 @@
+import { silenceSetAsideAudio } from "../recording/audioCut.js";
 import type { DevicePublicKeys } from "../crypto/devicePublicKeys.js";
 import type { OpenedBundle } from "../handoff/bundleOpener.js";
 import type { SharedMeeting } from "../handoff/messages.js";
@@ -242,7 +243,8 @@ export class SharedRecordRepository {
     }
     for (const id of this.queue(phone.deviceID)) {
       if (listedIDs.has(id) || this.ctx.db.get("SELECT id FROM meeting WHERE id = ?", id) === undefined) continue;
-      out.push({ record: this.current(id as LanaId), audio: this.audio(id as LanaId), queued: true });
+      const record = this.current(id as LanaId);
+      out.push({ record, audio: this.outgoingAudio(id as LanaId, record.notes.setAside ?? []), queued: true });
     }
     return out;
   }
@@ -396,6 +398,20 @@ export class SharedRecordRepository {
       return decodeMeeting(value);
     } catch {
       throw StoreError.corrupt(context);
+    }
+  }
+
+  /**
+   * Audio for a paired phone: set-aside parts go silent (times kept, so replay stays in step);
+   * audio that cannot be read goes without, while anything is set aside. The store keeps the original.
+   */
+  private outgoingAudio(id: LanaId, setAside: readonly { start: number; end: number }[]): { name: string; data: Uint8Array }[] {
+    const audio = this.audio(id);
+    if (setAside.length === 0) return audio;
+    try {
+      return silenceSetAsideAudio(audio, setAside);
+    } catch {
+      return [];
     }
   }
 

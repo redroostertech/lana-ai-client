@@ -8,3 +8,4 @@ export {
 } from "./transcriber.js";
 export { audioParts, localMeetingRecord, PART_SECONDS, RECORDING_BIT_RATE, RECORDING_SAMPLE_RATE, type LocalRecordInput } from "./localRecord.js";
 export { correctVocabulary, DEFAULT_VOCABULARY_THRESHOLDS, recognizedWords, soundKey, syllables, type CorrectOptions, type RecognizerResult, type TranscribedWord, type VocabularyEntry, type VocabularyThresholds } from "./meetingVocabulary.js";
+export { cutSetAsideAudio, parseM4a, silenceSetAsideAudio, SILENT_AAC_MONO_FRAME, type AudioPartData, type ParsedM4a, type TimeRange } from "./audioCut.js";

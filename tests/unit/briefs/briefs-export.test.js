@@ -43,6 +43,9 @@ describe('menu', () => {
     expect(X.menuOptions(record()).map((item) => item.value)).toEqual(['transcriptPdf', 'transcriptText', 'notesPdf', 'meetingPdf', 'audio']);
     expect(X.menuOptions(record({ hasAudio: false })).map((item) => item.value)).not.toContain('audio');
     expect(X.menuOptions(record())[0]).toEqual(expect.objectContaining({ label: 'Transcript (PDF)', icon: 'file-text' }));
+    const audio = (options) => options.find((item) => item.value === 'audio');
+    expect(audio(X.menuOptions(record())).description).toBe('The original recording');
+    expect(audio(X.menuOptions(record({ setAside: [{ start: 60, end: 120, reason: 'phone_call' }] }))).description).toBe('Set-aside parts are cut from this audio.');
   });
 });
 

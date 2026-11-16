@@ -90,7 +90,13 @@
   function menuOptions(record) {
     return KINDS
       .filter((kind) => kind !== 'audio' || Boolean(record && record.hasAudio))
-      .map((kind) => ({ value: kind, label: MENU[kind].label, description: MENU[kind].description, icon: MENU[kind].icon }));
+      .map((kind) => ({
+        value: kind,
+        label: MENU[kind].label,
+        // Set-aside parts are cut from saved audio (the host does the cut); the menu says so.
+        description: kind === 'audio' && (record && record.setAside || []).length > 0 ? 'Set-aside parts are cut from this audio.' : MENU[kind].description,
+        icon: MENU[kind].icon,
+      }));
   }
 
   /** The person's notes with text, in meeting order, as { title, body, when }. */
