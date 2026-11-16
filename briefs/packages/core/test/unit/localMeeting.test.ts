@@ -155,3 +155,40 @@ describe("set-aside parts in audio sent to a paired phone (synthetic)", () => {
     expect(stored).toEqual(few);
   });
 });
+
+describe("a meeting sent to the phone without audio (synthetic)", () => {
+  let rig: StoreRig;
+  beforeEach(async () => {
+    rig = await openRig();
+  });
+  afterEach(() => rig.cleanup());
+
+  it("is logged with ids and state only, and remembered so the meeting page can say so", async () => {
+    await rig.store.pairDevice(phone.publicKeys, new Uint8Array(32).fill(7));
+    const meeting = record(rig);
+    rig.store.local.insert(meeting, [{ name: "seg-0000.m4a", data: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9]) }]);
+    rig.store.shared.edit(meeting.id, (current) => ({ ...current, notes: { ...current.notes, setAside: [{ start: 1, end: 2, reason: "phone_call" as const }] } }));
+    rig.store.shared.queueForPhone(meeting.id, phone.publicKeys.deviceID);
+
+    const lines: Array<{ event: string; fields: Readonly<Record<string, string | number | boolean>> }> = [];
+    const log = { info: (event: string, fields = {}) => lines.push({ event, fields }), notice: (event: string, fields = {}) => lines.push({ event, fields }), error: (event: string, fields = {}) => lines.push({ event, fields }) };
+    let audioCount = -1;
+    const accept = async (update: RecordUpdate, sealed: Uint8Array[]): Promise<HandoffMessage> => {
+      const opened = await openRecordUpdate(update, sealed, phone, mac.publicKeys);
+      audioCount = opened.audio.length;
+      return { type: "sync_ack", payload: issueRecordAck(update, opened.record, phone, new Date("2026-11-01T16:00:00.000Z")) };
+    };
+    const air = new Air();
+    const presenter = new FakePresenter();
+    const session = new MacHandoffSession({ identity: mac, trust: rig.store, tone: air, presenter, sink: rig.store, records: rig.store, clock: new FakeClock(), log });
+    const { client, server } = MemoryFrameChannel.pair();
+    await Promise.allSettled([
+      session.run(server),
+      runScriptedPhone(client, { identity: phone, mac: mac.publicKeys, bundles: [], air, presenter, maxProtocolVersion: 2, answerUpdate: accept }),
+    ]);
+    expect(audioCount).toBe(0);
+    const withheld = lines.find((line) => line.event === "handoff.mac.audio_withheld");
+    expect(withheld?.fields).toEqual({ meeting: meeting.id, phone: phone.publicKeys.deviceID, state: "set_aside_not_cut" });
+    expect(rig.store.shared.audioWithheld(meeting.id)).toEqual([phone.publicKeys.deviceID]);
+  });
+});

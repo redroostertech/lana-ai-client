@@ -342,6 +342,7 @@ export class MacHandoffSession {
         this.log.info("handoff.mac.record_skipped", { meeting: outgoing.record.id, state: "cancelled" });
         continue;
       }
+      if (outgoing.audioWithheld === true) this.log.notice("handoff.mac.audio_withheld", { meeting: outgoing.record.id, phone: phone.deviceID, state: "set_aside_not_cut" });
       try {
         if (leased !== null) leased.updatesSent += 1;
         await this.sendRecord(channel, phone, records, outgoing, leased !== null);

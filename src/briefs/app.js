@@ -425,7 +425,7 @@
     }
     return `<li class="briefs-share-row" data-share-row="${escape(phone.id)}">
         <span class="briefs-share-phone" aria-hidden="true">${icon('smartphone')}</span>
-        <span class="briefs-share-text"><span class="briefs-share-name">${escape(row.title)}</span><span class="briefs-share-status">${escape(row.status)}</span></span>
+        <span class="briefs-share-text"><span class="briefs-share-name">${escape(row.title)}</span><span class="briefs-share-status">${escape(row.status)}</span>${row.note ? `<span class="briefs-share-note">${escape(row.note)}</span>` : ''}</span>
         ${control}
       </li>`;
   }

@@ -313,6 +313,8 @@ export interface SharedRecordPhone {
   snoozedAt?: string | null;
   /** When this meeting last reached that phone (ISO time): handed off from it, or an update sent there. Null if never. */
   lastSyncedAt?: string | null;
+  /** The meeting went to this phone without audio: its set-aside parts could not be taken out. */
+  audioWithheld?: boolean;
 }
 
 /** "Cancel send": taken off the queue, already being delivered (not stopped), or nothing was queued. */

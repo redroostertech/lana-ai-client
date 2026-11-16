@@ -268,6 +268,7 @@ export class RecordsService implements RecordsApi {
     const declined = new Map(store.shared.declined(id).map((entry) => [entry.phoneDeviceID, entry.declinedAt.toISOString()] as const));
     const snoozed = new Map(store.shared.snoozed(id).map((entry) => [entry.phoneDeviceID, entry.snoozedAt.toISOString()] as const));
     const synced = store.shared.lastSynced(id);
+    const withheld = new Set(store.shared.audioWithheld(id));
     return {
       meetingID: id,
       revision: record.sync?.revision ?? 0,
@@ -286,6 +287,7 @@ export class RecordsService implements RecordsApi {
         declinedAt: declined.get(device.keys.deviceID) ?? null,
         snoozedAt: snoozed.get(device.keys.deviceID) ?? null,
         lastSyncedAt: synced.get(device.keys.deviceID)?.toISOString() ?? null,
+        ...(withheld.has(device.keys.deviceID) ? { audioWithheld: true } : {}),
       })),
     };
   }

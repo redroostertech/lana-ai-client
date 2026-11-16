@@ -40,7 +40,10 @@
     if (answer !== null) return { title, status: answer === 'declined' ? 'Declined' : 'Not now', action: 'send' };
     const synced = parsed(phone.lastSyncedAt);
     const status = Number.isNaN(synced) ? (phone.shared ? 'Shared' : 'Not sent yet') : `Last synced ${monthDayTime.format(new Date(synced))}`;
-    return { title, status, action: phone.shared ? 'sent' : 'send' };
+    // The set-aside parts could not be taken out of the audio, so the phone got the meeting without it.
+    const row = { title, status, action: phone.shared ? 'sent' : 'send' };
+    if (phone.shared && phone.audioWithheld) row.note = `This meeting went to ${phoneLabel(phone)} without audio because LANA could not take the set-aside parts out.`;
+    return row;
   }
 
   /** The line under a waiting send, or why it is no longer waiting. Null when there is nothing to say. */

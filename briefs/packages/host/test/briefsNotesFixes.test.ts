@@ -180,3 +180,22 @@ describe("records written before strict reading", () => {
     expect(pointText(" | only fields")).toBe("only fields");
   });
 });
+
+describe("Send to phone without audio", () => {
+  it("the shared record view says which phones got the meeting without audio", async () => {
+    const { phone } = await import("./support/realRig.js");
+    await rig.store.pairDevice(phone.publicKeys, new Uint8Array(32).fill(7));
+    const id = makeLanaId("meeting");
+    rig.store.local.insert(localMeetingRecord({
+      id, title: "Junk audio", startedAt: new Date(2026, 10, 11), durationSeconds: 70,
+      consent: { method: "verbal_announced", confirmedBy: [], confirmedAt: rig.clock.now() }, userNotes: [], appVersion: "0.1.0", speakers: [{ id: "S1" }], transcript: TRANSCRIPT,
+    }), [{ name: "seg-0000.m4a", data: new Uint8Array([9, 9, 9, 9, 9, 9, 9, 9]) }]);
+    const before = await records().state(id);
+    expect(before.ok && before.value.phones.map((item) => item.audioWithheld === true)).toEqual([false]);
+    rig.store.shared.edit(id, (current) => ({ ...current, notes: { ...current.notes, setAside: [{ start: 20, end: 60, reason: "phone_call" as const }] } }));
+    rig.store.shared.queueForPhone(id, phone.publicKeys.deviceID);
+    expect(rig.store.shared.outgoing(phone.publicKeys, [])[0]).toMatchObject({ audio: [], audioWithheld: true });
+    const after = await records().state(id);
+    expect(after.ok && after.value.phones.map((item) => item.audioWithheld === true)).toEqual([true]);
+  });
+});
