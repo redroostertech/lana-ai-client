@@ -395,7 +395,7 @@ const palette = Lex.Modal.open({ heading: 'Command palette', palette: true, cont
 
 ### Expand toggle (`<lex-modal>` and `<lex-drawer>`)
 
-Every modal and drawer with a header gets an icon button directly left of the close X that grows the overlay to fill the app window (inside the safe area insets) and back. It uses the LANA dock's full screen arrows, is a real `<button>` with `aria-pressed` and an `Expand` / `Collapse` label, and Escape still closes. Rules and storage live in `Lex.OverlayExpand` (`lex.core.js`).
+Every modal and drawer with a header gets an icon button directly left of the close X that grows the overlay to fill the app window (inside the safe area insets) and back. It uses the LANA dock's full screen arrows, is a real `<button>` with `aria-pressed` and the same `Full screen` / `Exit full screen` label (aria-label and tooltip) as the LANA chat, and Escape still closes. Rules and storage live in `Lex.OverlayExpand` (`lex.core.js`).
 
 - **Default on.** Small dialogs never expand: no toggle for `Lex.Modal.confirm/alert/confirmAsync/alertAsync/prompt`, `size="sm"` modals, `width="sm"` drawers, a `palette` modal, `size="full"` modals, `width="full"` drawers, or any overlay with `expandable="false"`. Add `expandable="false"` to larger confirm-like dialogs (for example a `size="md"` delete confirmation) and other fixed dialogs whose content cannot use the space.
 - **Session memory:** an overlay with an `id` reopens expanded or not as the user last left it this session (`sessionStorage`, key `lex-overlay-expanded:<id>`). Overlays without an `id` start collapsed.

@@ -697,8 +697,8 @@
   };
 
   // Expand/collapse toggle shared by lex-modal and lex-drawer: a button left
-  // of the close X grows the overlay to fill the app window. Icons are the
-  // LANA dock's full screen arrows (lex-lana-dock.js).
+  // of the close X grows the overlay to fill the app window. Icons and labels
+  // ("Full screen" / "Exit full screen") match the LANA dock (lex-lana-dock.js).
   const EXPAND_SVG = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" '
     + 'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
     + '<path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/></svg>';
@@ -722,10 +722,10 @@
       if (o.size === 'full' || o.size === 'sm') return false;
       return true;
     },
-    label(expanded) { return expanded ? 'Collapse' : 'Expand'; },
+    label(expanded) { return expanded ? 'Exit full screen' : 'Full screen'; },
     icon(expanded) { return expanded ? COLLAPSE_SVG : EXPAND_SVG; },
     buttonHtml(className) {
-      return `<button type="button" class="${className}" data-action="expand" aria-pressed="false" aria-label="Expand" title="Expand">${EXPAND_SVG}</button>`;
+      return `<button type="button" class="${className}" data-action="expand" aria-pressed="false" aria-label="Full screen" title="Full screen">${EXPAND_SVG}</button>`;
     },
     sync(button, expanded) {
       if (!button) return;

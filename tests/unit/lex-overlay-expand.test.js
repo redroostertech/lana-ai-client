@@ -57,8 +57,8 @@ describe('Lex.OverlayExpand rules', () => {
   });
 
   test('label and icon follow the state', () => {
-    expect(X.label(false)).toBe('Expand');
-    expect(X.label(true)).toBe('Collapse');
+    expect(X.label(false)).toBe('Full screen');
+    expect(X.label(true)).toBe('Exit full screen');
     expect(X.icon(false)).toContain('<svg');
     expect(X.icon(true)).toContain('<svg');
     expect(X.icon(true)).not.toBe(X.icon(false));
@@ -69,12 +69,12 @@ describe('Lex.OverlayExpand rules', () => {
     const btn = doc.querySelector('button');
     X.sync(btn, true);
     expect(btn.getAttribute('aria-pressed')).toBe('true');
-    expect(btn.getAttribute('aria-label')).toBe('Collapse');
-    expect(btn.title).toBe('Collapse');
+    expect(btn.getAttribute('aria-label')).toBe('Exit full screen');
+    expect(btn.title).toBe('Exit full screen');
     expect(btn.querySelector('path').getAttribute('d')).toBe('M4 14h6v6');
     X.sync(btn, false);
     expect(btn.getAttribute('aria-pressed')).toBe('false');
-    expect(btn.getAttribute('aria-label')).toBe('Expand');
+    expect(btn.getAttribute('aria-label')).toBe('Full screen');
   });
 
   test('remembers the state per overlay id for the session', () => {

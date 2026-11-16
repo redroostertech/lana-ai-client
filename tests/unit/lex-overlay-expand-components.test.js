@@ -39,13 +39,14 @@ describe('lex-modal expand toggle', () => {
     expect(expand).not.toBeNull();
     expect(close.previousElementSibling).toBe(expand);
     expect(expand.getAttribute('aria-pressed')).toBe('false');
-    expect(expand.getAttribute('aria-label')).toBe('Expand');
+    expect(expand.getAttribute('aria-label')).toBe('Full screen');
+    expect(expand.title).toBe('Full screen');
 
     const panel = modal.querySelector('.lex-modal-panel');
     click(window, expand);
     expect(panel.classList.contains('lex-modal-panel--expanded')).toBe(true);
     expect(expand.getAttribute('aria-pressed')).toBe('true');
-    expect(expand.getAttribute('aria-label')).toBe('Collapse');
+    expect(expand.getAttribute('aria-label')).toBe('Exit full screen');
     expect(modal.expanded).toBe(true);
 
     click(window, expand);
