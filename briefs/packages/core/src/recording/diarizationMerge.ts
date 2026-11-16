@@ -149,3 +149,79 @@ export function mergeSpeakers(segments: readonly HeardSegment[], turns: readonly
 function round(seconds: number): number {
   return Math.round(seconds * 1_000) / 1_000;
 }
+
+/** Below this much talk, a diarizer cluster is folded into another: 8 s, or 2% of all talk when that is more. */
+export const SMALL_CLUSTER_SECONDS = 8;
+export const SMALL_CLUSTER_SHARE = 0.02;
+
+export function smallClusterLimit(turns: readonly SpeakerTurn[]): number {
+  const total = turns.reduce((sum, turn) => sum + Math.max(0, turn.end - turn.start), 0);
+  return Math.max(SMALL_CLUSTER_SECONDS, SMALL_CLUSTER_SHARE * total);
+}
+
+function cosine(a: Float32Array, b: Float32Array): number {
+  let dot = 0;
+  let na = 0;
+  let nb = 0;
+  for (let index = 0; index < Math.min(a.length, b.length); index += 1) {
+    dot += a[index]! * b[index]!;
+    na += a[index]! * a[index]!;
+    nb += b[index]! * b[index]!;
+  }
+  return na === 0 || nb === 0 ? -1 : dot / Math.sqrt(na * nb);
+}
+
+/**
+ * Folds diarizer clusters with little talk into a bigger one. On real speech through one
+ * microphone the clustering splits one person into many short clusters (a phone recording
+ * came out as 45 speakers). Each cluster under `smallClusterLimit` joins the big cluster whose
+ * mean voice embedding is most similar; without embeddings, the big cluster nearest in time
+ * (the earlier one on a tie). Only original big clusters are targets. `allowed` limits which big
+ * clusters a small one may join (on this computer: the same side, mic or meeting audio); a small
+ * cluster with no allowed target stays. When every cluster is small (a very short recording)
+ * nothing changes.
+ */
+export function foldSmallClusters(turns: readonly SpeakerTurn[], embedding: (cluster: number) => Float32Array | null, allowed: (small: number, big: number) => boolean = () => true): SpeakerTurn[] {
+  const talk = new Map<number, number>();
+  for (const turn of turns) talk.set(turn.speaker, (talk.get(turn.speaker) ?? 0) + Math.max(0, turn.end - turn.start));
+  const limit = smallClusterLimit(turns);
+  const big = [...talk].filter(([, seconds]) => seconds >= limit).map(([cluster]) => cluster);
+  if (big.length === 0) return [...turns];
+  const target = new Map<number, number>();
+  const small = [...talk].filter(([, seconds]) => seconds < limit).sort((a, b) => a[1] - b[1] || a[0] - b[0]).map(([cluster]) => cluster);
+  for (const cluster of small) {
+    const targets = new Set(big.filter((candidate) => allowed(cluster, candidate)));
+    if (targets.size === 0) continue;
+    const own = embedding(cluster);
+    let best: number | undefined;
+    if (own !== null) {
+      let score = -Infinity;
+      for (const candidate of targets) {
+        const other = embedding(candidate);
+        if (other === null) continue;
+        const value = cosine(own, other);
+        if (value > score) {
+          score = value;
+          best = candidate;
+        }
+      }
+    }
+    if (best === undefined) {
+      // In time order, so on a tie the earlier big cluster wins.
+      const ordered = [...turns].sort((x, y) => x.start - y.start);
+      let gap = Infinity;
+      for (const turn of ordered.filter((item) => item.speaker === cluster)) {
+        for (const other of ordered) {
+          if (!targets.has(other.speaker)) continue;
+          const distance = Math.max(0, Math.max(turn.start, other.start) - Math.min(turn.end, other.end));
+          if (distance < gap) {
+            gap = distance;
+            best = other.speaker;
+          }
+        }
+      }
+    }
+    if (best !== undefined) target.set(cluster, best);
+  }
+  return turns.map((turn) => (target.has(turn.speaker) ? { ...turn, speaker: target.get(turn.speaker)! } : turn));
+}
