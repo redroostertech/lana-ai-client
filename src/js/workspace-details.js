@@ -45,6 +45,8 @@
   var customFieldDefinitions = [];
   var customFieldValues = [];
   var customFieldsBaseline = null;
+  var customFieldsLibrary = null;      // last field-library response while the picker is open
+  var customFieldsSectionSeq = 0;      // guards the dock card against a stale await
   var _navContext = null;              // navigation context (source, conversationId, etc.)
   var matterTabs = null;               // tabs from the matter's makeup (LanaMatterTabRegistry.buildTabs)
   var makeupClient = null;             // MatterMakeupAPIClient
@@ -8437,6 +8439,7 @@
     customFieldDefinitions = [];
     customFieldValues = [];
     customFieldsBaseline = null;
+    customFieldsLibrary = null;
   }
 
   /**
@@ -8450,7 +8453,9 @@
       var target = e.target;
       if (!target || !target.dataset) return;
       var value = e.detail ? e.detail.value : target.value;
-      if (target.dataset.fieldDefIndex !== undefined) {
+      if (target.dataset.libraryPick !== undefined) {
+        useLibraryField(value);
+      } else if (target.dataset.fieldDefIndex !== undefined) {
         updateFieldDefinition(Number(target.dataset.fieldDefIndex), target.dataset.fieldDefProp, value);
       } else if (target.dataset.fieldValueKey !== undefined) {
         updateFieldValue(target.dataset.fieldValueKey, value);
@@ -8467,18 +8472,34 @@
     if (!container) return;
     bindCustomFieldSelects(container);
 
+    var pickerHtml = '';
+    if (customFieldsLibrary) {
+      var libraryOptions = LanaMatterFields.libraryOptions(customFieldsLibrary,
+        { definitions: customFieldDefinitions });
+      pickerHtml =
+        '<div class="mb-4 p-4 rounded-lg border border-gray-200">' +
+          '<label class="block text-xs font-medium text-gray-700 mb-1">Use an existing field</label>' +
+          (libraryOptions.length
+            ? '<lex-select size="sm" searchable="true" data-library-pick="true"' +
+                ' placeholder="Search your field library"' +
+                ' options="' + escapeHtml(JSON.stringify(libraryOptions)) + '"></lex-select>'
+            : '<p class="text-sm text-gray-500">Your field library is empty. Create a new field instead.</p>') +
+          '<p class="mt-2 text-xs text-gray-500">Adding a field here uses it on this matter only. Other matters keep their own fields.</p>' +
+        '</div>';
+    }
+
     if (customFieldDefinitions.length === 0) {
-      container.innerHTML =
+      container.innerHTML = pickerHtml +
         '<div class="text-center py-8 text-gray-500">' +
           '<svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
             '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>' +
           '</svg>' +
-          '<p class="mt-2 text-sm">No custom fields yet. Click "Add Field" to create one.</p>' +
+          '<p class="mt-2 text-sm">No custom fields on this matter yet. Create a new field, or use one from your library.</p>' +
         '</div>';
       return;
     }
 
-    var html = '<div class="space-y-4">';
+    var html = pickerHtml + '<div class="space-y-4">';
 
     for (var i = 0; i < customFieldDefinitions.length; i++) {
       var def = customFieldDefinitions[i];
@@ -8524,6 +8545,7 @@
             '<div class="col-span-2">' +
               '<label class="block text-xs font-medium text-gray-700 mb-1">Type</label>' +
               '<lex-select size="sm" data-field-def-index="' + i + '" data-field-def-prop="type"' +
+                (def.id ? ' disabled="true" title="A saved field type cannot change"' : '') +
                 ' options="' + escapeHtml(JSON.stringify(selectTypeOptions)) + '"' +
                 ' value="' + escapeHtml(def.type || 'text') + '"></lex-select>' +
             '</div>' +
@@ -8578,7 +8600,7 @@
       case 'number':
         return '<input type="number" value="' + escapeHtml(currentValue || '') + '"' +
           ' onchange="updateFieldValue(\'' + key + '\', this.value)"' +
-          ' placeholder="Enter ' + displayName + '"' +
+          ' placeholder="' + escapeHtml(LanaMatterFields.placeholderFor(def)) + '"' +
           ' class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus" />';
 
       case 'currency':
@@ -8588,7 +8610,7 @@
           '</div>' +
           '<input type="number" step="0.01" value="' + escapeHtml(currentValue || '') + '"' +
             ' onchange="updateFieldValue(\'' + key + '\', this.value)"' +
-            ' placeholder="0.00"' +
+            ' placeholder="' + escapeHtml(def.default_value != null && def.default_value !== '' ? LanaMatterFields.placeholderFor(def) : '0.00') + '"' +
             ' class="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus" />' +
         '</div>';
 
@@ -8628,9 +8650,44 @@
       default:
         return '<input type="text" value="' + escapeHtml(currentValue || '') + '"' +
           ' onchange="updateFieldValue(\'' + key + '\', this.value)"' +
-          ' placeholder="Enter ' + displayName + '"' +
+          ' placeholder="' + escapeHtml(LanaMatterFields.placeholderFor(def)) + '"' +
           ' class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus" />';
     }
+  }
+
+  /**
+   * Open the "Use an existing field" picker over the organization library.
+   */
+  async function openCustomFieldLibrary() {
+    if (!currentEditFieldsMatter) return;
+    try {
+      customFieldsLibrary = await matterFieldsClient().searchLibrary(currentEditFieldsMatter, '');
+    } catch (error) {
+      console.error('[openCustomFieldLibrary] Error:', error);
+      Lex.Toast.error(LanaMatterFields.errorMessage(error));
+      return;
+    }
+    renderCustomFieldsModal();
+  }
+
+  /**
+   * Add the library field chosen in the picker; it is attached to this
+   * matter when the drawer is saved.
+   * @param {string} definitionId
+   */
+  function useLibraryField(definitionId) {
+    var defs = (customFieldsLibrary && customFieldsLibrary.data && customFieldsLibrary.data.definitions) || [];
+    var picked = null;
+    for (var i = 0; i < defs.length; i++) {
+      if (defs[i].id === definitionId) { picked = defs[i]; break; }
+    }
+    if (!picked) return;
+    var next = LanaMatterFields.addLibraryField(
+      { definitions: customFieldDefinitions, values: customFieldValues }, picked);
+    customFieldDefinitions = next.definitions;
+    customFieldValues = next.values;
+    customFieldsLibrary = null;
+    renderCustomFieldsModal();
   }
 
   /**
@@ -8704,12 +8761,15 @@
    */
   function removeCustomField(index) {
     var def = customFieldDefinitions[index];
-    if (def && def.id) {
+    var saved = def && def.id && customFieldsBaseline && customFieldsBaseline.definitions.some(function (d) { return d.id === def.id; });
+    if (saved) {
       Lex.Modal.confirm(
-        'Remove field for every matter',
-        '"' + escapeHtml(def.display_name || def.key) + '" is shared by every matter in your organization. ' +
-          'Saving removes it from all of them. Values already recorded are kept but hidden.',
-        function () { dropCustomField(index); }
+        'Remove field from this matter',
+        '"' + escapeHtml(def.display_name || def.key) + '" will be removed from this matter when you save. ' +
+          'It stays in your field library and on any other matter that uses it. ' +
+          'This matter\'s value is kept and comes back if you add the field again.',
+        function () { dropCustomField(index); },
+        { variant: 'danger', confirmText: 'Remove' }
       );
       return;
     }
@@ -8789,11 +8849,12 @@
   window.updateFieldDefinition = updateFieldDefinition;
   window.updateFieldValue = updateFieldValue;
   window.removeCustomField = removeCustomField;
+  window.openCustomFieldLibrary = openCustomFieldLibrary;
   window.saveCustomFields = saveCustomFields;
 
   ['openEditCustomFieldsModal', 'closeEditCustomFieldsModal', 'renderCustomFieldsModal',
    'addCustomField', 'updateFieldDefinition', 'updateFieldValue',
-   'removeCustomField', 'saveCustomFields'].forEach(_trackGlobal);
+   'removeCustomField', 'saveCustomFields', 'openCustomFieldLibrary'].forEach(_trackGlobal);
 
   // =========================================================================
   // Custom Fields Section — dock panel rendering
@@ -8816,12 +8877,15 @@
       return;
     }
 
+    var seq = ++customFieldsSectionSeq;
     var fieldsToDisplay = [];
     try {
       fieldsToDisplay = LanaMatterFields.displayFields(await matterFieldsClient().listValues(matter.matter_id));
     } catch (error) {
       console.warn('[renderCustomFieldsSection] Could not load custom field values:', error && error.message);
     }
+    // A newer render (another matter, or a refresh) started while this one waited.
+    if (seq !== customFieldsSectionSeq) return;
 
     // Build lookup maps
     var defsMap = {};
@@ -8901,20 +8965,11 @@
   }
 
   function buildCustomFieldRow(field) {
-    var displayValue;
-    if (field.type === 'currency' && field.value !== null && field.value !== undefined && field.value !== '') {
-      var numVal = parseFloat(field.value);
-      if (!isNaN(numVal)) {
-        displayValue = '$' + numVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      } else {
-        displayValue = formatFieldValue(field.value);
-      }
-    } else {
-      displayValue = formatFieldValue(field.value);
-    }
+    // Values are user and AI written: always escaped (LanaMatterFields.displayHtml).
     return '<div class="flex justify-between">' +
       '<dt class="text-gray-500">' + escapeHtml(field.displayName) + '</dt>' +
-      '<dd class="text-gray-900 text-right max-w-[180px] truncate" title="' + escapeHtml(String(field.value)) + '">' + displayValue + '</dd>' +
+      '<dd class="text-gray-900 text-right max-w-[180px] truncate" title="' + escapeHtml(LanaMatterFields.displayText(field)) + '">' +
+        LanaMatterFields.displayHtml(field) + '</dd>' +
     '</div>';
   }
 

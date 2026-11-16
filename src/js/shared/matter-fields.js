@@ -2,39 +2,46 @@
  * matter-fields.js
  * View mapping and request building for typed custom matter fields.
  *
- * The server is the system of record (LANA-AI services/matter-fields):
- *   - definitions are org-level, shared by every matter in the organization:
- *       GET/POST /api/v1/matter-field-definitions, PATCH/DELETE .../:id
- *       (DELETE archives; field_key cannot change once created)
- *   - values belong to one matter:
- *       GET/PUT /api/v1/matters/:matter_id/field-values
- *       (bulk PUT { values: [{ field_key, value }] }; a null value clears)
- * PUT /matters/:id/settings refuses custom_fields and custom_field_definitions.
+ * The server is the system of record (LANA-AI services/matter-fields). A field
+ * definition lives in the organization's library, but it applies only to the
+ * matters (and workspaces, which are matters) that attached it:
+ *   - this matter's fields:  GET  /api/v1/matters/:id/field-attachments
+ *   - attach / detach:       POST /api/v1/matters/:id/field-attachments { field_definition_id }
+ *                            DELETE /api/v1/matters/:id/field-attachments/:definition_id
+ *                            (detach keeps the matter's value, hidden)
+ *   - the library picker:    GET  /api/v1/matters/:id/field-library?q=  (each row has `attached`)
+ *   - create / edit a field: POST /api/v1/matter-field-definitions, PATCH .../:id
+ *   - values:                GET/PUT /api/v1/matters/:id/field-values (null clears)
+ * A value for an unattached field is refused, so a new field is attached
+ * before its value is written. PUT /matters/:id/settings refuses custom fields.
  *
  * The drawer works on a state { definitions, values }:
  *   definitions: [{ id?, key, display_name, type, required, options, default_value }]
- *                (no id = not saved yet)
+ *                (no id = not created yet; an id not in the loaded state = picked
+ *                from the library, to attach)
  *   values:      [{ key, value }]
- * The server coerces and validates every value; this module only maps shapes,
- * diffs the drawer against what was loaded and words the server's refusals.
+ * The server coerces and validates every value; this module maps shapes, diffs
+ * the drawer against what was loaded, escapes values for display and words
+ * the server's refusals.
  *
  * Public API (window.LanaMatterFields, or module.exports in Node):
- *   - TYPE_OPTIONS / typeOptions(def)   -> lex-select options for the Type control
- *   - hasOptions(type)                  -> select and multiselect take an option list
- *   - isReadOnlyValue(type)             -> person/party values are not edited here
- *   - definitionsRequest()/valuesRequest(matterId) -> { method, path }
- *   - toDrawerState(defsResponse, valuesResponse)  -> drawer state
- *   - cloneState(state)
- *   - planSave(baseline, current)       -> { errors, creates, updates, archives, values }
- *   - buildSaveRequests(matterId, plan) -> [{ method, path, body? }] in send order
- *   - adoptIds(current, baseline)       -> stamps saved ids onto current definitions by key
- *   - displayFields(valuesResponse)     -> [{ key, displayName, value, type }] with a value
- *   - errorMessage(error)               -> the server's message, validation details included
+ *   - TYPE_OPTIONS / typeOptions(def), typeLabel(type), hasOptions(type), isReadOnlyValue(type)
+ *   - attachedRequest, valuesRequest, libraryRequest, createRequest, attachRequest,
+ *     detachRequest, updateRequest, valuesWriteRequest -> { method, path, body? }
+ *   - toDrawerState(attachedResponse, valuesResponse) -> drawer state
+ *   - cloneState(state), addLibraryField(state, libraryDefinition)
+ *   - libraryOptions(libraryResponse, state) -> lex-select options for the picker
+ *   - findLibraryDefinition(libraryResponse, fieldKey) -> exact key match or null
+ *   - planSave(baseline, current) -> { errors, creates, attaches, updates, detaches, values }
+ *   - adoptIds(current, baseline)
+ *   - displayFields(valuesResponse), displayHtml(field), placeholderFor(def)
+ *   - errorMessage(error)
  */
 (function (global) {
   'use strict';
 
   var DEFINITIONS_PATH = '/api/v1/matter-field-definitions';
+  var LIBRARY_PAGE = 200;
 
   // person and party hold structured values and are not offered for new fields.
   var TYPE_OPTIONS = [
@@ -59,6 +66,14 @@
     return TYPE_OPTIONS;
   }
 
+  function typeLabel(type) {
+    if (READ_ONLY_TYPES[type]) return READ_ONLY_TYPES[type];
+    for (var i = 0; i < TYPE_OPTIONS.length; i++) {
+      if (TYPE_OPTIONS[i].value === type) return TYPE_OPTIONS[i].label;
+    }
+    return type || 'Text';
+  }
+
   function hasOptions(type) {
     return type === 'select' || type === 'multiselect';
   }
@@ -67,39 +82,67 @@
     return !!READ_ONLY_TYPES[type];
   }
 
-  function matterPath(matterId) {
-    return '/api/v1/matters/' + encodeURIComponent(matterId) + '/field-values';
+  function matterBase(matterId) {
+    return '/api/v1/matters/' + encodeURIComponent(matterId);
   }
 
-  function definitionsRequest() {
-    return { method: 'GET', path: DEFINITIONS_PATH + '?limit=500' };
+  function attachedRequest(matterId) {
+    return { method: 'GET', path: matterBase(matterId) + '/field-attachments' };
   }
 
   function valuesRequest(matterId) {
-    return { method: 'GET', path: matterPath(matterId) };
+    return { method: 'GET', path: matterBase(matterId) + '/field-values' };
+  }
+
+  function libraryRequest(matterId, query) {
+    var path = matterBase(matterId) + '/field-library?limit=' + LIBRARY_PAGE;
+    if (query) path += '&q=' + encodeURIComponent(query);
+    return { method: 'GET', path: path };
+  }
+
+  function createRequest(body) {
+    return { method: 'POST', path: DEFINITIONS_PATH, body: body };
+  }
+
+  function attachRequest(matterId, definitionId) {
+    return { method: 'POST', path: matterBase(matterId) + '/field-attachments', body: { field_definition_id: definitionId } };
+  }
+
+  function detachRequest(matterId, definitionId) {
+    return { method: 'DELETE', path: matterBase(matterId) + '/field-attachments/' + encodeURIComponent(definitionId) };
+  }
+
+  function updateRequest(update) {
+    return { method: 'PATCH', path: DEFINITIONS_PATH + '/' + encodeURIComponent(update.id), body: update.body };
+  }
+
+  function valuesWriteRequest(matterId, values) {
+    return { method: 'PUT', path: matterBase(matterId) + '/field-values', body: { values: values } };
   }
 
   function dataOf(response) {
     return (response && response.data) || {};
   }
 
-  function toDrawerState(definitionsResponse, valuesResponse) {
-    var defs = dataOf(definitionsResponse).definitions || [];
+  function toDefinition(d) {
+    return {
+      id: d.id,
+      key: d.field_key,
+      display_name: d.field_label || '',
+      type: d.field_type || 'text',
+      required: d.is_required === true,
+      options: Array.isArray(d.options) ? d.options.slice() : [],
+      default_value: d.default_value === undefined ? null : d.default_value
+    };
+  }
+
+  function toDrawerState(attachedResponse, valuesResponse) {
+    var defs = dataOf(attachedResponse).fields || [];
     var rows = dataOf(valuesResponse).values || [];
     var byKey = {};
     rows.forEach(function (row) { byKey[row.field_key] = row.value; });
 
-    var definitions = defs.map(function (d) {
-      return {
-        id: d.id,
-        key: d.field_key,
-        display_name: d.field_label || '',
-        type: d.field_type || 'text',
-        required: d.is_required === true,
-        options: Array.isArray(d.options) ? d.options.slice() : [],
-        default_value: d.default_value === undefined ? null : d.default_value
-      };
-    });
+    var definitions = defs.map(toDefinition);
     var values = definitions.map(function (d) {
       var v = byKey[d.key];
       return { key: d.key, value: v === null || v === undefined ? '' : v };
@@ -109,6 +152,40 @@
 
   function cloneState(state) {
     return JSON.parse(JSON.stringify(state || { definitions: [], values: [] }));
+  }
+
+  /** Add a library field picked in the drawer; it is attached on save. */
+  function addLibraryField(state, libraryDefinition) {
+    var next = cloneState(state);
+    var def = toDefinition(libraryDefinition);
+    var already = next.definitions.some(function (d) { return d.id === def.id || d.key === def.key; });
+    if (!already) {
+      next.definitions.push(def);
+      next.values.push({ key: def.key, value: '' });
+    }
+    return next;
+  }
+
+  function libraryOptions(libraryResponse, state) {
+    var used = {};
+    ((state && state.definitions) || []).forEach(function (d) { if (d.id) used[d.id] = true; });
+    return (dataOf(libraryResponse).definitions || []).map(function (d) {
+      var taken = d.attached === true || used[d.id] === true;
+      return {
+        value: d.id,
+        label: (d.field_label || d.field_key) + ' (' + d.field_key + ')',
+        description: taken ? 'Already on this matter' : typeLabel(d.field_type),
+        disabled: taken
+      };
+    });
+  }
+
+  function findLibraryDefinition(libraryResponse, fieldKey) {
+    var defs = dataOf(libraryResponse).definitions || [];
+    for (var i = 0; i < defs.length; i++) {
+      if (defs[i].field_key === fieldKey) return defs[i];
+    }
+    return null;
   }
 
   /** The value as it is sent: null for blank, typed where the input is loose. */
@@ -147,7 +224,7 @@
   }
 
   function planSave(baseline, current) {
-    var plan = { errors: [], creates: [], updates: [], archives: [], values: [] };
+    var plan = { errors: [], creates: [], attaches: [], updates: [], detaches: [], values: [] };
     var defs = (current && current.definitions) || [];
     var baseDefs = (baseline && baseline.definitions) || [];
 
@@ -166,26 +243,30 @@
 
     defs.forEach(function (d) {
       var label = String(d.display_name).trim();
-      var choice = hasOptions(d.type);
       var options = (d.options || []).map(function (o) { return String(o).trim(); }).filter(function (o) { return o; });
-      if (!d.id || !baseById[d.id]) {
+      if (!d.id) {
         var body = { field_key: String(d.key).trim(), field_label: label, field_type: d.type || 'text', is_required: d.required === true };
-        if (choice) body.options = options;
-        plan.creates.push(body);
+        if (hasOptions(d.type)) body.options = options;
+        plan.creates.push({ key: body.field_key, body: body });
+        return;
+      }
+      if (!baseById[d.id]) {
+        plan.attaches.push(d.id); // picked from the library
         return;
       }
       keptIds[d.id] = true;
+      // A saved field's type never changes here: the stored values would
+      // become unreadable in every matter. Label, required and options do.
       var before = baseById[d.id];
       var patch = {};
       if (label !== before.display_name) patch.field_label = label;
-      if (d.type !== before.type) patch.field_type = d.type;
       if ((d.required === true) !== (before.required === true)) patch.is_required = d.required === true;
-      if (choice && (d.type !== before.type || !sameValue(options, before.options || []))) patch.options = options;
+      if (hasOptions(before.type) && !sameValue(options, before.options || [])) patch.options = options;
       if (Object.keys(patch).length) plan.updates.push({ id: d.id, body: patch });
     });
 
     baseDefs.forEach(function (d) {
-      if (d.id && !keptIds[d.id]) plan.archives.push(d.id);
+      if (d.id && !keptIds[d.id]) plan.detaches.push(d.id);
     });
 
     var now = valueMap(current.values);
@@ -199,24 +280,7 @@
     return plan;
   }
 
-  function buildSaveRequests(matterId, plan) {
-    var requests = [];
-    plan.creates.forEach(function (body) {
-      requests.push({ method: 'POST', path: DEFINITIONS_PATH, body: body });
-    });
-    plan.updates.forEach(function (u) {
-      requests.push({ method: 'PATCH', path: DEFINITIONS_PATH + '/' + encodeURIComponent(u.id), body: u.body });
-    });
-    plan.archives.forEach(function (id) {
-      requests.push({ method: 'DELETE', path: DEFINITIONS_PATH + '/' + encodeURIComponent(id) });
-    });
-    if (plan.values.length) {
-      requests.push({ method: 'PUT', path: matterPath(matterId), body: { values: plan.values } });
-    }
-    return requests;
-  }
-
-  /** After a partial save, give unsaved drawer fields the ids the server now has. */
+  /** After a partial save, give drawer fields the ids the server now has. */
   function adoptIds(current, baseline) {
     var idByKey = {};
     ((baseline && baseline.definitions) || []).forEach(function (d) { idByKey[d.key] = d.id; });
@@ -241,6 +305,44 @@
       });
   }
 
+  function escapeHtml(text) {
+    return String(text)
+      .split('&').join('&amp;')
+      .split('<').join('&lt;')
+      .split('>').join('&gt;')
+      .split('"').join('&quot;')
+      .split("'").join('&#39;');
+  }
+
+  /** Plain text for a stored value; the caller decides how to show it. */
+  function displayText(field) {
+    var value = field && field.value;
+    if (value === null || value === undefined || value === '') return 'Not set';
+    if (field.type === 'currency') {
+      var num = typeof value === 'number' ? value : parseFloat(value);
+      if (Number.isFinite(num)) {
+        return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+    }
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+    if (Array.isArray(value)) return value.map(function (v) { return String(v); }).join(', ');
+    if (typeof value === 'object') return JSON.stringify(value);
+    return String(value);
+  }
+
+  /** A stored value, escaped for an HTML string. Values are untrusted. */
+  function displayHtml(field) {
+    return escapeHtml(displayText(field));
+  }
+
+  /** Input hint: the field's default when it has one (shown, never saved). */
+  function placeholderFor(def) {
+    if (def && def.default_value !== null && def.default_value !== undefined && String(def.default_value) !== '') {
+      return 'Default: ' + def.default_value;
+    }
+    return 'Enter ' + ((def && (def.display_name || def.key)) || 'a value');
+  }
+
   function errorMessage(error) {
     if (!error) return 'Could not save custom fields';
     var body = error.data && error.data.error;
@@ -258,16 +360,28 @@
   var moduleApi = {
     TYPE_OPTIONS: TYPE_OPTIONS,
     typeOptions: typeOptions,
+    typeLabel: typeLabel,
     hasOptions: hasOptions,
     isReadOnlyValue: isReadOnlyValue,
-    definitionsRequest: definitionsRequest,
+    attachedRequest: attachedRequest,
     valuesRequest: valuesRequest,
+    libraryRequest: libraryRequest,
+    createRequest: createRequest,
+    attachRequest: attachRequest,
+    detachRequest: detachRequest,
+    updateRequest: updateRequest,
+    valuesWriteRequest: valuesWriteRequest,
     toDrawerState: toDrawerState,
     cloneState: cloneState,
+    addLibraryField: addLibraryField,
+    libraryOptions: libraryOptions,
+    findLibraryDefinition: findLibraryDefinition,
     planSave: planSave,
-    buildSaveRequests: buildSaveRequests,
     adoptIds: adoptIds,
     displayFields: displayFields,
+    displayText: displayText,
+    displayHtml: displayHtml,
+    placeholderFor: placeholderFor,
     errorMessage: errorMessage
   };
 

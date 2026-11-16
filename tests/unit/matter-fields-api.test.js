@@ -1,21 +1,24 @@
 'use strict';
 
 // The matter "Edit Custom Fields" drawer writes through the typed matter-field
-// endpoints. PUT /matters/:id/settings refuses custom_fields and
-// custom_field_definitions, so no request built here may go there.
+// endpoints. A field lives in the organization library but applies only to
+// the matters that attached it: the drawer lists this matter's attached
+// fields, creates new ones (library + attach here), attaches existing ones
+// from the library, and detaches. PUT /matters/:id/settings refuses custom
+// fields, so no request built here may go there.
 
 const MatterFields = require('../../src/js/shared/matter-fields.js');
 const MatterFieldsAPIClient = require('../../src/js/api/matter-fields-api.client.js');
 
-const SERVER_DEFINITIONS = {
+const SERVER_ATTACHED = {
   status: 'success',
   data: {
-    definitions: [
+    matter_id: 'MATT-1',
+    fields: [
       { id: 'd-1', field_key: 'case_number', field_label: 'Case Number', field_type: 'text', is_required: true, options: [], default_value: null },
-      { id: 'd-2', field_key: 'stage', field_label: 'Stage', field_type: 'select', is_required: false, options: ['Open', 'Closed'], default_value: null },
+      { id: 'd-2', field_key: 'stage', field_label: 'Stage', field_type: 'select', is_required: false, options: ['Open', 'Closed'], default_value: 'Open' },
       { id: 'd-3', field_key: 'estate_value', field_label: 'Estate Value', field_type: 'currency', is_required: false, options: [], default_value: null }
-    ],
-    total: 3
+    ]
   }
 };
 
@@ -30,9 +33,24 @@ const SERVER_VALUES = {
   }
 };
 
+const SERVER_LIBRARY = {
+  status: 'success',
+  data: {
+    definitions: [
+      { id: 'd-1', field_key: 'case_number', field_label: 'Case Number', field_type: 'text', is_required: true, options: [], attached: true },
+      { id: 'd-9', field_key: 'trustee', field_label: 'Trustee', field_type: 'text', is_required: false, options: [], attached: false }
+    ],
+    total: 2, limit: 200, offset: 0
+  }
+};
+
 function fakeApi(overrides = {}) {
   return {
-    get: jest.fn(async (path) => (path.indexOf('/field-values') !== -1 ? SERVER_VALUES : SERVER_DEFINITIONS)),
+    get: jest.fn(async (path) => {
+      if (path.indexOf('/field-values') !== -1) return SERVER_VALUES;
+      if (path.indexOf('/field-library') !== -1) return SERVER_LIBRARY;
+      return SERVER_ATTACHED;
+    }),
     post: jest.fn(async (path, body) => ({ status: 'success', data: Object.assign({ id: 'd-new' }, body) })),
     patch: jest.fn(async () => ({ status: 'success', data: {} })),
     put: jest.fn(async () => ({ status: 'success', data: { values: [] } })),
@@ -42,17 +60,18 @@ function fakeApi(overrides = {}) {
 }
 
 function loadedState() {
-  return MatterFields.toDrawerState(SERVER_DEFINITIONS, SERVER_VALUES);
+  return MatterFields.toDrawerState(SERVER_ATTACHED, SERVER_VALUES);
 }
 
 describe('matter-fields model', () => {
-  test('maps definitions and values into the drawer state', () => {
+  test('maps this matter\'s attached fields and values into the drawer state', () => {
     const state = loadedState();
     expect(state.definitions).toEqual([
       { id: 'd-1', key: 'case_number', display_name: 'Case Number', type: 'text', required: true, options: [], default_value: null },
-      { id: 'd-2', key: 'stage', display_name: 'Stage', type: 'select', required: false, options: ['Open', 'Closed'], default_value: null },
+      { id: 'd-2', key: 'stage', display_name: 'Stage', type: 'select', required: false, options: ['Open', 'Closed'], default_value: 'Open' },
       { id: 'd-3', key: 'estate_value', display_name: 'Estate Value', type: 'currency', required: false, options: [], default_value: null }
     ]);
+    // A default is a hint, never a value: stage stays blank.
     expect(state.values).toEqual([
       { key: 'case_number', value: 'A-100' },
       { key: 'stage', value: '' },
@@ -60,84 +79,91 @@ describe('matter-fields model', () => {
     ]);
   });
 
-  test('an unchanged drawer builds no requests', () => {
+  test('an unchanged drawer plans nothing', () => {
     const base = loadedState();
     const plan = MatterFields.planSave(base, MatterFields.cloneState(base));
-    expect(plan.errors).toEqual([]);
-    expect(MatterFields.buildSaveRequests('MATT-1', plan)).toEqual([]);
+    expect(plan).toEqual({ errors: [], creates: [], attaches: [], updates: [], detaches: [], values: [] });
   });
 
-  test('builds org-level definition writes, then one bulk value write for this matter', () => {
+  test('plans creates, attaches of library fields, label edits, detaches and one value write', () => {
     const base = loadedState();
-    const edit = MatterFields.cloneState(base);
-    edit.definitions[0].display_name = 'Court Case Number';       // label change
-    edit.definitions[1].options = ['Open', 'Pending', 'Closed'];  // option change
-    edit.definitions.splice(2, 1);                                // remove estate_value
+    let edit = MatterFields.cloneState(base);
+    edit.definitions[0].display_name = 'Court Case Number';
+    edit.definitions[1].options = ['Open', 'Pending', 'Closed'];
+    edit.definitions.splice(2, 1); // remove estate_value from this matter
+    edit = MatterFields.addLibraryField(edit, SERVER_LIBRARY.data.definitions[1]);
     edit.definitions.push({ key: 'filing_date', display_name: 'Filing Date', type: 'date', required: false, options: [] });
-    edit.values = [
-      { key: 'case_number', value: '' },          // clear
-      { key: 'stage', value: 'Pending' },         // set
-      { key: 'estate_value', value: 1 },          // field removed: not written
-      { key: 'filing_date', value: '2026-11-01' } // value on a new field
-    ];
+    edit.values.push({ key: 'filing_date', value: '2026-11-01' });
+    edit.values[0].value = '';
+    edit.values[1].value = 'Pending';
+    edit.values.find((v) => v.key === 'trustee').value = 'Ann';
 
     const plan = MatterFields.planSave(base, edit);
     expect(plan.errors).toEqual([]);
-    const requests = MatterFields.buildSaveRequests('MATT-1', plan);
-
-    expect(requests).toEqual([
-      {
-        method: 'POST',
-        path: '/api/v1/matter-field-definitions',
-        body: { field_key: 'filing_date', field_label: 'Filing Date', field_type: 'date', is_required: false }
-      },
-      { method: 'PATCH', path: '/api/v1/matter-field-definitions/d-1', body: { field_label: 'Court Case Number' } },
-      { method: 'PATCH', path: '/api/v1/matter-field-definitions/d-2', body: { options: ['Open', 'Pending', 'Closed'] } },
-      { method: 'DELETE', path: '/api/v1/matter-field-definitions/d-3' },
-      {
-        method: 'PUT',
-        path: '/api/v1/matters/MATT-1/field-values',
-        body: {
-          values: [
-            { field_key: 'case_number', value: null },
-            { field_key: 'stage', value: 'Pending' },
-            { field_key: 'filing_date', value: '2026-11-01' }
-          ]
-        }
-      }
+    expect(plan.creates).toEqual([
+      { key: 'filing_date', body: { field_key: 'filing_date', field_label: 'Filing Date', field_type: 'date', is_required: false } }
     ]);
-    requests.forEach((r) => expect(r.path).not.toMatch(/\/settings/));
+    expect(plan.attaches).toEqual(['d-9']);
+    expect(plan.updates).toEqual([
+      { id: 'd-1', body: { field_label: 'Court Case Number' } },
+      { id: 'd-2', body: { options: ['Open', 'Pending', 'Closed'] } }
+    ]);
+    expect(plan.detaches).toEqual(['d-3']);
+    expect(plan.values).toEqual([
+      { field_key: 'case_number', value: null },
+      { field_key: 'stage', value: 'Pending' },
+      { field_key: 'trustee', value: 'Ann' },
+      { field_key: 'filing_date', value: '2026-11-01' }
+    ]);
   });
 
-  test('a choice field sends its options and a multiselect value as a list', () => {
-    const base = { definitions: [], values: [] };
-    const edit = {
-      definitions: [{ key: 'assets', display_name: 'Assets', type: 'multiselect', required: true, options: ['House', 'Car'] }],
-      values: [{ key: 'assets', value: ['Car'] }]
-    };
-    const requests = MatterFields.buildSaveRequests('MATT 2', MatterFields.planSave(base, edit));
-    expect(requests[0].body).toEqual({
-      field_key: 'assets', field_label: 'Assets', field_type: 'multiselect', is_required: true, options: ['House', 'Car']
-    });
-    expect(requests[1]).toEqual({
-      method: 'PUT',
-      path: '/api/v1/matters/MATT%202/field-values',
-      body: { values: [{ field_key: 'assets', value: ['Car'] }] }
-    });
+  test('a saved field never sends a type change (it would strand stored values)', () => {
+    const base = loadedState();
+    const edit = MatterFields.cloneState(base);
+    edit.definitions[2].type = 'text';
+    expect(MatterFields.planSave(base, edit).updates).toEqual([]);
+  });
+
+  test('request builders target the typed endpoints, never settings', () => {
+    const requests = [
+      MatterFields.attachedRequest('MATT 1'),
+      MatterFields.valuesRequest('MATT 1'),
+      MatterFields.libraryRequest('MATT 1', 'law'),
+      MatterFields.createRequest({ field_key: 'x', field_label: 'X', field_type: 'text', is_required: false }),
+      MatterFields.attachRequest('MATT 1', 'd-1'),
+      MatterFields.detachRequest('MATT 1', 'd-1'),
+      MatterFields.updateRequest({ id: 'd-1', body: { field_label: 'Y' } }),
+      MatterFields.valuesWriteRequest('MATT 1', [{ field_key: 'x', value: 'v' }])
+    ];
+    expect(requests).toEqual([
+      { method: 'GET', path: '/api/v1/matters/MATT%201/field-attachments' },
+      { method: 'GET', path: '/api/v1/matters/MATT%201/field-values' },
+      { method: 'GET', path: '/api/v1/matters/MATT%201/field-library?limit=200&q=law' },
+      { method: 'POST', path: '/api/v1/matter-field-definitions', body: { field_key: 'x', field_label: 'X', field_type: 'text', is_required: false } },
+      { method: 'POST', path: '/api/v1/matters/MATT%201/field-attachments', body: { field_definition_id: 'd-1' } },
+      { method: 'DELETE', path: '/api/v1/matters/MATT%201/field-attachments/d-1' },
+      { method: 'PATCH', path: '/api/v1/matter-field-definitions/d-1', body: { field_label: 'Y' } },
+      { method: 'PUT', path: '/api/v1/matters/MATT%201/field-values', body: { values: [{ field_key: 'x', value: 'v' }] } }
+    ]);
+  });
+
+  test('library options mark fields this matter already uses as not choosable', () => {
+    expect(MatterFields.libraryOptions(SERVER_LIBRARY, loadedState())).toEqual([
+      { value: 'd-1', label: 'Case Number (case_number)', description: 'Already on this matter', disabled: true },
+      { value: 'd-9', label: 'Trustee (trustee)', description: 'Text', disabled: false }
+    ]);
   });
 
   test('numbers typed as text are unchanged values, booleans are values not blanks', () => {
     const base = loadedState();
     const edit = MatterFields.cloneState(base);
     edit.values[2].value = '250000';
-    expect(MatterFields.buildSaveRequests('MATT-1', MatterFields.planSave(base, edit))).toEqual([]);
+    expect(MatterFields.planSave(base, edit).values).toEqual([]);
 
     const b = { definitions: [{ id: 'd-9', key: 'signed', display_name: 'Signed', type: 'boolean', required: false, options: [] }], values: [{ key: 'signed', value: '' }] };
     const e = MatterFields.cloneState(b);
     e.values[0].value = false;
-    expect(MatterFields.buildSaveRequests('M', MatterFields.planSave(b, e))[0].body).toEqual({
-      values: [{ field_key: 'signed', value: false }]
-    });
+    expect(MatterFields.planSave(b, e).values).toEqual([{ field_key: 'signed', value: false }]);
   });
 
   test('refuses a missing name and duplicate keys before any request', () => {
@@ -152,6 +178,30 @@ describe('matter-fields model', () => {
       ],
       values: []
     }).errors).toEqual(['Duplicate field keys: dup']);
+  });
+
+  test('displayHtml escapes every value shape, including a stored script payload', () => {
+    const payload = '<img src=x onerror=alert(1)>';
+    const shapes = [
+      { type: 'text', value: payload },
+      { type: 'text', value: payload + 'x'.repeat(80) },
+      { type: 'multiselect', value: [payload, 'b'] },
+      { type: 'person', value: { name: payload } },
+      { type: 'currency', value: payload }
+    ];
+    shapes.forEach((field) => {
+      const html = MatterFields.displayHtml(field);
+      expect(html).not.toMatch(/<img/i);
+      expect(html).toContain('&lt;img');
+    });
+    expect(MatterFields.displayHtml({ type: 'currency', value: 1234.5 })).toBe('$1,234.50');
+    expect(MatterFields.displayHtml({ type: 'boolean', value: false })).toBe('No');
+    expect(MatterFields.displayHtml({ type: 'multiselect', value: ['House', 'Car'] })).toBe('House, Car');
+  });
+
+  test('placeholderFor shows a default as a hint without making it a value', () => {
+    expect(MatterFields.placeholderFor({ key: 'stage', display_name: 'Stage', default_value: 'Open' })).toBe('Default: Open');
+    expect(MatterFields.placeholderFor({ key: 'stage', display_name: 'Stage', default_value: null })).toBe('Enter Stage');
   });
 
   test('errorMessage shows the server validation details, not only "Validation failed"', () => {
@@ -172,15 +222,16 @@ describe('matter-fields model', () => {
 });
 
 describe('MatterFieldsAPIClient', () => {
-  test('loadDrawer reads definitions and this matter\'s values from the typed endpoints', async () => {
+  test('loadDrawer reads this matter\'s attached fields and values', async () => {
     const api = fakeApi();
     const state = await new MatterFieldsAPIClient(api).loadDrawer('MATT-1');
-    expect(api.get).toHaveBeenCalledWith('/api/v1/matter-field-definitions?limit=500');
+    expect(api.get).toHaveBeenCalledWith('/api/v1/matters/MATT-1/field-attachments');
     expect(api.get).toHaveBeenCalledWith('/api/v1/matters/MATT-1/field-values');
+    expect(api.get).not.toHaveBeenCalledWith(expect.stringContaining('/matter-field-definitions'));
     expect(state.definitions.length).toBe(3);
   });
 
-  test('saveDrawer sends each request in order and never the settings endpoint', async () => {
+  test('a new field goes to the library, is attached here, and then gets its value', async () => {
     const api = fakeApi();
     const client = new MatterFieldsAPIClient(api);
     const base = await client.loadDrawer('MATT-1');
@@ -190,13 +241,49 @@ describe('MatterFieldsAPIClient', () => {
 
     await client.saveDrawer('MATT-1', base, edit);
 
-    expect(api.post).toHaveBeenCalledWith('/api/v1/matter-field-definitions',
-      { field_key: 'notes', field_label: 'Notes', field_type: 'text', is_required: false });
-    expect(api.put).toHaveBeenCalledWith('/api/v1/matters/MATT-1/field-values',
-      { values: [{ field_key: 'notes', value: 'hello' }] });
-    expect(api.post.mock.invocationCallOrder[0]).toBeLessThan(api.put.mock.invocationCallOrder[0]);
-    const allPaths = [].concat(api.put.mock.calls, api.post.mock.calls).map((c) => c[0]);
-    allPaths.forEach((p) => expect(p).not.toMatch(/\/settings/));
+    expect(api.post.mock.calls).toEqual([
+      ['/api/v1/matter-field-definitions', { field_key: 'notes', field_label: 'Notes', field_type: 'text', is_required: false }],
+      ['/api/v1/matters/MATT-1/field-attachments', { field_definition_id: 'd-new' }]
+    ]);
+    expect(api.put).toHaveBeenCalledWith('/api/v1/matters/MATT-1/field-values', { values: [{ field_key: 'notes', value: 'hello' }] });
+    expect(api.post.mock.invocationCallOrder[1]).toBeLessThan(api.put.mock.invocationCallOrder[0]);
+    [].concat(api.put.mock.calls, api.post.mock.calls).forEach((c) => expect(c[0]).not.toMatch(/\/settings/));
+  });
+
+  test('a create that conflicts (field already in the library) attaches the existing field instead', async () => {
+    const conflict = Object.assign(new Error('exists'), { status: 409 });
+    const api = fakeApi({
+      post: jest.fn(async (path, body) => {
+        if (path === '/api/v1/matter-field-definitions') throw conflict;
+        return { status: 'success', data: body };
+      }),
+      get: jest.fn(async (path) => {
+        if (path.indexOf('/field-library') !== -1) {
+          return { data: { definitions: [{ id: 'd-77', field_key: 'notes_extra', attached: false }, { id: 'd-78', field_key: 'notes', attached: false }] } };
+        }
+        if (path.indexOf('/field-values') !== -1) return SERVER_VALUES;
+        return SERVER_ATTACHED;
+      })
+    });
+    const client = new MatterFieldsAPIClient(api);
+    const base = await client.loadDrawer('MATT-1');
+    const edit = MatterFields.cloneState(base);
+    edit.definitions.push({ key: 'notes', display_name: 'Notes', type: 'text', required: false, options: [] });
+
+    await client.saveDrawer('MATT-1', base, edit);
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/matters/MATT-1/field-library?limit=200&q=notes');
+    expect(api.post).toHaveBeenLastCalledWith('/api/v1/matters/MATT-1/field-attachments', { field_definition_id: 'd-78' });
+  });
+
+  test('remove detaches from this matter only; nothing is archived', async () => {
+    const api = fakeApi();
+    const client = new MatterFieldsAPIClient(api);
+    const base = await client.loadDrawer('MATT-1');
+    const edit = MatterFields.cloneState(base);
+    edit.definitions.splice(0, 1);
+    await client.saveDrawer('MATT-1', base, edit);
+    expect(api.delete.mock.calls).toEqual([['/api/v1/matters/MATT-1/field-attachments/d-1']]);
   });
 
   test('saveDrawer rejects with the server message and a fresh baseline after a partial write', async () => {

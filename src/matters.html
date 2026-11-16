@@ -2286,6 +2286,7 @@
     let similarMattersWidget = null;
 
     // Render Custom Fields Section (global so it can be called from other script tags)
+    let customFieldsSectionSeq = 0;
     window.renderCustomFieldsSection = async function(matter) {
       const container = document.getElementById('customFieldsSection');
       if (!container) return;
@@ -2298,6 +2299,7 @@
       }
 
       // This matter's typed field values; label and type ride along with each value
+      const seq = ++customFieldsSectionSeq;
       let fieldsToDisplay = [];
       try {
         fieldsToDisplay = LanaMatterFields.displayFields(
@@ -2305,6 +2307,8 @@
       } catch (error) {
         console.warn('[renderCustomFieldsSection] Could not load custom field values:', error && error.message);
       }
+      // A newer render (another matter, or a refresh) started while this one waited.
+      if (seq !== customFieldsSectionSeq) return;
 
       // Lookup maps for the shadow_table merge below
       const defsMap = {};
@@ -2360,22 +2364,11 @@
       ` : `
         <dl class="space-y-2 text-sm">
           ${fieldsToDisplay.map(field => {
-            let displayValue = field.value;
-
-            // Format currency values
-            if (field.type === 'currency' && field.value !== null && field.value !== undefined && field.value !== '') {
-              const numValue = parseFloat(field.value);
-              if (!isNaN(numValue)) {
-                displayValue = '$' + numValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-              }
-            } else {
-              displayValue = formatFieldValue(field.value);
-            }
-
+            // Values are user and AI written: always escaped (LanaMatterFields.displayHtml).
             return `
               <div class="flex justify-between">
                 <dt class="text-gray-500">${escapeHtml(field.displayName)}</dt>
-                <dd class="text-gray-900 text-right max-w-md truncate" title="${escapeHtml(String(field.value))}">${displayValue}</dd>
+                <dd class="text-gray-900 text-right max-w-md truncate" title="${escapeHtml(LanaMatterFields.displayText(field))}">${LanaMatterFields.displayHtml(field)}</dd>
               </div>
             `;
           }).join('')}
@@ -9977,6 +9970,7 @@
     let customFieldDefinitions = [];
     let customFieldValues = [];
     let customFieldsBaseline = null;
+    let customFieldsLibrary = null;
 
     // Open edit custom fields modal
     async function openEditCustomFieldsModal(matterId) {
@@ -10015,25 +10009,42 @@
       customFieldDefinitions = [];
       customFieldValues = [];
       customFieldsBaseline = null;
+      customFieldsLibrary = null;
     }
 
     // Render custom fields modal content
     function renderCustomFieldsModal() {
       const container = document.getElementById('customFieldsContainer');
 
+      let pickerHtml = '';
+      if (customFieldsLibrary) {
+        const libraryOptions = LanaMatterFields.libraryOptions(customFieldsLibrary, { definitions: customFieldDefinitions });
+        pickerHtml = `
+          <div class="mb-4 p-4 rounded-lg border border-gray-200">
+            <label class="block text-xs font-medium text-gray-700 mb-1">Use an existing field</label>
+            ${libraryOptions.length ? `
+              <lex-select size="sm" searchable="true" data-library-pick="true"
+                placeholder="Search your field library"
+                options="${lexSelectOptionsAttr(libraryOptions)}"></lex-select>
+            ` : '<p class="text-sm text-gray-500">Your field library is empty. Create a new field instead.</p>'}
+            <p class="mt-2 text-xs text-gray-500">Adding a field here uses it on this matter only. Other matters keep their own fields.</p>
+          </div>
+        `;
+      }
+
       if (customFieldDefinitions.length === 0) {
-        container.innerHTML = `
+        container.innerHTML = pickerHtml + `
           <div class="text-center py-8 text-gray-500">
             <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
             </svg>
-            <p class="mt-2 text-sm">No custom fields yet. Click "Add Field" to create one.</p>
+            <p class="mt-2 text-sm">No custom fields on this matter yet. Create a new field, or use one from your library.</p>
           </div>
         `;
         return;
       }
 
-      container.innerHTML = `
+      container.innerHTML = pickerHtml + `
         <div class="space-y-4">
           ${customFieldDefinitions.map((def, index) => {
             const valueObj = customFieldValues.find(v => v.key === def.key);
@@ -10074,6 +10085,7 @@
                     <lex-select
                       data-field-definition-index="${index}"
                       size="sm"
+                      ${def.id ? 'disabled="true" title="A saved field type cannot change"' : ''}
                       options="${lexSelectOptionsAttr(LanaMatterFields.typeOptions(def))}"
                       value="${lexSelectAttr(def.type || '')}"
                     ></lex-select>
@@ -10148,7 +10160,7 @@
               type="number"
               value="${escapeHtml(currentValue || '')}"
               onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
-              placeholder="Enter ${escapeHtml(def.display_name || def.key)}"
+              placeholder="${escapeHtml(LanaMatterFields.placeholderFor(def))}"
               class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             />
           `;
@@ -10164,7 +10176,7 @@
                 step="0.01"
                 value="${escapeHtml(currentValue || '')}"
                 onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
-                placeholder="0.00"
+                placeholder="${escapeHtml(def.default_value != null && def.default_value !== '' ? LanaMatterFields.placeholderFor(def) : '0.00')}"
                 class="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               />
             </div>
@@ -10224,11 +10236,36 @@
               type="text"
               value="${escapeHtml(currentValue || '')}"
               onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
-              placeholder="Enter ${escapeHtml(def.display_name || def.key)}"
+              placeholder="${escapeHtml(LanaMatterFields.placeholderFor(def))}"
               class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             />
           `;
       }
+    }
+
+    // Open the "Use an existing field" picker over the organization library
+    async function openCustomFieldLibrary() {
+      if (!currentEditFieldsMatter) return;
+      try {
+        customFieldsLibrary = await new MatterFieldsAPIClient(api).searchLibrary(currentEditFieldsMatter, '');
+      } catch (error) {
+        console.error('[openCustomFieldLibrary] Error:', error);
+        Toast.error(LanaMatterFields.errorMessage(error));
+        return;
+      }
+      renderCustomFieldsModal();
+    }
+
+    // Add the picked library field; it is attached to this matter on save
+    function useLibraryField(definitionId) {
+      const defs = (customFieldsLibrary && customFieldsLibrary.data && customFieldsLibrary.data.definitions) || [];
+      const picked = defs.find(d => d.id === definitionId);
+      if (!picked) return;
+      const next = LanaMatterFields.addLibraryField({ definitions: customFieldDefinitions, values: customFieldValues }, picked);
+      customFieldDefinitions = next.definitions;
+      customFieldValues = next.values;
+      customFieldsLibrary = null;
+      renderCustomFieldsModal();
     }
 
     // Add new custom field
@@ -10254,7 +10291,9 @@
     document.addEventListener('lex-change', (event) => {
       const target = event.target;
       if (!target || target.tagName !== 'LEX-SELECT') return;
-      if (target.dataset.fieldDefinitionIndex !== undefined) {
+      if (target.dataset.libraryPick !== undefined) {
+        useLibraryField(event.detail.value);
+      } else if (target.dataset.fieldDefinitionIndex !== undefined) {
         updateFieldDefinition(Number(target.dataset.fieldDefinitionIndex), 'type', event.detail.value);
       } else if (target.dataset.fieldValueKey !== undefined) {
         updateFieldValue(target.dataset.fieldValueKey, event.detail.value);
@@ -10294,12 +10333,15 @@
     // Remove custom field (removes both definition and value)
     function removeCustomField(index) {
       const def = customFieldDefinitions[index];
-      if (def && def.id) {
+      const saved = def && def.id && customFieldsBaseline && customFieldsBaseline.definitions.some(d => d.id === def.id);
+      if (saved) {
         Lex.Modal.confirm(
-          'Remove field for every matter',
-          `"${escapeHtml(def.display_name || def.key)}" is shared by every matter in your organization. ` +
-            'Saving removes it from all of them. Values already recorded are kept but hidden.',
-          () => dropCustomField(index)
+          'Remove field from this matter',
+          `"${escapeHtml(def.display_name || def.key)}" will be removed from this matter when you save. ` +
+            'It stays in your field library and on any other matter that uses it. ' +
+            'This matter\'s value is kept and comes back if you add the field again.',
+          () => dropCustomField(index),
+          { variant: 'danger', confirmText: 'Remove' }
         );
         return;
       }
@@ -10399,19 +10441,30 @@
   <!-- Edit Custom Fields Modal -->
   <lex-modal id="editCustomFieldsModal" heading="Edit Custom Fields" width="72rem">
       <div>
-        <p class="text-sm text-gray-500 mb-4">Fields are shared by every matter in your organization. Values are saved for this matter only.</p>
+        <p class="text-sm text-gray-500 mb-4">These fields apply to this matter only. Reuse a field from your library to add it here.</p>
         <div id="customFieldsContainer"></div>
 
-        <!-- Add Field Button -->
-        <button
-          onclick="addCustomField()"
-          class="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed border-gray-300 rounded-lg text-sm font-medium text-gray-600 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-          </svg>
-          Add Field
-        </button>
+        <!-- Add Field Buttons -->
+        <div class="mt-4 grid grid-cols-2 gap-3">
+          <button
+            onclick="addCustomField()"
+            class="w-full flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed border-gray-300 rounded-lg text-sm font-medium text-gray-600 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+            </svg>
+            Create new field
+          </button>
+          <button
+            onclick="openCustomFieldLibrary()"
+            class="w-full flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed border-gray-300 rounded-lg text-sm font-medium text-gray-600 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z"></path>
+            </svg>
+            Use an existing field
+          </button>
+        </div>
       </div>
 
       <lex-btn data-slot="footer" variant="secondary" onclick="closeEditCustomFieldsModal()">Cancel</lex-btn>
