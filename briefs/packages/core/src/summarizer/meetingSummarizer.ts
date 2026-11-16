@@ -5,6 +5,8 @@ import { assembleIntent } from "../intent/intentAssembler.js";
 import type { Intent } from "../intent/intent.js";
 import { overlapsSetAside, segmentSetAside, speakerDisplayName, type MeetingNotes, type NotesGap, type NotesTable, type SetAsidePart, type Speaker, type TranscriptSegment } from "../intent/meetingParts.js";
 import type { SourceSpan } from "../intent/keyPoint.js";
+import { INTENT_LIMITS } from "../intent/validator.js";
+import { graphemes } from "../text/graphemes.js";
 import { resolveDueText } from "./dueDates.js";
 import { groundQuotes } from "./evidenceGrounder.js";
 import { verifiedLines } from "./lineMatcher.js";
@@ -24,13 +26,7 @@ export interface NotesBackend {
   checkOpenQuestions?(request: QuestionCheckRequest, signal?: AbortSignal): Promise<QuestionResolution[]>;
 }
 
-/** The person's own choices about set-aside parts, kept across re-runs. */
-export interface SetAsideChoices {
-  /** Parts the person restored: a detected part overlapping one of these is not set aside again. */
-  readonly restored: readonly { readonly start: number; readonly end: number }[];
-  /** Ranges the person set aside themselves. */
-  readonly added: readonly SetAsidePart[];
-}
+
 
 export interface SkippedChunk {
   readonly index: number;
@@ -72,7 +68,12 @@ export interface SummarizeOptions {
   readonly meetingStart?: Date;
   /** The firm's word list: names the notes spell exactly. */
   readonly vocabulary?: readonly string[];
-  readonly setAsideChoices?: SetAsideChoices;
+  /**
+   * The person's reviewed set-aside parts, on a rewrite (the phone's `MeetingContext.setAside`).
+   * Undefined: the model finds them. Set: exactly these are kept, their lines never reach the
+   * model, and the model's ASIDE lines are ignored.
+   */
+  readonly fixedSetAside?: readonly SetAsidePart[];
 }
 
 /** Set-aside rules shared with the phone (contract): shorter detected parts are ignored; closer same-reason parts join. */
@@ -106,7 +107,9 @@ export class MeetingSummarizer {
   async summarize(options: SummarizeOptions): Promise<SummaryResult> {
     const availability = await this.backend.availability();
     if (!availability.available) throw new SummarizerUnavailableError(availability);
-    const chunks = this.chunker.chunk(options.transcript);
+    const fixed = options.fixedSetAside === undefined ? undefined : normalizeSetAside(options.fixedSetAside);
+    const visible = fixed === undefined ? options.transcript : options.transcript.filter((segment) => !segmentSetAside(segment, fixed));
+    const chunks = this.chunker.chunk(visible);
     const points: DraftPoint[] = [];
     const intents: Intent[] = [];
     const skipped: SkippedChunk[] = [];
@@ -140,7 +143,7 @@ export class MeetingSummarizer {
         if (result.ok) intents.push(result.intent);
         else dropped += 1;
       }
-      for (const aside of extraction.asides ?? []) {
+      for (const aside of fixed === undefined ? extraction.asides ?? [] : []) {
         const cited = aside.lines.flatMap((line) => {
           const segment = segmentAtLine(chunk, line);
           return segment === undefined ? [] : [segment];
@@ -163,7 +166,7 @@ export class MeetingSummarizer {
       runningSummary = this.cap(outcome.extraction.runningSummary);
       options.progress?.((chunk.index + 1) / chunks.length);
     }
-    const setAside = finalSetAside(asides, options.setAsideChoices, options.transcript);
+    const setAside = fixed ?? finalSetAside(asides, options.transcript);
     const outside = (sources: readonly SourceSpan[]): boolean => !sources.some((span) => overlapsSetAside(span.start, span.end, setAside, 0.5));
     const kept = points.filter((point) => outside(point.sources));
     const keptIntents = intents.filter((intent) => !intent.evidence.some((item) => overlapsSetAside(item.tStart, item.tEnd, setAside, 0.5)));
@@ -278,7 +281,7 @@ export function promiseAction(point: ExtractedPoint, chunk: TranscriptChunk): Qu
   const spoken = SPOKEN_WHEN.exec(point.text)?.[0];
   return {
     type: "task.create",
-    title: title.length > 200 ? title.slice(0, 200) : title,
+    title: graphemes(title).slice(0, INTENT_LIMITS.maxTitle).join(""),
     body: point.text,
     ...(spoken === undefined ? {} : { dueText: spoken }),
     assigneeHint: point.decidedBy ?? cited[0]!.speaker,
@@ -302,17 +305,37 @@ function finishCandidate(candidate: QuotedCandidate, speakers: readonly Speaker[
 }
 
 /**
- * The meeting's set-aside parts (contract): detected ranges joined when they overlap or are
- * under 5 seconds apart with the same reason, shorter than 20 seconds dropped, any the person
- * restored dropped, then the person's own ranges added; sorted, non-overlapping, with the
- * speakers heard in each.
+ * The meeting's set-aside parts from the model (contract): ranges joined when they overlap or
+ * are under 5 seconds apart with the same reason, shorter than 20 seconds dropped; sorted,
+ * non-overlapping, with the speakers heard in each.
  */
-export function finalSetAside(detected: readonly SetAsidePart[], choices: SetAsideChoices | undefined, transcript: readonly TranscriptSegment[]): SetAsidePart[] {
-  const joined = joinParts(detected, SET_ASIDE_JOIN_GAP, true)
-    .filter((part) => part.end - part.start >= MIN_SET_ASIDE_SECONDS)
-    .filter((part) => !(choices?.restored ?? []).some((restored) => Math.min(part.end, restored.end) - Math.max(part.start, restored.start) > 1));
-  const all = joinParts([...joined, ...(choices?.added ?? []).filter((part) => part.end > part.start)], 0, false);
-  return all.map((part) => {
+export function finalSetAside(detected: readonly SetAsidePart[], transcript: readonly TranscriptSegment[]): SetAsidePart[] {
+  const joined = joinParts(detected, SET_ASIDE_JOIN_GAP, true).filter((part) => part.end - part.start >= MIN_SET_ASIDE_SECONDS);
+  return withSpeakers(joined, transcript);
+}
+
+/** A part the person set aside, added to the meeting's list: overlaps join, speakers recounted. */
+export function addingSetAside(parts: readonly SetAsidePart[], part: SetAsidePart, transcript: readonly TranscriptSegment[]): SetAsidePart[] {
+  return withSpeakers(joinParts([...parts, part].filter((item) => item.end > item.start), 0, false), transcript);
+}
+
+/** Sorted, overlaps joined, empty parts dropped, speakers kept as stored (the phone's `SetAside.normalized`). */
+export function normalizeSetAside(parts: readonly SetAsidePart[]): SetAsidePart[] {
+  const out: SetAsidePart[] = [];
+  for (const part of [...parts].filter((item) => item.end > item.start).sort((a, b) => a.start - b.start || a.end - b.end)) {
+    const last = out.at(-1);
+    if (last !== undefined && part.start < last.end) {
+      const reason = part.end - part.start > last.end - last.start ? part.reason : last.reason;
+      out[out.length - 1] = { ...last, end: Math.max(last.end, part.end), reason };
+    } else {
+      out.push(part);
+    }
+  }
+  return out;
+}
+
+function withSpeakers(parts: readonly SetAsidePart[], transcript: readonly TranscriptSegment[]): SetAsidePart[] {
+  return parts.map((part) => {
     const speakers = [...new Set(transcript.filter((segment) => segmentSetAside(segment, [part])).map((segment) => segment.speaker))].sort();
     return speakers.length === 0 ? { start: part.start, end: part.end, reason: part.reason } : { start: part.start, end: part.end, reason: part.reason, speakers };
   });

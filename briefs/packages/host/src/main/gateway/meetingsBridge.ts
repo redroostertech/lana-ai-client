@@ -1,6 +1,6 @@
 import type { AttestationMethod as CoreMethod } from "@lana/core/handoff";
 import { parseLanaId } from "@lana/core/ids";
-import { displayTitleOf, segmentSetAside, speakerDisplayName, type IntentParams, type MeetingRecord as CoreMeeting } from "@lana/core/intent";
+import { displayTitleOf, overlapsSetAside, segmentSetAside, speakerDisplayName, type IntentParams, type MeetingRecord as CoreMeeting } from "@lana/core/intent";
 import type { GatewayStore, MeetingOrigin } from "@lana/core/store";
 import type { AttestationMethod, MeetingRecord, MeetingsApi, MeetingSummary, Result } from "../../shared/api.js";
 import type { MainLog } from "../log.js";
@@ -26,16 +26,17 @@ export function toApiMeeting(record: CoreMeeting, extra: { method: CoreMethod; o
     durationSeconds: record.durationSeconds,
     speakers: record.speakers.map((speaker) => ({ id: speaker.id, name: speakerDisplayName(speaker) })),
     transcript: record.transcript.map((segment) => ({ speaker: segment.speaker, start: segment.start, end: segment.end, text: segment.text })),
-    keyPoints: record.notes.keyPoints.map((point) => ({
+    // Anything citing a set-aside part (one set aside after the notes were written) is not shown.
+    keyPoints: record.notes.keyPoints.filter((point) => !point.sources.some((span) => overlapsSetAside(span.start, span.end, record.notes.setAside, 0.5))).map((point) => ({
       id: point.id,
       kind: point.kind === "open_question" ? "openQuestion" : point.kind,
-      text: point.text,
+      text: pointText(point.text),
       sources: point.sources.map((span) => ({ start: span.start, end: span.end, speaker: span.speaker ?? null })),
       precision: point.precision,
       decidedBy: point.decidedBy ?? null,
     })),
     setAside: (record.notes.setAside ?? []).map((part) => ({ start: part.start, end: part.end, reason: part.reason, speakers: [...(part.speakers ?? [])] })),
-    tables: (record.notes.tables ?? []).map((table) => ({
+    tables: (record.notes.tables ?? []).filter((table) => !table.sources.some((span) => overlapsSetAside(span.start, span.end, record.notes.setAside, 0.5))).map((table) => ({
       title: table.title, columns: [...table.columns], rows: table.rows.map((row) => [...row]),
       sources: table.sources.map((span) => ({ start: span.start, end: span.end, speaker: span.speaker ?? null })),
     })),
@@ -48,6 +49,15 @@ export function toApiMeeting(record: CoreMeeting, extra: { method: CoreMethod; o
     attestationMethod: toApiMethod(extra.method, extra.origin),
     hasAudio: extra.hasAudio,
   };
+}
+
+/**
+ * A key point's text as shown and exported. Notes written before strict reading can hold raw
+ * model fields ("a | none | b"); only the first non-empty field is shown, never a "|".
+ */
+export function pointText(text: string): string {
+  if (!text.includes("|")) return text;
+  return text.split("|").map((field) => field.trim()).find((field) => field !== "") ?? "";
 }
 
 /** Whether every speaker with a line outside the set-aside parts has a typed name. */
@@ -97,12 +107,13 @@ export class MeetingsBridge implements Omit<MeetingsApi, "audio"> {
       const actions = this.store.intents
         .list({ meetingID })
         .filter((stored) => !HIDDEN_STATUSES.has(stored.intent.status))
+        .filter((stored) => !stored.intent.evidence.some((item) => overlapsSetAside(item.tStart, item.tEnd, record.notes.setAside, 0.5)))
         .map((stored) => {
           const evidence = stored.intent.evidence;
           const start = evidence.length === 0 ? 0 : Math.min(...evidence.map((item) => item.tStart));
           return {
             id: stored.intent.id,
-            title: displayTitleOf(stored.intent.params),
+            title: pointText(displayTitleOf(stored.intent.params)),
             at: start,
             confirmed: CONFIRMED_STATUSES.has(stored.intent.status),
             ...actionFacts(stored.intent.params),

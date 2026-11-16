@@ -128,7 +128,11 @@ export class LanaClient {
     if (!Array.isArray(connectors)) throw new LanaError("invalidResponse");
     return connectors.flatMap((item) => {
       const row = asRecord(item);
-      const name = row === null ? null : text(row["display_name"]) ?? text(row["name"]);
+      if (row === null) return [];
+      // Only systems the firm actually connected: no disconnected, failed or catalog rows.
+      const status = (text(row["status"]) ?? text(row["auth_status"]) ?? "").toLowerCase();
+      if (status !== "" && !["active", "connected", "authorized", "authenticated", "healthy", "syncing", "ok"].includes(status)) return [];
+      const name = text(row["display_name"]) ?? text(row["name"]);
       return name === null ? [] : [name];
     });
   }

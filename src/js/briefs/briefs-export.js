@@ -160,11 +160,13 @@
       && !(point.sources || []).some((span) => citesSetAside(record, span.start, span.end)));
   }
 
+  /** Actions not citing a set-aside part. The view gives the first and last quote times, so each is checked on its own. */
   function actionsOf(record) {
+    const inside = (time) => setAsideParts(record).some((part) => time >= part.start && time < part.end);
     return (record.actions || []).filter((action) => {
       const start = Number.isFinite(action.start) ? action.start : action.at;
       const end = Number.isFinite(action.end) ? action.end : start;
-      return !citesSetAside(record, start, end);
+      return !inside(start) && !inside(end);
     }).sort((a, b) => a.at - b.at);
   }
 
@@ -278,9 +280,9 @@ ${record.speakersNamed === false ? '  <p class="ex-notice">Speakers have no name
   }
 
   function tablesSection(record) {
-    const tables = (record.tables || []).map((table) => Object.assign({}, table, {
-      rows: (table.rows || []).filter(() => !(table.sources || []).every((span) => citesSetAside(record, span.start, span.end))),
-    })).filter((table) => table.rows.length > 0 && (table.columns || []).length > 0);
+    // A table citing a set-aside part is left out whole: its rows carry no times of their own.
+    const tables = (record.tables || []).filter((table) => (table.rows || []).length > 0 && (table.columns || []).length > 0
+      && !(table.sources || []).some((span) => citesSetAside(record, span.start, span.end)));
     if (tables.length === 0) return '';
     return `<section class="ex-section"><h2 class="ex-h2">Tables</h2>
   ${tables.map((table) => `<h3 class="ex-h3">${escape(table.title)}</h3>

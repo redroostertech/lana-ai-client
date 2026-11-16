@@ -983,9 +983,9 @@
 
   // ── Set-aside parts and writing the notes again ───────
 
-  async function writeNotesAgain() {
-    const id = state.selectedId;
-    if (!recordedHere() || state.rewriting) return;
+  /** Writes the notes again for meeting `id`, only while it is still the open meeting. */
+  async function writeNotesAgain(id = state.selectedId) {
+    if (state.selectedId !== id || !recordedHere() || state.rewriting) return;
     state.rewriting = true;
     renderSide();
     Lex.Toast.info('LANA is writing the notes again.');
@@ -1003,18 +1003,20 @@
     state.asideMenu = false;
     setSelection(null);
     const done = await attempt(() => bridge().records.setAside(id, S.first(selection), S.last(selection), reason));
-    if (!done) return;
+    if (!done || state.selectedId !== id) return;
     await loadMeeting(id, true);
-    if (recordedHere()) writeNotesAgain();
+    if (state.selectedId !== id) return;
+    if (recordedHere()) writeNotesAgain(id);
     else Lex.Toast.success('Set aside. Those lines are out of every export.');
   }
 
   async function restoreAside(start) {
     const id = state.selectedId;
     const done = await attempt(() => bridge().records.restoreSetAside(id, start));
-    if (!done) return;
+    if (!done || state.selectedId !== id) return;
     await loadMeeting(id, true);
-    if (recordedHere()) writeNotesAgain();
+    if (state.selectedId !== id) return;
+    if (recordedHere()) writeNotesAgain(id);
     else Lex.Toast.success('Restored. Those lines are back in the transcript and exports.');
   }
 

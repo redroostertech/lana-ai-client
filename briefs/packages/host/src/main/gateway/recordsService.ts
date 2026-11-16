@@ -1,4 +1,4 @@
-import { addSetAsideChoice, restoreSetAsideChoice, type HandoffGateway } from "@lana/core/gateway";
+import type { HandoffGateway } from "@lana/core/gateway";
 import { parseLanaId, type LanaId } from "@lana/core/ids";
 import {
   decodeIntent, removingClip, savingClip, SET_ASIDE_REASONS, titleOf, type SetAsideReason,
@@ -7,7 +7,7 @@ import {
 import { randomUUID } from "node:crypto";
 import type { JsonValue } from "@lana/core/json";
 import { EDITABLE_STATUSES, StoreError } from "@lana/core/store";
-import { finalSetAside } from "@lana/core/summarizer";
+import { addingSetAside } from "@lana/core/summarizer";
 import type {
   CancelSendView, ConflictChoiceView, DraftCard, DraftKind, LanaEvent, RecordConflictView, RecordsApi, Result, SharedRecordView, TranscriptClip,
 } from "../../shared/api.js";
@@ -126,7 +126,7 @@ export class RecordsService implements RecordsApi {
 
   /**
    * Puts a set-aside part back in the meeting (the part starting at `start`): it leaves the
-   * shared record's set_aside, and writing the notes again does not set it aside again.
+   * shared record's set_aside, which a rewrite of the notes keeps as the person's list.
    */
   async restoreSetAside(meetingID: string, start: number): Promise<Result<null>> {
     return this.run(meetingID, (id) => {
@@ -137,7 +137,6 @@ export class RecordsService implements RecordsApi {
         ...current,
         notes: { ...current.notes, setAside: (current.notes.setAside ?? []).filter((item) => Math.abs(item.start - part.start) >= 0.01) },
       }));
-      restoreSetAsideChoice(this.gateway.store.settings, id, part);
       this.changed(id, "records.set_aside_restored");
       return null;
     });
@@ -153,9 +152,8 @@ export class RecordsService implements RecordsApi {
       const part = { start: Math.min(...lines.map((line) => line.start)), end: Math.max(...lines.map((line) => line.end)), reason };
       this.gateway.store.shared.edit(id, (current) => ({
         ...current,
-        notes: { ...current.notes, setAside: finalSetAside([], { restored: [], added: [...(current.notes.setAside ?? []), part] }, current.transcript) },
+        notes: { ...current.notes, setAside: addingSetAside(current.notes.setAside ?? [], part, current.transcript) },
       }));
-      addSetAsideChoice(this.gateway.store.settings, id, part);
       this.changed(id, "records.set_aside_added");
       return null;
     });

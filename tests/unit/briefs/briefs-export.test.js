@@ -207,6 +207,14 @@ describe('owners, due dates, cited ranges and who decided', () => {
     expect(X.setAsideLine({ start: 60, end: 125, reason: 'side_conversation' })).toBe('Set aside: 1:00 to 2:05 (side conversation)');
   });
 
+  test('an action with quotes on both sides of a set-aside part stays; a table citing one goes', () => {
+    const record = fixed();
+    record.actions = [{ id: 'a4', title: 'Compare both plans', at: 10, start: 10, end: 1854, confirmed: false, owner: null, dueDate: null, dueText: null }];
+    expect(X.meetingHtml(record, [])).toContain('Compare both plans');
+    record.tables = [{ title: 'Visits', columns: ['Day', 'Time'], rows: [['Saturday', 'Afternoon']], sources: [{ start: 1330, end: 1569, speaker: 'S3' }] }];
+    expect(X.meetingHtml(record, [])).not.toContain('Visits');
+  });
+
   test('tables render as tables, escaped', () => {
     const html = X.notesHtml(fixed(), []);
     expect(html).toContain('<table class="ex-table">');

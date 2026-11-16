@@ -1,4 +1,5 @@
 import { displayNameFor, type MeetingRecord } from "../intent/meeting.js";
+import { segmentSetAside } from "../intent/meetingParts.js";
 import { clipLineIndices, type TranscriptClip } from "../intent/transcriptClip.js";
 import type { Passage } from "./passage.js";
 
@@ -7,7 +8,9 @@ import type { Passage } from "./passage.js";
  * `ClipPassage`). Pinned to a chat started from the clip, so LANA reads it first.
  */
 export function clipPassage(clip: TranscriptClip, meeting: MeetingRecord): Passage | undefined {
-  const lines = clipLineIndices(clip, meeting.transcript).map((index) => meeting.transcript[index]!);
+  // Set-aside lines never reach LANA, even inside a pinned clip.
+  const lines = clipLineIndices(clip, meeting.transcript).map((index) => meeting.transcript[index]!)
+    .filter((line) => !segmentSetAside(line, meeting.notes.setAside));
   if (lines.length === 0) return undefined;
   return {
     id: `clip-${clip.id}`,

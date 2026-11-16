@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AVAILABLE } from "@lana/core/ask";
-import { loadSetAsideChoices, saveVocabulary } from "@lana/core/gateway";
+import { saveVocabulary } from "@lana/core/gateway";
 import { makeLanaId } from "@lana/core/ids";
 import { localMeetingRecord } from "@lana/core/recording";
 import type { TextModel, TextModelRequest } from "@lana/core/runtime";
@@ -79,24 +79,54 @@ describe("notes for a meeting recorded here, with the notes fixes", () => {
     const id = storeLocal();
     await new NotesWriter(rig.store, new Scripted([REPLY]), rig.log).write(id, () => undefined);
     await new NotesWriter(rig.store, new Scripted([REPLY]), rig.log).write(id, () => undefined);
-    expect(rig.store.intents.list({ meetingID: id })).toHaveLength(1);
+    expect(rig.store.intents.list({ meetingID: id }).filter((stored) => stored.intent.status !== "dismissed")).toHaveLength(1);
   });
 
-  it("restores a set-aside part, remembers it for the next notes, and lets the person set a range aside", async () => {
+  it("restores a set-aside part and lets the person set a range aside; writing the notes again keeps their list", async () => {
     const id = storeLocal();
     await new NotesWriter(rig.store, new Scripted([REPLY]), rig.log).write(id, () => undefined);
     const service = records();
     expect(await service.restoreSetAside(id, 20)).toEqual({ ok: true, value: null });
     expect(rig.store.shared.current(id).notes.setAside ?? []).toEqual([]);
-    expect(loadSetAsideChoices(rig.store.settings, id).restored).toEqual([{ start: 20, end: 60 }]);
+    // A rewrite: the model's ASIDE lines are ignored, the person's (empty) list stays.
     await new NotesWriter(rig.store, new Scripted([REPLY]), rig.log).write(id, () => undefined);
     expect(rig.store.shared.current(id).notes.setAside ?? []).toEqual([]);
 
     expect(await service.setAside(id, 3, 3, "other_matter")).toEqual({ ok: true, value: null });
     expect(rig.store.shared.current(id).notes.setAside).toEqual([{ start: 30, end: 60, reason: "other_matter", speakers: ["S3"] }]);
-    expect(loadSetAsideChoices(rig.store.settings, id).added).toEqual([{ start: 30, end: 60, reason: "other_matter" }]);
+    const model = new Scripted([REPLY]);
+    await new NotesWriter(rig.store, model, rig.log).write(id, () => undefined);
+    expect(model.prompts[0]).not.toContain("plumber");
+    expect(rig.store.shared.current(id).notes.setAside).toEqual([{ start: 30, end: 60, reason: "other_matter", speakers: ["S3"] }]);
     expect((await service.setAside(id, 9, 9, "phone_call")).ok).toBe(false);
     expect((await service.setAside(id, 1, 1, "lunch" as never)).ok).toBe(false);
+  });
+
+  it("a rewrite replaces untouched actions instead of adding copies, and keeps ones the person acted on", async () => {
+    const id = storeLocal();
+    await new NotesWriter(rig.store, new Scripted([REPLY]), rig.log).write(id, () => undefined);
+    const first = rig.store.intents.list({ meetingID: id });
+    expect(first).toHaveLength(1);
+    const renamed = REPLY.replace("Omar will send", "Omar Haddad will send");
+    await new NotesWriter(rig.store, new Scripted([renamed]), rig.log).write(id, () => undefined);
+    const after = rig.store.intents.list({ meetingID: id });
+    expect(after.filter((stored) => stored.intent.status !== "dismissed")).toHaveLength(1);
+    expect(after.find((stored) => stored.intent.id === first[0]!.intent.id)?.intent.status).toBe("dismissed");
+  });
+
+  it("the meeting view leaves out key points and actions that cite a part set aside later", async () => {
+    const id = storeLocal();
+    await new NotesWriter(rig.store, new Scripted([[
+      "POINT: summary | L2 | The revised schedule goes out tonight.",
+      "ACTION: task | L2 | Send revised schedule | Send it and copy Priya | tonight | S2 | none",
+      "POINT: summary | L5 | The setup fee is 1,200 dollars.",
+      "SUMMARY: x",
+    ].join("\n")]), rig.log).write(id, () => undefined);
+    await records().setAside(id, 1, 1, "side_conversation");
+    const shown = await new MeetingsBridge(rig.store, rig.log).get(id);
+    if (!shown.ok) throw new Error("not shown");
+    expect(shown.value.keyPoints.map((point) => point.text)).toEqual(["The setup fee is 1,200 dollars."]);
+    expect(shown.value.actions).toEqual([]);
   });
 
   it("shows the meeting with set-aside parts, tables, who decided, action owners and due dates", async () => {
@@ -135,5 +165,15 @@ describe("seeding the word list from the firm's connectors", () => {
     expect(await seedVocabularyFromConnectors(rig.store.settings, async () => ["Leadli", "Actionstep"], rig.log)).toBe(true);
     expect(await seedVocabularyFromConnectors(rig.store.settings, async () => ["Clio"], rig.log)).toBe(false);
     expect(loadVocabulary(rig.store.settings).map((entry) => entry.term)).toEqual(["Leadli", "Actionstep"]);
+  });
+});
+
+describe("records written before strict reading", () => {
+  it("never show raw | fields: a stored point keeps only its first field", async () => {
+    const { pointText } = await import("../src/main/gateway/meetingsBridge.js");
+    expect(pointText("Move the files to the new system | none | Dana | client matters | none")).toBe("Move the files to the new system");
+    expect(pointText("Who signs? | The meeting left this open")).toBe("Who signs?");
+    expect(pointText("A plain point.")).toBe("A plain point.");
+    expect(pointText(" | only fields")).toBe("only fields");
   });
 });

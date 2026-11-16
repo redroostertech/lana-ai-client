@@ -199,13 +199,21 @@ describe("whole meeting notes", () => {
     expect(result.intents).toEqual([]);
   });
 
-  it("ignores a set-aside stretch shorter than 20 seconds, and one the person restored", async () => {
+  it("ignores a set-aside stretch shorter than 20 seconds", async () => {
     const short = await run("ASIDE: logistics | L2\nSUMMARY: x");
     expect(short.result.notes.setAside ?? []).toEqual([]);
-    const restored = await run("ASIDE: phone_call | L5, L7\nSUMMARY: x", { setAsideChoices: { restored: [{ start: 33, end: 75 }], added: [] } });
+  });
+
+  it("on a rewrite keeps the person's reviewed parts exactly, never shows their lines to the model, and ignores model asides", async () => {
+    const fixed = await run("ASIDE: logistics | L1, L3\nPOINT: summary | L3 | The setup fee is 1,200 dollars and the monthly fee is 300.\nSUMMARY: x", {
+      fixedSetAside: [{ start: 33, end: 75, reason: "phone_call", speakers: ["S1", "S3"] }],
+    });
+    expect(fixed.result.notes.setAside).toEqual([{ start: 33, end: 75, reason: "phone_call", speakers: ["S1", "S3"] }]);
+    expect(fixed.model.calls[0]!.prompt).not.toContain("dentist");
+    expect(fixed.model.calls[0]!.prompt).not.toContain("other line");
+    expect(fixed.result.notes.keyPoints.map((point) => point.text)).toEqual(["The setup fee is 1,200 dollars and the monthly fee is 300."]);
+    const restored = await run("ASIDE: phone_call | L5, L7\nSUMMARY: x", { fixedSetAside: [] });
     expect(restored.result.notes.setAside ?? []).toEqual([]);
-    const added = await run("SUMMARY: x", { setAsideChoices: { restored: [], added: [{ start: 41, end: 60, reason: "other_matter" }] } });
-    expect(added.result.notes.setAside).toEqual([{ start: 41, end: 60, reason: "other_matter", speakers: ["S3"] }]);
   });
 
   it("builds tables with their sources", async () => {
@@ -259,5 +267,20 @@ describe("Ask passages sent to LANA", () => {
     expect(text).not.toContain("other line");
     expect(text).toContain("Fees were set.");
     expect(text).toContain("bronze plan");
+  });
+});
+
+describe("a pinned clip in Ask", () => {
+  it("leaves out set-aside lines", async () => {
+    const { clipPassage } = await import("../../src/ask/clipPassage.js");
+    const { localMeetingRecord } = await import("../../src/recording/index.js");
+    const base = localMeetingRecord({
+      id: meetingID, title: "Synthetic", startedAt: new Date(2026, 10, 11), durationSeconds: 108,
+      consent: { method: "verbal_announced", confirmedBy: [], confirmedAt: new Date(2026, 10, 11) }, userNotes: [], appVersion: "0.1.0", speakers, transcript,
+    });
+    const record = { ...base, notes: { keyPoints: [], gaps: [], setAside: [{ start: 33, end: 75, reason: "phone_call" as const }] } };
+    const passage = clipPassage({ id: "c1", start: 24, end: 84 }, record);
+    expect(passage?.text).toContain("draft checklist");
+    expect(passage?.text).not.toContain("dentist");
   });
 });

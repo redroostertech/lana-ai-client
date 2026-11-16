@@ -1,6 +1,6 @@
 export {
-  attributePoint, finalSetAside, MeetingSummarizer, promiseAction, SummarizerUnavailableError,
-  type NotesBackend, type SetAsideChoices, type SkippedChunk, type SummarizeOptions, type SummaryResult,
+  addingSetAside, attributePoint, finalSetAside, MeetingSummarizer, normalizeSetAside, promiseAction, SummarizerUnavailableError,
+  type NotesBackend, type SkippedChunk, type SummarizeOptions, type SummaryResult,
 } from "./meetingSummarizer.js";
 export { resolveDueText } from "./dueDates.js";
 export { excerpt, lineScores, stems, verifiedLines } from "./lineMatcher.js";
