@@ -44,6 +44,11 @@
   var currentEditFieldsMatter = null;
   var customFieldDefinitions = [];
   var customFieldValues = [];
+  var customFieldsBaseline = null;
+  var customFieldsLibrary = null;      // last field-library response while the picker is open
+  var customFieldsSectionSeq = 0;      // guards the dock card against a stale await
+  var customFieldsOpenSeq = 0;         // guards the drawer against a late load for another matter
+  var customFieldsLibrarySearch = null; // debounced server search for the library picker
   var _navContext = null;              // navigation context (source, conversationId, etc.)
   var matterTabs = null;               // tabs from the matter's makeup (LanaMatterTabRegistry.buildTabs)
   var makeupClient = null;             // MatterMakeupAPIClient
@@ -256,13 +261,6 @@
       }
     }
     return parts.join(' ');
-  }
-
-  function formatFieldValue(value) {
-    if (value === null || value === undefined) return 'Not set';
-    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-    if (typeof value === 'object') return JSON.stringify(value);
-    return String(value);
   }
 
   function buildUserChip(person, index) {
@@ -8376,9 +8374,13 @@
   // Custom Fields Modal (adapted from workspace.js lines 9942-10385)
   // =========================================================================
 
+  function matterFieldsClient() {
+    return new MatterFieldsAPIClient(api);
+  }
+
   /**
    * Open the edit custom fields modal for a matter.
-   * Loads matter data, populates state, renders modal.
+   * Loads the org field definitions and this matter's values, renders modal.
    * @param {string} matterId - The matter ID
    */
   async function openEditCustomFieldsModal(matterId) {
@@ -8389,52 +8391,24 @@
     }
 
     currentEditFieldsMatter = matterId;
+    var openSeq = ++customFieldsOpenSeq;
 
-    var matter = window.currentViewedMatter;
-
-    if (!matter || matter.matter_id !== matterId) {
-      try {
-        var result = await api.getMatter(matterId, { bustCache: true });
-
-        if (result && result.error) {
-          console.error('[openEditCustomFieldsModal] API error:', result.error);
-          Lex.Toast.error(result.error.message || 'Failed to load matter details');
-          return;
-        }
-
-        if (result && result.matter) {
-          matter = result.matter;
-          window.currentViewedMatter = matter;
-        } else {
-          console.error('[openEditCustomFieldsModal] Invalid API response:', result);
-          Lex.Toast.error('Failed to load matter details');
-          return;
-        }
-      } catch (error) {
-        console.error('[openEditCustomFieldsModal] Error loading matter:', error);
-        Lex.Toast.error(error.message || 'Failed to load matter details');
-        return;
-      }
+    // This matter's attached fields and their values (typed matter fields).
+    var loaded;
+    try {
+      loaded = await matterFieldsClient().loadDrawer(matterId);
+    } catch (error) {
+      if (openSeq !== customFieldsOpenSeq) return;
+      console.error('[openEditCustomFieldsModal] Error loading custom fields:', error);
+      Lex.Toast.error(LanaMatterFields.errorMessage(error));
+      return;
     }
-
-    customFieldDefinitions = [];
-    customFieldValues = [];
-
-    if (matter && matter.metadata && matter.metadata.custom_field_definitions && Array.isArray(matter.metadata.custom_field_definitions)) {
-      customFieldDefinitions = JSON.parse(JSON.stringify(matter.metadata.custom_field_definitions));
-    }
-
-    if (matter && matter.metadata && matter.metadata.custom_fields && Array.isArray(matter.metadata.custom_fields)) {
-      customFieldValues = JSON.parse(JSON.stringify(matter.metadata.custom_fields));
-    }
-
-    // Initialize values for fields that do not have them yet
-    customFieldDefinitions.forEach(function (def) {
-      var hasValue = customFieldValues.some(function (v) { return v.key === def.key; });
-      if (!hasValue) {
-        customFieldValues.push({ key: def.key, value: def.default_value || '' });
-      }
-    });
+    // The drawer was opened again (another matter) while this load waited.
+    if (openSeq !== customFieldsOpenSeq || currentEditFieldsMatter !== matterId) return;
+    customFieldsBaseline = loaded;
+    var drawerState = LanaMatterFields.cloneState(customFieldsBaseline);
+    customFieldDefinitions = drawerState.definitions;
+    customFieldValues = drawerState.values;
 
     renderCustomFieldsModal();
 
@@ -8465,6 +8439,10 @@
     currentEditFieldsMatter = null;
     customFieldDefinitions = [];
     customFieldValues = [];
+    customFieldsBaseline = null;
+    customFieldsLibrary = null;
+    customFieldsLibrarySearch = null;
+    customFieldsOpenSeq++;
   }
 
   /**
@@ -8474,11 +8452,19 @@
   function bindCustomFieldSelects(container) {
     if (container.dataset.customFieldSelectsBound === 'true') return;
     container.dataset.customFieldSelectsBound = 'true';
+    // The picker's search box: ask the server (debounced) so every library
+    // field is reachable, not only the first page.
+    container.addEventListener('input', function (e) {
+      var picker = e.target && e.target.closest ? e.target.closest('lex-select[data-library-pick]') : null;
+      if (picker && customFieldsLibrarySearch) customFieldsLibrarySearch.query(e.target.value || '');
+    });
     container.addEventListener('lex-change', function (e) {
       var target = e.target;
       if (!target || !target.dataset) return;
       var value = e.detail ? e.detail.value : target.value;
-      if (target.dataset.fieldDefIndex !== undefined) {
+      if (target.dataset.libraryPick !== undefined) {
+        useLibraryField(value);
+      } else if (target.dataset.fieldDefIndex !== undefined) {
         updateFieldDefinition(Number(target.dataset.fieldDefIndex), target.dataset.fieldDefProp, value);
       } else if (target.dataset.fieldValueKey !== undefined) {
         updateFieldValue(target.dataset.fieldValueKey, value);
@@ -8495,45 +8481,61 @@
     if (!container) return;
     bindCustomFieldSelects(container);
 
+    var pickerHtml = '';
+    if (customFieldsLibrary) {
+      var libraryOptions = LanaMatterFields.libraryOptions(customFieldsLibrary,
+        { definitions: customFieldDefinitions });
+      pickerHtml =
+        '<div class="mb-4 p-4 rounded-lg border border-gray-200">' +
+          '<label class="block text-xs font-medium text-gray-700 mb-1">Use an existing field</label>' +
+          (libraryOptions.length
+            ? '<lex-select size="sm" searchable="true" data-library-pick="true"' +
+                ' placeholder="Search your field library"' +
+                ' options="' + escapeHtml(JSON.stringify(libraryOptions)) + '"></lex-select>'
+            : '<p class="text-sm text-gray-500">Your field library is empty. Create a new field instead.</p>') +
+          '<p class="mt-2 text-xs text-gray-500">Adding a field here uses it on this matter only. Other matters keep their own fields.</p>' +
+        '</div>';
+    }
+
     if (customFieldDefinitions.length === 0) {
-      container.innerHTML =
+      container.innerHTML = pickerHtml +
         '<div class="text-center py-8 text-gray-500">' +
           '<svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
             '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>' +
           '</svg>' +
-          '<p class="mt-2 text-sm">No custom fields yet. Click "Add Field" to create one.</p>' +
+          '<p class="mt-2 text-sm">No custom fields on this matter yet. Create a new field, or use one from your library.</p>' +
         '</div>';
       return;
     }
 
-    var html = '<div class="space-y-4">';
+    var html = pickerHtml + '<div class="space-y-4">';
+
+    var canManageLibrary = !!(customFieldsBaseline && customFieldsBaseline.canManageLibrary);
 
     for (var i = 0; i < customFieldDefinitions.length; i++) {
       var def = customFieldDefinitions[i];
+      // A library field's name, required flag and options apply to every
+      // matter using it: read only unless this person manages the library.
+      var lockProps = !!def.id && !canManageLibrary;
+      var libraryNote = !def.id ? '' : (canManageLibrary
+        ? '<p class="mb-3 text-xs text-gray-500">Changes apply to every matter using this field.</p>'
+        : '<p class="mb-3 text-xs text-gray-500">Library field. Ask an admin to change its name, required setting or options.</p>');
       var valueObj = null;
       for (var j = 0; j < customFieldValues.length; j++) {
         if (customFieldValues[j].key === def.key) { valueObj = customFieldValues[j]; break; }
       }
       var currentValue = valueObj ? valueObj.value : (def.default_value || '');
 
-      var selectTypeOptions = [
-        { value: 'text', label: 'Text' },
-        { value: 'textarea', label: 'Long text' },
-        { value: 'number', label: 'Number' },
-        { value: 'currency', label: 'Currency' },
-        { value: 'date', label: 'Date' },
-        { value: 'datetime', label: 'Date and time' },
-        { value: 'boolean', label: 'Yes/No' },
-        { value: 'select', label: 'Dropdown' }
-      ];
+      var selectTypeOptions = LanaMatterFields.typeOptions(def);
 
       var optionsRowHtml = '';
-      if (def.type === 'select') {
+      if (LanaMatterFields.hasOptions(def.type)) {
         var optionsJoined = (def.options || []).join(', ');
         optionsRowHtml =
           '<div class="mb-3">' +
             '<label class="block text-xs font-medium text-gray-700 mb-1">Dropdown Options (comma-separated)</label>' +
             '<input type="text" value="' + escapeHtml(optionsJoined) + '"' +
+              (lockProps ? ' readonly' : '') +
               ' onchange="updateFieldDefinition(' + i + ', \'options\', this.value.split(\',\').map(function(s){return s.trim();}).filter(function(s){return s;}))"' +
               ' placeholder="e.g., Active, Pending, Closed"' +
               ' class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus" />' +
@@ -8542,10 +8544,12 @@
 
       html +=
         '<div class="p-4 bg-gray-50 rounded-lg border border-gray-200">' +
+          libraryNote +
           '<div class="grid grid-cols-12 gap-3 mb-3">' +
             '<div class="col-span-3">' +
               '<label class="block text-xs font-medium text-gray-700 mb-1">Field Key</label>' +
               '<input type="text" value="' + escapeHtml(def.key || '') + '"' +
+                (def.id ? ' readonly title="A saved field key cannot change"' : '') +
                 ' onchange="updateFieldDefinition(' + i + ', \'key\', this.value)"' +
                 ' placeholder="e.g., case_number"' +
                 ' class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus" />' +
@@ -8553,6 +8557,7 @@
             '<div class="col-span-4">' +
               '<label class="block text-xs font-medium text-gray-700 mb-1">Display Name</label>' +
               '<input type="text" value="' + escapeHtml(def.display_name || '') + '"' +
+                (lockProps ? ' readonly' : '') +
                 ' onchange="updateFieldDefinition(' + i + ', \'display_name\', this.value)"' +
                 ' placeholder="e.g., Case Number"' +
                 ' class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus" />' +
@@ -8560,6 +8565,7 @@
             '<div class="col-span-2">' +
               '<label class="block text-xs font-medium text-gray-700 mb-1">Type</label>' +
               '<lex-select size="sm" data-field-def-index="' + i + '" data-field-def-prop="type"' +
+                (def.id ? ' disabled="true" title="A saved field type cannot change"' : '') +
                 ' options="' + escapeHtml(JSON.stringify(selectTypeOptions)) + '"' +
                 ' value="' + escapeHtml(def.type || 'text') + '"></lex-select>' +
             '</div>' +
@@ -8567,6 +8573,7 @@
               '<label class="block text-xs font-medium text-gray-700 mb-1">Required</label>' +
               '<label class="flex items-center px-3 py-2">' +
                 '<input type="checkbox"' + (def.required ? ' checked' : '') +
+                  (lockProps ? ' disabled' : '') +
                   ' onchange="updateFieldDefinition(' + i + ', \'required\', this.checked)"' +
                   ' class="rounded border-gray-300 lex-text-accent lex-ring-focus" />' +
                 '<span class="ml-2 text-sm text-gray-700">Yes</span>' +
@@ -8604,17 +8611,17 @@
     var key = escapeHtml(def.key || '');
     var displayName = escapeHtml(def.display_name || def.key || '');
 
-    switch (def.type) {
-      case 'textarea':
-        return '<textarea onchange="updateFieldValue(\'' + key + '\', this.value)"' +
-          ' placeholder="Enter ' + displayName + '" rows="3"' +
-          ' class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus">' +
-          escapeHtml(currentValue || '') + '</textarea>';
+    if (LanaMatterFields.isReadOnlyValue(def.type)) {
+      return '<p class="text-sm text-gray-500">' +
+        escapeHtml(currentValue === '' || currentValue == null ? 'Not set' : JSON.stringify(currentValue)) +
+        '</p>';
+    }
 
+    switch (def.type) {
       case 'number':
         return '<input type="number" value="' + escapeHtml(currentValue || '') + '"' +
           ' onchange="updateFieldValue(\'' + key + '\', this.value)"' +
-          ' placeholder="Enter ' + displayName + '"' +
+          ' placeholder="' + escapeHtml(LanaMatterFields.placeholderFor(def)) + '"' +
           ' class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus" />';
 
       case 'currency':
@@ -8624,17 +8631,12 @@
           '</div>' +
           '<input type="number" step="0.01" value="' + escapeHtml(currentValue || '') + '"' +
             ' onchange="updateFieldValue(\'' + key + '\', this.value)"' +
-            ' placeholder="0.00"' +
+            ' placeholder="' + escapeHtml(def.default_value != null && def.default_value !== '' ? LanaMatterFields.placeholderFor(def) : '0.00') + '"' +
             ' class="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus" />' +
         '</div>';
 
       case 'date':
         return '<input type="date" value="' + escapeHtml(currentValue || '') + '"' +
-          ' onchange="updateFieldValue(\'' + key + '\', this.value)"' +
-          ' class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus" />';
-
-      case 'datetime':
-        return '<input type="datetime-local" value="' + escapeHtml(currentValue || '') + '"' +
           ' onchange="updateFieldValue(\'' + key + '\', this.value)"' +
           ' class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus" />';
 
@@ -8658,13 +8660,70 @@
           ' options="' + escapeHtml(JSON.stringify(selectOptions)) + '"' +
           ' value="' + escapeHtml(currentValue == null ? '' : String(currentValue)) + '"></lex-select>';
 
+      case 'multiselect':
+        var multiOptions = (def.options || []).map(function (opt) { return { value: String(opt), label: String(opt) }; });
+        return '<lex-select size="sm" multiple="true" data-field-value-key="' + key + '"' +
+          ' placeholder="' + escapeHtml('Select ' + (def.display_name || def.key || '')) + '"' +
+          ' options="' + escapeHtml(JSON.stringify(multiOptions)) + '"' +
+          ' value="' + escapeHtml(JSON.stringify(Array.isArray(currentValue) ? currentValue : [])) + '"></lex-select>';
+
       case 'text':
       default:
         return '<input type="text" value="' + escapeHtml(currentValue || '') + '"' +
           ' onchange="updateFieldValue(\'' + key + '\', this.value)"' +
-          ' placeholder="Enter ' + displayName + '"' +
+          ' placeholder="' + escapeHtml(LanaMatterFields.placeholderFor(def)) + '"' +
           ' class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus" />';
     }
+  }
+
+  /**
+   * Open the "Use an existing field" picker over the organization library.
+   */
+  async function openCustomFieldLibrary() {
+    if (!currentEditFieldsMatter) return;
+    var matterId = currentEditFieldsMatter;
+    try {
+      customFieldsLibrary = await matterFieldsClient().searchLibrary(matterId, '');
+    } catch (error) {
+      console.error('[openCustomFieldLibrary] Error:', error);
+      Lex.Toast.error(LanaMatterFields.errorMessage(error));
+      return;
+    }
+    if (currentEditFieldsMatter !== matterId) return;
+    customFieldsLibrarySearch = LanaMatterFields.createLibrarySearch({
+      search: function (q) { return matterFieldsClient().searchLibrary(matterId, q); },
+      onResults: function (response) {
+        if (currentEditFieldsMatter !== matterId || !customFieldsLibrary) return;
+        customFieldsLibrary = response;
+        // Update the open picker in place so the search box keeps focus.
+        var picker = document.querySelector('#customFieldsContainer lex-select[data-library-pick]');
+        if (picker) {
+          picker.options = LanaMatterFields.libraryOptions(response, { definitions: customFieldDefinitions });
+        }
+      }
+    });
+    renderCustomFieldsModal();
+  }
+
+  /**
+   * Add the library field chosen in the picker; it is attached to this
+   * matter when the drawer is saved.
+   * @param {string} definitionId
+   */
+  function useLibraryField(definitionId) {
+    var defs = (customFieldsLibrary && customFieldsLibrary.data && customFieldsLibrary.data.definitions) || [];
+    var picked = null;
+    for (var i = 0; i < defs.length; i++) {
+      if (defs[i].id === definitionId) { picked = defs[i]; break; }
+    }
+    if (!picked) return;
+    var next = LanaMatterFields.addLibraryField(
+      { definitions: customFieldDefinitions, values: customFieldValues }, picked);
+    customFieldDefinitions = next.definitions;
+    customFieldValues = next.values;
+    customFieldsLibrary = null;
+    customFieldsLibrarySearch = null;
+    renderCustomFieldsModal();
   }
 
   /**
@@ -8737,6 +8796,23 @@
    * @param {number} index - Definition index to remove
    */
   function removeCustomField(index) {
+    var def = customFieldDefinitions[index];
+    var saved = def && def.id && customFieldsBaseline && customFieldsBaseline.definitions.some(function (d) { return d.id === def.id; });
+    if (saved) {
+      Lex.Modal.confirm(
+        'Remove field from this matter',
+        '"' + escapeHtml(def.display_name || def.key) + '" will be removed from this matter when you save. ' +
+          'It stays in your field library and on any other matter that uses it. ' +
+          'This matter\'s value is kept and comes back if you add the field again.',
+        function () { dropCustomField(index); },
+        { variant: 'danger', confirmText: 'Remove' }
+      );
+      return;
+    }
+    dropCustomField(index);
+  }
+
+  function dropCustomField(index) {
     if (customFieldDefinitions[index]) {
       var key = customFieldDefinitions[index].key;
       customFieldDefinitions.splice(index, 1);
@@ -8757,28 +8833,6 @@
    */
   async function saveCustomFields() {
     try {
-      var validDefinitions = customFieldDefinitions.filter(function (def) {
-        return def.key && def.key.trim() !== '' && def.display_name && def.display_name.trim() !== '';
-      });
-
-      if (validDefinitions.length === 0 && customFieldDefinitions.length > 0) {
-        Lex.Toast.error('Please fill in Key and Display Name for all fields');
-        return;
-      }
-
-      // Check for duplicate keys — NO regex, use string compare
-      var keys = validDefinitions.map(function (f) { return f.key.toLowerCase().trim(); });
-      var duplicates = keys.filter(function (k, idx) { return keys.indexOf(k) !== idx; });
-      if (duplicates.length > 0) {
-        Lex.Toast.error('Duplicate field keys: ' + duplicates.join(', '));
-        return;
-      }
-
-      var definitionKeys = validDefinitions.map(function (d) { return d.key; });
-      var validValues = customFieldValues.filter(function (v) {
-        return definitionKeys.indexOf(v.key) !== -1;
-      });
-
       if (!currentEditFieldsMatter) {
         Lex.Toast.error('Matter ID not found');
         return;
@@ -8786,10 +8840,20 @@
 
       var matterId = currentEditFieldsMatter;
 
-      await api.put('/api/v1/matters/' + matterId + '/settings', {
-        custom_field_definitions: validDefinitions,
-        custom_fields: validValues
-      });
+      try {
+        await matterFieldsClient().saveDrawer(matterId, customFieldsBaseline,
+          { definitions: customFieldDefinitions, values: customFieldValues });
+      } catch (saveError) {
+        console.error('[saveCustomFields] Error:', saveError);
+        if (saveError.baseline) {
+          // Part of the save may have landed; diff the next try against the server.
+          customFieldsBaseline = saveError.baseline;
+          LanaMatterFields.adoptIds({ definitions: customFieldDefinitions }, customFieldsBaseline);
+          renderCustomFieldsModal();
+        }
+        Lex.Toast.error(saveError.userMessage || LanaMatterFields.errorMessage(saveError));
+        return;
+      }
 
       Lex.Toast.success('Custom fields updated successfully!');
       closeEditCustomFieldsModal();
@@ -8821,11 +8885,12 @@
   window.updateFieldDefinition = updateFieldDefinition;
   window.updateFieldValue = updateFieldValue;
   window.removeCustomField = removeCustomField;
+  window.openCustomFieldLibrary = openCustomFieldLibrary;
   window.saveCustomFields = saveCustomFields;
 
   ['openEditCustomFieldsModal', 'closeEditCustomFieldsModal', 'renderCustomFieldsModal',
    'addCustomField', 'updateFieldDefinition', 'updateFieldValue',
-   'removeCustomField', 'saveCustomFields'].forEach(_trackGlobal);
+   'removeCustomField', 'saveCustomFields', 'openCustomFieldLibrary'].forEach(_trackGlobal);
 
   // =========================================================================
   // Custom Fields Section — dock panel rendering
@@ -8834,7 +8899,7 @@
 
   /**
    * Render the custom fields section inside the dock details panel.
-   * Reads definitions and values from matter.metadata and builds the
+   * Reads this matter's typed field values (label and type ride along) and builds the
    * collapsible section with an edit button.
    * @param {Object} matter - The current matter object
    */
@@ -8848,15 +8913,23 @@
       return;
     }
 
-    var customFieldDefs = (matter.metadata && matter.metadata.custom_field_definitions) || [];
-    var customFieldVals = (matter.metadata && matter.metadata.custom_fields) || [];
+    var seq = ++customFieldsSectionSeq;
+    var fieldsToDisplay = [];
+    try {
+      fieldsToDisplay = LanaMatterFields.displayFields(await matterFieldsClient().listValues(matter.matter_id));
+    } catch (error) {
+      console.warn('[renderCustomFieldsSection] Could not load custom field values:', error && error.message);
+    }
+    // A newer render (another matter, or a refresh) started while this one waited.
+    if (seq !== customFieldsSectionSeq) return;
 
     // Build lookup maps
     var defsMap = {};
-    customFieldDefs.forEach(function (def) { defsMap[def.key] = def; });
-
     var valuesMap = {};
-    customFieldVals.forEach(function (field) { valuesMap[field.key] = field.value; });
+    fieldsToDisplay.forEach(function (field) {
+      defsMap[field.key] = { display_name: field.displayName, type: field.type };
+      valuesMap[field.key] = field.value;
+    });
 
     function isValidValue(value) {
       if (value === null || value === undefined || value === '') return false;
@@ -8866,20 +8939,6 @@
       }
       return true;
     }
-
-    var fieldsToDisplay = [];
-
-    customFieldDefs.forEach(function (def) {
-      var value = valuesMap[def.key];
-      if (isValidValue(value)) {
-        fieldsToDisplay.push({
-          key: def.key,
-          displayName: def.display_name || def.key,
-          value: value,
-          type: def.type
-        });
-      }
-    });
 
     // Legacy shadow_table data
     if (matter.shadow_table && typeof matter.shadow_table === 'object') {
@@ -8942,20 +9001,11 @@
   }
 
   function buildCustomFieldRow(field) {
-    var displayValue;
-    if (field.type === 'currency' && field.value !== null && field.value !== undefined && field.value !== '') {
-      var numVal = parseFloat(field.value);
-      if (!isNaN(numVal)) {
-        displayValue = '$' + numVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      } else {
-        displayValue = formatFieldValue(field.value);
-      }
-    } else {
-      displayValue = formatFieldValue(field.value);
-    }
+    // Values are user and AI written: always escaped (LanaMatterFields.displayHtml).
     return '<div class="flex justify-between">' +
       '<dt class="text-gray-500">' + escapeHtml(field.displayName) + '</dt>' +
-      '<dd class="text-gray-900 text-right max-w-[180px] truncate" title="' + escapeHtml(String(field.value)) + '">' + displayValue + '</dd>' +
+      '<dd class="text-gray-900 text-right max-w-[180px] truncate" title="' + escapeHtml(LanaMatterFields.displayText(field)) + '">' +
+        LanaMatterFields.displayHtml(field) + '</dd>' +
     '</div>';
   }
 

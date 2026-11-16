@@ -560,6 +560,7 @@ All form components use the `withFormField` mixin, providing: `name`, `label`, `
 - `multiple`: `select.value` is an array of strings; the setter takes an array, a JSON array string or a comma-separated string.
 - `multiple` pills: a long label truncates with an ellipsis inside `.lex-select-pill-label`, the remove mark always shows, and the pill's `title` is the full label. The trigger carries `.lex-select-trigger--multiple`, so a page's CSS can let pills wrap (`height: auto`) and widen them.
 - `.options` / `.value` assigned before the element upgrades are kept.
+- Setting `.options` while the dropdown is open (search results loaded as the person types) keeps the search text, focus and caret in the search box.
 - `select.focus()` focuses the trigger. Inside a native `<form>`, the form's `reset` restores the value the select had when it first connected.
 - Option, clear and pill-remove clicks call `preventDefault`, so a lex-select inside a `<label>` does not reopen.
 - Keyboard (non-searchable): ArrowDown/Enter/Space opens; ArrowUp/ArrowDown move; Enter/Space selects; Escape closes.

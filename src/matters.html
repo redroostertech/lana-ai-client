@@ -46,8 +46,10 @@
   <script src="../src/js/tiptap-bundle-built.js"></script>
   <script src="../src/js/api/matter-notes-api.client.js"></script>
   <script src="../src/js/api/matter-links-api.client.js"></script>
+  <script src="../src/js/api/matter-fields-api.client.js"></script>
   <script src="../src/js/shared/note-labels.js"></script>
   <script src="../src/js/shared/entity-links.js"></script>
+  <script src="../src/js/shared/matter-fields.js"></script>
   <script src="../src/js/components/note-list.component.js"></script>
   <script src="../src/js/components/note-editor.component.js"></script>
   <script src="../src/js/matter-notes.js"></script>
@@ -2284,6 +2286,7 @@
     let similarMattersWidget = null;
 
     // Render Custom Fields Section (global so it can be called from other script tags)
+    let customFieldsSectionSeq = 0;
     window.renderCustomFieldsSection = async function(matter) {
       const container = document.getElementById('customFieldsSection');
       if (!container) return;
@@ -2295,19 +2298,23 @@
         return;
       }
 
-      // Extract custom field definitions and values
-      const customFieldDefs = matter.metadata?.custom_field_definitions || [];
-      const customFieldValues = matter.metadata?.custom_fields || [];
+      // This matter's typed field values; label and type ride along with each value
+      const seq = ++customFieldsSectionSeq;
+      let fieldsToDisplay = [];
+      try {
+        fieldsToDisplay = LanaMatterFields.displayFields(
+          await new MatterFieldsAPIClient(api).listValues(matter.matter_id));
+      } catch (error) {
+        console.warn('[renderCustomFieldsSection] Could not load custom field values:', error && error.message);
+      }
+      // A newer render (another matter, or a refresh) started while this one waited.
+      if (seq !== customFieldsSectionSeq) return;
 
-      // Build a map of definitions for quick lookup
+      // Lookup maps for the shadow_table merge below
       const defsMap = {};
-      customFieldDefs.forEach(def => {
-        defsMap[def.key] = def;
-      });
-
-      // Build a map of values
       const valuesMap = {};
-      customFieldValues.forEach(field => {
+      fieldsToDisplay.forEach(field => {
+        defsMap[field.key] = { display_name: field.displayName, type: field.type };
         valuesMap[field.key] = field.value;
       });
 
@@ -2320,22 +2327,6 @@
         }
         return true;
       };
-
-      // Build display array with definitions and values
-      const fieldsToDisplay = [];
-
-      // Add fields from definitions that have values
-      customFieldDefs.forEach(def => {
-        const value = valuesMap[def.key];
-        if (isValidValue(value)) {
-          fieldsToDisplay.push({
-            key: def.key,
-            displayName: def.display_name || def.key,
-            value: value,
-            type: def.type
-          });
-        }
-      });
 
       // Also check for legacy shadow_table data
       if (matter.shadow_table && typeof matter.shadow_table === 'object') {
@@ -2373,22 +2364,11 @@
       ` : `
         <dl class="space-y-2 text-sm">
           ${fieldsToDisplay.map(field => {
-            let displayValue = field.value;
-
-            // Format currency values
-            if (field.type === 'currency' && field.value !== null && field.value !== undefined && field.value !== '') {
-              const numValue = parseFloat(field.value);
-              if (!isNaN(numValue)) {
-                displayValue = '$' + numValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-              }
-            } else {
-              displayValue = formatFieldValue(field.value);
-            }
-
+            // Values are user and AI written: always escaped (LanaMatterFields.displayHtml).
             return `
               <div class="flex justify-between">
                 <dt class="text-gray-500">${escapeHtml(field.displayName)}</dt>
-                <dd class="text-gray-900 text-right max-w-md truncate" title="${escapeHtml(String(field.value))}">${displayValue}</dd>
+                <dd class="text-gray-900 text-right max-w-md truncate" title="${escapeHtml(LanaMatterFields.displayText(field))}">${LanaMatterFields.displayHtml(field)}</dd>
               </div>
             `;
           }).join('')}
@@ -2728,15 +2708,6 @@
         .replace(/^custom_/, '')
         .replace(/_/g, ' ')
         .replace(/\b\w/g, l => l.toUpperCase());
-    }
-
-    // Helper function to format field values
-    function formatFieldValue(value) {
-      if (value === null || value === undefined) return 'N/A';
-      if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-      if (typeof value === 'object') return JSON.stringify(value);
-      if (typeof value === 'string' && value.length > 50) return value.substring(0, 50) + '...';
-      return escapeHtml(String(value));
     }
 
     // Helper function to create collapsible section
@@ -9989,6 +9960,10 @@
     let currentEditFieldsMatter = null;
     let customFieldDefinitions = [];
     let customFieldValues = [];
+    let customFieldsBaseline = null;
+    let customFieldsLibrary = null;
+    let customFieldsOpenSeq = 0;          // guards the drawer against a late load for another matter
+    let customFieldsLibrarySearch = null; // debounced server search for the library picker
 
     // Open edit custom fields modal
     async function openEditCustomFieldsModal(matterId) {
@@ -10000,56 +9975,24 @@
       }
 
       currentEditFieldsMatter = matterId;
+      const openSeq = ++customFieldsOpenSeq;
 
-      // Load current custom field definitions and values
-      let matter = window.currentViewedMatter;
-
-      // If matter is not loaded or doesn't match the requested matterId, fetch it
-      if (!matter || matter.matter_id !== matterId) {
-        try {
-          const result = await api.getMatter(matterId, { bustCache: true });
-
-          // Check for error response from backend: { error: { message: "...", code: "..." } }
-          if (result && result.error) {
-            console.error('[openEditCustomFieldsModal] API error:', result.error);
-            Toast.error(result.error.message || 'Failed to load matter details');
-            return;
-          }
-
-          // Backend returns { matter: {...} } on success
-          if (result && result.matter) {
-            matter = result.matter;
-            window.currentViewedMatter = matter;
-          } else {
-            console.error('[openEditCustomFieldsModal] Invalid API response:', result);
-            Toast.error('Failed to load matter details');
-            return;
-          }
-        } catch (error) {
-          console.error('[openEditCustomFieldsModal] Error loading matter:', error);
-          Toast.error(error.message || 'Failed to load matter details');
-          return;
-        }
+      // This matter's attached fields and their values (typed matter fields).
+      let loaded;
+      try {
+        loaded = await new MatterFieldsAPIClient(api).loadDrawer(matterId);
+      } catch (error) {
+        if (openSeq !== customFieldsOpenSeq) return;
+        console.error('[openEditCustomFieldsModal] Error loading custom fields:', error);
+        Toast.error(LanaMatterFields.errorMessage(error));
+        return;
       }
-
-      customFieldDefinitions = [];
-      customFieldValues = [];
-
-      if (matter && matter.metadata?.custom_field_definitions && Array.isArray(matter.metadata.custom_field_definitions)) {
-        customFieldDefinitions = JSON.parse(JSON.stringify(matter.metadata.custom_field_definitions));
-      }
-
-      if (matter && matter.metadata?.custom_fields && Array.isArray(matter.metadata.custom_fields)) {
-        customFieldValues = JSON.parse(JSON.stringify(matter.metadata.custom_fields));
-      }
-
-      // Initialize values for fields that don't have them yet
-      customFieldDefinitions.forEach(def => {
-        const hasValue = customFieldValues.some(v => v.key === def.key);
-        if (!hasValue) {
-          customFieldValues.push({ key: def.key, value: def.default_value || '' });
-        }
-      });
+      // The drawer was opened again (another matter) while this load waited.
+      if (openSeq !== customFieldsOpenSeq || currentEditFieldsMatter !== matterId) return;
+      customFieldsBaseline = loaded;
+      const drawerState = LanaMatterFields.cloneState(customFieldsBaseline);
+      customFieldDefinitions = drawerState.definitions;
+      customFieldValues = drawerState.values;
 
       renderCustomFieldsModal();
 
@@ -10064,32 +10007,60 @@
       currentEditFieldsMatter = null;
       customFieldDefinitions = [];
       customFieldValues = [];
+      customFieldsBaseline = null;
+      customFieldsLibrary = null;
+      customFieldsLibrarySearch = null;
+      customFieldsOpenSeq++;
     }
 
     // Render custom fields modal content
     function renderCustomFieldsModal() {
       const container = document.getElementById('customFieldsContainer');
 
+      let pickerHtml = '';
+      if (customFieldsLibrary) {
+        const libraryOptions = LanaMatterFields.libraryOptions(customFieldsLibrary, { definitions: customFieldDefinitions });
+        pickerHtml = `
+          <div class="mb-4 p-4 rounded-lg border border-gray-200">
+            <label class="block text-xs font-medium text-gray-700 mb-1">Use an existing field</label>
+            ${libraryOptions.length ? `
+              <lex-select size="sm" searchable="true" data-library-pick="true"
+                placeholder="Search your field library"
+                options="${lexSelectOptionsAttr(libraryOptions)}"></lex-select>
+            ` : '<p class="text-sm text-gray-500">Your field library is empty. Create a new field instead.</p>'}
+            <p class="mt-2 text-xs text-gray-500">Adding a field here uses it on this matter only. Other matters keep their own fields.</p>
+          </div>
+        `;
+      }
+
       if (customFieldDefinitions.length === 0) {
-        container.innerHTML = `
+        container.innerHTML = pickerHtml + `
           <div class="text-center py-8 text-gray-500">
             <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
             </svg>
-            <p class="mt-2 text-sm">No custom fields yet. Click "Add Field" to create one.</p>
+            <p class="mt-2 text-sm">No custom fields on this matter yet. Create a new field, or use one from your library.</p>
           </div>
         `;
         return;
       }
 
-      container.innerHTML = `
+      container.innerHTML = pickerHtml + `
         <div class="space-y-4">
           ${customFieldDefinitions.map((def, index) => {
             const valueObj = customFieldValues.find(v => v.key === def.key);
             const currentValue = valueObj ? valueObj.value : (def.default_value || '');
+            // A library field's name, required flag and options apply to every
+            // matter using it: read only unless this person manages the library.
+            const canManageLibrary = !!(customFieldsBaseline && customFieldsBaseline.canManageLibrary);
+            const lockProps = !!def.id && !canManageLibrary;
+            const libraryNote = !def.id ? '' : (canManageLibrary
+              ? '<p class="mb-3 text-xs text-gray-500">Changes apply to every matter using this field.</p>'
+              : '<p class="mb-3 text-xs text-gray-500">Library field. Ask an admin to change its name, required setting or options.</p>');
 
             return `
               <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                ${libraryNote}
                 <!-- Field Definition Row -->
                 <div class="grid grid-cols-12 gap-3 mb-3">
                   <!-- Key (identifier) -->
@@ -10098,6 +10069,7 @@
                     <input
                       type="text"
                       value="${escapeHtml(def.key || '')}"
+                      ${def.id ? 'readonly title="A saved field key cannot change"' : ''}
                       onchange="updateFieldDefinition(${index}, 'key', this.value)"
                       placeholder="e.g., case_number"
                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
@@ -10110,6 +10082,7 @@
                     <input
                       type="text"
                       value="${escapeHtml(def.display_name || '')}"
+                      ${lockProps ? 'readonly' : ''}
                       onchange="updateFieldDefinition(${index}, 'display_name', this.value)"
                       placeholder="e.g., Case Number"
                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
@@ -10122,16 +10095,8 @@
                     <lex-select
                       data-field-definition-index="${index}"
                       size="sm"
-                      options="${lexSelectOptionsAttr([
-                        { value: 'text', label: 'Text' },
-                        { value: 'textarea', label: 'Long text' },
-                        { value: 'number', label: 'Number' },
-                        { value: 'currency', label: 'Currency' },
-                        { value: 'date', label: 'Date' },
-                        { value: 'datetime', label: 'Date+Time' },
-                        { value: 'boolean', label: 'Yes/No' },
-                        { value: 'select', label: 'Dropdown' }
-                      ])}"
+                      ${def.id ? 'disabled="true" title="A saved field type cannot change"' : ''}
+                      options="${lexSelectOptionsAttr(LanaMatterFields.typeOptions(def))}"
                       value="${lexSelectAttr(def.type || '')}"
                     ></lex-select>
                   </div>
@@ -10143,6 +10108,7 @@
                       <input
                         type="checkbox"
                         ${def.required ? 'checked' : ''}
+                        ${lockProps ? 'disabled' : ''}
                         onchange="updateFieldDefinition(${index}, 'required', this.checked)"
                         class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                       />
@@ -10165,12 +10131,13 @@
                 </div>
 
                 <!-- Options for Select Type -->
-                ${def.type === 'select' ? `
+                ${LanaMatterFields.hasOptions(def.type) ? `
                   <div class="mb-3">
                     <label class="block text-xs font-medium text-gray-700 mb-1">Dropdown Options (comma-separated)</label>
                     <input
                       type="text"
                       value="${escapeHtml((def.options || []).join(', '))}"
+                      ${lockProps ? 'readonly' : ''}
                       onchange="updateFieldDefinition(${index}, 'options', this.value.split(',').map(s => s.trim()).filter(s => s))"
                       placeholder="e.g., Active, Pending, Closed"
                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
@@ -10194,24 +10161,18 @@
     function renderValueInput(def, currentValue, index) {
       const key = def.key;
 
-      switch (def.type) {
-        case 'textarea':
-          return `
-            <textarea
-              onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
-              placeholder="Enter ${escapeHtml(def.display_name || def.key)}"
-              rows="3"
-              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            >${escapeHtml(currentValue || '')}</textarea>
-          `;
+      if (LanaMatterFields.isReadOnlyValue(def.type)) {
+        return `<p class="text-sm text-gray-500">${escapeHtml(currentValue === '' || currentValue == null ? 'Not set' : JSON.stringify(currentValue))}</p>`;
+      }
 
+      switch (def.type) {
         case 'number':
           return `
             <input
               type="number"
               value="${escapeHtml(currentValue || '')}"
               onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
-              placeholder="Enter ${escapeHtml(def.display_name || def.key)}"
+              placeholder="${escapeHtml(LanaMatterFields.placeholderFor(def))}"
               class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             />
           `;
@@ -10227,7 +10188,7 @@
                 step="0.01"
                 value="${escapeHtml(currentValue || '')}"
                 onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
-                placeholder="0.00"
+                placeholder="${escapeHtml(def.default_value != null && def.default_value !== '' ? LanaMatterFields.placeholderFor(def) : '0.00')}"
                 class="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               />
             </div>
@@ -10237,16 +10198,6 @@
           return `
             <input
               type="date"
-              value="${escapeHtml(currentValue || '')}"
-              onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
-              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            />
-          `;
-
-        case 'datetime':
-          return `
-            <input
-              type="datetime-local"
               value="${escapeHtml(currentValue || '')}"
               onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
               class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
@@ -10278,6 +10229,18 @@
             ></lex-select>
           `;
 
+        case 'multiselect':
+          return `
+            <lex-select
+              data-field-value-key="${lexSelectAttr(key)}"
+              size="sm"
+              multiple="true"
+              placeholder="${lexSelectAttr(`Select ${def.display_name || def.key}`)}"
+              options="${lexSelectOptionsAttr((def.options || []).map(option => ({ value: String(option), label: String(option) })))}"
+              value="${lexSelectAttr(JSON.stringify(Array.isArray(currentValue) ? currentValue : []))}"
+            ></lex-select>
+          `;
+
         case 'text':
         default:
           return `
@@ -10285,11 +10248,49 @@
               type="text"
               value="${escapeHtml(currentValue || '')}"
               onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
-              placeholder="Enter ${escapeHtml(def.display_name || def.key)}"
+              placeholder="${escapeHtml(LanaMatterFields.placeholderFor(def))}"
               class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             />
           `;
       }
+    }
+
+    // Open the "Use an existing field" picker over the organization library
+    async function openCustomFieldLibrary() {
+      if (!currentEditFieldsMatter) return;
+      const matterId = currentEditFieldsMatter;
+      try {
+        customFieldsLibrary = await new MatterFieldsAPIClient(api).searchLibrary(matterId, '');
+      } catch (error) {
+        console.error('[openCustomFieldLibrary] Error:', error);
+        Toast.error(LanaMatterFields.errorMessage(error));
+        return;
+      }
+      if (currentEditFieldsMatter !== matterId) return;
+      customFieldsLibrarySearch = LanaMatterFields.createLibrarySearch({
+        search: (q) => new MatterFieldsAPIClient(api).searchLibrary(matterId, q),
+        onResults: (response) => {
+          if (currentEditFieldsMatter !== matterId || !customFieldsLibrary) return;
+          customFieldsLibrary = response;
+          // Update the open picker in place so the search box keeps focus.
+          const picker = document.querySelector('#customFieldsContainer lex-select[data-library-pick]');
+          if (picker) picker.options = LanaMatterFields.libraryOptions(response, { definitions: customFieldDefinitions });
+        }
+      });
+      renderCustomFieldsModal();
+    }
+
+    // Add the picked library field; it is attached to this matter on save
+    function useLibraryField(definitionId) {
+      const defs = (customFieldsLibrary && customFieldsLibrary.data && customFieldsLibrary.data.definitions) || [];
+      const picked = defs.find(d => d.id === definitionId);
+      if (!picked) return;
+      const next = LanaMatterFields.addLibraryField({ definitions: customFieldDefinitions, values: customFieldValues }, picked);
+      customFieldDefinitions = next.definitions;
+      customFieldValues = next.values;
+      customFieldsLibrary = null;
+      customFieldsLibrarySearch = null;
+      renderCustomFieldsModal();
     }
 
     // Add new custom field
@@ -10310,12 +10311,21 @@
       renderCustomFieldsModal();
     }
 
+    // The library picker's search box: ask the server (debounced) so every
+    // library field is reachable, not only the first page.
+    document.addEventListener('input', (event) => {
+      const picker = event.target && event.target.closest ? event.target.closest('#customFieldsContainer lex-select[data-library-pick]') : null;
+      if (picker && customFieldsLibrarySearch) customFieldsLibrarySearch.query(event.target.value || '');
+    });
+
     // Update field definition (metadata)
     // Custom-field selects are rendered as HTML strings; route their changes here.
     document.addEventListener('lex-change', (event) => {
       const target = event.target;
       if (!target || target.tagName !== 'LEX-SELECT') return;
-      if (target.dataset.fieldDefinitionIndex !== undefined) {
+      if (target.dataset.libraryPick !== undefined) {
+        useLibraryField(event.detail.value);
+      } else if (target.dataset.fieldDefinitionIndex !== undefined) {
         updateFieldDefinition(Number(target.dataset.fieldDefinitionIndex), 'type', event.detail.value);
       } else if (target.dataset.fieldValueKey !== undefined) {
         updateFieldValue(target.dataset.fieldValueKey, event.detail.value);
@@ -10354,6 +10364,23 @@
 
     // Remove custom field (removes both definition and value)
     function removeCustomField(index) {
+      const def = customFieldDefinitions[index];
+      const saved = def && def.id && customFieldsBaseline && customFieldsBaseline.definitions.some(d => d.id === def.id);
+      if (saved) {
+        Lex.Modal.confirm(
+          'Remove field from this matter',
+          `"${escapeHtml(def.display_name || def.key)}" will be removed from this matter when you save. ` +
+            'It stays in your field library and on any other matter that uses it. ' +
+            'This matter\'s value is kept and comes back if you add the field again.',
+          () => dropCustomField(index),
+          { variant: 'danger', confirmText: 'Remove' }
+        );
+        return;
+      }
+      dropCustomField(index);
+    }
+
+    function dropCustomField(index) {
       if (customFieldDefinitions[index]) {
         const key = customFieldDefinitions[index].key;
         customFieldDefinitions.splice(index, 1);
@@ -10371,28 +10398,6 @@
     // Save custom fields
     async function saveCustomFields() {
       try {
-        // Validate definitions
-        const validDefinitions = customFieldDefinitions.filter(def => {
-          return def.key && def.key.trim() !== '' && def.display_name && def.display_name.trim() !== '';
-        });
-
-        if (validDefinitions.length === 0 && customFieldDefinitions.length > 0) {
-          Toast.error('Please fill in Key and Display Name for all fields');
-          return;
-        }
-
-        // Validate no duplicate keys
-        const keys = validDefinitions.map(f => f.key.toLowerCase().trim());
-        const duplicates = keys.filter((key, index) => keys.indexOf(key) !== index);
-        if (duplicates.length > 0) {
-          Toast.error(`Duplicate field keys: ${duplicates.join(', ')}`);
-          return;
-        }
-
-        // Filter values to only include those with corresponding definitions
-        const definitionKeys = validDefinitions.map(d => d.key);
-        const validValues = customFieldValues.filter(v => definitionKeys.includes(v.key));
-
         // Validate we have a matter ID
         if (!currentEditFieldsMatter) {
           Toast.error('Matter ID not found');
@@ -10402,11 +10407,21 @@
         // Save the matter ID before closing modal (close sets currentEditFieldsMatter to null)
         const matterId = currentEditFieldsMatter;
 
-        // Update via settings endpoint
-        const response = await api.put(`/api/v1/matters/${matterId}/settings`, {
-          custom_field_definitions: validDefinitions,
-          custom_fields: validValues
-        });
+        // Definitions go to the org catalog, values to this matter (typed matter fields)
+        try {
+          await new MatterFieldsAPIClient(api).saveDrawer(matterId, customFieldsBaseline,
+            { definitions: customFieldDefinitions, values: customFieldValues });
+        } catch (saveError) {
+          console.error('[saveCustomFields] Error:', saveError);
+          if (saveError.baseline) {
+            // Part of the save may have landed; diff the next try against the server.
+            customFieldsBaseline = saveError.baseline;
+            LanaMatterFields.adoptIds({ definitions: customFieldDefinitions }, customFieldsBaseline);
+            renderCustomFieldsModal();
+          }
+          Toast.error(saveError.userMessage || LanaMatterFields.errorMessage(saveError));
+          return;
+        }
 
         Toast.success('Custom fields updated successfully!');
         closeEditCustomFieldsModal();
@@ -10458,19 +10473,30 @@
   <!-- Edit Custom Fields Modal -->
   <lex-modal id="editCustomFieldsModal" heading="Edit Custom Fields" width="72rem">
       <div>
-        <p class="text-sm text-gray-500 mb-4">Add or modify custom field values for this matter</p>
+        <p class="text-sm text-gray-500 mb-4">These fields apply to this matter only. Reuse a field from your library to add it here.</p>
         <div id="customFieldsContainer"></div>
 
-        <!-- Add Field Button -->
-        <button
-          onclick="addCustomField()"
-          class="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed border-gray-300 rounded-lg text-sm font-medium text-gray-600 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-          </svg>
-          Add Field
-        </button>
+        <!-- Add Field Buttons -->
+        <div class="mt-4 grid grid-cols-2 gap-3">
+          <button
+            onclick="addCustomField()"
+            class="w-full flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed border-gray-300 rounded-lg text-sm font-medium text-gray-600 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+            </svg>
+            Create new field
+          </button>
+          <button
+            onclick="openCustomFieldLibrary()"
+            class="w-full flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed border-gray-300 rounded-lg text-sm font-medium text-gray-600 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z"></path>
+            </svg>
+            Use an existing field
+          </button>
+        </div>
       </div>
 
       <lex-btn data-slot="footer" variant="secondary" onclick="closeEditCustomFieldsModal()">Cancel</lex-btn>

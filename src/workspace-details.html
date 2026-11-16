@@ -678,19 +678,30 @@
   </lex-modal>
 
   <!-- Edit Custom Fields Modal -->
-  <lex-drawer id="editCustomFieldsModal" heading="Edit Custom Fields" subtitle="Add or modify custom field values for this matter" width="lg"
+  <lex-drawer id="editCustomFieldsModal" heading="Edit Custom Fields" subtitle="These fields apply to this matter only. Reuse a field from your library to add it here." width="lg"
     buttons='[{"label":"Cancel","variant":"secondary","id":"cfCancelBtn"},{"label":"Save Changes","variant":"primary","id":"cfSaveBtn"}]'>
     <div>
       <div id="customFieldsContainer"></div>
-      <button
-        onclick="addCustomField()"
-        class="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed border-gray-300 rounded-lg text-sm font-medium text-gray-600 hover:border-gray-400 hover:text-gray-800 transition-colors"
-      >
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-        </svg>
-        Add Field
-      </button>
+      <div class="mt-4 grid grid-cols-2 gap-3">
+        <button
+          onclick="addCustomField()"
+          class="w-full flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed border-gray-300 rounded-lg text-sm font-medium text-gray-600 hover:border-gray-400 hover:text-gray-800 transition-colors"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+          </svg>
+          Create new field
+        </button>
+        <button
+          onclick="openCustomFieldLibrary()"
+          class="w-full flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed border-gray-300 rounded-lg text-sm font-medium text-gray-600 hover:border-gray-400 hover:text-gray-800 transition-colors"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z"></path>
+          </svg>
+          Use an existing field
+        </button>
+      </div>
     </div>
   </lex-drawer>
 
@@ -1169,8 +1180,10 @@
   <script src="js/tiptap-bundle-built.js"></script>
   <script src="js/api/matter-notes-api.client.js"></script>
   <script src="js/api/matter-links-api.client.js"></script>
+  <script src="js/api/matter-fields-api.client.js"></script>
   <script src="js/shared/note-labels.js"></script>
   <script src="js/shared/entity-links.js"></script>
+  <script src="js/shared/matter-fields.js"></script>
   <script src="js/shared/note-actions.js"></script>
   <script src="js/shared/board-work-items.js"></script>
   <script src="js/shared/task-priority.js"></script>

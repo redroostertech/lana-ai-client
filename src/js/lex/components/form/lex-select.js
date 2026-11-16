@@ -516,6 +516,15 @@
     render() {
       injectStyles();
 
+      // Any re-render while open (new .options from a search, for example)
+      // replaces the search box. Remember whether it held focus and where the
+      // caret was, so updated() can put both back.
+      const active = typeof document !== 'undefined' ? document.activeElement : null;
+      this._searchFocus = (this._open && active && typeof this.contains === 'function' && this.contains(active) &&
+        typeof active.matches === 'function' && active.matches('.lex-select-search input'))
+        ? { caret: active.selectionStart }
+        : null;
+
       // Parse value into selected set
       this._syncSelectedFromValue();
 
@@ -664,6 +673,19 @@
         this._refocusTrigger = false;
         const t = this.querySelector('.lex-select-trigger');
         if (t) t.focus();
+      }
+
+      // Keep typing in the search box across a re-render (see render()).
+      if (this._searchFocus) {
+        const caret = this._searchFocus.caret;
+        this._searchFocus = null;
+        const si = this.querySelector('.lex-select-search input');
+        if (si && this._open) {
+          si.focus();
+          si.value = this._searchTerm;
+          const pos = (caret === null || caret === undefined) ? si.value.length : caret;
+          try { si.setSelectionRange(pos, pos); } catch (err) {}
+        }
       }
 
       // Toggle dropdown
