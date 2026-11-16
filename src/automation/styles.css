@@ -650,17 +650,18 @@ button:disabled {
   color: #d64545;
 }
 
+/* Sidebar tokens: the sidebar is light or dark with the theme (lex-tokens.css). */
 .lex-sidebar-root .lex-sidebar-nav-item[data-id="create"] {
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  color: #fff;
+  border: 1px solid color-mix(in srgb, var(--lex-sidebar-text-active) 28%, transparent);
+  color: var(--lex-sidebar-text-active);
   font-weight: 700;
   box-shadow: none;
 }
 
 .lex-sidebar-root .lex-sidebar-nav-item[data-id="create"]:hover {
   background: transparent;
-  border-color: rgba(255, 255, 255, 0.42);
+  border-color: color-mix(in srgb, var(--lex-sidebar-text-active) 42%, transparent);
   transform: none;
 }
 

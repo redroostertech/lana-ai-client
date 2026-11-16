@@ -10,17 +10,18 @@
   font-family: var(--lex-font-sans, system-ui, sans-serif);
 }
 
+/* Sidebar tokens: the sidebar is light or dark with the theme (lex-tokens.css). */
 .lex-sidebar-root .lex-sidebar-nav-item[data-id="create"] {
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  border: 1px solid color-mix(in srgb, var(--lex-sidebar-text-active) 28%, transparent);
   background: transparent;
-  color: #fff;
+  color: var(--lex-sidebar-text-active);
   font-weight: 700;
   box-shadow: none;
 }
 
 .lex-sidebar-root .lex-sidebar-nav-item[data-id="create"]:hover {
-  border-color: rgba(255, 255, 255, 0.45);
-  background: rgba(255, 255, 255, 0.06);
+  border-color: color-mix(in srgb, var(--lex-sidebar-text-active) 45%, transparent);
+  background: color-mix(in srgb, var(--lex-sidebar-text-active) 6%, transparent);
   transform: none;
 }
 
