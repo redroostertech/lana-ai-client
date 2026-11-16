@@ -550,7 +550,8 @@
 
   /** Status vocabulary of this page, in filter order. */
   var CONNECTOR_STATUSES = {
-    connected:     { label: 'Connected',     color: 'green' },
+    connected:       { label: 'Connected',       color: 'green' },
+    needs_attention: { label: 'Needs attention', color: 'yellow' },
     not_connected: { label: 'Not connected', color: 'gray' },
     disconnected:  { label: 'Disconnected',  color: 'red' },
     coming_soon:   { label: 'Coming soon',   color: 'yellow' }
@@ -562,6 +563,9 @@
 
   /**
    * One table row of raw values for a connector (docs/TABLE-STANDARD.md §5).
+   * A connected row the health check flagged gets the status needs_attention,
+   * so its badge, the Status filter and the sort agree. Its actions still come
+   * from the connector itself, so it stays connected for Open and Sync.
    * @param {Object} connector
    * @param {Array} installedConnectors
    * @param {Array} pinned - pin keys
@@ -572,6 +576,8 @@
     var pinKey = getConnectorPinKey(connector);
     var category = String(normalized.category || '').toLowerCase();
     var attention = healthModule() ? healthModule().rowAttention(connectorHealth, [normalized.id, raw.id]) : null;
+    var status = getConnectorStatusKey(connector, installedConnectors);
+    if (status === 'connected' && attention) status = 'needs_attention';
     return {
       id: String(normalized.id),
       pin_key: pinKey,
@@ -583,7 +589,7 @@
       category: category === 'case' ? 'case_management' : category,
       auth_type: String(normalized.auth_type || '').toLowerCase(),
       scope: normalized.connector_scope,
-      status: getConnectorStatusKey(connector, installedConnectors),
+      status: status,
       version: String(normalized.version || '').replace(/^v/i, ''),
       created_at: raw.created_at || raw.installed_at || '',
       update_slug: getConnectorUpdateSlug(connector),

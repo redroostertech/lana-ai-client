@@ -214,13 +214,34 @@ describe('Data Connectors page wiring', () => {
     multi_instance: { enabled: true, instance_label: 'Company', instance_helper_text: 'One per company.', instance_placeholder: 'acme' }
   };
 
-  test('a row the health check flagged gets needs_attention, and its status stays the same', async () => {
+  test('a connected row the health check flagged gets the needs_attention status', async () => {
     const page = loadPage();
-    expect(page.mapConnectorRow(clio, [clio], []).needs_attention).toBe('no');
+    expect(page.mapConnectorRow(clio, [clio], [])).toMatchObject({ needs_attention: 'no', status: 'connected' });
     await page.loadConnectorHealth();
     const row = page.mapConnectorRow(clio, [clio], []);
     expect(row.needs_attention).toBe('yes');
-    expect(row.status).toBe('connected');
+    expect(row.status).toBe('needs_attention');
+  });
+
+  test('filtering by Connected leaves out flagged rows, and Needs attention finds them', async () => {
+    const page = loadPage();
+    await page.loadConnectorHealth();
+    const qb = { id: '33333333-4444-4555-8666-777777777777', connector_id: 'qb', name: 'QuickBooks', status: 'connected' };
+    const rows = [page.mapConnectorRow(clio, [clio, qb], []), page.mapConnectorRow(qb, [clio, qb], [])];
+    // lex-table's Status filter is an 'in' match on row.status.
+    const byStatus = (values) => rows.filter((r) => values.includes(r.status)).map((r) => r.name);
+    expect(byStatus(['connected'])).toEqual(['QuickBooks']);
+    expect(byStatus(['needs_attention'])).toEqual(['Clio']);
+  });
+
+  test('a needs-attention row is still connected for its actions (Open, not Set up)', async () => {
+    const page = loadPage();
+    await page.loadConnectorHealth();
+    const row = page.mapConnectorRow(clio, [clio], []);
+    expect(row.status).toBe('needs_attention');
+    const html = page.connectorActionsCell(row);
+    expect(html).toContain(`openConnectorManage('${SOURCE_B}')`);
+    expect(html).not.toContain('installConnector');
   });
 
   test('a health error fails quietly and flags nothing', async () => {
@@ -237,11 +258,11 @@ describe('Data Connectors page wiring', () => {
     expect(page.mapConnectorRow(qb, [qb], []).attention_reason).toBe('');
   });
 
-  test('the status cell shows one badge: a flagged connected row shows only Needs attention, with its reason', () => {
+  test('the status cell shows one badge: a needs-attention row shows only Needs attention, with its reason', () => {
     const T = require(path.join(SRC, 'js/shared/connector-table.js'));
-    const statuses = { connected: { label: 'Connected', color: 'green' } };
+    const statuses = { connected: { label: 'Connected', color: 'green' }, needs_attention: { label: 'Needs attention', color: 'yellow' } };
     const render = T.cellRenderers({ statuses }).status;
-    const flagged = render('connected', { needs_attention: 'yes', attention_reason: 'The last sync failed.' });
+    const flagged = render('needs_attention', { needs_attention: 'yes', attention_reason: 'The last sync failed.' });
     expect(flagged).toContain('label="Needs attention"');
     expect(flagged).not.toContain('label="Connected"');
     expect((flagged.match(/<lex-badge/g) || []).length).toBe(1);

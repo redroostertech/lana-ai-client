@@ -148,6 +148,7 @@ describe('LanaConnectorTable.statusBadge: one badge per row', () => {
   const T = baseWindow().LanaConnectorTable;
   const statuses = {
     connected: { label: 'Connected', color: 'green' },
+    needs_attention: { label: 'Needs attention', color: 'yellow' },
     not_connected: { label: 'Not connected', color: 'gray' },
     disconnected: { label: 'Disconnected', color: 'red' },
     coming_soon: { label: 'Coming soon', color: 'yellow' }
@@ -159,8 +160,12 @@ describe('LanaConnectorTable.statusBadge: one badge per row', () => {
     expect(badge('connected', false)).toEqual({ label: 'Connected', color: 'green', reason: '' });
   });
 
-  test('connected and flagged: Needs attention only, in yellow, with the reason', () => {
-    expect(badge('connected', true)).toEqual({ label: 'Needs attention', color: 'yellow', reason: REASON });
+  test('needs attention: its own badge, in yellow, with the reason', () => {
+    expect(badge('needs_attention', true)).toEqual({ label: 'Needs attention', color: 'yellow', reason: REASON });
+  });
+
+  test('a connected row is only ever Connected; the flag lives in its status', () => {
+    expect(badge('connected', true)).toEqual({ label: 'Connected', color: 'green', reason: '' });
   });
 
   test('not connected states keep their own badge even when flagged', () => {
@@ -175,7 +180,7 @@ describe('LanaConnectorTable.statusBadge: one badge per row', () => {
   });
 
   test('a flagged row without reason text falls back to plain copy', () => {
-    expect(T.statusBadge(statuses, { status: 'connected', needs_attention: 'yes' }).reason).toBe('Something needs a look.');
+    expect(T.statusBadge(statuses, { status: 'needs_attention', needs_attention: 'yes' }).reason).toBe('Something needs a look.');
   });
 
   test('no status: no badge', () => {
@@ -184,13 +189,13 @@ describe('LanaConnectorTable.statusBadge: one badge per row', () => {
 
   test('the cell renders exactly one badge in every state', () => {
     const render = T.cellRenderers({ statuses }).status;
-    ['connected', 'not_connected', 'disconnected', 'coming_soon', 'error'].forEach((status) => {
+    ['connected', 'needs_attention', 'not_connected', 'disconnected', 'coming_soon', 'error'].forEach((status) => {
       [true, false].forEach((flagged) => {
         const html = render(status, { status, needs_attention: flagged ? 'yes' : 'no', attention_reason: REASON });
         expect((html.match(/<lex-badge/g) || []).length).toBe(1);
       });
     });
-    const flaggedHtml = render('connected', { status: 'connected', needs_attention: 'yes', attention_reason: 'A "quoted" <reason>' });
+    const flaggedHtml = render('needs_attention', { status: 'needs_attention', needs_attention: 'yes', attention_reason: 'A "quoted" <reason>' });
     expect(flaggedHtml).toContain('title="A &quot;quoted&quot; &lt;reason&gt;"');
     expect(flaggedHtml).toContain('<span class="connector-table-sr-only">A &quot;quoted&quot; &lt;reason&gt;</span>');
   });
@@ -387,6 +392,16 @@ describe('Data Connectors row mapping', () => {
     const soonHtml = page.connectorActionsCell(soon);
     expect(soonHtml).toContain('View details');
     expect(soonHtml).not.toContain('installConnector');
+  });
+
+  test('the Status filter offers Needs attention, right after Connected', () => {
+    const page = loadPage();
+    expect(page.CONNECTOR_STATUSES.needs_attention).toEqual({ label: 'Needs attention', color: 'yellow' });
+    const options = baseWindow().LanaConnectorTable.columnFilterOptions([], page.CONNECTOR_STATUSES).status.options;
+    expect(options.slice(0, 2)).toEqual([
+      { value: 'connected', label: 'Connected' },
+      { value: 'needs_attention', label: 'Needs attention' }
+    ]);
   });
 
   test('status vocabulary labels are capitalised', () => {

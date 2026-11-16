@@ -135,26 +135,21 @@
     return (statuses && statuses[value]) || { label: humanize(value), color: 'gray' };
   }
 
-  var ATTENTION_BADGE = { label: 'Needs attention', color: 'yellow' };
   var ATTENTION_FALLBACK_REASON = 'Something needs a look.';
 
   /**
    * The one badge a row shows: { label, color, reason } or null with no status.
-   * A connected row the health check flagged shows Needs attention in place of
-   * Connected, with the reason. Every other status keeps its own badge.
+   * A needs_attention row (a connected row the health check flagged) carries
+   * its reason. Every status takes its label and color from the vocabulary.
    */
   function statusBadge(statuses, row) {
     var value = row && row.status;
     if (!value) return null;
-    if (value === 'connected' && row.needs_attention === 'yes') {
-      return {
-        label: ATTENTION_BADGE.label,
-        color: ATTENTION_BADGE.color,
-        reason: String(row.attention_reason || '').trim() || ATTENTION_FALLBACK_REASON
-      };
-    }
     var info = statusInfo(statuses, value);
-    return { label: info.label, color: info.color || 'gray', reason: '' };
+    var reason = value === 'needs_attention'
+      ? String(row.attention_reason || '').trim() || ATTENTION_FALLBACK_REASON
+      : '';
+    return { label: info.label, color: info.color || 'gray', reason: reason };
   }
 
   // Distinct non-empty values of a row field, sorted by their label.
