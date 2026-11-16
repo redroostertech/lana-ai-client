@@ -678,7 +678,7 @@
   </lex-modal>
 
   <!-- Edit Custom Fields Modal -->
-  <lex-drawer id="editCustomFieldsModal" heading="Edit Custom Fields" subtitle="Add or modify custom field values for this matter" width="lg"
+  <lex-drawer id="editCustomFieldsModal" heading="Edit Custom Fields" subtitle="Fields are shared by every matter in your organization. Values are saved for this matter only." width="lg"
     buttons='[{"label":"Cancel","variant":"secondary","id":"cfCancelBtn"},{"label":"Save Changes","variant":"primary","id":"cfSaveBtn"}]'>
     <div>
       <div id="customFieldsContainer"></div>
@@ -1169,8 +1169,10 @@
   <script src="js/tiptap-bundle-built.js"></script>
   <script src="js/api/matter-notes-api.client.js"></script>
   <script src="js/api/matter-links-api.client.js"></script>
+  <script src="js/api/matter-fields-api.client.js"></script>
   <script src="js/shared/note-labels.js"></script>
   <script src="js/shared/entity-links.js"></script>
+  <script src="js/shared/matter-fields.js"></script>
   <script src="js/shared/note-actions.js"></script>
   <script src="js/shared/board-work-items.js"></script>
   <script src="js/shared/task-priority.js"></script>

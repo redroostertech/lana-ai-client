@@ -44,6 +44,7 @@
   var currentEditFieldsMatter = null;
   var customFieldDefinitions = [];
   var customFieldValues = [];
+  var customFieldsBaseline = null;
   var _navContext = null;              // navigation context (source, conversationId, etc.)
   var matterTabs = null;               // tabs from the matter's makeup (LanaMatterTabRegistry.buildTabs)
   var makeupClient = null;             // MatterMakeupAPIClient
@@ -8376,9 +8377,13 @@
   // Custom Fields Modal (adapted from workspace.js lines 9942-10385)
   // =========================================================================
 
+  function matterFieldsClient() {
+    return new MatterFieldsAPIClient(api);
+  }
+
   /**
    * Open the edit custom fields modal for a matter.
-   * Loads matter data, populates state, renders modal.
+   * Loads the org field definitions and this matter's values, renders modal.
    * @param {string} matterId - The matter ID
    */
   async function openEditCustomFieldsModal(matterId) {
@@ -8390,51 +8395,17 @@
 
     currentEditFieldsMatter = matterId;
 
-    var matter = window.currentViewedMatter;
-
-    if (!matter || matter.matter_id !== matterId) {
-      try {
-        var result = await api.getMatter(matterId, { bustCache: true });
-
-        if (result && result.error) {
-          console.error('[openEditCustomFieldsModal] API error:', result.error);
-          Lex.Toast.error(result.error.message || 'Failed to load matter details');
-          return;
-        }
-
-        if (result && result.matter) {
-          matter = result.matter;
-          window.currentViewedMatter = matter;
-        } else {
-          console.error('[openEditCustomFieldsModal] Invalid API response:', result);
-          Lex.Toast.error('Failed to load matter details');
-          return;
-        }
-      } catch (error) {
-        console.error('[openEditCustomFieldsModal] Error loading matter:', error);
-        Lex.Toast.error(error.message || 'Failed to load matter details');
-        return;
-      }
+    // Definitions are org-level; values are this matter's (typed matter fields).
+    try {
+      customFieldsBaseline = await matterFieldsClient().loadDrawer(matterId);
+    } catch (error) {
+      console.error('[openEditCustomFieldsModal] Error loading custom fields:', error);
+      Lex.Toast.error(LanaMatterFields.errorMessage(error));
+      return;
     }
-
-    customFieldDefinitions = [];
-    customFieldValues = [];
-
-    if (matter && matter.metadata && matter.metadata.custom_field_definitions && Array.isArray(matter.metadata.custom_field_definitions)) {
-      customFieldDefinitions = JSON.parse(JSON.stringify(matter.metadata.custom_field_definitions));
-    }
-
-    if (matter && matter.metadata && matter.metadata.custom_fields && Array.isArray(matter.metadata.custom_fields)) {
-      customFieldValues = JSON.parse(JSON.stringify(matter.metadata.custom_fields));
-    }
-
-    // Initialize values for fields that do not have them yet
-    customFieldDefinitions.forEach(function (def) {
-      var hasValue = customFieldValues.some(function (v) { return v.key === def.key; });
-      if (!hasValue) {
-        customFieldValues.push({ key: def.key, value: def.default_value || '' });
-      }
-    });
+    var drawerState = LanaMatterFields.cloneState(customFieldsBaseline);
+    customFieldDefinitions = drawerState.definitions;
+    customFieldValues = drawerState.values;
 
     renderCustomFieldsModal();
 
@@ -8465,6 +8436,7 @@
     currentEditFieldsMatter = null;
     customFieldDefinitions = [];
     customFieldValues = [];
+    customFieldsBaseline = null;
   }
 
   /**
@@ -8516,19 +8488,10 @@
       }
       var currentValue = valueObj ? valueObj.value : (def.default_value || '');
 
-      var selectTypeOptions = [
-        { value: 'text', label: 'Text' },
-        { value: 'textarea', label: 'Long text' },
-        { value: 'number', label: 'Number' },
-        { value: 'currency', label: 'Currency' },
-        { value: 'date', label: 'Date' },
-        { value: 'datetime', label: 'Date and time' },
-        { value: 'boolean', label: 'Yes/No' },
-        { value: 'select', label: 'Dropdown' }
-      ];
+      var selectTypeOptions = LanaMatterFields.typeOptions(def);
 
       var optionsRowHtml = '';
-      if (def.type === 'select') {
+      if (LanaMatterFields.hasOptions(def.type)) {
         var optionsJoined = (def.options || []).join(', ');
         optionsRowHtml =
           '<div class="mb-3">' +
@@ -8546,6 +8509,7 @@
             '<div class="col-span-3">' +
               '<label class="block text-xs font-medium text-gray-700 mb-1">Field Key</label>' +
               '<input type="text" value="' + escapeHtml(def.key || '') + '"' +
+                (def.id ? ' readonly title="A saved field key cannot change"' : '') +
                 ' onchange="updateFieldDefinition(' + i + ', \'key\', this.value)"' +
                 ' placeholder="e.g., case_number"' +
                 ' class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus" />' +
@@ -8604,13 +8568,13 @@
     var key = escapeHtml(def.key || '');
     var displayName = escapeHtml(def.display_name || def.key || '');
 
-    switch (def.type) {
-      case 'textarea':
-        return '<textarea onchange="updateFieldValue(\'' + key + '\', this.value)"' +
-          ' placeholder="Enter ' + displayName + '" rows="3"' +
-          ' class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus">' +
-          escapeHtml(currentValue || '') + '</textarea>';
+    if (LanaMatterFields.isReadOnlyValue(def.type)) {
+      return '<p class="text-sm text-gray-500">' +
+        escapeHtml(currentValue === '' || currentValue == null ? 'Not set' : JSON.stringify(currentValue)) +
+        '</p>';
+    }
 
+    switch (def.type) {
       case 'number':
         return '<input type="number" value="' + escapeHtml(currentValue || '') + '"' +
           ' onchange="updateFieldValue(\'' + key + '\', this.value)"' +
@@ -8633,11 +8597,6 @@
           ' onchange="updateFieldValue(\'' + key + '\', this.value)"' +
           ' class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus" />';
 
-      case 'datetime':
-        return '<input type="datetime-local" value="' + escapeHtml(currentValue || '') + '"' +
-          ' onchange="updateFieldValue(\'' + key + '\', this.value)"' +
-          ' class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus" />';
-
       case 'boolean':
         return '<label class="flex items-center px-3 py-2">' +
           '<input type="checkbox"' + (currentValue === true || currentValue === 'true' ? ' checked' : '') +
@@ -8657,6 +8616,13 @@
           ' placeholder="' + escapeHtml(emptyLabel) + '"' +
           ' options="' + escapeHtml(JSON.stringify(selectOptions)) + '"' +
           ' value="' + escapeHtml(currentValue == null ? '' : String(currentValue)) + '"></lex-select>';
+
+      case 'multiselect':
+        var multiOptions = (def.options || []).map(function (opt) { return { value: String(opt), label: String(opt) }; });
+        return '<lex-select size="sm" multiple="true" data-field-value-key="' + key + '"' +
+          ' placeholder="' + escapeHtml('Select ' + (def.display_name || def.key || '')) + '"' +
+          ' options="' + escapeHtml(JSON.stringify(multiOptions)) + '"' +
+          ' value="' + escapeHtml(JSON.stringify(Array.isArray(currentValue) ? currentValue : [])) + '"></lex-select>';
 
       case 'text':
       default:
@@ -8737,6 +8703,20 @@
    * @param {number} index - Definition index to remove
    */
   function removeCustomField(index) {
+    var def = customFieldDefinitions[index];
+    if (def && def.id) {
+      Lex.Modal.confirm(
+        'Remove field for every matter',
+        '"' + escapeHtml(def.display_name || def.key) + '" is shared by every matter in your organization. ' +
+          'Saving removes it from all of them. Values already recorded are kept but hidden.',
+        function () { dropCustomField(index); }
+      );
+      return;
+    }
+    dropCustomField(index);
+  }
+
+  function dropCustomField(index) {
     if (customFieldDefinitions[index]) {
       var key = customFieldDefinitions[index].key;
       customFieldDefinitions.splice(index, 1);
@@ -8757,28 +8737,6 @@
    */
   async function saveCustomFields() {
     try {
-      var validDefinitions = customFieldDefinitions.filter(function (def) {
-        return def.key && def.key.trim() !== '' && def.display_name && def.display_name.trim() !== '';
-      });
-
-      if (validDefinitions.length === 0 && customFieldDefinitions.length > 0) {
-        Lex.Toast.error('Please fill in Key and Display Name for all fields');
-        return;
-      }
-
-      // Check for duplicate keys — NO regex, use string compare
-      var keys = validDefinitions.map(function (f) { return f.key.toLowerCase().trim(); });
-      var duplicates = keys.filter(function (k, idx) { return keys.indexOf(k) !== idx; });
-      if (duplicates.length > 0) {
-        Lex.Toast.error('Duplicate field keys: ' + duplicates.join(', '));
-        return;
-      }
-
-      var definitionKeys = validDefinitions.map(function (d) { return d.key; });
-      var validValues = customFieldValues.filter(function (v) {
-        return definitionKeys.indexOf(v.key) !== -1;
-      });
-
       if (!currentEditFieldsMatter) {
         Lex.Toast.error('Matter ID not found');
         return;
@@ -8786,10 +8744,20 @@
 
       var matterId = currentEditFieldsMatter;
 
-      await api.put('/api/v1/matters/' + matterId + '/settings', {
-        custom_field_definitions: validDefinitions,
-        custom_fields: validValues
-      });
+      try {
+        await matterFieldsClient().saveDrawer(matterId, customFieldsBaseline,
+          { definitions: customFieldDefinitions, values: customFieldValues });
+      } catch (saveError) {
+        console.error('[saveCustomFields] Error:', saveError);
+        if (saveError.baseline) {
+          // Part of the save may have landed; diff the next try against the server.
+          customFieldsBaseline = saveError.baseline;
+          LanaMatterFields.adoptIds({ definitions: customFieldDefinitions }, customFieldsBaseline);
+          renderCustomFieldsModal();
+        }
+        Lex.Toast.error(saveError.userMessage || LanaMatterFields.errorMessage(saveError));
+        return;
+      }
 
       Lex.Toast.success('Custom fields updated successfully!');
       closeEditCustomFieldsModal();
@@ -8834,7 +8802,7 @@
 
   /**
    * Render the custom fields section inside the dock details panel.
-   * Reads definitions and values from matter.metadata and builds the
+   * Reads this matter's typed field values (label and type ride along) and builds the
    * collapsible section with an edit button.
    * @param {Object} matter - The current matter object
    */
@@ -8848,15 +8816,20 @@
       return;
     }
 
-    var customFieldDefs = (matter.metadata && matter.metadata.custom_field_definitions) || [];
-    var customFieldVals = (matter.metadata && matter.metadata.custom_fields) || [];
+    var fieldsToDisplay = [];
+    try {
+      fieldsToDisplay = LanaMatterFields.displayFields(await matterFieldsClient().listValues(matter.matter_id));
+    } catch (error) {
+      console.warn('[renderCustomFieldsSection] Could not load custom field values:', error && error.message);
+    }
 
     // Build lookup maps
     var defsMap = {};
-    customFieldDefs.forEach(function (def) { defsMap[def.key] = def; });
-
     var valuesMap = {};
-    customFieldVals.forEach(function (field) { valuesMap[field.key] = field.value; });
+    fieldsToDisplay.forEach(function (field) {
+      defsMap[field.key] = { display_name: field.displayName, type: field.type };
+      valuesMap[field.key] = field.value;
+    });
 
     function isValidValue(value) {
       if (value === null || value === undefined || value === '') return false;
@@ -8866,20 +8839,6 @@
       }
       return true;
     }
-
-    var fieldsToDisplay = [];
-
-    customFieldDefs.forEach(function (def) {
-      var value = valuesMap[def.key];
-      if (isValidValue(value)) {
-        fieldsToDisplay.push({
-          key: def.key,
-          displayName: def.display_name || def.key,
-          value: value,
-          type: def.type
-        });
-      }
-    });
 
     // Legacy shadow_table data
     if (matter.shadow_table && typeof matter.shadow_table === 'object') {
