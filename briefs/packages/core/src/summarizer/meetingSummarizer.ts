@@ -405,7 +405,7 @@ function finishCandidate(candidate: QuotedCandidate, speakers: readonly Speaker[
   let spokenWhen = candidate.dueText;
   let owner = candidate.assigneeHint;
   if (owner !== undefined && resolveDueText(owner.trim(), meetingStart) !== undefined) {
-    if (spokenWhen === undefined) spokenWhen = owner.trim();
+    if (spokenWhen === undefined || spokenWhen.trim() === "") spokenWhen = owner.trim();
     owner = undefined;
   }
   let assigneeHint = owner ?? candidate.evidence.find((item) => FIRST_PERSON_PROMISE.test(item.quote))?.speaker;

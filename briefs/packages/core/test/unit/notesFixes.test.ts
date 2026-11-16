@@ -484,6 +484,21 @@ describe("set-aside guard boundaries (synthetic)", () => {
 });
 
 describe("time word as owner, more cases (synthetic)", () => {
+  /** A backend whose candidate carries a blank due text and "tonight" as the owner. */
+  async function finishBlank() {
+    const backend = {
+      modelID: "fake", tokenCounter: words, availability: async () => AVAILABLE,
+      extract: async (request: { chunk: typeof chunk }) => ({
+        points: [], runningSummary: "",
+        candidates: [{ type: "task.create" as const, title: "Send revised schedule", body: "Send it", dueText: "  ", assigneeHint: " tonight ", recipients: [], confidence: 0.7,
+          evidence: [{ speaker: "S2", tStart: 24, tEnd: 33, quote: request.chunk.segments[3]!.text }] }],
+      }),
+    };
+    const result = await new MeetingSummarizer(backend as never, { targetTokens: 4000, maxTokens: 6000 })
+      .summarize({ transcript, speakers, meetingID, now: new Date(2026, 10, 11, 16), meetingStart: new Date(2026, 10, 11, 15, 4) });
+    const params = result.intents[0]!.params;
+    return params.type === "task.create" ? params.task : undefined;
+  }
   async function task(action: string) {
     const model = new Scripted([`${action}\nSUMMARY: x`, "NONE"]);
     const result = await new MeetingSummarizer(new RuntimeNotesBackend(model, undefined, words), { targetTokens: 4000, maxTokens: 6000 })
@@ -495,6 +510,8 @@ describe("time word as owner, more cases (synthetic)", () => {
     expect(kept.type === "task.create" && kept.task).toMatchObject({ dueText: "tonight", assigneeHint: "Omar Haddad" });
     const vague = await task("ACTION: task | L4 | Send revised schedule | Send it | none | next month | none");
     expect(vague.type === "task.create" && vague.task.assigneeHint).toBe("next month");
+    const blank = await finishBlank();
+    expect(blank).toMatchObject({ dueText: "tonight" });
     const named = await task("ACTION: task | L4 | Send revised schedule | Send it | none | Priya | none");
     expect(named.type === "task.create" && named.task.assigneeHint).toBe("Priya");
   });
@@ -524,5 +541,18 @@ describe("rules from the 9B bench rerun (synthetic)", () => {
     expect(kept).toHaveLength(12);
     expect(kept).toContain("The guardianship fee is 3,500 dollars.");
     expect(kept).toContain("The probate deposit is 750 dollars.");
+  });
+});
+
+describe("set-aside guard clarifications (synthetic)", () => {
+  it("lets a lightly heard speaker back a check in a 2-person meeting, and no one is light when there is no talk", async () => {
+    const { guardCheckedParts } = await import("../../src/summarizer/meetingSummarizer.js");
+    const two: TranscriptSegment[] = [
+      { speaker: "S1", start: 0, end: 990, text: "Main speaker." },
+      { speaker: "S2", start: 990, end: 1000, text: "Brief." },
+    ];
+    expect(guardCheckedParts([{ start: 980, end: 1100, reason: "side_conversation" }], [], two)).toHaveLength(1);
+    const silent: TranscriptSegment[] = [{ speaker: "S1", start: 5, end: 5, text: "Zero length." }];
+    expect(guardCheckedParts([{ start: 0, end: 10, reason: "phone_call" }], [], silent)).toEqual([]);
   });
 });
