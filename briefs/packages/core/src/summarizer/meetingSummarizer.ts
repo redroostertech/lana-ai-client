@@ -87,7 +87,7 @@ const MAX_CHECKED_QUESTIONS = 6;
 const PROMISE_CONFIDENCE = 0.6;
 
 /** A decision that is meeting setup, not meeting content. */
-const LOGISTICS = /\b(screen ?shar\w*|share (my|the|your|his|her) screen|screen is (now )?(visible|showing|shared)|can (you|everyone|everybody) (see|hear)|audio|microphones?|mute|unmute|camera|browser|permissions?|refresh\w*|zoom link|meeting link|teams link|reconnect\w*|join(ed|ing)? the (call|meeting))\b/iu;
+const LOGISTICS = /\b(screen ?shar\w*|share (my|the|your|his|her) screen|(access|permission) to (the |my |your |his |her )?screen|screen access|screen is (now )?(visible|showing|shared)|can (you|everyone|everybody) (see|hear)|audio|microphones?|mute|unmute|camera|browser|permissions?|refresh\w*|zoom link|meeting link|teams link|reconnect\w*|join(ed|ing)? the (call|meeting))\b/iu;
 /** A decision that is someone's promise to do something: an action. */
 const PROMISE = /\b(will|'ll|\u2019ll|is going to|are going to|am going to|agrees? to|agreed to|offer(s|ed)? to|commit(s|ted)? to|promise(s|d)? to|volunteer(s|ed)? to)\s+(\w+\s+){0,2}?(send|draft|email|e-mail|call|share|map|create|prepare|review|follow|write|schedule|update|upload|move|forward|provide|set up|look|check|get|put|build|draw|copy|reach|circle|loop|book|file|confirm|finish|start|run|pull|add|fix|deliver)\b/iu;
 /** Words for when inside a promise. */
@@ -135,7 +135,7 @@ export class MeetingSummarizer {
       const extraction = outcome.extraction;
       const candidates: QuotedCandidate[] = [...extraction.candidates];
       for (const point of extraction.points) {
-        if (point.kind !== "summary" && LOGISTICS.test(point.text)) continue;
+        if (isLogistics(point)) continue;
         const promise = point.kind === "decision" ? promiseAction(point, chunk) : undefined;
         if (promise !== undefined) candidates.push(promise);
         else points.push(attributePoint(point, chunk));
@@ -170,13 +170,17 @@ export class MeetingSummarizer {
       runningSummary = this.cap(outcome.extraction.runningSummary);
       options.progress?.((chunk.index + 1) / chunks.length);
     }
-    if (fixed === undefined) asides.push(...await this.checkAsides(chunks, skipped, runningSummary, options.speakers, options.signal));
+    if (fixed === undefined) {
+      asides.push(...await this.checkAsides(chunks, skipped, runningSummary, options.speakers, options.signal));
+      asides.push(...visitorParts(visible));
+    }
     const setAside = fixed ?? finalSetAside(asides, options.transcript);
     const outside = (sources: readonly SourceSpan[]): boolean => !sources.some((span) => overlapsSetAside(span.start, span.end, setAside, 0.5));
     const kept = points.filter((point) => outside(point.sources));
     const keptIntents = intents.filter((intent) => !intent.evidence.some((item) => overlapsSetAside(item.tStart, item.tEnd, setAside, 0.5)));
     dropped += intents.length - keptIntents.length;
-    const checked = await this.checkOpenQuestions(kept, options.transcript.filter((segment) => !segmentSetAside(segment, setAside)), options.speakers, options.signal);
+    // The later lines the question check reads are the chunked lines (blank lines dropped), as Swift sends them.
+    const checked = await this.checkOpenQuestions(kept, chunks.flatMap((chunk) => chunk.segments).filter((segment) => !segmentSetAside(segment, setAside)), options.speakers, options.signal);
     const merged = reduceIntents(keptIntents, this.limits);
     const gaps: NotesGap[] = skipped.map((chunk) => ({
       start: chunk.startTime,
@@ -298,6 +302,11 @@ interface DraftTable {
   readonly rows: Array<{ cells: string[]; sources: SourceSpan[] }>;
 }
 
+/** A decision or open question about setting up the meeting (screen sharing, audio, links). */
+export function isLogistics(point: Pick<ExtractedPoint, "kind" | "text">): boolean {
+  return point.kind !== "summary" && LOGISTICS.test(point.text);
+}
+
 /** A decision that reads as someone's promise ("Omar will send..."): the action it really is. */
 export function promiseAction(point: ExtractedPoint, chunk: TranscriptChunk): QuotedCandidate | undefined {
   if (!PROMISE.test(point.text)) return undefined;
@@ -321,7 +330,49 @@ export function promiseAction(point: ExtractedPoint, chunk: TranscriptChunk): Qu
   };
 }
 
-/** The owner as the speaker's name when the model wrote a label, and a spoken date resolved against the meeting start. */
+/**
+ * A visitor (contract, the phone's rule): with more than 2 speakers, someone who talks 20 s or
+ * more but under 5% of all talk, all within 5 minutes, is set aside as another matter (a staff
+ * member who walks in about a different client). Detection only, never on a rewrite.
+ */
+export function visitorParts(transcript: readonly TranscriptSegment[]): SetAsidePart[] {
+  const lines = transcript.filter((segment) => segment.text.trim() !== "");
+  const bySpeaker = new Map<string, { talk: number; first: number; last: number }>();
+  let total = 0;
+  for (const line of lines) {
+    const talk = Math.max(0, line.end - line.start);
+    total += talk;
+    const entry = bySpeaker.get(line.speaker) ?? { talk: 0, first: line.start, last: line.end };
+    bySpeaker.set(line.speaker, { talk: entry.talk + talk, first: Math.min(entry.first, line.start), last: Math.max(entry.last, line.end) });
+  }
+  if (bySpeaker.size <= 2 || total <= 0) return [];
+  return [...bySpeaker.values()]
+    .filter((entry) => entry.talk >= VISITOR_MIN_SECONDS && entry.talk < VISITOR_SHARE * total && entry.last - entry.first <= VISITOR_SPAN_SECONDS)
+    .map((entry) => ({ start: entry.first, end: entry.last, reason: "other_matter" as const }));
+}
+
+const VISITOR_MIN_SECONDS = 20;
+const VISITOR_SHARE = 0.05;
+const VISITOR_SPAN_SECONDS = 300;
+
+/** Whether the spoken due words (or the time inside them) are said in the action's quotes. */
+function dueSaid(dueText: string, evidence: readonly { readonly quote: string }[]): boolean {
+  const spoken = normalizeText(SPOKEN_WHEN.exec(dueText)?.[0] ?? dueText);
+  if (spoken === "") return false;
+  return ` ${normalizeText(evidence.map((item) => item.quote).join(" "))} `.includes(` ${spoken} `);
+}
+
+/** "map_payment_timelines" reads "Map payment timelines". */
+function readableTitle(title: string): string {
+  if (!title.includes("_") || /\s/u.test(title)) return title;
+  const words = title.replace(/_+/gu, " ").trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/**
+ * The owner as the speaker's name when the model wrote a label, a readable title, and a spoken
+ * date kept only when the cited lines say it, resolved against the meeting start.
+ */
 function finishCandidate(candidate: QuotedCandidate, speakers: readonly Speaker[], meetingStart: Date): QuotedCandidate {
   let assigneeHint = candidate.assigneeHint;
   const label = assigneeHint === undefined ? null : /^s(\d+)$/iu.exec(assigneeHint.trim());
@@ -329,9 +380,11 @@ function finishCandidate(candidate: QuotedCandidate, speakers: readonly Speaker[
     const speaker = speakers.find((item) => item.id === `S${label[1]}`);
     assigneeHint = speaker === undefined ? `S${label[1]}` : speakerDisplayName(speaker);
   }
-  if (candidate.type !== "task.create") return { ...candidate, assigneeHint, dueText: undefined };
-  const dueDate = candidate.dueDate ?? (candidate.dueText === undefined ? undefined : resolveDueText(candidate.dueText, meetingStart));
-  return { ...candidate, assigneeHint, dueDate };
+  const title = readableTitle(candidate.title);
+  if (candidate.type !== "task.create") return { ...candidate, title, assigneeHint, dueText: undefined };
+  const dueText = candidate.dueText !== undefined && dueSaid(candidate.dueText, candidate.evidence) ? candidate.dueText : undefined;
+  const dueDate = candidate.dueDate ?? (dueText === undefined ? undefined : resolveDueText(dueText, meetingStart));
+  return { ...candidate, title, assigneeHint, dueText, dueDate };
 }
 
 /**

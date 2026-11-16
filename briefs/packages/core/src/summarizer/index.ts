@@ -1,5 +1,5 @@
 export {
-  addingSetAside, attributePoint, finalSetAside, MeetingSummarizer, normalizeSetAside, promiseAction, SummarizerUnavailableError,
+  addingSetAside, attributePoint, finalSetAside, isLogistics, MeetingSummarizer, visitorParts, normalizeSetAside, promiseAction, SummarizerUnavailableError,
   type NotesBackend, type SkippedChunk, type SummarizeOptions, type SummaryResult,
 } from "./meetingSummarizer.js";
 export { resolveDueText } from "./dueDates.js";

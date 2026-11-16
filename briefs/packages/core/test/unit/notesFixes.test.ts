@@ -356,3 +356,43 @@ describe("the set-aside check (notes.aside.v1)", () => {
     expect(model.calls).toHaveLength(1);
   });
 });
+
+describe("rules adopted from the phone's real-meeting rerun (synthetic)", () => {
+  const visitorTranscript: TranscriptSegment[] = [
+    { speaker: "S1", start: 0, end: 300, text: "We go over the onboarding schedule for the Harbor account." },
+    { speaker: "S2", start: 300, end: 600, text: "The setup fee is 1,200 dollars and the monthly fee is 300." },
+    { speaker: "S3", start: 600, end: 615, text: "Sorry to interrupt, quick one about the Lopez file." },
+    { speaker: "S3", start: 615, end: 640, text: "The petition for the Lopez estate needs the new heirs listed." },
+    { speaker: "S1", start: 640, end: 900, text: "Thanks. Back to the schedule, kickoff is in December." },
+  ];
+
+  it("sets aside a visitor: more than 2 speakers, 20 s or more but under 5% of talk, within 5 minutes", async () => {
+    const model = new Scripted(["SUMMARY: Onboarding.", "NONE"]);
+    const result = await new MeetingSummarizer(new RuntimeNotesBackend(model, undefined, words), { targetTokens: 4000, maxTokens: 6000 })
+      .summarize({ transcript: visitorTranscript, speakers, meetingID, now: new Date() });
+    expect(result.notes.setAside).toEqual([{ start: 600, end: 640, reason: "other_matter", speakers: ["S3"] }]);
+  });
+
+  it("keeps a spoken due word only when the cited lines say it, and makes snake_case titles readable", async () => {
+    const reply = [
+      "ACTION: task | L2 | map_payment_timelines | Map the payment timelines | this week | S2 | none",
+      "ACTION: task | L4 | Send revised schedule | Send it and copy Priya | tonight | S2 | none",
+      "SUMMARY: x",
+    ].join("\n");
+    const model = new Scripted([reply, "NONE"]);
+    const result = await new MeetingSummarizer(new RuntimeNotesBackend(model, undefined, words), { targetTokens: 4000, maxTokens: 6000 })
+      .summarize({ transcript, speakers, meetingID, now: new Date(2026, 10, 11, 16), meetingStart: new Date(2026, 10, 11, 15, 4) });
+    const tasks = result.intents.map((intent) => (intent.params.type === "task.create" ? intent.params.task : undefined));
+    expect(tasks[0]).toMatchObject({ title: "Map payment timelines" });
+    expect(tasks[0]!.dueText).toBeUndefined();
+    expect(tasks[0]!.dueDate).toBeUndefined();
+    expect(tasks[1]).toMatchObject({ dueText: "tonight", dueDate: "2026-11-11" });
+  });
+
+  it("treats screen access trouble as meeting setup", async () => {
+    const model = new Scripted(["POINT: decision | L2 | S2 | They gave access to the screen so it shows.\nSUMMARY: x", "NONE"]);
+    const result = await new MeetingSummarizer(new RuntimeNotesBackend(model, undefined, words), { targetTokens: 4000, maxTokens: 6000 })
+      .summarize({ transcript, speakers, meetingID, now: new Date() });
+    expect(result.notes.keyPoints).toEqual([]);
+  });
+});

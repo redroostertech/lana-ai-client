@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { AVAILABLE, BackendError } from "../../src/ask/backend.js";
 import type { LanaId } from "../../src/ids/lanaId.js";
-import { encodeIntent, encodeNotes, type Speaker, type TranscriptSegment } from "../../src/intent/index.js";
+import { encodeIntent, encodeNotes, encodeSetAside, type Speaker, type TranscriptSegment } from "../../src/intent/index.js";
 import { canonicalString } from "../../src/json/canonical.js";
 import { LanaDate } from "../../src/json/lanaDate.js";
 import { parseJson } from "../../src/json/parse.js";
@@ -12,7 +12,7 @@ import type { TextModel, TextModelRequest } from "../../src/runtime/index.js";
 import { workflowDefinition } from "../../src/runtime/index.js";
 import {
   chunkPromptText, MeetingSummarizer, NOTES_MAX_RESPONSE_TOKENS, NOTES_SCHEMA, normalizeText, notesInstructions, notesPrompt, parseNotes, RuntimeNotesBackend,
-  textSimilarity, TranscriptChunker, validateNotes, type TokenCounter,
+  isLogistics, promiseAction, resolveDueText, textSimilarity, TranscriptChunker, validateNotes, type TokenCounter,
 } from "../../src/summarizer/index.js";
 import { golden } from "./fixtures.js";
 
@@ -30,7 +30,11 @@ interface NotesGolden {
   instructions: { standard: string; neutral: string };
   chunk_cases: Array<{ name: string; target: number; max: number; chunks: Array<{ index: number; estimated_tokens: number; segments: Segment[]; prompt_text: string }> }>;
   prompts: Array<{ phrasing: "standard" | "neutral"; summary: string; prompt: string }>;
-  replies: Array<{ reply: string; valid: boolean; reason?: string; points: Array<{ kind: string; text: string; lines: number[] }>; candidates: unknown[]; summary: string }>;
+  replies: Array<{ reply: string; valid: boolean; reason?: string; points: Array<{ kind: string; text: string; lines: number[] }>; candidates: unknown[]; summary: string; set_aside?: string; tables?: unknown[] }>;
+  due_words?: Array<{ words: string; meeting_start: string; date: string | null }>;
+  due_calendar_time_zone?: string;
+  promises?: Array<{ text: string; lines: number[]; decided_by: string | null; logistics: boolean; action: unknown }>;
+  vocabulary_prompt?: string;
   meetings: Array<{
     name: string; target: number; max: number;
     steps: Array<{ reply?: string; error?: string; code?: string }>;
@@ -115,12 +119,47 @@ describe("note writer golden vectors (Swift NotesGoldenVectorExportTests)", () =
       const parsed = parseNotes(item.reply, whole);
       expect(parsed.points.map((point) => ({ kind: point.kind, text: point.text, lines: [...point.lines], decided_by: point.decidedBy ?? null }))).toEqual(item.points);
       expect(parsed.runningSummary).toBe(item.summary);
+      if (item.set_aside !== undefined) {
+        // One part per ASIDE line, first to last cited line, in reply order, without speakers.
+        const parts = (parsed.asides ?? []).map((aside) => {
+          const cited = aside.lines.map((line) => whole.segments[line - 1]!);
+          return { start: Math.min(...cited.map((segment) => segment.start)), end: Math.max(...cited.map((segment) => segment.end)), reason: aside.reason };
+        });
+        expect(canonicalString(parts.map((part) => encodeSetAside(part))), item.reply).toBe(item.set_aside);
+      }
+      if (item.tables !== undefined) expect(parsed.tables ?? [], item.reply).toEqual(item.tables);
       expect(parsed.candidates.map((candidate) => ({
         type: candidate.type, title: candidate.title, body: candidate.body, due_date: candidate.dueDate ?? null, due_text: candidate.dueText ?? null, assignee_hint: candidate.assigneeHint ?? null,
         regarding_name: candidate.regardingName ?? null, confidence: candidate.confidence,
         evidence: candidate.evidence.map((quote) => ({ speaker: quote.speaker, t_start: quote.tStart, t_end: quote.tEnd, quote: quote.quote })),
       }))).toEqual(item.candidates);
     }
+  });
+
+  it("resolves spoken due words like DueDateResolver (in the export's time zone)", () => {
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (fixture.due_words === undefined || zone !== fixture.due_calendar_time_zone) return;
+    for (const item of fixture.due_words) expect(resolveDueText(item.words, LanaDate.parse(item.meeting_start)!) ?? null, item.words).toBe(item.date);
+  });
+
+  it("checks decisions for promises and meeting setup like PromiseCheck", () => {
+    const whole = { index: 0, segments: transcript, estimatedTokens: 0 };
+    for (const item of fixture.promises ?? []) {
+      const point = { kind: "decision" as const, text: item.text, lines: item.lines, ...(item.decided_by === null ? {} : { decidedBy: item.decided_by }) };
+      expect(isLogistics(point), item.text).toBe(item.logistics);
+      const action = promiseAction(point, whole);
+      expect(action === undefined ? null : {
+        type: action.type, title: action.title, body: action.body, due_date: action.dueDate ?? null, due_text: action.dueText ?? null, assignee_hint: action.assigneeHint ?? null,
+        regarding_name: action.regardingName ?? null, confidence: action.confidence,
+        evidence: action.evidence.map((quote) => ({ speaker: quote.speaker, t_start: quote.tStart, t_end: quote.tEnd, quote: quote.quote })),
+      }, item.text).toEqual(item.action);
+    }
+  });
+
+  it("names the firm's terms in the prompt like NotesFormat", () => {
+    if (fixture.vocabulary_prompt === undefined) return;
+    const whole = { index: 0, segments: transcript, estimatedTokens: 0 };
+    expect(notesPrompt({ chunk: whole, runningSummary: "", speakers, phrasing: "standard", vocabulary: ["Acme Logistics", "Pemberton", "Warehousely"] })).toBe(fixture.vocabulary_prompt);
   });
 
   it("summarizes whole meetings like MeetingSummarizer over RuntimeNotesBackend", async () => {
