@@ -3,7 +3,7 @@ import { AVAILABLE } from "../../src/ask/backend.js";
 import type { LanaId } from "../../src/ids/lanaId.js";
 import { decodeNotes, encodeNotes, type Speaker, type TranscriptSegment } from "../../src/intent/index.js";
 import type { TextModel, TextModelRequest } from "../../src/runtime/index.js";
-import { MeetingSummarizer, notesInstructions, notesPrompt, parseNotes, RuntimeNotesBackend, type TokenCounter } from "../../src/summarizer/index.js";
+import { finalSetAside, MeetingSummarizer, notesInstructions, notesPrompt, parseNotes, RuntimeNotesBackend, type TokenCounter } from "../../src/summarizer/index.js";
 import { resolveDueText } from "../../src/summarizer/dueDates.js";
 
 // Synthetic meeting text only.
@@ -394,5 +394,31 @@ describe("rules adopted from the phone's real-meeting rerun (synthetic)", () => 
     const result = await new MeetingSummarizer(new RuntimeNotesBackend(model, undefined, words), { targetTokens: 4000, maxTokens: 6000 })
       .summarize({ transcript, speakers, meetingID, now: new Date() });
     expect(result.notes.keyPoints).toEqual([]);
+  });
+});
+
+describe("rules from the desktop rerun, round two (synthetic)", () => {
+  it("names the owner from a first-person promise in the cited line when the model wrote none", async () => {
+    const model = new Scripted(["ACTION: task | L4 | Send revised schedule | Send it and copy Priya | tonight | none | none\nSUMMARY: x", "NONE"]);
+    const result = await new MeetingSummarizer(new RuntimeNotesBackend(model, undefined, words), { targetTokens: 4000, maxTokens: 6000 })
+      .summarize({ transcript, speakers, meetingID, now: new Date() });
+    const params = result.intents[0]!.params;
+    expect(params.type === "task.create" && params.task.assigneeHint).toBe("Omar Haddad");
+  });
+
+  it("joins set-aside parts of any reason less than 30 seconds apart", () => {
+    const parts = finalSetAside([
+      { start: 100, end: 130, reason: "phone_call" },
+      { start: 150, end: 240, reason: "side_conversation" },
+      { start: 300, end: 330, reason: "phone_call" },
+    ], []);
+    expect(parts).toEqual([{ start: 100, end: 240, reason: "side_conversation" }, { start: 300, end: 330, reason: "phone_call" }]);
+  });
+
+  it("keeps more key points for a longer meeting: three per part, at least twelve", async () => {
+    const { reduceKeyPoints, DEFAULT_SUMMARY_LIMITS } = await import("../../src/summarizer/summaryReducer.js");
+    const drafts = Array.from({ length: 30 }, (_, index) => ({ kind: "summary" as const, text: `Point number ${index} about topic ${index * 7}`, sources: [{ start: index * 60, end: index * 60 + 10 }], precision: "exact" as const }));
+    expect(reduceKeyPoints(drafts, [], DEFAULT_SUMMARY_LIMITS).keyPoints).toHaveLength(12);
+    expect(reduceKeyPoints(drafts, [], DEFAULT_SUMMARY_LIMITS, 9).keyPoints).toHaveLength(27);
   });
 });

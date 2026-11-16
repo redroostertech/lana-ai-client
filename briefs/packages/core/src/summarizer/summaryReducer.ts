@@ -27,6 +27,8 @@ export const DEFAULT_SUMMARY_LIMITS: SummaryLimits = {
   noteSimilarityThreshold: 0.8,
 };
 
+const SUMMARY_BULLETS_PER_CHUNK = 3;
+
 /** A verified point before ids are assigned. */
 export interface DraftPoint {
   readonly kind: KeyPointKind;
@@ -67,7 +69,11 @@ export function unionSpans(left: readonly SourceSpan[], right: readonly SourceSp
 }
 
 /** Near-identical points of one kind merge (keeping every source), each kind is capped, then numbered `kp-1`... */
-export function reduceKeyPoints(drafts: readonly DraftPoint[], gaps: readonly NotesGap[], limits: SummaryLimits = DEFAULT_SUMMARY_LIMITS): MeetingNotes {
+/**
+ * `chunkCount`: a longer meeting keeps more key points, three per transcript part and never
+ * fewer than `maxSummaryBullets` (otherwise the first parts crowd out the rest).
+ */
+export function reduceKeyPoints(drafts: readonly DraftPoint[], gaps: readonly NotesGap[], limits: SummaryLimits = DEFAULT_SUMMARY_LIMITS, chunkCount = 0): MeetingNotes {
   const merged: Array<{ kind: KeyPointKind; text: string; sources: SourceSpan[]; precision: KeyPointPrecision; decidedBy?: string | undefined }> = [];
   for (const raw of drafts) {
     const text = raw.text.replace(WHITESPACE, "");
@@ -82,7 +88,7 @@ export function reduceKeyPoints(drafts: readonly DraftPoint[], gaps: readonly No
       merged.push({ kind: raw.kind, text, sources: [...raw.sources], precision: raw.precision, decidedBy: raw.decidedBy });
     }
   }
-  const caps: Record<KeyPointKind, number> = { summary: limits.maxSummaryBullets, decision: limits.maxDecisions, open_question: limits.maxOpenQuestions };
+  const caps: Record<KeyPointKind, number> = { summary: Math.max(limits.maxSummaryBullets, SUMMARY_BULLETS_PER_CHUNK * chunkCount), decision: limits.maxDecisions, open_question: limits.maxOpenQuestions };
   const ordered = KEY_POINT_KINDS.flatMap((kind) =>
     stableSort(merged.filter((point) => point.kind === kind).slice(0, caps[kind]), (a, b) => (a.sources[0]?.start ?? 0) - (b.sources[0]?.start ?? 0)));
   const keyPoints: KeyPoint[] = ordered.map((point, offset) => ({

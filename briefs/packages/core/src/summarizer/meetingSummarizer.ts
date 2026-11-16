@@ -83,6 +83,10 @@ export interface SummarizeOptions {
 /** Set-aside rules shared with the phone (contract): shorter detected parts are ignored; closer same-reason parts join. */
 const MIN_SET_ASIDE_SECONDS = 20;
 const SET_ASIDE_JOIN_GAP = 5;
+/** Parts of any reason less than this far apart are one stretch (a call broken by a pause). */
+const SET_ASIDE_BRIDGE_GAP = 30;
+/** A cited line where the speaker promises something: they own the action when the model named no one. */
+const FIRST_PERSON_PROMISE = /\b(i'll|i\u2019ll|i will|i'm going to|i\u2019m going to|i am going to|let me|i can)\b/iu;
 const MAX_CHECKED_QUESTIONS = 6;
 const PROMISE_CONFIDENCE = 0.6;
 
@@ -192,7 +196,7 @@ export class MeetingSummarizer {
       if (rows.length === 0) return [];
       return [{ title: table.title, columns: table.columns, rows: rows.map((row) => row.cells), sources: rows.reduce<SourceSpan[]>((all, row) => unionSpans(all, row.sources), []) }];
     });
-    const reduced = reduceKeyPoints(checked, gaps, this.limits);
+    const reduced = reduceKeyPoints(checked, gaps, this.limits, chunks.length);
     return {
       notes: {
         ...reduced,
@@ -374,7 +378,7 @@ function readableTitle(title: string): string {
  * date kept only when the cited lines say it, resolved against the meeting start.
  */
 function finishCandidate(candidate: QuotedCandidate, speakers: readonly Speaker[], meetingStart: Date): QuotedCandidate {
-  let assigneeHint = candidate.assigneeHint;
+  let assigneeHint = candidate.assigneeHint ?? candidate.evidence.find((item) => FIRST_PERSON_PROMISE.test(item.quote))?.speaker;
   const label = assigneeHint === undefined ? null : /^s(\d+)$/iu.exec(assigneeHint.trim());
   if (label !== null) {
     const speaker = speakers.find((item) => item.id === `S${label[1]}`);
@@ -393,7 +397,7 @@ function finishCandidate(candidate: QuotedCandidate, speakers: readonly Speaker[
  * non-overlapping, with the speakers heard in each.
  */
 export function finalSetAside(detected: readonly SetAsidePart[], transcript: readonly TranscriptSegment[]): SetAsidePart[] {
-  const joined = joinParts(detected, SET_ASIDE_JOIN_GAP, true).filter((part) => part.end - part.start >= MIN_SET_ASIDE_SECONDS);
+  const joined = joinParts(joinParts(detected, SET_ASIDE_JOIN_GAP, true), SET_ASIDE_BRIDGE_GAP, false).filter((part) => part.end - part.start >= MIN_SET_ASIDE_SECONDS);
   return withSpeakers(joined, transcript);
 }
 
