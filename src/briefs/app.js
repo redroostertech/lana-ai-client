@@ -1117,7 +1117,7 @@
     return Boolean(state.record && state.record.attestationMethod === 'recordedHere');
   }
 
-  /** "Speakers have no names yet" with Write notes again on a meeting recorded here. */
+  /** "1 speaker has no name yet (S3)" with Write notes again on a meeting recorded here. */
   function speakersHtml() {
     const notice = M.speakersNotice(state.record, recordedHere());
     if (!notice) return '';

@@ -251,7 +251,7 @@
   <p class="ex-kind">${escape(kindLabel)}</p>
   <h1 class="ex-title">${escape(meetingTitle(record))}</h1>
   <dl class="ex-facts">${facts.map((fact) => `<div class="ex-fact"><dt>${escape(fact.term)}</dt><dd>${escape(fact.value)}</dd></div>`).join('')}</dl>
-${record.speakersNamed === false ? '  <p class="ex-notice">Speakers have no names yet, so notes say S1, S2 and so on.</p>\n' : ''}</header>`;
+${M.unnamedText(record) ? `  <p class="ex-notice">${escape(M.unnamedText(record))}</p>\n` : ''}</header>`;
   }
 
   function transcriptSection(record) {

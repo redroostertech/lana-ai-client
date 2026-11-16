@@ -174,9 +174,11 @@ describe('set-aside parts on the meeting page', () => {
 
 describe('speaker names and who decided', () => {
   test('asks for names only while a speaker in the meeting has none', () => {
-    expect(M.speakersNotice({ speakersNamed: false }, true)).toBe('Speakers have no names yet. Name them in the transcript, then write the notes again so they use names.');
-    expect(M.speakersNotice({ speakersNamed: false }, false)).toBe('Speakers have no names yet. Name them in the transcript so notes and exports use names.');
-    expect(M.speakersNotice({ speakersNamed: true }, true)).toBe('');
+    expect(M.speakersNotice({ speakersNamed: false, unnamedSpeakers: ['S3'] }, true)).toBe('1 speaker has no name yet (S3). Name them in the transcript, then write the notes again.');
+    expect(M.speakersNotice({ speakersNamed: false, unnamedSpeakers: ['S2', 'S3'] }, true)).toBe('2 speakers have no names yet (S2, S3). Name them in the transcript, then write the notes again.');
+    expect(M.speakersNotice({ speakersNamed: false, unnamedSpeakers: ['S3'] }, false)).toBe('1 speaker has no name yet (S3). Name them in the transcript so notes and exports use names.');
+    expect(M.speakersNotice({ speakersNamed: true, unnamedSpeakers: [] }, true)).toBe('');
+    expect(M.speakersNotice({ unnamedSpeakers: [] }, true)).toBe('');
     expect(M.speakersNotice({}, true)).toBe('');
   });
 

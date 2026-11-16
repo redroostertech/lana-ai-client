@@ -255,6 +255,8 @@ export interface MeetingRecord {
   tables: NotesTable[];
   /** False while a speaker with lines in the meeting (outside set-aside parts) has no name. */
   speakersNamed: boolean;
+  /** Labels of the speakers with lines in the meeting (outside set-aside parts) who have no name, in label order. */
+  unnamedSpeakers: string[];
   userNotes: UserNote[];
   clips: TranscriptClip[];
   actions: ActionMarker[];

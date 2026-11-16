@@ -224,9 +224,11 @@ describe('owners, due dates, cited ranges and who decided', () => {
   });
 
   test('unnamed speakers are said plainly', () => {
-    const html = X.meetingHtml(record({ speakersNamed: false }), []);
-    expect(html).toContain('Speakers have no names yet, so notes say S1, S2 and so on.');
-    expect(X.meetingHtml(fixed(), [])).not.toContain('no names yet');
+    const html = X.meetingHtml(record({ speakersNamed: false, unnamedSpeakers: ['S3'] }), []);
+    expect(html).toContain('<p class="ex-notice">1 speaker has no name yet (S3).</p>');
+    expect(X.meetingHtml(record({ speakersNamed: false, unnamedSpeakers: ['S2', 'S3'] }), [])).toContain('2 speakers have no names yet (S2, S3).');
+    expect(X.meetingHtml(fixed(), [])).not.toContain('no name');
+    expect(X.meetingHtml(record({ speakersNamed: true, unnamedSpeakers: [] }), [])).not.toContain('no name');
   });
 
   test('no dashes or emoji in what the export adds', () => {

@@ -41,6 +41,7 @@ export function toApiMeeting(record: CoreMeeting, extra: { method: CoreMethod; o
       sources: table.sources.map((span) => ({ start: span.start, end: span.end, speaker: span.speaker ?? null })),
     })),
     speakersNamed: speakersNamed(record),
+    unnamedSpeakers: unnamedSpeakers(record),
     gaps: record.notes.gaps.map((gap) => ({ start: gap.start, end: gap.end, reason: gap.reason === "refused" ? "refused" : "failed" })),
     userNotes: record.userNotes.map((note) => ({ id: note.id, text: note.text, createdAt: note.createdAt.toISOString(), anchor: note.anchor ?? null })),
     clips: record.clips.map((clip) => ({ id: clip.id, start: clip.start, end: clip.end })),
@@ -60,11 +61,16 @@ export function pointText(text: string): string {
   return text.split("|").map((field) => field.trim()).find((field) => field !== "") ?? "";
 }
 
+/** Labels of speakers with a line outside the set-aside parts and no typed name, in label order. */
+export function unnamedSpeakers(record: CoreMeeting): string[] {
+  const used = new Set(record.transcript.filter((segment) => segment.text.trim() !== "" && !segmentSetAside(segment, record.notes.setAside)).map((segment) => segment.speaker));
+  const named = new Set(record.speakers.filter((speaker) => speaker.name !== undefined && speaker.name.trim() !== "").map((speaker) => speaker.id));
+  return [...used].filter((id) => !named.has(id)).sort((a, b) => Number(a.replace(/\D/gu, "")) - Number(b.replace(/\D/gu, "")) || (a < b ? -1 : a > b ? 1 : 0));
+}
+
 /** Whether every speaker with a line outside the set-aside parts has a typed name. */
 export function speakersNamed(record: CoreMeeting): boolean {
-  const used = new Set(record.transcript.filter((segment) => segment.text.trim() !== "" && !segmentSetAside(segment, record.notes.setAside)).map((segment) => segment.speaker));
-  return record.speakers.filter((speaker) => used.has(speaker.id)).every((speaker) => speaker.name !== undefined && speaker.name.trim() !== "")
-    && [...used].every((id) => record.speakers.some((speaker) => speaker.id === id));
+  return unnamedSpeakers(record).length === 0;
 }
 
 /** Owner and due date of an action, as the meeting page and the export print them. */

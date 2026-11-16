@@ -327,12 +327,20 @@
     return out;
   }
 
-  /** The line asking for speaker names, or "" when every speaker in the meeting has one. */
+  /** "1 speaker has no name yet (S3)." for the speakers in the meeting who have none, or "". */
+  function unnamedText(record) {
+    const unnamed = (record && Array.isArray(record.unnamedSpeakers)) ? record.unnamedSpeakers : [];
+    if (unnamed.length === 0) return '';
+    return unnamed.length === 1
+      ? `1 speaker has no name yet (${unnamed[0]}).`
+      : `${unnamed.length} speakers have no names yet (${unnamed.join(', ')}).`;
+  }
+
+  /** The line asking for the missing speaker names, or "" when every speaker in the meeting has one. */
   function speakersNotice(record, recordedHere) {
-    if (!record || record.speakersNamed !== false) return '';
-    return recordedHere
-      ? 'Speakers have no names yet. Name them in the transcript, then write the notes again so they use names.'
-      : 'Speakers have no names yet. Name them in the transcript so notes and exports use names.';
+    const which = unnamedText(record);
+    if (!which) return '';
+    return `${which} ${recordedHere ? 'Name them in the transcript, then write the notes again.' : 'Name them in the transcript so notes and exports use names.'}`;
   }
 
   /** "Decided by Dana Reyes" for a decision with a decider, else "". */
@@ -344,7 +352,7 @@
 
   const api = {
     SKIP_SECONDS, SPEEDS,
-    reasonLabel, setAsideSummary, setAsideLabel, setAsideLines, speakersNotice, decidedByText,
+    reasonLabel, setAsideSummary, setAsideLabel, setAsideLines, speakersNotice, unnamedText, decidedByText,
     clock, duration,
     clipLineIndices, clipPositions,
     selection: { first, last, count, contains, tapLine, extendTo, moveBy, extendBy },

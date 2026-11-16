@@ -147,12 +147,15 @@ describe("notes for a meeting recorded here, with the notes fixes", () => {
     expect(shown.value.actions[0]).toMatchObject({ title: "Send revised schedule", owner: "Omar Haddad", dueDate: "2026-11-11", dueText: "tonight", start: 10, end: 20 });
     // S3 speaks only inside the set-aside part, so every speaker in the meeting itself has a name.
     expect(shown.value.speakersNamed).toBe(true);
+    expect(shown.value.unnamedSpeakers).toEqual([]);
   });
 
   it("says when speakers in the meeting have no names yet", async () => {
     const id = storeLocal([{ id: "S1" }, { id: "S2", name: "Omar Haddad" }, { id: "S3" }]);
     const shown = await new MeetingsBridge(rig.store, rig.log).get(id);
     expect(shown.ok && shown.value.speakersNamed).toBe(false);
+    // Only the speakers with lines in the meeting who have no name (S2 is named).
+    expect(shown.ok && shown.value.unnamedSpeakers).toEqual(["S1", "S3"]);
   });
 });
 
