@@ -1001,7 +1001,18 @@
         return;
       }
 
-      const result = await api.get(`/api/v1/integrations/connectors/catalog/${encodeURIComponent(state.connectorType)}`);
+      // By connection id first, so run options are worded for this
+      // connection; by type if that read fails.
+      const paths = LanaConnectorRunOptions.catalogPaths(state.connectorType, state.sourceId);
+      let result = null;
+      for (let i = 0; i < paths.length; i += 1) {
+        try {
+          result = await api.get(paths[i]);
+          break;
+        } catch (error) {
+          if (i === paths.length - 1) throw error;
+        }
+      }
       state.catalog = result.connector || null;
       state.connectorScope = normalizeConnectorScope(
         state.catalog?.connector_scope ||
