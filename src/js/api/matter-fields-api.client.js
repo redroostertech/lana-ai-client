@@ -63,19 +63,34 @@ class MatterFieldsAPIClient {
   }
 
   /**
-   * Create a library field and return its id. When the key already exists in
-   * the library (409, for example after a save that half landed), the
-   * existing field is used instead of failing again.
+   * Create a library field and return its id.
+   *
+   * A 409 means the key is already in the library. That field is NOT reused
+   * here: it may be someone else's, with a different meaning. The person is
+   * told to add it with "Use an existing field". (A retry of this drawer's own
+   * half-landed save never gets here: saveDrawer stamps the created id on the
+   * drawer's field, so the retry attaches it instead of creating it again.)
+   * An archived key is not in the library, and the server's own message says
+   * to ask an admin.
    */
-  async createOrFind(matterId, create) {
+  async create(matterId, create) {
     const fields = this.fields();
     try {
       const created = await this.send(fields.createRequest(create.body));
       return created && created.data && created.data.id;
     } catch (error) {
       if (error && error.status === 409) {
-        const existing = fields.findLibraryDefinition(await this.searchLibrary(matterId, create.key), create.key);
-        if (existing) return existing.id;
+        let existing = null;
+        try {
+          existing = fields.findLibraryDefinition(await this.searchLibrary(matterId, create.key), create.key);
+        } catch (_) { /* keep the server's wording */ }
+        if (existing) {
+          const taken = new Error('A field with key ' + create.key + ' already exists in the library. ' +
+            "Use 'Use an existing field' to add it.");
+          taken.status = 409;
+          taken.userMessage = taken.message;
+          throw taken;
+        }
       }
       throw error;
     }
@@ -101,7 +116,12 @@ class MatterFieldsAPIClient {
     try {
       const attachIds = plan.attaches.slice();
       for (const create of plan.creates) {
-        attachIds.push(await this.createOrFind(matterId, create));
+        const id = await this.create(matterId, create);
+        // Remember it on the drawer's field: if a later step fails, the retry
+        // attaches this field instead of creating it a second time.
+        const def = (current.definitions || []).find((d) => !d.id && String(d.key).trim() === create.key);
+        if (def) def.id = id;
+        attachIds.push(id);
       }
       for (const id of attachIds) {
         await this.send(fields.attachRequest(matterId, id));
@@ -116,7 +136,7 @@ class MatterFieldsAPIClient {
         await this.send(fields.valuesWriteRequest(matterId, plan.values));
       }
     } catch (error) {
-      error.userMessage = fields.errorMessage(error);
+      error.userMessage = error.userMessage || fields.errorMessage(error);
       try {
         error.baseline = await this.loadDrawer(matterId);
       } catch (_) { /* keep the original refusal */ }

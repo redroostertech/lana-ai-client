@@ -313,8 +313,8 @@ describe('MatterFieldsAPIClient', () => {
     [].concat(api.put.mock.calls, api.post.mock.calls).forEach((c) => expect(c[0]).not.toMatch(/\/settings/));
   });
 
-  test('a create that conflicts (field already in the library) attaches the existing field instead', async () => {
-    const conflict = Object.assign(new Error('exists'), { status: 409 });
+  test('a key already in the library is NOT silently reused: the person is told to use the existing field', async () => {
+    const conflict = Object.assign(new Error('A field with key "notes" already exists in this organization.'), { status: 409 });
     const api = fakeApi({
       post: jest.fn(async (path, body) => {
         if (path === '/api/v1/matter-field-definitions') throw conflict;
@@ -333,10 +333,32 @@ describe('MatterFieldsAPIClient', () => {
     const edit = MatterFields.cloneState(base);
     edit.definitions.push({ key: 'notes', display_name: 'Notes', type: 'text', required: false, options: [] });
 
+    await expect(client.saveDrawer('MATT-1', base, edit)).rejects.toMatchObject({
+      userMessage: 'A field with key notes already exists in the library. Use \'Use an existing field\' to add it.'
+    });
+    expect(api.post).toHaveBeenCalledTimes(1); // no attach of someone else's field
+  });
+
+  test('retrying a save that half landed attaches the field this drawer created, without creating it again', async () => {
+    let attachFails = true;
+    const api = fakeApi({
+      post: jest.fn(async (path, body) => {
+        if (path === '/api/v1/matter-field-definitions') return { status: 'success', data: Object.assign({ id: 'd-new' }, body) };
+        if (attachFails) { attachFails = false; throw Object.assign(new Error('network'), { status: 0 }); }
+        return { status: 'success', data: body };
+      })
+    });
+    const client = new MatterFieldsAPIClient(api);
+    const base = await client.loadDrawer('MATT-1');
+    const edit = MatterFields.cloneState(base);
+    edit.definitions.push({ key: 'notes', display_name: 'Notes', type: 'text', required: false, options: [] });
+
+    await expect(client.saveDrawer('MATT-1', base, edit)).rejects.toBeTruthy();
     await client.saveDrawer('MATT-1', base, edit);
 
-    expect(api.get).toHaveBeenCalledWith('/api/v1/matters/MATT-1/field-library?limit=200&q=notes');
-    expect(api.post).toHaveBeenLastCalledWith('/api/v1/matters/MATT-1/field-attachments', { field_definition_id: 'd-78' });
+    const creates = api.post.mock.calls.filter((c) => c[0] === '/api/v1/matter-field-definitions');
+    expect(creates.length).toBe(1);
+    expect(api.post).toHaveBeenLastCalledWith('/api/v1/matters/MATT-1/field-attachments', { field_definition_id: 'd-new' });
   });
 
   test('a key held by an ARCHIVED field reports the server\'s message instead of looping', async () => {
