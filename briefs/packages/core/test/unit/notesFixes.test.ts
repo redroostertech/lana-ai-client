@@ -472,11 +472,12 @@ describe("set-aside guard boundaries (synthetic)", () => {
     { speaker: "S3", start: 990, end: 1000, text: "Light speaker." },
     { speaker: "S4", start: 1000, end: 1008, text: "   " },
   ];
-  it("needs a real overlap, a light line at least half inside, and ignores blank lines", async () => {
+  it("needs a notes range within the window, a light line at least half inside, and ignores blank lines", async () => {
     const { guardCheckedParts } = await import("../../src/summarizer/meetingSummarizer.js");
     const notes = [{ start: 100, end: 200, reason: "phone_call" as const }];
-    expect(guardCheckedParts([{ start: 200, end: 300, reason: "phone_call" }], notes, lines)).toEqual([]);
-    expect(guardCheckedParts([{ start: 199, end: 300, reason: "phone_call" }], notes, lines)).toHaveLength(1);
+    // Touching (or less than 30 s away) counts as corroborated; 30 s or more away does not.
+    expect(guardCheckedParts([{ start: 200, end: 300, reason: "phone_call" }], notes, lines)).toHaveLength(1);
+    expect(guardCheckedParts([{ start: 230, end: 300, reason: "phone_call" }], notes, lines)).toEqual([]);
     expect(guardCheckedParts([{ start: 996, end: 1100, reason: "other_matter" }], [], lines)).toEqual([]);
     expect(guardCheckedParts([{ start: 995, end: 1100, reason: "other_matter" }], [], lines)).toHaveLength(1);
     expect(guardCheckedParts([{ start: 1000, end: 1100, reason: "other_matter" }], [], lines)).toEqual([]);
@@ -554,5 +555,22 @@ describe("set-aside guard clarifications (synthetic)", () => {
     expect(guardCheckedParts([{ start: 980, end: 1100, reason: "side_conversation" }], [], two)).toHaveLength(1);
     const silent: TranscriptSegment[] = [{ speaker: "S1", start: 5, end: 5, text: "Zero length." }];
     expect(guardCheckedParts([{ start: 0, end: 10, reason: "phone_call" }], [], silent)).toEqual([]);
+  });
+});
+
+describe("set-aside guard: within the bridge window (synthetic)", () => {
+  it("counts a checked part less than 30 s from a notes ASIDE range as corroborated", async () => {
+    const { guardCheckedParts } = await import("../../src/summarizer/meetingSummarizer.js");
+    const lines: TranscriptSegment[] = [{ speaker: "S1", start: 0, end: 500, text: "Main." }, { speaker: "S2", start: 500, end: 1000, text: "Other." }];
+    const notes = [{ start: 100, end: 200, reason: "phone_call" as const }];
+    expect(guardCheckedParts([{ start: 229, end: 260, reason: "phone_call" }], notes, lines)).toHaveLength(1);
+    expect(guardCheckedParts([{ start: 230, end: 260, reason: "phone_call" }], notes, lines)).toEqual([]);
+    expect(guardCheckedParts([{ start: 40, end: 71, reason: "phone_call" }], notes, lines)).toHaveLength(1);
+    expect(guardCheckedParts([{ start: 40, end: 70, reason: "phone_call" }], notes, lines)).toEqual([]);
+    // Containment either way, a zero-length part, and fractional edges.
+    expect(guardCheckedParts([{ start: 120, end: 150, reason: "phone_call" }], notes, lines)).toHaveLength(1);
+    expect(guardCheckedParts([{ start: 50, end: 300, reason: "phone_call" }], notes, lines)).toHaveLength(1);
+    expect(guardCheckedParts([{ start: 150, end: 150, reason: "phone_call" }], notes, lines)).toHaveLength(1);
+    expect(guardCheckedParts([{ start: 229.5, end: 260, reason: "phone_call" }], notes, lines)).toHaveLength(1);
   });
 });
