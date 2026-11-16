@@ -93,28 +93,35 @@
   }
 
   /**
-   * Wrap requests so only the latest one's answer counts: an answer that
-   * arrives after a newer request began resolves to latestOnly.STALE, so a
-   * slow read of run A cannot overwrite run B opened after it. Failures of
-   * the latest request still reject.
+   * The run (or other subject) the person asked for, recorded at the moment
+   * they ask: open records it, close clears it. An answer is applied only
+   * when its subject is still the requested one, so a background refresh
+   * for run A that started after a click on run B, or an answer that lands
+   * after the drawer closed, resolves to requestedSubject.STALE and is
+   * dropped. A refresh checks isRequested before it starts. Failures of the
+   * requested subject still reject.
    */
   var STALE = { stale: true };
-  function latestOnly() {
-    var sequence = 0;
-    return function guard(promise) {
-      sequence += 1;
-      var mine = sequence;
-      return Promise.resolve(promise).then(function (value) {
-        return mine === sequence ? value : STALE;
-      }, function (error) {
-        if (mine !== sequence) return STALE;
-        throw error;
-      });
+  function requestedSubject() {
+    var requested = null;
+    return {
+      request: function (id) { requested = id; },
+      clear: function () { requested = null; },
+      current: function () { return requested; },
+      isRequested: function (id) { return requested !== null && requested === id; },
+      guard: function (id, promise) {
+        return Promise.resolve(promise).then(function (value) {
+          return requested === id ? value : STALE;
+        }, function (error) {
+          if (requested !== id) return STALE;
+          throw error;
+        });
+      }
     };
   }
-  latestOnly.STALE = STALE;
+  requestedSubject.STALE = STALE;
 
-  var moduleApi = { createLivePoller: createLivePoller, ensurePoller: ensurePoller, latestOnly: latestOnly };
+  var moduleApi = { createLivePoller: createLivePoller, ensurePoller: ensurePoller, requestedSubject: requestedSubject };
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = moduleApi;
   }

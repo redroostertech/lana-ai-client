@@ -1,6 +1,6 @@
 const path = require('path');
 
-const { createLivePoller, ensurePoller, latestOnly } = require(path.join(__dirname, '../../src/js/shared/live-poller.js'));
+const { createLivePoller, ensurePoller } = require(path.join(__dirname, '../../src/js/shared/live-poller.js'));
 
 function fakeDocument() {
   const listeners = {};
@@ -103,24 +103,41 @@ describe('ensurePoller: one poller per slot, replaced when its subject changes',
   });
 });
 
-describe('latestOnly: a slow answer for an older request is ignored', () => {
-  test('opening run A then run B keeps B even when A answers last', async () => {
-    const guard = latestOnly();
-    let answerA;
+describe('requestedSubject: only the run the person asked for is applied', () => {
+  const { requestedSubject } = require(path.join(__dirname, '../../src/js/shared/live-poller.js'));
+  const later = () => { let resolve; const promise = new Promise((r) => { resolve = r; }); return { promise, resolve }; };
+
+  test('a poll for run A that starts after a click on B is not applied; B is', async () => {
+    const subject = requestedSubject();
     const applied = [];
-    const open = (id, promise) => guard(promise).then((value) => { if (value !== latestOnly.STALE) applied.push([id, value]); });
-    const a = open('A', new Promise((resolve) => { answerA = resolve; }));
-    const b = open('B', Promise.resolve('detail-B'));
-    await b;
-    answerA('detail-A');
-    await a;
-    expect(applied).toEqual([['B', 'detail-B']]);
+    const load = (id, request) => subject.guard(id, request).then((value) => { if (value !== requestedSubject.STALE) applied.push(id); });
+    subject.request('A');
+    const pollA = later();
+    subject.request('B'); // the click lands before the poll tick
+    expect(subject.isRequested('A')).toBe(false); // the poller checks this and does not start
+    const late = load('A', pollA.promise); // a tick that started anyway
+    await load('B', Promise.resolve('detail-B'));
+    pollA.resolve('detail-A');
+    await late;
+    expect(applied).toEqual(['B']);
   });
 
-  test('control: a single request is applied, and a failure still rejects', async () => {
-    const guard = latestOnly();
-    await expect(guard(Promise.resolve(1))).resolves.toBe(1);
-    await expect(guard(Promise.reject(new Error('gone')))).rejects.toThrow('gone');
+  test('closing the drawer drops an answer still in flight', async () => {
+    const subject = requestedSubject();
+    subject.request('A');
+    const answer = later();
+    const pending = subject.guard('A', answer.promise);
+    subject.clear();
+    answer.resolve('detail-A');
+    await expect(pending).resolves.toBe(requestedSubject.STALE);
+    expect(subject.current()).toBeNull();
+  });
+
+  test('control: the requested run is applied, and its failure still rejects', async () => {
+    const subject = requestedSubject();
+    subject.request('A');
+    await expect(subject.guard('A', Promise.resolve(1))).resolves.toBe(1);
+    await expect(subject.guard('A', Promise.reject(new Error('gone')))).rejects.toThrow('gone');
   });
 });
 

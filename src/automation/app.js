@@ -364,6 +364,7 @@ function onAppLexClose(event) {
   }
 
   if (event.target?.matches?.('[data-run-detail-drawer]')) {
+    forgetRequestedRun();
     state.selectedRunId = null;
     state.selectedRunDetail = null;
     state.selectedRunArtifactId = null;
@@ -504,6 +505,7 @@ function showApp() {
 
 function setView(view, options = {}) {
   if (state.currentView === 'runs' && view !== 'runs') {
+    forgetRequestedRun();
     state.selectedRunId = null;
     state.selectedRunDetail = null;
     state.selectedRunArtifactId = null;
@@ -550,6 +552,7 @@ function applyAutomationRouteState(route) {
   if (route.view === 'library-detail' && route.automationId) {
     state.libraryDetail = createLibraryDetailState(route.automationId);
   }
+  if (route.view === 'runs') requestRun(route.runId || null);
   if (route.view === 'runs' && (route.runId || null) !== state.selectedRunId) {
     state.selectedRunId = route.runId || null;
     state.selectedRunDetail = null;
@@ -1288,12 +1291,13 @@ async function onAppClick(event) {
 
   const openRunDetailButton = event.target.closest('[data-open-run-detail]');
   if (openRunDetailButton) {
-    await loadRunDetail(openRunDetailButton.dataset.openRunDetail);
+    await openRunDetail(openRunDetailButton.dataset.openRunDetail);
     renderCurrentView();
     return;
   }
 
   if (event.target.closest('[data-close-run-detail]')) {
+    forgetRequestedRun();
     state.selectedRunId = null;
     state.selectedRunDetail = null;
     state.selectedRunArtifactId = null;
@@ -2013,16 +2017,38 @@ async function refreshNotificationBadge() {
   }
 }
 
-// Only the latest run detail read is applied: opening run B while run A's
-// read is still in flight must not reopen A when A answers last.
-const runDetailRequests = window.LanaLivePoller ? window.LanaLivePoller.latestOnly() : (promise) => promise;
+// The run the person asked for, recorded the moment they open or close it
+// (shared LanaLivePoller.requestedSubject). A read is applied only while its
+// run is still the requested one: a background refresh for run A that
+// started after a click on run B, or an answer landing after the drawer
+// closed, is dropped.
+const runSubject = window.LanaLivePoller ? window.LanaLivePoller.requestedSubject() : null;
+const STALE_RUN = window.LanaLivePoller ? window.LanaLivePoller.requestedSubject.STALE : null;
 
+function requestRun(executionId) {
+  if (runSubject) runSubject.request(executionId || null);
+}
+
+function forgetRequestedRun() {
+  if (runSubject) runSubject.clear();
+}
+
+// Open a run (a click or a link): record it first, then read it.
+async function openRunDetail(executionId) {
+  if (!executionId) return;
+  requestRun(executionId);
+  await loadRunDetail(executionId);
+}
+
+// Read a run's detail: only for the requested run, applied only if it still is.
 async function loadRunDetail(executionId) {
   if (!executionId) return;
-  const payload = await runDetailRequests(fetchJson(`/api/executions/${executionId}`, {
+  if (runSubject && !runSubject.isRequested(executionId)) return;
+  const request = fetchJson(`/api/executions/${executionId}`, {
     headers: authHeaders()
-  }));
-  if (window.LanaLivePoller && payload === window.LanaLivePoller.latestOnly.STALE) return;
+  });
+  const payload = runSubject ? await runSubject.guard(executionId, request) : await request;
+  if (payload === STALE_RUN) return;
   const opened = state.selectedRunId !== executionId;
   state.selectedRunId = executionId;
   state.selectedRunDetail = payload || null;
@@ -2578,6 +2604,7 @@ function createContext() {
     gotoBuilder,
     gotoLibraryDetail,
     loadRunDetail,
+    openRunDetail,
     loadApprovalDetail,
     decideApproval
   };

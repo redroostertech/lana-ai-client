@@ -623,8 +623,8 @@ export function renderRuns(context) {
       updateBannerBadges(store, result);
     },
     onRowClick: async (row) => {
-      if (row?.execution_id && typeof context.loadRunDetail === 'function') {
-        await context.loadRunDetail(row.execution_id);
+      if (row?.execution_id && typeof context.openRunDetail === 'function') {
+        await context.openRunDetail(row.execution_id);
         context.renderCurrentView();
       }
     }
