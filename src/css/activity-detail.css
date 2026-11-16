@@ -1264,7 +1264,7 @@ button.atd-banner-action {
 
 .atd-journey-pulse {
   display: grid;
-  grid-template-columns: 10px minmax(0, auto);
+  grid-template-columns: auto minmax(0, auto);
   gap: 10px;
   align-items: center;
   min-width: 130px;
@@ -1272,28 +1272,6 @@ button.atd-banner-action {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.055);
-}
-
-.atd-journey-pulse > span {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #78d4aa;
-  box-shadow: 0 0 0 5px rgba(120, 212, 170, 0.1);
-}
-
-.atd-journey-pulse--working > span {
-  animation: atd-pulse 1.8s ease-in-out infinite;
-}
-
-.atd-journey-pulse--review > span {
-  background: #e9b965;
-  box-shadow: 0 0 0 5px rgba(233, 185, 101, 0.1);
-}
-
-.atd-journey-pulse--attention > span {
-  background: #e98080;
-  box-shadow: 0 0 0 5px rgba(233, 128, 128, 0.1);
 }
 
 .atd-journey-pulse small,
@@ -1396,11 +1374,6 @@ button.atd-banner-action {
   border-color: #df7b7b;
   color: #ffc0c0;
   box-shadow: 0 0 0 4px rgba(223, 123, 123, 0.09);
-}
-
-@keyframes atd-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.55; transform: scale(0.82); }
 }
 
 /* Input is an explicit run interruption, parallel to approval. */
@@ -1795,8 +1768,3 @@ button.atd-banner-action {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .atd-journey-pulse--working > span {
-    animation: none;
-  }
-}

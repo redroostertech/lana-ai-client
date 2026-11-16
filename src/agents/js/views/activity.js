@@ -120,7 +120,7 @@
     setMetric('outcomesMetricReady', ready);
   }
 
-  function renderOutcome(task) {
+  function renderOutcome(task, settled) {
     var status = task.execution_status || task.status || 'pending';
     var group = statusGroup(status);
     var title = escHtml(task.name || task.title || 'Untitled outcome');
@@ -133,19 +133,35 @@
       : (task.matter_id || task.visibility === 'workspace' || task.run_scope === 'workspace' ? 'Workspace' : 'Organization');
     var starter = task.triggered_by_name || task.created_by_name || task.owner_name || '';
     var access = task.is_mine === true ? 'Started by you' : (starter ? 'Started by ' + starter : (scope + ' run'));
-    return '<article class="outcome-card outcome-card--' + group + '">'
+    return '<article class="outcome-card outcome-card--' + group + (settled ? ' lex-run-row--settled' : '') + '">'
       + '<span class="outcome-card-status-icon"><i></i></span>'
       + '<button type="button" class="outcome-card-main" data-task-id="' + escHtml(task.id || '') + '"><span class="outcome-card-title-row"><strong>' + title + '</strong><span class="outcome-card-priority outcome-card-priority--' + escHtml(priority) + '">' + escHtml(priorityLabel(priority)) + '</span></span>'
       + '<span class="outcome-card-description">' + description + '</span><small>' + escHtml(statusMessage(status)) + '</small><span class="outcome-card-scope">' + escHtml(scope) + ' · ' + escHtml(access) + '</span></button>'
-      + '<span class="outcome-card-meta"><strong>' + escHtml(statusLabel(status)) + '</strong><small>' + created + '</small><button type="button" data-task-id="' + escHtml(task.id || '') + '">' + escHtml(action) + ' →</button><button type="button" class="outcome-card-log" data-task-log-id="' + escHtml(task.id || '') + '">Run activity</button></span>'
+      + '<span class="outcome-card-meta"><lex-run-status status="' + escHtml(status) + '" label="' + escHtml(statusLabel(status)) + '"' + (settled ? ' settled' : '') + '></lex-run-status><small>' + created + '</small><button type="button" data-task-id="' + escHtml(task.id || '') + '">' + escHtml(action) + ' →</button><button type="button" class="outcome-card-log" data-task-log-id="' + escHtml(task.id || '') + '">Run activity</button></span>'
       + '</article>';
+  }
+
+  // Which outcomes just ended (shared LanaRunStatus.trackTransitions), and
+  // whether any is live, for the refresh rhythm.
+  function trackTaskStates(state) {
+    var RunStatus = global.LanaRunStatus;
+    var ended = {};
+    if (!RunStatus) return ended;
+    var seen = RunStatus.trackTransitions(state.runStates || null, state.tasks.map(function (task) {
+      return { id: task.id, state: RunStatus.stateOf(task.execution_status || task.status) };
+    }));
+    state.runStates = seen.next;
+    seen.ended.forEach(function (entry) { ended[entry.id] = true; });
+    state.anyLive = state.tasks.some(function (task) { return RunStatus.isLive(RunStatus.stateOf(task.execution_status || task.status)); });
+    return ended;
   }
 
   function renderTasks(state) {
     var holder = el('atItems');
     if (!holder) return;
+    var ended = trackTaskStates(state);
     var html = '';
-    for (var i = 0; i < state.tasks.length; i++) html += renderOutcome(state.tasks[i]);
+    for (var i = 0; i < state.tasks.length; i++) html += renderOutcome(state.tasks[i], ended[String(state.tasks[i].id)]);
     holder.innerHTML = html;
     show(holder);
   }
@@ -159,11 +175,14 @@
     show(empty);
   }
 
-  function loadTasks(ctx, state) {
-    hide(el('atItems'));
-    hide(el('atEmpty'));
-    hide(el('atPagination'));
-    show(el('atLoading'));
+  function loadTasks(ctx, state, options) {
+    var silent = Boolean(options && options.silent);
+    if (!silent) {
+      hide(el('atItems'));
+      hide(el('atEmpty'));
+      hide(el('atPagination'));
+      show(el('atLoading'));
+    }
     if (!window.api || typeof window.api.get !== 'function') {
       var ready = function () { loadTasks(ctx, state); };
       state._lexReadyHandler = ready;
@@ -176,14 +195,15 @@
     if (state.statusFilter) url += '&execution_status=' + encodeURIComponent(state.statusFilter);
     if (state.priorityFilter) url += '&priority=' + encodeURIComponent(state.priorityFilter);
     url += '&sort_by=created_at&sort_order=desc';
-    window.api.get(url).then(function (response) {
+    return window.api.get(url).then(function (response) {
       if (state.destroyed) return;
       hide(el('atLoading'));
+      hide(el('atEmpty'));
       state.tasks = response && Array.isArray(response.data) ? response.data : (Array.isArray(response) ? response : []);
       var pagination = response && response.pagination ? response.pagination : {};
       state.totalItems = Number(pagination.total != null ? pagination.total : state.tasks.length);
       updateMetrics(state);
-      if (!state.tasks.length) renderEmpty(state);
+      if (!state.tasks.length) { hide(el('atItems')); renderEmpty(state); }
       else renderTasks(state);
       var totalPages = Math.max(1, Math.ceil(state.totalItems / state.pageSize));
       if (totalPages > 1) {
@@ -195,14 +215,29 @@
           show(paginationEl);
         }
       }
+      keepOutcomesLive(ctx, state);
     }).catch(function (err) {
-      if (state.destroyed) return;
+      if (state.destroyed || silent) return;
       console.error('[agents] Failed to load outcomes', err);
       hide(el('atLoading'));
       var empty = el('atEmpty');
       if (empty) empty.innerHTML = '<lex-empty icon="alert-circle" message="Outcomes are unavailable" description="Check the Agents service and try again."></lex-empty>';
       show(empty);
     });
+  }
+
+  // The list follows along on screen: every few seconds while an outcome is
+  // still being worked on, slower otherwise (shared LanaLivePoller).
+  function keepOutcomesLive(ctx, state) {
+    var Poller = global.LanaLivePoller;
+    if (!Poller || (state.poller && state.poller.running)) return;
+    state.poller = Poller.createLivePoller({
+      intervalMs: 4000,
+      idleIntervalMs: 20000,
+      isActive: function () { return !state.destroyed; },
+      isLive: function () { return Boolean(state.anyLive); },
+      refresh: function () { return loadTasks(ctx, state, { silent: true }); }
+    }).start();
   }
 
   function bind(state, node, eventName, handler) {
@@ -256,6 +291,7 @@
     var state = rootEl && rootEl._activityState;
     if (!state) return;
     state.destroyed = true;
+    if (state.poller) state.poller.stop();
     if (state._lexReadyHandler) document.removeEventListener('lex-ready', state._lexReadyHandler);
     for (var i = 0; i < state._unbindFns.length; i++) {
       try { state._unbindFns[i](); } catch (_err) { /* ignored */ }

@@ -5,11 +5,13 @@ import {
   drawerSection,
   drawerStatGrid,
   invalidateServerTable,
+  keepServerTableLive,
   lexEmpty,
   matterLinkCell,
   mountServerTable,
   mutedCell,
   nameCell,
+  runStatusMark,
   sectionIntro,
   serverTableSection,
   textCell
@@ -20,12 +22,9 @@ const TABLE_ID = 'automationRunsTable';
 const TOOLBAR_PREFIX = 'automationRuns';
 const Queries = () => window.AutomationTableQueries;
 
-function statusClass(status) {
-  const normalized = normalizeText(status);
-  if (normalized === 'completed') return 'success';
-  if (normalized === 'failed' || normalized === 'rejected' || normalized === 'cancelled') return 'warning';
-  if (normalized === 'awaiting_approval' || normalized === 'pending' || normalized === 'in_progress' || normalized === 'running') return 'warning';
-  return '';
+function isLiveStatus(status) {
+  const RunStatus = window.LanaRunStatus;
+  return Boolean(RunStatus && RunStatus.isLive(RunStatus.stateOf(status)));
 }
 
 function statusLabel(status) {
@@ -313,8 +312,8 @@ function renderRunDetailsPanel(context) {
     >
       <div class="automation-detail-drawer run-detail-content">
 
-      <div class="badge-row">
-        ${badge(statusLabel(run.status), statusClass(run.status))}
+      <div class="badge-row" data-run-detail-status>
+        ${runStatusMark({ status: run.status, bar: true })}
         ${badge(run.trigger_event_type || 'manual')}
         ${badge(scope.badge, scope.type === 'organization' ? 'info' : '')}
       </div>
@@ -342,23 +341,12 @@ function renderRunDetailsPanel(context) {
       ${drawerSection({
         title: 'Step Outcomes',
         body: steps.length
-          ? `
-            <div class="run-detail-list">
-              ${steps.map((step) => `
-                <lex-card variant="flat" class="automation-detail-item">
-                  <div class="row-between">
-                    <strong>${escapeHtml(step.step_id || `Step ${step.step_index || '?'}`)}</strong>
-                    <span>${badge(statusLabel(step.status), statusClass(step.status))}</span>
-                  </div>
-                  <p class="muted">${escapeHtml(step.step_type || 'step')} ${step.duration_ms ? `• ${escapeHtml(formatDuration(step.duration_ms))}` : ''}</p>
-                  ${step.message ? `<p>${escapeHtml(step.message)}</p>` : ''}
-                </lex-card>
-              `).join('')}
-            </div>
-          `
+          ? `<lex-run-trace data-run-trace${isLiveStatus(run.status) ? ' live' : ''}></lex-run-trace>`
           : lexEmpty({
-            message: 'No step outcomes captured',
-            description: 'This run did not return step-level execution data.',
+            message: isLiveStatus(run.status) ? 'Waiting for the first step' : 'No step outcomes captured',
+            description: isLiveStatus(run.status)
+              ? 'Steps appear here as the run works through them.'
+              : 'This run did not return step-level execution data.',
             icon: 'inbox'
           })
       })}
@@ -382,19 +370,6 @@ function renderRunDetailsPanel(context) {
     </lex-drawer>
   `;
 }
-
-// Status badge colours for the table.
-const RUN_STATUS_COLORS = {
-  completed: 'success',
-  failed: 'error',
-  rejected: 'error',
-  cancelled: '',
-  pending: 'warning',
-  paused: 'warning',
-  awaiting_approval: 'warning',
-  running: 'info',
-  in_progress: 'info'
-};
 
 // Rows keep raw values; the renderers format them.
 export function mapRunRow(run) {
@@ -446,7 +421,7 @@ function cellRenderers() {
     trigger_event_type: (value) => (value ? textCell(Q.humanizeEvent(value)) : mutedCell()),
     started_at: dateTimeCell,
     created_at: dateTimeCell,
-    status: (value) => badge(Q.humanizeLabel(value || 'pending'), RUN_STATUS_COLORS[value] || ''),
+    status: (value, row) => runStatusMark({ status: value || 'pending', settled: Boolean(row._settled) }),
     duration: (value) => {
       const text = Q.humanizeDuration(value);
       return text ? textCell(Q.capitalizeFirst(text)) : mutedCell();
@@ -538,14 +513,30 @@ function rememberSeen(store, rows) {
   if (changed) applyFilterOptions(store);
 }
 
+// Rows whose run just went from live to ended pop once; anyLive sets the
+// refresh rhythm (LanaRunStatus.trackTransitions, shared with the agents app).
+function markSettledRuns(store, rows) {
+  const RunStatus = window.LanaRunStatus;
+  if (!RunStatus) return;
+  const seen = RunStatus.trackTransitions(store.runStates || null, rows.map((row) => ({
+    id: row.execution_id, state: RunStatus.stateOf(row.status)
+  })));
+  store.runStates = seen.next;
+  const ended = new Set(seen.ended.map((entry) => entry.id));
+  rows.forEach((row) => { row._settled = ended.has(String(row.execution_id)); });
+  store.anyLive = rows.some((row) => RunStatus.isLive(RunStatus.stateOf(row.status)));
+}
+
 async function fetchRunsPage(context, query, search) {
   const Q = Queries();
   const params = Q.runsParams(query, search);
   const response = await context.fetchJson(`/api/executions?${params.toString()}`, { headers: context.authHeaders() });
   const runs = response?.data || response?.executions || [];
   context.state.runs = runs;
+  const rows = runs.map(mapRunRow);
+  markSettledRuns(runsStore(context), rows);
   return {
-    rows: runs.map(mapRunRow),
+    rows,
     pagination: Q.tablePagination(response, query, runs.length)
   };
 }
@@ -639,4 +630,47 @@ export function renderRuns(context) {
     }
   });
   loadFilterSources(context, store);
+  keepServerTableLive({ id: TABLE_ID, store, isLive: () => store.anyLive });
+  fillRunTrace(context);
+  keepRunDetailLive(context);
+}
+
+// The drawer's live trace takes its steps as a property, after render.
+function fillRunTrace(context) {
+  const trace = document.querySelector('[data-run-trace]');
+  const detail = context.state.selectedRunDetail;
+  if (trace && detail) trace.steps = Array.isArray(detail.step_outcomes) ? detail.step_outcomes : [];
+}
+
+/**
+ * While the open run is live, re-read it every few seconds and update the
+ * drawer in place: the trace gets its new steps (they rise in, the live step
+ * pulses) without rebuilding the page. When the run ends, the whole view
+ * renders once so the status, controls and artifacts settle.
+ */
+function keepRunDetailLive(context) {
+  const { state } = context;
+  const Poller = window.LanaLivePoller;
+  if (!Poller || !state.selectedRunId || (state.runDetailPoller && state.runDetailPoller.running)) return;
+  const runId = state.selectedRunId;
+  state.runDetailPoller = Poller.createLivePoller({
+    intervalMs: 3000,
+    idleIntervalMs: 3000,
+    isActive: () => state.currentView === 'runs' && state.selectedRunId === runId
+      && isLiveStatus(state.selectedRunDetail?.data?.status),
+    refresh: async () => {
+      const before = state.selectedRunDetail?.data?.status;
+      await context.loadRunDetail(runId);
+      if (state.selectedRunId !== runId) return;
+      const after = state.selectedRunDetail?.data?.status;
+      if (after !== before) {
+        invalidateRunsTable(context);
+        context.renderCurrentView();
+        const mark = document.querySelector('[data-run-detail-status] lex-run-status');
+        if (mark && !isLiveStatus(after)) mark.setAttribute('settled', '');
+        return;
+      }
+      fillRunTrace(context);
+    }
+  }).start();
 }

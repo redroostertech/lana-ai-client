@@ -107,7 +107,7 @@
 
 .agent-detail-run-row {
   display: grid;
-  grid-template-columns: 12px 1fr auto auto auto;
+  grid-template-columns: minmax(110px, auto) 1fr auto auto;
   gap: 12px;
   align-items: center;
   padding: 12px 16px;
@@ -124,22 +124,6 @@
   border-bottom: none;
 }
 
-.agent-detail-run-status-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  background: var(--lex-text-tertiary);
-}
-
-/* Status dot color modifiers — driven from Lex status tokens. */
-.agent-detail-run-status-dot--running   { background: var(--lex-status-info); }
-.agent-detail-run-status-dot--awaiting  { background: var(--lex-status-warning); }
-.agent-detail-run-status-dot--complete  { background: var(--lex-status-success); }
-.agent-detail-run-status-dot--failed    { background: var(--lex-status-danger); }
-.agent-detail-run-status-dot--cancelled { background: var(--lex-text-tertiary); }
-.agent-detail-run-status-dot--pending   { background: var(--lex-text-tertiary); }
-
 .agent-detail-run-title {
   font-size: 0.8125rem;
   font-weight: 500;
@@ -147,11 +131,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.agent-detail-run-status {
-  font-size: 0.75rem;
-  color: var(--lex-text-secondary);
 }
 
 .agent-detail-run-priority {

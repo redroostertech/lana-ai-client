@@ -3,11 +3,13 @@ import {
   createServerTableStore,
   dateTimeCell,
   invalidateServerTable,
+  keepServerTableLive,
   matterLinkCell,
   mountServerTable,
   mutedCell,
   nameCell,
   relativeTimeCell,
+  runStatusMark,
   serverTableSection,
   surface,
   textCell
@@ -66,6 +68,8 @@ export function mapAutomationRow(automation) {
     visibility: automation.visibility || 'private',
     state: automationState(automation),
     last_executed_at: automation.last_executed_at || '',
+    // The newest run this viewer may see (server last-run.contract), or null.
+    last_run: automation.last_run || null,
     created_at: automation.created_at || '',
     updated_at: automation.updated_at || '',
     _raw: automation
@@ -100,7 +104,11 @@ function cellRenderers() {
       return value ? textCell(option ? option.label : Q.humanizeLabel(value)) : mutedCell();
     },
     state: (value) => badge(Q.humanizeLabel(value || 'inactive'), STATE_COLORS[value] || ''),
-    last_executed_at: relativeTimeCell,
+    // Last run: its status (Running / Succeeded / Failed) and when; a run
+    // the viewer may not see still shows its time.
+    last_executed_at: (value, row) => (row.last_run
+      ? runStatusMark({ lastRun: row.last_run, settled: Boolean(row._settled) })
+      : relativeTimeCell(value)),
     created_at: dateTimeCell,
     updated_at: relativeTimeCell
   };
@@ -175,13 +183,29 @@ function rememberSeen(context, store, rows) {
   if (changed && !store.facets) applyFilterOptions(context, store);
 }
 
+// A row whose last run just went from live to ended is marked once, so its
+// status pops (LanaRunStatus.trackTransitions over the run ids).
+function markSettledRuns(store, rows) {
+  const RunStatus = window.LanaRunStatus;
+  if (!RunStatus) return;
+  const seen = RunStatus.trackTransitions(store.runStates || null, rows
+    .filter((row) => row.last_run)
+    .map((row) => ({ id: row.last_run.run_id, state: RunStatus.stateOf(row.last_run) })));
+  store.runStates = seen.next;
+  const ended = new Set(seen.ended.map((entry) => entry.id));
+  rows.forEach((row) => { row._settled = Boolean(row.last_run && ended.has(String(row.last_run.run_id))); });
+  store.anyLive = rows.some((row) => row.last_run && RunStatus.isLive(RunStatus.stateOf(row.last_run)));
+}
+
 async function fetchAutomationsPage(context, query, search) {
   const Q = Queries();
   const params = Q.libraryParams(query, search);
   const response = await context.fetchJson(`/api/automations?${params.toString()}`, { headers: context.authHeaders() });
   const automations = response?.automations || response?.data || [];
+  const rows = automations.map(mapAutomationRow);
+  markSettledRuns(libraryStore(context), rows);
   return {
-    rows: automations.map(mapAutomationRow),
+    rows,
     pagination: Q.tablePagination(response, query, automations.length)
   };
 }
@@ -317,4 +341,5 @@ export function renderLibrary(context) {
     }
   });
   loadFacets(context, store);
+  keepServerTableLive({ id: TABLE_ID, store, isLive: () => store.anyLive, idleIntervalMs: 30000 });
 }

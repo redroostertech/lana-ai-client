@@ -40,7 +40,11 @@
     security: { bg: 'var(--lex-status-danger-bg)', text: 'var(--lex-status-danger-text)' },
     comment: { bg: 'var(--lex-bg-accent-muted)', text: 'var(--lex-text-accent)' },
     comment_mention: { bg: 'var(--lex-bg-accent-muted)', text: 'var(--lex-text-accent)' },
-    comment_reply: { bg: 'var(--lex-bg-accent-muted)', text: 'var(--lex-text-accent)' }
+    comment_reply: { bg: 'var(--lex-bg-accent-muted)', text: 'var(--lex-text-accent)' },
+    automation_run_succeeded: { bg: 'var(--lex-status-success-bg)', text: 'var(--lex-status-success-text)' },
+    automation_run_failed: { bg: 'var(--lex-status-danger-bg)', text: 'var(--lex-status-danger-text)' },
+    agent_run_succeeded: { bg: 'var(--lex-status-success-bg)', text: 'var(--lex-status-success-text)' },
+    agent_run_failed: { bg: 'var(--lex-status-danger-bg)', text: 'var(--lex-status-danger-text)' }
   };
 
   function init() {
@@ -291,6 +295,12 @@
       return 'approval-detail.html?id=' + encodeURIComponent(approvalId);
     }
 
+    if (!url && notification.resource_id && notification.resource_type === 'automation_run') {
+      return 'automation/index.html#run/' + encodeURIComponent(notification.resource_id);
+    }
+    if (!url && notification.resource_id && notification.resource_type === 'agent_run') {
+      return 'agents/index.html#run/' + encodeURIComponent(notification.resource_id);
+    }
     return normalizeActionUrl(url);
   }
 
@@ -456,6 +466,8 @@
     if (type && type.indexOf('document') === 0) key = 'document';
     if (type === 'system_alert' || type === 'storage_warning') key = 'warning';
     if (type === 'processing_failed' || type === 'approval_resume_failed' || type === 'security') key = 'error';
+    if (type === 'automation_run_failed' || type === 'agent_run_failed') key = 'error';
+    if (type === 'automation_run_succeeded' || type === 'agent_run_succeeded') key = 'success';
     return '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">' + (ICONS[key] || ICONS.info) + '</svg>';
   }
 

@@ -9,6 +9,7 @@
   <script src="../js/tailwind-loader.js"></script>
   <link rel="stylesheet" href="../css/lex-tokens.css">
   <link rel="stylesheet" href="../css/lex-motion.css">
+  <link rel="stylesheet" href="../css/lex-run-status.css">
   <link rel="stylesheet" href="../css/app-walkthrough.css">
   <link rel="stylesheet" href="../css/agents.css">
   <link rel="stylesheet" href="../css/agent-detail.css">
@@ -51,6 +52,10 @@
   <script src="../js/lex/components/foundation/lex-action-card.js"></script>
   <script src="../js/lex/components/foundation/lex-badge.js"></script>
   <script src="../js/lex/components/foundation/lex-empty.js"></script>
+  <script src="../js/shared/run-status.js"></script>
+  <script src="../js/shared/live-poller.js"></script>
+  <script src="../js/lex/components/foundation/lex-run-status.js"></script>
+  <script src="../js/lex/components/foundation/lex-run-trace.js"></script>
   <script src="../js/lex/components/foundation/lex-banner.js"></script>
   <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
   <script src="../js/lex/components/foundation/lex-drawer.js"></script>
@@ -109,6 +114,7 @@
   <!-- View modules: each registers on window.LanaAgentsApp.Views.<name>.
        Loaded BEFORE app.js so the controller's initial route dispatch
        finds all view renderers already registered. -->
+  <script src="./js/agents-dashboard-model.js"></script>
   <script src="./js/views/catalog.js"></script>
   <script src="./js/views/agent-detail.js"></script>
   <script src="../js/shared/note-labels.js"></script>

@@ -478,6 +478,8 @@ Lex.Toast.warning('Token expires in 5 minutes');
 | `<lex-text>` | Typography wrapper | `content`, `variant` |
 | `<lex-detail-panel>` | Expandable detail below KPI | `open`, `heading`, `actionLabel` |
 | `<lex-action-menu>` | Full-screen action sheet | `actions`, `open` |
+| `<lex-run-status>` | Run status mark for automations and agents (running breathes, ended pops); needs `js/shared/run-status.js` and `css/lex-run-status.css` | `status`, `label`, `time`, `bar`, `compact`, `settled`, `.lastRun` |
+| `<lex-run-trace>` | Live step-by-step trace of one run (active step pulses, new steps rise in); same dependencies | `live`, `empty`, `.steps` |
 
 ### Foundation Decision Guides
 

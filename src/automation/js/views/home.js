@@ -1,4 +1,4 @@
-import { badge } from '../shared/ui.js';
+import { badge, runStatusMark } from '../shared/ui.js';
 import { escapeAttribute, escapeHtml, formatLabel, timeAgo } from '../shared/utils.js';
 import { countReadyConnectors } from '../shared/connectors.js';
 
@@ -175,7 +175,9 @@ function renderRunnableAutomation(context, automation, run) {
         </div>
       </div>
       <div class="home-run-card-actions" data-slot="footer">
-        <span class="home-run-time">${run ? `Last run ${escapeHtml(timeAgo(runTime))}` : `Updated ${escapeHtml(timeAgo(runTime))}`}</span>
+        ${automation.last_run
+          ? `<span class="home-run-time">${runStatusMark({ lastRun: automation.last_run })}</span>`
+          : `<span class="home-run-time">${run ? `Last run ${escapeHtml(timeAgo(runTime))}` : `Updated ${escapeHtml(timeAgo(runTime))}`}</span>`}
         <lex-btn
           variant="primary"
           size="sm"

@@ -282,7 +282,7 @@
 
 .agents-studio-outcome {
   display: grid;
-  grid-template-columns: 12px minmax(0, 1fr) minmax(120px, auto) 18px;
+  grid-template-columns: 32px minmax(0, 1fr) minmax(120px, auto) 18px;
   gap: 14px;
   align-items: center;
   width: 100%;
@@ -303,18 +303,6 @@
 .agents-studio-outcome:hover {
   background: var(--lex-bg-secondary, #f7f8f6);
 }
-
-.agents-studio-outcome-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--lex-text-tertiary, #8b928c);
-}
-
-.agents-studio-outcome-dot--ready { background: var(--lex-color-success-500, #3f9875); }
-.agents-studio-outcome-dot--attention { background: var(--lex-color-warning-500, #d39b26); }
-.agents-studio-outcome-dot--working { background: var(--lex-color-info-500, #4c879e); box-shadow: 0 0 0 4px rgba(76, 135, 158, 0.12); }
-.agents-studio-outcome-dot--issue { background: var(--lex-color-danger-500, #c95454); }
 
 .agents-studio-outcome-copy,
 .agents-studio-outcome-meta {
@@ -530,3 +518,166 @@
     transition: none;
   }
 }
+
+/* ── Agents home: needs you and working now (after LANA Orcestr8's Control
+   Center). Status marks and motion come from css/lex-run-status.css. ── */
+
+.agents-home-now {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.agents-home-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.agents-home-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--lex-run-waiting-bg);
+  color: var(--lex-run-waiting-text);
+  font-size: 0.72rem;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.agents-home-count--pop { animation: lex-run-pop 420ms var(--lex-ease-bouncy-spring, cubic-bezier(0.34, 1.56, 0.64, 1)); }
+
+.agents-home-list {
+  overflow: hidden;
+  border: 1px solid var(--lex-border-subtle, #e0e4e0);
+  border-radius: var(--lex-radius-lg, 16px);
+  background: var(--lex-bg-primary, #fff);
+}
+
+.agents-home-row {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto 18px;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 12px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--lex-border-subtle, #e6e9e6);
+  background: transparent;
+  color: var(--lex-text-primary, #171b18);
+  text-align: left;
+  cursor: pointer;
+  transition: background 150ms ease;
+  animation: lex-run-rise 240ms var(--lex-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+
+.agents-home-row--working { grid-template-columns: 36px minmax(0, 1fr) auto; }
+.agents-home-row:last-child { border-bottom: 0; }
+.agents-home-row:hover { background: var(--lex-bg-secondary, #f7f8f6); }
+
+.agents-home-row-copy { min-width: 0; }
+
+.agents-home-row-copy strong,
+.agents-home-row-copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agents-home-row-copy strong { font-size: 0.8rem; }
+
+.agents-home-row-copy small {
+  margin-top: 3px;
+  color: var(--lex-text-tertiary, #777e78);
+  font-size: 0.7rem;
+}
+
+.agents-home-row-arrow { color: var(--lex-text-tertiary, #8b928c); }
+
+.agents-home-avatar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #1e3028;
+  color: #e7f4ed;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+/* The corner badge says why a row needs you: approval, question, stopped. */
+.agents-home-avatar-badge {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 13px;
+  height: 13px;
+  border: 2px solid var(--lex-bg-primary, #fff);
+  border-radius: 50%;
+  background: var(--lex-run-waiting);
+}
+
+.agents-home-row--stopped .agents-home-avatar-badge { background: var(--lex-run-failed); }
+
+/* A working agent's avatar breathes (Orcestr8's live ring). */
+.agents-home-avatar--live::after,
+.agents-card--live .agents-card-avatar::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  border: 1.5px solid var(--lex-run-running);
+  animation: lex-run-breathe 1.6s ease-in-out infinite;
+}
+
+.agents-card--live .agents-card-avatar { position: relative; }
+.agents-card--live { border-color: var(--lex-run-running); }
+
+.agents-home-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px;
+  color: var(--lex-text-secondary, #626963);
+  font-size: 0.78rem;
+}
+
+.agents-home-empty strong { color: var(--lex-text-primary, #171b18); font-size: 0.82rem; }
+
+.agents-card-run {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.agents-card-run-label {
+  color: var(--lex-text-tertiary, #777e78);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 900px) {
+  .agents-home-now { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agents-home-row,
+  .agents-home-count--pop { animation: none; }
+  .agents-home-avatar--live::after,
+  .agents-card--live .agents-card-avatar::after { animation: none; opacity: 0.6; }
+}
+

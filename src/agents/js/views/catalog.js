@@ -30,15 +30,31 @@
     +     '<lex-btn id="agentsTourBtn" variant="ghost" size="lg" leading-icon="play">Take the walkthrough</lex-btn>'
     +   '</lex-app-hero>'
 
+    // The home, ranked like LANA Orcestr8's Control Center: what needs you,
+    // what is working now, then your agents and recent outcomes
+    // (GET /api/v1/agent-runs/dashboard, refreshed live).
     +   '<section class="agents-studio-metrics" aria-label="Workspace pulse">'
-    +     '<lex-metric id="agentsMetricDeployed" label="Deployed agents" value="–"></lex-metric>'
-    +     '<lex-metric id="agentsMetricRunning" label="Working now" value="–"></lex-metric>'
-    +     '<lex-metric id="agentsMetricAttention" label="Need your input" value="–"></lex-metric>'
-    +     '<lex-metric id="agentsMetricCompleted" label="Outcomes ready" value="–"></lex-metric>'
+    +     '<lex-metric id="agentsMetricAttention" label="Needs you" value="..."></lex-metric>'
+    +     '<lex-metric id="agentsMetricRunning" label="Working now" value="..."></lex-metric>'
+    +     '<lex-metric id="agentsMetricCompleted" label="Finished this week" value="..."></lex-metric>'
+    +     '<lex-metric id="agentsMetricFailed" label="Stopped this week" value="..."></lex-metric>'
     +   '</section>'
 
-    +   '<lex-app-loop id="agentsJourney" kicker="A simple loop" heading="You always know what happens next."'
-    +     ' steps="[{&quot;value&quot;:&quot;build&quot;,&quot;title&quot;:&quot;Build&quot;,&quot;text&quot;:&quot;Start with the outcome and choose what your agent may use.&quot;},{&quot;value&quot;:&quot;run&quot;,&quot;title&quot;:&quot;Run&quot;,&quot;text&quot;:&quot;Give it a task yourself or put recurring work on a schedule.&quot;},{&quot;value&quot;:&quot;review&quot;,&quot;title&quot;:&quot;Review outcomes&quot;,&quot;text&quot;:&quot;Open deliverables, approvals, and a clear record of the work.&quot;}]"></lex-app-loop>'
+    +   '<section class="agents-home-now" aria-label="Right now">'
+    +     '<div class="agents-home-panel agents-home-needs" aria-labelledby="agentsNeedsTitle">'
+    +       '<div class="agents-studio-section-head">'
+    +         '<div><span class="agents-studio-section-kicker">First</span><h2 id="agentsNeedsTitle">Needs you <span id="agentsNeedsCount" class="agents-home-count">0</span></h2></div>'
+    +         '<lex-segmented id="agentsNeedsTabs" value="all"></lex-segmented>'
+    +       '</div>'
+    +       '<div id="agentsNeedsList" class="agents-home-list"><div class="agents-studio-outcome-loading"><lex-spinner size="sm"></lex-spinner><span>Checking what needs you...</span></div></div>'
+    +     '</div>'
+    +     '<div class="agents-home-panel agents-home-working" aria-labelledby="agentsWorkingTitle">'
+    +       '<div class="agents-studio-section-head">'
+    +         '<div><span class="agents-studio-section-kicker">Live</span><h2 id="agentsWorkingTitle">Working now</h2></div>'
+    +       '</div>'
+    +       '<div id="agentsWorkingList" class="agents-home-list"></div>'
+    +     '</div>'
+    +   '</section>'
 
     +   '<section class="agents-studio-roster" aria-labelledby="agentsRosterTitle">'
     +     '<div class="agents-studio-section-head agents-studio-section-head--roster">'
@@ -64,6 +80,9 @@
     +     '</div>'
     +     '<div id="agentsRecentOutcomes" class="agents-studio-outcome-list"><div class="agents-studio-outcome-loading"><lex-spinner size="sm"></lex-spinner><span>Loading recent outcomes...</span></div></div>'
     +   '</section>'
+
+    +   '<lex-app-loop id="agentsJourney" kicker="A simple loop" heading="You always know what happens next."'
+    +     ' steps="[{&quot;value&quot;:&quot;build&quot;,&quot;title&quot;:&quot;Build&quot;,&quot;text&quot;:&quot;Start with the outcome and choose what your agent may use.&quot;},{&quot;value&quot;:&quot;run&quot;,&quot;title&quot;:&quot;Run&quot;,&quot;text&quot;:&quot;Give it a task yourself or put recurring work on a schedule.&quot;},{&quot;value&quot;:&quot;review&quot;,&quot;title&quot;:&quot;Review outcomes&quot;,&quot;text&quot;:&quot;Open deliverables, approvals, and a clear record of the work.&quot;}]"></lex-app-loop>'
 
     +   '<lex-modal id="agentsRunModal" heading="Give this agent a task" size="md" confirm-text="Start run" cancel-text="Cancel" data-hoist>'
     +     '<div class="agents-run-modal-body"><p id="agentsRunModalText" class="agents-run-modal-text">Describe the outcome you need. You will be able to follow the work live.</p>'
@@ -169,7 +188,8 @@
       allAgents: [],
       customAgents: [],
       templates: [],
-      tasks: [],
+      dashboard: null,
+      needsTab: 'all',
       filter: 'mine',
       query: '',
       selectedAgent: null,
@@ -187,19 +207,14 @@
   }
 
   function updateMetrics(state) {
-    var running = 0;
-    var attention = 0;
-    var completed = 0;
-    for (var i = 0; i < state.tasks.length; i++) {
-      var status = state.tasks[i].execution_status || state.tasks[i].status || '';
-      if (status === 'running' || status === 'queued' || status === 'compiling_context') running++;
-      if (status === 'awaiting_input' || status === 'awaiting_approval') attention++;
-      if (status === 'completed' || status === 'approved') completed++;
-    }
-    setMetric('agentsMetricDeployed', state.customAgents.filter(function (agent) { return agent.is_active !== false; }).length);
-    setMetric('agentsMetricRunning', running);
-    setMetric('agentsMetricAttention', attention);
-    setMetric('agentsMetricCompleted', completed);
+    var Model = global.AgentsDashboardModel;
+    var dashboard = state.dashboard;
+    if (!Model || !dashboard) return;
+    var counts = dashboard.counts || {};
+    setMetric('agentsMetricAttention', Model.countLabel(counts.needs_you, dashboard.capped));
+    setMetric('agentsMetricRunning', Model.countLabel(counts.working, dashboard.capped));
+    setMetric('agentsMetricCompleted', Model.countLabel(counts.succeeded, dashboard.capped));
+    setMetric('agentsMetricFailed', Model.countLabel(counts.failed, dashboard.capped));
   }
 
   function findInstalledAgent(state, template) {
@@ -218,11 +233,21 @@
     var active = agent.is_active !== false;
     var tools = Array.isArray(agent.allowed_tools) ? agent.allowed_tools.length : 0;
     var visibility = agent.visibility === 'private' ? 'Only me' : (agent.visibility === 'workspace' ? 'Workspace' : 'Organization');
-    return '<article class="agents-card agents-card--deployed" data-agent-slug="' + slug + '" data-agent-id="' + definitionId + '">'
+    var RunStatus = global.LanaRunStatus;
+    var lastRun = RunStatus ? RunStatus.lastRunSummary(agent.last_run || null) : null;
+    var live = Boolean(lastRun && RunStatus.isLive(lastRun.state));
+    // Last run (server last_run): a running agent's avatar breathes and its
+    // run line slides; a finished or failed run is marked with when.
+    var runLine = lastRun
+      ? '<div class="agents-card-run" data-agent-run-id="' + escHtml(lastRun.runId) + '"><span class="agents-card-run-label">Last run</span>'
+        + '<lex-run-status status="' + escHtml(lastRun.state) + '"' + (lastRun.time ? ' time="' + escHtml(lastRun.time) + '"' : '') + (live ? ' bar' : '') + '></lex-run-status></div>'
+      : '';
+    return '<article class="agents-card agents-card--deployed' + (live ? ' agents-card--live' : '') + '" data-agent-slug="' + slug + '" data-agent-id="' + definitionId + '">'
       + '<div class="agents-card-top"><span class="agents-card-avatar">' + escHtml((agent.name || agent.slug || 'A').charAt(0).toUpperCase()) + '</span>'
       + '<span class="agents-card-status ' + (active ? 'agents-card-status--live' : 'agents-card-status--paused') + '"><i></i>' + (active ? 'Deployed' : 'Paused') + '</span></div>'
       + '<div class="agents-card-body"><h3>' + name + '</h3><p>' + description + '</p></div>'
       + '<div class="agents-card-facts"><span>' + escHtml(visibility) + '</span><span>' + tools + ' capabilit' + (tools === 1 ? 'y' : 'ies') + '</span><span>' + escHtml(scheduleLabel(agent.schedule)) + '</span></div>'
+      + runLine
       + '<div class="agents-card-actions"><lex-btn variant="primary" size="sm" icon="play" data-action="run" data-agent-slug="' + slug + '" data-agent-id="' + definitionId + '"' + (active ? '' : ' disabled') + '>Run agent</lex-btn>'
       + '<lex-btn variant="ghost" size="sm" data-action="open" data-agent-slug="' + slug + '" data-agent-id="' + definitionId + '">Open</lex-btn></div></article>';
   }
@@ -279,50 +304,101 @@
     show(grid);
   }
 
-  function statusLabel(status) {
-    if (status === 'awaiting_input') return 'Needs your input';
-    if (status === 'awaiting_approval') return 'Ready for approval';
-    if (status === 'compiling_context') return 'Getting ready';
-    if (status === 'running') return 'Working now';
-    if (status === 'queued') return 'Queued';
-    if (status === 'completed' || status === 'approved') return 'Outcome ready';
-    if (status === 'failed') return 'Needs attention';
-    if (status === 'cancelled') return 'Cancelled';
-    return humanize(status || 'pending');
+  // ---- Home: needs you, working now, recent outcomes ----------------------
+
+  function avatarLetter(name) {
+    return escHtml(String(name || 'A').charAt(0).toUpperCase());
   }
 
-  function statusClass(status) {
-    if (status === 'completed' || status === 'approved') return 'ready';
-    if (status === 'awaiting_input' || status === 'awaiting_approval') return 'attention';
-    if (status === 'running' || status === 'queued' || status === 'compiling_context') return 'working';
-    if (status === 'failed' || status === 'rejected') return 'issue';
-    return 'neutral';
+  function renderNeedsYou(state) {
+    var Model = global.AgentsDashboardModel;
+    var holder = el('agentsNeedsList');
+    if (!holder || !Model || !state.dashboard) return;
+    var all = state.dashboard.needs_you || [];
+    var counts = Model.needsTabCounts(all);
+    var tabs = el('agentsNeedsTabs');
+    if (tabs) {
+      tabs.options = Model.NEEDS_TABS.map(function (tab) { return { value: tab.value, label: tab.label + ' ' + counts[tab.value] }; });
+      tabs.value = state.needsTab;
+    }
+    var count = el('agentsNeedsCount');
+    if (count) {
+      var next = String(counts.all);
+      if (count.textContent !== next && state.needsSeen) {
+        count.classList.remove('agents-home-count--pop');
+        void count.offsetWidth;
+        count.classList.add('agents-home-count--pop');
+      }
+      count.textContent = next;
+      state.needsSeen = true;
+    }
+    var items = Model.filterNeeds(all, state.needsTab);
+    if (!items.length) {
+      holder.innerHTML = '<div class="agents-home-empty"><strong>' + (all.length ? 'Nothing here right now.' : 'Nothing needs you.') + '</strong>'
+        + '<span>' + (all.length ? 'Try another tab.' : 'Approvals, questions and runs that stopped will show up here first.') + '</span></div>';
+      return;
+    }
+    holder.innerHTML = items.map(function (item) {
+      var target = item.attention === 'stopped' ? 'run' : 'outcome';
+      return '<button type="button" class="agents-home-row agents-home-row--' + escHtml(item.attention || 'needs') + '" data-home-target="' + target + '" data-run-id="' + escHtml(item.run_id) + '">'
+        + '<span class="agents-home-avatar">' + avatarLetter(item.agent_name) + '<i class="agents-home-avatar-badge" aria-hidden="true"></i></span>'
+        + '<span class="agents-home-row-copy"><strong>' + escHtml(Model.needSentence(item)) + '</strong>'
+        + '<small>' + escHtml(item.title || 'Agent run') + (item.at ? ' · ' + escHtml(global.LanaRunStatus ? global.LanaRunStatus.shortAgo(item.at) : '') : '') + '</small></span>'
+        + '<lex-run-status status="' + escHtml(item.status) + '" compact></lex-run-status>'
+        + '<span class="agents-home-row-arrow" aria-hidden="true">→</span></button>';
+    }).join('');
+  }
+
+  function renderWorkingNow(state) {
+    var Model = global.AgentsDashboardModel;
+    var holder = el('agentsWorkingList');
+    if (!holder || !Model || !state.dashboard) return;
+    var items = state.dashboard.working_now || [];
+    if (!items.length) {
+      holder.innerHTML = '<div class="agents-home-empty"><strong>No agents are working right now.</strong><span>Start a run from one of your agents and follow it here.</span></div>';
+      return;
+    }
+    holder.innerHTML = items.map(function (item) {
+      var line = Model.workingLine(item);
+      return '<button type="button" class="agents-home-row agents-home-row--working" data-home-target="run" data-run-id="' + escHtml(item.run_id) + '">'
+        + '<span class="agents-home-avatar agents-home-avatar--live">' + avatarLetter(item.agent_name) + '</span>'
+        + '<span class="agents-home-row-copy"><strong>' + escHtml(line.who) + ' is working on ' + escHtml(line.what) + '</strong>'
+        + '<small>Now: ' + escHtml(line.step) + '</small></span>'
+        + '<lex-run-status status="' + escHtml(item.status) + '" bar></lex-run-status>'
+        + '</button>';
+    }).join('');
   }
 
   function renderRecentOutcomes(state) {
     var holder = el('agentsRecentOutcomes');
-    if (!holder) return;
-    if (!state.tasks.length) {
-      holder.innerHTML = '<div class="agents-studio-outcomes-empty"><span>No outcomes yet.</span><strong>Run an agent and its work will appear here.</strong></div>';
+    if (!holder || !state.dashboard) return;
+    var items = state.dashboard.recent || [];
+    var ended = state.endedRuns || {};
+    if (!items.length) {
+      holder.innerHTML = '<div class="agents-studio-outcomes-empty"><span>No outcomes this week.</span><strong>Run an agent and its work will appear here.</strong></div>';
       return;
     }
-    var html = '';
-    var limit = Math.min(4, state.tasks.length);
-    for (var i = 0; i < limit; i++) {
-      var task = state.tasks[i];
-      var status = task.execution_status || task.status || 'pending';
-      var title = escHtml(task.name || task.title || 'Agent outcome');
-      var description = escHtml(task.task_description || task.description || 'Open this outcome to review the work.');
-      html += '<button type="button" class="agents-studio-outcome" data-outcome-id="' + escHtml(task.id || '') + '">'
-        + '<span class="agents-studio-outcome-dot agents-studio-outcome-dot--' + statusClass(status) + '"></span>'
-        + '<span class="agents-studio-outcome-copy"><strong>' + title + '</strong><small>' + description + '</small></span>'
-        + '<span class="agents-studio-outcome-meta"><strong>' + escHtml(statusLabel(status)) + '</strong><small>' + escHtml(task.created_at ? timeAgo(task.created_at) : '') + '</small></span>'
+    var RunStatus = global.LanaRunStatus;
+    holder.innerHTML = items.map(function (item) {
+      var settled = Boolean(ended[item.run_id]);
+      return '<button type="button" class="agents-studio-outcome' + (settled ? ' lex-run-row--settled' : '') + '" data-outcome-id="' + escHtml(item.run_id) + '">'
+        + '<span class="agents-home-avatar">' + avatarLetter(item.agent_name) + '</span>'
+        + '<span class="agents-studio-outcome-copy"><strong>' + escHtml(item.title || 'Agent outcome') + '</strong><small>' + escHtml(item.agent_name || 'Agent') + '</small></span>'
+        + '<span class="agents-studio-outcome-meta"><lex-run-status status="' + escHtml(item.status) + '"' + (settled ? ' settled' : '') + '></lex-run-status>'
+        + '<small>' + escHtml(RunStatus ? RunStatus.shortAgo(item.at) : '') + '</small></span>'
         + '<span class="agents-studio-outcome-arrow">→</span></button>';
-    }
-    holder.innerHTML = html;
+    }).join('');
   }
 
-  function loadAgents(state) {
+  function renderHome(state) {
+    updateMetrics(state);
+    renderNeedsYou(state);
+    renderWorkingNow(state);
+    renderRecentOutcomes(state);
+  }
+
+  function loadAgents(state, options) {
+    var silent = Boolean(options && options.silent);
     if (!window.api || typeof window.api.get !== 'function') {
       var ready = function () { loadAgents(state); };
       state._lexReadyHandler = ready;
@@ -335,15 +411,14 @@
       state.allAgents = Array.isArray(agents) ? agents : [];
       state.customAgents = state.allAgents.filter(function (agent) { return getKind(agent) === 'custom'; });
       state.templates = state.allAgents.filter(function (agent) { return getKind(agent) === 'system'; });
-      if (!state.customAgents.length) {
+      if (!state.customAgents.length && !silent) {
         state.filter = 'templates';
         var filter = el('agentsFilterTabs');
         if (filter) filter.value = 'templates';
       }
-      updateMetrics(state);
       renderGrid(state);
     }).catch(function (err) {
-      if (state.destroyed) return;
+      if (state.destroyed || silent) return;
       console.error('[agents] Failed to load workspace agents', err);
       hide(el('agentsLoading'));
       var empty = el('agentsEmpty');
@@ -352,20 +427,50 @@
     });
   }
 
-  function loadRecentOutcomes(state) {
-    if (!window.api || typeof window.api.get !== 'function') return;
-    window.api.get('/api/v1/agentic-tasks?limit=50&offset=0&sort_by=created_at&sort_order=desc').then(function (response) {
+  function loadDashboard(state) {
+    if (!window.api || typeof window.api.get !== 'function') return null;
+    return window.api.get('/api/v1/agent-runs/dashboard').then(function (response) {
       if (state.destroyed) return;
-      state.tasks = response && Array.isArray(response.data) ? response.data : (Array.isArray(response) ? response : []);
-      updateMetrics(state);
-      renderRecentOutcomes(state);
+      var dashboard = response || {};
+      var RunStatus = global.LanaRunStatus;
+      var moved = false;
+      if (RunStatus) {
+        // Runs that just ended pop once; any start or end refreshes the agent
+        // cards so their last run follows (shared LanaRunStatus.trackTransitions).
+        var rows = [].concat(dashboard.working_now || [], dashboard.needs_you || [], dashboard.recent || [])
+          .map(function (item) { return { id: item.run_id, state: RunStatus.stateOf(item.status) }; });
+        var seen = RunStatus.trackTransitions(state.runStates || null, rows);
+        moved = Boolean(state.runStates) && (seen.ended.length > 0 || seen.started.length > 0);
+        state.runStates = seen.next;
+        state.endedRuns = {};
+        seen.ended.forEach(function (entry) { state.endedRuns[entry.id] = true; });
+      }
+      state.dashboard = dashboard;
+      renderHome(state);
+      if (moved) loadAgents(state, { silent: true });
+      keepHomeLive(state);
     }).catch(function (err) {
       if (state.destroyed) return;
-      console.warn('[agents] Recent outcomes unavailable', err);
-      state.tasks = [];
-      updateMetrics(state);
-      renderRecentOutcomes(state);
+      console.warn('[agents] Agents home unavailable', err);
+      if (!state.dashboard) {
+        state.dashboard = { counts: {}, needs_you: [], working_now: [], recent: [] };
+        renderHome(state);
+      }
     });
+  }
+
+  // The home follows along on screen: every few seconds while an agent is
+  // working, slower otherwise (shared LanaLivePoller, paused while hidden).
+  function keepHomeLive(state) {
+    var Poller = global.LanaLivePoller;
+    if (!Poller || (state.homePoller && state.homePoller.running)) return;
+    state.homePoller = Poller.createLivePoller({
+      intervalMs: 4000,
+      idleIntervalMs: 20000,
+      isActive: function () { return !state.destroyed; },
+      isLive: function () { return Boolean(state.dashboard && (state.dashboard.working_now || []).length); },
+      refresh: function () { return loadDashboard(state); }
+    }).start();
   }
 
   function findAgent(state, slug, definitionId) {
@@ -528,6 +633,19 @@
       if (action === 'open' || action === 'preview') ctx.app.setView('agentDetail', { slug: slug, definitionId: definitionId });
       if (action === 'use-template') ctx.app.setView('create', { templateSlug: slug });
     });
+    bind(state, el('agentsNeedsTabs'), 'lex-change', function (event) {
+      state.needsTab = (event && event.detail && event.detail.value) || 'all';
+      renderNeedsYou(state);
+    });
+    var openHomeRow = function (event) {
+      var row = event.target.closest('[data-home-target]');
+      if (!row || !row.getAttribute('data-run-id')) return;
+      var runId = row.getAttribute('data-run-id');
+      if (row.getAttribute('data-home-target') === 'run') ctx.app.setView('agentRun', { runId: runId });
+      else ctx.app.setView('activityDetail', { id: runId });
+    };
+    bind(state, el('agentsNeedsList'), 'click', openHomeRow);
+    bind(state, el('agentsWorkingList'), 'click', openHomeRow);
     bind(state, el('agentsRecentOutcomes'), 'click', function (event) {
       var row = event.target.closest('[data-outcome-id]');
       if (row && row.getAttribute('data-outcome-id')) ctx.app.setView('activityDetail', { id: row.getAttribute('data-outcome-id') });
@@ -554,7 +672,7 @@
     rootEl._catalogState = state;
     wire(rootEl, ctx, state);
     loadAgents(state);
-    loadRecentOutcomes(state);
+    loadDashboard(state);
     if (registerWalkthrough(ctx)) global.LanaAppWalkthrough.showFirstRun('agents');
   }
 
@@ -562,6 +680,7 @@
     var state = rootEl && rootEl._catalogState;
     if (!state) return;
     state.destroyed = true;
+    if (state.homePoller) state.homePoller.stop();
     if (state._lexReadyHandler) document.removeEventListener('lex-ready', state._lexReadyHandler);
     for (var i = 0; i < state._unbindFns.length; i++) {
       try { state._unbindFns[i](); } catch (_err) { /* ignored */ }

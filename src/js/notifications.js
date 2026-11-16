@@ -19,7 +19,11 @@ window.LanaDisplay = window.LanaDisplay || (function() {
     approval_escalated: 'Approval escalated',
     approval_reminder: 'Approval reminder',
     approval_decided: 'Approval decided',
-    approval_resume_failed: 'Approval could not be completed'
+    approval_resume_failed: 'Approval could not be completed',
+    automation_run_succeeded: 'Automation run finished',
+    automation_run_failed: 'Automation run failed',
+    agent_run_succeeded: 'Agent run finished',
+    agent_run_failed: 'Agent run failed'
   };
 
   function replaceAllLiteral(value, search, replacement) {

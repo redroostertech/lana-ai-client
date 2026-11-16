@@ -112,6 +112,7 @@
 
 .outcome-card {
   position: relative;
+  box-sizing: border-box; /* width 100% plus padding overflowed the list and clipped the status column */
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr) minmax(150px, auto);
   gap: 16px;

@@ -435,30 +435,6 @@
   function hide(node) { if (node) node.classList.add('hidden'); }
   function setText(id, value) { var node = el(id); if (node) node.textContent = value == null ? '' : String(value); }
 
-  function statusLabel(status) {
-    if (!status) return 'Pending';
-    if (status === 'compiling_context') return 'Compiling...';
-    if (status === 'running')           return 'Running';
-    if (status === 'awaiting_input')    return 'Needs Input';
-    if (status === 'awaiting_approval') return 'Pending Approval';
-    if (status === 'approved')          return 'Approved';
-    if (status === 'completed')         return 'Completed';
-    if (status === 'failed')            return 'Failed';
-    if (status === 'rejected')          return 'Rejected';
-    if (status === 'cancelled')         return 'Cancelled';
-    if (status === 'queued')            return 'Queued';
-    return status;
-  }
-
-  function statusDotModifier(status) {
-    if (status === 'running' || status === 'compiling_context' || status === 'queued') return 'agent-detail-run-status-dot--running';
-    if (status === 'awaiting_input' || status === 'awaiting_approval') return 'agent-detail-run-status-dot--awaiting';
-    if (status === 'completed' || status === 'approved') return 'agent-detail-run-status-dot--complete';
-    if (status === 'failed' || status === 'rejected')   return 'agent-detail-run-status-dot--failed';
-    if (status === 'cancelled') return 'agent-detail-run-status-dot--cancelled';
-    return 'agent-detail-run-status-dot--pending';
-  }
-
   function priorityClass(priority) {
     if (priority === 'urgent') return 'agent-detail-run-priority--urgent';
     if (priority === 'high')   return 'agent-detail-run-priority--high';
@@ -1132,26 +1108,26 @@
   // Runs list
   // =========================================================================
 
-  function renderRunRow(run) {
+  function renderRunRow(run, settled) {
     var status = run.status || 'queued';
     var priority = run.priority || 'medium';
-    var dotMod = statusDotModifier(status);
     var pCls = priorityClass(priority);
-    var label = statusLabel(status);
     var title = run.title || ('Run ' + (run.id || '').slice(0, 8));
 
+    // Shared run status mark (lex-run-status): a live run breathes, a run that
+    // just ended pops once.
     return ''
-      + '<div class="agent-detail-run-row" data-run-id="' + escHtml(run.id || '') + '">'
-      +   '<span class="agent-detail-run-status-dot ' + dotMod + '"></span>'
+      + '<div class="agent-detail-run-row' + (settled ? ' lex-run-row--settled' : '') + '" data-run-id="' + escHtml(run.id || '') + '">'
+      +   '<lex-run-status class="agent-detail-run-state" status="' + escHtml(status) + '"' + (settled ? ' settled' : '') + '></lex-run-status>'
       +   '<span class="agent-detail-run-title">' + escHtml(title) + '</span>'
-      +   '<span class="agent-detail-run-status">' + escHtml(label) + '</span>'
       +   '<span class="agent-detail-run-priority ' + pCls + '">' + escHtml(priority) + '</span>'
       +   '<span class="agent-detail-run-time">' + escHtml(run.created_at ? timeAgo(run.created_at) : '') + '</span>'
       + '</div>';
   }
 
-  function loadRuns(state) {
-    if (state.runsLoaded) return;
+  function loadRuns(state, options) {
+    var silent = Boolean(options && options.silent);
+    if (state.runsLoaded && !silent) return;
     if (!window.api || typeof window.api.get !== 'function') return;
 
     var loadingEl = el('agentDetailRunsLoading');
@@ -1169,14 +1145,16 @@
 
     state.runsLoaded = true;
 
-    show(loadingEl);
-    if (listEl) listEl.innerHTML = '';
-    hide(emptyEl);
+    if (!silent) {
+      show(loadingEl);
+      if (listEl) listEl.innerHTML = '';
+      hide(emptyEl);
+    }
 
     var url = '/api/v1/agent-runs?agent_definition_id=' + encodeURIComponent(agentDefinitionId)
             + '&limit=20&sort_by=created_at&sort_order=desc';
 
-    window.api.get(url)
+    return window.api.get(url)
       .then(function (resp) {
         if (state.destroyed) return;
         hide(loadingEl);
@@ -1187,17 +1165,22 @@
 
         if (countEl) countEl.textContent = runs.length + (runs.length === 1 ? ' run' : ' runs');
 
+        var ended = trackRunStates(state, runs);
         if (runs.length === 0) {
+          if (listEl) listEl.innerHTML = '';
           show(emptyEl);
           return;
         }
+        hide(emptyEl);
 
         var html = '';
-        for (var i = 0; i < runs.length; i++) html += renderRunRow(runs[i]);
+        for (var i = 0; i < runs.length; i++) html += renderRunRow(runs[i], ended[String(runs[i].id)]);
         if (listEl) listEl.innerHTML = html;
+        keepRunsLive(state);
       })
       .catch(function (err) {
         if (state.destroyed) return;
+        if (silent) return; // a failed refresh keeps the list already shown
         hide(loadingEl);
         console.error('[agent-detail] Failed to load runs:', err);
         if (countEl) countEl.textContent = '';
@@ -1210,6 +1193,35 @@
         }
         show(emptyEl);
       });
+  }
+
+  // Which runs just ended (LanaRunStatus.trackTransitions, shared with the
+  // automations app); also whether any run is live, for the refresh rhythm.
+  function trackRunStates(state, runs) {
+    var RunStatus = global.LanaRunStatus;
+    var ended = {};
+    if (!RunStatus) return ended;
+    var seen = RunStatus.trackTransitions(state.runStates || null, runs.map(function (run) {
+      return { id: run.id, state: RunStatus.stateOf(run.status) };
+    }));
+    state.runStates = seen.next;
+    seen.ended.forEach(function (entry) { ended[entry.id] = true; });
+    state.runsLive = runs.some(function (run) { return RunStatus.isLive(RunStatus.stateOf(run.status)); });
+    return ended;
+  }
+
+  // The runs list follows along while the Runs tab is open: every few seconds
+  // while a run is live, slower otherwise (shared LanaLivePoller).
+  function keepRunsLive(state) {
+    var Poller = global.LanaLivePoller;
+    if (!Poller || (state.runsPoller && state.runsPoller.running)) return;
+    state.runsPoller = Poller.createLivePoller({
+      intervalMs: 4000,
+      idleIntervalMs: 20000,
+      isActive: function () { return !state.destroyed && state.activeTab === 'runs'; },
+      isLive: function () { return Boolean(state.runsLive); },
+      refresh: function () { return loadRuns(state, { silent: true }); }
+    }).start();
   }
 
   function wireRunsList(ctx, state) {
@@ -2297,6 +2309,7 @@
     var state = rootEl && rootEl._agentDetailState;
     if (!state) return;
     state.destroyed = true;
+    if (state.runsPoller) state.runsPoller.stop();
     if (state._lexReadyHandler) {
       document.removeEventListener('lex-ready', state._lexReadyHandler);
       state._lexReadyHandler = null;

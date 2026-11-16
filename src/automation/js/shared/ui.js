@@ -406,6 +406,50 @@ export function metaGrid(items, className = 'meta-grid') {
   `;
 }
 
+/**
+ * A run status mark (lex-run-status) for a raw status, or for an API
+ * last_run when `lastRun` is given. `settled` marks a run that just ended
+ * (LanaRunStatus.trackTransitions), so it pops once.
+ */
+export function runStatusMark({ status = '', lastRun, time = '', settled = false, bar = false, compact = false } = {}) {
+  const RunStatus = window.LanaRunStatus;
+  let state = status;
+  let when = time;
+  if (lastRun !== undefined && RunStatus) {
+    const summary = RunStatus.lastRunSummary(lastRun);
+    state = summary.state;
+    when = when || summary.time;
+  }
+  return `<lex-run-status status="${escapeAttribute(state)}"${when ? ` time="${escapeAttribute(when)}"` : ''}`
+    + `${settled ? ' settled' : ''}${bar ? ' bar' : ''}${compact ? ' compact' : ''}></lex-run-status>`;
+}
+
+/**
+ * Keep a server-paged table fresh while its view is on screen (shared
+ * LanaLivePoller): every `intervalMs` while `isLive()` answers true, every
+ * `idleIntervalMs` otherwise, paused while the window is hidden. One poller
+ * per store; a re-render replaces it.
+ */
+export function keepServerTableLive({ id, store, isLive, intervalMs = 4000, idleIntervalMs = 15000 }) {
+  if (store.livePoller) store.livePoller.stop();
+  const Poller = window.LanaLivePoller;
+  if (!Poller) return null;
+  store.livePoller = Poller.createLivePoller({
+    intervalMs,
+    idleIntervalMs,
+    isActive: () => Boolean(document.getElementById(id)),
+    isLive: () => Boolean(isLive && isLive()),
+    refresh: () => {
+      const table = document.getElementById(id);
+      if (!table || typeof table.requestServerQuery !== 'function') return null;
+      invalidateServerTable(store);
+      table.requestServerQuery();
+      return store.cache ? store.cache.promise : null;
+    }
+  }).start();
+  return store.livePoller;
+}
+
 export function badge(label, tone = '') {
   const color = tone === 'success'
     ? 'green'

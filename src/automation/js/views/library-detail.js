@@ -1,4 +1,4 @@
-import { badge, drawerSection, emptyState, lexEmpty, metaGrid, surface } from '../shared/ui.js';
+import { badge, drawerSection, emptyState, lexEmpty, metaGrid, runStatusMark, surface } from '../shared/ui.js';
 import { escapeAttribute, escapeHtml, formatDate, formatLabel, getOrganizationTimezone, timeAgo } from '../shared/utils.js';
 import { describeStep, humanizeTrigger, humanizeWhen } from '../shared/step-humanizer.js';
 import { getApiUrl } from '../shared/api-base-url.js';
@@ -393,7 +393,7 @@ function renderRunRow(run, isExpanded, lanaClientUrl) {
     <div class="ld-run-row ${isExpanded ? 'ld-run-row--expanded' : ''}" data-run-id="${escapeAttribute(runId)}">
       <div class="ld-run-row-summary" data-ld-toggle-run="${escapeAttribute(runId)}">
         <div class="ld-run-row-lead">
-          ${badge(formatLabel(status), statusTone(status))}
+          ${runStatusMark({ status, bar: true, settled: Boolean(run._settled) })}
           ${badge(runScope.label, runScope.type === 'organization' ? 'info' : '')}
           ${matterBadge}
           <span class="muted" style="font-size:0.8rem;">${escapeHtml(timeAgo(run.triggered_at || run.started_at))}</span>
@@ -2563,10 +2563,11 @@ export function openRunStream(context, automationId) {
     _runStreamPollFallback = setInterval(async () => {
       const ld = state.libraryDetail;
       if (!ld || ld.activeTab !== 'runs') return;
-      await loadAutomationRuns(context, automationId, ld.runsOffset || 0);
-      renderCurrentView();
+      await refreshRunsLive(context, automationId);
     }, 5000);
   }
+
+  keepExpandedRunLive(context, automationId);
 
   if (typeof EventSource === 'undefined') {
     startPollingFallback();
@@ -2581,8 +2582,7 @@ export function openRunStream(context, automationId) {
     const handleStatusChange = async () => {
       const ld = state.libraryDetail;
       if (!ld || ld.activeTab !== 'runs') return;
-      await loadAutomationRuns(context, automationId, ld.runsOffset || 0);
-      renderCurrentView();
+      await refreshRunsLive(context, automationId);
     };
 
     es.addEventListener('execution.started', handleStatusChange);
@@ -2603,6 +2603,67 @@ export function openRunStream(context, automationId) {
 }
 
 /**
+ * Re-read the run list and, when a run is open, its detail too, so the open
+ * run's steps and logs follow along. Runs that just ended are marked so their
+ * status pops (LanaRunStatus.trackTransitions, shared with the agents app).
+ */
+async function refreshRunsLive(context, automationId) {
+  const ld = context.state.libraryDetail;
+  if (!ld || ld.automationId !== automationId) return;
+  await loadAutomationRuns(context, automationId, ld.runsOffset || 0);
+  markSettledRuns(ld);
+  if (ld.expandedRunId) {
+    try {
+      const payload = await context.fetchJson(`/api/v1/automation/executions/${encodeURIComponent(ld.expandedRunId)}`, {
+        headers: context.authHeaders()
+      });
+      if (payload && typeof payload === 'object' && context.state.libraryDetail === ld) {
+        payload.open_step_details = { ...(ld.openStepDetails || {}) };
+        ld.expandedRunDetail = payload;
+      }
+    } catch (_err) {
+      // Keep the detail already shown; the next refresh tries again.
+    }
+  }
+  context.renderCurrentView();
+}
+
+function markSettledRuns(ld) {
+  const RunStatus = window.LanaRunStatus;
+  if (!RunStatus || !Array.isArray(ld.runs)) return;
+  const seen = RunStatus.trackTransitions(ld.runStates || null, ld.runs.map((run) => ({
+    id: run.execution_id, state: RunStatus.stateOf(run.status)
+  })));
+  ld.runStates = seen.next;
+  const ended = new Set(seen.ended.map((entry) => entry.id));
+  ld.runs.forEach((run) => { run._settled = ended.has(String(run.execution_id)); });
+}
+
+// The stream only reports status changes; while the open run is live its
+// steps move without one, so it is re-read every few seconds until it ends.
+let _expandedRunPoller = null;
+function keepExpandedRunLive(context, automationId) {
+  if (_expandedRunPoller) _expandedRunPoller.stop();
+  const Poller = window.LanaLivePoller;
+  const RunStatus = window.LanaRunStatus;
+  if (!Poller || !RunStatus) return;
+  const ld = () => context.state.libraryDetail;
+  _expandedRunPoller = Poller.createLivePoller({
+    intervalMs: 3000,
+    idleIntervalMs: 10000,
+    isActive: () => Boolean(ld() && ld().automationId === automationId),
+    isLive: () => Boolean(ld() && ld().expandedRunDetail
+      && RunStatus.isLive(RunStatus.stateOf(ld().expandedRunDetail.data && ld().expandedRunDetail.data.status))),
+    refresh: async () => {
+      const current = ld();
+      if (!current || current.activeTab !== 'runs' || !current.expandedRunDetail) return;
+      if (!RunStatus.isLive(RunStatus.stateOf(current.expandedRunDetail.data && current.expandedRunDetail.data.status))) return;
+      await refreshRunsLive(context, automationId);
+    }
+  }).start();
+}
+
+/**
  * Close the active run stream (EventSource or polling fallback).
  * Call this when the detail view unmounts or the tab is switched away.
  */
@@ -2615,6 +2676,10 @@ export function closeRunStream() {
   if (_runStreamPollFallback) {
     clearInterval(_runStreamPollFallback);
     _runStreamPollFallback = null;
+  }
+  if (_expandedRunPoller) {
+    _expandedRunPoller.stop();
+    _expandedRunPoller = null;
   }
 }
 

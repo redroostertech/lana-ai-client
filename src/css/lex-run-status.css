@@ -1,0 +1,304 @@
+/* Lex UI: run status mark and live run trace
+   (js/lex/components/foundation/lex-run-status.js, lex-run-trace.js).
+   Motion ported from LANA Orcestr8's run views: a running run breathes
+   (o-breathe 1.6s) and slides a bar (o-slide 1.4s), a run that just ended
+   pops once (o-pop), new trace steps rise in (o-rise). Reduce Motion keeps
+   every state readable with no movement. Light by default; the existing
+   [data-lex-theme="dark"] hook gives the dark palette. */
+
+:root {
+  --lex-run-running: var(--lex-status-success, #16845b);
+  --lex-run-running-bg: var(--lex-status-success-bg, #e7f4ea);
+  --lex-run-running-text: var(--lex-status-success-text, #1f6b47);
+  --lex-run-succeeded: var(--lex-status-success, #1f7a3e);
+  --lex-run-succeeded-bg: var(--lex-status-success-bg, #e7f4ea);
+  --lex-run-succeeded-text: var(--lex-status-success-text, #1f7a3e);
+  --lex-run-failed: var(--lex-status-danger, #b42318);
+  --lex-run-failed-bg: var(--lex-status-danger-bg, #fdecea);
+  --lex-run-failed-text: var(--lex-status-danger-text, #b42318);
+  --lex-run-waiting: var(--lex-status-warning, #c46a10);
+  --lex-run-waiting-bg: var(--lex-status-warning-bg, #fff4e5);
+  --lex-run-waiting-text: var(--lex-status-warning-text, #8a5300);
+  --lex-run-idle: var(--lex-text-tertiary, #8a8f98);
+  --lex-run-idle-bg: var(--lex-bg-tertiary, #f2f3f5);
+  --lex-run-idle-text: var(--lex-text-secondary, #5b616b);
+  --lex-run-track: var(--lex-bg-tertiary, #eceef1);
+}
+
+[data-lex-theme="dark"] {
+  --lex-run-running: #4cc38a;
+  --lex-run-running-bg: rgba(76, 195, 138, 0.16);
+  --lex-run-running-text: #7fdcae;
+  --lex-run-succeeded: #4cc38a;
+  --lex-run-succeeded-bg: rgba(76, 195, 138, 0.14);
+  --lex-run-succeeded-text: #7fdcae;
+  --lex-run-failed: #f97066;
+  --lex-run-failed-bg: rgba(249, 112, 102, 0.16);
+  --lex-run-failed-text: #fda29b;
+  --lex-run-waiting: #f5b546;
+  --lex-run-waiting-bg: rgba(245, 181, 70, 0.16);
+  --lex-run-waiting-text: #f8cf86;
+  --lex-run-idle: #8f96a3;
+  --lex-run-idle-bg: rgba(255, 255, 255, 0.08);
+  --lex-run-idle-text: #c3c8d0;
+  --lex-run-track: rgba(255, 255, 255, 0.1);
+}
+
+@keyframes lex-run-breathe {
+  0%, 100% { transform: scale(0.9); opacity: 0.2; }
+  50% { transform: scale(1.15); opacity: 0.7; }
+}
+
+@keyframes lex-run-slide {
+  from { left: -40%; }
+  to { left: 100%; }
+}
+
+@keyframes lex-run-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+
+@keyframes lex-run-jiggle {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  50% { transform: translateX(3px); }
+  75% { transform: translateX(-1px); }
+  100% { transform: translateX(0); }
+}
+
+@keyframes lex-run-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes lex-run-pulse {
+  50% { opacity: 0.35; }
+}
+
+/* ── Status mark ─────────────────────────────────────────────────────── */
+
+lex-run-status { display: inline-flex; vertical-align: middle; }
+
+.lex-run-status {
+  --_run-color: var(--lex-run-idle);
+  --_run-bg: var(--lex-run-idle-bg);
+  --_run-text: var(--lex-run-idle-text);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px 2px 6px;
+  border-radius: 999px;
+  background: var(--_run-bg);
+  color: var(--_run-text);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.lex-run-status--running,
+.lex-run-status--queued { --_run-color: var(--lex-run-running); --_run-bg: var(--lex-run-running-bg); --_run-text: var(--lex-run-running-text); }
+.lex-run-status--succeeded { --_run-color: var(--lex-run-succeeded); --_run-bg: var(--lex-run-succeeded-bg); --_run-text: var(--lex-run-succeeded-text); }
+.lex-run-status--failed { --_run-color: var(--lex-run-failed); --_run-bg: var(--lex-run-failed-bg); --_run-text: var(--lex-run-failed-text); }
+.lex-run-status--waiting { --_run-color: var(--lex-run-waiting); --_run-bg: var(--lex-run-waiting-bg); --_run-text: var(--lex-run-waiting-text); }
+
+.lex-run-status__mark {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border-radius: 50%;
+  color: var(--lex-color-white, #fff);
+  background: var(--_run-color);
+}
+
+.lex-run-status__mark svg { width: 10px; height: 10px; }
+
+/* Running and queued: a small dot that breathes inside a ring. */
+.lex-run-status--running .lex-run-status__mark,
+.lex-run-status--queued .lex-run-status__mark,
+.lex-run-status--none .lex-run-status__mark,
+.lex-run-status--unknown .lex-run-status__mark {
+  width: 8px;
+  height: 8px;
+  margin: 3px;
+}
+
+.lex-run-status--running .lex-run-status__mark::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 1.5px solid var(--_run-color);
+  opacity: 0.6;
+  animation: lex-run-breathe 1.6s ease-in-out infinite;
+}
+
+.lex-run-status--queued .lex-run-status__mark { animation: lex-run-pulse 1.2s ease-in-out infinite; }
+
+.lex-run-status--none .lex-run-status__mark { background: transparent; border: 1.5px solid var(--lex-run-idle); }
+
+.lex-run-status__time { font-weight: 500; opacity: 0.8; }
+
+/* The sliding bar sits on its own line under the label. */
+.lex-run-status--with-bar { flex-wrap: wrap; }
+
+.lex-run-status__bar {
+  position: relative;
+  flex-basis: 100%;
+  height: 3px;
+  margin: 1px 0 2px 20px;
+  border-radius: 2px;
+  background: var(--lex-run-track);
+  overflow: hidden;
+}
+
+.lex-run-status__bar span {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--_run-color), transparent);
+  animation: lex-run-slide 1.4s var(--lex-ease-motion-in-out, cubic-bezier(0.42, 0, 0.58, 1)) infinite;
+}
+
+.lex-run-status--compact { padding: 2px; background: transparent; }
+
+/* The moment a run ends: the mark pops and the chip settles with a jiggle. */
+.lex-run-status--settled { animation: lex-run-jiggle 500ms var(--lex-ease-bouncy-spring, cubic-bezier(0.34, 1.56, 0.64, 1)); }
+.lex-run-status--settled .lex-run-status__mark { animation: lex-run-pop 420ms var(--lex-ease-bouncy-spring, cubic-bezier(0.34, 1.56, 0.64, 1)); }
+
+/* ── Live trace ──────────────────────────────────────────────────────── */
+
+.lex-run-trace {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: var(--lex-run-trace-max-height, 420px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lex-run-trace--empty {
+  padding: 12px;
+  font-size: 13px;
+  color: var(--lex-text-secondary);
+}
+
+.lex-run-trace__step {
+  --_run-color: var(--lex-run-idle);
+  position: relative;
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  align-items: start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--lex-text-primary);
+}
+
+/* The rail between marks. */
+.lex-run-trace__step:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 19px;
+  top: 28px;
+  bottom: -6px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--lex-run-track);
+}
+
+.lex-run-trace__step--succeeded { --_run-color: var(--lex-run-succeeded); }
+.lex-run-trace__step--failed { --_run-color: var(--lex-run-failed); }
+.lex-run-trace__step--running,
+.lex-run-trace__step--active { --_run-color: var(--lex-run-running); }
+.lex-run-trace__step--waiting { --_run-color: var(--lex-run-waiting); }
+
+.lex-run-trace__mark {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  color: var(--lex-color-white, #fff);
+  background: var(--_run-color);
+}
+
+.lex-run-trace__mark svg { width: 12px; height: 12px; }
+
+.lex-run-trace__step--queued .lex-run-trace__mark,
+.lex-run-trace__step--unknown .lex-run-trace__mark {
+  background: var(--lex-bg-primary, #fff);
+  border: 2px solid var(--lex-run-track);
+}
+
+.lex-run-trace__step--active { background: var(--lex-run-running-bg); }
+
+.lex-run-trace__step--active .lex-run-trace__mark::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 1.5px solid var(--_run-color);
+  animation: lex-run-breathe 1.6s ease-in-out infinite;
+}
+
+.lex-run-trace__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.lex-run-trace__label { font-weight: 600; }
+.lex-run-trace__step--queued .lex-run-trace__label { color: var(--lex-text-secondary); font-weight: 500; }
+.lex-run-trace__detail { font-size: 12px; color: var(--lex-text-secondary); overflow-wrap: anywhere; }
+.lex-run-trace__step--failed .lex-run-trace__detail { color: var(--lex-run-failed-text); }
+.lex-run-trace__time { font-size: 12px; color: var(--lex-text-secondary); white-space: nowrap; }
+.lex-run-trace__step--active .lex-run-trace__time { color: var(--lex-run-running-text); font-weight: 600; }
+
+.lex-run-trace__bar {
+  position: relative;
+  height: 3px;
+  margin-top: 4px;
+  width: 120px;
+  border-radius: 2px;
+  background: var(--lex-run-track);
+  overflow: hidden;
+}
+
+.lex-run-trace__bar span {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, var(--lex-run-running), transparent);
+  animation: lex-run-slide 1.4s var(--lex-ease-motion-in-out, cubic-bezier(0.42, 0, 0.58, 1)) infinite;
+}
+
+.lex-run-trace__step--new { animation: lex-run-rise 320ms var(--lex-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both; }
+
+/* Rows in any run list may carry these to mark live and just-ended runs. */
+.lex-run-row--settled { animation: lex-run-jiggle 500ms var(--lex-ease-bouncy-spring, cubic-bezier(0.34, 1.56, 0.64, 1)); }
+.lex-run-row--enter { animation: lex-run-rise 280ms var(--lex-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lex-run-status--running .lex-run-status__mark::after,
+  .lex-run-trace__step--active .lex-run-trace__mark::after { animation: none; opacity: 0.6; transform: none; }
+  .lex-run-status--queued .lex-run-status__mark { animation: none; }
+  .lex-run-status__bar span,
+  .lex-run-trace__bar span { animation: none; left: 0; width: 100%; opacity: 0.5; }
+  .lex-run-status--settled,
+  .lex-run-status--settled .lex-run-status__mark,
+  .lex-run-trace__step--new,
+  .lex-run-row--settled,
+  .lex-run-row--enter { animation: none; }
+}

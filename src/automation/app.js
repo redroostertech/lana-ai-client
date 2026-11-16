@@ -369,6 +369,7 @@ function onAppLexClose(event) {
     state.selectedRunArtifactId = null;
     state.selectedRunArtifactDetail = null;
     state.selectedRunArtifactLoading = false;
+    syncAutomationHistory(state.currentView, { replaceHistory: true });
     renderCurrentView();
   }
 
@@ -409,6 +410,7 @@ async function bootstrapApp() {
   renderUserChip();
   setView(state.currentView, { replaceHistory: true });
   await refreshCurrentView();
+  await openLinkedRun();
   // First visit to Automate's Library: show the walkthrough once.
   if (state.currentView === 'library' && window.LanaAppWalkthrough) {
     window.LanaAppWalkthrough.showFirstRun('automate');
@@ -536,22 +538,11 @@ function setView(view, options = {}) {
   renderCurrentView();
 }
 
+// Hash routes (js/shared/automation-routes.js): view names,
+// #automation/<id>, and #run/<executionId> (a run alert's deep link).
 function parseAutomationRouteFromLocation() {
-  if (typeof window === 'undefined') return null;
-  const hash = String(window.location.hash || '').replace(/^#/, '').trim();
-  if (!hash) return null;
-
-  if (hash.startsWith('automation/')) {
-    const automationId = decodeURIComponent(hash.slice('automation/'.length).trim());
-    return automationId ? { view: 'library-detail', automationId } : null;
-  }
-
-  const view = hash.split('?')[0];
-  if (VIEW_DEFINITIONS[view]) {
-    return { view };
-  }
-
-  return null;
+  if (typeof window === 'undefined' || !window.AutomationRoutes) return null;
+  return window.AutomationRoutes.parseAutomationHash(window.location.hash, VIEW_DEFINITIONS);
 }
 
 function applyAutomationRouteState(route) {
@@ -559,16 +550,33 @@ function applyAutomationRouteState(route) {
   if (route.view === 'library-detail' && route.automationId) {
     state.libraryDetail = createLibraryDetailState(route.automationId);
   }
+  if (route.view === 'runs' && (route.runId || null) !== state.selectedRunId) {
+    state.selectedRunId = route.runId || null;
+    state.selectedRunDetail = null;
+    state.selectedRunArtifactId = null;
+    state.selectedRunArtifactDetail = null;
+  }
   state.currentView = route.view;
 }
 
 function buildAutomationHash(view) {
-  if (view === 'library-detail') {
-    const automationId = state.libraryDetail?.automationId;
-    return automationId ? `#automation/${encodeURIComponent(automationId)}` : '#library';
+  return window.AutomationRoutes
+    ? window.AutomationRoutes.buildAutomationHash(view, state, VIEW_DEFINITIONS)
+    : '#library';
+}
+
+// A #run/<id> link names a run whose detail is not loaded yet: load it and
+// open the drawer, or say so when it is gone or not the viewer's to see.
+async function openLinkedRun() {
+  if (state.currentView !== 'runs' || !state.selectedRunId || state.selectedRunDetail) return;
+  const runId = state.selectedRunId;
+  try {
+    await loadRunDetail(runId);
+  } catch (_error) {
+    if (state.selectedRunId === runId) state.selectedRunId = null;
+    flash('That run could not be opened. It may have been removed, or it is not yours to see.', true);
   }
-  if (VIEW_DEFINITIONS[view]) return `#${encodeURIComponent(view)}`;
-  return '#library';
+  renderCurrentView();
 }
 
 function syncAutomationHistory(view, options = {}) {
@@ -615,9 +623,11 @@ function onAutomationPopState() {
     return;
   }
 
-  refreshCurrentView().catch((error) => {
-    flash(error.message || 'Failed to refresh view.', true);
-  });
+  refreshCurrentView()
+    .then(() => openLinkedRun())
+    .catch((error) => {
+      flash(error.message || 'Failed to refresh view.', true);
+    });
 }
 
 function onTopbarMenuAction(event) {
@@ -828,6 +838,7 @@ function renderCurrentView() {
   if (state.currentView === 'home') {
     renderHome(context);
     configureHomeComposer();
+    keepHomeLive();
   }
   if (state.currentView === 'library') renderLibrary(context);
   if (state.currentView === 'library-detail') renderLibraryDetail(context);
@@ -838,6 +849,28 @@ function renderCurrentView() {
   if (state.currentView === 'approvals') renderApprovals(context);
 
   restoreFocusSnapshot(els.viewContent, focusSnapshot);
+}
+
+// While a Home card's automation is running, re-read the automations every
+// few seconds so its status turns to Succeeded or Failed on its own (shared
+// LanaLivePoller; nothing is read while no run is live or Home is not open).
+let homeLivePoller = null;
+function homeHasLiveRun() {
+  const RunStatus = window.LanaRunStatus;
+  return Boolean(RunStatus) && (state.automations || [])
+    .some((automation) => automation.last_run && RunStatus.isLive(RunStatus.stateOf(automation.last_run)));
+}
+function keepHomeLive() {
+  if ((homeLivePoller && homeLivePoller.running) || !window.LanaLivePoller) return;
+  homeLivePoller = window.LanaLivePoller.createLivePoller({
+    intervalMs: 4000,
+    idleIntervalMs: 4000,
+    isActive: () => state.currentView === 'home' && homeHasLiveRun(),
+    refresh: async () => {
+      await loadAutomations();
+      if (state.currentView === 'home') renderCurrentView();
+    }
+  }).start();
 }
 
 /**
@@ -1985,11 +2018,16 @@ async function loadRunDetail(executionId) {
   const payload = await fetchJson(`/api/executions/${executionId}`, {
     headers: authHeaders()
   });
+  const opened = state.selectedRunId !== executionId;
   state.selectedRunId = executionId;
   state.selectedRunDetail = payload || null;
-  state.selectedRunArtifactId = null;
-  state.selectedRunArtifactDetail = null;
-  state.selectedRunArtifactLoading = false;
+  if (opened) {
+    state.selectedRunArtifactId = null;
+    state.selectedRunArtifactDetail = null;
+    state.selectedRunArtifactLoading = false;
+  }
+  // The open run is in the address (#run/<id>), so it can be linked to.
+  if (state.currentView === 'runs') syncAutomationHistory('runs');
 }
 
 async function loadRunArtifact(artifactId) {

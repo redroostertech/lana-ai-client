@@ -281,6 +281,10 @@
     password_reset_request:'<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>',
     password_changed:'<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>',
     login_new_device:'<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>',
+    automation_run_succeeded:'<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>',
+    automation_run_failed:'<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>',
+    agent_run_succeeded:'<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>',
+    agent_run_failed:'<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>',
     heartbeat_report:'<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>'
   };
 
@@ -308,7 +312,11 @@
     document_shared: { bg: 'var(--lex-bg-accent-muted)', text: 'var(--lex-text-accent)' },
     matter_shared:   { bg: 'var(--lex-bg-accent-muted)', text: 'var(--lex-text-accent)' },
     matter_assigned: { bg: 'var(--lex-status-success-bg)', text: 'var(--lex-status-success-text)' },
-    heartbeat_report:{ bg: 'var(--lex-status-info-bg)', text: 'var(--lex-status-info-text)' }
+    heartbeat_report:{ bg: 'var(--lex-status-info-bg)', text: 'var(--lex-status-info-text)' },
+    automation_run_succeeded: { bg: 'var(--lex-status-success-bg)', text: 'var(--lex-status-success-text)' },
+    automation_run_failed: { bg: 'var(--lex-status-danger-bg)', text: 'var(--lex-status-danger-text)' },
+    agent_run_succeeded: { bg: 'var(--lex-status-success-bg)', text: 'var(--lex-status-success-text)' },
+    agent_run_failed: { bg: 'var(--lex-status-danger-bg)', text: 'var(--lex-status-danger-text)' }
   };
 
   var DEFAULT_STYLE = { bg: 'var(--lex-bg-tertiary)', text: 'var(--lex-text-secondary)' };
@@ -987,6 +995,9 @@
 
       // No usable action_url: fall back to the resource reference
       if (rtype === 'task' && rid) return 'my-tasks.html?task=' + encodeURIComponent(rid);
+      // Run alerts open the run in its app.
+      if (rtype === 'automation_run' && rid) return 'automation/index.html#run/' + encodeURIComponent(rid);
+      if (rtype === 'agent_run' && rid) return 'agents/index.html#run/' + encodeURIComponent(rid);
       if (rtype === 'alert_instance') return 'alerts.html';
       return null;
     }
