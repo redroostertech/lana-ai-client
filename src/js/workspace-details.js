@@ -263,13 +263,6 @@
     return parts.join(' ');
   }
 
-  function formatFieldValue(value) {
-    if (value === null || value === undefined) return 'Not set';
-    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-    if (typeof value === 'object') return JSON.stringify(value);
-    return String(value);
-  }
-
   function buildUserChip(person, index) {
     var firstName = person.first_name || 'User';
     var lastInitial = (person.last_name || '')[0] || '';

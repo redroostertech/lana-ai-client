@@ -2710,15 +2710,6 @@
         .replace(/\b\w/g, l => l.toUpperCase());
     }
 
-    // Helper function to format field values
-    function formatFieldValue(value) {
-      if (value === null || value === undefined) return 'N/A';
-      if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-      if (typeof value === 'object') return JSON.stringify(value);
-      if (typeof value === 'string' && value.length > 50) return value.substring(0, 50) + '...';
-      return escapeHtml(String(value));
-    }
-
     // Helper function to create collapsible section
     function createCollapsibleSection(id, title, content, actions = '', isExpanded = true, hasFooter = false, footerContent = '') {
       return `
