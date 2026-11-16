@@ -574,3 +574,39 @@ describe("set-aside guard: within the bridge window (synthetic)", () => {
     expect(guardCheckedParts([{ start: 229.5, end: 260, reason: "phone_call" }], notes, lines)).toHaveLength(1);
   });
 });
+
+describe("key point cap with answered questions (synthetic)", () => {
+  it("keeps the turn-taking when a point has no part number, and an answered question keeps its part", async () => {
+    const { reduceKeyPoints, DEFAULT_SUMMARY_LIMITS } = await import("../../src/summarizer/summaryReducer.js");
+    const { applyQuestionCheck } = await import("../../src/summarizer/questionCheck.js");
+    const drafts = [
+      ...Array.from({ length: 20 }, (_, index) => ({ kind: "summary" as const, text: `Early point ${index} topic ${index * 13}`, sources: [{ start: index, end: index + 1 }], precision: "exact" as const, chunk: 0 })),
+      { kind: "summary" as const, text: "Answered without a part number.", sources: [{ start: 50, end: 51 }], precision: "exact" as const },
+      { kind: "summary" as const, text: "The guardianship fee is 3,500 dollars.", sources: [{ start: 100, end: 101 }], precision: "exact" as const, chunk: 1 },
+    ];
+    expect(reduceKeyPoints(drafts, [], DEFAULT_SUMMARY_LIMITS, 2).keyPoints.map((point) => point.text)).toContain("The guardianship fee is 3,500 dollars.");
+    const question = { kind: "open_question" as const, text: "Who approves the contract?", sources: [{ start: 92, end: 100 }], precision: "exact" as const, chunk: 3 };
+    const plan = { drafts: [[0]], request: { questions: [question.text], speakers: [], lines: { index: 0, estimatedTokens: 0, segments: [{ speaker: "S1", start: 100, end: 108, text: "Our controller approves every contract." }] } } };
+    const answered = applyQuestionCheck([{ question: 0, answer: "The controller approves every contract.", lines: [1] }], plan, [question]);
+    expect(answered[0]).toMatchObject({ kind: "summary", chunk: 3 });
+  });
+});
+
+describe("key point cap prefers figures within a part (synthetic)", () => {
+  it("takes a part's points that hold numbers first", async () => {
+    const { reduceKeyPoints, DEFAULT_SUMMARY_LIMITS } = await import("../../src/summarizer/summaryReducer.js");
+    const point = (text: string, start: number, chunk: number) => ({ kind: "summary" as const, text, sources: [{ start, end: start + 1 }], precision: "exact" as const, chunk });
+    const drafts = [
+      ...["alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india", "juliet", "kilo", "lima", "mike", "november", "oscar", "papa"]
+        .map((word, index) => point(`Early talk about the ${word} project and its ${word} owners.`, index, 0)),
+      point("Payment structure for estates was described in detail.", 100, 1),
+      point("Payment structure for guardianships was described next.", 101, 1),
+      point("Payment structure for trusts was described after that.", 101.5, 1),
+      point("The guardianship fee is 3,500 dollars.", 102, 1),
+    ];
+    // Cap 12 over 2 parts with 16 and 4 points: part 1 gets at most its turns, and the figure is among them.
+    const kept = reduceKeyPoints(drafts, [], { ...DEFAULT_SUMMARY_LIMITS, maxSummaryBullets: 4 }, 1).keyPoints.map((item) => item.text);
+    expect(kept).toHaveLength(4);
+    expect(kept).toContain("The guardianship fee is 3,500 dollars.");
+  });
+});

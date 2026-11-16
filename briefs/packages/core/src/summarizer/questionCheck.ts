@@ -157,7 +157,9 @@ export function applyQuestionCheck(resolutions: readonly QuestionResolution[], p
       return segment === undefined || segment.start < after ? [] : [segment];
     });
     if (cited.length === 0) continue;
-    replaced.set(group[0]!, { kind: "summary", text: answer, sources: spansFor(cited), precision: "exact" });
+    const asked = drafts[group[0]!]!;
+    // The answer keeps the question's transcript part, so the key point cap still takes points from every part.
+    replaced.set(group[0]!, { kind: "summary", text: answer, sources: spansFor(cited), precision: "exact", ...(asked.chunk === undefined ? {} : { chunk: asked.chunk }) });
     for (const index of group.slice(1)) removed.add(index);
   }
   return drafts.flatMap((draft, index) => (removed.has(index) ? [] : [replaced.get(index) ?? draft]));

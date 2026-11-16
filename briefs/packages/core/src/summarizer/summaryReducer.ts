@@ -103,13 +103,18 @@ export function reduceKeyPoints(drafts: readonly DraftPoint[], gaps: readonly No
 /**
  * At most `cap` points. Over the cap, points are taken in turn from each transcript part
  * (first of each part, then second of each...), so the early parts do not crowd out the rest.
- * Without part numbers, the first `cap`.
+ * A point without a part number is taken last in each round (its own group after the parts).
  */
-function capped<T extends { chunk?: number | undefined }>(points: readonly T[], cap: number): T[] {
-  if (points.length <= cap || points.some((point) => point.chunk === undefined)) return points.slice(0, cap);
+function capped<T extends { chunk?: number | undefined; text?: string }>(points: readonly T[], cap: number): T[] {
+  if (points.length <= cap) return [...points];
   const byChunk = new Map<number, T[]>();
-  for (const point of points) byChunk.set(point.chunk!, [...(byChunk.get(point.chunk!) ?? []), point]);
-  const parts = [...byChunk.keys()].sort((a, b) => a - b).map((key) => byChunk.get(key)!);
+  for (const point of points) {
+    const key = point.chunk ?? Number.MAX_SAFE_INTEGER;
+    byChunk.set(key, [...(byChunk.get(key) ?? []), point]);
+  }
+  // Within a part, points that hold a number (amounts, counts, dates) come first: figures are kept.
+  const figuresFirst = (group: T[]): T[] => [...group.filter((point) => hasFigure(point)), ...group.filter((point) => !hasFigure(point))];
+  const parts = [...byChunk.keys()].sort((a, b) => a - b).map((key) => figuresFirst(byChunk.get(key)!));
   const kept = new Set<T>();
   for (let round = 0; kept.size < cap; round += 1) {
     let added = false;
@@ -123,6 +128,10 @@ function capped<T extends { chunk?: number | undefined }>(points: readonly T[], 
     if (!added) break;
   }
   return points.filter((point) => kept.has(point));
+}
+
+function hasFigure(point: { text?: string }): boolean {
+  return /\p{N}/u.test(point.text ?? "");
 }
 
 /** Merged intents (same idempotency key, or same type, same entity and similar titles) and how many the cap removed. */
