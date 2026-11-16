@@ -229,12 +229,23 @@ describe('Data Connectors page wiring', () => {
     expect(page.mapConnectorRow(clio, [clio], []).needs_attention).toBe('no');
   });
 
-  test('the status cell adds a Needs attention badge only for flagged rows', () => {
+  test('a flagged row carries its health reason as plain text (control: a healthy row has none)', async () => {
+    const page = loadPage();
+    await page.loadConnectorHealth();
+    expect(page.mapConnectorRow(clio, [clio], []).attention_reason).toBe('No successful sync in the last day.');
+    const qb = { id: '33333333-4444-4555-8666-777777777777', connector_id: 'qb', name: 'QuickBooks', status: 'connected' };
+    expect(page.mapConnectorRow(qb, [qb], []).attention_reason).toBe('');
+  });
+
+  test('the status cell shows one badge: a flagged connected row shows only Needs attention, with its reason', () => {
     const T = require(path.join(SRC, 'js/shared/connector-table.js'));
     const statuses = { connected: { label: 'Connected', color: 'green' } };
     const render = T.cellRenderers({ statuses }).status;
-    expect(render('connected', { needs_attention: 'yes' })).toContain('label="Needs attention"');
-    expect(render('connected', { needs_attention: 'yes' })).toContain('label="Connected"');
+    const flagged = render('connected', { needs_attention: 'yes', attention_reason: 'The last sync failed.' });
+    expect(flagged).toContain('label="Needs attention"');
+    expect(flagged).not.toContain('label="Connected"');
+    expect((flagged.match(/<lex-badge/g) || []).length).toBe(1);
+    expect(flagged).toContain('title="The last sync failed."');
     expect(render('connected', { needs_attention: 'no' })).not.toContain('Needs attention');
   });
 
@@ -252,15 +263,65 @@ describe('Data Connectors page wiring', () => {
 });
 
 describe('a long attention list', () => {
-  test('shows the first five and says how many more are marked below (control: five or fewer show all)', () => {
-    const conn = (i) => ({ id: 's' + i, connector_id: 'c' + i, name: 'Tool ' + i, status: 'needs_attention', reasons: ['stale_sync'] });
-    const many = H.attentionMarkup(H.healthView({ data: { summary: { needs_attention: 13 }, connections: Array.from({ length: 13 }, (_, i) => conn(i)) } }));
-    expect((many.match(/dc-attention-item/g) || []).length).toBe(5);
+  const conn = (i) => ({ id: 's' + i, connector_id: 'c' + i, name: 'Tool ' + i, status: 'needs_attention', reasons: ['stale_sync'] });
+  const markup = (n, expanded) => H.attentionMarkup(H.healthView({ data: { summary: { needs_attention: n }, connections: Array.from({ length: n }, (_, i) => conn(i)) } }), { expanded });
+
+  test('shows the first five, says "and N more" with a Show all button (control: five or fewer show all, no button)', () => {
+    const many = markup(13);
+    expect((many.match(/class="dc-attention-item"/g) || []).length).toBe(13);
+    expect((many.match(/class="dc-attention-item" hidden/g) || []).length).toBe(8);
     expect(many).toContain('13 connections need a look.');
-    expect(many).toContain('8 more are marked in the list below.');
-    const few = H.attentionMarkup(H.healthView({ data: { summary: { needs_attention: 5 }, connections: Array.from({ length: 5 }, (_, i) => conn(i)) } }));
-    expect((few.match(/dc-attention-item/g) || []).length).toBe(5);
-    expect(few).not.toContain('more');
+    expect(many).toContain('And 8 more.');
+    expect(many).toContain('data-dc-attention-toggle');
+    expect(many).toContain('>Show all 13</lex-btn>');
+    const few = markup(5);
+    expect((few.match(/class="dc-attention-item"/g) || []).length).toBe(5);
+    expect(few).not.toContain('hidden');
+    expect(few).not.toContain('data-dc-attention-toggle');
+  });
+
+  test('expanded shows every item and offers Show fewer', () => {
+    const all = markup(13, true);
+    expect(all).not.toContain(' hidden');
+    expect(all).toContain('>Show fewer</lex-btn>');
+    expect(all).not.toContain('And 8 more.');
+  });
+});
+
+describe('the reason on a row and in the viewer', () => {
+  test('rowAttention gives the reason text for a flagged source (control: healthy or unknown ids give null)', () => {
+    const view = H.healthView(HEALTH);
+    expect(H.rowAttention(view, ['clio', SOURCE_B]).reasonText).toBe('No successful sync in the last day.');
+    expect(H.rowAttention(view, [SOURCE_A]).reasonText).toBe('Not signed in. Connect to keep syncing. Some syncs failed today.');
+    expect(H.rowAttention(view, ['33333333-4444-4555-8666-777777777777'])).toBeNull();
+    expect(H.rowAttention(null, [SOURCE_A])).toBeNull();
+  });
+
+  test('every reason code has a next step, and the first reason picks it', () => {
+    Object.keys(H.REASON_COPY).forEach((code) => {
+      expect(H.nextStepText([code])).toMatch(/\.$/);
+    });
+    expect(H.nextStepText(['auth_expired', 'recent_failures'])).toBe(H.nextStepText(['auth_expired']));
+    expect(H.nextStepText([])).toBe('');
+  });
+
+  test('the viewer notice names the reason and the next step for a flagged source (control: healthy source shows nothing)', () => {
+    const view = H.healthView(HEALTH);
+    const notice = H.viewerNotice(view, SOURCE_A);
+    expect(notice.reason).toBe('Not signed in. Connect to keep syncing. Some syncs failed today.');
+    expect(notice.nextStep).toBe(H.nextStepText(['auth_expired']));
+    const html = H.viewerNoticeMarkup(notice);
+    expect(html).toContain('role="status"');
+    expect(html).toContain('<lex-badge label="Needs attention" color="yellow" size="sm"></lex-badge>');
+    expect(html).toContain(notice.reason);
+    expect(html).toContain(notice.nextStep);
+    expect(H.viewerNotice(view, '33333333-4444-4555-8666-777777777777')).toBeNull();
+    expect(H.viewerNotice(view, '')).toBeNull();
+    expect(H.viewerNoticeMarkup(null)).toBe('');
+  });
+
+  test('viewer notice text is escaped', () => {
+    expect(H.viewerNoticeMarkup({ reason: '<b>x</b>', nextStep: '' })).not.toContain('<b>');
   });
 });
 
@@ -268,5 +329,15 @@ describe('reason copy', () => {
   test('not signed in hides the no-sync reason it explains; other reasons stay (control: stale sync alone still shows)', () => {
     expect(H.reasonList(['auth_expired', 'sync_disabled', 'stale_sync'])).toEqual(['Not signed in. Connect to keep syncing.', 'Syncing is turned off.']);
     expect(H.reasonList(['stale_sync'])).toEqual(['No successful sync in the last day.']);
+  });
+});
+
+describe('connector viewer wiring', () => {
+  test('the viewer loads the health module, has the notice mount and asks for its own source', () => {
+    const html = read('integrations/connector-viewer.html');
+    expect(html).toContain('<script src="../js/shared/connector-health-view.js"></script>');
+    expect(html).toContain('<link rel="stylesheet" href="../css/connector-health-notice.css">');
+    expect(html).toContain('<div id="healthNotice" hidden></div>');
+    expect(html).toMatch(/view\.viewerNotice\(view\.healthView\(await Connectors\.getHealth\(\)\), state\.sourceId\)/);
   });
 });

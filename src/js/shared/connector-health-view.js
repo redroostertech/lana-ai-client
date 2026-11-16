@@ -6,7 +6,8 @@
  *
  * The backend decides health and re-auth. This module only maps its
  * payloads to short copy and markup:
- *   - GET /api/v1/integrations/connectors/health   -> healthView(payload)
+ *   - GET /api/v1/integrations/connectors/health   -> healthView(payload),
+ *     rowAttention (the row badge reason) and viewerNotice (the viewer notice)
  *   - write_access on rows of GET /connectors       -> reauthNotices(rows, dismissed)
  *   - POST /connectors/:slug/instances              -> validateInstanceKey, submitInstance
  *
@@ -25,6 +26,16 @@
     sync_error: 'The last sync failed.',
     stale_sync: 'No successful sync in the last day.',
     recent_failures: 'Some syncs failed today.'
+  };
+  // What to do next, in the words of the connector viewer's tabs. The backend
+  // lists reasons in precedence order, so the first one picks the step.
+  var NEXT_STEP_COPY = {
+    auth_expired: 'Go to Configuration and connect again.',
+    inactive: 'Go to Configuration and turn the connection back on.',
+    sync_disabled: 'Go to Configuration and turn syncing back on.',
+    sync_error: 'Open Execution Logs to see what failed, then run a sync from Run.',
+    stale_sync: 'Run a sync from the Run tab.',
+    recent_failures: 'Open Execution Logs to see what failed.'
   };
   var FALLBACK_REASON = 'Something needs a look.';
   var ATTENTION_LIST_MAX = 5;
@@ -47,6 +58,15 @@
     return out.length ? out : [FALLBACK_REASON];
   }
 
+  /** The next step for a list of reason codes, or '' when none is known. */
+  function nextStepText(codes) {
+    var list = Array.isArray(codes) ? codes : [];
+    for (var i = 0; i < list.length; i += 1) {
+      if (NEXT_STEP_COPY[list[i]]) return NEXT_STEP_COPY[list[i]];
+    }
+    return '';
+  }
+
   /**
    * The health payload ({ success, data } or data) as what the page shows.
    * Only connections the backend marked needs_attention become items.
@@ -59,17 +79,24 @@
       return c && c.id && c.status === 'needs_attention';
     }).map(function (c) {
       var reasons = Array.isArray(c.reasons) ? c.reasons : [];
+      var copy = reasonList(reasons);
       return {
         id: String(c.id),
         connectorId: c.connector_id || '',
         name: c.name || c.connector_id || 'Connection',
         scope: c.scope === 'personal' ? 'personal' : 'organization',
-        reasons: reasonList(reasons),
+        reasons: copy,
+        reasonText: copy.join(' '),
+        nextStep: nextStepText(reasons),
         action: reasons.indexOf('auth_expired') !== -1 ? 'Reconnect' : 'Open'
       };
     });
     var attention = {};
-    items.forEach(function (item) { attention[item.id] = true; });
+    var byId = {};
+    items.forEach(function (item) {
+      attention[item.id] = true;
+      byId[item.id] = item;
+    });
     var needsAttention = typeof summary.needs_attention === 'number' ? summary.needs_attention : items.length;
     return {
       total: typeof summary.total === 'number' ? summary.total : connections.length,
@@ -77,6 +104,7 @@
       needsAttention: needsAttention,
       items: items,
       attention: attention,
+      byId: byId,
       checkedAt: data.checked_at || null
     };
   }
@@ -85,6 +113,25 @@
   function rowNeedsAttention(view, ids) {
     if (!view || !view.attention) return false;
     return (ids || []).some(function (id) { return id != null && view.attention[String(id)] === true; });
+  }
+
+  /** The flagged item for a connector row (its reasonText, nextStep), or null. */
+  function rowAttention(view, ids) {
+    if (!view || !view.byId) return null;
+    var list = ids || [];
+    for (var i = 0; i < list.length; i += 1) {
+      var id = list[i];
+      if (id != null && view.byId[String(id)]) return view.byId[String(id)];
+    }
+    return null;
+  }
+
+  /** What the connector viewer shows for its source: { name, reason, nextStep } or null when healthy. */
+  function viewerNotice(view, sourceId) {
+    if (!sourceId) return null;
+    var item = rowAttention(view, [sourceId]);
+    if (!item) return null;
+    return { name: item.name, reason: item.reasonText, nextStep: item.nextStep };
   }
 
   // ── Google write permission (write_access.needs_reauth) ────────────
@@ -227,15 +274,20 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
-  /** The "Needs attention" summary, or '' when nothing needs attention. */
-  function attentionMarkup(view) {
+  /**
+   * The "Needs attention" summary, or '' when nothing needs attention.
+   * options.expanded shows every item; otherwise the first ATTENTION_LIST_MAX
+   * show and the rest wait behind "Show all".
+   */
+  function attentionMarkup(view, options) {
     if (!view || !view.needsAttention || !view.items.length) return '';
     var count = view.items.length;
-    // A long list would push the connectors far down; the rest carry a row badge.
-    var shown = view.items.slice(0, ATTENTION_LIST_MAX);
-    var more = count - shown.length;
-    var rows = shown.map(function (item) {
-      return '<li class="dc-attention-item">' +
+    var expanded = Boolean(options && options.expanded);
+    // A long list would push the connectors far down, so it starts short.
+    var more = Math.max(0, count - ATTENTION_LIST_MAX);
+    var rows = view.items.map(function (item, index) {
+      var hidden = !expanded && index >= ATTENTION_LIST_MAX ? ' hidden' : '';
+      return '<li class="dc-attention-item"' + hidden + '>' +
         '<div class="dc-attention-text"><strong class="dc-attention-name">' + esc(item.name) + '</strong>' +
         '<span class="dc-attention-reason">' + esc(item.reasons.join(' ')) + '</span></div>' +
         '<lex-btn variant="secondary" size="sm" data-dc-health-open="' + esc(item.id) + '"' +
@@ -246,7 +298,23 @@
       '<lex-badge label="Needs attention" color="yellow" size="sm"></lex-badge>' +
       '<span class="dc-attention-count">' + count + (count === 1 ? ' connection needs a look.' : ' connections need a look.') + '</span>' +
       '</div><ul class="dc-attention-list">' + rows + '</ul>' +
-      (more > 0 ? '<p class="dc-attention-more">' + more + (more === 1 ? ' more is' : ' more are') + ' marked in the list below.</p>' : '');
+      (more > 0
+        ? '<div class="dc-attention-more">' +
+          (expanded ? '' : '<span>And ' + more + ' more.</span>') +
+          '<lex-btn variant="ghost" size="sm" data-dc-attention-toggle aria-expanded="' + (expanded ? 'true' : 'false') + '">' +
+          (expanded ? 'Show fewer' : 'Show all ' + count) + '</lex-btn></div>'
+        : '');
+  }
+
+  /** The connector viewer's notice for a flagged source, or ''. */
+  function viewerNoticeMarkup(notice) {
+    if (!notice) return '';
+    return '<div class="connector-health-notice" role="status">' +
+      '<lex-badge label="Needs attention" color="yellow" size="sm"></lex-badge>' +
+      '<div class="connector-health-notice-text">' +
+      '<p class="connector-health-notice-reason">' + esc(notice.reason || FALLBACK_REASON) + '</p>' +
+      (notice.nextStep ? '<p class="connector-health-notice-step">' + esc(notice.nextStep) + '</p>' : '') +
+      '</div></div>';
   }
 
   /** The permission notices, or '' when there are none. */
@@ -265,12 +333,17 @@
 
   var moduleApi = {
     REASON_COPY: REASON_COPY,
+    NEXT_STEP_COPY: NEXT_STEP_COPY,
     CAPABILITY_COPY: CAPABILITY_COPY,
     DISMISS_STORAGE_KEY: DISMISS_STORAGE_KEY,
     reasonText: reasonText,
     reasonList: reasonList,
     healthView: healthView,
     rowNeedsAttention: rowNeedsAttention,
+    rowAttention: rowAttention,
+    nextStepText: nextStepText,
+    viewerNotice: viewerNotice,
+    viewerNoticeMarkup: viewerNoticeMarkup,
     capabilityText: capabilityText,
     reauthNotices: reauthNotices,
     readDismissed: readDismissed,

@@ -89,3 +89,17 @@
   gap: 6px;
   justify-content: flex-end;
 }
+
+/* The health reason after a Needs attention badge, for screen readers only;
+   sighted users get it as the badge tooltip. */
+.connector-table-sr-only {
+  border: 0;
+  clip: rect(0, 0, 0, 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}

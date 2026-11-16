@@ -11,13 +11,14 @@
  * Each page maps its own connectors to rows of raw values:
  *   { id, pin_key, pinned: 'yes'|'no', name, vendor, description, logo_url,
  *     category, auth_type, scope: 'org'|'user', status, version, created_at,
- *     needs_attention?: 'yes'|'no', _raw }
+ *     needs_attention?: 'yes'|'no', attention_reason?: string, _raw }
  * and supplies its status vocabulary and the Actions cell.
  *
  * Public API (window.LanaConnectorTable, or module.exports in Node):
  *   - COLUMNS, LABELS, SORTABLE_COLUMNS, SEARCH_KEYS, SORT_OPTIONS
  *   - authLabel(value), categoryLabel(value), scopeLabel(value), versionLabel(value)
  *   - columnFilterOptions(rows, statuses)  -> setColumnFilterOptions map
+ *   - statusBadge(statuses, row)           -> the one status badge of a row
  *   - cellRenderers(config)                -> lex-table renderers
  *   - sectionMarkup(config)                -> toolbar + heading + lex-table HTML
  *   - snapshot(table)                      -> restoreQuery() state of a table
@@ -134,6 +135,28 @@
     return (statuses && statuses[value]) || { label: humanize(value), color: 'gray' };
   }
 
+  var ATTENTION_BADGE = { label: 'Needs attention', color: 'yellow' };
+  var ATTENTION_FALLBACK_REASON = 'Something needs a look.';
+
+  /**
+   * The one badge a row shows: { label, color, reason } or null with no status.
+   * A connected row the health check flagged shows Needs attention in place of
+   * Connected, with the reason. Every other status keeps its own badge.
+   */
+  function statusBadge(statuses, row) {
+    var value = row && row.status;
+    if (!value) return null;
+    if (value === 'connected' && row.needs_attention === 'yes') {
+      return {
+        label: ATTENTION_BADGE.label,
+        color: ATTENTION_BADGE.color,
+        reason: String(row.attention_reason || '').trim() || ATTENTION_FALLBACK_REASON
+      };
+    }
+    var info = statusInfo(statuses, value);
+    return { label: info.label, color: info.color || 'gray', reason: '' };
+  }
+
   // Distinct non-empty values of a row field, sorted by their label.
   function distinctOptions(rows, key, labelFn) {
     var seen = {};
@@ -218,13 +241,14 @@
         return '<lex-badge label="' + label + '" color="' + (label === 'Personal' ? 'blue' : 'gray') + '" size="sm"></lex-badge>';
       },
       status: function (value, row) {
-        if (!value) return muted('');
-        var info = statusInfo(statuses, value);
-        // A row the health check flagged keeps its status and adds a second badge.
-        var attention = row && row.needs_attention === 'yes'
-          ? '<lex-badge label="Needs attention" color="yellow" size="sm"></lex-badge>'
-          : '';
-        return '<lex-badge label="' + esc(info.label) + '" color="' + esc(info.color || 'gray') + '" size="sm"></lex-badge>' + attention;
+        var badge = statusBadge(statuses, Object.assign({}, row || {}, { status: value }));
+        if (!badge) return muted('');
+        if (!badge.reason) {
+          return '<lex-badge label="' + esc(badge.label) + '" color="' + esc(badge.color) + '" size="sm"></lex-badge>';
+        }
+        // The reason is the tooltip, and read out after the label.
+        return '<lex-badge label="' + esc(badge.label) + '" color="' + esc(badge.color) + '" size="sm" title="' + esc(badge.reason) + '"></lex-badge>' +
+          '<span class="connector-table-sr-only">' + esc(badge.reason) + '</span>';
       },
       version: function (value) {
         return value ? '<span class="connector-table-text">' + esc(versionLabel(value)) + '</span>' : muted('');
@@ -467,6 +491,7 @@
     scopeLabel: scopeLabel,
     versionLabel: versionLabel,
     columnFilterOptions: columnFilterOptions,
+    statusBadge: statusBadge,
     cellRenderers: cellRenderers,
     sectionMarkup: sectionMarkup,
     snapshot: snapshot,

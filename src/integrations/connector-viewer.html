@@ -161,6 +161,7 @@
     }
   </style>
   <link rel="stylesheet" href="../css/lex-chat.css">
+  <link rel="stylesheet" href="../css/connector-health-notice.css">
 </head>
 <body>
   <lex-loader theme="light"></lex-loader>
@@ -180,6 +181,8 @@
       <lex-breadcrumb id="connectorBreadcrumb" items='[{"label":"Data Connectors","href":"data-connectors.html"},{"label":"Connector"}]'></lex-breadcrumb>
 
       <div id="pageAlert" class="hidden mb-6 rounded-2xl border px-4 py-3 text-sm"></div>
+
+      <div id="healthNotice" hidden></div>
 
       <div id="viewerLoading" class="flex items-center justify-center py-20">
         <div class="flex items-center gap-3 text-gray-600">
@@ -452,6 +455,7 @@
   <script src="../insights/js/record-table-kit.js"></script>
   <script src="js/integration-tables.js"></script>
   <script src="js/connector-viewer-tables.js"></script>
+  <script src="../js/shared/connector-health-view.js"></script>
 
   <script>
     const urlParams = new URLSearchParams(window.location.search);
@@ -7581,12 +7585,28 @@
       window.history.replaceState({}, '', nextUrl);
     }
 
+    // Why the health check flagged this source (GET /connectors/health), if it
+    // did. js/shared/connector-health-view.js holds the copy; a failure shows nothing.
+    async function loadHealthNotice() {
+      const node = document.getElementById('healthNotice');
+      const view = window.LanaConnectorHealthView;
+      if (!node || !view || !state.sourceId || typeof Connectors === 'undefined' || typeof Connectors.getHealth !== 'function') return;
+      try {
+        const notice = view.viewerNotice(view.healthView(await Connectors.getHealth()), state.sourceId);
+        node.innerHTML = view.viewerNoticeMarkup(notice);
+        node.hidden = !notice;
+      } catch (error) {
+        console.warn('[Connector Viewer] Connection health could not be loaded', error && error.message);
+      }
+    }
+
     async function init() {
       try {
         setLoading(true);
         applyPageIdentity();
         await resolveConnectorContext();
         registerElectronOAuthCallbackHandler();
+        loadHealthNotice();
 
         if (!state.iframeOnlyFallback) {
           await loadCatalog();

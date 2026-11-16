@@ -55,6 +55,8 @@
   // Connection health (GET /connectors/health) as healthView() shaped it, or
   // null when it has not loaded or failed. The page works without it.
   var connectorHealth = null;
+  // The summary starts with the first few items; Show all expands it.
+  var attentionExpanded = false;
 
   function resetState() {
     allConnectors = [];
@@ -71,6 +73,7 @@
     connectorTablePromise = null;
     connectorTableStore = { query: null };
     connectorHealth = null;
+    attentionExpanded = false;
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────
@@ -568,6 +571,7 @@
     var raw = normalized.raw || {};
     var pinKey = getConnectorPinKey(connector);
     var category = String(normalized.category || '').toLowerCase();
+    var attention = healthModule() ? healthModule().rowAttention(connectorHealth, [normalized.id, raw.id]) : null;
     return {
       id: String(normalized.id),
       pin_key: pinKey,
@@ -583,7 +587,8 @@
       version: String(normalized.version || '').replace(/^v/i, ''),
       created_at: raw.created_at || raw.installed_at || '',
       update_slug: getConnectorUpdateSlug(connector),
-      needs_attention: healthModule() && healthModule().rowNeedsAttention(connectorHealth, [normalized.id, raw.id]) ? 'yes' : 'no',
+      needs_attention: attention ? 'yes' : 'no',
+      attention_reason: attention ? attention.reasonText : '',
       instance_slug: raw.multi_instance && raw.multi_instance.enabled === true ? String(raw.connector_id || '') : '',
       _raw: raw
     };
@@ -673,7 +678,7 @@
     var mount = document.getElementById('dcAttention');
     var view = healthModule();
     if (!mount) return;
-    var html = view ? view.attentionMarkup(connectorHealth) : '';
+    var html = view ? view.attentionMarkup(connectorHealth, { expanded: attentionExpanded }) : '';
     mount.innerHTML = html;
     if (html) mount.removeAttribute('hidden');
     else mount.setAttribute('hidden', '');
@@ -2009,7 +2014,14 @@
         return;
       }
       var dismiss = el.closest('[data-dc-reauth-dismiss]');
-      if (dismiss) dismissReauthNotice(dismiss.getAttribute('data-dc-reauth-dismiss'));
+      if (dismiss) {
+        dismissReauthNotice(dismiss.getAttribute('data-dc-reauth-dismiss'));
+        return;
+      }
+      if (el.closest('[data-dc-attention-toggle]')) {
+        attentionExpanded = !attentionExpanded;
+        renderHealthSummary();
+      }
     });
 
     // Embedded iframe back-button → dismiss the host modal
