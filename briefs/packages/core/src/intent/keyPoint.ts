@@ -21,6 +21,8 @@ export interface KeyPoint {
   readonly text: string;
   readonly sources: readonly SourceSpan[];
   readonly precision: KeyPointPrecision;
+  /** For a decision: the speaker label (`S1`) of who decided. Wire key `decided_by`, omitted when unknown. */
+  readonly decidedBy?: string | undefined;
 }
 
 /** Mirrors the Swift initializer, which clamps `end` to at least `start`. Decoding does not clamp. */
@@ -42,7 +44,7 @@ export function decodeSourceSpan(value: JsonValue, path: string): SourceSpan {
 }
 
 export function encodeKeyPoint(point: KeyPoint): JsonObject {
-  return { id: point.id, kind: point.kind, text: point.text, sources: point.sources.map(encodeSourceSpan), precision: point.precision };
+  return { id: point.id, kind: point.kind, text: point.text, sources: point.sources.map(encodeSourceSpan), precision: point.precision, decided_by: point.decidedBy };
 }
 
 export function decodeKeyPoint(value: JsonValue, path: string): KeyPoint {
@@ -53,6 +55,7 @@ export function decodeKeyPoint(value: JsonValue, path: string): KeyPoint {
     text: field(object, "text", path, asString),
     sources: field(object, "sources", path, arrayOf(decodeSourceSpan)),
     precision: field(object, "precision", path, (v, p) => asEnum(v, KEY_POINT_PRECISIONS, p)),
+    decidedBy: optional(object, "decided_by", path, asString),
   };
 }
 

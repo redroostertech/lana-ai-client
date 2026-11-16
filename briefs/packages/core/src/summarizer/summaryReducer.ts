@@ -33,6 +33,8 @@ export interface DraftPoint {
   readonly text: string;
   readonly sources: readonly SourceSpan[];
   readonly precision: KeyPointPrecision;
+  /** For a decision: the speaker label of who decided. */
+  readonly decidedBy?: string | undefined;
 }
 
 const WHITESPACE = /^[\s\u0085​]+|[\s\u0085​]+$/gu;
@@ -66,7 +68,7 @@ export function unionSpans(left: readonly SourceSpan[], right: readonly SourceSp
 
 /** Near-identical points of one kind merge (keeping every source), each kind is capped, then numbered `kp-1`... */
 export function reduceKeyPoints(drafts: readonly DraftPoint[], gaps: readonly NotesGap[], limits: SummaryLimits = DEFAULT_SUMMARY_LIMITS): MeetingNotes {
-  const merged: Array<{ kind: KeyPointKind; text: string; sources: SourceSpan[]; precision: KeyPointPrecision }> = [];
+  const merged: Array<{ kind: KeyPointKind; text: string; sources: SourceSpan[]; precision: KeyPointPrecision; decidedBy?: string | undefined }> = [];
   for (const raw of drafts) {
     const text = raw.text.replace(WHITESPACE, "");
     if (text === "" || raw.sources.length === 0) continue;
@@ -75,14 +77,18 @@ export function reduceKeyPoints(drafts: readonly DraftPoint[], gaps: readonly No
       const existing = merged[index]!;
       existing.sources = unionSpans(existing.sources, raw.sources);
       if (raw.precision === "approximate") existing.precision = "approximate";
+      existing.decidedBy ??= raw.decidedBy;
     } else {
-      merged.push({ kind: raw.kind, text, sources: [...raw.sources], precision: raw.precision });
+      merged.push({ kind: raw.kind, text, sources: [...raw.sources], precision: raw.precision, decidedBy: raw.decidedBy });
     }
   }
   const caps: Record<KeyPointKind, number> = { summary: limits.maxSummaryBullets, decision: limits.maxDecisions, open_question: limits.maxOpenQuestions };
   const ordered = KEY_POINT_KINDS.flatMap((kind) =>
     stableSort(merged.filter((point) => point.kind === kind).slice(0, caps[kind]), (a, b) => (a.sources[0]?.start ?? 0) - (b.sources[0]?.start ?? 0)));
-  const keyPoints: KeyPoint[] = ordered.map((point, offset) => ({ id: `kp-${offset + 1}`, kind: point.kind, text: point.text, sources: point.sources, precision: point.precision }));
+  const keyPoints: KeyPoint[] = ordered.map((point, offset) => ({
+    id: `kp-${offset + 1}`, kind: point.kind, text: point.text, sources: point.sources, precision: point.precision,
+    ...(point.kind === "decision" && point.decidedBy !== undefined ? { decidedBy: point.decidedBy } : {}),
+  }));
   return { keyPoints, gaps: [...gaps] };
 }
 

@@ -5,7 +5,7 @@ import type { WorkflowDefinition } from "./kernel.js";
  * (`LanaRuntime/Workflows/*.json`; a test checks they stay equal). Kept in code so the
  * Electron main bundle needs no data files.
  */
-export const WORKFLOW_NAMES = ["ask.answer.v1", "clip.draft.v1", "notes.chunk.v1"] as const;
+export const WORKFLOW_NAMES = ["ask.answer.v1", "clip.draft.v1", "notes.chunk.v1", "notes.questions.v1"] as const;
 export type WorkflowName = (typeof WORKFLOW_NAMES)[number];
 
 const ASK_ANSWER_V1: WorkflowDefinition = {
@@ -57,6 +57,22 @@ const NOTES_CHUNK_V1: WorkflowDefinition = {
   ],
 };
 
+const NOTES_QUESTIONS_V1: WorkflowDefinition = {
+  initial_state: "check",
+  states: [
+    {
+      id: "check",
+      type: "llm_call",
+      sub_prompt: "Check each question against the later lines, in the required format.",
+      temperature: 0.0,
+      output_schema: "lana.notes.questions.v1",
+      retry: { limit: 1 },
+      next: "checked",
+    },
+    { id: "checked", type: "terminal", outcome: "checked" },
+  ],
+};
+
 export function workflowDefinition(name: WorkflowName): WorkflowDefinition {
   switch (name) {
     case "ask.answer.v1":
@@ -65,5 +81,7 @@ export function workflowDefinition(name: WorkflowName): WorkflowDefinition {
       return CLIP_DRAFT_V1;
     case "notes.chunk.v1":
       return NOTES_CHUNK_V1;
+    case "notes.questions.v1":
+      return NOTES_QUESTIONS_V1;
   }
 }

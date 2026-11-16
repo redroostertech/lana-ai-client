@@ -13,6 +13,8 @@ export interface TaskParams {
   readonly detail: string;
   /** Calendar date `YYYY-MM-DD`. */
   readonly dueDate?: string | undefined;
+  /** The spoken words for when ("tonight", "this week"); `dueDate` is resolved from them when it can be. Wire key `due_text`. */
+  readonly dueText?: string | undefined;
   readonly assigneeHint?: string | undefined;
   readonly regarding?: EntityHint | undefined;
 }
@@ -119,6 +121,7 @@ export function encodeParams(params: IntentParams): JsonValue {
         title: params.task.title,
         detail: params.task.detail,
         due_date: params.task.dueDate,
+        due_text: params.task.dueText,
         assignee_hint: params.task.assigneeHint,
         regarding: hint(params.task.regarding),
       };
@@ -155,6 +158,7 @@ export function decodeParams(type: string, value: JsonValue, path: string): Inte
           title: field(object, "title", path, asString),
           detail: field(object, "detail", path, asString),
           dueDate: optional(object, "due_date", path, asString),
+          dueText: optional(object, "due_text", path, asString),
           assigneeHint: optional(object, "assignee_hint", path, asString),
           regarding: optional(object, "regarding", path, decodeEntityHint),
         },

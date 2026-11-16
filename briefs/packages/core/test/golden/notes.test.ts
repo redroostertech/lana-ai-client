@@ -76,6 +76,8 @@ describe("note writer golden vectors (Swift NotesGoldenVectorExportTests)", () =
   it("runs the same notes.chunk.v1 workflow as the Swift bundle", () => {
     const swift = JSON.parse(readFileSync(fileURLToPath(new URL("../../../../fixtures/workflows/notes.chunk.v1.json", import.meta.url)), "utf8")) as unknown;
     expect(workflowDefinition("notes.chunk.v1")).toEqual(swift);
+    const questions = JSON.parse(readFileSync(fileURLToPath(new URL("../../../../fixtures/workflows/notes.questions.v1.json", import.meta.url)), "utf8")) as unknown;
+    expect(workflowDefinition("notes.questions.v1")).toEqual(questions);
     expect(NOTES_SCHEMA).toBe(fixture.schema);
     expect(NOTES_MAX_RESPONSE_TOKENS).toBe(fixture.maximum_response_tokens);
   });
@@ -111,10 +113,10 @@ describe("note writer golden vectors (Swift NotesGoldenVectorExportTests)", () =
       expect(validation.valid, item.reply).toBe(item.valid);
       if (!validation.valid) expect(validation.reason).toBe(item.reason);
       const parsed = parseNotes(item.reply, whole);
-      expect(parsed.points.map((point) => ({ kind: point.kind, text: point.text, lines: [...point.lines] }))).toEqual(item.points);
+      expect(parsed.points.map((point) => ({ kind: point.kind, text: point.text, lines: [...point.lines], decided_by: point.decidedBy ?? null }))).toEqual(item.points);
       expect(parsed.runningSummary).toBe(item.summary);
       expect(parsed.candidates.map((candidate) => ({
-        type: candidate.type, title: candidate.title, body: candidate.body, due_date: candidate.dueDate ?? null, assignee_hint: candidate.assigneeHint ?? null,
+        type: candidate.type, title: candidate.title, body: candidate.body, due_date: candidate.dueDate ?? null, due_text: candidate.dueText ?? null, assignee_hint: candidate.assigneeHint ?? null,
         regarding_name: candidate.regardingName ?? null, confidence: candidate.confidence,
         evidence: candidate.evidence.map((quote) => ({ speaker: quote.speaker, t_start: quote.tStart, t_end: quote.tEnd, quote: quote.quote })),
       }))).toEqual(item.candidates);
