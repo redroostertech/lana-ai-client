@@ -38,10 +38,12 @@ describe("cutting set-aside parts out of exported audio", () => {
     // Two stored parts of 100 frames (about 2.13 s each); set aside 1.0 s to 3.0 s.
     const out = cutSetAsideAudio([part("seg-0.m4a", 100, 0), part("seg-1.m4a", 100, 100)], [{ start: 1.0, end: 3.0 }]);
     const kept = out.flatMap((item) => ids(item.data));
-    const inside = (id: number) => (id + 0.5) * FRAME >= 1.0 && (id + 0.5) * FRAME < 3.0;
+    // Any frame that overlaps the part is taken out, so nothing at the edges leaks.
+    const inside = (id: number) => id * FRAME < 3.0 && (id + 1) * FRAME > 1.0;
     expect(kept).toEqual(Array.from({ length: 200 }, (_, id) => id).filter((id) => !inside(id)));
     const total = out.reduce((sum, item) => sum + parseM4a(item.data).duration, 0);
-    expect(total).toBeCloseTo(aacDuration(200, RATE) - 2.0, 1);
+    expect(total).toBeGreaterThan(aacDuration(200, RATE) - 2.0 - 2 * FRAME);
+    expect(total).toBeLessThanOrEqual(aacDuration(200, RATE) - 2.0);
   });
 
   it("drops a stored part that is all set aside, and returns the original bytes when nothing is", () => {
@@ -69,8 +71,42 @@ describe("silencing set-aside parts in audio sent to a paired phone", () => {
     const parsed = parseM4a(out[0]!.data);
     expect(parsed.frames).toHaveLength(100);
     parsed.frames.forEach((frame, id) => {
-      const inside = (id + 0.5) * FRAME >= 1.0 && (id + 0.5) * FRAME < 1.5;
+      const inside = id * FRAME < 1.5 && (id + 1) * FRAME > 1.0;
       expect(Array.from(frame)).toEqual(inside ? Array.from(SILENT_AAC_MONO_FRAME) : Array.from(frames(100)[id]!));
     });
+  });
+});
+
+describe("audio from the phone's own encoder (Core Audio, synthetic sine)", () => {
+  const coreAudio = new Uint8Array(readFileSync(fileURLToPath(new URL("../../../../fixtures/recording/sine-3s-coreaudio.m4a", import.meta.url))));
+
+  it("reads channels and rate from the decoder config, and the real length without priming and padding", () => {
+    const parsed = parseM4a(coreAudio);
+    expect(parsed.channels).toBe(1);
+    expect(parsed.sampleRate).toBe(RATE);
+    expect(parsed.priming).toBe(2112);
+    expect(parsed.duration).toBeCloseTo(3.0, 3);
+  });
+
+  it("silences instead of cutting, keeping the real length", () => {
+    const out = silenceSetAsideAudio([{ name: "seg.m4a", data: coreAudio }], [{ start: 1, end: 2 }]);
+    const parsed = parseM4a(out[0]!.data);
+    expect(parsed.frames).toHaveLength(parseM4a(coreAudio).frames.length);
+    expect(parsed.duration).toBeCloseTo(3.0, 3);
+  });
+
+  it("places cuts on the real timeline: priming does not push them late across parts", () => {
+    // Two 3 s parts in a row: a cut at 4.0 to 5.0 s is 1.0 to 2.0 s into the second part.
+    const out = cutSetAsideAudio([{ name: "a.m4a", data: coreAudio }, { name: "b.m4a", data: coreAudio }], [{ start: 4.0, end: 5.0 }]);
+    expect(out[0]!.data).toBe(coreAudio);
+    const second = parseM4a(out[1]!.data);
+    expect(second.duration).toBeGreaterThan(1.9);
+    expect(second.duration).toBeLessThan(2.05);
+  });
+
+  it("drops a frame that only partly overlaps a part, so nothing at the edge leaks", () => {
+    // Frame 47 spans 1.0027 to 1.0240 s; frame 46 spans 0.9813 to 1.0027 s and overlaps a cut from 1.0 s.
+    const out = cutSetAsideAudio([part("seg-0.m4a", 100)], [{ start: 1.0, end: 1.5 }]);
+    expect(ids(out[0]!.data)).not.toContain(46);
   });
 });

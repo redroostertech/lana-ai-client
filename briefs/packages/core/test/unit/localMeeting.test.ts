@@ -148,8 +148,9 @@ describe("set-aside parts in audio sent to a paired phone (synthetic)", () => {
     const frames = sent[0]!.audio.flatMap((part) => parseM4a(part.data).frames);
     expect(frames).toHaveLength(200);
     const silent = frames.filter((frame) => Array.from(frame).join() === Array.from(SILENT_AAC_MONO_FRAME).join()).length;
-    expect(silent).toBeGreaterThanOrEqual(46);
-    expect(silent).toBeLessThanOrEqual(47);
+    // 1.0 s to 2.0 s, plus the frames that only overlap an edge.
+    expect(silent).toBeGreaterThanOrEqual(47);
+    expect(silent).toBeLessThanOrEqual(49);
     const stored = rig.store.meetings.audioParts(meeting.id).flatMap((part) => parseM4a(rig.store.meetings.audioData(meeting.id, part.index)).frames);
     expect(stored).toEqual(few);
   });
