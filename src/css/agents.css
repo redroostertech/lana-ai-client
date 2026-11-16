@@ -556,9 +556,9 @@
 
 .agents-home-list {
   overflow: hidden;
-  border: 1px solid var(--lex-border-subtle, #e0e4e0);
+  border: 1px solid var(--lex-border-subtle);
   border-radius: var(--lex-radius-lg, 16px);
-  background: var(--lex-bg-primary, #fff);
+  background: var(--lex-bg-primary);
 }
 
 .agents-home-row {
@@ -569,9 +569,9 @@
   width: 100%;
   padding: 12px 16px;
   border: 0;
-  border-bottom: 1px solid var(--lex-border-subtle, #e6e9e6);
+  border-bottom: 1px solid var(--lex-border-subtle);
   background: transparent;
-  color: var(--lex-text-primary, #171b18);
+  color: var(--lex-text-primary);
   text-align: left;
   cursor: pointer;
   transition: background 150ms ease;
@@ -580,7 +580,7 @@
 
 .agents-home-row--working { grid-template-columns: 36px minmax(0, 1fr) auto; }
 .agents-home-row:last-child { border-bottom: 0; }
-.agents-home-row:hover { background: var(--lex-bg-secondary, #f7f8f6); }
+.agents-home-row:hover { background: var(--lex-bg-secondary); }
 
 .agents-home-row-copy { min-width: 0; }
 
@@ -596,11 +596,11 @@
 
 .agents-home-row-copy small {
   margin-top: 3px;
-  color: var(--lex-text-tertiary, #777e78);
+  color: var(--lex-text-tertiary);
   font-size: 0.7rem;
 }
 
-.agents-home-row-arrow { color: var(--lex-text-tertiary, #8b928c); }
+.agents-home-row-arrow { color: var(--lex-text-tertiary); }
 
 .agents-home-avatar {
   position: relative;
@@ -610,8 +610,8 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: #1e3028;
-  color: #e7f4ed;
+  background: var(--lex-color-brand-900);
+  color: var(--lex-color-brand-50);
   font-size: 0.8rem;
   font-weight: 700;
 }
@@ -623,7 +623,7 @@
   bottom: -3px;
   width: 13px;
   height: 13px;
-  border: 2px solid var(--lex-bg-primary, #fff);
+  border: 2px solid var(--lex-bg-primary);
   border-radius: 50%;
   background: var(--lex-run-waiting);
 }
@@ -649,11 +649,11 @@
   flex-direction: column;
   gap: 4px;
   padding: 18px;
-  color: var(--lex-text-secondary, #626963);
+  color: var(--lex-text-secondary);
   font-size: 0.78rem;
 }
 
-.agents-home-empty strong { color: var(--lex-text-primary, #171b18); font-size: 0.82rem; }
+.agents-home-empty strong { color: var(--lex-text-primary); font-size: 0.82rem; }
 
 .agents-card-run {
   display: flex;
@@ -663,7 +663,7 @@
 }
 
 .agents-card-run-label {
-  color: var(--lex-text-tertiary, #777e78);
+  color: var(--lex-text-tertiary);
   font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0.04em;

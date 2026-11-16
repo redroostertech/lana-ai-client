@@ -33,7 +33,7 @@
     + '<section id="atdJourney" class="atd-journey" aria-labelledby="atdJourneyTitle">'
     +   '<div class="atd-journey-head">'
     +     '<div><span id="atdJourneyKicker" class="atd-journey-kicker">Agent run</span><h2 id="atdJourneyTitle">Preparing the run</h2><p id="atdJourneyDescription">LANA is getting the right context ready.</p></div>'
-    +     '<div id="atdJourneyPulse" class="atd-journey-pulse" data-lex-theme="dark"><lex-run-status compact status="pending"></lex-run-status><div><small>Status</small><strong>Starting</strong></div></div>'
+    +     '<div id="atdJourneyPulse" class="atd-journey-pulse"><lex-run-status compact status="pending"></lex-run-status><div><small>Status</small><strong>Starting</strong></div></div>'
     +   '</div>'
     +   '<ol id="atdJourneyStages" class="atd-journey-stages"></ol>'
     // Keep exports inside their own padded footer so they never collide with
@@ -652,8 +652,7 @@
     setTextValue('atdJourneyKicker', kicker);
     setTextValue('atdJourneyTitle', journey.title);
     setTextValue('atdJourneyDescription', journey.description);
-    // The shared run status mark (lex-run-status), on the dark journey panel:
-    // a live run breathes; the moment it ends (it was live when last drawn)
+    // The shared run status mark (lex-run-status): a live run breathes; the moment it ends (it was live when last drawn)
     // the mark pops once.
     var pulse = el('atdJourneyPulse');
     if (pulse) {
@@ -663,7 +662,6 @@
         && (RunStatus.isLive(state.journeyRunState) || state.journeyRunState === 'waiting') && RunStatus.isEnded(runState));
       if (state) state.journeyRunState = runState;
       pulse.className = 'atd-journey-pulse atd-journey-pulse--' + journey.tone;
-      pulse.setAttribute('data-lex-theme', 'dark');
       pulse.innerHTML = '<lex-run-status compact status="' + escHtml(currentStatus) + '"' + (settled ? ' settled' : '') + '></lex-run-status>'
         + '<div><small>Status</small><strong>' + escHtml(journey.pulse) + '</strong></div>';
     }

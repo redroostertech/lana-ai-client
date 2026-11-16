@@ -3,45 +3,28 @@
    Motion ported from LANA Orcestr8's run views: a running run breathes
    (o-breathe 1.6s) and slides a bar (o-slide 1.4s), a run that just ended
    pops once (o-pop), new trace steps rise in (o-rise). Reduce Motion keeps
-   every state readable with no movement. Light by default; the existing
-   [data-lex-theme="dark"] hook gives the dark palette. */
+   every state readable with no movement. Colors come only from Lex theme
+   tokens (status, text, background), so the marks follow a dark theme when
+   the apps get one; no raw colors here. */
 
 :root {
-  --lex-run-running: var(--lex-status-success, #16845b);
-  --lex-run-running-bg: var(--lex-status-success-bg, #e7f4ea);
-  --lex-run-running-text: var(--lex-status-success-text, #1f6b47);
-  --lex-run-succeeded: var(--lex-status-success, #1f7a3e);
-  --lex-run-succeeded-bg: var(--lex-status-success-bg, #e7f4ea);
-  --lex-run-succeeded-text: var(--lex-status-success-text, #1f7a3e);
-  --lex-run-failed: var(--lex-status-danger, #b42318);
-  --lex-run-failed-bg: var(--lex-status-danger-bg, #fdecea);
-  --lex-run-failed-text: var(--lex-status-danger-text, #b42318);
-  --lex-run-waiting: var(--lex-status-warning, #c46a10);
-  --lex-run-waiting-bg: var(--lex-status-warning-bg, #fff4e5);
-  --lex-run-waiting-text: var(--lex-status-warning-text, #8a5300);
-  --lex-run-idle: var(--lex-text-tertiary, #8a8f98);
-  --lex-run-idle-bg: var(--lex-bg-tertiary, #f2f3f5);
-  --lex-run-idle-text: var(--lex-text-secondary, #5b616b);
-  --lex-run-track: var(--lex-bg-tertiary, #eceef1);
-}
-
-[data-lex-theme="dark"] {
-  --lex-run-running: #4cc38a;
-  --lex-run-running-bg: rgba(76, 195, 138, 0.16);
-  --lex-run-running-text: #7fdcae;
-  --lex-run-succeeded: #4cc38a;
-  --lex-run-succeeded-bg: rgba(76, 195, 138, 0.14);
-  --lex-run-succeeded-text: #7fdcae;
-  --lex-run-failed: #f97066;
-  --lex-run-failed-bg: rgba(249, 112, 102, 0.16);
-  --lex-run-failed-text: #fda29b;
-  --lex-run-waiting: #f5b546;
-  --lex-run-waiting-bg: rgba(245, 181, 70, 0.16);
-  --lex-run-waiting-text: #f8cf86;
-  --lex-run-idle: #8f96a3;
-  --lex-run-idle-bg: rgba(255, 255, 255, 0.08);
-  --lex-run-idle-text: #c3c8d0;
-  --lex-run-track: rgba(255, 255, 255, 0.1);
+  --lex-run-running: var(--lex-status-success);
+  --lex-run-running-bg: var(--lex-status-success-bg);
+  --lex-run-running-text: var(--lex-status-success-text);
+  --lex-run-succeeded: var(--lex-status-success);
+  --lex-run-succeeded-bg: var(--lex-status-success-bg);
+  --lex-run-succeeded-text: var(--lex-status-success-text);
+  --lex-run-failed: var(--lex-status-danger);
+  --lex-run-failed-bg: var(--lex-status-danger-bg);
+  --lex-run-failed-text: var(--lex-status-danger-text);
+  --lex-run-waiting: var(--lex-status-warning);
+  --lex-run-waiting-bg: var(--lex-status-warning-bg);
+  --lex-run-waiting-text: var(--lex-status-warning-text);
+  --lex-run-idle: var(--lex-text-tertiary);
+  --lex-run-idle-bg: var(--lex-bg-tertiary);
+  --lex-run-idle-text: var(--lex-text-secondary);
+  --lex-run-track: var(--lex-bg-tertiary);
+  --lex-run-mark-ink: var(--lex-color-white);
 }
 
 @keyframes lex-run-breathe {
@@ -114,7 +97,7 @@ lex-run-status { display: inline-flex; vertical-align: middle; }
   height: 14px;
   flex: none;
   border-radius: 50%;
-  color: var(--lex-color-white, #fff);
+  color: var(--lex-run-mark-ink);
   background: var(--_run-color);
 }
 
@@ -234,7 +217,7 @@ lex-run-status { display: inline-flex; vertical-align: middle; }
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  color: var(--lex-color-white, #fff);
+  color: var(--lex-run-mark-ink);
   background: var(--_run-color);
 }
 
@@ -242,7 +225,7 @@ lex-run-status { display: inline-flex; vertical-align: middle; }
 
 .lex-run-trace__step--queued .lex-run-trace__mark,
 .lex-run-trace__step--unknown .lex-run-trace__mark {
-  background: var(--lex-bg-primary, #fff);
+  background: var(--lex-bg-primary);
   border: 2px solid var(--lex-run-track);
 }
 
