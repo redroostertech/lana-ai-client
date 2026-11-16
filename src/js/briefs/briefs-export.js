@@ -109,8 +109,110 @@
     });
   }
 
+  // ── Set-aside parts (always left out) ─────────────────
+  // A part LANA or the person set aside (a phone call, another matter) never appears in an
+  // export: its transcript lines and anything citing them are left out, and one line says so.
+
+  const SET_ASIDE_REASONS = { phone_call: 'phone call', side_conversation: 'side conversation', logistics: 'meeting setup', other_matter: 'another matter' };
+
+  function setAsideParts(record) {
+    return (record.setAside || []).filter((part) => part && Number.isFinite(part.start) && Number.isFinite(part.end)).slice().sort((a, b) => a.start - b.start);
+  }
+
+  /** "Set aside: 21:58 to 26:09 (phone call)". */
+  function setAsideLine(part) {
+    return `Set aside: ${M.clock(part.start)} to ${M.clock(part.end)} (${SET_ASIDE_REASONS[part.reason] || 'not part of the meeting'})`;
+  }
+
+  /** More than half of [start, end] lies in a set-aside part (a whole transcript line). */
+  function lineSetAside(record, start, end) {
+    const length = Math.max(end - start, 0.01);
+    return setAsideParts(record).some((part) => Math.min(end, part.end) - Math.max(start, part.start) >= length / 2);
+  }
+
+  /** Any overlap over half a second (a cited span or an action's evidence). */
+  function citesSetAside(record, start, end) {
+    return setAsideParts(record).some((part) => Math.min(end, part.end) - Math.max(start, part.start) > 0.5);
+  }
+
+  /** The transcript in order with each set-aside part as one placeholder: [{ segment } | { part }]. */
+  function transcriptRows(record) {
+    const parts = setAsideParts(record);
+    const shown = new Set();
+    const rows = [];
+    for (const segment of record.transcript || []) {
+      const part = parts.find((item) => {
+        const length = Math.max(segment.end - segment.start, 0.01);
+        return Math.min(segment.end, item.end) - Math.max(segment.start, item.start) >= length / 2;
+      });
+      if (part === undefined) {
+        rows.push({ segment });
+      } else if (!shown.has(part)) {
+        shown.add(part);
+        rows.push({ part });
+      }
+    }
+    return rows;
+  }
+
   function pointsOf(record, kind) {
-    return (record.keyPoints || []).filter((point) => point.kind === kind && String(point.text || '').trim() !== '');
+    return (record.keyPoints || []).filter((point) => point.kind === kind && String(point.text || '').trim() !== ''
+      && !(point.sources || []).some((span) => citesSetAside(record, span.start, span.end)));
+  }
+
+  function actionsOf(record) {
+    return (record.actions || []).filter((action) => {
+      const start = Number.isFinite(action.start) ? action.start : action.at;
+      const end = Number.isFinite(action.end) ? action.end : start;
+      return !citesSetAside(record, start, end);
+    }).sort((a, b) => a.at - b.at);
+  }
+
+  // ── Attribution: cited ranges, owners and due dates ───
+
+  /** "Cited 29:52 to 30:54" (first source start to last source end); "Cited about" when approximate. */
+  function citedText(sources, approximate) {
+    const spans = (sources || []).filter((span) => span && Number.isFinite(span.start));
+    if (spans.length === 0) return '';
+    const start = Math.min(...spans.map((span) => span.start));
+    const end = Math.max(...spans.map((span) => (Number.isFinite(span.end) ? span.end : span.start)));
+    return `Cited ${approximate ? 'about ' : ''}${M.clock(start)} to ${M.clock(end)}`;
+  }
+
+  /** The speaker's name for a label like S2; any other text as written. */
+  function personName(record, who) {
+    const value = String(who == null ? '' : who).trim();
+    if (value === '') return '';
+    const speaker = (record.speakers || []).find((item) => item.id === value);
+    return speaker && String(speaker.name).trim() ? speaker.name : value;
+  }
+
+  /** "Wednesday, November 11, 2026" from YYYY-MM-DD, or "". */
+  function dueDay(date) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(date || ''));
+    if (!match) return '';
+    const day = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    return new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(day);
+  }
+
+  /** "Owner: Omar Haddad. Due: Wednesday, November 11, 2026 (tonight)." or "Owner: not said. No date given." */
+  function ownerDueText(record, action) {
+    const owner = personName(record, action.owner);
+    const day = dueDay(action.dueDate);
+    const spoken = String(action.dueText || '').trim();
+    let due;
+    if (day && spoken) due = `Due: ${day} (${spoken}).`;
+    else if (day) due = `Due: ${day}.`;
+    else if (spoken) due = `Due: ${spoken}.`;
+    else due = 'No date given.';
+    return `Owner: ${owner || 'not said'}. ${due}`;
+  }
+
+  /** A key point's line under its text: the cited range, and who decided for a decision. */
+  function pointMeta(record, point) {
+    const cited = citedText(point.sources, point.precision === 'approximate');
+    const decided = point.kind === 'decision' && point.decidedBy ? ` Decided by ${personName(record, point.decidedBy)}.` : '';
+    return cited ? `${cited}.${decided}` : decided.trim();
   }
 
   function speakerList(record) {
@@ -127,7 +229,9 @@
     const transcript = record.transcript || [];
     const lines = transcript.length === 0
       ? ['No transcript yet.']
-      : transcript.map((segment) => `[${M.clock(segment.start)}] ${speakerName(record, segment.speaker)}: ${String(segment.text || '').trim()}`);
+      : transcriptRows(record).map((row) => (row.part
+        ? setAsideLine(row.part)
+        : `[${M.clock(row.segment.start)}] ${speakerName(record, row.segment.speaker)}: ${String(row.segment.text || '').trim()}`));
     return `${head.filter(Boolean).join('\n')}\n\n${lines.join('\n\n')}\n`;
   }
 
@@ -145,14 +249,19 @@
   <p class="ex-kind">${escape(kindLabel)}</p>
   <h1 class="ex-title">${escape(meetingTitle(record))}</h1>
   <dl class="ex-facts">${facts.map((fact) => `<div class="ex-fact"><dt>${escape(fact.term)}</dt><dd>${escape(fact.value)}</dd></div>`).join('')}</dl>
-</header>`;
+${record.speakersNamed === false ? '  <p class="ex-notice">Speakers have no names yet, so notes say S1, S2 and so on.</p>\n' : ''}</header>`;
   }
 
   function transcriptSection(record) {
     const transcript = record.transcript || [];
     if (transcript.length === 0) return '<section class="ex-section"><h2 class="ex-h2">Transcript</h2><p class="ex-empty">No transcript yet.</p></section>';
     let previous = null;
-    const turns = transcript.map((segment) => {
+    const turns = transcriptRows(record).map((row) => {
+      if (row.part) {
+        previous = null;
+        return `<p class="ex-set-aside">${escape(setAsideLine(row.part))}</p>`;
+      }
+      const segment = row.segment;
       const same = segment.speaker === previous;
       previous = segment.speaker;
       return `<div class="ex-turn${same ? ' is-continued' : ''}">
@@ -164,30 +273,46 @@
   }
 
   function sourceLine(record, point) {
-    const span = (point.sources || [])[0];
-    if (!span) return '';
-    const who = point.precision === 'approximate' || !span.speaker ? 'Around' : `${speakerName(record, span.speaker)},`;
-    return `<span class="ex-point-source">${escape(`${who} ${M.clock(span.start)}`)}</span>`;
+    const meta = pointMeta(record, point);
+    return meta ? `<span class="ex-point-source">${escape(meta)}</span>` : '';
+  }
+
+  function tablesSection(record) {
+    const tables = (record.tables || []).map((table) => Object.assign({}, table, {
+      rows: (table.rows || []).filter(() => !(table.sources || []).every((span) => citesSetAside(record, span.start, span.end))),
+    })).filter((table) => table.rows.length > 0 && (table.columns || []).length > 0);
+    if (tables.length === 0) return '';
+    return `<section class="ex-section"><h2 class="ex-h2">Tables</h2>
+  ${tables.map((table) => `<h3 class="ex-h3">${escape(table.title)}</h3>
+  <table class="ex-table"><thead><tr>${table.columns.map((column) => `<th>${escape(column)}</th>`).join('')}</tr></thead><tbody>${table.rows.map((row) => `<tr>${table.columns.map((_, index) => `<td>${escape(row[index] == null ? '' : row[index])}</td>`).join('')}</tr>`).join('')}</tbody></table>`).join('\n  ')}
+</section>`;
   }
 
   function pointsSections(record) {
-    const sections = GROUPS.map((group) => {
+    const groups = GROUPS.map((group) => {
       const points = pointsOf(record, group.kind);
       if (points.length === 0) return '';
       return `<section class="ex-section"><h2 class="ex-h2">${group.title}</h2>
   <ul class="ex-points">${points.map((point) => `<li class="ex-point is-${escape(point.kind)}"><span class="ex-point-text">${escape(point.text)}</span>${sourceLine(record, point)}</li>`).join('')}</ul>
 </section>`;
     }).filter(Boolean);
-    if (sections.length > 0) return sections.join('\n');
+    const tables = tablesSection(record);
+    const sections = tables ? groups.concat([tables]) : groups;
+    if (groups.length > 0) return sections.join('\n');
     const why = (record.transcript || []).length === 0 ? 'No notes yet. LANA writes them once the transcript is ready.' : 'No AI notes came with this meeting.';
-    return `<section class="ex-section"><h2 class="ex-h2">Key points</h2><p class="ex-empty">${why}</p></section>`;
+    return `<section class="ex-section"><h2 class="ex-h2">Key points</h2><p class="ex-empty">${why}</p></section>${tables ? `\n${tables}` : ''}`;
   }
 
   function actionsSection(record) {
-    const actions = (record.actions || []).slice().sort((a, b) => a.at - b.at);
+    const actions = actionsOf(record);
     if (actions.length === 0) return '<section class="ex-section"><h2 class="ex-h2">Actions</h2><p class="ex-empty">No actions on this meeting.</p></section>';
     return `<section class="ex-section"><h2 class="ex-h2">Actions</h2>
-  <ul class="ex-points">${actions.map((action) => `<li class="ex-point is-action"><span class="ex-point-text">${escape(action.title)}</span><span class="ex-point-source">${escape(`${action.confirmed ? 'Confirmed' : 'Proposed'}, ${M.clock(action.at)}`)}</span></li>`).join('')}</ul>
+  <ul class="ex-points">${actions.map((action) => {
+    const start = Number.isFinite(action.start) ? action.start : action.at;
+    const end = Number.isFinite(action.end) ? action.end : start;
+    const cited = citedText([{ start, end }], false);
+    return `<li class="ex-point is-action"><span class="ex-point-text">${escape(action.title)}</span><span class="ex-point-owner">${escape(ownerDueText(record, action))}</span><span class="ex-point-source">${escape(`${action.confirmed ? 'Confirmed' : 'Proposed'}. ${cited}.`)}</span></li>`;
+  }).join('')}</ul>
 </section>`;
   }
 
@@ -244,6 +369,7 @@
   const api = {
     KINDS, MENU,
     escape, safeName, dateStamp, longDate, fileStem, menuOptions, noteEntries,
+    setAsideLine, ownerDueText, pointMeta, citedText, transcriptRows,
     transcriptText, transcriptHtml, notesHtml, meetingHtml,
     exportRequest, savedMessage, revealLabel,
   };

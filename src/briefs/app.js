@@ -31,7 +31,10 @@
     decision: { icon: 'scale', title: 'Decision', hint: 'LANA drafts a decision from these lines' },
     correct: { icon: 'edit-3', title: 'Correct line', hint: 'Correct this line in place' },
     play: { icon: 'play', title: 'Play', hint: 'Play these lines' },
+    aside: { icon: 'eye-off', title: 'Set aside', hint: 'Keep these lines out of the notes and every export' },
   };
+  /** Why a stretch is set aside, as the clip bar offers it. */
+  const ASIDE_REASONS = ['phone_call', 'side_conversation', 'logistics', 'other_matter'];
 
   const state = {
     meetings: [],
@@ -45,6 +48,12 @@
     correcting: null,
     editingTitle: false,
     editingSpeaker: null,
+    /** The set-aside review list is open. */
+    reviewAside: false,
+    /** The clip bar shows the reasons to set the selection aside. */
+    asideMenu: false,
+    /** "Write notes again" is running for the open meeting. */
+    rewriting: false,
     selectedPoint: null,
     panel: 'keyPoints',
     followAlong: true,
@@ -136,6 +145,18 @@
     }
   }
 
+  /** Like call, for changes that answer null: true when it worked. */
+  async function attempt(fn) {
+    let result = null;
+    try {
+      result = await fn();
+    } catch (_) {
+      result = null;
+    }
+    outcome(result);
+    return Boolean(result && result.ok);
+  }
+
   // ── Meetings (listed in the sidebar by lex-app) ───────
 
   function renderAvailability() {
@@ -192,6 +213,9 @@
     state.current = null;
     state.shared = null;
     state.mergeEdit = null;
+    state.reviewAside = false;
+    state.asideMenu = false;
+    state.rewriting = false;
     closeShare(false);
   }
 
@@ -859,8 +883,10 @@
       els.turns.innerHTML = '<li class="briefs-list-note">No transcript yet.</li>';
       return;
     }
+    const asideLines = M.setAsideLines(record.setAside || [], record.transcript);
     els.turns.innerHTML = record.transcript.map((segment, index) => {
       const clip = positions.get(index);
+      const aside = asideLines.has(index);
       const selected = S.contains(selection, index);
       const classes = ['briefs-turn'];
       if (clip) classes.push('is-clipped', `clip-${clip}`);
@@ -869,6 +895,7 @@
       if (selected && index === S.last(selection)) classes.push('is-selection-last');
       if (highlighted.has(index)) classes.push('is-highlighted');
       if (state.current === index) classes.push('is-current');
+      if (aside) classes.push('is-set-aside');
       const speaker = state.editingSpeaker === index
         ? inlineEdit(speakerName(segment.speaker), 'Speaker name', 'speaker', false).replace('data-inline="speaker"', `data-inline="speaker" data-speaker="${escape(segment.speaker)}"`)
         : `<button type="button" class="briefs-editable briefs-turn-speaker" data-edit-speaker="${index}" title="Rename this speaker everywhere">${escape(speakerName(segment.speaker))}</button>`;
@@ -879,6 +906,7 @@
           <div class="briefs-turn-head">
             ${speaker}
             <span class="briefs-turn-time">${M.clock(segment.start)}</span>
+            ${aside ? '<span class="briefs-turn-aside">Set aside</span>' : ''}
             <button type="button" class="briefs-icon-btn briefs-turn-play" data-play-turn="${index}" data-clip-key="turn-${index}" aria-label="Play this turn"><span class="briefs-play-icon">${icon('play')}</span></button>
           </div>
           ${text}
@@ -898,6 +926,7 @@
 
   function setSelection(next) {
     state.selection = next;
+    state.asideMenu = false;
     if (next !== null) state.correcting = null;
     renderTranscript();
     renderClipBar();
@@ -929,8 +958,12 @@
     const single = S.count(selection) === 1;
     const canPlay = player !== null && player.ready;
     const summary = M.clipSummary(S.count(selection), M.clock(span.start), M.clock(span.end));
-    const actions = [isClip ? 'unhighlight' : 'highlight', 'note', 'action', 'decision'].concat(single ? ['correct'] : [], ['play']);
-    const body = state.drafting !== null
+    const actions = [isClip ? 'unhighlight' : 'highlight', 'note', 'action', 'decision'].concat(single ? ['correct'] : [], ['aside', 'play']);
+    const asideMenu = `<div class="briefs-clipbar-actions" role="group" aria-label="Why set these lines aside">${ASIDE_REASONS.map((reason) => {
+      const label = M.reasonLabel(reason);
+      return `<button type="button" class="briefs-clipbar-action" data-aside-reason="${reason}" aria-label="Set aside as ${label}"><span>${escape(label.charAt(0).toUpperCase() + label.slice(1))}</span></button>`;
+    }).join('')}<button type="button" class="briefs-clipbar-action" data-aside-cancel aria-label="Do not set these lines aside">${icon('x')}<span>Cancel</span></button></div>`;
+    const body = state.asideMenu ? asideMenu : state.drafting !== null
       ? `<div class="briefs-clipbar-drafting" role="status"><lex-spinner size="sm"></lex-spinner><span>${state.drafting === 'action' ? 'LANA is drafting the action' : 'LANA is drafting the decision'}</span></div>`
       : `<div class="briefs-clipbar-actions">${actions.map((action) => {
           const label = CLIP_ACTIONS[action];
@@ -946,6 +979,43 @@
         <button type="button" class="briefs-icon-btn" data-clip-close aria-label="Clear the selection">${icon('x')}</button>
       </div>
       ${body}`;
+  }
+
+  // ── Set-aside parts and writing the notes again ───────
+
+  async function writeNotesAgain() {
+    const id = state.selectedId;
+    if (!recordedHere() || state.rewriting) return;
+    state.rewriting = true;
+    renderSide();
+    Lex.Toast.info('LANA is writing the notes again.');
+    const done = await attempt(() => bridge().recording.writeNotes(id));
+    state.rewriting = false;
+    if (state.selectedId !== id) return;
+    if (done) Lex.Toast.success('Notes written again.');
+    await loadMeeting(id, true);
+  }
+
+  async function setAsideSelection(reason) {
+    const selection = state.selection;
+    if (selection === null) return;
+    const id = state.selectedId;
+    state.asideMenu = false;
+    setSelection(null);
+    const done = await attempt(() => bridge().records.setAside(id, S.first(selection), S.last(selection), reason));
+    if (!done) return;
+    await loadMeeting(id, true);
+    if (recordedHere()) writeNotesAgain();
+    else Lex.Toast.success('Set aside. Those lines are out of every export.');
+  }
+
+  async function restoreAside(start) {
+    const id = state.selectedId;
+    const done = await attempt(() => bridge().records.restoreSetAside(id, start));
+    if (!done) return;
+    await loadMeeting(id, true);
+    if (recordedHere()) writeNotesAgain();
+    else Lex.Toast.success('Restored. Those lines are back in the transcript and exports.');
   }
 
   /** LANA drafts it in the background; it lands in the inbox. Nothing here waits for the model. */
@@ -998,6 +1068,10 @@
       case 'play':
         if (player && player.ready) player.playFrom(state.record.transcript[firstLine].start);
         return;
+      case 'aside':
+        state.asideMenu = true;
+        renderClipBar();
+        return;
       default:
     }
   }
@@ -1037,7 +1111,50 @@
     }
   }
 
+  function recordedHere() {
+    return Boolean(state.record && state.record.attestationMethod === 'recordedHere');
+  }
+
+  /** "Speakers have no names yet" with Write notes again on a meeting recorded here. */
+  function speakersHtml() {
+    const notice = M.speakersNotice(state.record, recordedHere());
+    if (!notice) return '';
+    const button = recordedHere()
+      ? `<lex-btn variant="secondary" size="sm" leading-icon="refresh-cw" data-write-notes ${state.rewriting ? 'disabled' : ''}>${state.rewriting ? 'Writing notes' : 'Write notes again'}</lex-btn>`
+      : '';
+    return `<section class="briefs-points-group briefs-notice" aria-label="Speaker names"><p class="briefs-notice-text">${icon('users')}<span>${escape(notice)}</span></p>${button}</section>`;
+  }
+
+  /** "LANA set aside 2 parts, 7 minutes" with a review list: play or restore each part. */
+  function setAsideHtml() {
+    const parts = state.record.setAside || [];
+    if (parts.length === 0) return '';
+    const list = state.reviewAside ? `<ul class="briefs-aside-list">${parts.map((part) => `<li class="briefs-aside-row">
+        <button type="button" class="briefs-aside-play" data-seek="${part.start}" aria-label="Go to ${escape(M.setAsideLabel(part))}">${icon('play')}<span>${escape(M.setAsideLabel(part))}</span></button>
+        <lex-btn variant="ghost" size="sm" data-restore-aside="${part.start}" aria-label="Restore ${escape(M.setAsideLabel(part))}">Restore</lex-btn>
+      </li>`).join('')}</ul><p class="briefs-list-note">Set-aside parts stay out of the notes, actions and every export. Restore a part to put it back${recordedHere() ? ' and write the notes again' : ''}.</p>` : '';
+    return `<section class="briefs-points-group briefs-aside" aria-label="Set aside">
+        <div class="briefs-aside-head"><p class="briefs-aside-summary">${icon('eye-off')}<span>${escape(M.setAsideSummary(parts))}</span></p>
+        <lex-btn variant="ghost" size="sm" data-review-aside aria-expanded="${state.reviewAside}">${state.reviewAside ? 'Hide' : 'Review'}</lex-btn></div>
+        ${list}
+      </section>`;
+  }
+
+  function tablesHtml() {
+    const tables = state.record.tables || [];
+    if (tables.length === 0) return '';
+    return `<section class="briefs-points-group" aria-label="Tables"><p class="briefs-overline">Tables</p>${tables.map((table) => `<div class="briefs-table-wrap">
+        <p class="briefs-table-title">${escape(table.title)}</p>
+        <table class="briefs-table"><thead><tr>${table.columns.map((column) => `<th scope="col">${escape(column)}</th>`).join('')}</tr></thead>
+        <tbody>${table.rows.map((row) => `<tr>${table.columns.map((_, index) => `<td>${escape(row[index] == null ? '' : row[index])}</td>`).join('')}</tr>`).join('')}</tbody></table>
+      </div>`).join('')}</section>`;
+  }
+
   function keyPointsHtml() {
+    return speakersHtml() + setAsideHtml() + keyPointGroupsHtml() + tablesHtml();
+  }
+
+  function keyPointGroupsHtml() {
     const record = state.record;
     if (record.keyPoints.length === 0 && record.gaps.length === 0) {
       return `<section class="briefs-points-group"><p class="briefs-overline">Key points</p><p class="briefs-list-note">${record.transcript.length === 0 ? 'No notes yet. LANA writes them once the transcript is ready.' : 'No AI notes came with this meeting. The transcript is complete.'}</p></section>`;
@@ -1053,6 +1170,7 @@
                 const title = sourceTitle(span, point);
                 return `<button type="button" class="briefs-source${point.precision === 'approximate' ? ' is-approximate' : ''}" data-source="${escape(point.id)}" data-source-index="${index}" data-clip-key="source-${escape(point.id)}-${index}" aria-label="Play ${escape(title)}"><span class="briefs-play-icon">${icon('play')}</span><span>${escape(title)}</span></button>`;
               }).join('')}</div>
+              ${M.decidedByText(record, point) ? `<p class="briefs-point-decider">${escape(M.decidedByText(record, point))}</p>` : ''}
               ${point.kind === 'openQuestion' ? `<div class="briefs-point-question">${questionHtml(point)}</div>` : ''}
             </div>`).join('')}
         </section>`;
@@ -1647,6 +1765,25 @@
       return;
     }
     if (target.closest('[data-clip-close]')) return setSelection(null);
+    const reason = target.closest('[data-aside-reason]');
+    if (reason) return setAsideSelection(reason.dataset.asideReason);
+    if (target.closest('[data-aside-cancel]')) {
+      state.asideMenu = false;
+      renderClipBar();
+      return;
+    }
+    if (target.closest('[data-review-aside]')) {
+      state.reviewAside = !state.reviewAside;
+      renderSide();
+      return;
+    }
+    const restore = target.closest('[data-restore-aside]');
+    if (restore) return restoreAside(Number(restore.dataset.restoreAside));
+    const rewrite = target.closest('[data-write-notes]');
+    if (rewrite) {
+      if (!rewrite.hasAttribute('disabled')) writeNotesAgain();
+      return;
+    }
     const point = target.closest('[data-point]');
     if (point) {
       state.selectedPoint = state.selectedPoint === point.dataset.point ? null : point.dataset.point;

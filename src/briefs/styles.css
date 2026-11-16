@@ -793,6 +793,135 @@ body {
   color: var(--briefs-muted);
 }
 
+/* ── Notes fixes: speaker names, set-aside parts, who decided, tables ── */
+
+.briefs-notice {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--bt-surface);
+  box-shadow: inset 0 0 0 1px var(--bt-hairline);
+  justify-items: start;
+}
+
+.briefs-notice-text,
+.briefs-aside-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--briefs-ink);
+}
+
+.briefs-notice-text svg,
+.briefs-aside-summary svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  color: var(--briefs-muted);
+}
+
+.briefs-aside {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--bt-surface);
+  box-shadow: inset 0 0 0 1px var(--bt-hairline);
+}
+
+.briefs-aside-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.briefs-aside-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.briefs-aside-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.briefs-aside-play {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--briefs-ink);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.briefs-aside-play svg {
+  width: 12px;
+  height: 12px;
+  color: var(--bt-accent);
+}
+
+.briefs-point-decider {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--briefs-muted);
+}
+
+.briefs-table-wrap {
+  overflow-x: auto;
+}
+
+.briefs-table-title {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--briefs-ink);
+}
+
+.briefs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  color: var(--briefs-ink);
+}
+
+.briefs-table th,
+.briefs-table td {
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--bt-hairline);
+}
+
+.briefs-table th {
+  font-weight: 600;
+  color: var(--briefs-muted);
+}
+
+.briefs-turn.is-set-aside .briefs-turn-text {
+  color: var(--briefs-muted);
+  font-style: italic;
+}
+
+.briefs-turn-aside {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--briefs-muted);
+  box-shadow: inset 0 0 0 1px var(--bt-hairline);
+}
+
 .briefs-notes {
   display: grid;
   gap: 10px;

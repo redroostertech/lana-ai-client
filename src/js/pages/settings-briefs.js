@@ -137,8 +137,70 @@
     select.value = String(preferences.retentionDays);
   }
 
+  // ── Meeting word list ─────────────────────────────────
+
+  var vocabulary = [];
+
+  function renderVocabulary(list) {
+    var box = el('sv2-briefs-words');
+    if (!box) return;
+    vocabulary = Array.isArray(list) ? list : [];
+    while (box.firstChild) box.removeChild(box.firstChild);
+    var rows = S.vocabularyRows(vocabulary);
+    if (rows.length === 0) {
+      var empty = document.createElement('li');
+      empty.className = 'sv2-briefs-option-description sv2-briefs-words-empty';
+      empty.textContent = 'No names yet.';
+      box.appendChild(empty);
+      return;
+    }
+    rows.forEach(function (row) {
+      var line = document.createElement('li');
+      line.className = 'sv2-briefs-word';
+      var copy = document.createElement('div');
+      copy.className = 'sv2-briefs-option-copy';
+      var name = document.createElement('span');
+      name.className = 'sv2-briefs-option-name';
+      name.textContent = row.term;
+      copy.appendChild(name);
+      if (row.detail) {
+        var detail = document.createElement('span');
+        detail.className = 'sv2-briefs-option-description';
+        detail.textContent = row.detail;
+        copy.appendChild(detail);
+      }
+      var remove = document.createElement('lex-btn');
+      remove.setAttribute('variant', 'ghost');
+      remove.setAttribute('size', 'sm');
+      remove.setAttribute('label', 'Remove');
+      remove.setAttribute('aria-label', 'Remove ' + row.term);
+      remove.setAttribute('data-briefs-word-remove', row.term);
+      line.appendChild(copy);
+      line.appendChild(remove);
+      box.appendChild(line);
+    });
+  }
+
+  function saveVocabulary(list) {
+    apply(function () { return bridge().preferences.setVocabulary(list); }, el('sv2-briefs-words-message'));
+  }
+
+  function addWord() {
+    var term = el('sv2-briefs-word');
+    var heard = el('sv2-briefs-word-heard');
+    var result = S.addVocabularyTerm(vocabulary, term && term.value, heard && heard.value);
+    if (result.error) {
+      setText(el('sv2-briefs-words-message'), result.error);
+      return;
+    }
+    if (term) term.value = '';
+    if (heard) heard.value = '';
+    saveVocabulary(result.list);
+  }
+
   function renderPreferences(preferences) {
     if (!preferences) return;
+    renderVocabulary(preferences.vocabulary);
     renderProximity(preferences);
     renderBackground(preferences);
     renderRetention(preferences);
@@ -281,6 +343,16 @@
     });
 
     el('sv2-briefs-models').addEventListener('click', onModelClick);
+
+    el('sv2-briefs-word-add').addEventListener('click', addWord);
+    el('sv2-briefs-word').addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') addWord();
+    });
+    el('sv2-briefs-words').addEventListener('click', function (event) {
+      var button = event.target.closest('[data-briefs-word-remove]');
+      if (!button) return;
+      saveVocabulary(S.removeVocabularyTerm(vocabulary, button.getAttribute('data-briefs-word-remove')));
+    });
     // Model names arrive with the AI card's topology; draw again when they do.
     window.addEventListener('lana-ai-topology', function () { renderModels(null); });
     // And the plan's word on them arrives with Settings > Capabilities.

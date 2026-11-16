@@ -295,8 +295,56 @@
     return parts.length <= NOTE_MAX_LENGTH ? text : parts.slice(0, NOTE_MAX_LENGTH).map((part) => part.segment).join('');
   }
 
+  // ── Set-aside parts, speaker names, who decided (Briefs notes fixes) ──
+
+  const REASONS = { phone_call: 'phone call', side_conversation: 'side conversation', logistics: 'meeting setup', other_matter: 'another matter' };
+
+  function reasonLabel(reason) {
+    return REASONS[reason] || 'not part of the meeting';
+  }
+
+  /** "LANA set aside 2 parts, 7 minutes", or "" when nothing is set aside. */
+  function setAsideSummary(parts) {
+    const list = parts || [];
+    if (list.length === 0) return '';
+    const seconds = list.reduce((sum, part) => sum + Math.max(0, part.end - part.start), 0);
+    const minutes = Math.max(1, Math.round(seconds / 60));
+    return `LANA set aside ${list.length} ${list.length === 1 ? 'part' : 'parts'}, ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
+  }
+
+  /** "21:58 to 26:09, phone call". */
+  function setAsideLabel(part) {
+    return `${clock(part.start)} to ${clock(part.end)}, ${reasonLabel(part.reason)}`;
+  }
+
+  /** Indices of transcript lines more than half inside a set-aside part. */
+  function setAsideLines(parts, transcript) {
+    const out = new Set();
+    (transcript || []).forEach((segment, index) => {
+      const length = Math.max(segment.end - segment.start, TOLERANCE);
+      if ((parts || []).some((part) => Math.min(segment.end, part.end) - Math.max(segment.start, part.start) >= length / 2)) out.add(index);
+    });
+    return out;
+  }
+
+  /** The line asking for speaker names, or "" when every speaker in the meeting has one. */
+  function speakersNotice(record, recordedHere) {
+    if (!record || record.speakersNamed !== false) return '';
+    return recordedHere
+      ? 'Speakers have no names yet. Name them in the transcript, then write the notes again so they use names.'
+      : 'Speakers have no names yet. Name them in the transcript so notes and exports use names.';
+  }
+
+  /** "Decided by Dana Reyes" for a decision with a decider, else "". */
+  function decidedByText(record, point) {
+    if (!point || point.kind !== 'decision' || !point.decidedBy) return '';
+    const speaker = ((record && record.speakers) || []).find((item) => item.id === point.decidedBy);
+    return `Decided by ${speaker && String(speaker.name).trim() ? speaker.name : point.decidedBy}`;
+  }
+
   const api = {
     SKIP_SECONDS, SPEEDS,
+    reasonLabel, setAsideSummary, setAsideLabel, setAsideLines, speakersNotice, decidedByText,
     clock, duration,
     clipLineIndices, clipPositions,
     selection: { first, last, count, contains, tapLine, extendTo, moveBy, extendBy },
