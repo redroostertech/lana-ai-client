@@ -26,7 +26,7 @@
               "text" : "Okay, I will send the engagement letter today and schedule a follow up call."
             },
             {
-              "end" : 24.050000000000001,
+              "end" : 24.05,
               "speaker" : "S3",
               "start" : 18.5,
               "text" : "We agreed to mediation in December. Can you also check whether the insurance policy covers the warehouse?"
@@ -95,7 +95,7 @@
               "text" : "Okay, I will send the engagement letter today and schedule a follow up call."
             },
             {
-              "end" : 24.050000000000001,
+              "end" : 24.05,
               "speaker" : "S3",
               "start" : 18.5,
               "text" : "We agreed to mediation in December. Can you also check whether the insurance policy covers the warehouse?"
@@ -237,9 +237,262 @@
       "target" : 40
     }
   ],
+  "due_calendar_time_zone" : "America/New_York",
+  "due_words" : [
+    {
+      "date" : "2026-11-11",
+      "meeting_start" : "2026-11-11T19:40:00.000Z",
+      "words" : "tonight"
+    },
+    {
+      "date" : null,
+      "meeting_start" : "2026-11-11T19:40:00.000Z",
+      "words" : "Rough draft TONIGHT"
+    },
+    {
+      "date" : "2026-11-11",
+      "meeting_start" : "2026-11-11T19:40:00.000Z",
+      "words" : "by tonight."
+    },
+    {
+      "date" : "2026-11-11",
+      "meeting_start" : "2026-11-11T19:40:00.000Z",
+      "words" : "today"
+    },
+    {
+      "date" : "2026-11-11",
+      "meeting_start" : "2026-11-11T19:40:00.000Z",
+      "words" : "this evening"
+    },
+    {
+      "date" : "2026-11-11",
+      "meeting_start" : "2026-11-11T19:40:00.000Z",
+      "words" : "end of day"
+    },
+    {
+      "date" : "2026-11-11",
+      "meeting_start" : "2026-11-11T19:40:00.000Z",
+      "words" : "EOD"
+    },
+    {
+      "date" : "2026-11-11",
+      "meeting_start" : "2026-11-11T19:40:00.000Z",
+      "words" : "COB"
+    },
+    {
+      "date" : "2026-11-12",
+      "meeting_start" : "2026-11-11T19:40:00.000Z",
+      "words" : "tomorrow"
+    },
+    {
+      "date" : "2026-11-12",
+      "meeting_start" : "2026-11-11T19:40:00.000Z",
+      "words" : "tomorrow night"
+    },
+    {
+      "date" : "2026-11-13",
+      "meeting_start" : "2026-11-11T19:40:00.000Z",
+      "words" : "this week"
+    },
+    {
+      "date" : "2026-11-13",
+      "meeting_start" : "2026-11-11T19:40:00.000Z",
+      "words" : "by the end of the week"
+    },
+    {
+      "date" : "2026-11-13",
+      "meeting_start" : "2026-11-11T19:40:00.000Z",
+      "words" : "end of week"
+    },
+    {
+      "date" : "2026-11-13",
+      "meeting_start" : "2026-11-11T19:40:00.000Z",
+      "words" : "EOW"
+    },
+    {
+      "date" : null,
+      "meeting_start" : "2026-11-11T19:40:00.000Z",
+      "words" : "next week"
+    },
+    {
+      "date" : "2026-11-13",
+      "meeting_start" : "2026-11-11T19:40:00.000Z",
+      "words" : "by Friday"
+    },
+    {
+      "date" : "2026-11-20",
+      "meeting_start" : "2026-11-11T19:40:00.000Z",
+      "words" : "next friday"
+    },
+    {
+      "date" : "2026-11-13",
+      "meeting_start" : "2026-11-11T19:40:00.000Z",
+      "words" : "this Friday"
+    },
+    {
+      "date" : "2026-11-16",
+      "meeting_start" : "2026-11-11T19:40:00.000Z",
+      "words" : "monday morning"
+    },
+    {
+      "date" : "2026-11-18",
+      "meeting_start" : "2026-11-11T19:40:00.000Z",
+      "words" : "Wednesday"
+    },
+    {
+      "date" : "2026-11-15",
+      "meeting_start" : "2026-11-11T19:40:00.000Z",
+      "words" : "sunday"
+    },
+    {
+      "date" : null,
+      "meeting_start" : "2026-11-11T19:40:00.000Z",
+      "words" : "2026-12-01"
+    },
+    {
+      "date" : null,
+      "meeting_start" : "2026-11-11T19:40:00.000Z",
+      "words" : "soon"
+    },
+    {
+      "date" : null,
+      "meeting_start" : "2026-11-11T19:40:00.000Z",
+      "words" : "none"
+    },
+    {
+      "date" : null,
+      "meeting_start" : "2026-11-11T19:40:00.000Z",
+      "words" : ""
+    },
+    {
+      "date" : "2026-11-14",
+      "meeting_start" : "2026-11-14T15:00:00.000Z",
+      "words" : "tonight"
+    },
+    {
+      "date" : null,
+      "meeting_start" : "2026-11-14T15:00:00.000Z",
+      "words" : "Rough draft TONIGHT"
+    },
+    {
+      "date" : "2026-11-14",
+      "meeting_start" : "2026-11-14T15:00:00.000Z",
+      "words" : "by tonight."
+    },
+    {
+      "date" : "2026-11-14",
+      "meeting_start" : "2026-11-14T15:00:00.000Z",
+      "words" : "today"
+    },
+    {
+      "date" : "2026-11-14",
+      "meeting_start" : "2026-11-14T15:00:00.000Z",
+      "words" : "this evening"
+    },
+    {
+      "date" : "2026-11-14",
+      "meeting_start" : "2026-11-14T15:00:00.000Z",
+      "words" : "end of day"
+    },
+    {
+      "date" : "2026-11-14",
+      "meeting_start" : "2026-11-14T15:00:00.000Z",
+      "words" : "EOD"
+    },
+    {
+      "date" : "2026-11-14",
+      "meeting_start" : "2026-11-14T15:00:00.000Z",
+      "words" : "COB"
+    },
+    {
+      "date" : "2026-11-15",
+      "meeting_start" : "2026-11-14T15:00:00.000Z",
+      "words" : "tomorrow"
+    },
+    {
+      "date" : "2026-11-15",
+      "meeting_start" : "2026-11-14T15:00:00.000Z",
+      "words" : "tomorrow night"
+    },
+    {
+      "date" : "2026-11-14",
+      "meeting_start" : "2026-11-14T15:00:00.000Z",
+      "words" : "this week"
+    },
+    {
+      "date" : "2026-11-14",
+      "meeting_start" : "2026-11-14T15:00:00.000Z",
+      "words" : "by the end of the week"
+    },
+    {
+      "date" : "2026-11-14",
+      "meeting_start" : "2026-11-14T15:00:00.000Z",
+      "words" : "end of week"
+    },
+    {
+      "date" : "2026-11-14",
+      "meeting_start" : "2026-11-14T15:00:00.000Z",
+      "words" : "EOW"
+    },
+    {
+      "date" : null,
+      "meeting_start" : "2026-11-14T15:00:00.000Z",
+      "words" : "next week"
+    },
+    {
+      "date" : "2026-11-20",
+      "meeting_start" : "2026-11-14T15:00:00.000Z",
+      "words" : "by Friday"
+    },
+    {
+      "date" : "2026-11-27",
+      "meeting_start" : "2026-11-14T15:00:00.000Z",
+      "words" : "next friday"
+    },
+    {
+      "date" : "2026-11-20",
+      "meeting_start" : "2026-11-14T15:00:00.000Z",
+      "words" : "this Friday"
+    },
+    {
+      "date" : "2026-11-16",
+      "meeting_start" : "2026-11-14T15:00:00.000Z",
+      "words" : "monday morning"
+    },
+    {
+      "date" : "2026-11-18",
+      "meeting_start" : "2026-11-14T15:00:00.000Z",
+      "words" : "Wednesday"
+    },
+    {
+      "date" : "2026-11-15",
+      "meeting_start" : "2026-11-14T15:00:00.000Z",
+      "words" : "sunday"
+    },
+    {
+      "date" : null,
+      "meeting_start" : "2026-11-14T15:00:00.000Z",
+      "words" : "2026-12-01"
+    },
+    {
+      "date" : null,
+      "meeting_start" : "2026-11-14T15:00:00.000Z",
+      "words" : "soon"
+    },
+    {
+      "date" : null,
+      "meeting_start" : "2026-11-14T15:00:00.000Z",
+      "words" : "none"
+    },
+    {
+      "date" : null,
+      "meeting_start" : "2026-11-14T15:00:00.000Z",
+      "words" : ""
+    }
+  ],
   "instructions" : {
-    "neutral" : "You are preparing a neutral administrative record of a professional meeting the user recorded. Describing what was discussed is required for the record and is not an endorsement. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one item per line and nothing else, in exactly this format:\nPOINT: summary | 1, 2 | One short sentence about what was discussed.\nPOINT: decision | 3 | One short sentence about a decision clearly made.\nPOINT: question | 4 | One short sentence about a question left open.\nACTION: task | 5 | Short title | One sentence of detail | YYYY-MM-DD, or none | who, or none | client, matter or company, or none\nSUMMARY: Two or three sentences summarizing the meeting so far.\nThe numbers are the L numbers of the lines each item comes from. Write at most 12 points. Only write an ACTION when someone asked for or agreed to it: task (someone must do something), note (record something in the file) or email (someone asked for an email). Write a date only if a specific calendar date was said for that action; otherwise write none.",
-    "standard" : "You take neutral, factual notes of a meeting the user recorded. Summarize what was discussed. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one item per line and nothing else, in exactly this format:\nPOINT: summary | 1, 2 | One short sentence about what was discussed.\nPOINT: decision | 3 | One short sentence about a decision clearly made.\nPOINT: question | 4 | One short sentence about a question left open.\nACTION: task | 5 | Short title | One sentence of detail | YYYY-MM-DD, or none | who, or none | client, matter or company, or none\nSUMMARY: Two or three sentences summarizing the meeting so far.\nThe numbers are the L numbers of the lines each item comes from. Write at most 12 points. Only write an ACTION when someone asked for or agreed to it: task (someone must do something), note (record something in the file) or email (someone asked for an email). Write a date only if a specific calendar date was said for that action; otherwise write none."
+    "neutral" : "You are preparing a neutral administrative record of a professional meeting the user recorded. Describing what was discussed is required for the record and is not an endorsement. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one item per line and nothing else, in exactly this format:\nPOINT: summary | L7, L8 | One short sentence about what was discussed.\nPOINT: decision | L12 | S2 | One short sentence about a decision clearly made.\nPOINT: question | L3 | One short sentence about a question still unanswered at the end of this part.\nACTION: task | L10 | Short title | One sentence of detail | when | who will do it | client, matter or company, or none\nTABLE: Short table title | First column; Second column; Third column\nROW: Short table title | L14 | first value; second value; third value\nASIDE: phone_call | L20, L31\nSUMMARY: Two or three sentences summarizing the meeting so far.\nThe L numbers are the numbers of the transcript lines that contain each item, not a count of your items: cite the line where it was said, not the line before or after it. Never put a | inside a sentence. Write at most 12 points. Keep every amount, percentage, count and duration that was said, written as numbers (750 dollars, 3 percent, 160 cases, two weeks). A decision is a choice the speakers agreed on, or one stated by the person who has the say, about the work discussed. After its L numbers, write the speaker label or name of who decided, or both. These are not decisions: setting up the meeting (screen sharing, audio, links, permissions), a plan a person already had before the meeting, and a request. A promise to do something is an ACTION, not a decision. Leave out a question when a later line in this part answers it. Write an ACTION for each thing someone will do after this point: a speaker says they will do something, a speaker asks or tells another person to do something, or they agree on a next step. Use task (someone must do something), note (record something in the file) or email (someone asked for an email). For who, write the speaker label or name of the person who will do it. For when, write a calendar date YYYY-MM-DD only if one was said; otherwise the speaker's own words for when (tonight, this week, by Friday); otherwise none. When a speaker goes through a list (products, prices, steps, a schedule), write one TABLE line with its columns separated by ; and then one ROW line per item with the same number of values. Write an ASIDE line for a stretch that is not part of this meeting, citing its first and last line: phone_call (someone takes a phone call), side_conversation (talk with someone who is not in the meeting), logistics (getting audio, screens or links working), other_matter (a different client, case or matter). Write no point, action or row from an ASIDE stretch.",
+    "standard" : "You take neutral, factual notes of a meeting the user recorded. Summarize what was discussed. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one item per line and nothing else, in exactly this format:\nPOINT: summary | L7, L8 | One short sentence about what was discussed.\nPOINT: decision | L12 | S2 | One short sentence about a decision clearly made.\nPOINT: question | L3 | One short sentence about a question still unanswered at the end of this part.\nACTION: task | L10 | Short title | One sentence of detail | when | who will do it | client, matter or company, or none\nTABLE: Short table title | First column; Second column; Third column\nROW: Short table title | L14 | first value; second value; third value\nASIDE: phone_call | L20, L31\nSUMMARY: Two or three sentences summarizing the meeting so far.\nThe L numbers are the numbers of the transcript lines that contain each item, not a count of your items: cite the line where it was said, not the line before or after it. Never put a | inside a sentence. Write at most 12 points. Keep every amount, percentage, count and duration that was said, written as numbers (750 dollars, 3 percent, 160 cases, two weeks). A decision is a choice the speakers agreed on, or one stated by the person who has the say, about the work discussed. After its L numbers, write the speaker label or name of who decided, or both. These are not decisions: setting up the meeting (screen sharing, audio, links, permissions), a plan a person already had before the meeting, and a request. A promise to do something is an ACTION, not a decision. Leave out a question when a later line in this part answers it. Write an ACTION for each thing someone will do after this point: a speaker says they will do something, a speaker asks or tells another person to do something, or they agree on a next step. Use task (someone must do something), note (record something in the file) or email (someone asked for an email). For who, write the speaker label or name of the person who will do it. For when, write a calendar date YYYY-MM-DD only if one was said; otherwise the speaker's own words for when (tonight, this week, by Friday); otherwise none. When a speaker goes through a list (products, prices, steps, a schedule), write one TABLE line with its columns separated by ; and then one ROW line per item with the same number of values. Write an ASIDE line for a stretch that is not part of this meeting, citing its first and last line: phone_call (someone takes a phone call), side_conversation (talk with someone who is not in the meeting), logistics (getting audio, screens or links working), other_matter (a different client, case or matter). Write no point, action or row from an ASIDE stretch."
   },
   "long_segment" : [
     {
@@ -249,29 +502,43 @@
       "text" : "The parties discussed the Pemberton deposition schedule at length. The parties discussed the Pemberton deposition schedule at length. The parties discussed the Pemberton deposition schedule at length. The parties discussed the Pemberton deposition schedule at length. The parties discussed the Pemberton deposition schedule at length. The parties discussed the Pemberton deposition schedule at length. and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list and then the witness list."
     }
   ],
-  "maximum_response_tokens" : 1000,
+  "maximum_response_tokens" : 1200,
   "meeting_id" : "mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM",
   "meetings" : [
     {
       "calls" : [
         {
-          "instructions" : "You take neutral, factual notes of a meeting the user recorded. Summarize what was discussed. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one item per line and nothing else, in exactly this format:\nPOINT: summary | 1, 2 | One short sentence about what was discussed.\nPOINT: decision | 3 | One short sentence about a decision clearly made.\nPOINT: question | 4 | One short sentence about a question left open.\nACTION: task | 5 | Short title | One sentence of detail | YYYY-MM-DD, or none | who, or none | client, matter or company, or none\nSUMMARY: Two or three sentences summarizing the meeting so far.\nThe numbers are the L numbers of the lines each item comes from. Write at most 12 points. Only write an ACTION when someone asked for or agreed to it: task (someone must do something), note (record something in the file) or email (someone asked for an email). Write a date only if a specific calendar date was said for that action; otherwise write none.",
+          "instructions" : "You take neutral, factual notes of a meeting the user recorded. Summarize what was discussed. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one item per line and nothing else, in exactly this format:\nPOINT: summary | L7, L8 | One short sentence about what was discussed.\nPOINT: decision | L12 | S2 | One short sentence about a decision clearly made.\nPOINT: question | L3 | One short sentence about a question still unanswered at the end of this part.\nACTION: task | L10 | Short title | One sentence of detail | when | who will do it | client, matter or company, or none\nTABLE: Short table title | First column; Second column; Third column\nROW: Short table title | L14 | first value; second value; third value\nASIDE: phone_call | L20, L31\nSUMMARY: Two or three sentences summarizing the meeting so far.\nThe L numbers are the numbers of the transcript lines that contain each item, not a count of your items: cite the line where it was said, not the line before or after it. Never put a | inside a sentence. Write at most 12 points. Keep every amount, percentage, count and duration that was said, written as numbers (750 dollars, 3 percent, 160 cases, two weeks). A decision is a choice the speakers agreed on, or one stated by the person who has the say, about the work discussed. After its L numbers, write the speaker label or name of who decided, or both. These are not decisions: setting up the meeting (screen sharing, audio, links, permissions), a plan a person already had before the meeting, and a request. A promise to do something is an ACTION, not a decision. Leave out a question when a later line in this part answers it. Write an ACTION for each thing someone will do after this point: a speaker says they will do something, a speaker asks or tells another person to do something, or they agree on a next step. Use task (someone must do something), note (record something in the file) or email (someone asked for an email). For who, write the speaker label or name of the person who will do it. For when, write a calendar date YYYY-MM-DD only if one was said; otherwise the speaker's own words for when (tonight, this week, by Friday); otherwise none. When a speaker goes through a list (products, prices, steps, a schedule), write one TABLE line with its columns separated by ; and then one ROW line per item with the same number of values. Write an ASIDE line for a stretch that is not part of this meeting, citing its first and last line: phone_call (someone takes a phone call), side_conversation (talk with someone who is not in the meeting), logistics (getting audio, screens or links working), other_matter (a different client, case or matter). Write no point, action or row from an ASIDE stretch.",
           "prompt" : "Speakers: S1 is Dana Reyes, S3 is Sofia Marin.\n\nTranscript part 1:\nL1 S1 [0.0-6.2]: Thanks for joining. Let's review the Acme intake and the filing deadline next Friday.\nL2 S2 [6.5-12.0]: I spoke with the client yesterday and they want the draft by Wednesday.\nL3 S1 [12.8-18.0]: Okay, I will send the engagement letter today and schedule a follow up call.\nL4 S3 [18.5-24.1]: We agreed to mediation in December. Can you also check whether the insurance policy covers the warehouse?\nL5 S2 [30.2-36.0]: Please email Sofia the motion draft by November 14.\nL6 S1 [36.5-44.0]: I will file the motion to compel on Friday. We still do not know who pays the expert.\nL7 S3 [44.2-50.0]: Record in the file that the client approved the budget.\nL8 S1 [50.5-58.0]: Last thing, send the engagement letter to Acme Logistics.\n\nWrite the notes for this transcript part, in the required format."
+        },
+        {
+          "instructions" : "You find the lines of a meeting transcript that are not part of this meeting. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one line per stretch and nothing else, in exactly this format:\nASIDE: phone_call | L5-L9\nReasons: phone_call (someone takes a phone call with a person who is not in the meeting), side_conversation (talk with someone who walked in or is not in the meeting, about something else), logistics (getting audio, screens or links working), other_matter (talk about a different client, case, family or matter than the meeting is about). Cite the first and last line of each stretch. If every line is part of the meeting, reply NONE.",
+          "prompt" : "Speakers: S1 is Dana Reyes, S3 is Sofia Marin.\n\nThe meeting is about: Intake reviewed.\n\nTranscript part 1:\nL1 S1 [0.0-6.2]: Thanks for joining. Let's review the Acme intake and the filing deadline next Friday.\nL2 S2 [6.5-12.0]: I spoke with the client yesterday and they want the draft by Wednesday.\nL3 S1 [12.8-18.0]: Okay, I will send the engagement letter today and schedule a follow up call.\nL4 S3 [18.5-24.1]: We agreed to mediation in December. Can you also check whether the insurance policy covers the warehouse?\nL5 S2 [30.2-36.0]: Please email Sofia the motion draft by November 14.\nL6 S1 [36.5-44.0]: I will file the motion to compel on Friday. We still do not know who pays the expert.\nL7 S3 [44.2-50.0]: Record in the file that the client approved the budget.\nL8 S1 [50.5-58.0]: Last thing, send the engagement letter to Acme Logistics.\n\nList the stretches that are not part of this meeting, in the required format, or NONE."
+        },
+        {
+          "instructions" : "You find the lines of a meeting transcript that are not part of this meeting. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one line per stretch and nothing else, in exactly this format:\nASIDE: phone_call | L5-L9\nReasons: phone_call (someone takes a phone call with a person who is not in the meeting), side_conversation (talk with someone who walked in or is not in the meeting, about something else), logistics (getting audio, screens or links working), other_matter (talk about a different client, case, family or matter than the meeting is about). Cite the first and last line of each stretch. If every line is part of the meeting, reply NONE.",
+          "prompt" : "Speakers: S1 is Dana Reyes, S3 is Sofia Marin.\n\nThe meeting is about: Intake reviewed.\n\nTranscript part 1:\nL1 S1 [0.0-6.2]: Thanks for joining. Let's review the Acme intake and the filing deadline next Friday.\nL2 S2 [6.5-12.0]: I spoke with the client yesterday and they want the draft by Wednesday.\nL3 S1 [12.8-18.0]: Okay, I will send the engagement letter today and schedule a follow up call.\nL4 S3 [18.5-24.1]: We agreed to mediation in December. Can you also check whether the insurance policy covers the warehouse?\nL5 S2 [30.2-36.0]: Please email Sofia the motion draft by November 14.\nL6 S1 [36.5-44.0]: I will file the motion to compel on Friday. We still do not know who pays the expert.\nL7 S3 [44.2-50.0]: Record in the file that the client approved the budget.\nL8 S1 [50.5-58.0]: Last thing, send the engagement letter to Acme Logistics.\n\nList the stretches that are not part of this meeting, in the required format, or NONE."
+        },
+        {
+          "instructions" : "You check whether questions raised in a meeting were answered later in the same meeting. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one line per question and nothing else, in exactly this format:\nQ1: answered | 3, 4 | One short sentence stating the answer.\nQ2: open\nWrite answered only when the cited lines clearly answer that question. The numbers are the L numbers of the lines that give the answer. Write open when the lines do not answer it, or only touch on it.",
+          "prompt" : "Speakers: S1 is Dana Reyes, S3 is Sofia Marin.\n\nQuestions:\nQ1: Does the policy cover the warehouse?\n\nLater in the meeting:\nL1 S2 [30.2-36.0]: Please email Sofia the motion draft by November 14.\nL2 S1 [36.5-44.0]: I will file the motion to compel on Friday. We still do not know who pays the expert.\n\nCheck each question against the later lines, in the required format."
+        },
+        {
+          "instructions" : "You check whether questions raised in a meeting were answered later in the same meeting. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one line per question and nothing else, in exactly this format:\nQ1: answered | 3, 4 | One short sentence stating the answer.\nQ2: open\nWrite answered only when the cited lines clearly answer that question. The numbers are the L numbers of the lines that give the answer. Write open when the lines do not answer it, or only touch on it.",
+          "prompt" : "Speakers: S1 is Dana Reyes, S3 is Sofia Marin.\n\nQuestions:\nQ1: Does the policy cover the warehouse?\n\nLater in the meeting:\nL1 S2 [30.2-36.0]: Please email Sofia the motion draft by November 14.\nL2 S1 [36.5-44.0]: I will file the motion to compel on Friday. We still do not know who pays the expert.\n\nCheck each question against the later lines, in the required format."
         }
       ],
       "chunk_count" : 1,
       "dropped" : 1,
       "intents" : [
-        "{\"confidence\":0.7,\"created_at\":\"2026-10-26T07:33:20.000Z\",\"evidence\":[{\"quote\":\"Okay, I will send the engagement letter today and schedule a follow up call.\",\"speaker\":\"S1\",\"t_end\":18,\"t_start\":12.75}],\"id\":\"int_01M5VJ1JG08SXKCNTK3F02JKSM\",\"idempotency_key\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM:task.create:acme-logistics-send-the-engagement-letter\",\"meeting_id\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM\",\"params\":{\"assignee_hint\":\"Dana Reyes\",\"detail\":\"Today\",\"regarding\":{\"kind\":\"matter\",\"name\":\"Acme Logistics\"},\"title\":\"Send the engagement letter\"},\"schema\":\"lana.intent/v1\",\"status\":\"proposed\",\"type\":\"task.create\"}",
-        "{\"confidence\":0.7,\"created_at\":\"2026-10-26T07:33:20.000Z\",\"evidence\":[{\"quote\":\"Last thing, send the engagement letter to Acme Logistics.\",\"speaker\":\"S1\",\"t_end\":58,\"t_start\":50.5}],\"id\":\"int_01M5VJ1JG0G76GPXB99Z55FPBK\",\"idempotency_key\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM:note.log:budget-approved\",\"meeting_id\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM\",\"params\":{\"body\":\"The client approved the budget\",\"subject\":\"Budget approved\"},\"schema\":\"lana.intent/v1\",\"status\":\"proposed\",\"type\":\"note.log\"}"
+        "{\"confidence\":0.7,\"created_at\":\"2026-10-26T07:33:20.000Z\",\"evidence\":[{\"quote\":\"Okay, I will send the engagement letter today and schedule a follow up call.\",\"speaker\":\"S1\",\"t_end\":18,\"t_start\":12.75}],\"id\":\"int_01M5VJ1JG0HGA6Q6JCZYR7ZCEJ\",\"idempotency_key\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM:task.create:acme-logistics-send-the-engagement-letter\",\"meeting_id\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM\",\"params\":{\"assignee_hint\":\"Dana Reyes\",\"detail\":\"Today\",\"regarding\":{\"kind\":\"matter\",\"name\":\"Acme Logistics\"},\"title\":\"Send the engagement letter\"},\"schema\":\"lana.intent/v1\",\"status\":\"proposed\",\"type\":\"task.create\"}",
+        "{\"confidence\":0.7,\"created_at\":\"2026-10-26T07:33:20.000Z\",\"evidence\":[{\"quote\":\"Record in the file that the client approved the budget.\",\"speaker\":\"S3\",\"t_end\":50,\"t_start\":44.25}],\"id\":\"int_01M5VJ1JG0Z67FNKJDWNR489P0\",\"idempotency_key\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM:note.log:budget-approved\",\"meeting_id\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM\",\"params\":{\"body\":\"The client approved the budget\",\"subject\":\"Budget approved\"},\"schema\":\"lana.intent/v1\",\"status\":\"proposed\",\"type\":\"note.log\"}"
       ],
       "max" : 2000,
       "name" : "one_chunk",
       "notes" : "{\"gaps\":[],\"key_points\":[{\"id\":\"kp-1\",\"kind\":\"summary\",\"precision\":\"exact\",\"sources\":[{\"end\":6.25,\"speaker\":\"S1\",\"start\":0},{\"end\":12,\"speaker\":\"S2\",\"start\":6.5}],\"text\":\"The team reviewed the Acme intake.\"},{\"id\":\"kp-2\",\"kind\":\"summary\",\"precision\":\"exact\",\"sources\":[{\"end\":6.25,\"speaker\":\"S1\",\"start\":0}],\"text\":\"Intake.\"},{\"id\":\"kp-3\",\"kind\":\"decision\",\"precision\":\"exact\",\"sources\":[{\"end\":24.05,\"speaker\":\"S3\",\"start\":18.5}],\"text\":\"Mediation in December.\"},{\"id\":\"kp-4\",\"kind\":\"open_question\",\"precision\":\"exact\",\"sources\":[{\"end\":24.05,\"speaker\":\"S3\",\"start\":18.5}],\"text\":\"Does the policy cover the warehouse?\"}]}",
       "retried" : 0,
-      "skipped" : [
-
-      ],
+      "skipped" : [],
       "steps" : [
         {
           "reply" : "POINT: summary | 1, 2 | The team reviewed the Acme intake.\nPOINT: decision | L4 | Mediation in December.\nPOINT: question | 4,4,99 | Does the policy cover the warehouse?\nACTION: task | 3 | Send the engagement letter | Today | none | Dana Reyes | Acme Logistics\nSUMMARY: Intake reviewed.\n**POINT:** summary | 1 | Intake.\n- ACTION: email | 6 | Email the motion draft | Send Sofia the draft | 2026-11-14 | Sofia Marin | none\nACTION: note | 8 | Budget approved | The client approved the budget | none | none | none\nACTION: task | 77 | Invented | x | none | none | none"
@@ -282,34 +549,94 @@
     {
       "calls" : [
         {
-          "instructions" : "You take neutral, factual notes of a meeting the user recorded. Summarize what was discussed. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one item per line and nothing else, in exactly this format:\nPOINT: summary | 1, 2 | One short sentence about what was discussed.\nPOINT: decision | 3 | One short sentence about a decision clearly made.\nPOINT: question | 4 | One short sentence about a question left open.\nACTION: task | 5 | Short title | One sentence of detail | YYYY-MM-DD, or none | who, or none | client, matter or company, or none\nSUMMARY: Two or three sentences summarizing the meeting so far.\nThe numbers are the L numbers of the lines each item comes from. Write at most 12 points. Only write an ACTION when someone asked for or agreed to it: task (someone must do something), note (record something in the file) or email (someone asked for an email). Write a date only if a specific calendar date was said for that action; otherwise write none.",
+          "instructions" : "You take neutral, factual notes of a meeting the user recorded. Summarize what was discussed. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one item per line and nothing else, in exactly this format:\nPOINT: summary | L7, L8 | One short sentence about what was discussed.\nPOINT: decision | L12 | S2 | One short sentence about a decision clearly made.\nPOINT: question | L3 | One short sentence about a question still unanswered at the end of this part.\nACTION: task | L10 | Short title | One sentence of detail | when | who will do it | client, matter or company, or none\nTABLE: Short table title | First column; Second column; Third column\nROW: Short table title | L14 | first value; second value; third value\nASIDE: phone_call | L20, L31\nSUMMARY: Two or three sentences summarizing the meeting so far.\nThe L numbers are the numbers of the transcript lines that contain each item, not a count of your items: cite the line where it was said, not the line before or after it. Never put a | inside a sentence. Write at most 12 points. Keep every amount, percentage, count and duration that was said, written as numbers (750 dollars, 3 percent, 160 cases, two weeks). A decision is a choice the speakers agreed on, or one stated by the person who has the say, about the work discussed. After its L numbers, write the speaker label or name of who decided, or both. These are not decisions: setting up the meeting (screen sharing, audio, links, permissions), a plan a person already had before the meeting, and a request. A promise to do something is an ACTION, not a decision. Leave out a question when a later line in this part answers it. Write an ACTION for each thing someone will do after this point: a speaker says they will do something, a speaker asks or tells another person to do something, or they agree on a next step. Use task (someone must do something), note (record something in the file) or email (someone asked for an email). For who, write the speaker label or name of the person who will do it. For when, write a calendar date YYYY-MM-DD only if one was said; otherwise the speaker's own words for when (tonight, this week, by Friday); otherwise none. When a speaker goes through a list (products, prices, steps, a schedule), write one TABLE line with its columns separated by ; and then one ROW line per item with the same number of values. Write an ASIDE line for a stretch that is not part of this meeting, citing its first and last line: phone_call (someone takes a phone call), side_conversation (talk with someone who is not in the meeting), logistics (getting audio, screens or links working), other_matter (a different client, case or matter). Write no point, action or row from an ASIDE stretch.",
+          "prompt" : "Speakers: S1 is Dana Reyes, S3 is Sofia Marin.\n\nTranscript part 1:\nL1 S1 [0.0-6.2]: Thanks for joining. Let's review the Acme intake and the filing deadline next Friday.\nL2 S2 [6.5-12.0]: I spoke with the client yesterday and they want the draft by Wednesday.\nL3 S1 [12.8-18.0]: Okay, I will send the engagement letter today and schedule a follow up call.\nL4 S3 [18.5-24.1]: We agreed to mediation in December. Can you also check whether the insurance policy covers the warehouse?\nL5 S2 [30.2-36.0]: Please email Sofia the motion draft by November 14.\nL6 S1 [36.5-44.0]: I will file the motion to compel on Friday. We still do not know who pays the expert.\nL7 S3 [44.2-50.0]: Record in the file that the client approved the budget.\nL8 S1 [50.5-58.0]: Last thing, send the engagement letter to Acme Logistics.\n\nWrite the notes for this transcript part, in the required format."
+        },
+        {
+          "instructions" : "You find the lines of a meeting transcript that are not part of this meeting. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one line per stretch and nothing else, in exactly this format:\nASIDE: phone_call | L5-L9\nReasons: phone_call (someone takes a phone call with a person who is not in the meeting), side_conversation (talk with someone who walked in or is not in the meeting, about something else), logistics (getting audio, screens or links working), other_matter (talk about a different client, case, family or matter than the meeting is about). Cite the first and last line of each stretch. If every line is part of the meeting, reply NONE.",
+          "prompt" : "Speakers: S1 is Dana Reyes, S3 is Sofia Marin.\n\nTranscript part 1:\nL1 S1 [0.0-6.2]: Thanks for joining. Let's review the Acme intake and the filing deadline next Friday.\nL2 S2 [6.5-12.0]: I spoke with the client yesterday and they want the draft by Wednesday.\nL3 S1 [12.8-18.0]: Okay, I will send the engagement letter today and schedule a follow up call.\nL4 S3 [18.5-24.1]: We agreed to mediation in December. Can you also check whether the insurance policy covers the warehouse?\nL5 S2 [30.2-36.0]: Please email Sofia the motion draft by November 14.\nL6 S1 [36.5-44.0]: I will file the motion to compel on Friday. We still do not know who pays the expert.\nL7 S3 [44.2-50.0]: Record in the file that the client approved the budget.\nL8 S1 [50.5-58.0]: Last thing, send the engagement letter to Acme Logistics.\n\nList the stretches that are not part of this meeting, in the required format, or NONE."
+        },
+        {
+          "instructions" : "You find the lines of a meeting transcript that are not part of this meeting. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one line per stretch and nothing else, in exactly this format:\nASIDE: phone_call | L5-L9\nReasons: phone_call (someone takes a phone call with a person who is not in the meeting), side_conversation (talk with someone who walked in or is not in the meeting, about something else), logistics (getting audio, screens or links working), other_matter (talk about a different client, case, family or matter than the meeting is about). Cite the first and last line of each stretch. If every line is part of the meeting, reply NONE.",
+          "prompt" : "Speakers: S1 is Dana Reyes, S3 is Sofia Marin.\n\nTranscript part 1:\nL1 S1 [0.0-6.2]: Thanks for joining. Let's review the Acme intake and the filing deadline next Friday.\nL2 S2 [6.5-12.0]: I spoke with the client yesterday and they want the draft by Wednesday.\nL3 S1 [12.8-18.0]: Okay, I will send the engagement letter today and schedule a follow up call.\nL4 S3 [18.5-24.1]: We agreed to mediation in December. Can you also check whether the insurance policy covers the warehouse?\nL5 S2 [30.2-36.0]: Please email Sofia the motion draft by November 14.\nL6 S1 [36.5-44.0]: I will file the motion to compel on Friday. We still do not know who pays the expert.\nL7 S3 [44.2-50.0]: Record in the file that the client approved the budget.\nL8 S1 [50.5-58.0]: Last thing, send the engagement letter to Acme Logistics.\n\nList the stretches that are not part of this meeting, in the required format, or NONE."
+        }
+      ],
+      "chunk_count" : 1,
+      "dropped" : 0,
+      "intents" : [
+        "{\"confidence\":0.7,\"created_at\":\"2026-10-26T07:33:20.000Z\",\"evidence\":[{\"quote\":\"Okay, I will send the engagement letter today and schedule a follow up call.\",\"speaker\":\"S1\",\"t_end\":18,\"t_start\":12.75}],\"id\":\"int_01M5VJ1JG076NZ08A6PAC4GB8M\",\"idempotency_key\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM:task.create:acme-logistics-send-the-engagement-letter\",\"meeting_id\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM\",\"params\":{\"assignee_hint\":\"Dana Reyes\",\"detail\":\"Schedule a call too.\",\"due_date\":\"2026-10-26\",\"due_text\":\"today\",\"regarding\":{\"kind\":\"matter\",\"name\":\"Acme Logistics\"},\"title\":\"Send the engagement letter\"},\"schema\":\"lana.intent/v1\",\"status\":\"proposed\",\"type\":\"task.create\"}",
+        "{\"confidence\":0.7,\"created_at\":\"2026-10-26T07:33:20.000Z\",\"evidence\":[{\"quote\":\"I will file the motion to compel on Friday. We still do not know who pays the expert.\",\"speaker\":\"S1\",\"t_end\":44,\"t_start\":36.5}],\"id\":\"int_01M5VJ1JG01PXYWHWETWP2WNYT\",\"idempotency_key\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM:task.create:file-the-motion-to-compel\",\"meeting_id\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM\",\"params\":{\"assignee_hint\":\"Dana Reyes\",\"detail\":\"On Friday.\",\"due_date\":\"2026-10-30\",\"due_text\":\"Friday\",\"title\":\"File the motion to compel\"},\"schema\":\"lana.intent/v1\",\"status\":\"proposed\",\"type\":\"task.create\"}",
+        "{\"confidence\":0.7,\"created_at\":\"2026-10-26T07:33:20.000Z\",\"evidence\":[{\"quote\":\"Okay, I will send the engagement letter today and schedule a follow up call.\",\"speaker\":\"S1\",\"t_end\":18,\"t_start\":12.75}],\"id\":\"int_01M5VJ1JG06C9XH4DB3QH0EMHT\",\"idempotency_key\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM:task.create:send-the-engagement-letter\",\"meeting_id\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM\",\"params\":{\"assignee_hint\":\"Dana Reyes\",\"detail\":\"Today.\",\"due_date\":\"2026-11-12\",\"title\":\"Send the engagement letter\"},\"schema\":\"lana.intent/v1\",\"status\":\"proposed\",\"type\":\"task.create\"}",
+        "{\"confidence\":0.5,\"created_at\":\"2026-10-26T07:33:20.000Z\",\"evidence\":[{\"quote\":\"Okay, I will send the engagement letter today and schedule a follow up call.\",\"speaker\":\"S1\",\"t_end\":18,\"t_start\":12.75}],\"id\":\"int_01M5VJ1JG070QJSXNMR5P4MD1Q\",\"idempotency_key\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM:task.create:schedule-a-follow-up-call\",\"meeting_id\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM\",\"params\":{\"assignee_hint\":\"Dana Reyes\",\"detail\":\"Follow up with the client\",\"title\":\"Schedule a follow up call\"},\"schema\":\"lana.intent/v1\",\"status\":\"proposed\",\"type\":\"task.create\"}"
+      ],
+      "max" : 2000,
+      "name" : "strict_one_chunk",
+      "notes" : "{\"gaps\":[],\"key_points\":[{\"decided_by\":\"S3\",\"id\":\"kp-1\",\"kind\":\"decision\",\"precision\":\"exact\",\"sources\":[{\"end\":24.05,\"speaker\":\"S3\",\"start\":18.5}],\"text\":\"Mediation in December.\"},{\"id\":\"kp-2\",\"kind\":\"decision\",\"precision\":\"exact\",\"sources\":[{\"end\":24.05,\"speaker\":\"S3\",\"start\":18.5}],\"text\":\"Mediation in December is set.\"}],\"tables\":[{\"columns\":[\"Item\",\"When\"],\"rows\":[[\"Motion draft\",\"November 14\"],[\"Budget\",\"approved\"]],\"sources\":[{\"end\":36,\"speaker\":\"S2\",\"start\":30.25},{\"end\":50,\"speaker\":\"S3\",\"start\":44.25}],\"title\":\"Filings\"}]}",
+      "retried" : 0,
+      "skipped" : [],
+      "steps" : [
+        {
+          "reply" : "POINT: decision | L4 | Mediation in December | The team agreed to it\nPOINT: question | L4 | Is the warehouse covered? | left open\nPOINT: summary | L1 | Intake | review | extra\nPOINT: decision | L3 | Send the engagement letter | Schedule a call too. | today | S1 | Acme Logistics\nPOINT: decision | L4 | Sofia Marin | Mediation in December.\nPOINT: decision | L4 | Speaker 3 | Mediation goes ahead in December.\nPOINT: decision | L4 | none | Mediation in December is set.\nACTION: task | L7 | File the motion to compel | On Friday. | Friday | S1 | none\nACTION: task | L3 | Send the engagement letter | Today. | 2026-11-12 | S1 | none\nACTION: task | Schedule a follow up call | Follow up with the client | this week | S1 | none\nASIDE: side_conversation | L7, L8\nTABLE: Filings | Item; When\nROW: Filings | L5 | Motion draft; November 14\nROW: Filings | L7 | Budget; approved\nPOINT: decision | L4 | S3 | Screen sharing works after a refresh.\nPOINT: question | L4 | Can everyone hear the audio?"
+        }
+      ],
+      "target" : 1500
+    },
+    {
+      "calls" : [
+        {
+          "instructions" : "You take neutral, factual notes of a meeting the user recorded. Summarize what was discussed. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one item per line and nothing else, in exactly this format:\nPOINT: summary | L7, L8 | One short sentence about what was discussed.\nPOINT: decision | L12 | S2 | One short sentence about a decision clearly made.\nPOINT: question | L3 | One short sentence about a question still unanswered at the end of this part.\nACTION: task | L10 | Short title | One sentence of detail | when | who will do it | client, matter or company, or none\nTABLE: Short table title | First column; Second column; Third column\nROW: Short table title | L14 | first value; second value; third value\nASIDE: phone_call | L20, L31\nSUMMARY: Two or three sentences summarizing the meeting so far.\nThe L numbers are the numbers of the transcript lines that contain each item, not a count of your items: cite the line where it was said, not the line before or after it. Never put a | inside a sentence. Write at most 12 points. Keep every amount, percentage, count and duration that was said, written as numbers (750 dollars, 3 percent, 160 cases, two weeks). A decision is a choice the speakers agreed on, or one stated by the person who has the say, about the work discussed. After its L numbers, write the speaker label or name of who decided, or both. These are not decisions: setting up the meeting (screen sharing, audio, links, permissions), a plan a person already had before the meeting, and a request. A promise to do something is an ACTION, not a decision. Leave out a question when a later line in this part answers it. Write an ACTION for each thing someone will do after this point: a speaker says they will do something, a speaker asks or tells another person to do something, or they agree on a next step. Use task (someone must do something), note (record something in the file) or email (someone asked for an email). For who, write the speaker label or name of the person who will do it. For when, write a calendar date YYYY-MM-DD only if one was said; otherwise the speaker's own words for when (tonight, this week, by Friday); otherwise none. When a speaker goes through a list (products, prices, steps, a schedule), write one TABLE line with its columns separated by ; and then one ROW line per item with the same number of values. Write an ASIDE line for a stretch that is not part of this meeting, citing its first and last line: phone_call (someone takes a phone call), side_conversation (talk with someone who is not in the meeting), logistics (getting audio, screens or links working), other_matter (a different client, case or matter). Write no point, action or row from an ASIDE stretch.",
           "prompt" : "Speakers: S1 is Dana Reyes, S3 is Sofia Marin.\n\nTranscript part 1:\nL1 S1 [0.0-6.2]: Thanks for joining. Let's review the Acme intake and the filing deadline next Friday.\nL2 S2 [6.5-12.0]: I spoke with the client yesterday and they want the draft by Wednesday.\n\nWrite the notes for this transcript part, in the required format."
         },
         {
-          "instructions" : "You take neutral, factual notes of a meeting the user recorded. Summarize what was discussed. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one item per line and nothing else, in exactly this format:\nPOINT: summary | 1, 2 | One short sentence about what was discussed.\nPOINT: decision | 3 | One short sentence about a decision clearly made.\nPOINT: question | 4 | One short sentence about a question left open.\nACTION: task | 5 | Short title | One sentence of detail | YYYY-MM-DD, or none | who, or none | client, matter or company, or none\nSUMMARY: Two or three sentences summarizing the meeting so far.\nThe numbers are the L numbers of the lines each item comes from. Write at most 12 points. Only write an ACTION when someone asked for or agreed to it: task (someone must do something), note (record something in the file) or email (someone asked for an email). Write a date only if a specific calendar date was said for that action; otherwise write none.",
+          "instructions" : "You take neutral, factual notes of a meeting the user recorded. Summarize what was discussed. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one item per line and nothing else, in exactly this format:\nPOINT: summary | L7, L8 | One short sentence about what was discussed.\nPOINT: decision | L12 | S2 | One short sentence about a decision clearly made.\nPOINT: question | L3 | One short sentence about a question still unanswered at the end of this part.\nACTION: task | L10 | Short title | One sentence of detail | when | who will do it | client, matter or company, or none\nTABLE: Short table title | First column; Second column; Third column\nROW: Short table title | L14 | first value; second value; third value\nASIDE: phone_call | L20, L31\nSUMMARY: Two or three sentences summarizing the meeting so far.\nThe L numbers are the numbers of the transcript lines that contain each item, not a count of your items: cite the line where it was said, not the line before or after it. Never put a | inside a sentence. Write at most 12 points. Keep every amount, percentage, count and duration that was said, written as numbers (750 dollars, 3 percent, 160 cases, two weeks). A decision is a choice the speakers agreed on, or one stated by the person who has the say, about the work discussed. After its L numbers, write the speaker label or name of who decided, or both. These are not decisions: setting up the meeting (screen sharing, audio, links, permissions), a plan a person already had before the meeting, and a request. A promise to do something is an ACTION, not a decision. Leave out a question when a later line in this part answers it. Write an ACTION for each thing someone will do after this point: a speaker says they will do something, a speaker asks or tells another person to do something, or they agree on a next step. Use task (someone must do something), note (record something in the file) or email (someone asked for an email). For who, write the speaker label or name of the person who will do it. For when, write a calendar date YYYY-MM-DD only if one was said; otherwise the speaker's own words for when (tonight, this week, by Friday); otherwise none. When a speaker goes through a list (products, prices, steps, a schedule), write one TABLE line with its columns separated by ; and then one ROW line per item with the same number of values. Write an ASIDE line for a stretch that is not part of this meeting, citing its first and last line: phone_call (someone takes a phone call), side_conversation (talk with someone who is not in the meeting), logistics (getting audio, screens or links working), other_matter (a different client, case or matter). Write no point, action or row from an ASIDE stretch.",
           "prompt" : "Speakers: S1 is Dana Reyes, S3 is Sofia Marin.\n\nEarlier in the meeting: Intake reviewed.\n\nTranscript part 2:\nL1 S1 [12.8-18.0]: Okay, I will send the engagement letter today and schedule a follow up call.\nL2 S3 [18.5-24.1]: We agreed to mediation in December. Can you also check whether the insurance policy covers the warehouse?\n\nWrite the notes for this transcript part, in the required format."
         },
         {
-          "instructions" : "You take neutral, factual notes of a meeting the user recorded. Summarize what was discussed. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one item per line and nothing else, in exactly this format:\nPOINT: summary | 1, 2 | One short sentence about what was discussed.\nPOINT: decision | 3 | One short sentence about a decision clearly made.\nPOINT: question | 4 | One short sentence about a question left open.\nACTION: task | 5 | Short title | One sentence of detail | YYYY-MM-DD, or none | who, or none | client, matter or company, or none\nSUMMARY: Two or three sentences summarizing the meeting so far.\nThe numbers are the L numbers of the lines each item comes from. Write at most 12 points. Only write an ACTION when someone asked for or agreed to it: task (someone must do something), note (record something in the file) or email (someone asked for an email). Write a date only if a specific calendar date was said for that action; otherwise write none.",
+          "instructions" : "You take neutral, factual notes of a meeting the user recorded. Summarize what was discussed. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one item per line and nothing else, in exactly this format:\nPOINT: summary | L7, L8 | One short sentence about what was discussed.\nPOINT: decision | L12 | S2 | One short sentence about a decision clearly made.\nPOINT: question | L3 | One short sentence about a question still unanswered at the end of this part.\nACTION: task | L10 | Short title | One sentence of detail | when | who will do it | client, matter or company, or none\nTABLE: Short table title | First column; Second column; Third column\nROW: Short table title | L14 | first value; second value; third value\nASIDE: phone_call | L20, L31\nSUMMARY: Two or three sentences summarizing the meeting so far.\nThe L numbers are the numbers of the transcript lines that contain each item, not a count of your items: cite the line where it was said, not the line before or after it. Never put a | inside a sentence. Write at most 12 points. Keep every amount, percentage, count and duration that was said, written as numbers (750 dollars, 3 percent, 160 cases, two weeks). A decision is a choice the speakers agreed on, or one stated by the person who has the say, about the work discussed. After its L numbers, write the speaker label or name of who decided, or both. These are not decisions: setting up the meeting (screen sharing, audio, links, permissions), a plan a person already had before the meeting, and a request. A promise to do something is an ACTION, not a decision. Leave out a question when a later line in this part answers it. Write an ACTION for each thing someone will do after this point: a speaker says they will do something, a speaker asks or tells another person to do something, or they agree on a next step. Use task (someone must do something), note (record something in the file) or email (someone asked for an email). For who, write the speaker label or name of the person who will do it. For when, write a calendar date YYYY-MM-DD only if one was said; otherwise the speaker's own words for when (tonight, this week, by Friday); otherwise none. When a speaker goes through a list (products, prices, steps, a schedule), write one TABLE line with its columns separated by ; and then one ROW line per item with the same number of values. Write an ASIDE line for a stretch that is not part of this meeting, citing its first and last line: phone_call (someone takes a phone call), side_conversation (talk with someone who is not in the meeting), logistics (getting audio, screens or links working), other_matter (a different client, case or matter). Write no point, action or row from an ASIDE stretch.",
           "prompt" : "Speakers: S1 is Dana Reyes, S3 is Sofia Marin.\n\nEarlier in the meeting: Intake reviewed.\n\nTranscript part 2:\nL1 S1 [12.8-18.0]: Okay, I will send the engagement letter today and schedule a follow up call.\nL2 S3 [18.5-24.1]: We agreed to mediation in December. Can you also check whether the insurance policy covers the warehouse?\n\nWrite the notes for this transcript part, in the required format."
         },
         {
-          "instructions" : "You take neutral, factual notes of a meeting the user recorded. Summarize what was discussed. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one item per line and nothing else, in exactly this format:\nPOINT: summary | 1, 2 | One short sentence about what was discussed.\nPOINT: decision | 3 | One short sentence about a decision clearly made.\nPOINT: question | 4 | One short sentence about a question left open.\nACTION: task | 5 | Short title | One sentence of detail | YYYY-MM-DD, or none | who, or none | client, matter or company, or none\nSUMMARY: Two or three sentences summarizing the meeting so far.\nThe numbers are the L numbers of the lines each item comes from. Write at most 12 points. Only write an ACTION when someone asked for or agreed to it: task (someone must do something), note (record something in the file) or email (someone asked for an email). Write a date only if a specific calendar date was said for that action; otherwise write none.",
+          "instructions" : "You take neutral, factual notes of a meeting the user recorded. Summarize what was discussed. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one item per line and nothing else, in exactly this format:\nPOINT: summary | L7, L8 | One short sentence about what was discussed.\nPOINT: decision | L12 | S2 | One short sentence about a decision clearly made.\nPOINT: question | L3 | One short sentence about a question still unanswered at the end of this part.\nACTION: task | L10 | Short title | One sentence of detail | when | who will do it | client, matter or company, or none\nTABLE: Short table title | First column; Second column; Third column\nROW: Short table title | L14 | first value; second value; third value\nASIDE: phone_call | L20, L31\nSUMMARY: Two or three sentences summarizing the meeting so far.\nThe L numbers are the numbers of the transcript lines that contain each item, not a count of your items: cite the line where it was said, not the line before or after it. Never put a | inside a sentence. Write at most 12 points. Keep every amount, percentage, count and duration that was said, written as numbers (750 dollars, 3 percent, 160 cases, two weeks). A decision is a choice the speakers agreed on, or one stated by the person who has the say, about the work discussed. After its L numbers, write the speaker label or name of who decided, or both. These are not decisions: setting up the meeting (screen sharing, audio, links, permissions), a plan a person already had before the meeting, and a request. A promise to do something is an ACTION, not a decision. Leave out a question when a later line in this part answers it. Write an ACTION for each thing someone will do after this point: a speaker says they will do something, a speaker asks or tells another person to do something, or they agree on a next step. Use task (someone must do something), note (record something in the file) or email (someone asked for an email). For who, write the speaker label or name of the person who will do it. For when, write a calendar date YYYY-MM-DD only if one was said; otherwise the speaker's own words for when (tonight, this week, by Friday); otherwise none. When a speaker goes through a list (products, prices, steps, a schedule), write one TABLE line with its columns separated by ; and then one ROW line per item with the same number of values. Write an ASIDE line for a stretch that is not part of this meeting, citing its first and last line: phone_call (someone takes a phone call), side_conversation (talk with someone who is not in the meeting), logistics (getting audio, screens or links working), other_matter (a different client, case or matter). Write no point, action or row from an ASIDE stretch.",
           "prompt" : "Speakers: S1 is Dana Reyes, S3 is Sofia Marin.\n\nEarlier in the meeting: More.\n\nTranscript part 3:\nL1 S2 [30.2-36.0]: Please email Sofia the motion draft by November 14.\nL2 S1 [36.5-44.0]: I will file the motion to compel on Friday. We still do not know who pays the expert.\n\nWrite the notes for this transcript part, in the required format."
         },
         {
-          "instructions" : "You take neutral, factual notes of a meeting the user recorded. Summarize what was discussed. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one item per line and nothing else, in exactly this format:\nPOINT: summary | 1, 2 | One short sentence about what was discussed.\nPOINT: decision | 3 | One short sentence about a decision clearly made.\nPOINT: question | 4 | One short sentence about a question left open.\nACTION: task | 5 | Short title | One sentence of detail | YYYY-MM-DD, or none | who, or none | client, matter or company, or none\nSUMMARY: Two or three sentences summarizing the meeting so far.\nThe numbers are the L numbers of the lines each item comes from. Write at most 12 points. Only write an ACTION when someone asked for or agreed to it: task (someone must do something), note (record something in the file) or email (someone asked for an email). Write a date only if a specific calendar date was said for that action; otherwise write none.",
+          "instructions" : "You take neutral, factual notes of a meeting the user recorded. Summarize what was discussed. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one item per line and nothing else, in exactly this format:\nPOINT: summary | L7, L8 | One short sentence about what was discussed.\nPOINT: decision | L12 | S2 | One short sentence about a decision clearly made.\nPOINT: question | L3 | One short sentence about a question still unanswered at the end of this part.\nACTION: task | L10 | Short title | One sentence of detail | when | who will do it | client, matter or company, or none\nTABLE: Short table title | First column; Second column; Third column\nROW: Short table title | L14 | first value; second value; third value\nASIDE: phone_call | L20, L31\nSUMMARY: Two or three sentences summarizing the meeting so far.\nThe L numbers are the numbers of the transcript lines that contain each item, not a count of your items: cite the line where it was said, not the line before or after it. Never put a | inside a sentence. Write at most 12 points. Keep every amount, percentage, count and duration that was said, written as numbers (750 dollars, 3 percent, 160 cases, two weeks). A decision is a choice the speakers agreed on, or one stated by the person who has the say, about the work discussed. After its L numbers, write the speaker label or name of who decided, or both. These are not decisions: setting up the meeting (screen sharing, audio, links, permissions), a plan a person already had before the meeting, and a request. A promise to do something is an ACTION, not a decision. Leave out a question when a later line in this part answers it. Write an ACTION for each thing someone will do after this point: a speaker says they will do something, a speaker asks or tells another person to do something, or they agree on a next step. Use task (someone must do something), note (record something in the file) or email (someone asked for an email). For who, write the speaker label or name of the person who will do it. For when, write a calendar date YYYY-MM-DD only if one was said; otherwise the speaker's own words for when (tonight, this week, by Friday); otherwise none. When a speaker goes through a list (products, prices, steps, a schedule), write one TABLE line with its columns separated by ; and then one ROW line per item with the same number of values. Write an ASIDE line for a stretch that is not part of this meeting, citing its first and last line: phone_call (someone takes a phone call), side_conversation (talk with someone who is not in the meeting), logistics (getting audio, screens or links working), other_matter (a different client, case or matter). Write no point, action or row from an ASIDE stretch.",
           "prompt" : "Speakers: S1 is Dana Reyes, S3 is Sofia Marin.\n\nEarlier in the meeting: More.\n\nTranscript part 3:\nL1 S2 [30.2-36.0]: Please email Sofia the motion draft by November 14.\nL2 S1 [36.5-44.0]: I will file the motion to compel on Friday. We still do not know who pays the expert.\n\nWrite the notes for this transcript part, in the required format."
         },
         {
-          "instructions" : "You take neutral, factual notes of a meeting the user recorded. Summarize what was discussed. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one item per line and nothing else, in exactly this format:\nPOINT: summary | 1, 2 | One short sentence about what was discussed.\nPOINT: decision | 3 | One short sentence about a decision clearly made.\nPOINT: question | 4 | One short sentence about a question left open.\nACTION: task | 5 | Short title | One sentence of detail | YYYY-MM-DD, or none | who, or none | client, matter or company, or none\nSUMMARY: Two or three sentences summarizing the meeting so far.\nThe numbers are the L numbers of the lines each item comes from. Write at most 12 points. Only write an ACTION when someone asked for or agreed to it: task (someone must do something), note (record something in the file) or email (someone asked for an email). Write a date only if a specific calendar date was said for that action; otherwise write none.",
+          "instructions" : "You take neutral, factual notes of a meeting the user recorded. Summarize what was discussed. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one item per line and nothing else, in exactly this format:\nPOINT: summary | L7, L8 | One short sentence about what was discussed.\nPOINT: decision | L12 | S2 | One short sentence about a decision clearly made.\nPOINT: question | L3 | One short sentence about a question still unanswered at the end of this part.\nACTION: task | L10 | Short title | One sentence of detail | when | who will do it | client, matter or company, or none\nTABLE: Short table title | First column; Second column; Third column\nROW: Short table title | L14 | first value; second value; third value\nASIDE: phone_call | L20, L31\nSUMMARY: Two or three sentences summarizing the meeting so far.\nThe L numbers are the numbers of the transcript lines that contain each item, not a count of your items: cite the line where it was said, not the line before or after it. Never put a | inside a sentence. Write at most 12 points. Keep every amount, percentage, count and duration that was said, written as numbers (750 dollars, 3 percent, 160 cases, two weeks). A decision is a choice the speakers agreed on, or one stated by the person who has the say, about the work discussed. After its L numbers, write the speaker label or name of who decided, or both. These are not decisions: setting up the meeting (screen sharing, audio, links, permissions), a plan a person already had before the meeting, and a request. A promise to do something is an ACTION, not a decision. Leave out a question when a later line in this part answers it. Write an ACTION for each thing someone will do after this point: a speaker says they will do something, a speaker asks or tells another person to do something, or they agree on a next step. Use task (someone must do something), note (record something in the file) or email (someone asked for an email). For who, write the speaker label or name of the person who will do it. For when, write a calendar date YYYY-MM-DD only if one was said; otherwise the speaker's own words for when (tonight, this week, by Friday); otherwise none. When a speaker goes through a list (products, prices, steps, a schedule), write one TABLE line with its columns separated by ; and then one ROW line per item with the same number of values. Write an ASIDE line for a stretch that is not part of this meeting, citing its first and last line: phone_call (someone takes a phone call), side_conversation (talk with someone who is not in the meeting), logistics (getting audio, screens or links working), other_matter (a different client, case or matter). Write no point, action or row from an ASIDE stretch.",
           "prompt" : "Speakers: S1 is Dana Reyes, S3 is Sofia Marin.\n\nEarlier in the meeting: More.\n\nTranscript part 4:\nL1 S3 [44.2-50.0]: Record in the file that the client approved the budget.\nL2 S1 [50.5-58.0]: Last thing, send the engagement letter to Acme Logistics.\n\nWrite the notes for this transcript part, in the required format."
+        },
+        {
+          "instructions" : "You find the lines of a meeting transcript that are not part of this meeting. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one line per stretch and nothing else, in exactly this format:\nASIDE: phone_call | L5-L9\nReasons: phone_call (someone takes a phone call with a person who is not in the meeting), side_conversation (talk with someone who walked in or is not in the meeting, about something else), logistics (getting audio, screens or links working), other_matter (talk about a different client, case, family or matter than the meeting is about). Cite the first and last line of each stretch. If every line is part of the meeting, reply NONE.",
+          "prompt" : "Speakers: S1 is Dana Reyes, S3 is Sofia Marin.\n\nTranscript part 1:\nL1 S1 [0.0-6.2]: Thanks for joining. Let's review the Acme intake and the filing deadline next Friday.\nL2 S2 [6.5-12.0]: I spoke with the client yesterday and they want the draft by Wednesday.\n\nList the stretches that are not part of this meeting, in the required format, or NONE."
+        },
+        {
+          "instructions" : "You find the lines of a meeting transcript that are not part of this meeting. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one line per stretch and nothing else, in exactly this format:\nASIDE: phone_call | L5-L9\nReasons: phone_call (someone takes a phone call with a person who is not in the meeting), side_conversation (talk with someone who walked in or is not in the meeting, about something else), logistics (getting audio, screens or links working), other_matter (talk about a different client, case, family or matter than the meeting is about). Cite the first and last line of each stretch. If every line is part of the meeting, reply NONE.",
+          "prompt" : "Speakers: S1 is Dana Reyes, S3 is Sofia Marin.\n\nTranscript part 1:\nL1 S1 [0.0-6.2]: Thanks for joining. Let's review the Acme intake and the filing deadline next Friday.\nL2 S2 [6.5-12.0]: I spoke with the client yesterday and they want the draft by Wednesday.\n\nList the stretches that are not part of this meeting, in the required format, or NONE."
+        },
+        {
+          "instructions" : "You find the lines of a meeting transcript that are not part of this meeting. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one line per stretch and nothing else, in exactly this format:\nASIDE: phone_call | L5-L9\nReasons: phone_call (someone takes a phone call with a person who is not in the meeting), side_conversation (talk with someone who walked in or is not in the meeting, about something else), logistics (getting audio, screens or links working), other_matter (talk about a different client, case, family or matter than the meeting is about). Cite the first and last line of each stretch. If every line is part of the meeting, reply NONE.",
+          "prompt" : "Speakers: S1 is Dana Reyes, S3 is Sofia Marin.\n\nTranscript part 2:\nL1 S1 [12.8-18.0]: Okay, I will send the engagement letter today and schedule a follow up call.\nL2 S3 [18.5-24.1]: We agreed to mediation in December. Can you also check whether the insurance policy covers the warehouse?\n\nList the stretches that are not part of this meeting, in the required format, or NONE."
+        },
+        {
+          "instructions" : "You find the lines of a meeting transcript that are not part of this meeting. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one line per stretch and nothing else, in exactly this format:\nASIDE: phone_call | L5-L9\nReasons: phone_call (someone takes a phone call with a person who is not in the meeting), side_conversation (talk with someone who walked in or is not in the meeting, about something else), logistics (getting audio, screens or links working), other_matter (talk about a different client, case, family or matter than the meeting is about). Cite the first and last line of each stretch. If every line is part of the meeting, reply NONE.",
+          "prompt" : "Speakers: S1 is Dana Reyes, S3 is Sofia Marin.\n\nTranscript part 2:\nL1 S1 [12.8-18.0]: Okay, I will send the engagement letter today and schedule a follow up call.\nL2 S3 [18.5-24.1]: We agreed to mediation in December. Can you also check whether the insurance policy covers the warehouse?\n\nList the stretches that are not part of this meeting, in the required format, or NONE."
+        },
+        {
+          "instructions" : "You find the lines of a meeting transcript that are not part of this meeting. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one line per stretch and nothing else, in exactly this format:\nASIDE: phone_call | L5-L9\nReasons: phone_call (someone takes a phone call with a person who is not in the meeting), side_conversation (talk with someone who walked in or is not in the meeting, about something else), logistics (getting audio, screens or links working), other_matter (talk about a different client, case, family or matter than the meeting is about). Cite the first and last line of each stretch. If every line is part of the meeting, reply NONE.",
+          "prompt" : "Speakers: S1 is Dana Reyes, S3 is Sofia Marin.\n\nTranscript part 4:\nL1 S3 [44.2-50.0]: Record in the file that the client approved the budget.\nL2 S1 [50.5-58.0]: Last thing, send the engagement letter to Acme Logistics.\n\nList the stretches that are not part of this meeting, in the required format, or NONE."
+        },
+        {
+          "instructions" : "You find the lines of a meeting transcript that are not part of this meeting. Each transcript line looks like: L4 S1 [12.0-15.5]: text. Reply with one line per stretch and nothing else, in exactly this format:\nASIDE: phone_call | L5-L9\nReasons: phone_call (someone takes a phone call with a person who is not in the meeting), side_conversation (talk with someone who walked in or is not in the meeting, about something else), logistics (getting audio, screens or links working), other_matter (talk about a different client, case, family or matter than the meeting is about). Cite the first and last line of each stretch. If every line is part of the meeting, reply NONE.",
+          "prompt" : "Speakers: S1 is Dana Reyes, S3 is Sofia Marin.\n\nTranscript part 4:\nL1 S3 [44.2-50.0]: Record in the file that the client approved the budget.\nL2 S1 [50.5-58.0]: Last thing, send the engagement letter to Acme Logistics.\n\nList the stretches that are not part of this meeting, in the required format, or NONE."
         }
       ],
       "chunk_count" : 4,
       "dropped" : 0,
       "intents" : [
-        "{\"confidence\":0.7,\"created_at\":\"2026-10-26T07:33:20.000Z\",\"evidence\":[{\"quote\":\"Okay, I will send the engagement letter today and schedule a follow up call.\",\"speaker\":\"S1\",\"t_end\":18,\"t_start\":12.75}],\"id\":\"int_01M5VJ1JG07ZJEW2G7NEBPFXGF\",\"idempotency_key\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM:task.create:acme-logistics-send-engagement-letter\",\"meeting_id\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM\",\"params\":{\"detail\":\"today\",\"regarding\":{\"kind\":\"matter\",\"name\":\"Acme Logistics\"},\"title\":\"Send engagement letter\"},\"schema\":\"lana.intent/v1\",\"status\":\"proposed\",\"type\":\"task.create\"}"
+        "{\"confidence\":0.7,\"created_at\":\"2026-10-26T07:33:20.000Z\",\"evidence\":[{\"quote\":\"Okay, I will send the engagement letter today and schedule a follow up call.\",\"speaker\":\"S1\",\"t_end\":18,\"t_start\":12.75}],\"id\":\"int_01M5VJ1JG0T9AVTKV47RSTZ700\",\"idempotency_key\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM:task.create:acme-logistics-send-engagement-letter\",\"meeting_id\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM\",\"params\":{\"assignee_hint\":\"Dana Reyes\",\"detail\":\"today\",\"regarding\":{\"kind\":\"matter\",\"name\":\"Acme Logistics\"},\"title\":\"Send engagement letter\"},\"schema\":\"lana.intent/v1\",\"status\":\"proposed\",\"type\":\"task.create\"}",
+        "{\"confidence\":0.7,\"created_at\":\"2026-10-26T07:33:20.000Z\",\"evidence\":[{\"quote\":\"Record in the file that the client approved the budget.\",\"speaker\":\"S3\",\"t_end\":50,\"t_start\":44.25}],\"id\":\"int_01M5VJ1JG01GWG03GAP6X7JK4K\",\"idempotency_key\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM:note.log:budget-approved\",\"meeting_id\":\"mtg_01JCQ7A1B2C3D4E5F6G7H8J9KM\",\"params\":{\"body\":\"The client approved the budget\",\"subject\":\"Budget approved\"},\"schema\":\"lana.intent/v1\",\"status\":\"proposed\",\"type\":\"note.log\"}"
       ],
       "max" : 45,
       "name" : "three_chunks_with_refusal",
@@ -394,6 +721,87 @@
     }
   ],
   "now" : "2026-10-26T07:33:20.000Z",
+  "promises" : [
+    {
+      "action" : {
+        "assignee_hint" : "S1",
+        "body" : "Dana agrees to send the engagement letter today.",
+        "confidence" : 0.6,
+        "due_date" : null,
+        "due_text" : "today",
+        "evidence" : [
+          {
+            "quote" : "Okay, I will send the engagement letter today and schedule a follow up call.",
+            "speaker" : "S1",
+            "t_end" : 18,
+            "t_start" : 12.75
+          }
+        ],
+        "regarding_name" : null,
+        "title" : "Dana agrees to send the engagement letter today",
+        "type" : "task.create"
+      },
+      "decided_by" : null,
+      "lines" : [
+        3
+      ],
+      "logistics" : false,
+      "text" : "Dana agrees to send the engagement letter today."
+    },
+    {
+      "action" : {
+        "assignee_hint" : "S3",
+        "body" : "Sofia will check the insurance policy this week.",
+        "confidence" : 0.6,
+        "due_date" : null,
+        "due_text" : "this week",
+        "evidence" : [
+          {
+            "quote" : "We agreed to mediation in December. Can you also check whether the insurance policy covers the warehouse?",
+            "speaker" : "S3",
+            "t_end" : 24.05,
+            "t_start" : 18.5
+          }
+        ],
+        "regarding_name" : null,
+        "title" : "Sofia will check the insurance policy this week",
+        "type" : "task.create"
+      },
+      "decided_by" : "S3",
+      "lines" : [
+        4
+      ],
+      "logistics" : false,
+      "text" : "Sofia will check the insurance policy this week."
+    },
+    {
+      "action" : null,
+      "decided_by" : null,
+      "lines" : [
+        1
+      ],
+      "logistics" : true,
+      "text" : "The screen is visible after a refresh."
+    },
+    {
+      "action" : null,
+      "decided_by" : "S3",
+      "lines" : [
+        4
+      ],
+      "logistics" : false,
+      "text" : "Mediation in December."
+    },
+    {
+      "action" : null,
+      "decided_by" : null,
+      "lines" : [
+        4
+      ],
+      "logistics" : false,
+      "text" : "They will use mediation in December."
+    }
+  ],
   "prompts" : [
     {
       "phrasing" : "standard",
@@ -412,8 +820,9 @@
         {
           "assignee_hint" : "Dana Reyes",
           "body" : "Today",
-          "confidence" : 0.69999999999999996,
+          "confidence" : 0.7,
           "due_date" : null,
+          "due_text" : null,
           "evidence" : [
             {
               "quote" : "Okay, I will send the engagement letter today and schedule a follow up call.",
@@ -429,6 +838,7 @@
       ],
       "points" : [
         {
+          "decided_by" : null,
           "kind" : "summary",
           "lines" : [
             1,
@@ -437,6 +847,7 @@
           "text" : "The team reviewed the Acme intake."
         },
         {
+          "decided_by" : null,
           "kind" : "decision",
           "lines" : [
             4
@@ -444,6 +855,7 @@
           "text" : "Mediation in December."
         },
         {
+          "decided_by" : null,
           "kind" : "open_question",
           "lines" : [
             4
@@ -452,7 +864,9 @@
         }
       ],
       "reply" : "POINT: summary | 1, 2 | The team reviewed the Acme intake.\nPOINT: decision | L4 | Mediation in December.\nPOINT: question | 4,4,99 | Does the policy cover the warehouse?\nACTION: task | 3 | Send the engagement letter | Today | none | Dana Reyes | Acme Logistics\nSUMMARY: Intake reviewed.",
+      "set_aside" : "[]",
       "summary" : "Intake reviewed.",
+      "tables" : [],
       "valid" : true
     },
     {
@@ -460,8 +874,9 @@
         {
           "assignee_hint" : "Sofia Marin",
           "body" : "Send Sofia the draft",
-          "confidence" : 0.69999999999999996,
+          "confidence" : 0.7,
           "due_date" : "2026-11-14",
+          "due_text" : null,
           "evidence" : [
             {
               "quote" : "Please email Sofia the motion draft by November 14.",
@@ -477,8 +892,9 @@
         {
           "assignee_hint" : null,
           "body" : "The client approved the budget",
-          "confidence" : 0.69999999999999996,
+          "confidence" : 0.7,
           "due_date" : null,
+          "due_text" : null,
           "evidence" : [
             {
               "quote" : "Record in the file that the client approved the budget.",
@@ -494,6 +910,7 @@
       ],
       "points" : [
         {
+          "decided_by" : null,
           "kind" : "summary",
           "lines" : [
             1
@@ -502,30 +919,37 @@
         }
       ],
       "reply" : "**POINT:** summary | 1 | Intake.\n- ACTION: email | 6 | Email the motion draft | Send Sofia the draft | 2026-11-14 | Sofia Marin | none\nACTION: note | 8 | Budget approved | The client approved the budget | none | none | none\nACTION: task | 77 | Invented | x | none | none | none",
+      "set_aside" : "[]",
       "summary" : "",
+      "tables" : [],
       "valid" : true
     },
     {
-      "candidates" : [
-
-      ],
-      "points" : [
-
-      ],
+      "candidates" : [],
+      "points" : [],
       "reason" : "no_recognised_lines",
       "reply" : "Sure! Here you go.",
+      "set_aside" : "[]",
       "summary" : "",
+      "tables" : [],
       "valid" : false
     },
     {
-      "candidates" : [
-
-      ],
+      "candidates" : [],
       "points" : [
-
+        {
+          "decided_by" : null,
+          "kind" : "summary",
+          "lines" : [
+            1
+          ],
+          "text" : "Wrong kind."
+        }
       ],
       "reply" : "POINT: summary | one | No line.\nPOINT: other | 1 | Wrong kind.\nPOINT: summary | 2 |\nACTION: task | 2 | Too few | fields",
+      "set_aside" : "[]",
       "summary" : "",
+      "tables" : [],
       "valid" : true
     },
     {
@@ -533,8 +957,9 @@
         {
           "assignee_hint" : null,
           "body" : "detail",
-          "confidence" : 0.69999999999999996,
-          "due_date" : "next Friday",
+          "confidence" : 0.7,
+          "due_date" : null,
+          "due_text" : "next Friday",
           "evidence" : [
             {
               "quote" : "Thanks for joining. Let's review the Acme intake and the filing deadline next Friday.",
@@ -557,7 +982,7 @@
             {
               "quote" : "We agreed to mediation in December. Can you also check whether the insurance policy covers the warehouse?",
               "speaker" : "S3",
-              "t_end" : 24.050000000000001,
+              "t_end" : 24.05,
               "t_start" : 18.5
             }
           ],
@@ -568,6 +993,7 @@
       ],
       "points" : [
         {
+          "decided_by" : null,
           "kind" : "decision",
           "lines" : [
             3
@@ -576,7 +1002,9 @@
         }
       ],
       "reply" : "ACTION: task | 1, 2, 3, 4, 5 | Prepare | detail | next Friday | none | none\nPOINT: decision | 3 | Dana sends the engagement letter today.",
+      "set_aside" : "[]",
       "summary" : "",
+      "tables" : [],
       "valid" : true
     },
     {
@@ -586,6 +1014,7 @@
           "body" : "Send the engagement letter to Acme Logistics today",
           "confidence" : 0.5,
           "due_date" : null,
+          "due_text" : null,
           "evidence" : [
             {
               "quote" : "Okay, I will send the engagement letter today and schedule a follow up call.",
@@ -603,6 +1032,7 @@
           "body" : "Send Sofia Marin the motion draft by November 14",
           "confidence" : 0.5,
           "due_date" : "2026-11-14",
+          "due_text" : null,
           "evidence" : [
             {
               "quote" : "Please email Sofia the motion draft by November 14.",
@@ -614,13 +1044,178 @@
           "regarding_name" : null,
           "title" : "Email the motion draft",
           "type" : "email.draft"
+        },
+        {
+          "assignee_hint" : null,
+          "body" : "x",
+          "confidence" : 0.7,
+          "due_date" : null,
+          "due_text" : null,
+          "evidence" : [
+            {
+              "quote" : "Okay, I will send the engagement letter today and schedule a follow up call.",
+              "speaker" : "S1",
+              "t_end" : 18,
+              "t_start" : 12.75
+            }
+          ],
+          "regarding_name" : null,
+          "title" : "Six fields with a line",
+          "type" : "task.create"
+        }
+      ],
+      "points" : [],
+      "reply" : "ACTION: task | Send engagement letter and schedule follow-up call | Send the engagement letter to Acme Logistics today | none | none | client\nACTION: email | Email the motion draft | Send Sofia Marin the motion draft by November 14 | 2026-11-14 | none | none\nACTION: task | Something unrelated | Nothing said about this | none | none | none\nACTION: task | 3 | Six fields with a line | x | none | none",
+      "set_aside" : "[]",
+      "summary" : "",
+      "tables" : [],
+      "valid" : true
+    },
+    {
+      "candidates" : [],
+      "points" : [],
+      "reply" : "POINT: decision | L4 | Mediation in December | The team agreed to it\nPOINT: question | L4 | Is the warehouse covered? | left open\nPOINT: summary | L1 | Intake | review | extra",
+      "set_aside" : "[]",
+      "summary" : "",
+      "tables" : [],
+      "valid" : true
+    },
+    {
+      "candidates" : [
+        {
+          "assignee_hint" : "S1",
+          "body" : "Schedule a call too.",
+          "confidence" : 0.7,
+          "due_date" : null,
+          "due_text" : "today",
+          "evidence" : [
+            {
+              "quote" : "Okay, I will send the engagement letter today and schedule a follow up call.",
+              "speaker" : "S1",
+              "t_end" : 18,
+              "t_start" : 12.75
+            }
+          ],
+          "regarding_name" : "Acme Logistics",
+          "title" : "Send the engagement letter",
+          "type" : "task.create"
         }
       ],
       "points" : [
-
+        {
+          "decided_by" : null,
+          "kind" : "decision",
+          "lines" : [
+            4
+          ],
+          "text" : "Mediation in December is set."
+        }
       ],
-      "reply" : "ACTION: task | Send engagement letter and schedule follow-up call | Send the engagement letter to Acme Logistics today | none | none | client\nACTION: email | Email the motion draft | Send Sofia Marin the motion draft by November 14 | 2026-11-14 | none | none\nACTION: task | Something unrelated | Nothing said about this | none | none | none\nACTION: task | 3 | Six fields with a line | x | none | none",
+      "reply" : "POINT: decision | L3 | Send the engagement letter | Schedule a call too. | today | S1 | Acme Logistics\nPOINT: decision | L4 | Sofia Marin | Mediation in December.\nPOINT: decision | L4 | Speaker 3 | Mediation goes ahead in December.\nPOINT: decision | L4 | none | Mediation in December is set.",
+      "set_aside" : "[]",
       "summary" : "",
+      "tables" : [],
+      "valid" : true
+    },
+    {
+      "candidates" : [],
+      "points" : [],
+      "reply" : "ASIDE: phone_call | L5, L6\nASIDE: logistics | L1, L3\nASIDE: smalltalk | L2\nTABLE: Filings | Item; When\nROW: Filings | L6 | Motion draft; November 14\nROW: filings | L7 | Motion to compel; Friday; extra\nROW: Filings | L7 | Motion to compel\nROW: Filings | L7 | first value; second value; third value\nTABLE: Short table title | A; B",
+      "set_aside" : "[{\"end\":36,\"reason\":\"phone_call\",\"start\":24.5},{\"end\":18,\"reason\":\"logistics\",\"start\":0}]",
+      "summary" : "",
+      "tables" : [
+        {
+          "columns" : [
+            "Item",
+            "When"
+          ],
+          "rows" : [
+            {
+              "cells" : [
+                "Motion draft",
+                "November 14"
+              ],
+              "lines" : [
+                6
+              ]
+            },
+            {
+              "cells" : [
+                "Motion to compel",
+                ""
+              ],
+              "lines" : [
+                7
+              ]
+            }
+          ],
+          "title" : "Filings"
+        }
+      ],
+      "valid" : true
+    },
+    {
+      "candidates" : [
+        {
+          "assignee_hint" : "S1",
+          "body" : "On Friday.",
+          "confidence" : 0.7,
+          "due_date" : null,
+          "due_text" : "Friday",
+          "evidence" : [
+            {
+              "quote" : "I will file the motion to compel on Friday. We still do not know who pays the expert.",
+              "speaker" : "S1",
+              "t_end" : 44,
+              "t_start" : 36.5
+            }
+          ],
+          "regarding_name" : null,
+          "title" : "File the motion to compel",
+          "type" : "task.create"
+        },
+        {
+          "assignee_hint" : "S1",
+          "body" : "Today.",
+          "confidence" : 0.7,
+          "due_date" : "2026-11-12",
+          "due_text" : null,
+          "evidence" : [
+            {
+              "quote" : "Okay, I will send the engagement letter today and schedule a follow up call.",
+              "speaker" : "S1",
+              "t_end" : 18,
+              "t_start" : 12.75
+            }
+          ],
+          "regarding_name" : null,
+          "title" : "Send the engagement letter",
+          "type" : "task.create"
+        },
+        {
+          "assignee_hint" : "S1",
+          "body" : "Follow up with the client",
+          "confidence" : 0.5,
+          "due_date" : null,
+          "due_text" : "this week",
+          "evidence" : [
+            {
+              "quote" : "Okay, I will send the engagement letter today and schedule a follow up call.",
+              "speaker" : "S1",
+              "t_end" : 18,
+              "t_start" : 12.75
+            }
+          ],
+          "regarding_name" : null,
+          "title" : "Schedule a follow up call",
+          "type" : "task.create"
+        }
+      ],
+      "points" : [],
+      "reply" : "ACTION: task | L7 | File the motion to compel | On Friday. | Friday | S1 | none\nACTION: task | L3 | Send the engagement letter | Today. | 2026-11-12 | S1 | none\nACTION: task | Schedule a follow up call | Follow up with the client | this week | S1 | none",
+      "set_aside" : "[]",
+      "summary" : "",
+      "tables" : [],
       "valid" : true
     }
   ],
@@ -629,7 +1224,7 @@
     {
       "a" : "Send the engagement letter",
       "b" : "Send engagement letter today",
-      "similarity" : 0.59999999999999998
+      "similarity" : 0.6
     },
     {
       "a" : "File the motion",
@@ -649,7 +1244,7 @@
     {
       "a" : "Call Dana about the lease",
       "b" : "Call Sofia about the lease",
-      "similarity" : 0.66666666666666663
+      "similarity" : 0.6666666666666666
     }
   ],
   "speakers" : [
@@ -686,7 +1281,7 @@
       "text" : "Okay, I will send the engagement letter today and schedule a follow up call."
     },
     {
-      "end" : 24.050000000000001,
+      "end" : 24.05,
       "speaker" : "S3",
       "start" : 18.5,
       "text" : "We agreed to mediation in December. Can you also check whether the insurance policy covers the warehouse?"
@@ -721,5 +1316,6 @@
       "start" : 50.5,
       "text" : "Last thing, send the engagement letter to Acme Logistics."
     }
-  ]
+  ],
+  "vocabulary_prompt" : "Speakers: S1 is Dana Reyes, S3 is Sofia Marin.\n\nSpell these names exactly: Acme Logistics, Pemberton, Warehousely.\n\nTranscript part 1:\nL1 S1 [0.0-6.2]: Thanks for joining. Let's review the Acme intake and the filing deadline next Friday.\nL2 S2 [6.5-12.0]: I spoke with the client yesterday and they want the draft by Wednesday.\nL3 S1 [12.8-18.0]: Okay, I will send the engagement letter today and schedule a follow up call.\nL4 S3 [18.5-24.1]: We agreed to mediation in December. Can you also check whether the insurance policy covers the warehouse?\nL5 S2 [24.5-30.0]:    \nL6 S2 [30.2-36.0]: Please email Sofia the motion draft by November 14.\nL7 S1 [36.5-44.0]: I will file the motion to compel on Friday. We still do not know who pays the expert.\nL8 S3 [44.2-50.0]: Record in the file that the client approved the budget.\nL9 S1 [50.5-58.0]: Last thing, send the engagement letter to Acme Logistics."
 }

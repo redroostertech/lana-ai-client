@@ -73,4 +73,33 @@ describe.skipIf(!RUN)("whole-meeting transcription with speakers (opt in)", () =
       folder.cleanup();
     }
   }, 120_000);
+
+  it("keeps three distinct voices in one room apart after folding small clusters (mono, no channel help)", async () => {
+    const folder = temporaryDirectory("room");
+    try {
+      const lines = [
+        ["Samantha", "Thanks for joining, let's look at the onboarding plan for the Harbor account."],
+        ["Daniel", "Sure, I have the schedule and the fee sheet open right here."],
+        ["Rishi", "I can add the training dates once we agree on kickoff."],
+        ["Samantha", "The setup fee is twelve hundred dollars and the monthly fee is three hundred."],
+        ["Daniel", "That matches what the client signed last week, so we are fine there."],
+        ["Rishi", "I will check with the trainers about the second week of December."],
+      ] as const;
+      const gap = TRANSCRIPTION_SAMPLE_RATE * 0.7;
+      const clips = [...lines, ...lines, ...lines].map(([name, text], index) => voice(folder.path, name, text, index));
+      const length = clips.reduce((sum, clip) => sum + clip.length + gap, 0);
+      const mic = new Float32Array(length);
+      let at = 0;
+      for (const clip of clips) {
+        mic.set(clip, at);
+        at += clip.length + gap;
+      }
+      const transcriber = new MeetingTranscriber({ models: transcriptionModelPaths(process.env["LANA_SPEECH_MODELS_DIR"] ?? "") });
+      const result = await transcriber.transcribe({ mic, system: new Float32Array(length) });
+      expect(result.speakers).toHaveLength(3);
+    } finally {
+      folder.cleanup();
+    }
+  }, 180_000);
 });
+

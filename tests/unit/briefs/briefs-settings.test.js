@@ -96,3 +96,26 @@ describe('badge colors', () => {
     expect(['good', 'warning', 'danger', 'neutral'].map(S.badgeColor)).toEqual(['green', 'yellow', 'red', 'gray']);
   });
 });
+
+describe('meeting word list', () => {
+  const S2 = require('../../../src/js/briefs/briefs-settings');
+  const list = [{ term: 'Leadli', alsoHeardAs: ['lead lease', 'leely'] }, { term: 'Actionstep', alsoHeardAs: [] }];
+
+  test('rows show each name and how else it is heard', () => {
+    expect(S2.vocabularyRows(list)).toEqual([
+      { term: 'Leadli', detail: 'Also heard as: lead lease, leely' },
+      { term: 'Actionstep', detail: '' },
+    ]);
+    expect(S2.vocabularyRows(null)).toEqual([]);
+  });
+
+  test('adding trims, splits the heard-as text and refuses blanks and repeats', () => {
+    expect(S2.addVocabularyTerm(list, '  Clio ', ' clee oh , , klio ')).toEqual({ list: list.concat([{ term: 'Clio', alsoHeardAs: ['clee oh', 'klio'] }]), error: null });
+    expect(S2.addVocabularyTerm(list, '   ', '')).toEqual({ list, error: 'Type a name to add.' });
+    expect(S2.addVocabularyTerm(list, 'leadli', '')).toEqual({ list, error: 'Leadli is already on the list.' });
+  });
+
+  test('removing takes one name out', () => {
+    expect(S2.removeVocabularyTerm(list, 'Leadli')).toEqual([{ term: 'Actionstep', alsoHeardAs: [] }]);
+  });
+});

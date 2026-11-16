@@ -37,6 +37,8 @@ const path = require('path');
 const BRIEFS_APP_ID = 'lana-notes';
 // Must match RUNNING_CHANNEL in briefs/packages/host/src/preload/bridge.ts.
 const RUNNING_CHANNEL = 'briefs:running';
+// Must match STARTED_CHANNEL in briefs/packages/host/src/preload/bridge.ts.
+const STARTED_CHANNEL = 'briefs:started';
 // Must match AUDIO_SCHEME in briefs/packages/host/src/main/services/meetingAudio.ts
 // (tests/unit/electron-briefs.test.js checks). Registered before the app is ready without
 // loading the host, so Briefs costs nothing at launch while it is off.
@@ -270,6 +272,10 @@ function createBriefs(deps) {
     host = started;
     hostKey = key;
     addOpenWindows();
+    // Pages that loaded before Briefs started switch their tone player on now.
+    for (const window of deps.getWindows()) {
+      if (!window.isDestroyed() && typeof window.webContents.send === 'function') window.webContents.send(STARTED_CHANNEL);
+    }
     try {
       // The host reads its saved session and opens the phone gateway once a page is there
       // to play the pairing tone and show prompts.
@@ -369,4 +375,4 @@ function registerBriefsSchemes(protocol) {
   protocol.registerSchemesAsPrivileged([{ scheme: BRIEFS_AUDIO_SCHEME, privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true } }]);
 }
 
-module.exports = { RUNNING_CHANNEL, createBriefs, registerBriefsSchemes, isBriefsEnabled, isClientPage, personKey, personOf, sessionSnapshot, BRIEFS_APP_ID, BRIEFS_AUDIO_SCHEME };
+module.exports = { RUNNING_CHANNEL, STARTED_CHANNEL, createBriefs, registerBriefsSchemes, isBriefsEnabled, isClientPage, personKey, personOf, sessionSnapshot, BRIEFS_APP_ID, BRIEFS_AUDIO_SCHEME };

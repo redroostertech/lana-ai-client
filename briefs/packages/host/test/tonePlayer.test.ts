@@ -131,3 +131,24 @@ describe("the tone player in the client's preload", () => {
     expect(started).toHaveLength(1);
   });
 });
+
+describe("a page that loaded before Briefs started", () => {
+  it("switches the tone player on when Briefs says it started, once", async () => {
+    const { exposeBriefsBridge, STARTED_CHANNEL } = await import("../src/preload/bridge.js");
+    const listeners = new Map<string, Array<() => void>>();
+    const started: unknown[] = [];
+    const ipc = {
+      invoke: async (channel: string) => (channel === "briefs:running" ? false : null),
+      on: (channel: string, listener: () => void) => void listeners.set(channel, [...(listeners.get(channel) ?? []), listener]),
+      removeListener: (channel: string, listener: () => void) => void listeners.set(channel, (listeners.get(channel) ?? []).filter((item) => item !== listener)),
+      send: () => undefined,
+    };
+    exposeBriefsBridge({ exposeInMainWorld: () => undefined }, ipc as never, (bridge) => void started.push(bridge));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(started).toEqual([]);
+    expect(STARTED_CHANNEL).toBe("briefs:started");
+    for (const listener of listeners.get("briefs:started") ?? []) listener();
+    for (const listener of listeners.get("briefs:started") ?? []) listener();
+    expect(started).toHaveLength(1);
+  });
+});

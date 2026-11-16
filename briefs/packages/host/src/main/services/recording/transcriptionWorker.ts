@@ -25,6 +25,6 @@ async function run(request: WorkerRequest): Promise<WorkerReply> {
     if (fraction - last < 0.02 && fraction < 1) return;
     last = fraction;
     port?.postMessage({ type: "progress", fraction } satisfies WorkerReply);
-  });
+  }, request.vocabulary ?? []);
   return { type: "done", speakers: merged.speakers, transcript: merged.transcript };
 }

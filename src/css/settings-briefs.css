@@ -130,3 +130,41 @@
     gap: 12px;
   }
 }
+
+/* Meeting word list (Connected devices). */
+.sv2-briefs-words {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sv2-briefs-word {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-top: 1px solid var(--lex-border-subtle);
+}
+
+.sv2-briefs-word:first-child {
+  border-top: 0;
+}
+
+.sv2-briefs-words-empty {
+  padding: 8px 0;
+}
+
+.sv2-briefs-words-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  align-items: end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+@media (max-width: 720px) {
+  .sv2-briefs-words-add {
+    grid-template-columns: 1fr;
+  }
+}

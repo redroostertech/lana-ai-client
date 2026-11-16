@@ -80,6 +80,31 @@ describe("Mac handoff session", () => {
     expect(rig.presenter.qr).toMatch(/^lananotes:\/\/attest\?s=[0-9A-F-]{36}&n=[A-Za-z0-9_-]{22}$/);
   });
 
+  it("moves on to the QR fallback when the tone never finishes playing (a page that cannot play it)", async () => {
+    const rig = new Rig();
+    rig.air.muted = true;
+    const hanging = { play: () => new Promise<void>(() => undefined) };
+    const session = new MacHandoffSession({
+      identity: mac, trust: rig.trust, tone: hanging, presenter: rig.presenter, sink: rig.sink, clock: rig.clock,
+      policy: { ...DEFAULT_MAC_HANDOFF_POLICY, tonePlayTimeoutMs: 50 },
+    });
+    const result = await rig.runBoth(session, rig.script());
+    expect(result.phone.status).toBe("fulfilled");
+    expect(rig.sink.completed[0]?.attestation).toMatchObject({ method: "qr" });
+  }, 15_000);
+
+  it("moves on to the QR fallback when the tone output fails, and does not try it again", async () => {
+    const rig = new Rig();
+    rig.air.muted = true;
+    let calls = 0;
+    const failing = { play: async () => { calls += 1; throw new Error("tone output timed out"); } };
+    const session = new MacHandoffSession({ identity: mac, trust: rig.trust, tone: failing, presenter: rig.presenter, sink: rig.sink, clock: rig.clock, policy: DEFAULT_MAC_HANDOFF_POLICY });
+    const result = await rig.runBoth(session, rig.script());
+    expect(result.phone.status).toBe("fulfilled");
+    expect(rig.sink.completed[0]?.attestation).toMatchObject({ method: "qr" });
+    expect(calls).toBe(1);
+  });
+
   it("accepts a Mac approval fallback and refuses when declined", async () => {
     const policy = handoffPolicyFromSettings({ requireMacClick: false, allowQr: false, allowMacApproval: true });
     expect(policy.allowedMethods).toEqual(["acoustic", "mac_approval"]);

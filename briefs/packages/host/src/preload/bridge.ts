@@ -15,6 +15,8 @@ type Namespace = keyof typeof ALL_API_METHODS;
 export const BRIEFS_GLOBAL = "lanaBriefs";
 /** Answered by the client (electron-briefs.js) whether or not Briefs runs. */
 export const RUNNING_CHANNEL = "briefs:running";
+/** Main tells every open page when Briefs starts (a page loaded before it, e.g. after sign-in). */
+export const STARTED_CHANNEL = "briefs:started";
 
 export function buildBriefsBridge(ipcRenderer: Pick<IpcRenderer, "invoke" | "on" | "removeListener" | "send">): LanaBridge {
   const namespaces = Object.fromEntries(
@@ -74,9 +76,19 @@ export function exposeBriefsBridge(
     return;
   }
   contextBridge.exposeInMainWorld(BRIEFS_GLOBAL, bridge);
+  // The tone player starts once: now when Briefs already runs, or when main says it started
+  // (Briefs turned on after this page loaded, by sign-in or a discovery refresh).
+  let started = false;
+  const start = (): void => {
+    if (started) return;
+    started = true;
+    ipcRenderer.removeListener(STARTED_CHANNEL, start);
+    startTone(bridge);
+  };
+  ipcRenderer.on(STARTED_CHANNEL, start);
   ipcRenderer.invoke(RUNNING_CHANNEL).then(
     (running: unknown) => {
-      if (running === true) startTone(bridge);
+      if (running === true) start();
     },
     () => undefined,
   );

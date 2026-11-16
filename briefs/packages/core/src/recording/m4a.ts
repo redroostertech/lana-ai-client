@@ -17,6 +17,11 @@ export interface M4aInput {
   readonly audioSpecificConfig?: Uint8Array | undefined;
   /** Bits per second, recorded in the decoder configuration. */
   readonly bitRate?: number | undefined;
+  /**
+   * An edit list (`elst`): skip `priming` samples at the start and play `playSamples`, so a
+   * re-written file keeps the original's real length. Absent: no edit list (as before).
+   */
+  readonly edit?: { readonly priming: number; readonly playSamples: number } | undefined;
 }
 
 const SAMPLE_RATE_INDEX = [96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350];
@@ -43,7 +48,7 @@ export function muxM4a(input: M4aInput): Uint8Array {
   const mdatSize = 8 + frames.reduce((sum, frame) => sum + frame.length, 0);
   const ftyp = box("ftyp", ascii("M4A "), u32(0), ascii("M4A "), ascii("mp42"), ascii("isom"));
   // The chunk offset depends on the size of moov, which holds it: build once, measure, rebuild.
-  const build = (offset: number) => moov(sampleRate, channels, duration, frames, config, input.bitRate ?? DEFAULT_BIT_RATE, offset);
+  const build = (offset: number) => moov(sampleRate, channels, duration, frames, config, input.bitRate ?? DEFAULT_BIT_RATE, offset, input.edit);
   const offset = ftyp.length + build(0).length + 8;
   const head = concat([ftyp, build(offset), u32(mdatSize), ascii("mdat")]);
   const out = new Uint8Array(head.length + mdatSize - 8);
@@ -58,10 +63,11 @@ export function muxM4a(input: M4aInput): Uint8Array {
 
 // MARK: - Boxes
 
-function moov(rate: number, channels: number, duration: number, frames: readonly Uint8Array[], config: Uint8Array, bitRate: number, offset: number): Uint8Array {
+function moov(rate: number, channels: number, duration: number, frames: readonly Uint8Array[], config: Uint8Array, bitRate: number, offset: number, edit?: M4aInput["edit"]): Uint8Array {
+  const played = edit === undefined ? duration : Math.max(0, Math.min(edit.playSamples, duration - edit.priming));
   const matrix = concat([u32(0x00010000), u32(0), u32(0), u32(0), u32(0x00010000), u32(0), u32(0), u32(0), u32(0x40000000)]);
-  const mvhd = fullBox("mvhd", 0, 0, u32(0), u32(0), u32(rate), u32(duration), u32(0x00010000), u16(0x0100), u16(0), u32(0), u32(0), matrix, zeros(24), u32(2));
-  const tkhd = fullBox("tkhd", 0, 7, u32(0), u32(0), u32(1), u32(0), u32(duration), u32(0), u32(0), u16(0), u16(0), u16(0x0100), u16(0), matrix, u32(0), u32(0));
+  const mvhd = fullBox("mvhd", 0, 0, u32(0), u32(0), u32(rate), u32(played), u32(0x00010000), u16(0x0100), u16(0), u32(0), u32(0), matrix, zeros(24), u32(2));
+  const tkhd = fullBox("tkhd", 0, 7, u32(0), u32(0), u32(1), u32(0), u32(played), u32(0), u32(0), u16(0), u16(0), u16(0x0100), u16(0), matrix, u32(0), u32(0));
   const mdhd = fullBox("mdhd", 0, 0, u32(0), u32(0), u32(rate), u32(duration), u16(0x55c4), u16(0));
   const hdlr = fullBox("hdlr", 0, 0, u32(0), ascii("soun"), u32(0), u32(0), u32(0), ascii("SoundHandler"), new Uint8Array([0]));
   const smhd = fullBox("smhd", 0, 0, u16(0), u16(0));
@@ -76,7 +82,9 @@ function moov(rate: number, channels: number, duration: number, frames: readonly
   const stbl = box("stbl", stsd, stts, stsc, stsz, stco);
   const minf = box("minf", smhd, dinf, stbl);
   const mdia = box("mdia", mdhd, hdlr, minf);
-  return box("moov", mvhd, box("trak", tkhd, mdia));
+  if (edit === undefined) return box("moov", mvhd, box("trak", tkhd, mdia));
+  const edts = box("edts", fullBox("elst", 0, 0, u32(1), u32(played), u32(edit.priming), u16(1), u16(0)));
+  return box("moov", mvhd, box("trak", tkhd, edts, mdia));
 }
 
 /** Elementary stream descriptor (ISO 14496-1): ES, decoder config (AAC, audio stream), the AudioSpecificConfig, SL config. */

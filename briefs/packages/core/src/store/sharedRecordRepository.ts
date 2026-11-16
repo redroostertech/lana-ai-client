@@ -1,3 +1,4 @@
+import { silenceSetAsideAudio } from "../recording/audioCut.js";
 import type { DevicePublicKeys } from "../crypto/devicePublicKeys.js";
 import type { OpenedBundle } from "../handoff/bundleOpener.js";
 import type { SharedMeeting } from "../handoff/messages.js";
@@ -22,6 +23,8 @@ import type { StoreContext } from "./storeContext.js";
 import { DISTANT_PAST, parseStoredDate } from "./storedDate.js";
 
 const SHARED_PHONES_KEY = "shared_record.phones.";
+/** Phones a meeting went to without audio (its set-aside parts could not be taken out). */
+const AUDIO_WITHHELD_KEY = "shared_record.audio_withheld.";
 const QUEUE_KEY = "shared_record.queue.";
 const DECLINED_KEY = "shared_record.declined.";
 const SNOOZED_KEY = "shared_record.snoozed.";
@@ -242,7 +245,12 @@ export class SharedRecordRepository {
     }
     for (const id of this.queue(phone.deviceID)) {
       if (listedIDs.has(id) || this.ctx.db.get("SELECT id FROM meeting WHERE id = ?", id) === undefined) continue;
-      out.push({ record: this.current(id as LanaId), audio: this.audio(id as LanaId), queued: true });
+      const record = this.current(id as LanaId);
+      const sent = this.outgoingAudio(id as LanaId, record.notes.setAside ?? []);
+      const withheld = this.audioWithheld(id);
+      const phones = sent.withheld ? [...new Set([...withheld, phone.deviceID])] : withheld.filter((item) => item !== phone.deviceID);
+      if (phones.length !== withheld.length) this.setList(`${AUDIO_WITHHELD_KEY}${id}`, phones);
+      out.push({ record, audio: sent.audio, queued: true, ...(sent.withheld ? { audioWithheld: true } : {}) });
     }
     return out;
   }
@@ -397,6 +405,25 @@ export class SharedRecordRepository {
     } catch {
       throw StoreError.corrupt(context);
     }
+  }
+
+  /**
+   * Audio for a paired phone: set-aside parts go silent (times kept, so replay stays in step);
+   * audio that cannot be read goes without, while anything is set aside. The store keeps the original.
+   */
+  private outgoingAudio(id: LanaId, setAside: readonly { start: number; end: number }[]): { audio: { name: string; data: Uint8Array }[]; withheld: boolean } {
+    const audio = this.audio(id);
+    if (setAside.length === 0 || audio.length === 0) return { audio, withheld: false };
+    try {
+      return { audio: silenceSetAsideAudio(audio, setAside), withheld: false };
+    } catch {
+      return { audio: [], withheld: true };
+    }
+  }
+
+  /** Phones this meeting went to without audio (the meeting page says so on that phone's row). */
+  audioWithheld(id: string): string[] {
+    return this.list(`${AUDIO_WITHHELD_KEY}${id}`);
   }
 
   private audio(id: LanaId): { name: string; data: Uint8Array }[] {

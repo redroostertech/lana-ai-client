@@ -4,3 +4,4 @@ export * from "./toneBridge.js";
 export { PAIRING_LIFETIME_MS, PAIRING_MESSAGES } from "./pairingCoordinator.js";
 export { HandoffGateway, GatewayOpenError, type GatewayOptions, type GatewayOpenErrorKind } from "./handoffGateway.js";
 export * from "./backgroundUpdates.js";
+export * from "./vocabularySettings.js";

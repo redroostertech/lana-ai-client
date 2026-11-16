@@ -2,7 +2,7 @@ import { LanaDate } from "../json/lanaDate.js";
 import type { JsonObject, JsonValue } from "../json/jsonValue.js";
 import { arrayOf, asDate, asEnum, asNumber, asObject, asString, field, optional } from "../json/read.js";
 import { isBlankLine } from "../text/whitespace.js";
-import { decodeKeyPoint, encodeKeyPoint, type KeyPoint } from "./keyPoint.js";
+import { decodeKeyPoint, decodeSourceSpan, encodeKeyPoint, encodeSourceSpan, type KeyPoint, type SourceSpan } from "./keyPoint.js";
 
 export interface Speaker {
   /** Stable diarization label, `S1`, `S2`... */
@@ -15,6 +15,12 @@ export interface TranscriptSegment {
   readonly start: number;
   readonly end: number;
   readonly text: string;
+  /**
+   * The recognizer's own text for this line, present only when the transcript pass changed a
+   * word (`MeetingVocabulary`). Wire key `asr_text`; absent on every other line, so records
+   * without corrections encode exactly as before.
+   */
+  readonly recognizedText?: string | undefined;
 }
 
 export const NOTES_GAP_REASONS = ["refused", "model_error"] as const;
@@ -26,9 +32,40 @@ export interface NotesGap {
   readonly reason: NotesGapReason;
 }
 
+/** Why LANA left a stretch of the meeting out of the notes and the exports. */
+export const SET_ASIDE_REASONS = ["phone_call", "side_conversation", "logistics", "other_matter"] as const;
+export type SetAsideReason = (typeof SET_ASIDE_REASONS)[number];
+
+/**
+ * A stretch that is not part of the meeting (a phone call, a side conversation, meeting
+ * setup, another matter). Notes never cite a line inside it and exports always leave its
+ * lines out. Wire key on the notes: `set_aside`, sorted by start, non-overlapping.
+ */
+export interface SetAsidePart {
+  readonly start: number;
+  readonly end: number;
+  readonly reason: SetAsideReason;
+  /** Diarization labels heard in it; omitted when empty. */
+  readonly speakers?: readonly string[] | undefined;
+  /** "person" for a part the person set aside by hand; omitted for parts LANA found. */
+  readonly by?: "person" | undefined;
+}
+
+/** A spoken list (products, prices, a schedule) as a table. Wire key on the notes: `tables`. */
+export interface NotesTable {
+  readonly title: string;
+  readonly columns: readonly string[];
+  readonly rows: readonly (readonly string[])[];
+  readonly sources: readonly SourceSpan[];
+}
+
 export interface MeetingNotes {
   readonly keyPoints: readonly KeyPoint[];
   readonly gaps: readonly NotesGap[];
+  /** Absent in older records: read as empty, and omitted from the encoding when empty. */
+  readonly setAside?: readonly SetAsidePart[] | undefined;
+  /** Absent in older records: read as empty, and omitted from the encoding when empty. */
+  readonly tables?: readonly NotesTable[] | undefined;
 }
 
 export const CONSENT_METHODS = ["verbal_announced", "all_parties_confirmed"] as const;
@@ -63,7 +100,7 @@ export function decodeSpeaker(value: JsonValue, path: string): Speaker {
 }
 
 export function encodeSegment(segment: TranscriptSegment): JsonObject {
-  return { speaker: segment.speaker, start: segment.start, end: segment.end, text: segment.text };
+  return { speaker: segment.speaker, start: segment.start, end: segment.end, text: segment.text, asr_text: segment.recognizedText };
 }
 
 export function decodeSegment(value: JsonValue, path: string): TranscriptSegment {
@@ -73,13 +110,18 @@ export function decodeSegment(value: JsonValue, path: string): TranscriptSegment
     start: field(object, "start", path, asNumber),
     end: field(object, "end", path, asNumber),
     text: field(object, "text", path, asString),
+    recognizedText: optional(object, "asr_text", path, asString),
   };
 }
 
 export function encodeNotes(notes: MeetingNotes): JsonObject {
+  const setAside = notes.setAside ?? [];
+  const tables = notes.tables ?? [];
   return {
     key_points: notes.keyPoints.map(encodeKeyPoint),
     gaps: notes.gaps.map((gap) => ({ start: gap.start, end: gap.end, reason: gap.reason })),
+    set_aside: setAside.length === 0 ? undefined : setAside.map(encodeSetAside),
+    tables: tables.length === 0 ? undefined : tables.map(encodeTable),
   };
 }
 
@@ -88,7 +130,52 @@ export function decodeNotes(value: JsonValue, path: string): MeetingNotes {
   return {
     keyPoints: field(object, "key_points", path, arrayOf(decodeKeyPoint)),
     gaps: field(object, "gaps", path, arrayOf(decodeGap)),
+    setAside: optional(object, "set_aside", path, arrayOf(decodeSetAside)) ?? [],
+    tables: optional(object, "tables", path, arrayOf(decodeTable)) ?? [],
   };
+}
+
+export function encodeSetAside(part: SetAsidePart): JsonObject {
+  const speakers = part.speakers ?? [];
+  return { start: part.start, end: part.end, reason: part.reason, speakers: speakers.length === 0 ? undefined : [...speakers], by: part.by };
+}
+
+export function decodeSetAside(value: JsonValue, path: string): SetAsidePart {
+  const object = asObject(value, path);
+  const speakers = optional(object, "speakers", path, arrayOf(asString)) ?? [];
+  const by = optional(object, "by", path, (v, p) => asEnum(v, ["person"] as const, p));
+  return {
+    start: field(object, "start", path, asNumber),
+    end: field(object, "end", path, asNumber),
+    reason: field(object, "reason", path, (v, p) => asEnum(v, SET_ASIDE_REASONS, p)),
+    ...(speakers.length === 0 ? {} : { speakers }),
+    ...(by === undefined ? {} : { by }),
+  };
+}
+
+export function encodeTable(table: NotesTable): JsonObject {
+  return { title: table.title, columns: [...table.columns], rows: table.rows.map((row) => [...row]), sources: table.sources.map(encodeSourceSpan) };
+}
+
+export function decodeTable(value: JsonValue, path: string): NotesTable {
+  const object = asObject(value, path);
+  return {
+    title: field(object, "title", path, asString),
+    columns: field(object, "columns", path, arrayOf(asString)),
+    rows: field(object, "rows", path, arrayOf(arrayOf(asString))),
+    sources: field(object, "sources", path, arrayOf(decodeSourceSpan)),
+  };
+}
+
+/** Whether `[start, end]` overlaps a set-aside part by more than `tolerance` seconds. */
+export function overlapsSetAside(start: number, end: number, parts: readonly SetAsidePart[] | undefined, tolerance = 0.05): boolean {
+  return (parts ?? []).some((part) => Math.min(end, part.end) - Math.max(start, part.start) > tolerance);
+}
+
+/** Whether a transcript line falls inside a set-aside part (more than half of it is covered). */
+export function segmentSetAside(segment: Pick<TranscriptSegment, "start" | "end">, parts: readonly SetAsidePart[] | undefined): boolean {
+  const length = Math.max(segment.end - segment.start, 0.01);
+  return (parts ?? []).some((part) => Math.min(segment.end, part.end) - Math.max(segment.start, part.start) >= length / 2);
 }
 
 function decodeGap(value: JsonValue, path: string): NotesGap {

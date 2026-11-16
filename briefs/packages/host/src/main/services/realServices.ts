@@ -24,6 +24,7 @@ import { NotesWriter } from "./recording/notesWriter.js";
 import { TalkService, type TalkPartsFactory } from "./talk/talkService.js";
 import { UserNotesService } from "./userNotesService.js";
 import { BleWakeAdvertiser, type BleHelperProcess } from "./bleWake/bleWakeAdvertiser.js";
+import { seedVocabularyFromConnectors } from "./vocabularySeeding.js";
 
 export interface RealServicesOptions {
   readonly runtime: GatewayRuntime;
@@ -193,7 +194,11 @@ export function createRealServices(options: RealServicesOptions): RealServices {
   const settings = new SettingsService(store.settings, options.applyTheme, emit, log);
   const audit = new AuditService(store, options.pickSavePath, log);
   const audio = new MeetingAudioService(store, log);
-  const meetingExport = new MeetingExportService(store.meetings, options.exportFiles, log);
+  const meetingExport = new MeetingExportService({
+    audioParts: (id) => store.meetings.audioParts(id),
+    audioData: (id, index) => store.meetings.audioData(id, index),
+    setAside: (id) => store.shared.current(id).notes.setAside ?? [],
+  }, options.exportFiles, log);
   const notes = new UserNotesService(store, platform.deviceNoun, log);
   const userNotes: AllLanaServices["userNotes"] = {
     save: async (meetingID, list) => {
@@ -205,12 +210,20 @@ export function createRealServices(options: RealServicesOptions): RealServices {
     },
   };
 
+  // The meeting word list starts from the firm's connector names, once LANA can list them.
+  const seedWords = (): void => {
+    if (!runtime.isSignedIn()) return;
+    void seedVocabularyFromConnectors(store.settings, () => lana.connectorNames(), log).then((seeded) => {
+      if (seeded) void preferences.publish();
+    });
+  };
   runtime.onAccount((signedIn) => {
     if (!signedIn) {
       void talk.end();
       audio.revokeAll();
     }
     void preferences.publish();
+    if (signedIn) seedWords();
   });
   // No access (signed out of the client) ends any talk.
   runtime.onAccess((open) => {
@@ -268,6 +281,7 @@ export function createRealServices(options: RealServicesOptions): RealServices {
       preferences.startRetention();
       bleWake.start();
       void recording.recover();
+      seedWords();
       // Model downloads cut off by quitting pick up from their `.part` files.
       models.resumePending();
     },

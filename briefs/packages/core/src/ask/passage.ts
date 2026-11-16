@@ -1,6 +1,7 @@
 import type { LanaId } from "../ids/lanaId.js";
 import { displayNameFor, type MeetingRecord } from "../intent/meeting.js";
 import { keyPointStart, type KeyPointKind } from "../intent/keyPoint.js";
+import { overlapsSetAside, segmentSetAside } from "../intent/meetingParts.js";
 import { regardingOf, titleOf } from "../intent/params.js";
 import { graphemeCount } from "../text/graphemes.js";
 import { isBlank } from "../text/whitespace.js";
@@ -66,8 +67,12 @@ export class PassageBuilder {
       kind, start, end, speakers, text, keyPointKind,
     });
     const name = (speaker: string): string => displayNameFor(meeting, speaker);
+    // Set-aside parts (a phone call, another matter) never reach LANA: not their lines, nor anything citing them.
+    const setAside = meeting.notes.setAside ?? [];
+    const aside = (start: number, end: number): boolean => overlapsSetAside(start, end, setAside, 0.5);
 
     for (const point of meeting.notes.keyPoints) {
+      if (point.sources.some((source) => aside(source.start, source.end))) continue;
       const names = unique(point.sources.flatMap((source) => (source.speaker === undefined ? [] : [name(source.speaker)])));
       const start = keyPointStart(point);
       const end = point.sources.length === 0 ? start : Math.max(...point.sources.map((source) => source.end));
@@ -79,6 +84,7 @@ export class PassageBuilder {
       result.push(make(`user-${note.id}`, "userNote", anchor, anchor, [], `My note: ${note.text}`));
     }
     for (const intent of meeting.intents) {
+      if (intent.evidence.some((evidence) => aside(evidence.tStart, evidence.tEnd))) continue;
       const params = intent.params;
       const kind = params.type === "note.log" ? "Proposed note"
         : params.type === "task.create" ? "Proposed task"
@@ -94,7 +100,7 @@ export class PassageBuilder {
       result.push(make(`action-${intent.id}`, "action", start, end, intent.evidence.map((evidence) => name(evidence.speaker)), lines.join("\n")));
     }
 
-    const turns = meeting.transcript.filter((turn) => !isBlank(turn.text));
+    const turns = meeting.transcript.filter((turn) => !isBlank(turn.text) && !segmentSetAside(turn, setAside));
     let index = 0;
     let number = 0;
     while (index < turns.length) {

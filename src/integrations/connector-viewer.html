@@ -416,6 +416,7 @@
   <script src="../js/menu.js"></script>
   <script src="../js/navigation-helpers.js"></script>
   <script src="../js/connectors.js"></script>
+  <script src="../js/connector-run-options.model.js"></script>
   <script src="../js/shared/connector-oauth-exchange.js"></script>
 
   <script src="../js/lex/lex.core.js"></script>
@@ -1000,7 +1001,18 @@
         return;
       }
 
-      const result = await api.get(`/api/v1/integrations/connectors/catalog/${encodeURIComponent(state.connectorType)}`);
+      // By connection id first, so run options are worded for this
+      // connection; by type if that read fails.
+      const paths = LanaConnectorRunOptions.catalogPaths(state.connectorType, state.sourceId);
+      let result = null;
+      for (let i = 0; i < paths.length; i += 1) {
+        try {
+          result = await api.get(paths[i]);
+          break;
+        } catch (error) {
+          if (i === paths.length - 1) throw error;
+        }
+      }
       state.catalog = result.connector || null;
       state.connectorScope = normalizeConnectorScope(
         state.catalog?.connector_scope ||
@@ -1602,8 +1614,8 @@
 
     function getRunTabModel() {
       const runBehavior = getUiBehavior().run || {};
-      const options = Array.isArray(runBehavior.options) ? runBehavior.options : [];
-      if (Object.keys(runBehavior).length) {
+      const options = LanaConnectorRunOptions.servedOptions(runBehavior);
+      if (LanaConnectorRunOptions.hasPackageRunBehavior(runBehavior)) {
         return {
           supportsDateRange: Boolean(runBehavior.supports_date_range),
           supportsValidationHarness: Boolean(runBehavior.supports_validation_harness),
@@ -1639,7 +1651,7 @@
           'After sync, use Output to search, assign, and shortlist edits instead of manually overwriting connector payloads.',
           'Use Execution Logs for server-side failures and status transitions.'
         ],
-        options: [],
+        options,
         optionsHeader: 'Advanced options',
         optionsDescription: ''
       };

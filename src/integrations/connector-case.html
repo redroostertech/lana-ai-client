@@ -20,6 +20,7 @@
   <script src="../js/lex/components/form/lex-select.js"></script>
   <script src="../js/menu.js"></script>
   <script src="../js/connectors.js"></script>
+  <script src="../js/connector-sync-queue.model.js"></script>
 </head>
 <body class="bg-gray-50 min-h-screen">
   <!-- Sidebar -->
@@ -341,9 +342,13 @@
       try {
         Toast.info('Starting sync...');
         const result = await Connectors.triggerSync(connectorId);
-        Toast.success(`Synced ${result.records_synced} records`);
+        Toast.success(LanaConnectorSyncQueue.startedMessage(result));
         loadConnectors();
       } catch (error) {
+        if (LanaConnectorSyncQueue.isAlreadySyncing(error)) {
+          Toast.info('This connection is already syncing.');
+          return;
+        }
         Toast.error('Sync failed: ' + error.message);
       }
     }

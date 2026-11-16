@@ -4,6 +4,8 @@ import {
   AAC_SAMPLES_PER_FRAME, audioParts, localMeetingRecord, packFrames, packPcm, RECORDING_SAMPLE_RATE, RecordingJournal, TRANSCRIPTION_SAMPLE_RATE, unpackFrames,
   type RecordingSealer, type TranscriptionModelPaths,
 } from "@lana/core/recording";
+import { loadVocabulary } from "@lana/core/gateway";
+import type { VocabularyEntry } from "@lana/core/recording";
 import type { GatewayStore } from "@lana/core/store";
 import { join } from "node:path";
 import type {
@@ -36,7 +38,7 @@ const BUSY = { code: "busy", message: "A recording is already in progress." } as
 
 /** Whole-meeting transcription, in a worker thread in the app. */
 export interface MeetingTranscription {
-  transcribe(models: TranscriptionModelPaths, pcm: Uint8Array[], progress: (fraction: number) => void): Promise<{ speakers: Speaker[]; transcript: TranscriptSegment[] }>;
+  transcribe(models: TranscriptionModelPaths, pcm: Uint8Array[], progress: (fraction: number) => void, vocabulary?: readonly VocabularyEntry[]): Promise<{ speakers: Speaker[]; transcript: TranscriptSegment[] }>;
 }
 
 export interface RecordingServiceOptions {
@@ -385,7 +387,7 @@ export class RecordingService implements RecordingApi {
       journal.close();
       const result = await this.options.transcription.transcribe(this.options.models.paths(), pcm, (fraction) => {
         if (show) this.publish({ ...this.view, phase: "transcribing", progress: fraction });
-      });
+      }, loadVocabulary(this.options.store.settings));
       this.options.store.shared.edit(id, (record) => ({ ...record, speakers: result.speakers, transcript: result.transcript }), "meeting.transcribed");
       journal.remove();
       this.options.meetingStored(id);

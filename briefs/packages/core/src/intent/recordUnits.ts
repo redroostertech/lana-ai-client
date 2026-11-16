@@ -5,7 +5,7 @@ import { utf8 } from "../bytes/utf8.js";
 import { decodeIntent, encodeIntent } from "./intent.js";
 import { decodeKeyPoint, encodeKeyPoint, keyPointStart } from "./keyPoint.js";
 import type { MeetingRecord } from "./meeting.js";
-import { decodeNotes, decodeSegment, decodeSpeaker, encodeNotes, encodeSegment, encodeSpeaker, type NotesGap } from "./meetingParts.js";
+import { decodeNotes, decodeSegment, decodeSpeaker, encodeNotes, encodeSegment, encodeSpeaker, type MeetingNotes, type NotesGap } from "./meetingParts.js";
 import { decodeOutcome, EMPTY_SYNC, encodeOutcome } from "./meetingSync.js";
 import { decodeTranscriptClip, encodeTranscriptClip } from "./transcriptClip.js";
 import { decodeUserNote, encodeUserNote } from "./userNote.js";
@@ -13,13 +13,17 @@ import { decodeUserNote, encodeUserNote } from "./userNote.js";
 /**
  * Swift `RecordUnits`: a record split into the units merged one by one (`title`,
  * `speaker/<id>`, `segment/<index>`, `gaps`, `keypoint/<id>`, `note/<id>`, `clip/<id>`,
- * `intent/<id>`, `outcome/<intent id>`), each as canonical JSON, and rebuilt in a fixed
- * order so both devices produce byte-identical records.
+ * `intent/<id>`, `outcome/<intent id>`, and `set_aside` and `tables` only when not empty),
+ * each as canonical JSON, and rebuilt in a fixed order so both devices produce
+ * byte-identical records.
  */
 export function recordUnits(record: MeetingRecord): Map<string, string> {
   const units = new Map<string, string>();
   units.set("title", canonicalString(record.title));
   units.set("gaps", canonicalString(encodeNotes({ keyPoints: [], gaps: record.notes.gaps }).gaps ?? []));
+  const extras = encodeNotes({ keyPoints: [], gaps: [], setAside: record.notes.setAside, tables: record.notes.tables });
+  if (extras["set_aside"] !== undefined) units.set("set_aside", canonicalString(extras["set_aside"]));
+  if (extras["tables"] !== undefined) units.set("tables", canonicalString(extras["tables"]));
   for (const speaker of record.speakers) units.set(`speaker/${speaker.id}`, canonicalString(encodeSpeaker(speaker)));
   record.transcript.forEach((segment, index) => units.set(`segment/${index}`, canonicalString(encodeSegment(segment))));
   for (const point of record.notes.keyPoints) units.set(`keypoint/${point.id}`, canonicalString(encodeKeyPoint(point)));
@@ -48,6 +52,7 @@ const byID = (a: { id: string }, b: { id: string }): number => (a.id < b.id ? -1
 export function rebuildRecord(base: MeetingRecord, units: Map<string, string>): MeetingRecord {
   const title = units.get("title");
   const gaps = units.get("gaps");
+  const extras = notesExtras(units.get("set_aside"), units.get("tables"));
   const outcomes = values(units, "outcome/", decodeOutcome).map((entry) => entry.value).sort((a, b) => (a.intentID < b.intentID ? -1 : a.intentID > b.intentID ? 1 : 0));
   const sync = base.sync !== undefined || outcomes.length > 0 ? { ...(base.sync ?? EMPTY_SYNC), outcomes } : undefined;
   return {
@@ -59,6 +64,8 @@ export function rebuildRecord(base: MeetingRecord, units: Map<string, string>): 
       gaps: gaps === undefined ? [] : (decodeNotes({ key_points: [], gaps: parseUnit(gaps) }, "gaps").gaps as NotesGap[]),
       keyPoints: values(units, "keypoint/", decodeKeyPoint).map((entry) => entry.value)
         .sort((a, b) => keyPointStart(a) - keyPointStart(b) || byID(a, b)),
+      setAside: extras.setAside,
+      tables: extras.tables,
     },
     userNotes: values(units, "note/", decodeUserNote).map((entry) => entry.value).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || byID(a, b)),
     clips: values(units, "clip/", decodeTranscriptClip).map((entry) => entry.value).sort((a, b) => a.start - b.start || byID(a, b)),
@@ -66,6 +73,16 @@ export function rebuildRecord(base: MeetingRecord, units: Map<string, string>): 
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || byID(a, b)),
     sync,
   };
+}
+
+/** The `set_aside` and `tables` units, empty when absent. */
+function notesExtras(setAside: string | undefined, tables: string | undefined): Pick<MeetingNotes, "setAside" | "tables"> {
+  const notes = decodeNotes({
+    key_points: [], gaps: [],
+    ...(setAside === undefined ? {} : { set_aside: parseUnit(setAside) }),
+    ...(tables === undefined ? {} : { tables: parseUnit(tables) }),
+  }, "notes");
+  return { setAside: notes.setAside ?? [], tables: notes.tables ?? [] };
 }
 
 /** The record in the fixed order. */
