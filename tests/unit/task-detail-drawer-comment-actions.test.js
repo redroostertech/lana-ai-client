@@ -63,6 +63,7 @@ function loadDrawer(options = {}) {
   const Lex = {
     Auth: { user: { id: 'user-1', name: 'Test User' } },
     Toast: { warning: jest.fn(), success: jest.fn(), error: jest.fn() },
+    Utils: { taskWorkspaceName: (task) => (task && task.matter_name) || '' },
     Modal: { confirm: jest.fn((title, message, onConfirm) => onConfirm && onConfirm()) },
   };
   const windowStub = { Lex, api: options.api };

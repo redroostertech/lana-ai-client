@@ -69,6 +69,27 @@ describe('lex-table server paging', () => {
     expect(table.render()).toContain('animate-pulse');
   });
 
+  // Run History refreshes every few seconds; a refresh used to swap the rows
+  // for the loading skeleton until the server answered.
+  test('a quiet refresh keeps the shown rows; the first load and a normal query still show the skeleton', () => {
+    const window = loadLex();
+    const table = serverTable(window);
+    table.requestServerQuery({ quiet: true });
+    expect(table.dataSource.loading).toBe(true);
+    expect(table.render()).toContain('animate-pulse');
+
+    table.setServerData([{ id: 'a', name: 'Brief.docx', workspace: 'Smith', updated_at: '' }], { page: 1, total: 1 });
+    table.requestServerQuery({ quiet: true });
+    expect(table.dataSource.loading).toBe(false);
+    expect(lastEvent(table, 'lex-query-change')).toBeTruthy();
+    expect(table.render()).toContain('Brief.docx');
+    expect(table.render()).not.toContain('animate-pulse');
+
+    table.requestServerQuery();
+    expect(table.dataSource.loading).toBe(true);
+    expect(table.render()).toContain('animate-pulse');
+  });
+
   test('setServerData renders the page and reads snake_case pagination', () => {
     const window = loadLex();
     const table = serverTable(window);

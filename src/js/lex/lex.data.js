@@ -398,8 +398,10 @@
       };
     }
 
-    requestServerQuery() {
-      this._loading = true;
+    // quiet: a background refresh of a page already shown keeps its rows on
+    // screen instead of the loading skeleton until the new page answers.
+    requestServerQuery(quiet = false) {
+      this._loading = !(quiet && this._serverPageShown && !this._error);
       this._error = null;
       this.element._scheduleUpdate();
       this.element.emit('lex-query-change', this.query);
@@ -411,6 +413,7 @@
       const total = Number(pagination.total);
       const totalPages = Number(pagination.totalPages || pagination.total_pages);
       this._serverMode = true;
+      this._serverPageShown = true;
       this._clientSideMode = false;
       this._data = list;
       this._pagination.page = Number(pagination.page) || this._pagination.page || 1;
@@ -720,11 +723,12 @@
       }
 
       // Ask the page for data: shows the loading state and emits
-      // 'lex-query-change'. Pass { resetPage: true } after an outside filter changes.
+      // 'lex-query-change'. Pass { resetPage: true } after an outside filter changes,
+      // { quiet: true } for a background refresh that keeps the shown rows.
       requestServerQuery(options = {}) {
         const source = this._ensureServerSource();
         if (options.resetPage) source._pagination.page = 1;
-        source.requestServerQuery();
+        source.requestServerQuery(options.quiet === true);
       }
 
       // Hand one page of rows back: pagination accepts { page, limit|page_size,

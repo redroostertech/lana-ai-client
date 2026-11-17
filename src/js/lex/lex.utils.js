@@ -470,6 +470,25 @@
     scrollRAF = requestAnimationFrame(step);
   }
 
+  // ── Task workspace ────────────────────────────────────────────────────
+  // The workspace (matter) a task belongs to, from the task's own matter or
+  // workspace fields only. Never parsed out of the title: a system task titled
+  // "Review UTM Source Hygiene - INFO" has no workspace, and its severity
+  // suffix is not one. '' means the task is organization-level.
+  function taskWorkspaceName(task) {
+    if (!task) return '';
+    return (
+      task.matter_name ||
+      task.matterName ||
+      task.client_matter_name ||
+      task.workspace_name ||
+      task.workspaceName ||
+      (task.matter && (task.matter.matter_name || task.matter.name)) ||
+      (task.workspace && task.workspace.name) ||
+      ''
+    );
+  }
+
   // ── Public API ────────────────────────────────────────────────────────
 
   global.Lex.Scroll = {
@@ -522,7 +541,8 @@
     formatPercentage:   formatPercentage,
     statusBadge:        statusBadge,
     getFileType:        getFileType,
-    setLexButtonText:   setLexButtonText
+    setLexButtonText:   setLexButtonText,
+    taskWorkspaceName:  taskWorkspaceName
   };
 
   // ── Backward-compat globals ───────────────────────────────────────────

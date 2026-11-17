@@ -46,7 +46,7 @@ function memoryStorage() {
 
 describe('connection health summary', () => {
   test('every reason code has short, plain copy', () => {
-    expect(H.reasonText('auth_expired')).toBe('Not signed in. Connect to keep syncing.');
+    expect(H.reasonText('auth_expired')).toBe('Not signed in. Sign in again to keep syncing.');
     expect(H.reasonText('stale_sync')).toBe('No successful sync in the last day.');
     expect(H.reasonText('inactive')).toBe('This connection is turned off.');
     expect(H.reasonText('sync_disabled')).toBe('Syncing is turned off.');
@@ -60,19 +60,19 @@ describe('connection health summary', () => {
     const view = H.healthView(HEALTH);
     expect(view.needsAttention).toBe(2);
     expect(view.items.map((i) => i.id)).toEqual([SOURCE_A, SOURCE_B]);
-    expect(view.items[0]).toMatchObject({ name: 'Gmail', connectorId: 'gmail', scope: 'personal', action: 'Reconnect' });
-    expect(view.items[0].reasons).toEqual(['Not signed in. Connect to keep syncing.', 'Some syncs failed today.']);
+    expect(view.items[0]).toMatchObject({ name: 'Gmail', connectorId: 'gmail', scope: 'personal', action: 'Sign in again' });
+    expect(view.items[0].reasons).toEqual(['Not signed in. Sign in again to keep syncing.', 'Some syncs failed today.']);
     expect(view.items[1]).toMatchObject({ name: 'Clio', action: 'Open', reasons: ['No successful sync in the last day.'] });
     expect(H.rowNeedsAttention(view, ['clio', SOURCE_B])).toBe(true);
     expect(H.rowNeedsAttention(view, ['33333333-4444-4555-8666-777777777777'])).toBe(false);
   });
 
-  test('the summary lists each affected connection with a Reconnect or Open button', () => {
+  test('the summary lists each affected connection with a Sign in again or Open button', () => {
     const html = H.attentionMarkup(H.healthView(HEALTH));
     expect(html).toContain('<lex-badge label="Needs attention" color="yellow" size="sm"></lex-badge>');
     expect(html).toContain('2 connections need a look.');
-    expect(html).toContain('Not signed in. Connect to keep syncing.');
-    expect(html).toContain(`data-dc-health-open="${SOURCE_A}" data-dc-health-connector="gmail">Reconnect</lex-btn>`);
+    expect(html).toContain('Not signed in. Sign in again to keep syncing.');
+    expect(html).toContain(`data-dc-health-open="${SOURCE_A}" data-dc-health-connector="gmail">Sign in again</lex-btn>`);
     expect(html).toContain(`data-dc-health-open="${SOURCE_B}" data-dc-health-connector="clio">Open</lex-btn>`);
     expect(html).not.toContain('QuickBooks');
   });
@@ -313,7 +313,7 @@ describe('the reason on a row and in the viewer', () => {
   test('rowAttention gives the reason text for a flagged source (control: healthy or unknown ids give null)', () => {
     const view = H.healthView(HEALTH);
     expect(H.rowAttention(view, ['clio', SOURCE_B]).reasonText).toBe('No successful sync in the last day.');
-    expect(H.rowAttention(view, [SOURCE_A]).reasonText).toBe('Not signed in. Connect to keep syncing. Some syncs failed today.');
+    expect(H.rowAttention(view, [SOURCE_A]).reasonText).toBe('Not signed in. Sign in again to keep syncing. Some syncs failed today.');
     expect(H.rowAttention(view, ['33333333-4444-4555-8666-777777777777'])).toBeNull();
     expect(H.rowAttention(null, [SOURCE_A])).toBeNull();
   });
@@ -324,12 +324,14 @@ describe('the reason on a row and in the viewer', () => {
     });
     expect(H.nextStepText(['auth_expired', 'recent_failures'])).toBe(H.nextStepText(['auth_expired']));
     expect(H.nextStepText([])).toBe('');
+    // A refused or failed sign-in asks the admin to sign in again.
+    expect(H.nextStepText(['auth_expired'])).toBe('Go to Configuration and sign in again.');
   });
 
   test('the viewer notice names the reason and the next step for a flagged source (control: healthy source shows nothing)', () => {
     const view = H.healthView(HEALTH);
     const notice = H.viewerNotice(view, SOURCE_A);
-    expect(notice.reason).toBe('Not signed in. Connect to keep syncing. Some syncs failed today.');
+    expect(notice.reason).toBe('Not signed in. Sign in again to keep syncing. Some syncs failed today.');
     expect(notice.nextStep).toBe(H.nextStepText(['auth_expired']));
     const html = H.viewerNoticeMarkup(notice);
     expect(html).toContain('role="status"');
@@ -348,7 +350,7 @@ describe('the reason on a row and in the viewer', () => {
 
 describe('reason copy', () => {
   test('not signed in hides the no-sync reason it explains; other reasons stay (control: stale sync alone still shows)', () => {
-    expect(H.reasonList(['auth_expired', 'sync_disabled', 'stale_sync'])).toEqual(['Not signed in. Connect to keep syncing.', 'Syncing is turned off.']);
+    expect(H.reasonList(['auth_expired', 'sync_disabled', 'stale_sync'])).toEqual(['Not signed in. Sign in again to keep syncing.', 'Syncing is turned off.']);
     expect(H.reasonList(['stale_sync'])).toEqual(['No successful sync in the last day.']);
   });
 });
@@ -360,5 +362,46 @@ describe('connector viewer wiring', () => {
     expect(html).toContain('<link rel="stylesheet" href="../css/connector-health-notice.css">');
     expect(html).toContain('<div id="healthNotice" hidden></div>');
     expect(html).toMatch(/view\.viewerNotice\(view\.healthView\(await Connectors\.getHealth\(\)\), state\.sourceId\)/);
+  });
+
+  // The Setup card read "35777 records synced" next to Records Synced 35,421.
+  // The card is the last sync's count and says so; the Setup message (from
+  // the backend summary) is the records stored now.
+  test('the Records Synced card says it is the last sync count', () => {
+    const html = read('integrations/connector-viewer.html');
+    expect(html).toContain("formatNumber(lastSync && (lastSync.records_processed || lastSync.records_fetched || 0))");
+    // The subtitle names only the last sync's count; the entity type count
+    // is not placed under it, where it would read as a last-sync figure.
+    expect(html).toContain("? 'Records the last sync processed'");
+    expect(html).not.toContain("['In the last sync', entityTypesText]");
+  });
+});
+
+// The backend says which sign-in failed (connector-health.model); the copy
+// follows the code. Only an OAuth grant failure asks for a new sign-in.
+describe('not signed in, by backend reason code', () => {
+  const H = require('../../src/js/shared/connector-health-view.js');
+
+  test.each([
+    ['auth_expired', 'Not signed in. Sign in again to keep syncing.', 'Go to Configuration and sign in again.', 'Sign in again'],
+    ['api_key_invalid', 'The API key is missing or was not accepted.', 'Go to Configuration and check the API key.', 'Check the API key'],
+    ['app_credentials_invalid', 'The app credentials for this connector need fixing. Signing in again will not help.',
+      'Contact support to fix the app credentials.', 'Open'],
+    ['credentials_invalid', 'The connection details are missing or were not accepted.',
+      'Go to Configuration and check the connection details.', 'Check the connection details'],
+    ['firm_app_credentials_invalid', 'Your OAuth app credentials for this connector were not accepted.',
+      'Fix the app credentials in Configuration, then sign in again.', 'Fix the app credentials'],
+    ['not_connected', 'This connection is not connected.', 'Go to Configuration and check the connection.', 'Check the connection'],
+    ['provider_unavailable', 'The provider was unavailable for several syncs, so syncing paused.',
+      'Run a sync from the Run tab once the provider is back.', 'Open']
+  ])('%s', (code, reason, step, action) => {
+    const view = H.healthView({ connections: [{ id: 'c-1', connector_id: 'x', name: 'X', status: 'needs_attention', reasons: [code, 'stale_sync'] }] });
+    expect(view.items[0].reasons[0]).toBe(reason);
+    expect(view.items[0].nextStep).toBe(step);
+    expect(view.items[0].action).toBe(action);
+    if (code !== 'provider_unavailable') {
+      // Not being signed in already explains the missing sync.
+      expect(view.items[0].reasons).toEqual([reason]);
+    }
   });
 });

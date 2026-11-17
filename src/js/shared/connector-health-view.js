@@ -19,10 +19,23 @@
 
   // ── Connection health ───────────────────────────────────────────────
 
+  // The backend reason code picks the copy (connector-health.model). Not
+  // signed in is one of: auth_expired (OAuth: sign in again),
+  // api_key_invalid (check the API key), credentials_invalid (check the
+  // connection details), firm_app_credentials_invalid (the firm's own OAuth
+  // app: fix it in Configuration, then sign in again),
+  // app_credentials_invalid (LANA's OAuth app: contact support) or
+  // not_connected (the kind is unknown: neutral copy).
   var REASON_COPY = {
-    auth_expired: 'Not signed in. Connect to keep syncing.',
+    auth_expired: 'Not signed in. Sign in again to keep syncing.',
+    api_key_invalid: 'The API key is missing or was not accepted.',
+    credentials_invalid: 'The connection details are missing or were not accepted.',
+    firm_app_credentials_invalid: 'Your OAuth app credentials for this connector were not accepted.',
+    app_credentials_invalid: 'The app credentials for this connector need fixing. Signing in again will not help.',
+    not_connected: 'This connection is not connected.',
     inactive: 'This connection is turned off.',
     sync_disabled: 'Syncing is turned off.',
+    provider_unavailable: 'The provider was unavailable for several syncs, so syncing paused.',
     sync_error: 'The last sync failed.',
     stale_sync: 'No successful sync in the last day.',
     recent_failures: 'Some syncs failed today.'
@@ -30,12 +43,29 @@
   // What to do next, in the words of the connector viewer's tabs. The backend
   // lists reasons in precedence order, so the first one picks the step.
   var NEXT_STEP_COPY = {
-    auth_expired: 'Go to Configuration and connect again.',
+    auth_expired: 'Go to Configuration and sign in again.',
+    api_key_invalid: 'Go to Configuration and check the API key.',
+    credentials_invalid: 'Go to Configuration and check the connection details.',
+    firm_app_credentials_invalid: 'Fix the app credentials in Configuration, then sign in again.',
+    app_credentials_invalid: 'Contact support to fix the app credentials.',
+    not_connected: 'Go to Configuration and check the connection.',
     inactive: 'Go to Configuration and turn the connection back on.',
     sync_disabled: 'Go to Configuration and turn syncing back on.',
+    provider_unavailable: 'Run a sync from the Run tab once the provider is back.',
     sync_error: 'Open Execution Logs to see what failed, then run a sync from Run.',
     stale_sync: 'Run a sync from the Run tab.',
     recent_failures: 'Open Execution Logs to see what failed.'
+  };
+  var NOT_SIGNED_IN = ['auth_expired', 'api_key_invalid', 'credentials_invalid',
+    'firm_app_credentials_invalid', 'app_credentials_invalid', 'not_connected'];
+  // The summary button for the action the admin can take from the viewer;
+  // every other reason opens it.
+  var ACTION_COPY = {
+    auth_expired: 'Sign in again',
+    api_key_invalid: 'Check the API key',
+    credentials_invalid: 'Check the connection details',
+    firm_app_credentials_invalid: 'Fix the app credentials',
+    not_connected: 'Check the connection'
   };
   var FALLBACK_REASON = 'Something needs a look.';
   var ATTENTION_LIST_MAX = 5;
@@ -48,14 +78,24 @@
   function reasonList(codes) {
     var out = [];
     var list = Array.isArray(codes) ? codes : [];
-    // Not being signed in already explains why nothing synced; do not say both.
-    var notSignedIn = list.indexOf('auth_expired') !== -1;
+    // Any not-signed-in reason already explains why nothing synced; do not
+    // say both.
+    var notSignedIn = NOT_SIGNED_IN.some(function (code) { return list.indexOf(code) !== -1; });
     list.forEach(function (code) {
       if (notSignedIn && code === 'stale_sync') return;
       var text = reasonText(code);
       if (out.indexOf(text) === -1) out.push(text);
     });
     return out.length ? out : [FALLBACK_REASON];
+  }
+
+  /** The summary button label for a list of reason codes. */
+  function actionText(codes) {
+    var list = Array.isArray(codes) ? codes : [];
+    for (var i = 0; i < list.length; i += 1) {
+      if (ACTION_COPY[list[i]]) return ACTION_COPY[list[i]];
+    }
+    return 'Open';
   }
 
   /** The next step for a list of reason codes, or '' when none is known. */
@@ -88,7 +128,7 @@
         reasons: copy,
         reasonText: copy.join(' '),
         nextStep: nextStepText(reasons),
-        action: reasons.indexOf('auth_expired') !== -1 ? 'Reconnect' : 'Open'
+        action: actionText(reasons)
       };
     });
     var attention = {};
@@ -342,6 +382,7 @@
     rowNeedsAttention: rowNeedsAttention,
     rowAttention: rowAttention,
     nextStepText: nextStepText,
+    actionText: actionText,
     viewerNotice: viewerNotice,
     viewerNoticeMarkup: viewerNoticeMarkup,
     capabilityText: capabilityText,

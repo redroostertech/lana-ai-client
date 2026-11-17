@@ -42,7 +42,7 @@ function loadDrawer(api) {
     body: { appendChild: (el) => { if (el.id) registry[el.id] = el; } },
     addEventListener: (type, fn) => { (listeners[type] = listeners[type] || []).push(fn); }
   };
-  const Lex = { Auth: { user: { id: 'user-1', name: 'Test User' } }, Toast: { success: jest.fn(), error: jest.fn(), warning: jest.fn() } };
+  const Lex = { Auth: { user: { id: 'user-1', name: 'Test User' } }, Utils: { taskWorkspaceName: (task) => (task && task.matter_name) || '' }, Toast: { success: jest.fn(), error: jest.fn(), warning: jest.fn() } };
   const windowStub = { Lex, api };
   vm.runInNewContext(drawerSource, {
     window: windowStub,

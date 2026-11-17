@@ -20,8 +20,21 @@ function loadDashboardTaskMatterName() {
   expect(start).toBeGreaterThan(-1);
   expect(end).toBeGreaterThan(start);
   // eslint-disable-next-line no-new-func
-  return new Function(source.slice(start, end) + '\nreturn dashboardTaskMatterName;')();
+  return new Function('Lex', source.slice(start, end) + '\nreturn dashboardTaskMatterName;')(loadLex());
 }
+
+// The real Lex.Utils (the shared taskWorkspaceName rule) on a bare window.
+function loadLex() {
+  const read = (rel) => fs.readFileSync(path.join(__dirname, '..', '..', rel), 'utf8');
+  const window = { localStorage: { getItem: () => null }, Intl, Date };
+  // eslint-disable-next-line no-new-func
+  new Function('window', read('src/js/time-utils.js'))(window);
+  // eslint-disable-next-line no-new-func
+  new Function('window', 'document', read('src/js/lex/lex.utils.js'))(window, { createTextNode: (t) => ({ textContent: String(t) }) });
+  return window.Lex;
+}
+
+
 
 describe('dashboardTaskMatterName', () => {
   const dashboardTaskMatterName = loadDashboardTaskMatterName();

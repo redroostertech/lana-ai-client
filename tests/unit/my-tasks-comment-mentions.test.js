@@ -128,6 +128,7 @@ function loadMyTasks(options = {}) {
       },
       formatDate(value) { return String(value || ''); },
       setLexButtonText() {},
+      taskWorkspaceName(task) { return (task && task.matter_name) || ''; },
     },
     Toast: { warning: jest.fn(), error: jest.fn(), success: jest.fn() },
     Modal: { confirm: jest.fn() },

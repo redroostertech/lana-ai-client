@@ -2472,9 +2472,14 @@
       document.getElementById('lastSyncStatus').textContent = lastSyncDisplay.status;
       document.getElementById('lastSyncTime').textContent = lastSyncDisplay.detail;
       document.getElementById('recordsSynced').textContent = formatNumber(lastSync && (lastSync.records_processed || lastSync.records_fetched || 0));
-      document.getElementById('entityCountSummary').textContent = entityEntries.length
+      // This card is the last sync's own count. The Setup card's message is
+      // what LANA holds now ("records stored"), so the two can differ.
+      const entityTypesText = entityEntries.length
         ? `${entityEntries.length} entity type${entityEntries.length === 1 ? '' : 's'} tracked`
-        : (lastSyncDisplay.helper || 'No connector data yet');
+        : '';
+      document.getElementById('entityCountSummary').textContent = lastSync
+        ? 'Records the last sync processed'
+        : (entityTypesText || lastSyncDisplay.helper || 'No connector data yet');
 
       overviewNode.innerHTML = `
         <div class="max-w-5xl space-y-8">

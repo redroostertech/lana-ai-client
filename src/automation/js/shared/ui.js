@@ -443,7 +443,8 @@ export function keepServerTableLive({ id, store, isLive, intervalMs = 4000, idle
       const table = document.getElementById(id);
       if (!table || typeof table.requestServerQuery !== 'function') return null;
       invalidateServerTable(store);
-      table.requestServerQuery();
+      // Quiet: the rows on screen stay until the fresh page answers.
+      table.requestServerQuery({ quiet: true });
       return store.cache ? store.cache.promise : null;
     }
   }).start();

@@ -956,17 +956,7 @@
   }
 
   function dashboardTaskMatterName(task) {
-    if (!task) return '';
-    return (
-      task.matter_name ||
-      task.matterName ||
-      task.client_matter_name ||
-      task.workspace_name ||
-      task.workspaceName ||
-      (task.matter && (task.matter.matter_name || task.matter.name)) ||
-      (task.workspace && task.workspace.name) ||
-      ''
-    );
+    return Lex.Utils.taskWorkspaceName(task);
   }
 
   function renderDashboardTaskMatterKv(task, matterName) {

@@ -841,6 +841,7 @@ table.addEventListener('lex-query-change', async (e) => {
 });
 table.requestServerQuery();                      // first load
 table.requestServerQuery({ resetPage: true });   // after a filter outside the table changes
+table.requestServerQuery({ quiet: true });       // background refresh: keeps the shown rows, no skeleton
 ```
 **RULE:** with `server-paging`, list in `sortable-columns` only what the API can sort, and keep filters outside the table (column filters would only see one page).
 

@@ -2665,11 +2665,12 @@
     _renderTaskItem(task) {
       const id = task.id || task.task_id || '';
       const title = task.title || task.name || task.task_title || 'Untitled Task';
-      const titleParts = this._splitTaskTitle(title);
-      const displayTitle = this._truncateTaskTitle(titleParts.taskTitle);
-      const matter = this._getTaskMatterName(task);
+      const displayTitle = this._truncateTaskTitle(title);
+      // The workspace comes from the task's matter only, never from its title
+      // (shared rule: Lex.Utils.taskWorkspaceName).
+      const matter = Lex.Utils.taskWorkspaceName(task) || 'Organization-level';
       const due = this._getTaskDueBucket(task);
-      const meta = [matter || titleParts.matterName, due.label].filter(Boolean).join(' · ');
+      const meta = [matter, due.label].filter(Boolean).join(' · ');
       return `<button type="button" class="lex-sidebar-task-item" data-task-id="${this.escapeHtml(id)}" title="${this.escapeHtml(title)}">
         <span class="lex-sidebar-task-icon">${icon('clipboard-check', 'small')}</span>
         <span class="lex-sidebar-task-copy">
@@ -2683,35 +2684,6 @@
       const id = String(taskId || '');
       if (!id || !Array.isArray(this._taskItems)) return null;
       return this._taskItems.find((task) => String(task?.id || task?.task_id || '') === id) || null;
-    }
-
-    _getTaskMatterName(task) {
-      return (
-        task?.matter_name ||
-        task?.matterName ||
-        task?.client_matter_name ||
-        task?.workspace_name ||
-        task?.workspaceName ||
-        task?.matter?.matter_name ||
-        task?.matter?.name ||
-        task?.workspace?.name ||
-        ''
-      );
-    }
-
-    _splitTaskTitle(title) {
-      const value = String(title || '').trim();
-      const separators = [' — ', ' – ', ' - '];
-      for (const separator of separators) {
-        const index = value.lastIndexOf(separator);
-        if (index > 0 && index < value.length - separator.length) {
-          return {
-            taskTitle: value.slice(0, index).trim(),
-            matterName: value.slice(index + separator.length).trim()
-          };
-        }
-      }
-      return { taskTitle: value, matterName: '' };
     }
 
     _truncateTaskTitle(title) {
