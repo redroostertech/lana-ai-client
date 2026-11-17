@@ -1,5 +1,5 @@
 export {
-  addingSetAside, attributePoint, finalSetAside, isLogistics, MeetingSummarizer, visitorParts, normalizeSetAside, promiseAction, SummarizerUnavailableError,
+  addingSetAside, attributePoint, finalSetAside, finishCandidate, isLogistics, MeetingSummarizer, visitorParts, normalizeSetAside, promiseAction, SummarizerUnavailableError,
   type NotesBackend, type SkippedChunk, type SummarizeOptions, type SummaryResult,
 } from "./meetingSummarizer.js";
 export { resolveDueText } from "./dueDates.js";
@@ -13,10 +13,15 @@ export {
   type CandidateQuote, type ChunkExtraction, type ChunkPhrasing, type ChunkRequest, type ExtractedAside, type ExtractedPoint, type ExtractedTable, type QuotedCandidate,
 } from "./notesFormat.js";
 export { groundQuotes } from "./evidenceGrounder.js";
-export { DEFAULT_SUMMARY_LIMITS, isDuplicate, reduceIntents, reduceKeyPoints, spansFor, unionSpans, type DraftPoint, type SummaryLimits } from "./summaryReducer.js";
+export { capInTurn, DEFAULT_SUMMARY_LIMITS, isDuplicate, reduceIntents, reduceKeyPoints, spansFor, unionSpans, type DraftPoint, type SummaryLimits } from "./summaryReducer.js";
 export { normalizedWords, normalizeText, textSimilarity } from "./textNormalizer.js";
 export {
   chunkEnd, chunkLine, chunkPromptText, chunkStart, DEFAULT_CHUNK_BUDGET, HEURISTIC_TOKENS, oneDecimal, segmentAtLine, TranscriptChunker,
   type ChunkBudget, type TokenCounter, type TranscriptChunk,
 } from "./transcriptChunk.js";
 export { RuntimeNotesBackend } from "./runtimeNotesBackend.js";
+export {
+  FIND_MORE_CHUNK_BUDGET, FIND_MORE_MAX_RESPONSE_TOKENS, FIND_MORE_MAX_SUGGESTIONS, FIND_MORE_RULES, FIND_MORE_SCHEMA, findMoreInstructions, findMorePrompt,
+  answeredText, checkedKind, commitmentAction, covered, FIND_MORE_ANSWER_WORDS, FIND_MORE_NOT_NAMES, meetingPeople, taskShape, FIND_MORE_KIND_WORDS, FindMoreUnavailableError, knownForChunk, NoteFinder, parseFindMore, validateFindMore,
+  type FindMoreBackend, type FindMoreKnown, type FindMoreOptions, type FindMoreRequest, type FindMoreResult, type FindMoreSuggestion, type SuggestionKind,
+} from "./findMore.js";

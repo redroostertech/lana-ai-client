@@ -59,7 +59,7 @@ export function tidyEventKey(event: string): string {
 export function auditCategory(event: string): AuditCategory {
   const prefix = event.split(".")[0] ?? "";
   if (event === "audio.purged" || event === "store.imported" || prefix === "connector" || prefix === "entitlement") return "security";
-  if (prefix === "bundle" || prefix === "meeting" || prefix === "record") return "meetings";
+  if (prefix === "bundle" || prefix === "meeting" || prefix === "record" || prefix === "find_more") return "meetings";
   if (prefix === "device" || prefix === "handoff") return "devices";
   if (prefix === "intent" || prefix === "action" || prefix === "draft") return "actions";
   return "security";
@@ -149,6 +149,12 @@ function count(value: string | undefined): number | null {
   return Number(value);
 }
 
+/** "1 suggestion" or "3 suggestions". */
+function suggestionCount(value: string | undefined): string {
+  const number = Number(value ?? 0);
+  return `${number} ${number === 1 ? "suggestion" : "suggestions"}`;
+}
+
 /** "an action" or "a decision" (an open question's draft is an action). */
 function draftWhat(kind: string | undefined): string {
   return kind === "decision" ? "a decision" : "an action";
@@ -217,6 +223,12 @@ function sentence(facts: AuditFacts, names: AuditNames): string {
       return `Draft of ${draftWhat(detail["kind"])} from ${meeting(subject)} cancelled`;
     case "draft.added":
       return `Drafted decision added to ${meeting(subject)}`;
+    case "find_more.ran":
+      return `LANA looked for more notes in ${meeting(subject)}, found ${suggestionCount(detail["found"])}`;
+    case "find_more.added":
+      return `Added ${suggestionCount(detail["added"])} from Find more notes to ${meeting(subject)}`;
+    case "find_more.dismissed":
+      return `Dismissed ${suggestionCount(detail["dismissed"])} from Find more notes in ${meeting(subject)}`;
     case "intent.quarantined":
       return `Set aside an action from ${meeting(detail["meeting_id"])} that did not pass checks`;
     case "intent.transition":

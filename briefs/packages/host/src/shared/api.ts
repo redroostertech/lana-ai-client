@@ -350,6 +350,10 @@ export interface RecordsApi {
   /** Saves lines `first` to `last` as a clip (a highlight). Returns the clip, or the one already covering exactly those lines. */
   saveClip(meetingID: string, first: number, last: number): Promise<Result<TranscriptClip>>;
   removeClip(meetingID: string, clipID: string): Promise<Result<null>>;
+  /** Rewrites a key point's text; it syncs to the phone as this computer's edit. */
+  editKeyPoint(meetingID: string, pointID: string, text: string): Promise<Result<null>>;
+  /** Removes a key point; it syncs to the phone as this computer's edit. */
+  removeKeyPoint(meetingID: string, pointID: string): Promise<Result<null>>;
   /** Puts the set-aside part that starts at `start` back in the meeting. On a meeting recorded here, write the notes again after. */
   restoreSetAside(meetingID: string, start: number): Promise<Result<null>>;
   /** Sets transcript lines `first` to `last` (0-based) aside: out of the notes and every export. */
@@ -370,6 +374,50 @@ export interface RecordsApi {
 }
 
 export type DraftKind = "action" | "decision";
+
+// MARK: - Find more notes
+
+/** One suggestion waiting for the person (Find more notes). Text goes to the window only. */
+export interface FindMoreSuggestionView {
+  id: string;
+  kind: "summary" | "decision" | "openQuestion" | "task";
+  text: string;
+  /** A task's owner as written, or null. */
+  owner: string | null;
+  dueDate: string | null;
+  dueText: string | null;
+  /** A decision: the speaker label of who decided, or null. */
+  decidedBy: string | null;
+  /** The cited time range, seconds. */
+  start: number;
+  end: number;
+}
+
+export interface FindMoreView {
+  meetingID: string;
+  /** idle: never run or nothing running; running: part `part` of `of`; ready: the last run finished. */
+  status: "idle" | "running" | "ready" | "failed" | "unavailable";
+  part: number;
+  of: number;
+  suggestions: FindMoreSuggestionView[];
+  /** The last finished run here: when (ISO) and how many it found. */
+  lastRun: { at: string; found: number } | null;
+}
+
+/**
+ * Find more notes: LANA reads the meeting again in smaller parts for what the notes missed,
+ * in the background. Suggestions wait for the person; nothing changes the notes until one is
+ * added. Added items go through the shared record like a hand edit.
+ */
+export interface FindMoreApi {
+  state(meetingID: string): Promise<Result<FindMoreView>>;
+  /** Starts a run in the background; progress and the result arrive as `findMore` events. */
+  start(meetingID: string): Promise<Result<FindMoreView>>;
+  /** Adds the suggestions (Add, or Add all with every id) to the meeting. */
+  add(meetingID: string, suggestionIDs: string[]): Promise<Result<FindMoreView>>;
+  /** Dismisses the suggestions (Dismiss, or Dismiss all); they are never suggested again here. */
+  dismiss(meetingID: string, suggestionIDs: string[]): Promise<Result<FindMoreView>>;
+}
 
 export type DraftState =
   /** In the queue behind `ahead` other drafts. */
@@ -510,7 +558,7 @@ export const API_METHODS = {
   access: ["state", "checkAgain"],
   devices: ["list", "revoke", "pairingState", "startPairing", "cancelPairing", "answerPairing", "resetPairing", "gatewayStatus"],
   meetings: ["list", "get", "audio"],
-  records: ["state", "resolve", "sendToPhone", "cancelSend", "rename", "renameSpeaker", "correctLine", "saveClip", "removeClip", "restoreSetAside", "setAside", "requestDraft", "drafts", "cancelDraft", "addDecision"],
+  records: ["state", "resolve", "sendToPhone", "cancelSend", "rename", "renameSpeaker", "correctLine", "saveClip", "removeClip", "editKeyPoint", "removeKeyPoint", "restoreSetAside", "setAside", "requestDraft", "drafts", "cancelDraft", "addDecision"],
   inbox: ["pendingCount", "unreadCount", "list"],
   audit: ["list", "verify"],
   settings: ["get", "setTheme", "walkthroughCompleted", "setWalkthroughCompleted"],
@@ -1089,7 +1137,9 @@ export type LanaScreenEvent =
   | { type: "askThreads"; threads: AskThreadSummary[] }
   | { type: "talk"; session: TalkSession }
   | { type: "preferences"; preferences: Preferences }
-  | { type: "models"; status: ModelsStatus };
+  | { type: "models"; status: ModelsStatus }
+  /** Find more notes progress or result for one meeting. */
+  | { type: "findMore"; view: FindMoreView };
 
 export interface LanaScreenServices {
   actions: ActionsApi;
@@ -1101,6 +1151,7 @@ export interface LanaScreenServices {
   userNotes: UserNotesApi;
   models: ModelsApi;
   meetingExport: MeetingExportApi;
+  findMore: FindMoreApi;
 }
 
 /** A function so it is hoisted: `API_METHODS` above spreads it in. */
@@ -1126,6 +1177,7 @@ export function screenApiMethods() {
   userNotes: ["save"],
   models: ["status", "download", "remove"],
   meetingExport: ["save", "showInFolder"],
+  findMore: ["state", "start", "add", "dismiss"],
   } as const satisfies { [K in keyof LanaScreenServices]: ReadonlyArray<keyof LanaScreenServices[K]> };
 }
 

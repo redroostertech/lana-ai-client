@@ -24,3 +24,4 @@ export type { SharedRecordRepository, ConflictChoice, CancelSendStatus, SendDecl
 export type { ClipDraftRepository, ClipDraftKind as StoredClipDraftKind, ClipDraftRequest, ClipDraftStatus, StoredClipDraft } from "./clipDraftRepository.js";
 export { MANUAL_ACTION_SCHEMA, type ActionRepository, type NewManualAction, type StoredAction, type StoredActionOrigin } from "./actionRepository.js";
 export { LOCAL_ATTESTATION, type LocalMeetingRepository, type LocalAudioPart } from "./localMeetingRepository.js";
+export type { FindMoreRepository, FindMoreState } from "./findMoreRepository.js";

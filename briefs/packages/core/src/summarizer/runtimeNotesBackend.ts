@@ -3,6 +3,7 @@ import type { HandoffLog } from "../handoff/log.js";
 import type { TextModel } from "../runtime/textModel.js";
 import { WorkflowRunner } from "../runtime/workflowRunner.js";
 import type { NotesBackend } from "./meetingSummarizer.js";
+import { FIND_MORE_MAX_RESPONSE_TOKENS, FIND_MORE_SCHEMA, findMoreInstructions, findMorePrompt, parseFindMore, validateFindMore, type FindMoreBackend, type FindMoreRequest } from "./findMore.js";
 import { NOTES_MAX_RESPONSE_TOKENS, NOTES_SCHEMA, notesInstructions, notesPrompt, parseNotes, validateNotes, type ChunkExtraction, type ChunkRequest } from "./notesFormat.js";
 import { parseQuestionCheck, QUESTION_CHECK_INSTRUCTIONS, QUESTION_CHECK_MAX_RESPONSE_TOKENS, QUESTION_CHECK_SCHEMA, questionCheckPrompt, validateQuestionCheck, type QuestionCheckRequest, type QuestionResolution } from "./questionCheck.js";
 import { ASIDE_CHECK_INSTRUCTIONS, ASIDE_CHECK_MAX_RESPONSE_TOKENS, ASIDE_CHECK_SCHEMA, asideCheckPrompt, parseAsideCheck, validateAsideCheck, type AsideCheckRequest } from "./asideCheck.js";
@@ -14,7 +15,7 @@ import { HEURISTIC_TOKENS, type TokenCounter } from "./transcriptChunk.js";
  * model call in `NotesFormat`, retried once when the reply is unreadable or the model throws.
  * Also runs the open question check (`notes.questions.v1`) once per meeting (Nov 13).
  */
-export class RuntimeNotesBackend implements NotesBackend {
+export class RuntimeNotesBackend implements NotesBackend, FindMoreBackend {
   private readonly runner: WorkflowRunner;
 
   constructor(private readonly model: TextModel, log?: HandoffLog, readonly tokenCounter: TokenCounter = HEURISTIC_TOKENS) {
@@ -71,5 +72,20 @@ export class RuntimeNotesBackend implements NotesBackend {
     const content = run.output("check")?.["content"];
     if (run.verdict.status !== "completed" || typeof content !== "string") throw run.modelError ?? BackendError.malformedOutput();
     return parseQuestionCheck(content, request);
+  }
+
+  /** The `notes.more.v1` workflow (Find more notes): what one smaller part's notes are missing. */
+  async findMore(request: FindMoreRequest, signal?: AbortSignal): Promise<ChunkExtraction> {
+    const run = await this.runner.run("notes.more.v1", {
+      instructions: findMoreInstructions(request.phrasing),
+      content: findMorePrompt(request),
+      maximumResponseTokens: FIND_MORE_MAX_RESPONSE_TOKENS,
+      validators: { [FIND_MORE_SCHEMA]: validateFindMore },
+      signal,
+    });
+    signal?.throwIfAborted();
+    const content = run.output("extract")?.["content"];
+    if (run.verdict.status !== "completed" || typeof content !== "string") throw run.modelError ?? BackendError.malformedOutput();
+    return parseFindMore(content, request.chunk, request.speakers);
   }
 }

@@ -92,7 +92,7 @@ export function reduceKeyPoints(drafts: readonly DraftPoint[], gaps: readonly No
   }
   const caps: Record<KeyPointKind, number> = { summary: Math.max(limits.maxSummaryBullets, SUMMARY_BULLETS_PER_CHUNK * chunkCount), decision: limits.maxDecisions, open_question: limits.maxOpenQuestions };
   const ordered = KEY_POINT_KINDS.flatMap((kind) =>
-    stableSort(capped(merged.filter((point) => point.kind === kind), caps[kind]), (a, b) => (a.sources[0]?.start ?? 0) - (b.sources[0]?.start ?? 0)));
+    stableSort(capInTurn(merged.filter((point) => point.kind === kind), caps[kind]), (a, b) => (a.sources[0]?.start ?? 0) - (b.sources[0]?.start ?? 0)));
   const keyPoints: KeyPoint[] = ordered.map((point, offset) => ({
     id: `kp-${offset + 1}`, kind: point.kind, text: point.text, sources: point.sources, precision: point.precision,
     ...(point.kind === "decision" && point.decidedBy !== undefined ? { decidedBy: point.decidedBy } : {}),
@@ -105,7 +105,7 @@ export function reduceKeyPoints(drafts: readonly DraftPoint[], gaps: readonly No
  * (first of each part, then second of each...), so the early parts do not crowd out the rest.
  * A point without a part number is taken last in each round (its own group after the parts).
  */
-function capped<T extends { chunk?: number | undefined; text?: string }>(points: readonly T[], cap: number): T[] {
+export function capInTurn<T extends { chunk?: number | undefined; text?: string }>(points: readonly T[], cap: number): T[] {
   if (points.length <= cap) return [...points];
   const byChunk = new Map<number, T[]>();
   for (const point of points) {

@@ -412,6 +412,11 @@ export class RecordingService implements RecordingApi {
     return { ok: false, error: { code: outcome, message: outcome === "unavailable" ? "The LANA model is needed to write notes. Get it in Settings, Ask." : "LANA could not write the notes. Try again." } };
   }
 
+  /** Whether LANA is writing notes for this meeting right now. */
+  isWritingNotes(meetingID: string): boolean {
+    return this.writing === meetingID;
+  }
+
   /** Notes after the transcript; never throws, and the meeting stays saved whatever happens. */
   private async notes(id: LanaId, show: boolean): Promise<NotesOutcome> {
     const writer = this.options.notes;

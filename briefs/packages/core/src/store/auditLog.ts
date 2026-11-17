@@ -47,6 +47,10 @@ export const AUDIT_EVENTS = {
   draftReady: "draft.ready",
   draftCancelled: "draft.cancelled",
   draftAdded: "draft.added",
+  /** Find more notes (desktop only): a run `{found}`, suggestions added `{added}` or dismissed `{dismissed}`. Subject the meeting id. */
+  findMoreRan: "find_more.ran",
+  findMoreAdded: "find_more.added",
+  findMoreDismissed: "find_more.dismissed",
   /** The Inbox (desktop only). Subject the action id; detail ids, types and states only. */
   actionCreatedManually: "action.created_manually",
   actionSaved: "action.saved",

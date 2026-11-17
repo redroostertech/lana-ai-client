@@ -619,3 +619,32 @@ describe("parts set aside by hand (synthetic)", () => {
     expect(normalizeSetAside([{ start: 0, end: 40, reason: "phone_call", by: "person" }, { start: 10, end: 20, reason: "logistics" }])).toEqual([{ start: 0, end: 40, reason: "phone_call", by: "person" }]);
   });
 });
+
+describe("Amendment 7 in the notes", () => {
+  it("drops a line that copies a format placeholder loosely", () => {
+    const parsed = parseNotes([
+      "POINT: summary | L3 | One short sentence about whether the setup fee covers training.",
+      "POINT: question | L10 | One short sentence about a question still open: who approves.",
+      "POINT: summary | L3 | The setup fee is 1,200 dollars and the monthly fee is 300.",
+    ].join("\n"), chunk);
+    expect(parsed.points.map((point) => point.text)).toEqual(["The setup fee is 1,200 dollars and the monthly fee is 300."]);
+  });
+
+  it("reads a POINT whose kind is a set-aside reason as an ASIDE line, never a key point", () => {
+    const parsed = parseNotes([
+      "POINT: phone call | L5, L7 | Dana takes a call about a dentist appointment.",
+      "POINT: side_conversation | L6 | A side chat.",
+      "POINT: other matter | L6 | Another client.",
+      "POINT: logistics | L2 | Screen sharing.",
+      "POINT: background | L1 | The meeting opens.",
+    ].join("\n"), chunk);
+    expect(parsed.asides).toEqual([
+      { reason: "phone_call", lines: [5, 7] },
+      { reason: "side_conversation", lines: [6] },
+      { reason: "other_matter", lines: [6] },
+      { reason: "logistics", lines: [2] },
+    ]);
+    expect(parsed.points.map((point) => [point.kind, point.text])).toEqual([["summary", "The meeting opens."]]);
+  });
+});
+

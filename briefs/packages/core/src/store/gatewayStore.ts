@@ -18,6 +18,7 @@ import { migrate } from "./gatewaySchema.js";
 import { IntentRepository } from "./intentRepository.js";
 import type { AuditSink, AuditTrail, BundleSink, DeviceDirectory, OutgoingRecord, PairingSink, RecordSync, TrustStore } from "./interfaces.js";
 import { LedgerRepository } from "./ledgerRepository.js";
+import { FindMoreRepository } from "./findMoreRepository.js";
 import { LocalMeetingRepository } from "./localMeetingRepository.js";
 import { MeetingRepository } from "./meetingRepository.js";
 import { MirrorRepository } from "./mirrorRepository.js";
@@ -64,6 +65,8 @@ export class GatewayStore implements TrustStore, BundleSink, RecordSync, Pairing
   readonly actions: ActionRepository;
   /** Meetings recorded on this computer (desktop only). */
   readonly local: LocalMeetingRepository;
+  /** Find more notes: suggestions waiting and dismissed, on this device only. */
+  readonly findMore: FindMoreRepository;
 
   private constructor(private readonly ctx: StoreContext) {
     this.devices = new DeviceRepository(ctx);
@@ -80,6 +83,7 @@ export class GatewayStore implements TrustStore, BundleSink, RecordSync, Pairing
     this.clipDrafts = new ClipDraftRepository(ctx);
     this.actions = new ActionRepository(ctx, this.intents);
     this.local = new LocalMeetingRepository(ctx, this.shared);
+    this.findMore = new FindMoreRepository(ctx, this.shared);
   }
 
   /**

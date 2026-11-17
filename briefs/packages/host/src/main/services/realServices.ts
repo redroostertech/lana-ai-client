@@ -21,6 +21,7 @@ import { DeviceTalkFactory } from "./talk/deviceTalkFactory.js";
 import { RendererAudio } from "./talk/rendererAudio.js";
 import { RecordingService, type MeetingTranscription, type RecordingServiceOptions } from "./recording/recordingService.js";
 import { NotesWriter } from "./recording/notesWriter.js";
+import { FindMoreService } from "../gateway/findMoreService.js";
 import { TalkService, type TalkPartsFactory } from "./talk/talkService.js";
 import { UserNotesService } from "./userNotesService.js";
 import { BleWakeAdvertiser, type BleHelperProcess } from "./bleWake/bleWakeAdvertiser.js";
@@ -154,6 +155,15 @@ export function createRealServices(options: RealServicesOptions): RealServices {
     },
   });
 
+  // Find more notes: the same LANA model as the notes, for any meeting here (recorded on this computer or the phone).
+  const findMore = new FindMoreService({
+    store,
+    model: modelFor("briefs.notes"),
+    emit,
+    log,
+    notesBusy: (meetingID) => recording.isWritingNotes(meetingID),
+  });
+
   const bleWake = new BleWakeAdvertiser({
     uuids: (at) => runtime.bleWakeUuids(at),
     onWakeChanged: (listener) => runtime.onWakeChanged(listener),
@@ -259,6 +269,7 @@ export function createRealServices(options: RealServicesOptions): RealServices {
     userNotes,
     models,
     meetingExport,
+    findMore,
     talkAudio,
     recording,
     tone: runtime.tone,

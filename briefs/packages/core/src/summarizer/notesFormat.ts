@@ -9,7 +9,7 @@ import type { ModelOutputValidation } from "../runtime/kernel.js";
 import { isLetter, isNumber } from "../ask/tokenizer.js";
 import { graphemes } from "../text/graphemes.js";
 import { excerpt, verifiedLines } from "./lineMatcher.js";
-import { normalizeText } from "./textNormalizer.js";
+import { normalizedWords, normalizeText } from "./textNormalizer.js";
 import { chunkPromptText, segmentAtLine, type TranscriptChunk } from "./transcriptChunk.js";
 
 /** A quote the action stands on, copied from a cited line (never typed by the model). */
@@ -184,6 +184,13 @@ export function parseNotes(reply: string, chunk: TranscriptChunk, speakers: read
     const pointBody = formatLineValue("POINT:", line);
     if (pointBody !== undefined) {
       const parts = splitFields(pointBody);
+      // A POINT whose kind is a set-aside reason is an ASIDE line for its cited lines (Amendment 7).
+      const asideReason = (parts[0] ?? "").toLowerCase().replace(/[\s-]+/gu, "_");
+      if ((SET_ASIDE_REASONS as readonly string[]).includes(asideReason)) {
+        const lines = parts.length >= 2 ? citedLines(parts[1]!, chunk, Number.MAX_SAFE_INTEGER) : [];
+        if (lines.length > 0) asides.push({ reason: asideReason as SetAsideReason, lines });
+        continue;
+      }
       if (parts.length === 6 || parts.length === 7) {
         addAction(actionFrom(["task", ...parts.slice(1)], chunk));
       } else if (points.length < MAX_POINTS) {
@@ -450,9 +457,27 @@ function matchWords(text: string): Set<string> {
   return out;
 }
 
+/**
+ * The format's example text, copied exactly or loosely (Amendment 7): 4 or more of its words
+ * (articles and short joining words left out) in one placeholder.
+ */
 function isPlaceholder(text: string): boolean {
   const wanted = trimSpaces(text).toLowerCase();
-  return PLACEHOLDERS.some((placeholder) => placeholder.toLowerCase() === wanted);
+  if (PLACEHOLDERS.some((placeholder) => placeholder.toLowerCase() === wanted)) return true;
+  const words = placeholderWords(text);
+  return PLACEHOLDERS.some((placeholder) => {
+    const have = placeholderWords(placeholder);
+    let shared = 0;
+    for (const word of words) if (have.has(word)) shared += 1;
+    return shared >= PLACEHOLDER_SHARED_WORDS;
+  });
+}
+
+const PLACEHOLDER_SHARED_WORDS = 4;
+const PLACEHOLDER_SKIPPED = new Set(["a", "an", "the", "of", "at", "in", "on", "to", "and", "or", "is", "this", "that"]);
+
+function placeholderWords(text: string): Set<string> {
+  return new Set(normalizedWords(text).filter((word) => !PLACEHOLDER_SKIPPED.has(word)));
 }
 
 const EMPTY_FIELDS = new Set(["none", "not specified", "unspecified", "not stated", "not said", "n/a", "na", "tbd", "unknown", "nobody", "no one"]);

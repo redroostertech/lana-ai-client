@@ -1,0 +1,21 @@
+{
+  "initial_state": "extract",
+  "states": [
+    {
+      "id": "extract",
+      "type": "llm_call",
+      "sub_prompt": "Write only the notes this transcript part is missing, in the required format, or NONE.",
+      "temperature": 0.2,
+      "output_schema": "lana.notes.more.v1",
+      "retry": {
+        "limit": 1
+      },
+      "next": "extracted"
+    },
+    {
+      "id": "extracted",
+      "type": "terminal",
+      "outcome": "extracted"
+    }
+  ]
+}

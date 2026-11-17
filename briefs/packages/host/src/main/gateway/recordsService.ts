@@ -122,6 +122,26 @@ export class RecordsService implements RecordsApi {
     }));
   }
 
+  // MARK: - Key points
+
+  /** Rewrites a key point's text (any key point, LANA's or the phone's); it syncs as this computer's edit. */
+  async editKeyPoint(meetingID: string, pointID: string, text: string): Promise<Result<null>> {
+    const trimmed = String(text).trim().slice(0, MAX_LINE);
+    if (trimmed === "") return { ok: false, error: { code: "invalid", message: "A key point cannot be empty. Remove it instead." } };
+    return this.edit(meetingID, (record) => {
+      if (!record.notes.keyPoints.some((point) => point.id === String(pointID))) throw new InvalidRecordInput("That key point is no longer on this meeting.");
+      return { ...record, notes: { ...record.notes, keyPoints: record.notes.keyPoints.map((point) => (point.id === String(pointID) ? { ...point, text: trimmed } : point)) } };
+    });
+  }
+
+  /** Removes a key point; it syncs as this computer's edit. */
+  async removeKeyPoint(meetingID: string, pointID: string): Promise<Result<null>> {
+    return this.edit(meetingID, (record) => {
+      if (!record.notes.keyPoints.some((point) => point.id === String(pointID))) throw new InvalidRecordInput("That key point is no longer on this meeting.");
+      return { ...record, notes: { ...record.notes, keyPoints: record.notes.keyPoints.filter((point) => point.id !== String(pointID)) } };
+    });
+  }
+
   // MARK: - Set-aside parts
 
   /**
@@ -315,7 +335,7 @@ export function conflictView(record: MeetingRecord, conflict: RecordConflict, ac
     case "note":
       return base("note", "One of your notes", field(conflict.phone, "text"), field(conflict.desktop, "text"), true);
     case "keypoint":
-      return base("keyPoint", "Key point", field(conflict.phone, "text"), field(conflict.desktop, "text"), false);
+      return base("keyPoint", "Key point", field(conflict.phone, "text"), field(conflict.desktop, "text"), true);
     case "clip":
       return base("clip", "Clip", conflict.phone === null ? null : "Clipped", conflict.desktop === null ? null : "Clipped", false);
     case "intent": {

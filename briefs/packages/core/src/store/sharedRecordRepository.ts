@@ -538,6 +538,7 @@ function editedValue(unit: string, conflict: RecordConflict, edited: string, now
     case "note":
       return { ...base, text: edited, updated_at: LanaDate.format(now) };
     case "segment":
+    case "keypoint":
       return { ...base, text: edited };
     case "speaker":
       return { ...base, name: edited.trim() === "" ? undefined : edited.trim() } as JsonValue;

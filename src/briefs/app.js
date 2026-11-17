@@ -16,6 +16,8 @@
   const B = window.BriefsShare;
   /** Export: what each export holds, the menu and file names (briefs-export.js). */
   const X = window.BriefsExport;
+  /** Find more notes: the pill, progress and the suggestions list (briefs-find-more.js). */
+  const F = window.BriefsFindMore;
   /** The top bar's phone status, Phones and the walkthrough (shared with the Dashboard). */
   const Phones = window.BriefsPhonesUI;
   /** How copy names this device (platform neutral). */
@@ -48,12 +50,21 @@
     correcting: null,
     editingTitle: false,
     editingSpeaker: null,
+    /** The key point whose text is being edited. */
+    editingPoint: null,
+    /** The key point whose Remove waits for a confirm. */
+    confirmingRemove: null,
     /** The set-aside review list is open. */
     reviewAside: false,
     /** The clip bar shows the reasons to set the selection aside. */
     asideMenu: false,
     /** "Write notes again" is running for the open meeting. */
     rewriting: false,
+    /** Find more notes for the open meeting (FindMoreView), and the last status seen per meeting for the done notice. */
+    findMore: null,
+    findMoreSeen: {},
+    /** An Add or Dismiss call is on its way: the buttons wait. */
+    settling: false,
     selectedPoint: null,
     panel: 'keyPoints',
     followAlong: true,
@@ -207,6 +218,8 @@
     state.correcting = null;
     state.editingTitle = false;
     state.editingSpeaker = null;
+    state.editingPoint = null;
+    state.confirmingRemove = null;
     state.selectedPoint = null;
     state.asked = new Set();
     state.drafts = [];
@@ -216,6 +229,7 @@
     state.reviewAside = false;
     state.asideMenu = false;
     state.rewriting = false;
+    state.findMore = null;
     closeShare(false);
   }
 
@@ -248,6 +262,7 @@
     }
     loadDrafts(id);
     loadShared(id);
+    loadFindMore(id);
     els.detailEmpty.classList.add('hidden');
     els.detailMeeting.classList.remove('hidden');
     renderMeeting();
@@ -262,6 +277,19 @@
       }
     } catch (_) {
       // Drafts show once the host answers.
+    }
+  }
+
+  async function loadFindMore(id) {
+    try {
+      const result = await bridge().findMore.state(id);
+      if (result && result.ok && state.selectedId === id) {
+        state.findMore = result.value;
+        state.findMoreSeen[id] = result.value.status;
+        renderSide();
+      }
+    } catch (_) {
+      // Find more shows once the host answers.
     }
   }
 
@@ -702,6 +730,15 @@
         call(() => bridge().records.correctLine(id, index, text));
       }
       renderTranscript();
+    } else if (kind === 'keyPoint') {
+      const pointID = box.dataset.pointId;
+      state.editingPoint = null;
+      if (changed) {
+        const point = state.record.keyPoints.find((item) => item.id === pointID);
+        if (point) point.text = text;
+        call(() => bridge().records.editKeyPoint(id, pointID, text));
+      }
+      renderSide();
     }
   }
 
@@ -1122,7 +1159,7 @@
     const notice = M.speakersNotice(state.record, recordedHere());
     if (!notice) return '';
     const button = recordedHere()
-      ? `<lex-btn variant="secondary" size="sm" leading-icon="refresh-cw" data-write-notes ${state.rewriting ? 'disabled' : ''}>${state.rewriting ? 'Writing notes' : 'Write notes again'}</lex-btn>`
+      ? `<lex-btn variant="secondary" size="sm" leading-icon="refresh-cw" data-write-notes ${state.rewriting || findMoreRunning() ? 'disabled' : ''}>${state.rewriting ? 'Writing notes' : 'Write notes again'}</lex-btn>`
       : '';
     return `<section class="briefs-points-group briefs-notice" aria-label="Speaker names"><p class="briefs-notice-text">${icon('users')}<span>${escape(notice)}</span></p>${button}</section>`;
   }
@@ -1153,7 +1190,114 @@
   }
 
   function keyPointsHtml() {
-    return speakersHtml() + setAsideHtml() + keyPointGroupsHtml() + tablesHtml();
+    return speakersHtml() + setAsideHtml() + findMoreHtml() + keyPointGroupsHtml() + tablesHtml();
+  }
+
+  // ── Find more notes ───────────────────────────────────
+
+  function findMoreRunning() {
+    return Boolean(state.findMore && state.findMore.status === 'running');
+  }
+
+  /** The LANA pill, its progress, and the suggestions waiting to be added. */
+  function findMoreHtml() {
+    const view = state.findMore;
+    const recording = state.recording;
+    const writingHere = Boolean(recording && recording.phase === 'writingNotes' && recording.meetingID === state.selectedId);
+    const meeting = { hasTranscript: state.record.transcript.length > 0, writingNotes: state.rewriting || writingHere };
+    const progress = F.progressText(view);
+    const pill = F.canFindMore(view, meeting)
+      ? `<lex-btn variant="lana" size="sm" data-find-more>${escape(F.pillLabel(view))}</lex-btn>`
+      : '';
+    const running = progress ? `<p class="briefs-more-progress" aria-live="polite"><lex-spinner size="sm"></lex-spinner><span>${escape(progress)}</span></p>` : '';
+    const heading = F.resultHeading(view);
+    const items = view ? view.suggestions : [];
+    const list = items.length === 0 ? '' : `<ul class="briefs-more-list">${items.map((item) => {
+      const facts = item.kind === 'task' ? F.taskFacts(item) : (item.kind === 'decision' ? M.decidedByText(state.record, item) : '');
+      const range = `${M.clock(item.start)} to ${M.clock(item.end)}`;
+      return `<li class="briefs-more-item is-${escape(item.kind)}">
+          <p class="briefs-more-kind">${escape(F.kindLabel(item.kind))}</p>
+          <p class="briefs-more-text">${escape(item.text)}</p>
+          ${facts ? `<p class="briefs-more-facts">${escape(facts)}</p>` : ''}
+          <div class="briefs-more-row">
+            <button type="button" class="briefs-source" data-more-play="${escape(item.id)}" data-clip-key="more-${escape(item.id)}" aria-label="Play ${escape(range)}"><span class="briefs-play-icon">${icon('play')}</span><span>${escape(range)}</span></button>
+            <span class="briefs-more-buttons">
+              <lex-btn variant="secondary" size="sm" data-more-add="${escape(item.id)}" ${state.settling ? 'disabled' : ''}>Add</lex-btn>
+              <lex-btn variant="ghost" size="sm" data-more-dismiss="${escape(item.id)}" ${state.settling ? 'disabled' : ''}>Dismiss</lex-btn>
+            </span>
+          </div>
+        </li>`;
+    }).join('')}</ul>`;
+    const all = items.length > 1 ? `<div class="briefs-more-all">
+        <lex-btn variant="secondary" size="sm" data-more-add-all ${state.settling ? 'disabled' : ''}>Add all</lex-btn>
+        <lex-btn variant="ghost" size="sm" data-more-dismiss-all ${state.settling ? 'disabled' : ''}>Dismiss all</lex-btn>
+      </div>` : '';
+    if (!pill && !running && !heading) return '';
+    return `<section class="briefs-points-group briefs-more" aria-label="Find more notes">
+        ${pill || running ? `<div class="briefs-more-head">${pill}${running}</div>` : ''}
+        ${heading ? `<div class="briefs-more-result"><p class="briefs-more-heading">${escape(heading)}</p>${all}</div>` : ''}
+        ${list}
+      </section>`;
+  }
+
+  /** Removes a key point (LANA's, the phone's or an added suggestion); it syncs to the phone like any edit. */
+  async function removeKeyPoint(pointID) {
+    const id = state.selectedId;
+    if (!id) return;
+    if (await attempt(() => bridge().records.removeKeyPoint(id, pointID)) && state.selectedId === id) {
+      if (state.selectedPoint === pointID) state.selectedPoint = null;
+      state.record.keyPoints = state.record.keyPoints.filter((point) => point.id !== pointID);
+      renderSide();
+      renderTranscript();
+      Lex.Toast.success('Key point removed.');
+    }
+  }
+
+  async function startFindMore() {
+    const id = state.selectedId;
+    if (!id || findMoreRunning()) return;
+    state.findMoreSeen[id] = 'starting';
+    const view = await call(() => bridge().findMore.start(id));
+    if (!view && state.findMoreSeen[id] === 'starting') delete state.findMoreSeen[id];
+    // The run's own events may already have arrived (even its result): never go back to an older view.
+    const seen = state.findMoreSeen[id];
+    if (view && state.selectedId === id && (seen === 'starting' || seen === 'running')) {
+      state.findMore = view;
+      state.findMoreSeen[id] = view.status;
+      renderSide();
+    }
+  }
+
+  /** Add or Dismiss (one id), or Add all and Dismiss all (every id waiting). */
+  async function settleSuggestions(action, ids) {
+    const id = state.selectedId;
+    if (!id || ids.length === 0 || state.settling) return;
+    const before = state.findMore ? state.findMore.suggestions.length : 0;
+    state.settling = true;
+    renderSide();
+    const view = await call(() => bridge().findMore[action](id, ids));
+    state.settling = false;
+    if (view && state.selectedId === id) {
+      state.findMore = view;
+      const added = Math.max(0, before - view.suggestions.length);
+      if (action === 'add' && added > 0) Lex.Toast.success(added === 1 ? 'Added to the notes.' : `${added} items added to the notes.`);
+    }
+    if (state.selectedId === id) renderSide();
+  }
+
+  /** A Find more event: progress or the result, with the in-app notice when a run finishes. */
+  function onFindMore(view) {
+    if (!view) return;
+    const before = state.findMoreSeen[view.meetingID] ? { status: state.findMoreSeen[view.meetingID] } : null;
+    state.findMoreSeen[view.meetingID] = view.status;
+    if (F.justFinished(before, view)) {
+      const meeting = state.meetings.find((item) => item.id === view.meetingID);
+      const notice = F.doneNotice(view, meeting ? meeting.title : '');
+      if (notice) Lex.Toast[notice.kind](notice.text);
+    }
+    if (!onPage() || view.meetingID !== state.selectedId) return;
+    state.findMore = view;
+    renderSide();
   }
 
   function keyPointGroupsHtml() {
@@ -1167,13 +1311,23 @@
       return `<section class="briefs-points-group" aria-label="${GROUP_TITLE[kind]}">
           <p class="briefs-overline">${GROUP_TITLE[kind]}</p>
           ${points.map((point) => `<div class="briefs-point is-${point.kind}${point.id === state.selectedPoint ? ' is-selected' : ''}">
-              <button type="button" class="briefs-point-text" data-point="${escape(point.id)}" aria-pressed="${point.id === state.selectedPoint}" title="Show where this came from">${escape(point.text)}</button>
+              ${state.editingPoint === point.id
+                ? inlineEdit(point.text, 'Key point', 'keyPoint', true).replace('data-inline="keyPoint"', `data-inline="keyPoint" data-point-id="${escape(point.id)}"`)
+                : `<button type="button" class="briefs-point-text" data-point="${escape(point.id)}" aria-pressed="${point.id === state.selectedPoint}" title="Show where this came from">${escape(point.text)}</button>`}
               <div class="briefs-point-sources">${point.sources.map((span, index) => {
                 const title = sourceTitle(span, point);
                 return `<button type="button" class="briefs-source${point.precision === 'approximate' ? ' is-approximate' : ''}" data-source="${escape(point.id)}" data-source-index="${index}" data-clip-key="source-${escape(point.id)}-${index}" aria-label="Play ${escape(title)}"><span class="briefs-play-icon">${icon('play')}</span><span>${escape(title)}</span></button>`;
               }).join('')}</div>
               ${M.decidedByText(record, point) ? `<p class="briefs-point-decider">${escape(M.decidedByText(record, point))}</p>` : ''}
               ${point.kind === 'openQuestion' ? `<div class="briefs-point-question">${questionHtml(point)}</div>` : ''}
+              ${state.editingPoint === point.id ? '' : state.confirmingRemove === point.id ? `<div class="briefs-point-tools is-confirming" role="group" aria-label="Remove this key point">
+                <span class="briefs-point-confirm">Remove this key point? It goes from the notes on this computer and the phone.</span>
+                <lex-btn variant="danger" size="sm" data-point-remove-confirm="${escape(point.id)}">Remove</lex-btn>
+                <lex-btn variant="ghost" size="sm" data-point-remove-cancel>Cancel</lex-btn>
+              </div>` : `<div class="briefs-point-tools">
+                <lex-btn variant="ghost" size="sm" leading-icon="edit-3" data-point-edit="${escape(point.id)}" aria-label="Edit this key point">Edit</lex-btn>
+                <lex-btn variant="ghost" size="sm" leading-icon="trash-2" data-point-remove="${escape(point.id)}" aria-label="Remove this key point">Remove</lex-btn>
+              </div>`}
             </div>`).join('')}
         </section>`;
     }).join('');
@@ -1779,6 +1933,43 @@
       renderSide();
       return;
     }
+    const pointEdit = target.closest('[data-point-edit]');
+    if (pointEdit) {
+      state.editingPoint = pointEdit.dataset.pointEdit;
+      renderSide();
+      const box = els.side.querySelector('[data-inline="keyPoint"]');
+      if (box) focusInlineEdit(box);
+      return;
+    }
+    const pointRemove = target.closest('[data-point-remove]');
+    if (pointRemove) {
+      state.confirmingRemove = pointRemove.dataset.pointRemove;
+      renderSide();
+      return;
+    }
+    if (target.closest('[data-point-remove-cancel]')) {
+      state.confirmingRemove = null;
+      renderSide();
+      return;
+    }
+    const pointRemoveConfirm = target.closest('[data-point-remove-confirm]');
+    if (pointRemoveConfirm) {
+      state.confirmingRemove = null;
+      return removeKeyPoint(pointRemoveConfirm.dataset.pointRemoveConfirm);
+    }
+    if (target.closest('[data-find-more]')) return startFindMore();
+    const moreAdd = target.closest('[data-more-add]');
+    if (moreAdd) return settleSuggestions('add', [moreAdd.dataset.moreAdd]);
+    const moreDismiss = target.closest('[data-more-dismiss]');
+    if (moreDismiss) return settleSuggestions('dismiss', [moreDismiss.dataset.moreDismiss]);
+    if (target.closest('[data-more-add-all]')) return settleSuggestions('add', (state.findMore ? state.findMore.suggestions : []).map((item) => item.id));
+    if (target.closest('[data-more-dismiss-all]')) return settleSuggestions('dismiss', (state.findMore ? state.findMore.suggestions : []).map((item) => item.id));
+    const morePlay = target.closest('[data-more-play]');
+    if (morePlay && player) {
+      const found = state.findMore && state.findMore.suggestions.find((item) => item.id === morePlay.dataset.morePlay);
+      if (found) player.playClip(morePlay.dataset.clipKey, found.start, found.end);
+      return;
+    }
     const restore = target.closest('[data-restore-aside]');
     if (restore) return restoreAside(Number(restore.dataset.restoreAside));
     const rewrite = target.closest('[data-write-notes]');
@@ -1828,10 +2019,18 @@
   }
 
   function onBriefsEvent(event) {
-    if (!event || !onPage()) return;
+    if (!event) return;
+    // The done notice shows on any page of the shell: the run goes on after leaving the meeting.
+    if (event.type === 'findMore') {
+      onFindMore(event.view);
+      return;
+    }
+    if (!onPage()) return;
     if (event.type === 'recording') {
       state.recording = event.view;
       renderNew();
+      // Find more waits while LANA writes this meeting's notes.
+      if (state.record && state.mode === 'meeting') renderSide();
       return;
     }
     if (event.type === 'recordingLevels') {
@@ -1852,9 +2051,24 @@
     }
   }
 
+  /** The page's dark theme follows the computer's setting (styles.css scopes the tokens to this page). */
+  const darkScheme = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  function applyTheme() {
+    const scroll = document.querySelector('.briefs-scroll');
+    if (scroll) scroll.setAttribute('data-lex-theme', darkScheme && darkScheme.matches ? 'dark' : 'light');
+  }
+  let themeBound = false;
+  function followTheme() {
+    applyTheme();
+    if (themeBound || !darkScheme || !darkScheme.addEventListener) return;
+    themeBound = true;
+    darkScheme.addEventListener('change', applyTheme);
+  }
+
   function init() {
     els.list = byId('briefs-detail');
     if (!els.list) return;
+    followTheme();
     if (player) player.close();
     player = null;
     state.selectedId = null;

@@ -93,9 +93,12 @@ const PROMISE_CONFIDENCE = 0.6;
 /** A decision that is meeting setup, not meeting content. */
 const LOGISTICS = /\b(screen ?shar\w*|share (my|the|your|his|her) screen|(access|permission) to (the |my |your |his |her )?screen|screen access|screen is (now )?(visible|showing|shared)|can (you|everyone|everybody) (see|hear)|audio|microphones?|mute|unmute|camera|browser|permissions?|refresh\w*|zoom link|meeting link|teams link|reconnect\w*|join(ed|ing)? the (call|meeting))\b/iu;
 /** A decision that is someone's promise to do something: an action. */
-const PROMISE = /\b(will|'ll|\u2019ll|is going to|are going to|am going to|agrees? to|agreed to|offer(s|ed)? to|commit(s|ted)? to|promise(s|d)? to|volunteer(s|ed)? to)\s+(\w+\s+){0,2}?(send|draft|email|e-mail|call|share|map|create|prepare|review|follow|write|schedule|update|upload|move|forward|provide|set up|look|check|get|put|build|draw|copy|reach|circle|loop|book|file|confirm|finish|start|run|pull|add|fix|deliver)\b/iu;
+/** The words a promise is made of (shared with Find more's commitment rule). */
+export const PROMISE_MODALS = "will|'ll|\u2019ll|is going to|are going to|am going to|agrees? to|agreed to|offer(?:s|ed)? to|commit(?:s|ted)? to|promise(?:s|d)? to|volunteer(?:s|ed)? to";
+export const PROMISE_VERBS = "send|draft|email|e-mail|call|share|map|create|prepare|review|follow|write|schedule|update|upload|move|forward|provide|set up|look|check|get|put|build|draw|copy|reach|circle|loop|book|file|confirm|finish|start|run|pull|add|fix|deliver";
+const PROMISE = new RegExp(`\\b(${PROMISE_MODALS})\\s+(\\w+\\s+){0,2}?(${PROMISE_VERBS})\\b`, "iu");
 /** Words for when inside a promise. */
-const SPOKEN_WHEN = /\b(tonight|today|tomorrow( morning| night)?|this (morning|afternoon|evening|week)|(by )?(the )?end of (the )?(day|week)|(by |this |next )?(monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b/iu;
+export const SPOKEN_WHEN = /\b(tonight|today|tomorrow( morning| night)?|this (morning|afternoon|evening|week)|(by )?(the )?end of (the )?(day|week)|(by |this |next )?(monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b/iu;
 
 /**
  * On-device notes and intents for one meeting, map-reduce (Swift `MeetingSummarizer`).
@@ -400,7 +403,7 @@ function readableTitle(title: string): string {
  * The owner as the speaker's name when the model wrote a label, a readable title, and a spoken
  * date kept only when the cited lines say it, resolved against the meeting start.
  */
-function finishCandidate(candidate: QuotedCandidate, speakers: readonly Speaker[], meetingStart: Date): QuotedCandidate {
+export function finishCandidate(candidate: QuotedCandidate, speakers: readonly Speaker[], meetingStart: Date): QuotedCandidate {
   // A time word written as the owner ("tonight") is a when, not an owner (contract).
   let spokenWhen = candidate.dueText;
   let owner = candidate.assigneeHint;
