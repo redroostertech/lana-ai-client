@@ -8,6 +8,7 @@ import { decodeIntent, encodeIntent, transitioned, type Intent } from "../intent
 import { validateIntent } from "../intent/validator.js";
 import { decodeMeeting, encodeMeeting, type MeetingRecord } from "../intent/meeting.js";
 import { contentHash, reconcileRecords, resolveUnit, stampRecord } from "../intent/meetingMerge.js";
+import type { KeyPoint } from "../intent/keyPoint.js";
 import { EMPTY_SYNC, type ActionOutcome, type RecordConflict } from "../intent/meetingSync.js";
 import { normalizedRecord } from "../intent/recordUnits.js";
 import { canonicalString } from "../json/canonical.js";
@@ -68,6 +69,12 @@ export type ConflictChoice =
 export class SharedRecordRepository {
   /** `<phone>|<meeting>` pairs a session is sending now (this process only). */
   private readonly delivering = new Set<string>();
+
+  /**
+   * Told about key points a phone copy removed (meeting state contract, "Removals learned from
+   * sync"), inside the merge's transaction. The store wires it to the local removed list.
+   */
+  onPhoneRemovedKeyPoints: (id: LanaId, points: readonly KeyPoint[]) => void = () => undefined;
 
   constructor(private readonly ctx: StoreContext, private readonly intents: IntentRepository) {}
 
@@ -315,6 +322,8 @@ export class SharedRecordRepository {
     const at = this.ctx.now();
     const local = this.refresh(id);
     let merged = reconcileRecords(local, opened.meeting, "desktop");
+    const removed = phoneRemovedKeyPoints(local, opened.meeting, merged);
+    if (removed.length > 0) this.onPhoneRemovedKeyPoints(id, removed);
     const stored = new Map(this.intents.list({ meetingID: id }).map((item) => [item.intent.id, item.intent] as const));
     const extraConflicts: RecordConflict[] = [];
     const kept = new Map<string, Intent>();
@@ -545,4 +554,20 @@ function editedValue(unit: string, conflict: RecordConflict, edited: string, now
     default:
       throw StoreError.corrupt("cannot edit this change");
   }
+}
+
+/**
+ * Key points the phone removed (meeting state contract, "Removals learned from sync"): in the
+ * local copy, missing from the phone's copy and from the merged result, not in a conflict, and
+ * the phone's counter for the unit moved past the local one.
+ */
+export function phoneRemovedKeyPoints(local: MeetingRecord, incoming: MeetingRecord, merged: MeetingRecord): KeyPoint[] {
+  const incomingIDs = new Set(incoming.notes.keyPoints.map((point) => point.id));
+  const mergedIDs = new Set(merged.notes.keyPoints.map((point) => point.id));
+  const conflicted = new Set((merged.sync?.conflicts ?? []).map((conflict) => conflict.unit));
+  return local.notes.keyPoints.filter((point) => {
+    const unit = `keypoint/${point.id}`;
+    if (incomingIDs.has(point.id) || mergedIDs.has(point.id) || conflicted.has(unit)) return false;
+    return (incoming.sync?.clock[unit]?.phone ?? 0) > (local.sync?.clock[unit]?.phone ?? 0);
+  });
 }

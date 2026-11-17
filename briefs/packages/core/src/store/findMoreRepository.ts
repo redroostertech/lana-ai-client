@@ -108,6 +108,19 @@ export class FindMoreRepository {
     });
   }
 
+  /** Key points a phone copy removed, learned in the sync merge: remembered like the person's own removals (no repeats). */
+  learnRemoved(id: LanaId, points: readonly KeyPoint[]): void {
+    this.ctx.db.write(() => {
+      const state = this.read(id);
+      const removed = [...state.removed];
+      for (const point of points) {
+        if (removed.some((item) => item.kind === point.kind && item.text === point.text)) continue;
+        removed.push({ kind: point.kind, text: point.text, sources: point.sources });
+      }
+      if (removed.length !== state.removed.length) this.write(id, { ...state, removed });
+    });
+  }
+
   // MARK: - Private
 
   private change(id: LanaId, body: (state: FindMoreState) => FindMoreState): FindMoreState {

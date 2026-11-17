@@ -84,6 +84,8 @@ export class GatewayStore implements TrustStore, BundleSink, RecordSync, Pairing
     this.actions = new ActionRepository(ctx, this.intents);
     this.local = new LocalMeetingRepository(ctx, this.shared);
     this.findMore = new FindMoreRepository(ctx, this.shared);
+    // Removals the phone made reach the local removed list in the same merge transaction.
+    this.shared.onPhoneRemovedKeyPoints = (id, points) => this.findMore.learnRemoved(id, points);
   }
 
   /**
