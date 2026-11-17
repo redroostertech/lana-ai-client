@@ -32,6 +32,8 @@ const levers = require('./electron-pip-levers');
 const fit = require('./src/js/local-ai-fit.model');
 
 const LOOPBACK_HOST = '127.0.0.1';
+// The runtime id the engine names this computer's Pip by (the server's own Pip uses the same).
+const PIP_RUNTIME_ID = 'pipcpp-local';
 const PREFERRED_PORTS = Object.freeze({ chat: 8081, embedding: 8082 });
 const ADDRESS_ENV = Object.freeze({ chat: 'LANA_ENGINE_CHAT_URL', embedding: 'LANA_ENGINE_EMBEDDING_URL' });
 
@@ -568,7 +570,17 @@ function createPip(deps) {
 function engineEndpoints(addresses) {
   const out = {};
   if (addresses.chat) {out.LANA_ENGINE_CHAT_URL = addresses.chat;}
-  if (addresses.chat && addresses.chatModelFile) {out.LANA_TOKENIZER_GGUF = addresses.chatModelFile;}
+  if (addresses.chat && addresses.chatModelFile) {
+    out.LANA_TOKENIZER_GGUF = addresses.chatModelFile;
+    // Who the engine expects to answer. Before it shows a chat answer the engine checks that the
+    // model and runtime that wrote it are the ones it was told to use (LANA-AI
+    // src/shared/llm/runtime-execution-identity.model.js); without these it withholds every answer
+    // ("could not confirm which model wrote this answer"). Pip names its model after the file
+    // (Qwen3.8-9B-Q4_K_M.gguf answers as Qwen3.8-9B-Q4_K_M), so the name comes from the file
+    // Pip was started with, not the tier's default.
+    out.LLM_MODEL = path.basename(addresses.chatModelFile).replace(/\.gguf$/i, '');
+    out.LLAMACPP_MAIN_RUNTIME_ID = PIP_RUNTIME_ID;
+  }
   if (addresses.chat && addresses.chatSlots) {
     out.LLM_QUEUE_CONCURRENCY = String(addresses.chatSlots);
     out.LLM_QUEUE_MAX_BACKGROUND_CONCURRENCY = '1';
@@ -580,6 +592,7 @@ function engineEndpoints(addresses) {
 module.exports = {
   createPip,
   engineEndpoints,
+  PIP_RUNTIME_ID,
   chatConfig,
   embeddingConfig,
   wantedServers,

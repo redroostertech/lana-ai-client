@@ -8,7 +8,7 @@
 const path = require('path');
 const { EventEmitter } = require('events');
 const {
-  createPip, chatConfig, embeddingConfig, wantedServers, resolvePipBinary, threadsFor, engineEndpoints, DEFAULTS,
+  createPip, chatConfig, embeddingConfig, wantedServers, resolvePipBinary, threadsFor, engineEndpoints, PIP_RUNTIME_ID, DEFAULTS,
   versionProblem, MISSING_FILE_MESSAGE
 } = require('../../electron-pip-supervisor');
 
@@ -667,10 +667,22 @@ describe('running the servers', () => {
 });
 
 test('what the engine is given: the addresses of the servers that answered, and the chat vocabulary', () => {
-  expect(engineEndpoints({ chat: 'http://127.0.0.1:8081', embedding: 'http://127.0.0.1:8082', chatModelFile: '/m/chat.gguf' })).toEqual({ LANA_ENGINE_CHAT_URL: 'http://127.0.0.1:8081', LANA_ENGINE_EMBEDDING_URL: 'http://127.0.0.1:8082', LANA_TOKENIZER_GGUF: '/m/chat.gguf' });
+  expect(engineEndpoints({ chat: 'http://127.0.0.1:8081', embedding: 'http://127.0.0.1:8082', chatModelFile: '/m/chat.gguf' })).toEqual({ LANA_ENGINE_CHAT_URL: 'http://127.0.0.1:8081', LANA_ENGINE_EMBEDDING_URL: 'http://127.0.0.1:8082', LANA_TOKENIZER_GGUF: '/m/chat.gguf', LLM_MODEL: 'chat', LLAMACPP_MAIN_RUNTIME_ID: 'pipcpp-local' });
   // The engine's queue runs as many calls as Pip has chat slots, background work at most one.
   expect(engineEndpoints({ chat: 'http://127.0.0.1:8081', embedding: null, chatModelFile: '/m/chat.gguf', chatSlots: 2 })).toMatchObject({ LLM_QUEUE_CONCURRENCY: '2', LLM_QUEUE_MAX_BACKGROUND_CONCURRENCY: '1' });
   expect(engineEndpoints({ chat: null, embedding: 'http://127.0.0.1:8082', chatSlots: 2 })).not.toHaveProperty('LLM_QUEUE_MAX_BACKGROUND_CONCURRENCY');
   expect(engineEndpoints({ chat: null, embedding: 'http://127.0.0.1:8082' })).toEqual({ LANA_ENGINE_EMBEDDING_URL: 'http://127.0.0.1:8082' });
   expect(engineEndpoints({ chat: null, embedding: null })).toEqual({});
+});
+
+// The engine shows a chat answer only when the model and runtime that wrote it are the ones it
+// expects (LANA-AI src/shared/llm/runtime-execution-identity.model.js). Pip answers as the model
+// file's name, so the engine is told that name and the runtime id; without them every answer was
+// withheld ("could not confirm which model wrote this answer").
+test('the engine is told the model Pip answers as (the file name) and the runtime id; none without a chat model', () => {
+  const out = engineEndpoints({ chat: 'http://127.0.0.1:8081', embedding: null, chatModelFile: '/Users/x/Library/Application Support/LQE/models/Qwen3.8-9B-Q4_K_M.gguf', chatSlots: 1 });
+  expect(out).toMatchObject({ LLM_MODEL: 'Qwen3.8-9B-Q4_K_M', LLAMACPP_MAIN_RUNTIME_ID: PIP_RUNTIME_ID });
+  expect(PIP_RUNTIME_ID).toMatch(/^\S+$/);
+  expect(engineEndpoints({ chat: 'http://127.0.0.1:8081', embedding: null })).not.toHaveProperty('LLM_MODEL');
+  expect(engineEndpoints({ chat: null, embedding: 'http://127.0.0.1:8082', chatModelFile: '/m/chat.gguf' })).not.toHaveProperty('LLAMACPP_MAIN_RUNTIME_ID');
 });

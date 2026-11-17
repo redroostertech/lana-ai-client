@@ -40,7 +40,9 @@ const CHANNELS = Object.freeze({
 // LANA_TOKENIZER_GGUF: the chat model file, so the engine counts tokens with its vocabulary.
 // LLM_QUEUE_*: the engine's model-call queue sized to Pip's chat slots, background work held to
 // one call (electron-pip-supervisor.js engineEndpoints).
-const ENGINE_MODEL_ENV = Object.freeze(['LANA_TIER', 'EMBEDDING_MODEL', 'LANA_ENGINE_EMBEDDING_URL', 'LANA_ENGINE_CHAT_URL', 'LANA_FORGE_URL', 'LANA_TOKENIZER_GGUF', 'LLM_QUEUE_CONCURRENCY', 'LLM_QUEUE_MAX_BACKGROUND_CONCURRENCY']);
+// LLM_MODEL, LLAMACPP_MAIN_RUNTIME_ID: the chat model and runtime the engine checks every answer
+// against (electron-pip-supervisor.js engineEndpoints); without them it withholds every answer.
+const ENGINE_MODEL_ENV = Object.freeze(['LANA_TIER', 'EMBEDDING_MODEL', 'LANA_ENGINE_EMBEDDING_URL', 'LANA_ENGINE_CHAT_URL', 'LANA_FORGE_URL', 'LANA_TOKENIZER_GGUF', 'LLM_QUEUE_CONCURRENCY', 'LLM_QUEUE_MAX_BACKGROUND_CONCURRENCY', 'LLM_MODEL', 'LLAMACPP_MAIN_RUNTIME_ID']);
 
 // The redactor on this computer (electron-redactor.js): its address and the secret it checks on
 // every request. They only work together, so they come from one place: the environment when it

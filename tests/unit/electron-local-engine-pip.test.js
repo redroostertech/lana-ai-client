@@ -72,6 +72,14 @@ test('Pip addresses set before the engine starts are in its environment', async 
   expect(spawned[0].env).toMatchObject(PIP);
 });
 
+test('the model Pip answers as and its runtime id reach the engine, so it can show answers', async () => {
+  const { engineEndpoints } = require('../../electron-pip-supervisor');
+  makeHost({ LANA_ENGINE_ROOT: root });
+  await host.setModelEndpoints(engineEndpoints({ chat: 'http://127.0.0.1:8081', embedding: null, chatModelFile: '/m/Qwen3.8-9B-Q4_K_M.gguf', chatSlots: 1 }));
+  await host.sync();
+  expect(spawned[0].env).toMatchObject({ LLM_MODEL: 'Qwen3.8-9B-Q4_K_M', LLAMACPP_MAIN_RUNTIME_ID: 'pipcpp-local' });
+});
+
 test('the engine always gets a level: demo unless the environment names one (it will not start without)', async () => {
   makeHost({ LANA_ENGINE_ROOT: root });
   await host.sync();
