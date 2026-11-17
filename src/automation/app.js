@@ -19,6 +19,7 @@ import {
   renderLibraryDetail,
   syncLibraryDetailModals
 } from './js/views/library-detail.js';
+import { handleStepInput } from './js/views/step-settings-view.js';
 import {
   applyTemplate,
   addBuilderAction,
@@ -1475,6 +1476,9 @@ async function loadLibraryData() {
 }
 
 async function onAppInput(event) {
+  // Declared step settings forms keep every edit in their state as it is made.
+  if (state.currentView === 'library-detail' && await handleStepInput(createContext(), event)) return;
+
   // Builder dropdowns are lex-select: their committed value arrives as
   // lex-change (handled like a native change). The input/change events of
   // the search box inside a lex-select are not field edits, and other lex

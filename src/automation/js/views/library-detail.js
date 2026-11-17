@@ -2,6 +2,9 @@ import { badge, drawerSection, emptyState, lexEmpty, metaGrid, runStatusMark, su
 import { escapeAttribute, escapeHtml, formatDate, formatLabel, getOrganizationTimezone, timeAgo } from '../shared/utils.js';
 import { describeStep, humanizeTrigger, humanizeWhen } from '../shared/step-humanizer.js';
 import { getApiUrl, safeArtifactUrl } from '../shared/api-base-url.js';
+import {
+  loadStepUi, stepTabs, stepIdOfTab, openStepTab, renderStepTab, afterStepTabRender, stepModalSpecs, handleStepClick
+} from './step-settings-view.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -1873,11 +1876,15 @@ export function renderLibraryDetail(context) {
     : escapeHtml(automationScope.label);
   const timeZone = getOrganizationTimezone(context);
 
+  const declaredTabs = stepTabs(context);
+  const activeStepId = stepIdOfTab(activeTab);
   const tabContent = activeTab === 'steps'
     ? renderStepsTab(automation)
     : activeTab === 'runs'
       ? renderRunsTab(context)
-      : renderSettingsTab(context, automation);
+      : activeStepId && declaredTabs.some((tab) => tab.id === activeTab)
+        ? renderStepTab(context, activeStepId)
+        : renderSettingsTab(context, automation);
 
   container.innerHTML = `
     <div class="connector-detail-shell" data-ld-root>
@@ -1932,6 +1939,7 @@ export function renderLibraryDetail(context) {
       <div class="ld-tabs">
         <button class="ld-tab ${activeTab === 'steps' ? 'ld-tab--active' : ''}" data-ld-tab="steps">Steps</button>
         <button class="ld-tab ${activeTab === 'runs' ? 'ld-tab--active' : ''}" data-ld-tab="runs">Runs</button>
+        ${declaredTabs.map((tab) => `<button class="ld-tab ${activeTab === tab.id ? 'ld-tab--active' : ''}" data-ld-tab="${escapeAttribute(tab.id)}">${escapeHtml(tab.label)}</button>`).join('')}
         <button class="ld-tab ${activeTab === 'settings' ? 'ld-tab--active' : ''}" data-ld-tab="settings">Settings</button>
       </div>
 
@@ -1946,8 +1954,10 @@ export function renderLibraryDetail(context) {
     delete: showDeleteModal ? renderDeleteModal(automation) : null,
     artifact: showArtifactModal ? renderArtifactModal(ld.modalArtifact, ld.artifactModalView || 'redline') : null,
     attachMatter: renderAttachMatterModal(context),
-    editOverrides: renderEditOverridesModal(context)
+    editOverrides: renderEditOverridesModal(context),
+    ...stepModalSpecs(context)
   });
+  if (activeStepId) afterStepTabRender(context, activeStepId);
 }
 
 // ---------------------------------------------------------------------------
@@ -1965,7 +1975,10 @@ const LD_MODAL_DISMISS = {
     ld.artifactModalView = 'redline';
   },
   attachMatter: (ld) => { ld.attachMatterModal = null; },
-  editOverrides: (ld) => { ld.editOverridesModal = null; }
+  editOverrides: (ld) => { ld.editOverridesModal = null; },
+  // Step settings dialogs (step-settings-view.js stepModalSpecs)
+  stepConfirm: (ld) => { for (const st of Object.values((ld.stepUi && ld.stepUi.byStep) || {})) st.confirm = null; },
+  stepRowAction: (ld) => { for (const st of Object.values((ld.stepUi && ld.stepUi.byStep) || {})) st.rowAction = null; }
 };
 
 const ldModals = new Map();
@@ -2049,6 +2062,9 @@ export async function handleLibraryDetailClick(context, event) {
   const ld = state.libraryDetail;
   if (!ld) return false;
 
+  // Declared step settings tabs and their dialogs (data-ss-*)
+  if (await handleStepClick(context, event)) return true;
+
   // Back button
   if (event.target.closest('[data-ld-back]')) {
     closeRunStream();
@@ -2075,6 +2091,10 @@ export async function handleLibraryDetailClick(context, event) {
       if (ld.matterAttachments === null && !ld.matterAttachmentsLoading) {
         await loadMatterAttachments(context, ld.automationId);
       }
+    } else if (stepIdOfTab(tab)) {
+      closeRunStream();
+      context.renderCurrentView();
+      await openStepTab(context, stepIdOfTab(tab));
     } else {
       closeRunStream();
     }
@@ -2743,6 +2763,8 @@ export async function loadLibraryDetailAutomation(context, automationId) {
     context.state.libraryDetail.automation = null;
     throw err;
   }
+  // Steps that declare settings, operations or views get their own tabs.
+  await loadStepUi(context);
 }
 
 export async function loadAutomationRuns(context, automationId, offset = 0) {

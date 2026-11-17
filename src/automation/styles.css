@@ -4394,3 +4394,176 @@ details[open].ld-step-raw > summary::before {
     height: 36px;
   }
 }
+
+/* Declared step settings tabs (js/views/step-settings-view.js) */
+.ss-tab {
+  display: grid;
+  gap: 16px;
+}
+
+.ss-actions {
+  margin-top: 12px;
+}
+
+.ss-run-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--white-100);
+}
+
+.ss-run-panel[data-ss-run-status="running"] {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.ss-run-panel--error {
+  border-color: var(--line-strong);
+}
+
+.ss-run-title {
+  margin: 0;
+  font-size: var(--lex-body-sm-size, 0.875rem);
+}
+
+.ss-run-lines {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.ss-errors {
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--white-200);
+}
+
+.ss-errors ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.ss-form {
+  display: grid;
+  gap: 16px;
+}
+
+.ss-field-label {
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  font-weight: var(--lex-weight-medium, 500);
+}
+
+.ss-help {
+  margin: 4px 0 8px;
+  color: var(--black-300);
+  font-size: 0.8rem;
+}
+
+.ss-group-list {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.ss-group-item {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+}
+
+.ss-group-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.ss-group-item-title {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.ss-group-item-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ss-group-item-fields .ss-field--condition,
+.ss-group-item-fields .ss-field--boolean {
+  grid-column: 1 / -1;
+}
+
+.ss-cond-group {
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+}
+
+.ss-cond-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.ss-cond-group-label {
+  font-size: 0.8rem;
+  color: var(--black-500);
+}
+
+.ss-cond-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) auto minmax(220px, 3fr) auto;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.ss-cond-op {
+  font-size: 0.8rem;
+  color: var(--black-500);
+  white-space: nowrap;
+}
+
+/* The page's global label rule stacks a label's children; keep a checkbox and its text on one row. */
+.ss-field--boolean .lex-checkbox-row {
+  flex-direction: row;
+  align-items: center;
+}
+
+@media (max-width: 900px) {
+  .ss-group-item-fields,
+  .ss-cond-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ss-cond-row .lex-select-trigger--multiple {
+  height: auto;
+  flex-wrap: wrap;
+}
+
+.ss-date,
+.ss-time {
+  display: block;
+  white-space: nowrap;
+}
+
+.ss-time {
+  color: var(--black-300);
+  font-size: 0.8rem;
+}
+
+/* Space between a dialog's explanation and the field under it. */
+.ss-dialog-text {
+  margin: 0 0 16px;
+}

@@ -92,6 +92,32 @@ export function formatDate(value, contextOrOptions = {}) {
   return formatDateTime(value, contextOrOptions);
 }
 
+/** The date alone ("1/20/2026"), Lex.Utils.formatDate in the display timezone; empty when not a date. */
+export function formatDateOnly(value, contextOrOptions = {}) {
+  if (!value) return '';
+  const utils = lexUtils();
+  const timeZone = getOrganizationTimezone(contextOrOptions);
+  if (utils && typeof utils.formatDate === 'function') {
+    // Lex.Utils.formatDate says "Never" for a value it cannot read; this helper (like formatTimeOnly) says nothing.
+    const text = utils.formatDate(value, { timeZone });
+    return text === 'Never' ? '' : text;
+  }
+  const parts = getDateParts(value, timeZone);
+  return parts ? `${Number(parts.month)}/${Number(parts.day)}/${parts.year}` : '';
+}
+
+/** The time alone ("3:16 PM"), Lex.Utils.formatTime in the display timezone; empty when not a date. */
+export function formatTimeOnly(value, contextOrOptions = {}) {
+  if (!value) return '';
+  const utils = lexUtils();
+  const timeZone = getOrganizationTimezone(contextOrOptions);
+  if (utils && typeof utils.formatTime === 'function') return utils.formatTime(value, { timeZone });
+  const parts = getDateParts(value, timeZone);
+  if (!parts) return '';
+  const hour24 = parts.hour === '24' ? 0 : Number(parts.hour);
+  return `${hour24 % 12 || 12}:${parts.minute} ${hour24 >= 12 ? 'PM' : 'AM'}`;
+}
+
 export function escapeHtml(value) {
   return String(value || '')
     .replace(/&/g, '&amp;')
