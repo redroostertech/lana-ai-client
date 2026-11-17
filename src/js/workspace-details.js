@@ -734,6 +734,10 @@
           openMakeupSwitch();
           return;
         }
+        if (id === 'headerOptionsObjectTypes') {
+          openObjectTypes();
+          return;
+        }
         if (id === 'headerOptionsEdit') {
           openEditMatterModal(matter);
           return;
@@ -958,6 +962,21 @@
     var deps = makeupPanelDeps();
     deps.onSwitched = refreshCurrentMatter;
     window.LanaMakeupSwitchDialog.open(deps);
+  }
+
+  // Object types on this matter (js/matter-object-types.js): after a type is
+  // added or removed, the makeup view (which lists the tabs) is read again.
+  function openObjectTypes() {
+    var matterId = currentMatterData && currentMatterData.matter && currentMatterData.matter.matter_id;
+    if (!matterId || !window.LanaMatterObjectTypes) return;
+    window.LanaMatterObjectTypes.open({
+      matterId: matterId,
+      onChanged: async function () {
+        await refreshMakeupView();
+        matterTabs = window.LanaMatterTabRegistry.buildTabs(currentMatterData && currentMatterData.makeup && currentMatterData.makeup.tabs);
+        applyMatterTabs();
+      }
+    });
   }
 
   // A skill toggle changes the makeup view model's `enabled` flags only.

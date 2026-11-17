@@ -1,0 +1,55 @@
+/* Object types drawer on the matter screen (js/matter-object-types.js).
+   Lex design tokens only. */
+
+.matter-object-types {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-spacing-sm, 0.5rem);
+}
+
+.matter-object-types__heading {
+  margin: var(--lex-spacing-md, 0.75rem) 0 0;
+  font-size: var(--lex-font-size-sm, 0.875rem);
+  font-weight: 600;
+  color: var(--lex-text-primary, #111827);
+}
+
+.matter-object-types__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-spacing-xs, 0.25rem);
+}
+
+.matter-object-types__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lex-spacing-md, 0.75rem);
+  padding: var(--lex-spacing-sm, 0.5rem) 0;
+  border-bottom: 1px solid var(--lex-border-subtle, #e5e7eb);
+}
+
+.matter-object-types__text {
+  display: flex;
+  flex-direction: column;
+}
+
+.matter-object-types__name {
+  font-size: var(--lex-font-size-sm, 0.875rem);
+  color: var(--lex-text-primary, #111827);
+}
+
+.matter-object-types__source,
+.matter-object-types__help {
+  font-size: var(--lex-font-size-xs, 0.75rem);
+  color: var(--lex-text-secondary, #6b7280);
+}
+
+.matter-object-types__notice {
+  font-size: var(--lex-font-size-sm, 0.875rem);
+  color: var(--lex-text-primary, #111827);
+}
+
+.matter-object-types__notice--error {
+  color: var(--lex-color-danger-600, #b91c1c);
+}

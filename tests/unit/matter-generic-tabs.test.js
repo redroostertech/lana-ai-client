@@ -24,6 +24,17 @@ describe('matter-generic-tabs', () => {
     expect(G.recordTable({ columns: content.columns, rows: [content.rows[1]] }).columns).toEqual(['name', 'value']);
   });
 
+  test('record cells are shown as the server wrote them (no date reformatting), escaped; actions keep their own renderer', () => {
+    const model = G.recordTable({
+      columns: [{ key: 'due_date', label: 'Due date' }, { key: 'created_by', label: 'Created by' }],
+      rows: [{ id: 'r', cells: { due_date: '2026-12-15', created_by: 'Ada <Admin> on 2026-11-16' }, actions: [{ label: 'Edit', form: 'f' }] }],
+    });
+    const renderers = G.textCellRenderers(model);
+    expect(Object.keys(renderers)).toEqual(['due_date', 'created_by']);
+    expect(renderers.due_date(model.rows[0].due_date)).toBe('2026-12-15');
+    expect(renderers.created_by(model.rows[0].created_by)).toBe('Ada &lt;Admin&gt; on 2026-11-16');
+  });
+
   test('actionAt resolves tab, row and grouped row actions, and ignores actions without a form', () => {
     expect(G.actionAt(content, null, '0', null).form).toBe('provider.create');
     expect(G.actionAt(content, '0', '0', null).subject).toBe('record:r1');

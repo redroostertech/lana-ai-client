@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="css/matter-runnables.css">
   <link rel="stylesheet" href="css/workspace-summary.css">
   <link rel="stylesheet" href="css/workspace-details.css">
+  <link rel="stylesheet" href="css/matter-object-types.css">
   <link rel="stylesheet" href="css/matter-ai-policy.css">
   <link rel="stylesheet" href="css/workspace-billable-hours.css">
   <link rel="stylesheet" href="css/workspace-switcher.css">
@@ -55,6 +56,7 @@
       >
         <button id="headerOptionsRunnables">Agents and skills</button>
         <button id="headerOptionsMakeup">Makeup</button>
+        <button id="headerOptionsObjectTypes">Object types</button>
         <button id="headerOptionsEdit">Edit Matter</button>
         <button id="headerOptionsStatus">Change Status</button>
         <button id="headerOptionsDelete" style="color: var(--lex-color-danger-600);">Delete</button>
@@ -678,6 +680,21 @@
     </div>
   </lex-modal>
 
+  <!-- Object types on this matter (js/matter-object-types.js) -->
+  <lex-drawer id="objectTypesDrawer" heading="Object types" subtitle="Records this matter keeps, each as a tab. Add one from your firm's library." width="md">
+    <div class="matter-object-types">
+      <p id="objectTypesNotice" class="matter-object-types__notice" hidden></p>
+      <p id="objectTypesReadOnly" class="matter-object-types__help" hidden>Only the matter owner or someone who can change the matter's makeup adds or removes types.</p>
+      <h3 class="matter-object-types__heading">On this matter</h3>
+      <div id="objectTypesApplied" class="matter-object-types__list"></div>
+      <p id="objectTypesAppliedEmpty" class="matter-object-types__help" hidden>None yet.</p>
+      <h3 class="matter-object-types__heading">From your library</h3>
+      <lex-input id="objectTypesSearch" name="q" type="search" placeholder="Search types"></lex-input>
+      <div id="objectTypesAvailable" class="matter-object-types__list"></div>
+      <p id="objectTypesAvailableEmpty" class="matter-object-types__help" hidden>No other types.</p>
+    </div>
+  </lex-drawer>
+
   <!-- Edit Custom Fields Modal -->
   <lex-drawer id="editCustomFieldsModal" heading="Edit Custom Fields" subtitle="These fields apply to this matter only. Reuse a field from your library to add it here." width="lg"
     buttons='[{"label":"Cancel","variant":"secondary","id":"cfCancelBtn"},{"label":"Save Changes","variant":"primary","id":"cfSaveBtn"}]'>
@@ -1185,6 +1202,9 @@
   <script src="js/shared/note-labels.js"></script>
   <script src="js/shared/entity-links.js"></script>
   <script src="js/shared/matter-fields.js"></script>
+  <script src="js/shared/custom-objects.js"></script>
+  <script src="js/api/custom-objects-api.client.js"></script>
+  <script src="js/matter-object-types.js"></script>
   <script src="js/shared/note-actions.js"></script>
   <script src="js/shared/board-work-items.js"></script>
   <script src="js/shared/task-priority.js"></script>

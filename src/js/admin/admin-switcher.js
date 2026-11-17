@@ -63,6 +63,12 @@
       allowedRoles: ['system_admin', 'org_admin', 'organization_admin']
     },
     {
+      value: 'admin/custom-objects.html',
+      label: 'Custom Objects',
+      description: 'Define the records your firm keeps on matters, such as payments',
+      allowedRoles: ['system_admin', 'org_admin', 'organization_admin']
+    },
+    {
       value: 'admin/run-controls.html',
       label: 'Run Controls',
       description: 'Pause automatic agent runs, set daily limits and see agent usage'

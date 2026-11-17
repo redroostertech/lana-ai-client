@@ -290,6 +290,16 @@
       events: ['payment.received', 'payment.refunded']
     },
     {
+      key: 'custom_object',
+      label: 'Custom Object Events',
+      description: 'Use these when a record your firm keeps on matters (such as a Payment) is added, changed or removed.',
+      when: 'These events fire when a custom object record is created, updated or deleted on a matter. Choice values are option keys (status paid), not labels.',
+      data: ['matter_id', 'object_type.key', 'object_type.label', 'record.record_id', 'record.values.<field>', 'changes.<field>.old', 'changes.<field>.new'],
+      useCases: ['Record the payment when a Payment is marked paid (changes.status.new equals paid)', 'Make the invoice when a Payment is added', 'Remind staff before a due date'],
+      examples: ['Payment marked paid: record payment and mark the matter paid in full'],
+      events: ['custom_object.record_created', 'custom_object.record_updated', 'custom_object.record_deleted']
+    },
+    {
       key: 'estimate',
       label: 'Estimate Events',
       description: 'Use these when estimates are created, sent, or approved.',

@@ -319,6 +319,19 @@
     return String(value).split('&').join('&amp;').split('<').join('&lt;').split('>').join('&gt;').split('"').join('&quot;').split("'").join('&#39;');
   }
 
+  // Cells are display text the server wrote. Shown as written: lex-table
+  // otherwise reformats columns with date-like names (due_date, created_by),
+  // shifting a date-only value by the viewer's time zone and turning
+  // "Ada Admin on 2026-11-16" into a bare timestamp.
+  function textCellRenderers(model) {
+    var renderers = {};
+    list(model && model.columns).forEach(function (column) {
+      if (column === 'actions') return;
+      renderers[column] = function (value) { return escapeHtml(value === null || value === undefined ? '' : String(value)); };
+    });
+    return renderers;
+  }
+
   var BODIES = {
     records: function (doc, content, host) {
       var model = recordTable(content);
@@ -328,15 +341,17 @@
       table.setAttribute('labels', model.labels.join(','));
       table.setAttribute('compact', '');
       host.appendChild(table);
-      if (typeof table.setCellRenderers === 'function' && model.columns.indexOf('actions') !== -1) {
-        table.setCellRenderers({
-          actions: function (value, row) {
+      if (typeof table.setCellRenderers === 'function') {
+        var renderers = textCellRenderers(model);
+        if (model.columns.indexOf('actions') !== -1) {
+          renderers.actions = function (value, row) {
             var actions = list(list(content.rows)[row._index] && list(content.rows)[row._index].actions);
             return '<div class="matter-generic-tab__actions">' + actions.map(function (action, index) {
               return '<lex-btn variant="secondary" size="sm" data-tab-row="' + row._index + '" data-tab-action="' + index + '">' + escapeHtml(action.label || 'Open') + '</lex-btn>';
             }).join('') + '</div>';
-          }
-        });
+          };
+        }
+        table.setCellRenderers(renderers);
       }
       if (typeof table.setData === 'function') table.setData(model.rows);
     },
@@ -443,6 +458,7 @@
     safeLinkUrl: safeLinkUrl,
     mergePage: mergePage,
     recordTable: recordTable,
+    textCellRenderers: textCellRenderers,
     actionAt: actionAt,
     downloadAt: downloadAt,
     downloadName: downloadName,

@@ -30,7 +30,7 @@
     "test:validation": "jest tests/validation",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "test:ci": "jest --ci --coverage --maxWorkers=2",
+    "test:ci": "node scripts/test-ci.js",
     "test:agents:ui": "playwright test tests/playwright/agents-ui.spec.js",
     "test:agents:live": "playwright test tests/playwright/agents-live.spec.js",
     "test:agents:e2e": "playwright test tests/playwright",

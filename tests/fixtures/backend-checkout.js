@@ -8,13 +8,21 @@
  * The backend is LANA_BACKEND_DIR when set (the only place looked at), else
  * the sibling worktree .runtime/lana-estate-rulebook, else a sibling LANA-AI/.
  * The first one holding every required file wins. When none does, the suite
- * is skipped with a warning saying where it looked.
+ * is skipped with a warning saying where it looked, except in CI (CI set to
+ * anything but empty, false or 0; npm run test:ci sets it):
+ * there it fails loudly, so a missing backend never passes as green.
  */
 
 const fs = require('fs');
 const path = require('path');
 
 const CLIENT_ROOT = path.resolve(__dirname, '..', '..');
+
+/** CI is set when it holds a value other than empty, false or 0 (npm run test:ci sets it). */
+function inCi() {
+  const value = String(process.env.CI || '').trim().toLowerCase();
+  return value !== '' && value !== 'false' && value !== '0';
+}
 
 /**
  * @param {string[]} required - backend-relative paths the suite reads
@@ -30,11 +38,21 @@ function findBackend(required) {
       + '. Set LANA_BACKEND_DIR to a backend worktree to run it.');
   }
   const resolve = (relative) => path.join(dir, relative);
+  const missing = (name) => {
+    describe(name, () => {
+      test('needs a LANA-AI checkout (set LANA_BACKEND_DIR)', () => {
+        throw new Error('[backend contract] No LANA-AI checkout with ' + required.join(', ') + ' at ' + candidates.join(', ')
+          + '. In CI the backend must be present: set LANA_BACKEND_DIR.');
+      });
+    });
+  };
+  let describeSuite = describe;
+  if (!dir) { describeSuite = inCi() ? missing : describe.skip; }
   return {
     dir,
     path: resolve,
     require: (relative) => require(resolve(relative)),
-    describe: dir ? describe : describe.skip,
+    describe: describeSuite,
   };
 }
 
@@ -75,4 +93,4 @@ function hermeticTracing(pathOf) {
   return { recorded };
 }
 
-module.exports = { findBackend, answerOf, hermeticTracing };
+module.exports = { findBackend, answerOf, hermeticTracing, inCi };
