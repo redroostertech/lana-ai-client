@@ -3,7 +3,7 @@ import { AVAILABLE } from "../../src/ask/backend.js";
 import type { LanaId } from "../../src/ids/lanaId.js";
 import { decodeNotes, encodeNotes, type Speaker, type TranscriptSegment } from "../../src/intent/index.js";
 import type { TextModel, TextModelRequest } from "../../src/runtime/index.js";
-import { finalSetAside, MeetingSummarizer, notesInstructions, notesPrompt, parseNotes, RuntimeNotesBackend, type TokenCounter } from "../../src/summarizer/index.js";
+import { finalSetAside, MeetingSummarizer, namesForLabels, notesInstructions, notesPrompt, parseNotes, RuntimeNotesBackend, type TokenCounter } from "../../src/summarizer/index.js";
 import { resolveDueText } from "../../src/summarizer/dueDates.js";
 
 // Synthetic meeting text only.
@@ -645,6 +645,46 @@ describe("Amendment 7 in the notes", () => {
       { reason: "logistics", lines: [2] },
     ]);
     expect(parsed.points.map((point) => [point.kind, point.text])).toEqual([["summary", "The meeting opens."]]);
+  });
+});
+
+describe("Amendment 8 in the notes: years the lines never said", () => {
+  it("fixes a year after a date to the one nearest the meeting, drops a point with a stray year, and fixes a due date's year", async () => {
+    const model = new Scripted([[
+      "POINT: summary | L8 | The pilot starts on the bronze plan on December 9, 2024.",
+      "POINT: summary | L3 | The setup fee was set in 2021.",
+      "ACTION: task | L4 | Send the draft checklist | Omar sends the checklist | 2024-11-12 | S2 | none",
+      "SUMMARY: x",
+    ].join("\n")]);
+    const summarizer = new MeetingSummarizer(new RuntimeNotesBackend(model, undefined, words));
+    const result = await summarizer.summarize({ transcript, speakers, meetingID, now: new Date(2026, 10, 11, 16, 0), meetingStart: new Date(2026, 10, 11, 15, 4), fixedSetAside: [] });
+    const texts = result.notes.keyPoints.map((point) => point.text);
+    expect(texts).toContain("The pilot starts on the bronze plan on December 9, 2026.");
+    expect(texts.some((text) => text.includes("2021"))).toBe(false);
+    const task = result.intents[0]!;
+    expect(task.params.type === "task.create" && task.params.task.dueDate).toBe("2026-11-12");
+  });
+});
+
+describe("Amendment 9: speaker labels in text LANA writes", () => {
+  it("names a labelled speaker, writes Speaker N for an unnamed one, and never touches the transcript", async () => {
+    expect(namesForLabels("S1 and S3 agree; S12 was not there.", speakers)).toBe("Dana Reyes and Speaker 3 agree; Speaker 12 was not there.");
+    expect(namesForLabels("Form S1A and S2-B stay.", speakers)).toBe("Form S1A and Omar Haddad-B stay.");
+    const model = new Scripted([[
+      "POINT: summary | L3 | S1 set the setup fee; S3 called about something else.",
+      "TABLE: Fees | Who; Amount",
+      "ROW: Fees | L3 | S1; 1,200 dollars",
+      "ACTION: task | L4 | S2 sends the draft checklist | S2 copies Priya | tonight | S3 | none",
+      "SUMMARY: x",
+    ].join("\n")]);
+    const summarizer = new MeetingSummarizer(new RuntimeNotesBackend(model, undefined, words));
+    const result = await summarizer.summarize({ transcript, speakers, meetingID, now: new Date(2026, 10, 11, 16, 0), meetingStart: new Date(2026, 10, 11, 15, 4), fixedSetAside: [] });
+    expect(result.notes.keyPoints.map((point) => point.text)).toContain("Dana Reyes set the setup fee; Speaker 3 called about something else.");
+    expect(result.notes.tables?.[0]?.rows[0]).toEqual(["Dana Reyes", "1,200 dollars"]);
+    const task = result.intents[0]!;
+    expect(task.params.type === "task.create" && [task.params.task.title, task.params.task.assigneeHint]).toEqual(["Omar Haddad sends the draft checklist", "Speaker 3"]);
+    expect(JSON.stringify(result.notes)).not.toMatch(/\bS[0-9]+\b(?!")/u);
+    expect(transcript.map((line) => line.speaker)).toContain("S3");
   });
 });
 

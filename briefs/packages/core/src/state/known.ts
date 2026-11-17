@@ -104,4 +104,22 @@ export function meetingPeople(speakers: readonly Speaker[], transcript: readonly
   return out;
 }
 
-
+/**
+ * How the meeting writes each person's name (lowercased key, written form): speaker names first,
+ * then the first capitalized form said in the lines. Keys are the people of the meeting.
+ */
+export function meetingNameForms(speakers: readonly Speaker[], transcript: readonly TranscriptSegment[]): Map<string, string> {
+  const people = meetingPeople(speakers, transcript);
+  const forms = new Map<string, string>();
+  for (const speaker of speakers) {
+    for (const word of (speaker.name ?? "").trim().split(/\s+/u)) if (word !== "" && people.has(word.toLowerCase()) && !forms.has(word.toLowerCase())) forms.set(word.toLowerCase(), word);
+  }
+  for (const segment of transcript) {
+    for (const match of segment.text.matchAll(/\p{Lu}[\p{Ll}'\u2019-]+/gu)) {
+      const word = match[0].replace(/['\u2019]s$/u, "");
+      const key = word.toLowerCase();
+      if (people.has(key) && !forms.has(key)) forms.set(key, word);
+    }
+  }
+  return forms;
+}

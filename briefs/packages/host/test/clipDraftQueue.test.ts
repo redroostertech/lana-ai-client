@@ -254,6 +254,19 @@ describe("background drafts (clip.draft.v1 in the main process)", () => {
     expect(openActions()).toBe(before);
   });
 
+  it("writes speaker names, not labels, in what LANA drafts from a clip (Amendment 9)", async () => {
+    const id = opened.meeting.id;
+    const record = rig.store.shared.current(id);
+    const label = record.speakers[0]!.id;
+    const shown = record.speakers[0]!.name?.trim() ? record.speakers[0]!.name!.trim() : `Speaker ${label.slice(1)}`;
+    await service.requestDraft(id, "action", 1, 1);
+    await settle();
+    drafter.calls[0]!.answer({ ...task(`Send ${label} the exhibit list`), assigneeHint: label });
+    await service.drafting.idle();
+    const made = rig.store.intents.list({ meetingID: id }).map((stored) => stored.intent).find((intent) => intent.params.type === "task.create" && intent.params.task.title.includes("exhibit list"))!;
+    expect(made.params.type === "task.create" && [made.params.task.title, made.params.task.assigneeHint]).toEqual([`Send ${shown} the exhibit list`, shown]);
+  });
+
   it("cancels a waiting draft and stops one on the model; nothing is added", async () => {
     const id = opened.meeting.id;
     const intentsBefore = rig.store.intents.list({ meetingID: id }).length;

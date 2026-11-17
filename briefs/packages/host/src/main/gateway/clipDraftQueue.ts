@@ -5,6 +5,7 @@ import {
 } from "@lana/core/intent";
 import type { ClipDrafter } from "@lana/core/runtime";
 import { MeetingStates } from "@lana/core/state";
+import { namesForLabels } from "@lana/core/summarizer";
 import type { ClipDraftRequest, GatewayStore, StoredClipDraft } from "@lana/core/store";
 import { randomUUID } from "node:crypto";
 import type { DraftCard, DraftState } from "../../shared/api.js";
@@ -201,7 +202,9 @@ export class ClipDraftQueue {
     const question = draft.questionID === undefined ? undefined : record.notes.keyPoints.find((point) => point.id === draft.questionID)?.text;
     const started = this.now().getTime();
     if (draft.kind === "decision") {
-      const text = await this.attempt(() => this.drafter?.decision(lines, record.speakers, signal));
+      const drafted = await this.attempt(() => this.drafter?.decision(lines, record.speakers, signal));
+      // Speaker labels in LANA's text become names (Amendment 9); the starting point is the transcript's own words.
+      const text = drafted === undefined ? undefined : namesForLabels(drafted, record.speakers);
       if (!this.stillWanted(draft.id, signal)) return;
       const start = [...lines.map((line) => line.text).join(" ")].slice(0, MAX_DECISION_START).join("");
       store.clipDrafts.readyDecision(draft.id, text ?? start, text !== undefined);
@@ -209,7 +212,11 @@ export class ClipDraftQueue {
       this.deps.log.info("drafts.ready", { draft: draft.id, kind: draft.kind, drafted: text !== undefined, ms: this.now().getTime() - started });
       return;
     }
-    const candidate = await this.attempt(() => this.candidate(question, lines, record.speakers, signal));
+    const raw = await this.attempt(() => this.candidate(question, lines, record.speakers, signal));
+    const candidate = raw === undefined ? undefined : {
+      ...raw, title: namesForLabels(raw.title, record.speakers), body: namesForLabels(raw.body, record.speakers),
+      assigneeHint: raw.assigneeHint === undefined ? undefined : namesForLabels(raw.assigneeHint, record.speakers),
+    };
     if (!this.stillWanted(draft.id, signal)) return;
     const fallback = question === undefined ? clipFallbackAction(lines) : clipQuestionFallbackAction(question, lines);
     const drafted = candidate === undefined ? undefined : clipIntent(candidate, lines, draft.meetingID, this.now());

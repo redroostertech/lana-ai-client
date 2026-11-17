@@ -15,6 +15,8 @@ import type { MeetingState } from "../state/meetingState.js";
 import { INTENT_LIMITS } from "../intent/validator.js";
 import { groundQuotes } from "./evidenceGrounder.js";
 import { stems, verifiedLines } from "./lineMatcher.js";
+import { checkDueYear, checkYears } from "./yearCheck.js";
+import { namesForLabels } from "./labelNames.js";
 import { finishCandidate, isLogistics, promiseAction, PROMISE_MODALS, PROMISE_VERBS, SPOKEN_WHEN } from "./meetingSummarizer.js";
 import { notesInstructions, parseNotes, quoteOf, validateNotes, type ChunkExtraction, type ChunkPhrasing, type QuotedCandidate } from "./notesFormat.js";
 import { capInTurn, DEFAULT_SUMMARY_LIMITS, isDuplicate, spansFor, unionSpans, type SummaryLimits } from "./summaryReducer.js";
@@ -200,12 +202,25 @@ export class NoteFinder {
         if (!sources.every((span) => outside(span.start, span.end))) continue;
         // A reported question ("Omar asks who...") is not a key point (Amendment 6).
         if (REPORTED_QUESTION.test(text)) continue;
-        const kind = checkedKind(point.kind, text);
+        // Years the cited lines never said (Amendment 8).
+        const checkedText = checkYears(text, cited.map((line) => line.text).join(" "), start);
+        if (checkedText === undefined) continue;
+        const kind = checkedKind(point.kind, checkedText);
         const decided = kind === "decision" && point.decidedBy !== undefined ? { decidedBy: point.decidedBy } : {};
-        found.push({ id: nextID(), kind, text, sources, precision: "exact", chunk: chunk.index, ...decided });
+        found.push({ id: nextID(), kind, text: namesForLabels(checkedText, state.speakers), sources, precision: "exact", chunk: chunk.index, ...decided });
       }
       for (const raw of candidates) {
-        const candidate = taskShape(finishCandidate(raw, state.speakers, start), people);
+        const shaped = taskShape(finishCandidate(raw, state.speakers, start), people, state.nameForms);
+        // Years the cited lines never said (Amendment 8): fixed in a date, else no task; the due date in the year said or nearest the meeting.
+        const quotes = shaped === undefined ? "" : shaped.evidence.map((item) => item.quote).join(" ");
+        const titleChecked = shaped === undefined ? undefined : checkYears(shaped.title, quotes, start);
+        // Speaker labels become names in the title, detail and owner (Amendment 9).
+        const named = (value: string | undefined) => (value === undefined ? undefined : namesForLabels(value, state.speakers));
+        const candidate = shaped === undefined || titleChecked === undefined ? undefined
+          : {
+            ...shaped, title: namesForLabels(titleChecked, state.speakers), body: named(shaped.body) ?? shaped.body, assigneeHint: named(shaped.assigneeHint),
+            ...(shaped.dueDate === undefined ? {} : { dueDate: checkDueYear(shaped.dueDate, quotes, start) }),
+          };
         if (candidate === undefined) continue;
         const grounding = groundQuotes(candidate.evidence, chunk.segments, state.speakers);
         const result = assembleIntent(candidate, grounding, state.id, options.now, options.intentID?.() ?? makeLanaId("intent", options.now));
@@ -280,7 +295,8 @@ export class NoteFinder {
       }
       if (!next.sources.every((span) => options.state.isVisible(span.start, span.end))) continue;
       // The question stays with its answer, so the key point reads on its own (Amendment 5).
-      const text = answeredText(item.text, next.text);
+      const written = answeredText(item.text, next.text);
+      const text = written === undefined ? undefined : namesForLabels(written, options.state.speakers);
       if (text === undefined) continue;
       out.push({ id: nextID(), kind: "summary", text, answer: next.text.trim(), sources: unionSpans(item.sources, next.sources), precision: "exact", chunk: item.chunk });
     }
@@ -357,6 +373,10 @@ export const FIND_MORE_ANSWER_WORDS = {
   openers: ["yes", "no", "probably", "maybe", "likely", "possibly", "definitely", "correct", "right", "sure", "ok", "okay"],
   aboutTheTalk: ["is discussed", "was discussed", "are discussed", "were discussed", "is noted", "was noted", "is mentioned", "was mentioned", "is raised", "was raised", "the speakers agree", "the speakers discuss", "the speakers note", "they discuss"],
   ownerPrefixes: ["client", "matter", "company", "owner", "regarding", "who"],
+  /** Words between a verb and a name that add no object ("check with Leila"). */
+  nameJoiners: ["with", "to", "for", "and", "the", "a", "an", "on", "up"],
+  /** Verbs whose object is the person (Amendment 8): "Call Dana" is a task, "Check Omar" is not. */
+  contactVerbs: ["call", "email", "e-mail", "text", "message", "phone", "meet", "ask", "tell", "remind", "contact", "notify", "thank", "invite", "visit", "pay"],
   /** A stand-alone answer may not start with one of these (Amendment 7): it needs its question. */
   leadingWords: ["i", "you", "he", "she", "it", "we", "they", "them", "this", "that", "these", "those", "but", "and", "so", "because", "also"],
   /** After a wh-word these start a subject, so the line is not a real question ("When the decision will be made"). */
@@ -488,7 +508,7 @@ export function commitmentAction(text: string, cited: readonly TranscriptSegment
  * ("client:" style prefixes removed), else empty; the title starts with a capital and a verb
  * (taken from a cited line where the owner says what they will do, if missing), else no task.
  */
-export function taskShape(candidate: QuotedCandidate, people: ReadonlySet<string>): QuotedCandidate | undefined {
+export function taskShape(candidate: QuotedCandidate, people: ReadonlySet<string>, nameForms: ReadonlyMap<string, string> = new Map()): QuotedCandidate | undefined {
   if (candidate.type !== "task.create") return candidate;
   let owner = candidate.assigneeHint?.trim();
   if (owner !== undefined) {
@@ -503,10 +523,22 @@ export function taskShape(candidate: QuotedCandidate, people: ReadonlySet<string
     const said = candidate.evidence.map((item) => item.quote).join(" ");
     const verb = new RegExp(`\\b${who}\\s*(?:'ll|\u2019ll|\\s+will|\\s+am going to|\\s+is going to|\\s+can)\\s+(\\p{Ll}+)`, "u").exec(said)?.[1];
     if (verb === undefined || !verbs.includes(verb)) return undefined;
-    title = `${verb} ${title.charAt(0).toLowerCase()}${title.slice(1)}`;
+    // A person's name keeps its capital (Amendment 8); any other first word goes lowercase after the verb.
+    const firstWord = title.split(/\s+/u)[0] ?? "";
+    title = people.has(firstWord.toLowerCase()) ? `${verb} ${title}` : `${verb} ${title.charAt(0).toLowerCase()}${title.slice(1)}`;
   }
   // A one-word title says nothing (Amendment 7).
   if (title.split(/\s+/u).filter((word) => word !== "").length < 2) return undefined;
+  // Names as the meeting writes them (Amendment 8).
+  title = title.split(/(\s+)/u).map((word) => {
+    const bare = word.replace(/[.,;:!?]+$/u, "");
+    const form = people.has(bare.toLowerCase()) ? (nameForms.get(bare.toLowerCase()) ?? `${bare.charAt(0).toUpperCase()}${bare.slice(1)}`) : bare;
+    return form + word.slice(bare.length);
+  }).join("");
   title = title.charAt(0).toUpperCase() + title.slice(1);
+  // Verb plus only names, with no object ("Check Omar", "Check with Leila"), says nothing, unless the verb is reaching the person (Amendment 8).
+  const words = title.toLowerCase().replace(/[.,;:!?]/gu, "").split(/\s+/u).filter((word) => word !== "");
+  const rest = words.slice(1).filter((word) => !(FIND_MORE_ANSWER_WORDS.nameJoiners as readonly string[]).includes(word));
+  if (rest.length > 0 && rest.every((word) => people.has(word)) && !(FIND_MORE_ANSWER_WORDS.contactVerbs as readonly string[]).includes(words[0]!)) return undefined;
   return { ...candidate, title, assigneeHint: owner };
 }

@@ -3,6 +3,8 @@ export {
   type NotesBackend, type SkippedChunk, type SummarizeOptions, type SummaryResult,
 } from "./meetingSummarizer.js";
 export { resolveDueText } from "./dueDates.js";
+export { namesForLabels } from "./labelNames.js";
+export { checkDueYear, checkYears, nearestYear } from "./yearCheck.js";
 export { excerpt, lineScores, stems, verifiedLines } from "./lineMatcher.js";
 export {
   applyQuestionCheck, parseQuestionCheck, planQuestionCheck, QUESTION_CHECK_INSTRUCTIONS, QUESTION_CHECK_MAX_RESPONSE_TOKENS, QUESTION_CHECK_SCHEMA,

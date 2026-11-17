@@ -8,7 +8,7 @@ import type { UserNote } from "../intent/userNote.js";
 import { DEFAULT_SUMMARY_LIMITS, isDuplicate, type SummaryLimits } from "../summarizer/summaryReducer.js";
 import type { FindMoreSuggestion } from "../summarizer/findMore.js";
 import { textSimilarity } from "../summarizer/textNormalizer.js";
-import { covered, knownNear, meetingPeople, type KnownItem, type SuggestionKind } from "./known.js";
+import { covered, knownNear, meetingNameForms, meetingPeople, type KnownItem, type SuggestionKind } from "./known.js";
 
 /** Who wrote a key point, from its id: an added Find more suggestion, a person's clip, else LANA's notes. */
 export type ItemOrigin = "model" | "person" | "find_more";
@@ -68,6 +68,8 @@ export interface MeetingState {
   readonly notesModel: string;
   /** People of the meeting, lowercased (speaker names and names said in the lines). */
   readonly people: ReadonlySet<string>;
+  /** How the meeting writes each person's name (lowercased key, written form). */
+  readonly nameForms: ReadonlyMap<string, string>;
   /** Everything already known: key points, actions, waiting, dismissed and removed suggestions. */
   readonly knownItems: readonly KnownItem[];
   /** Known items near a stretch, for a prompt (within 60 s, time order, at most 30). */
@@ -159,6 +161,7 @@ export function buildMeetingState(input: MeetingStateInput): MeetingState {
     removed: input.removed,
     notesModel: record.provenance.notesModel,
     people: meetingPeople(record.speakers, record.transcript),
+    nameForms: meetingNameForms(record.speakers, record.transcript),
     knownItems,
     known: (start, end) => knownNear(knownItems, start, end),
     isVisible: view.isVisible,

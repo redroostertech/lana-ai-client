@@ -9,7 +9,7 @@ import type { TextModel, TextModelRequest } from "../../src/runtime/index.js";
 import { workflowDefinition } from "../../src/runtime/index.js";
 import {
   FIND_MORE_CHUNK_BUDGET, FIND_MORE_MAX_SUGGESTIONS, FIND_MORE_RULES, findMoreInstructions, findMorePrompt, knownForChunk, NoteFinder, notesInstructions,
-  answeredText, checkedKind, commitmentAction, covered, meetingPeople, taskShape, FIND_MORE_KIND_WORDS, parseFindMore, RuntimeNotesBackend, validateFindMore, type FindMoreKnown, type TokenCounter,
+  answeredText, checkDueYear, checkYears, checkedKind, commitmentAction, covered, meetingPeople, taskShape, FIND_MORE_KIND_WORDS, parseFindMore, RuntimeNotesBackend, validateFindMore, type FindMoreKnown, type TokenCounter,
 } from "../../src/summarizer/index.js";
 
 // Synthetic meeting text only.
@@ -357,6 +357,39 @@ describe("Find more notes: suggestions", () => {
     const base = { type: "task.create" as const, body: "", recipients: [], confidence: 0.7, evidence: [{ speaker: "S2", tStart: 0, tEnd: 1, quote: "Thanks." }] };
     expect(taskShape({ ...base, title: "Email", assigneeHint: "Omar" }, new Set(["omar"]))).toBeUndefined();
     expect(taskShape({ ...base, title: "Email Priya", assigneeHint: "Omar" }, new Set(["omar"]))?.title).toBe("Email Priya");
+  });
+
+  it("keeps a person's name as the meeting writes it in a task title, and drops verb plus name with no object (Amendment 8)", () => {
+    const people = new Set(["omar", "priya", "leila"]);
+    const forms = new Map([["omar", "Omar"], ["priya", "Priya"], ["leila", "Leila"]]);
+    const base = { type: "task.create" as const, body: "", recipients: [], confidence: 0.7, evidence: [{ speaker: "S2", tStart: 0, tEnd: 1, quote: "I will check with Leila tonight and confirm the date with Priya." }] };
+    expect(taskShape({ ...base, title: "Omar", assigneeHint: "Omar" }, people, forms)).toBeUndefined();
+    expect(taskShape({ ...base, title: "Leila about the date", assigneeHint: "Omar" }, people, forms)?.title).toBe("Check Leila about the date");
+    expect(taskShape({ ...base, title: "Confirm the date with priya", assigneeHint: "Omar" }, people, forms)?.title).toBe("Confirm the date with Priya");
+    expect(taskShape({ ...base, title: "Check with Leila", assigneeHint: "Omar" }, people, forms)).toBeUndefined();
+    expect(taskShape({ ...base, title: "Email Priya", assigneeHint: "Omar" }, people, forms)?.title).toBe("Email Priya");
+  });
+
+  it("never keeps a year the cited lines did not say (Amendment 8)", () => {
+    const start = new Date(2026, 10, 16, 10, 0);
+    expect(checkYears("The signing is aimed for December 9, 2024.", "We are aiming to sign on December 9, if Leila can come.", start)).toBe("The signing is aimed for December 9, 2026.");
+    expect(checkYears("Due 9 January 2024.", "Due January 9.", start)).toBe("Due 9 January 2027.");
+    expect(checkYears("They bought the house in 2014.", "We bought it in 2014 for 410,000 dollars.", start)).toBe("They bought the house in 2014.");
+    expect(checkYears("The return covers 2023.", "The return covers last year.", start)).toBeUndefined();
+    expect(checkDueYear("2024-12-09", "We sign on December 9.", start)).toBe("2026-12-09");
+    expect(checkDueYear("2027-01-09", "We sign on January 9, 2027.", start)).toBe("2027-01-09");
+    expect(checkDueYear("2026-11-20", "By Friday.", start)).toBe("2026-11-20");
+  });
+
+  it("writes speaker names, not labels, in suggestions and task owners (Amendment 9)", async () => {
+    const model = new Scripted(["POINT: decision | L2 | S2 | S2 and S1 agree the setup fee is 1,200 dollars.\nACTION: task | L4 | Send the draft checklist to S1 | Send it tonight | tonight | S3 | none"]);
+    const result = await finder(model).find(options());
+    const texts = result.suggestions.map((item) => item.text);
+    expect(texts).toContain("Omar Haddad and Dana Reyes agree the setup fee is 1,200 dollars.");
+    const task = result.suggestions.find((item) => item.kind === "task")!;
+    expect(task.text).toBe("Send the draft checklist to Dana Reyes");
+    expect(task.intent?.params.type === "task.create" && task.intent.params.task.assigneeHint).toBe("Speaker 3");
+    expect(result.suggestions.find((item) => item.kind === "decision")?.decidedBy).toBe("S2");
   });
 
   it("says nothing new with an empty list", async () => {

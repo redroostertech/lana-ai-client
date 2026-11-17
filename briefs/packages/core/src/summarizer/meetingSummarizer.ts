@@ -8,6 +8,8 @@ import type { SourceSpan } from "../intent/keyPoint.js";
 import { INTENT_LIMITS } from "../intent/validator.js";
 import { graphemes } from "../text/graphemes.js";
 import { resolveDueText } from "./dueDates.js";
+import { checkDueYear, checkYears } from "./yearCheck.js";
+import { namesForLabels } from "./labelNames.js";
 import { groundQuotes } from "./evidenceGrounder.js";
 import { verifiedLines } from "./lineMatcher.js";
 import { quoteOf, type ChunkExtraction, type ChunkPhrasing, type ChunkRequest, type ExtractedPoint, type QuotedCandidate } from "./notesFormat.js";
@@ -144,11 +146,30 @@ export class MeetingSummarizer {
       for (const point of extraction.points) {
         if (isLogistics(point)) continue;
         const promise = point.kind === "decision" ? promiseAction(point, chunk) : undefined;
-        if (promise !== undefined) candidates.push(promise);
-        else points.push({ ...attributePoint(point, chunk), chunk: chunk.index });
+        if (promise !== undefined) {
+          candidates.push(promise);
+          continue;
+        }
+        const draft = attributePoint(point, chunk);
+        // Years the cited lines never said (Amendment 8): fixed after a date, else the point is dropped.
+        const citedText = chunk.segments.filter((segment) => draft.sources.some((span) => segment.end > span.start && segment.start < span.end)).map((segment) => segment.text).join(" ");
+        const text = checkYears(draft.text, citedText, start);
+        if (text !== undefined) points.push({ ...draft, text: namesForLabels(text, options.speakers), chunk: chunk.index });
       }
       for (const raw of candidates) {
-        const candidate = finishCandidate(raw, options.speakers, start);
+        const finished = finishCandidate(raw, options.speakers, start);
+        const quotes = finished.evidence.map((item) => item.quote).join(" ");
+        const title = checkYears(finished.title, quotes, start);
+        if (title === undefined) {
+          dropped += 1;
+          continue;
+        }
+        // Speaker labels become names in what LANA writes, owner included (Amendment 9).
+        const named = (value: string | undefined) => (value === undefined ? undefined : namesForLabels(value, options.speakers));
+        const candidate = {
+          ...finished, title: namesForLabels(title, options.speakers), body: named(finished.body) ?? finished.body, assigneeHint: named(finished.assigneeHint),
+          ...(finished.dueDate === undefined ? {} : { dueDate: checkDueYear(finished.dueDate, quotes, start) }),
+        };
         const grounding = groundQuotes(candidate.evidence, chunk.segments, options.speakers);
         const result = assembleIntent(candidate, grounding, options.meetingID, options.now, options.intentID?.() ?? makeLanaId("intent", options.now));
         if (result.ok) intents.push(result.intent);
@@ -170,9 +191,11 @@ export class MeetingSummarizer {
             return segment === undefined ? [] : [segment];
           })),
         }));
-        const existing = tables.find((item) => normalizeText(item.title) === normalizeText(table.title) && item.columns.length === table.columns.length);
-        if (existing !== undefined) existing.rows.push(...rows);
-        else tables.push({ title: table.title, columns: [...table.columns], rows });
+        const named = rows.map((row) => ({ ...row, cells: row.cells.map((cell) => namesForLabels(cell, options.speakers)) }));
+        const title = namesForLabels(table.title, options.speakers);
+        const existing = tables.find((item) => normalizeText(item.title) === normalizeText(title) && item.columns.length === table.columns.length);
+        if (existing !== undefined) existing.rows.push(...named);
+        else tables.push({ title, columns: table.columns.map((column) => namesForLabels(column, options.speakers)), rows: named });
       }
       runningSummary = this.cap(outcome.extraction.runningSummary);
       options.progress?.((chunk.index + 1) / chunks.length);
@@ -190,7 +213,9 @@ export class MeetingSummarizer {
     const keptIntents = intents.filter((intent) => !intent.evidence.some((item) => overlapsSetAside(item.tStart, item.tEnd, setAside, 0.5)));
     dropped += intents.length - keptIntents.length;
     // The later lines the question check reads are the chunked lines (blank lines dropped), as Swift sends them.
-    const checked = await this.checkOpenQuestions(kept, chunks.flatMap((chunk) => chunk.segments).filter((segment) => !segmentSetAside(segment, setAside)), options.speakers, options.signal);
+    const answered = await this.checkOpenQuestions(kept, chunks.flatMap((chunk) => chunk.segments).filter((segment) => !segmentSetAside(segment, setAside)), options.speakers, options.signal);
+    // An answer the question check wrote names speakers too (Amendment 9).
+    const checked = answered.map((point) => ({ ...point, text: namesForLabels(point.text, options.speakers) }));
     const merged = reduceIntents(keptIntents, this.limits);
     const gaps: NotesGap[] = skipped.map((chunk) => ({
       start: chunk.startTime,
