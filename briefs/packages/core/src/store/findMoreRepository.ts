@@ -19,6 +19,8 @@ export interface FindMoreState {
   readonly suggestions: readonly FindMoreSuggestion[];
   /** Never suggested again for this meeting. */
   readonly dismissed: readonly FindMoreKnown[];
+  /** Key points the person removed on this computer: a rewrite of the notes never brings them back. */
+  readonly removed: readonly FindMoreKnown[];
   /** The last finished run: when, and how many suggestions it found. */
   readonly lastRun: { readonly at: Date; readonly found: number } | null;
 }
@@ -37,7 +39,7 @@ export class FindMoreRepository {
   constructor(private readonly ctx: StoreContext, private readonly shared: SharedRecordRepository) {}
 
   state(id: LanaId): FindMoreState {
-    if (this.ctx.db.get("SELECT id FROM meeting WHERE id = ?", id) === undefined) return { suggestions: [], dismissed: [], lastRun: null };
+    if (this.ctx.db.get("SELECT id FROM meeting WHERE id = ?", id) === undefined) return { suggestions: [], dismissed: [], removed: [], lastRun: null };
     return this.read(id);
   }
 
@@ -91,6 +93,21 @@ export class FindMoreRepository {
     });
   }
 
+  /**
+   * Removes a key point through the shared record (it syncs like any edit) and remembers it on
+   * this computer, so a rewrite of the notes never brings it back. False when it is not there.
+   */
+  removeKeyPoint(id: LanaId, pointID: string): boolean {
+    return this.ctx.db.write(() => {
+      const point = this.shared.current(id).notes.keyPoints.find((item) => item.id === pointID);
+      if (point === undefined) return false;
+      this.shared.edit(id, (record) => ({ ...record, notes: { ...record.notes, keyPoints: record.notes.keyPoints.filter((item) => item.id !== pointID) } }));
+      const state = this.read(id);
+      this.write(id, { ...state, removed: [...state.removed, { kind: point.kind, text: point.text, sources: point.sources }] });
+      return true;
+    });
+  }
+
   // MARK: - Private
 
   private change(id: LanaId, body: (state: FindMoreState) => FindMoreState): FindMoreState {
@@ -105,7 +122,7 @@ export class FindMoreRepository {
   private read(id: LanaId): FindMoreState {
     const key = `${KEY_PREFIX}${id}`;
     const stored = this.ctx.db.get("SELECT value FROM setting WHERE key = ?", key);
-    if (stored === undefined) return { suggestions: [], dismissed: [], lastRun: null };
+    if (stored === undefined) return { suggestions: [], dismissed: [], removed: [], lastRun: null };
     const bytes = fromBase64(text(stored, "value"));
     if (bytes === null) throw StoreError.corrupt(key);
     const value = this.ctx.sealer.openJson(bytes, `setting|${key}`);
@@ -115,7 +132,7 @@ export class FindMoreRepository {
     const raw = object["last_run"];
     const run = raw !== null && typeof raw === "object" && !Array.isArray(raw) ? (raw as JsonObject) : null;
     const lastRun = run !== null && typeof run["at"] === "string" ? { at: parseStoredDate(run["at"]), found: Number(run["found"] ?? 0) } : null;
-    return { suggestions: list("suggestions").map(decodeSuggestion), dismissed: list("dismissed").map(decodeKnown), lastRun };
+    return { suggestions: list("suggestions").map(decodeSuggestion), dismissed: list("dismissed").map(decodeKnown), removed: list("removed").map(decodeKnown), lastRun };
   }
 
   private write(id: LanaId, state: FindMoreState): void {
@@ -123,6 +140,7 @@ export class FindMoreRepository {
     const value: JsonObject = {
       suggestions: state.suggestions.map(encodeSuggestion),
       dismissed: state.dismissed.map((item) => ({ kind: item.kind, text: item.text, sources: item.sources.map(encodeSourceSpan) })),
+      removed: state.removed.map((item) => ({ kind: item.kind, text: item.text, sources: item.sources.map(encodeSourceSpan) })),
       last_run: state.lastRun === null ? null : { at: LanaDate.format(state.lastRun.at), found: state.lastRun.found },
     };
     const sealed = toBase64(this.ctx.sealer.sealJson(value, `setting|${key}`));

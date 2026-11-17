@@ -1,7 +1,7 @@
 import type { LanaId } from "../ids/lanaId.js";
 import { displayNameFor, type MeetingRecord } from "../intent/meeting.js";
 import { keyPointStart, type KeyPointKind } from "../intent/keyPoint.js";
-import { overlapsSetAside, segmentSetAside } from "../intent/meetingParts.js";
+import { visibleView } from "../state/meetingState.js";
 import { regardingOf, titleOf } from "../intent/params.js";
 import { graphemeCount } from "../text/graphemes.js";
 import { isBlank } from "../text/whitespace.js";
@@ -68,8 +68,9 @@ export class PassageBuilder {
     });
     const name = (speaker: string): string => displayNameFor(meeting, speaker);
     // Set-aside parts (a phone call, another matter) never reach LANA: not their lines, nor anything citing them.
-    const setAside = meeting.notes.setAside ?? [];
-    const aside = (start: number, end: number): boolean => overlapsSetAside(start, end, setAside, 0.5);
+    // The meeting state's visible view is the one rule for that.
+    const view = visibleView(meeting);
+    const aside = (start: number, end: number): boolean => !view.isVisible(start, end);
 
     for (const point of meeting.notes.keyPoints) {
       if (point.sources.some((source) => aside(source.start, source.end))) continue;
@@ -100,7 +101,7 @@ export class PassageBuilder {
       result.push(make(`action-${intent.id}`, "action", start, end, intent.evidence.map((evidence) => name(evidence.speaker)), lines.join("\n")));
     }
 
-    const turns = meeting.transcript.filter((turn) => !isBlank(turn.text) && !segmentSetAside(turn, setAside));
+    const turns = view.visibleTranscript;
     let index = 0;
     let number = 0;
     while (index < turns.length) {

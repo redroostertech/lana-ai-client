@@ -22,6 +22,7 @@ export {
 export { RuntimeNotesBackend } from "./runtimeNotesBackend.js";
 export {
   FIND_MORE_CHUNK_BUDGET, FIND_MORE_MAX_RESPONSE_TOKENS, FIND_MORE_MAX_SUGGESTIONS, FIND_MORE_RULES, FIND_MORE_SCHEMA, findMoreInstructions, findMorePrompt,
-  answeredText, checkedKind, commitmentAction, covered, FIND_MORE_ANSWER_WORDS, FIND_MORE_NOT_NAMES, meetingPeople, taskShape, FIND_MORE_KIND_WORDS, FindMoreUnavailableError, knownForChunk, NoteFinder, parseFindMore, validateFindMore,
+  answeredText, checkedKind, commitmentAction, FIND_MORE_ANSWER_WORDS, FIND_MORE_NOT_NAMES, taskShape, FIND_MORE_KIND_WORDS, FindMoreUnavailableError, knownForChunk, NoteFinder, parseFindMore, validateFindMore,
   type FindMoreBackend, type FindMoreKnown, type FindMoreOptions, type FindMoreRequest, type FindMoreResult, type FindMoreSuggestion, type SuggestionKind,
 } from "./findMore.js";
+export { covered, meetingPeople } from "../state/known.js";

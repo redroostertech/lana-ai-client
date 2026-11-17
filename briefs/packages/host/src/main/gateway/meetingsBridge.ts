@@ -1,6 +1,7 @@
 import type { AttestationMethod as CoreMethod } from "@lana/core/handoff";
 import { parseLanaId } from "@lana/core/ids";
-import { displayTitleOf, overlapsSetAside, segmentSetAside, speakerDisplayName, type IntentParams, type MeetingRecord as CoreMeeting } from "@lana/core/intent";
+import { displayTitleOf, segmentSetAside, speakerDisplayName, type IntentParams, type MeetingRecord as CoreMeeting } from "@lana/core/intent";
+import { visibleView } from "@lana/core/state";
 import type { GatewayStore, MeetingOrigin } from "@lana/core/store";
 import type { AttestationMethod, MeetingRecord, MeetingsApi, MeetingSummary, Result } from "../../shared/api.js";
 import type { MainLog } from "../log.js";
@@ -19,15 +20,21 @@ export function toApiMethod(method: CoreMethod, origin: MeetingOrigin = "phone")
 
 /** A received meeting in the renderer's shape. Text goes to the window, never to logs. */
 export function toApiMeeting(record: CoreMeeting, extra: { method: CoreMethod; origin?: MeetingOrigin; hasAudio: boolean; actions: MeetingRecord["actions"] }): MeetingRecord {
+  // The meeting state's visible view: what the page, every export and Ask leave out.
+  const view = visibleView(record);
+  const visible = (spans: readonly { start: number; end: number }[]) => spans.every((span) => view.isVisible(span.start, span.end));
   return {
     id: record.id,
     title: record.title,
     startedAt: record.startedAt.toISOString(),
     durationSeconds: record.durationSeconds,
     speakers: record.speakers.map((speaker) => ({ id: speaker.id, name: speakerDisplayName(speaker) })),
-    transcript: record.transcript.map((segment) => ({ speaker: segment.speaker, start: segment.start, end: segment.end, text: segment.text })),
+    transcript: record.transcript.map((segment) => {
+      const part = view.setAside.findIndex((item) => segmentSetAside(segment, [item]));
+      return { speaker: segment.speaker, start: segment.start, end: segment.end, text: segment.text, setAsidePart: part < 0 ? null : part };
+    }),
     // Anything citing a set-aside part (one set aside after the notes were written) is not shown.
-    keyPoints: record.notes.keyPoints.filter((point) => !point.sources.some((span) => overlapsSetAside(span.start, span.end, record.notes.setAside, 0.5))).map((point) => ({
+    keyPoints: record.notes.keyPoints.filter((point) => visible(point.sources)).map((point) => ({
       id: point.id,
       kind: point.kind === "open_question" ? "openQuestion" : point.kind,
       text: pointText(point.text),
@@ -35,8 +42,8 @@ export function toApiMeeting(record: CoreMeeting, extra: { method: CoreMethod; o
       precision: point.precision,
       decidedBy: point.decidedBy ?? null,
     })),
-    setAside: (record.notes.setAside ?? []).map((part) => ({ start: part.start, end: part.end, reason: part.reason, speakers: [...(part.speakers ?? [])], ...(part.by === "person" ? { by: "person" as const } : {}) })),
-    tables: (record.notes.tables ?? []).filter((table) => !table.sources.some((span) => overlapsSetAside(span.start, span.end, record.notes.setAside, 0.5))).map((table) => ({
+    setAside: view.setAside.map((part) => ({ start: part.start, end: part.end, reason: part.reason, speakers: [...(part.speakers ?? [])], ...(part.by === "person" ? { by: "person" as const } : {}) })),
+    tables: (record.notes.tables ?? []).filter((table) => visible(table.sources)).map((table) => ({
       title: table.title, columns: [...table.columns], rows: table.rows.map((row) => [...row]),
       sources: table.sources.map((span) => ({ start: span.start, end: span.end, speaker: span.speaker ?? null })),
     })),
@@ -63,7 +70,7 @@ export function pointText(text: string): string {
 
 /** Labels of speakers with a line outside the set-aside parts and no typed name, in label order. */
 export function unnamedSpeakers(record: CoreMeeting): string[] {
-  const used = new Set(record.transcript.filter((segment) => segment.text.trim() !== "" && !segmentSetAside(segment, record.notes.setAside)).map((segment) => segment.speaker));
+  const used = new Set(visibleView(record).visibleTranscript.map((segment) => segment.speaker));
   const named = new Set(record.speakers.filter((speaker) => speaker.name !== undefined && speaker.name.trim() !== "").map((speaker) => speaker.id));
   return [...used].filter((id) => !named.has(id)).sort((a, b) => Number(a.replace(/\D/gu, "")) - Number(b.replace(/\D/gu, "")) || (a < b ? -1 : a > b ? 1 : 0));
 }
@@ -113,7 +120,7 @@ export class MeetingsBridge implements Omit<MeetingsApi, "audio"> {
       const actions = this.store.intents
         .list({ meetingID })
         .filter((stored) => !HIDDEN_STATUSES.has(stored.intent.status))
-        .filter((stored) => !stored.intent.evidence.some((item) => overlapsSetAside(item.tStart, item.tEnd, record.notes.setAside, 0.5)))
+        .filter((stored) => stored.intent.evidence.every((item) => visibleView(record).isVisible(item.tStart, item.tEnd)))
         .map((stored) => {
           const evidence = stored.intent.evidence;
           const start = evidence.length === 0 ? 0 : Math.min(...evidence.map((item) => item.tStart));

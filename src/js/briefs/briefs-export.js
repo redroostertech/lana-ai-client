@@ -117,40 +117,24 @@
 
   // ── Set-aside parts (always left out) ─────────────────
   // A part LANA or the person set aside (a phone call, another matter) never appears in an
-  // export: its transcript lines and anything citing them are left out, and one line says so.
+  // export: its transcript lines are left out, and one line says so. The host sends the
+  // meeting state's visible view: each line names the part it falls in (setAsidePart), and
+  // key points, actions and tables citing a set-aside part are already left out.
 
   const SET_ASIDE_REASONS = { phone_call: 'phone call', side_conversation: 'side conversation', logistics: 'meeting setup', other_matter: 'another matter' };
-
-  function setAsideParts(record) {
-    return (record.setAside || []).filter((part) => part && Number.isFinite(part.start) && Number.isFinite(part.end)).slice().sort((a, b) => a.start - b.start);
-  }
 
   /** "Set aside: 21:58 to 26:09 (phone call)". */
   function setAsideLine(part) {
     return `Set aside: ${M.clock(part.start)} to ${M.clock(part.end)} (${SET_ASIDE_REASONS[part.reason] || 'not part of the meeting'})`;
   }
 
-  /** More than half of [start, end] lies in a set-aside part (a whole transcript line). */
-  function lineSetAside(record, start, end) {
-    const length = Math.max(end - start, 0.01);
-    return setAsideParts(record).some((part) => Math.min(end, part.end) - Math.max(start, part.start) >= length / 2);
-  }
-
-  /** Any overlap over half a second (a cited span or an action's evidence). */
-  function citesSetAside(record, start, end) {
-    return setAsideParts(record).some((part) => Math.min(end, part.end) - Math.max(start, part.start) > 0.5);
-  }
-
   /** The transcript in order with each set-aside part as one placeholder: [{ segment } | { part }]. */
   function transcriptRows(record) {
-    const parts = setAsideParts(record);
+    const parts = record.setAside || [];
     const shown = new Set();
     const rows = [];
     for (const segment of record.transcript || []) {
-      const part = parts.find((item) => {
-        const length = Math.max(segment.end - segment.start, 0.01);
-        return Math.min(segment.end, item.end) - Math.max(segment.start, item.start) >= length / 2;
-      });
+      const part = Number.isInteger(segment.setAsidePart) ? parts[segment.setAsidePart] : undefined;
       if (part === undefined) {
         rows.push({ segment });
       } else if (!shown.has(part)) {
@@ -162,18 +146,12 @@
   }
 
   function pointsOf(record, kind) {
-    return (record.keyPoints || []).filter((point) => point.kind === kind && String(point.text || '').trim() !== ''
-      && !(point.sources || []).some((span) => citesSetAside(record, span.start, span.end)));
+    return (record.keyPoints || []).filter((point) => point.kind === kind && String(point.text || '').trim() !== '');
   }
 
-  /** Actions not citing a set-aside part. The view gives the first and last quote times, so each is checked on its own. */
+  /** Actions in time order (the host already left out any citing a set-aside part). */
   function actionsOf(record) {
-    const inside = (time) => setAsideParts(record).some((part) => time >= part.start && time < part.end);
-    return (record.actions || []).filter((action) => {
-      const start = Number.isFinite(action.start) ? action.start : action.at;
-      const end = Number.isFinite(action.end) ? action.end : start;
-      return !inside(start) && !inside(end);
-    }).sort((a, b) => a.at - b.at);
+    return (record.actions || []).slice().sort((a, b) => a.at - b.at);
   }
 
   // ── Attribution: cited ranges, owners and due dates ───
@@ -289,9 +267,8 @@ ${M.unnamedText(record) ? `  <p class="ex-notice">${escape(M.unnamedText(record)
   }
 
   function tablesSection(record) {
-    // A table citing a set-aside part is left out whole: its rows carry no times of their own.
-    const tables = (record.tables || []).filter((table) => (table.rows || []).length > 0 && (table.columns || []).length > 0
-      && !(table.sources || []).some((span) => citesSetAside(record, span.start, span.end)));
+    // A table citing a set-aside part is left out whole by the host (the visible view).
+    const tables = (record.tables || []).filter((table) => (table.rows || []).length > 0 && (table.columns || []).length > 0);
     if (tables.length === 0) return '';
     return `<section class="ex-section"><h2 class="ex-h2">Tables</h2>
   ${tables.map((table) => `<h3 class="ex-h3">${escape(table.title)}</h3>

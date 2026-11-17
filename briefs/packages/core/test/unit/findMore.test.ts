@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { AVAILABLE } from "../../src/ask/backend.js";
 import type { LanaId } from "../../src/ids/lanaId.js";
-import type { KeyPoint, Speaker, TranscriptSegment } from "../../src/intent/index.js";
+import type { Intent, KeyPoint, MeetingRecord, SetAsidePart, Speaker, TranscriptSegment } from "../../src/intent/index.js";
+import { localMeetingRecord } from "../../src/recording/index.js";
+import { buildMeetingState } from "../../src/state/index.js";
 import { titleOf } from "../../src/intent/index.js";
 import type { TextModel, TextModelRequest } from "../../src/runtime/index.js";
 import { workflowDefinition } from "../../src/runtime/index.js";
@@ -42,19 +44,34 @@ class Scripted implements TextModel {
 }
 
 let ids = 0;
-const options = (extra: Partial<Parameters<NoteFinder["find"]>[0]> = {}): Parameters<NoteFinder["find"]>[0] => ({
-  transcript,
-  speakers,
-  meetingID,
-  now: new Date("2026-11-16T15:00:00Z"),
-  meetingStart: new Date("2026-11-16T14:00:00Z"),
-  keyPoints: existing,
-  actions: [],
-  dismissed: [],
-  setAside: [{ start: 33, end: 70, reason: "phone_call" }],
-  intentID: () => `int_01JCQ7A1B2C3D4E5F6G7H8J9${String(ids++).padStart(2, "0")}` as LanaId,
-  ...extra,
-});
+interface Scenario {
+  readonly transcript?: TranscriptSegment[];
+  readonly keyPoints?: KeyPoint[];
+  readonly actions?: Intent[];
+  readonly dismissed?: FindMoreKnown[];
+  readonly setAside?: SetAsidePart[];
+  readonly progress?: (part: number, of: number) => void;
+}
+
+/** The find options over a meeting state built from synthetic parts. */
+const options = (extra: Scenario = {}): Parameters<NoteFinder["find"]>[0] => {
+  const record: MeetingRecord = {
+    ...localMeetingRecord({
+      id: meetingID, title: "Harbor intake", startedAt: new Date("2026-11-16T14:00:00Z"), durationSeconds: 90,
+      consent: { method: "verbal_announced", confirmedBy: [], confirmedAt: new Date("2026-11-16T14:00:00Z") },
+      userNotes: [], appVersion: "0.1.0", speakers, transcript: extra.transcript ?? transcript,
+    }),
+  };
+  const withNotes: MeetingRecord = { ...record, notes: { keyPoints: extra.keyPoints ?? existing, gaps: [], setAside: extra.setAside ?? [{ start: 33, end: 70, reason: "phone_call" }] } };
+  const state = buildMeetingState({ record: withNotes, actions: extra.actions ?? [], vocabulary: [], waiting: [], dismissed: extra.dismissed ?? [], removed: [] });
+  return {
+    state,
+    now: new Date("2026-11-16T15:00:00Z"),
+    meetingStart: new Date("2026-11-16T14:00:00Z"),
+    intentID: () => `int_01JCQ7A1B2C3D4E5F6G7H8J9${String(ids++).padStart(2, "0")}` as LanaId,
+    ...(extra.progress === undefined ? {} : { progress: extra.progress }),
+  };
+};
 
 function finder(model: TextModel, budget = { targetTokens: 1_000, maxTokens: 2_000 }): NoteFinder {
   return new NoteFinder(new RuntimeNotesBackend(model, undefined, words), budget);

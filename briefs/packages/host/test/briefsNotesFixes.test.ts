@@ -129,6 +129,21 @@ describe("notes for a meeting recorded here, with the notes fixes", () => {
     expect(shown.value.actions).toEqual([]);
   });
 
+  it("marks each line with the set-aside part it falls in, and leaves out a table citing one (the export's visible view)", async () => {
+    const id = storeLocal();
+    await new NotesWriter(rig.store, new Scripted([[
+      "POINT: summary | L5 | The setup fee is 1,200 dollars.",
+      "TABLE: Visits | Day; Time",
+      "ROW: Visits | L4 | Saturday; afternoon",
+      "ASIDE: phone_call | L3, L4",
+      "SUMMARY: x",
+    ].join("\n")]), rig.log).write(id, () => undefined);
+    const shown = await new MeetingsBridge(rig.store, rig.log).get(id);
+    if (!shown.ok) throw new Error("not shown");
+    expect(shown.value.transcript.map((line) => line.setAsidePart)).toEqual([null, null, 0, 0, null]);
+    expect(shown.value.tables).toEqual([]);
+  });
+
   it("shows the meeting with set-aside parts, tables, who decided, action owners and due dates", async () => {
     const id = storeLocal();
     await new NotesWriter(rig.store, new Scripted([[

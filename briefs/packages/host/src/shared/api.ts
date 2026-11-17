@@ -150,6 +150,8 @@ export interface TranscriptSegment {
   start: number;
   end: number;
   text: string;
+  /** The index in `setAside` of the part this line falls in (the meeting state's visible view), or null. */
+  setAsidePart: number | null;
 }
 
 export type KeyPointKind = "summary" | "decision" | "openQuestion";

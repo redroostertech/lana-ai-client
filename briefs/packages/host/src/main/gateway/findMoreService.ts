@@ -1,7 +1,7 @@
-import { loadVocabulary } from "@lana/core/gateway";
 import { parseLanaId, type LanaId } from "@lana/core/ids";
 import type { TextModel } from "@lana/core/runtime";
 import { StoreError, type GatewayStore } from "@lana/core/store";
+import { MeetingStates } from "@lana/core/state";
 import { FindMoreUnavailableError, NoteFinder, RuntimeNotesBackend, type FindMoreSuggestion } from "@lana/core/summarizer";
 import type { FindMoreApi, FindMoreSuggestionView, FindMoreView, LanaEvent, Result } from "../../shared/api.js";
 import type { MainLog } from "../log.js";
@@ -35,8 +35,11 @@ export class FindMoreService implements FindMoreApi {
   /** The last run's outcome per meeting, while the app runs. */
   private readonly outcomes = new Map<string, Outcome>();
   private work: Promise<void> = Promise.resolve();
+  private readonly states: MeetingStates;
 
-  constructor(private readonly options: FindMoreServiceOptions) {}
+  constructor(private readonly options: FindMoreServiceOptions) {
+    this.states = new MeetingStates(options.store);
+  }
 
   /** Resolves when the run in progress settles (tests). */
   idle(): Promise<void> {
@@ -63,7 +66,7 @@ export class FindMoreService implements FindMoreApi {
 
   async add(meetingID: string, suggestionIDs: string[]): Promise<Result<FindMoreView>> {
     return this.change(meetingID, suggestionIDs, (id, ids) => {
-      const added = this.options.store.findMore.add(id, ids);
+      const added = this.states.propose(id, [{ kind: "acceptSuggestions", suggestionIDs: ids }], "person").applied;
       this.options.log.info("find_more.added", { meeting: id, added });
       if (added > 0) this.options.emit({ type: "meetingChanged", meetingID: id });
     });
@@ -71,7 +74,7 @@ export class FindMoreService implements FindMoreApi {
 
   async dismiss(meetingID: string, suggestionIDs: string[]): Promise<Result<FindMoreView>> {
     return this.change(meetingID, suggestionIDs, (id, ids) => {
-      const dismissed = this.options.store.findMore.dismiss(id, ids);
+      const dismissed = this.states.propose(id, [{ kind: "dismissSuggestions", suggestionIDs: ids }], "person").applied;
       this.options.log.info("find_more.dismissed", { meeting: id, dismissed });
     });
   }
@@ -83,21 +86,11 @@ export class FindMoreService implements FindMoreApi {
     this.publish(id);
     let outcome: Outcome = "ready";
     try {
-      const record = store.shared.current(id);
-      const saved = store.findMore.state(id);
-      const actions = store.intents.list({ meetingID: id }).map((stored) => stored.intent).filter((intent) => intent.status !== "dismissed");
+      // The meeting as every step sees it: known items (notes, actions, waiting, dismissed and removed suggestions), repeats, people, visible lines.
+      const state = this.states.load(id);
       const result = await new NoteFinder(new RuntimeNotesBackend(this.options.model)).find({
-        transcript: record.transcript,
-        speakers: record.speakers,
-        meetingID: id,
+        state,
         now: new Date(),
-        meetingStart: record.startedAt,
-        vocabulary: loadVocabulary(store.settings).map((entry) => entry.term),
-        keyPoints: record.notes.keyPoints,
-        actions,
-        // Dismissed suggestions never come back, and those still waiting are not suggested twice.
-        dismissed: [...saved.dismissed, ...saved.suggestions.map((item) => ({ kind: item.kind, text: item.text, sources: item.sources }))],
-        setAside: record.notes.setAside ?? [],
         progress: (part, of) => {
           if (this.running?.id !== id) return;
           this.running.part = part;
@@ -105,7 +98,7 @@ export class FindMoreService implements FindMoreApi {
           this.publish(id);
         },
       });
-      store.findMore.saveRun(id, result.suggestions);
+      this.states.propose(id, [{ kind: "suggest", suggestions: result.suggestions }], "find_more");
       log.info("find_more.ran", { meeting: id, found: result.suggestions.length, chunks: result.chunkCount, skipped: result.skippedChunks });
     } catch (error) {
       if (error instanceof FindMoreUnavailableError) {

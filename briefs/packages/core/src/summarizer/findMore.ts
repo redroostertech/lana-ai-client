@@ -10,6 +10,8 @@ import { splitLines } from "../runtime/answerFormat.js";
 import { trimSpaces } from "../runtime/formatLine.js";
 import type { ModelOutputValidation } from "../runtime/kernel.js";
 import { graphemes } from "../text/graphemes.js";
+import { covered, knownNear, knownText, NOT_NAMES, type KnownItem, type SuggestionKind } from "../state/known.js";
+import type { MeetingState } from "../state/meetingState.js";
 import { INTENT_LIMITS } from "../intent/validator.js";
 import { groundQuotes } from "./evidenceGrounder.js";
 import { stems, verifiedLines } from "./lineMatcher.js";
@@ -32,34 +34,17 @@ export const FIND_MORE_CHUNK_BUDGET: ChunkBudget = { targetTokens: 750, maxToken
 export const FIND_MORE_MAX_SUGGESTIONS = 15;
 export const FIND_MORE_SCHEMA = "lana.notes.more.v1";
 export const FIND_MORE_MAX_RESPONSE_TOKENS = 1_200;
-/** Known items with a source this close to a part are listed in its prompt. */
-const NEAR_SECONDS = 60;
-const MAX_KNOWN = 30;
-const MAX_KNOWN_CHARACTERS = 200;
 /** Suggested questions go through the open question check this many to a call (as in the notes). */
 const MAX_CHECKED_QUESTIONS = 6;
-/** A suggestion whose content words are at least this share of one known item's is a rewording of it. */
-const COVERED_SHARE = 0.5;
-/** ...with at least this many tokens in common. */
-const COVERED_MIN_SHARED = 3;
-/** With every figure already in that item, this share is enough. */
-const COVERED_FIGURE_SHARE = 0.4;
-
 export const FIND_MORE_RULES = "These notes were written once already. Find what they missed in this transcript part: "
   + "specifics (amounts, dates, names, reasons, risks), commitments and open questions. "
   + "Never repeat or reword an item listed under Already in the notes. "
   + "Write a question only when no line in this part answers it. "
   + "Write no SUMMARY line and no ASIDE line. If nothing is missing, reply NONE.";
 
-export type SuggestionKind = KeyPointKind | "task";
-
+export type { SuggestionKind } from "../state/known.js";
 /** An item the notes already hold (or a dismissed suggestion): listed in the prompt and never suggested again. */
-export interface FindMoreKnown {
-  readonly kind: SuggestionKind;
-  /** The point's text, or the task's title. */
-  readonly text: string;
-  readonly sources: readonly SourceSpan[];
-}
+export type FindMoreKnown = KnownItem;
 
 /** One suggestion, waiting for the person: a key point of `kind`, or a task carrying its proposed `intent`. */
 export interface FindMoreSuggestion {
@@ -94,17 +79,11 @@ export interface FindMoreBackend {
 }
 
 export interface FindMoreOptions {
-  readonly transcript: readonly TranscriptSegment[];
-  readonly speakers: readonly Speaker[];
-  readonly meetingID: LanaId;
+  /** The meeting as every step sees it: visible lines, known items, repeats, people, set-aside parts. */
+  readonly state: MeetingState;
   readonly now: Date;
+  /** Spoken due dates resolve against it. Defaults to the meeting's start. */
   readonly meetingStart?: Date;
-  readonly vocabulary?: readonly string[];
-  readonly keyPoints: readonly KeyPoint[];
-  /** The meeting's actions, dismissed ones left out. */
-  readonly actions: readonly Intent[];
-  readonly dismissed: readonly FindMoreKnown[];
-  readonly setAside: readonly SetAsidePart[];
   /** Called as each part finishes: part n of total. */
   readonly progress?: (part: number, of: number) => void;
   readonly signal?: AbortSignal;
@@ -144,23 +123,13 @@ export function findMorePrompt(request: FindMoreRequest): string {
   return parts.join("\n\n");
 }
 
-/** Known items with a source within 60 s of the part, in time order, at most 30, each cut to 200 characters. */
+/** Known items for one part: within 60 s of it, in time order, at most 30 (the meeting state rule). */
 export function knownForChunk(chunk: TranscriptChunk, items: readonly FindMoreKnown[]): FindMoreKnown[] {
-  const low = chunkStart(chunk) - NEAR_SECONDS;
-  const high = chunkEnd(chunk) + NEAR_SECONDS;
-  const first = (item: FindMoreKnown) => Math.min(...item.sources.map((span) => span.start));
-  return items
-    .filter((item) => item.sources.some((span) => span.end >= low && span.start <= high))
-    .map((item, index) => ({ item, index }))
-    .sort((a, b) => first(a.item) - first(b.item) || a.index - b.index)
-    .slice(0, MAX_KNOWN)
-    .map(({ item }) => ({ ...item, text: knownText(item.text) }));
+  return knownNear(items, chunkStart(chunk), chunkEnd(chunk));
 }
 
-function knownText(text: string): string {
-  const flat = text.replace(/[|\r\n\u2028\u2029]+/gu, " ").replace(/ {2,}/gu, " ").trim();
-  return graphemes(flat).slice(0, MAX_KNOWN_CHARACTERS).join("");
-}
+/** Words that start a sentence but never name the person who commits (the meeting state list). */
+export const FIND_MORE_NOT_NAMES = NOT_NAMES;
 
 const NONE = /^none\.?$/iu;
 
@@ -189,23 +158,19 @@ export class NoteFinder {
   async find(options: FindMoreOptions): Promise<FindMoreResult> {
     const availability = await this.backend.availability();
     if (!availability.available) throw new FindMoreUnavailableError(availability);
-    const setAside = options.setAside;
-    const visible = options.transcript.filter((segment) => segment.text.trim() !== "" && !segmentSetAside(segment, setAside));
+    const { state } = options;
+    // The visible lines (set-aside parts and blank lines left out) are what the model reads.
+    const visible: TranscriptSegment[] = state.visibleTranscript.map(({ index: _index, ...segment }) => segment);
     const chunks = this.chunker.chunk(visible);
-    const people = meetingPeople(options.speakers, options.transcript);
-    const known: FindMoreKnown[] = [
-      ...options.keyPoints.map((point) => ({ kind: point.kind, text: point.text, sources: point.sources })),
-      ...options.actions.map((intent) => ({ kind: "task" as const, text: titleOf(intent.params), sources: intent.evidence.map((item) => ({ start: item.tStart, end: item.tEnd })) })),
-      ...options.dismissed,
-    ];
-    const outside = (start: number, end: number) => !overlapsSetAside(start, end, setAside, 0.5);
+    const people = state.people;
+    const outside = (start: number, end: number) => state.isVisible(start, end);
     const found: Array<Found> = [];
     let skipped = 0;
-    const start = options.meetingStart ?? options.now;
+    const start = options.meetingStart ?? state.startedAt;
     const nextID = options.suggestionID ?? (() => `more-${Math.random().toString(16).slice(2, 10)}`);
     for (const chunk of chunks) {
       throwIfAborted(options.signal);
-      const extraction = await this.extract(chunk, knownForChunk(chunk, known), options);
+      const extraction = await this.extract(chunk, state.known(chunkStart(chunk), chunkEnd(chunk)), options);
       if (extraction === undefined) {
         skipped += 1;
         options.progress?.(chunk.index + 1, chunks.length);
@@ -240,10 +205,10 @@ export class NoteFinder {
         found.push({ id: nextID(), kind, text, sources, precision: "exact", chunk: chunk.index, ...decided });
       }
       for (const raw of candidates) {
-        const candidate = taskShape(finishCandidate(raw, options.speakers, start), people);
+        const candidate = taskShape(finishCandidate(raw, state.speakers, start), people);
         if (candidate === undefined) continue;
-        const grounding = groundQuotes(candidate.evidence, chunk.segments, options.speakers);
-        const result = assembleIntent(candidate, grounding, options.meetingID, options.now, options.intentID?.() ?? makeLanaId("intent", options.now));
+        const grounding = groundQuotes(candidate.evidence, chunk.segments, state.speakers);
+        const result = assembleIntent(candidate, grounding, state.id, options.now, options.intentID?.() ?? makeLanaId("intent", options.now));
         if (!result.ok) continue;
         const intent = result.intent;
         if (!intent.evidence.every((item) => outside(item.tStart, item.tEnd))) continue;
@@ -289,7 +254,7 @@ export class NoteFinder {
       precision: item.precision,
       chunk: item.chunk,
     }));
-    const plan = planQuestionCheck(drafts, transcript, options.speakers, this.backend.tokenCounter ?? HEURISTIC_TOKENS, MAX_CHECKED_QUESTIONS);
+    const plan = planQuestionCheck(drafts, transcript, options.state.speakers, this.backend.tokenCounter ?? HEURISTIC_TOKENS, MAX_CHECKED_QUESTIONS);
     if (plan === undefined) return found;
     throwIfAborted(options.signal);
     let resolutions: QuestionResolution[];
@@ -313,7 +278,7 @@ export class NoteFinder {
         out.push(item);
         continue;
       }
-      if (next.sources.some((span) => overlapsSetAside(span.start, span.end, options.setAside, 0.5))) continue;
+      if (!next.sources.every((span) => options.state.isVisible(span.start, span.end))) continue;
       // The question stays with its answer, so the key point reads on its own (Amendment 5).
       const text = answeredText(item.text, next.text);
       if (text === undefined) continue;
@@ -322,25 +287,17 @@ export class NoteFinder {
     return out;
   }
 
-  /** Whether it matches a note or action already there, a dismissed suggestion, or an earlier suggestion. */
-  private repeats(suggestion: FindMoreSuggestion, options: FindMoreOptions, earlier: readonly FindMoreSuggestion[]): boolean {
+  /**
+   * Whether it repeats the meeting (the state's shared rule: notes, actions, waiting, dismissed
+   * and removed suggestions) or an earlier suggestion of this run (the same rules).
+   */
+  private repeats(suggestion: Found, options: FindMoreOptions, earlier: readonly Found[]): boolean {
+    const compareText = suggestion.answer ?? suggestion.text;
+    if (options.state.isRepeat(suggestion.text, suggestion.kind, { compareText, ...(suggestion.intent === undefined ? {} : { intent: suggestion.intent }) })) return true;
+    if (covered(compareText, earlier.map((item) => item.text))) return true;
     const similarText = (left: string, right: string, threshold: number) => textSimilarity(left, right) >= threshold;
-    const known = [
-      ...options.keyPoints.map((point) => point.text), ...options.actions.map((intent) => titleOf(intent.params)),
-      ...options.dismissed.map((item) => item.text), ...earlier.map((item) => item.text),
-    ];
-    // An answered question is compared by its answer (Amendment 6).
-    if (covered((suggestion as { answer?: string }).answer ?? suggestion.text, known)) return true;
-    if (suggestion.kind === "task") {
-      const intent = suggestion.intent!;
-      if (options.actions.some((action) => isDuplicate(action, intent, this.limits))) return true;
-      if (options.dismissed.some((item) => item.kind === "task" && similarText(item.text, suggestion.text, this.limits.titleSimilarityThreshold))) return true;
-      return earlier.some((item) => item.intent !== undefined && isDuplicate(item.intent, intent, this.limits));
-    }
-    const threshold = this.limits.noteSimilarityThreshold;
-    return options.keyPoints.some((point) => point.kind === suggestion.kind && similarText(point.text, suggestion.text, threshold))
-      || options.dismissed.some((item) => item.kind === suggestion.kind && similarText(item.text, suggestion.text, threshold))
-      || earlier.some((item) => item.kind === suggestion.kind && similarText(item.text, suggestion.text, threshold));
+    if (suggestion.kind === "task") return earlier.some((item) => item.intent !== undefined && isDuplicate(item.intent, suggestion.intent!, this.limits));
+    return earlier.some((item) => item.kind === suggestion.kind && similarText(item.text, suggestion.text, this.limits.noteSimilarityThreshold));
   }
 
   /** One part, retried once with the neutral phrasing when the model declines; undefined when it fails. */
@@ -348,8 +305,9 @@ export class NoteFinder {
     for (const phrasing of ["standard", "neutralReformulation"] as ChunkPhrasing[]) {
       throwIfAborted(options.signal);
       try {
-        const vocabulary = options.vocabulary ?? [];
-        const request: FindMoreRequest = vocabulary.length === 0 ? { chunk, speakers: options.speakers, phrasing, known } : { chunk, speakers: options.speakers, phrasing, known, vocabulary };
+        const vocabulary = options.state.vocabulary;
+        const speakers = options.state.speakers;
+        const request: FindMoreRequest = vocabulary.length === 0 ? { chunk, speakers, phrasing, known } : { chunk, speakers, phrasing, known, vocabulary };
         return await this.backend.findMore(request, options.signal);
       } catch (error) {
         if (isAbortError(error) || options.signal?.aborted === true) throw error;
@@ -359,30 +317,6 @@ export class NoteFinder {
     }
     return undefined;
   }
-}
-
-/**
- * True when the text is a rewording of one known item, of any kind: at least 60% of its content
- * words and figures are in that item, or every figure it holds is there and at least 40% overall.
- */
-export function covered(text: string, known: readonly string[]): boolean {
-  const figures = figuresOf(text);
-  const wanted = new Set([...stems(text), ...figures]);
-  if (wanted.size === 0) return false;
-  return known.some((item) => {
-    const itemFigures = figuresOf(item);
-    const have = new Set([...stems(item), ...itemFigures]);
-    let shared = 0;
-    for (const token of wanted) if (have.has(token)) shared += 1;
-    const share = shared / wanted.size;
-    if (share >= COVERED_SHARE && shared >= COVERED_MIN_SHARED) return true;
-    return figures.size > 0 && [...figures].every((figure) => itemFigures.has(figure)) && share >= COVERED_FIGURE_SHARE;
-  });
-}
-
-/** The numbers in a text, written without separators ("410,000" is "410000"). */
-function figuresOf(text: string): Set<string> {
-  return new Set([...text.matchAll(/\p{N}+(?:[.,]\p{N}+)*/gu)].map((match) => match[0].replace(/,/gu, "")));
 }
 
 /**
@@ -432,7 +366,7 @@ export const FIND_MORE_ANSWER_WORDS = {
 
 const MAX_ANSWERED_CHARACTERS = 300;
 const ALONE_MIN_WORDS = 6;
-const MONTHS_AND_DAYS = new Set(["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]);
+
 
 /**
  * An answered question as one key point (Amendments 5 and 6): the answer alone when, without a
@@ -497,34 +431,6 @@ const WH_WORDS = ["who", "what", "when", "where", "why", "how", "which"] as cons
 /** "Omar asks who will update the forms": a reported question, not a key point. */
 const REPORTED_QUESTION = /^\p{Lu}[\p{L}'\u2019-]*(?:\s+\p{Lu}[\p{L}'\u2019-]*)?\s+(?:asks|asked)\s+(?:if|whether|who|what|when|how|about)\b/u;
 
-/** Words that start a sentence but never name the person who commits. */
-export const FIND_MORE_NOT_NAMES = ["The", "We", "They", "He", "She", "It", "This", "That", "These", "Those", "Each", "Both", "Everyone", "Everybody", "Someone", "Nobody", "No", "Our", "Their", "His", "Her", "I", "You", "Who", "All"] as const;
-
-/**
- * The people of a meeting, lowercased: each speaker's name (whole, first and last word) and every
- * capitalized word inside a transcript line that is not the first word of a sentence, a month or
- * a day, or one of the not-names.
- */
-export function meetingPeople(speakers: readonly Speaker[], transcript: readonly TranscriptSegment[]): Set<string> {
-  const out = new Set<string>();
-  for (const speaker of speakers) {
-    if (speaker.name === undefined || speaker.name.trim() === "") continue;
-    const words = speaker.name.trim().split(/\s+/u);
-    out.add(speaker.name.trim().toLowerCase());
-    out.add(words[0]!.toLowerCase());
-    out.add(words.at(-1)!.toLowerCase());
-  }
-  for (const segment of transcript) {
-    for (const match of segment.text.matchAll(/(?<![.!?]\s)(?<!^)(?<=\s)(\p{Lu}[\p{Ll}'\u2019-]+)/gu)) {
-      const word = match[1]!.replace(/['\u2019]s$/u, "");
-      if (MONTHS_AND_DAYS.has(word) || (FIND_MORE_NOT_NAMES as readonly string[]).includes(word)) continue;
-      out.add(word.toLowerCase());
-    }
-    for (const match of segment.text.matchAll(/\b(?:Mr|Ms|Mrs|Dr)\.?\s+(\p{Lu}[\p{Ll}'\u2019-]+)/gu)) out.add(match[1]!.toLowerCase());
-  }
-  return out;
-}
-
 function isPerson(name: string, people: ReadonlySet<string>): boolean {
   const trimmed = name.trim();
   if (/^S\d+$/u.test(trimmed)) return true;
@@ -553,12 +459,12 @@ export function commitmentAction(text: string, cited: readonly TranscriptSegment
   let match = COMMITMENT.exec(trimmed);
   let owner = match?.[1];
   const firstPerson = /^(I|We)\s/u.exec(trimmed)?.[1];
-  if (match === null || owner === undefined || (FIND_MORE_NOT_NAMES as readonly string[]).includes(owner.split(/\s+/u)[0]!)) {
+  if (match === null || owner === undefined || (NOT_NAMES as readonly string[]).includes(owner.split(/\s+/u)[0]!)) {
     const any = COMMITMENT_ANY.exec(trimmed);
     const name = any?.[1];
     if (any === null || name === undefined) return undefined;
     if (firstPerson !== undefined && name.split(/\s+/u)[0] === firstPerson) owner = cited[0]!.speaker;
-    else if (!(FIND_MORE_NOT_NAMES as readonly string[]).includes(name.split(/\s+/u)[0]!) && isPerson(name, people)) owner = name;
+    else if (!(NOT_NAMES as readonly string[]).includes(name.split(/\s+/u)[0]!) && isPerson(name, people)) owner = name;
     else return undefined;
     match = any;
   }

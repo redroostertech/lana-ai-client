@@ -95,6 +95,6 @@ describe("Find more notes on this computer", () => {
   });
 
   it("has no state for a meeting that is not here", () => {
-    expect(rig.store.findMore.state(makeLanaId("meeting"))).toEqual({ suggestions: [], dismissed: [], lastRun: null });
+    expect(rig.store.findMore.state(makeLanaId("meeting"))).toEqual({ suggestions: [], dismissed: [], removed: [], lastRun: null });
   });
 });

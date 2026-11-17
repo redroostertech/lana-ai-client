@@ -1,5 +1,5 @@
 import { displayNameFor, type MeetingRecord } from "../intent/meeting.js";
-import { segmentSetAside } from "../intent/meetingParts.js";
+import { visibleView } from "../state/meetingState.js";
 import { clipLineIndices, type TranscriptClip } from "../intent/transcriptClip.js";
 import type { Passage } from "./passage.js";
 
@@ -9,8 +9,8 @@ import type { Passage } from "./passage.js";
  */
 export function clipPassage(clip: TranscriptClip, meeting: MeetingRecord): Passage | undefined {
   // Set-aside lines never reach LANA, even inside a pinned clip.
-  const lines = clipLineIndices(clip, meeting.transcript).map((index) => meeting.transcript[index]!)
-    .filter((line) => !segmentSetAside(line, meeting.notes.setAside));
+  const visible = new Set(visibleView(meeting).visibleTranscript.map((line) => line.index));
+  const lines = clipLineIndices(clip, meeting.transcript).filter((index) => visible.has(index)).map((index) => meeting.transcript[index]!);
   if (lines.length === 0) return undefined;
   return {
     id: `clip-${clip.id}`,

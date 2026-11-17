@@ -5,6 +5,7 @@ import { actionHistoryPassage } from "./actionHistory.js";
 import { AskEngine, type AnswerBackend, type AskAnswer, type AskEngineOptions, type AskOptions } from "./askEngine.js";
 import { PassageBuilder, type Passage } from "./passage.js";
 import { PassageIndex } from "./passageIndex.js";
+import { visibleView } from "../state/meetingState.js";
 
 /** What Ask reads from the gateway store (implemented by `GatewayStore`'s repositories). */
 export interface AskMeetingSource {
@@ -26,6 +27,8 @@ export type AskScope = { readonly kind: "all" } | { readonly kind: "meeting"; re
  */
 export class MeetingAskService {
   private passages = new Map<LanaId, Passage[]>();
+  /** Each indexed meeting's visible test (the meeting state's view), so nothing citing a set-aside part is offered. */
+  private visible = new Map<LanaId, (start: number, end: number) => boolean>();
   private summaries = new Map<LanaId, MeetingSummary>();
   private indexed = false;
 
@@ -51,6 +54,7 @@ export class MeetingAskService {
   /** Drops a meeting's passages, for example after its scratch-pad notes changed. */
   meetingChanged(id: LanaId): void {
     this.passages.delete(id);
+    this.visible.delete(id);
     this.indexed = false;
   }
 
@@ -64,6 +68,8 @@ export class MeetingAskService {
     for (const stored of await this.source.intents(scope.kind === "all" ? null : scope.id)) {
       const summary = this.summaries.get(stored.intent.meetingID);
       if (summary === undefined) continue;
+      const visible = this.visible.get(stored.intent.meetingID);
+      if (visible !== undefined && stored.intent.evidence.some((item) => !visible(item.tStart, item.tEnd))) continue;
       const events = await this.source.history(stored.intent.id);
       result.push(actionHistoryPassage(stored, events, summary.title, summary.startedAt, this.options.timeZone));
     }
@@ -79,10 +85,21 @@ export class MeetingAskService {
     if (this.indexed && setEquals(ids, [...this.passages.keys()])) return ids;
     const builder = this.options.builder ?? new PassageBuilder();
     const next = new Map<LanaId, Passage[]>();
+    const visible = new Map<LanaId, (start: number, end: number) => boolean>();
     for (const id of ids) {
-      next.set(id, this.passages.get(id) ?? builder.passages(await this.source.meeting(id)));
+      const cached = this.passages.get(id);
+      const known = this.visible.get(id);
+      if (cached !== undefined && known !== undefined) {
+        next.set(id, cached);
+        visible.set(id, known);
+        continue;
+      }
+      const meeting = await this.source.meeting(id);
+      next.set(id, builder.passages(meeting));
+      visible.set(id, visibleView(meeting).isVisible);
     }
     this.passages = next;
+    this.visible = visible;
     this.indexed = true;
     return ids;
   }

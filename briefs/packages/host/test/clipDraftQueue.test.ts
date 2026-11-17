@@ -216,6 +216,44 @@ describe("background drafts (clip.draft.v1 in the main process)", () => {
     expect(rig.store.audit.entries().map((entry) => entry.event)).toContain("draft.added");
   });
 
+  it("adds clip drafts through the meeting state's write path: repeats, rejected items and set-aside lines are left out", async () => {
+    const id = opened.meeting.id;
+    const openActions = () => rig.store.intents.list({ meetingID: id }).filter((stored) => stored.intent.status !== "dismissed").length;
+    // A decision the notes already hold is not added again.
+    rig.store.shared.edit(id, (record) => ({ ...record, notes: { ...record.notes, keyPoints: [...record.notes.keyPoints, { id: "kp-paper", kind: "decision", text: "We file the exhibits on paper by Friday.", sources: [{ start: record.transcript[0]!.start, end: record.transcript[0]!.end }], precision: "exact" }] } }));
+    await service.requestDraft(id, "decision", 0, 1);
+    await settle();
+    drafter.calls[0]!.answer("We file the exhibits on paper by Friday.");
+    await service.drafting.idle();
+    const ready = (await service.drafts(id) as { value: Array<{ id: string }> }).value[0]!;
+    const repeat = await service.addDecision(ready.id, "We file the exhibits on paper by Friday.");
+    expect(repeat.ok).toBe(false);
+    expect(rig.store.shared.current(id).notes.keyPoints.filter((point) => point.text === "We file the exhibits on paper by Friday.")).toHaveLength(1);
+
+    // An action the person dismissed is not drafted back.
+    const before = openActions();
+    await service.requestDraft(id, "action", 1, 1);
+    await settle();
+    drafter.calls[1]!.answer(task("Call the court clerk about the exhibits"));
+    await service.drafting.idle();
+    expect(openActions()).toBe(before + 1);
+    const made = rig.store.intents.list({ meetingID: id }).find((stored) => stored.intent.params.type === "task.create" && stored.intent.params.task.title === "Call the court clerk about the exhibits")!;
+    rig.store.intents.transition(made.intent.id, "dismissed", "user");
+    await service.requestDraft(id, "action", 1, 1);
+    await settle();
+    drafter.calls[2]!.answer(task("Call the court clerk about the exhibits"));
+    await service.drafting.idle();
+    expect(openActions()).toBe(before);
+
+    // Lines set aside: nothing drafted from them is added.
+    await service.setAside(id, 0, 0, "phone_call");
+    await service.requestDraft(id, "action", 0, 0);
+    await settle();
+    drafter.calls[3]?.answer(task("Move the plumber visit to Saturday"));
+    await service.drafting.idle();
+    expect(openActions()).toBe(before);
+  });
+
   it("cancels a waiting draft and stops one on the model; nothing is added", async () => {
     const id = opened.meeting.id;
     const intentsBefore = rig.store.intents.list({ meetingID: id }).length;

@@ -4,6 +4,7 @@ import {
   type CandidateIntent, type Intent, type MeetingRecord, type Speaker, type TranscriptSegment,
 } from "@lana/core/intent";
 import type { ClipDrafter } from "@lana/core/runtime";
+import { MeetingStates } from "@lana/core/state";
 import type { ClipDraftRequest, GatewayStore, StoredClipDraft } from "@lana/core/store";
 import { randomUUID } from "node:crypto";
 import type { DraftCard, DraftState } from "../../shared/api.js";
@@ -20,7 +21,7 @@ const MAX_DECISION_START = 600;
 const OPEN_INTENT_STATUSES = new Set(["proposed", "transferred", "resolved", "failed"]);
 
 export interface ClipDraftQueueDependencies {
-  readonly store: Pick<GatewayStore, "clipDrafts" | "shared" | "intents">;
+  readonly store: Pick<GatewayStore, "clipDrafts" | "shared" | "intents" | "findMore" | "settings" | "local">;
   readonly log: MainLog;
   /** A meeting changed (a draft queued, started, finished or was cancelled). */
   readonly onMeetingChanged: (meetingID: LanaId) => void;
@@ -99,17 +100,24 @@ export class ClipDraftQueue {
     return true;
   }
 
-  /** Adds a drafted decision, as the person edited it, to the meeting's key points. */
-  addDecision(id: string, text: string): StoredClipDraft | null {
+  /**
+   * Adds a drafted decision, as the person edited it, to the meeting's key points, through the
+   * meeting state's write path (cited, outside set-aside parts, not a repeat or something the
+   * person removed). Null when the draft is not open; "dropped" when the checks left it out.
+   */
+  addDecision(id: string, text: string): StoredClipDraft | null | "dropped" {
     const { store } = this.deps;
     const draft = store.clipDrafts.get(id);
     if (draft === null || draft.kind !== "decision" || draft.status !== "ready") return null;
-    store.shared.edit(draft.meetingID, (record) => {
-      const lines = linesBetween(record.transcript, draft.firstLine, draft.lastLine);
-      const clip = record.clips.find((item) => item.id === draft.clipID) ?? transcriptClip(draft.clipID, lines[0]?.start ?? 0, lines.at(-1)?.end ?? 0, this.now());
-      const point = clipDecision(text, clip, lines);
-      return { ...record, notes: { ...record.notes, keyPoints: addingDecision(record.notes.keyPoints, point, text) } };
-    });
+    const record = store.shared.current(draft.meetingID);
+    const lines = linesBetween(record.transcript, draft.firstLine, draft.lastLine);
+    const clip = record.clips.find((item) => item.id === draft.clipID) ?? transcriptClip(draft.clipID, lines[0]?.start ?? 0, lines.at(-1)?.end ?? 0, this.now());
+    const point = addingDecision([], clipDecision(text, clip, lines), text)[0];
+    const written = point === undefined ? 0 : new MeetingStates(store).propose(draft.meetingID, [{ kind: "addKeyPoints", points: [point] }], "clip").applied;
+    if (written === 0) {
+      this.deps.log.info("drafts.decision_dropped", { draft: id, meeting: draft.meetingID });
+      return "dropped";
+    }
     store.clipDrafts.added(id);
     this.deps.log.info("drafts.decision_added", { draft: id, meeting: draft.meetingID });
     this.changed(draft.meetingID);
@@ -211,7 +219,12 @@ export class ClipDraftQueue {
       this.deps.log.error("drafts.no_intent", { draft: draft.id });
       return;
     }
-    store.shared.addAction(draft.meetingID, intent);
+    // Through the meeting state's write path: a repeat, a dismissed action or set-aside lines leave nothing.
+    if (new MeetingStates(store).propose(draft.meetingID, [{ kind: "addAction", intent }], "clip").applied === 0) {
+      store.clipDrafts.cancel(draft.id);
+      this.deps.log.info("drafts.dropped", { draft: draft.id, kind: draft.kind });
+      return;
+    }
     store.clipDrafts.readyAction(draft.id, intent.id, drafted !== undefined);
     this.diagnostics?.outcome({
       draft: draft.id, kind: draft.kind, parsed: candidate !== undefined, drafted: drafted !== undefined,

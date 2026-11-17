@@ -7,6 +7,7 @@ import {
 import { randomUUID } from "node:crypto";
 import type { JsonValue } from "@lana/core/json";
 import { EDITABLE_STATUSES, StoreError } from "@lana/core/store";
+import { MeetingStates, type MeetingChange } from "@lana/core/state";
 import { addingSetAside } from "@lana/core/summarizer";
 import type {
   CancelSendView, ConflictChoiceView, DraftCard, DraftKind, LanaEvent, RecordConflictView, RecordsApi, Result, SharedRecordView, TranscriptClip,
@@ -128,17 +129,21 @@ export class RecordsService implements RecordsApi {
   async editKeyPoint(meetingID: string, pointID: string, text: string): Promise<Result<null>> {
     const trimmed = String(text).trim().slice(0, MAX_LINE);
     if (trimmed === "") return { ok: false, error: { code: "invalid", message: "A key point cannot be empty. Remove it instead." } };
-    return this.edit(meetingID, (record) => {
-      if (!record.notes.keyPoints.some((point) => point.id === String(pointID))) throw new InvalidRecordInput("That key point is no longer on this meeting.");
-      return { ...record, notes: { ...record.notes, keyPoints: record.notes.keyPoints.map((point) => (point.id === String(pointID) ? { ...point, text: trimmed } : point)) } };
-    });
+    return this.keyPointChange(meetingID, { kind: "editKeyPoint", pointID: String(pointID), text: trimmed });
   }
 
-  /** Removes a key point; it syncs as this computer's edit. */
+  /** Removes a key point; it syncs as this computer's edit, and a rewrite of the notes never brings it back. */
   async removeKeyPoint(meetingID: string, pointID: string): Promise<Result<null>> {
-    return this.edit(meetingID, (record) => {
-      if (!record.notes.keyPoints.some((point) => point.id === String(pointID))) throw new InvalidRecordInput("That key point is no longer on this meeting.");
-      return { ...record, notes: { ...record.notes, keyPoints: record.notes.keyPoints.filter((point) => point.id !== String(pointID)) } };
+    return this.keyPointChange(meetingID, { kind: "removeKeyPoint", pointID: String(pointID) });
+  }
+
+  /** A person's key point change through the meeting state's write path. */
+  private async keyPointChange(meetingID: string, change: MeetingChange): Promise<Result<null>> {
+    return this.run(meetingID, (id) => {
+      const result = new MeetingStates(this.gateway.store).propose(id, [change], "person");
+      if (result.applied === 0) throw new InvalidRecordInput("That key point is no longer on this meeting.");
+      this.changed(id, "records.edited");
+      return null;
     });
   }
 
@@ -230,6 +235,7 @@ export class RecordsService implements RecordsApi {
     if (value.trim() === "") return { ok: false, error: { code: "invalid", message: "Write what was decided." } };
     try {
       const added = this.drafting.addDecision(String(draftID), value);
+      if (added === "dropped") return { ok: false, error: { code: "invalid", message: "The notes already have this, it was removed, or it falls in a set-aside part." } };
       return added === null ? { ok: false, error: { code: "notFound", message: "That draft is no longer open." } } : { ok: true, value: null };
     } catch {
       this.log.error("records.decision_failed");

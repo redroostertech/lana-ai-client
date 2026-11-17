@@ -2,6 +2,7 @@ import { parseLanaId } from "@lana/core/ids";
 import { MeetingAskService, storeAskSource } from "@lana/core/ask";
 import type { RuntimePurpose, SpeechModelPackage } from "@lana/core/model";
 import { ClipDrafter, RuntimeAnswerBackend, type TextModel } from "@lana/core/runtime";
+import { visibleView } from "@lana/core/state";
 import type { AllLanaServices, LanaEvent, ModelState, PlatformInfo, ThemePreference, VoiceDownload } from "../../shared/api.js";
 import type { GatewayRuntime } from "../gateway/gatewayRuntime.js";
 import type { MainLog } from "../log.js";
@@ -207,7 +208,8 @@ export function createRealServices(options: RealServicesOptions): RealServices {
   const meetingExport = new MeetingExportService({
     audioParts: (id) => store.meetings.audioParts(id),
     audioData: (id, index) => store.meetings.audioData(id, index),
-    setAside: (id) => store.shared.current(id).notes.setAside ?? [],
+    // The meeting state's visible view: set-aside parts are cut from exported audio.
+    setAside: (id) => [...visibleView(store.shared.current(id)).setAside],
   }, options.exportFiles, log);
   const notes = new UserNotesService(store, platform.deviceNoun, log);
   const userNotes: AllLanaServices["userNotes"] = {

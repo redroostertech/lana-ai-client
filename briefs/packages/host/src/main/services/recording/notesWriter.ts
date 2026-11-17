@@ -2,6 +2,7 @@ import { loadVocabulary } from "@lana/core/gateway";
 import type { LanaId } from "@lana/core/ids";
 import type { TextModel } from "@lana/core/runtime";
 import type { GatewayStore } from "@lana/core/store";
+import { MeetingStates } from "@lana/core/state";
 import { MeetingSummarizer, RuntimeNotesBackend, SummarizerUnavailableError } from "@lana/core/summarizer";
 import type { MainLog } from "../../log.js";
 
@@ -48,9 +49,10 @@ export class NotesWriter implements NotesWriting {
       }
       const existing = new Set(this.store.intents.list({ meetingID }).filter((stored) => stored.intent.status !== "dismissed").map((stored) => stored.intent.idempotencyKey));
       const fresh = result.intents.filter((intent) => !existing.has(intent.idempotencyKey));
-      const added = this.store.local.applyNotes(meetingID, result.notes, fresh, result.modelID);
+      // Through the meeting state: a rewrite never brings back what the person removed or dismissed.
+      const written = new MeetingStates(this.store).propose(meetingID, [{ kind: "notes", notes: result.notes, intents: fresh, notesModel: result.modelID }], "model");
       this.log.info("recording.notes_written", {
-        meeting: meetingID, key_points: result.notes.keyPoints.length, actions: added.length, dropped: result.droppedIntentCount, chunks: result.chunkCount, skipped: result.skippedChunks.length,
+        meeting: meetingID, key_points: written.state.keyPoints.length, actions: written.state.actions.length, dropped: result.droppedIntentCount, rejected: written.dropped, chunks: result.chunkCount, skipped: result.skippedChunks.length,
       });
       return "written";
     } catch (error) {

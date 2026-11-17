@@ -161,21 +161,19 @@ describe('owners, due dates, cited ranges and who decided', () => {
   const fixed = () => record({
     speakers: [{ id: 'S1', name: 'Dana Reyes' }, { id: 'S2', name: 'Omar Haddad' }, { id: 'S3', name: 'S3' }],
     transcript: [
-      { speaker: 'S1', start: 0, end: 10, text: 'We go over the onboarding schedule.' },
-      { speaker: 'S2', start: 10, end: 20, text: 'I will send the revised schedule tonight.' },
-      { speaker: 'S1', start: 1318, end: 1330, text: 'Sorry, I have to take this call.' },
-      { speaker: 'S3', start: 1330, end: 1569, text: 'Calling about the plumber visit on Saturday.' },
-      { speaker: 'S1', start: 1792, end: 1854, text: 'The setup fee is 1,200 dollars.' },
+      { speaker: 'S1', start: 0, end: 10, text: 'We go over the onboarding schedule.', setAsidePart: null },
+      { speaker: 'S2', start: 10, end: 20, text: 'I will send the revised schedule tonight.', setAsidePart: null },
+      { speaker: 'S1', start: 1318, end: 1330, text: 'Sorry, I have to take this call.', setAsidePart: 0 },
+      { speaker: 'S3', start: 1330, end: 1569, text: 'Calling about the plumber visit on Saturday.', setAsidePart: 0 },
+      { speaker: 'S1', start: 1792, end: 1854, text: 'The setup fee is 1,200 dollars.', setAsidePart: null },
     ],
     keyPoints: [
       { id: 'k1', kind: 'decision', text: 'The setup fee is 1,200 dollars.', sources: [{ start: 1792, end: 1820, speaker: 'S1' }, { start: 1840, end: 1854, speaker: 'S1' }], precision: 'exact', decidedBy: 'S1' },
-      { id: 'k2', kind: 'summary', text: 'A plumber visit is on Saturday.', sources: [{ start: 1330, end: 1569, speaker: 'S3' }], precision: 'exact', decidedBy: null },
       { id: 'k3', kind: 'summary', text: 'The onboarding schedule was reviewed.', sources: [{ start: 0, end: 10, speaker: 'S1' }], precision: 'exact', decidedBy: null },
     ],
     actions: [
       { id: 'a1', title: 'Send the revised schedule', at: 10, start: 10, end: 20, confirmed: false, owner: 'Omar Haddad', dueDate: '2026-11-11', dueText: 'tonight' },
       { id: 'a2', title: 'Map the payment timeline', at: 1792, start: 1792, end: 1854, confirmed: false, owner: null, dueDate: null, dueText: 'next month' },
-      { id: 'a3', title: 'Move the plumber visit', at: 1330, start: 1330, end: 1569, confirmed: false, owner: 'S3', dueDate: null, dueText: null },
     ],
     setAside: [{ start: 1318, end: 1569, reason: 'phone_call', speakers: ['S1', 'S3'] }],
     tables: [{ title: 'Fees', columns: ['Item', 'Amount'], rows: [['Setup fee', '1,200 dollars'], ['Monthly <fee>', '300']], sources: [{ start: 1792, end: 1854, speaker: 'S1' }] }],
@@ -196,7 +194,7 @@ describe('owners, due dates, cited ranges and who decided', () => {
     expect(html).not.toContain('Dana Reyes, 29:52');
   });
 
-  test('set-aside parts: their lines and anything citing them are left out, with one placeholder line', () => {
+  test('set-aside parts: the lines the visible view marks are left out, with one placeholder line', () => {
     const html = X.meetingHtml(fixed(), []);
     for (const text of [html, X.transcriptText(fixed()), X.transcriptHtml(fixed()), X.notesHtml(fixed(), [])]) {
       expect(text).not.toContain('plumber');
@@ -210,12 +208,10 @@ describe('owners, due dates, cited ranges and who decided', () => {
     expect(X.setAsideLine({ start: 60, end: 125, reason: 'side_conversation' })).toBe('Set aside: 1:00 to 2:05 (side conversation)');
   });
 
-  test('an action with quotes on both sides of a set-aside part stays; a table citing one goes', () => {
+  test('prints the actions and tables the visible view sends, in time order', () => {
     const record = fixed();
     record.actions = [{ id: 'a4', title: 'Compare both plans', at: 10, start: 10, end: 1854, confirmed: false, owner: null, dueDate: null, dueText: null }];
     expect(X.meetingHtml(record, [])).toContain('Compare both plans');
-    record.tables = [{ title: 'Visits', columns: ['Day', 'Time'], rows: [['Saturday', 'Afternoon']], sources: [{ start: 1330, end: 1569, speaker: 'S3' }] }];
-    expect(X.meetingHtml(record, [])).not.toContain('Visits');
   });
 
   test('tables render as tables, escaped', () => {
