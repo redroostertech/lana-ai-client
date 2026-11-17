@@ -85,3 +85,29 @@
   user-select: all;
   cursor: default;
 }
+
+/* Shared data state block (js/shared/data-state.js): a non-ok metric result. */
+.lex-data-state {
+  border-radius: var(--lex-radius-md, 8px);
+  background: var(--lex-bg-subtle, #f9fafb);
+  border: 1px solid var(--lex-border-default, #e5e7eb);
+  padding: 0.75rem 1rem;
+}
+
+.lex-data-state__title {
+  color: var(--lex-text-primary, #111827);
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.lex-data-state__reason {
+  color: var(--lex-text-secondary, #4b5563);
+  font-size: 0.8125rem;
+  margin: 0.25rem 0 0;
+}
+
+.lex-data-state--timeout,
+.lex-data-state--engine-error {
+  border-color: var(--lex-border-warning, #fcd34d);
+}

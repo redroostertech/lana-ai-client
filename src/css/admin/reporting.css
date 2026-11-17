@@ -1,7 +1,6 @@
-/* Firm Reporting: one column. The report modules are picked from a
-   searchable dropdown in the controls card instead of a side menu. Sized
-   from the page column (container "reporting-page") so the app sidebar
-   and Ask LANA panel are accounted for. */
+/* Reports: opens on a list of reports; picking one shows its period and
+   compare controls in one column. Sized from the page column (container
+   "reporting-page") so the app sidebar and Ask LANA panel are accounted for. */
 .reporting-layout {
   container: reporting-page / inline-size;
 }
@@ -116,3 +115,332 @@
 .reporting-results-table table { min-width: 720px; }
 .reporting-results-table th { min-width: 130px; }
 .reporting-results-table th:first-child { min-width: 180px; }
+
+/* Reports list (first view) */
+.reporting-list {
+  margin-top: 1rem;
+}
+
+.reporting-list[hidden],
+.reporting-layout[hidden] {
+  display: none;
+}
+
+.reporting-list__toolbar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.reporting-list__heading {
+  color: var(--lex-text-primary);
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.reporting-list__search {
+  flex: 1 1 16rem;
+  max-width: 28rem;
+}
+
+.reporting-list__count {
+  color: var(--lex-text-secondary);
+  font-size: 0.875rem;
+  margin-left: auto;
+}
+
+.reporting-list__name {
+  align-items: center;
+  color: var(--lex-text-primary);
+  display: flex;
+  font-weight: 500;
+  gap: 0.5rem;
+}
+
+.reporting-list__muted {
+  color: var(--lex-text-secondary);
+}
+
+/* Picked report header (controls card) */
+.reporting-selected {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.reporting-selected__text {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.reporting-selected__name {
+  color: var(--lex-text-primary);
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.reporting-selected__purpose {
+  color: var(--lex-text-secondary);
+  font-size: 0.875rem;
+  margin: 0.25rem 0 0;
+}
+
+.reporting-selected__badge[hidden] {
+  display: none;
+}
+
+.reporting-add-tile__text {
+  color: var(--lex-text-secondary);
+  font-size: 0.875rem;
+  margin: 0 0 1rem;
+}
+
+/* A failed run's data state (shared DataState block) under the run controls. */
+.reporting-run-state {
+  margin-top: 1rem;
+}
+
+.reporting-run-state[hidden] {
+  display: none;
+}
+
+/* Report tile (ReportMetricCard): footer pinned to the card bottom. */
+.report-tile {
+  position: relative;
+  padding: 24px 24px 56px 24px;
+}
+
+.report-tile__footer {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.report-tile__title {
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.report-tile__value {
+  font-size: 30px;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.report-tile__cell {
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.report-tile__cell--fit {
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* Page structure (moved from inline styles in reporting.html). */
+.reporting-btn-content {
+  align-items: center;
+  display: flex;
+  gap: 0.375rem;
+}
+
+.reporting-main-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.reporting-presets {
+  margin-bottom: 1rem;
+}
+
+.reporting-presets__label {
+  margin-bottom: 0.5rem;
+}
+
+.reporting-presets__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.reporting-run-actions {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+}
+
+.reporting-customize-btn[hidden] {
+  display: none;
+}
+
+/* Shown by the page script (display: inline). */
+.reporting-customization-badge {
+  background: var(--lex-bg-accent-soft);
+  border-radius: 9999px;
+  color: var(--lex-text-accent);
+  display: none;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.125rem 0.5rem;
+}
+
+/* Shown by the page script (display: block). */
+.reporting-execution-info {
+  background: var(--lex-bg-accent-soft);
+  border: 1px solid var(--lex-border-accent);
+  border-radius: var(--lex-radius-md);
+  display: none;
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+}
+
+.reporting-execution-error {
+  background: var(--lex-status-danger-bg, #fef2f2);
+  border: 1px solid var(--lex-status-danger-border, #fecaca);
+  border-radius: var(--lex-radius-md);
+  display: none;
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+}
+
+.reporting-execution-error__title {
+  color: var(--lex-status-danger);
+  margin-bottom: 0.25rem;
+}
+
+.reporting-execution-error__text {
+  color: var(--lex-status-danger);
+}
+
+/* Shown by the page script (display: flex) once a report runs. */
+.reporting-module-results {
+  display: none;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.reporting-noscript {
+  align-items: center;
+  color: #666;
+  display: flex;
+  font-family: system-ui, sans-serif;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+/* Bars whose length the page script computes: style="--bar: 42%". */
+.reporting-bar {
+  width: var(--bar, 0%);
+}
+
+.reporting-chart-canvas {
+  max-height: 250px;
+}
+
+/* Metric info modal body (renderMetricInfoBody). */
+.reporting-info__lead,
+.reporting-info__text {
+  color: var(--lex-text-secondary, #475569);
+  line-height: 1.55;
+  margin: 0 0 0.6rem 0;
+}
+
+.reporting-info__lead {
+  margin-bottom: 0.75rem;
+}
+
+.reporting-info__heading {
+  color: var(--lex-text-primary, #0f172a);
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 1rem 0 0.4rem 0;
+}
+
+.reporting-info__heading--first {
+  margin-top: 0.75rem;
+}
+
+.reporting-info__muted {
+  color: var(--lex-text-muted, #94a3b8);
+  margin: 0 0 0.6rem 0;
+}
+
+.reporting-info__muted--last {
+  margin: 0;
+}
+
+.reporting-info__muted--loading {
+  font-style: italic;
+}
+
+.reporting-info__entity {
+  background: var(--lex-bg-secondary, #f1f5f9);
+  border-radius: 6px;
+  margin: 0 0 0.55rem 0;
+  padding: 0.5rem 0.75rem;
+}
+
+.reporting-info__entity-name {
+  color: var(--lex-text-primary, #0f172a);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.reporting-info__entity-desc {
+  color: var(--lex-text-secondary, #475569);
+  font-size: 0.75rem;
+  margin-top: 0.15rem;
+}
+
+.reporting-info__entity-fields {
+  color: var(--lex-text-muted, #64748b);
+  font-family: var(--lex-font-mono, monospace);
+  font-size: 0.7rem;
+  margin-top: 0.3rem;
+}
+
+.reporting-info__calc-intro {
+  color: var(--lex-text-secondary, #475569);
+  margin: 0 0 0.4rem 0;
+}
+
+.reporting-info__code,
+.reporting-info__pre {
+  background: var(--lex-bg-secondary, #f1f5f9);
+  border-radius: 6px;
+  color: var(--lex-text-primary, #0f172a);
+  padding: 0.5rem 0.75rem;
+}
+
+.reporting-info__code {
+  display: block;
+  font-size: 0.78rem;
+}
+
+.reporting-info__pre {
+  font-size: 0.72rem;
+  margin: 0;
+  max-height: 200px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.reporting-info__pre--tall {
+  max-height: 240px;
+}

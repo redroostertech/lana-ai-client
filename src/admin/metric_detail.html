@@ -38,11 +38,12 @@
       <lex-breadcrumb id="metricDetailBreadcrumb"></lex-breadcrumb>
 
       <section class="metric-detail-layout">
-        <div class="dash-summary-grid">
+        <div class="dash-summary-grid dash-summary-grid--five">
           <div class="dash-stat"><div class="dash-stat__label">Current Value</div><div class="dash-stat__value" id="metricCurrentValue">-</div></div>
           <div class="dash-stat"><div class="dash-stat__label">Prior Value</div><div class="dash-stat__value" id="metricPriorValue">-</div></div>
           <div class="dash-stat"><div class="dash-stat__label">Movement</div><div class="dash-stat__value" id="metricMovement">-</div></div>
           <div class="dash-stat"><div class="dash-stat__label">Direction</div><div class="dash-stat__value" id="metricDirection">-</div></div>
+          <div class="dash-stat"><div class="dash-stat__label">Period</div><div class="dash-stat__value" id="metricPeriod">-</div></div>
         </div>
 
         <section class="metric-detail-card">
@@ -198,6 +199,7 @@
   <script src="../js/lex/lex-page-init.js"></script>
   <script src="../js/shared/library-column-filters.js"></script>
   <script src="../js/shared/metric-tables.js"></script>
+  <script src="../js/shared/data-state.js"></script>
   <script src="../js/admin/metric-detail.js"></script>
   <script src="../js/auth-guard.js"></script>
   <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>

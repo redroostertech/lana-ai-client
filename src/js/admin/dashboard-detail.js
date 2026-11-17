@@ -83,18 +83,6 @@
     return window.Lex && Lex.Nav && Lex.Nav.getParams ? Lex.Nav.getParams() : new URLSearchParams(window.location.search || '');
   }
 
-  function setText(id, value) {
-    var node = el(id);
-    if (node) node.textContent = value == null ? '-' : String(value);
-  }
-
-  function formatDate(date) {
-    var year = date.getFullYear();
-    var month = String(date.getMonth() + 1).padStart(2, '0');
-    var day = String(date.getDate()).padStart(2, '0');
-    return year + '-' + month + '-' + day;
-  }
-
   function parseDateInput(value, endOfDay) {
     if (!value) return null;
     if (value instanceof Date) return Number.isFinite(value.getTime()) ? value : null;
@@ -109,19 +97,9 @@
     return Number.isFinite(parsed.getTime()) ? parsed : null;
   }
 
-  function toPeriodISOString(value, endOfDay) {
-    var date = parseDateInput(value, endOfDay);
-    return date ? date.toISOString() : '';
-  }
-
   function formatPeriodLabel(start, end) {
-    if (!start || !end) return 'Current period';
-    var startDate = parseDateInput(start, false);
-    var endDate = parseDateInput(end, false);
-    if (!startDate || !endDate) return 'Current period';
-    return startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-      + ' - '
-      + endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    // Picker values are the firm's plain days; name those days as written.
+    return LanaTime.formatUtcDayRange(start, end) || 'Current period';
   }
 
   function updateCompareByOptions(start, end, preset) {
@@ -166,8 +144,9 @@
   function getMetricCardRequestParams(type, limit) {
     var period = readPeriodControls();
     var params = { type: type, limit: limit };
-    if (period.start) params.periodStart = toPeriodISOString(period.start, false);
-    if (period.end) params.periodEnd = toPeriodISOString(period.end, true);
+    // Plain days (inclusive end): the backend bounds them in the firm's zone.
+    if (period.start) params.periodStart = period.start;
+    if (period.end) params.periodEnd = period.end;
     if (period.compareBy) params.compareBy = period.compareBy;
     // Period-over-period comparison: ask the metric layer to attach a
     // `comparison` block. Preset periods use the calendar mode, custom ranges
@@ -191,57 +170,29 @@
   // period and shows numbers that don't match the modal the user just opened.
   function buildMetricDetailHref(metricKey) {
     var qs = 'metric_key=' + encodeURIComponent(metricKey || '');
-    var startIso = currentPeriod.start ? toPeriodISOString(currentPeriod.start, false) : '';
-    var endIso = currentPeriod.end ? toPeriodISOString(currentPeriod.end, true) : '';
-    if (startIso) qs += '&periodStart=' + encodeURIComponent(startIso);
-    if (endIso) qs += '&periodEnd=' + encodeURIComponent(endIso);
-    if (currentPeriod.compareBy) qs += '&compareBy=' + encodeURIComponent(currentPeriod.compareBy);
+    // The days the person picked (firm days before the cards load, too), as
+    // plain days: the metric detail endpoint bounds them in the firm's zone,
+    // the same way the cards were bounded.
+    var period = readPeriodControls();
+    if (period.start) qs += '&periodStart=' + encodeURIComponent(period.start);
+    if (period.end) qs += '&periodEnd=' + encodeURIComponent(period.end);
+    if (period.compareBy) qs += '&compareBy=' + encodeURIComponent(period.compareBy);
     return 'admin/metric_detail.html?' + qs;
   }
 
-  function selectDashboardPeriodPreset(preset, reload) {
-    var today = LanaTime.nowDate();
-    var startDate;
-    var endDate;
-
-    switch (preset) {
-      case 'last30days':
-        endDate = new Date(today);
-        startDate = Lex.Utils.addDays(today, -29);
-        break;
-      case 'thisMonth':
-        startDate = Lex.Utils.startOfLocalMonth(today);
-        endDate = new Date(today);
-        break;
-      case 'lastMonth':
-        startDate = Lex.Utils.startOfLocalMonth(LanaTime.addLocalMonths(today, -1));
-        endDate = Lex.Utils.endOfLocalMonth(LanaTime.addLocalMonths(today, -1));
-        break;
-      case 'thisQuarter':
-        startDate = LanaTime.startOfLocalQuarter(today);
-        endDate = new Date(today);
-        break;
-      case 'thisYear':
-        startDate = Lex.Utils.startOfLocalYear(today);
-        endDate = new Date(today);
-        break;
-      case 'lastYear':
-        startDate = Lex.Utils.startOfLocalYear(LanaTime.addLocalMonths(today, -12));
-        endDate = Lex.Utils.endOfLocalYear(LanaTime.addLocalMonths(today, -12));
-        break;
-      case 'last7days':
-      default:
-        endDate = new Date(today);
-        startDate = Lex.Utils.addDays(today, -6);
-        break;
-    }
+  // Presets are the firm's days (the firm's zone, Lex.Utils.getFirmTimezone),
+  // so everyone in the firm sees the same cards. A stored user without the
+  // firm's zone refetches the profile first (api.ensureFirmTimezone).
+  async function selectDashboardPeriodPreset(preset, reload) {
+    await api.ensureFirmTimezone();
+    var days = LanaTime.reportPresetDays(preset, Lex.Utils.getFirmTimezone());
 
     var start = el('dashboardPeriodStart');
     var end = el('dashboardPeriodEnd');
-    if (start) start.value = formatDate(startDate);
-    if (end) end.value = formatDate(endDate);
+    if (start) start.value = days.start;
+    if (end) end.value = days.end;
     currentPeriodIsPreset = true;
-    updateCompareByOptions(formatDate(startDate), formatDate(endDate), preset);
+    updateCompareByOptions(days.start, days.end, preset);
     readPeriodControls();
     if (reload) reloadDashboardMetricsForCurrentPeriod();
   }
@@ -309,11 +260,9 @@
     if (rawFormat && typeof rawFormat === 'object') rawFormat = rawFormat.type || rawFormat.style;
     var format = String(rawFormat || 'number').toLowerCase();
     var metadata = (metric && metric.metadata) || {};
-    // Treat 0 and missing-value identically: a dashboard full of literal
-    // zeros looks populated when it's actually empty. Render an em-dash so
-    // "no signal yet" is unambiguous.
-    if (value === 0) return '-';
-    if (!hasValue(value)) return '-';
+    // A real 0 is a value; only a missing value shows the shared empty token.
+    // No-data cases arrive as a data_state and render the state block.
+    if (!hasValue(value)) return window.DataState.EMPTY_VALUE;
 
     if (Array.isArray(value)) {
       var metadataTotal = Number(metadata.total);
@@ -538,7 +487,7 @@
     if (breadcrumb) {
       breadcrumb.items = [
         { label: 'Dashboard', href: 'admin/analytics.html' },
-        { label: 'Library', href: 'admin/dashboard-library.html' },
+        { label: 'All dashboards', href: 'admin/dashboard-library.html' },
         { label: dashboard && dashboard.name ? dashboard.name : 'Dashboard' },
       ];
     }
@@ -558,24 +507,15 @@
     };
   }
 
-  function renderSummary(metrics, summary, groups) {
-    metrics.forEach(function (metric) {
-      if (!metric.status && metric.executable === true) metric.status = 'active';
-    });
-
-    setText('dashboardMetricTotal', summary && summary.total !== undefined ? summary.total : metrics.length);
-    setText('dashboardMetricExecutable', summary && summary.executable !== undefined ? summary.executable : metrics.filter(function (metric) { return metric.executable === true; }).length);
-    setText('dashboardMetricPlanned', summary && summary.planned !== undefined ? summary.planned : metrics.filter(function (metric) { return metric.status === 'planned'; }).length);
-    setText('dashboardMetricDomains', groups && groups.length ? groups.length : '-');
-  }
-
   function renderViewContext(type, metrics, groups) {
     var context = el('dashboardViewContext');
     var config = VIEW_CONFIG[type];
     if (!context || !config) return;
 
     var groupLabel = groups.length === 1 ? '1 group' : groups.length + ' groups';
-    var metricLabel = metrics.length === 1 ? '1 populated metric' : metrics.length + ' populated metrics';
+    // A tile with no data (a data_state that is not ok) is not populated.
+    var populated = metrics.filter(function (metric) { return !window.DataState.isProblem(metric); }).length;
+    var metricLabel = populated === 1 ? '1 populated metric' : populated + ' populated metrics';
 
     context.innerHTML = ''
       + '<div>'
@@ -681,6 +621,18 @@
   }
 
   function renderMetricCard(metric) {
+    // A tile whose result is not ok (the backend failure model) shows the
+    // shared state block, whatever kind of metric it is.
+    if (window.DataState && window.DataState.isProblem(metric)) {
+      var stateId = metric.metric_key || metric.key || metric.title;
+      metricInfoById[stateId] = metric;
+      return '<article class="dash-metric-card"><div class="dash-metric-card__top"><div>'
+        + '<div class="dash-metric-card__eyebrow">' + escapeHtml(getGroupLabel(metric, currentDashboardType)) + '</div>'
+        + '<div class="dash-metric-card__title">'
+        + escapeHtml(metric.title || metric.name || humanize(metric.metric_key) || 'Metric') + '</div></div>'
+        + '<button class="dash-metric-card__info" type="button" aria-label="Metric details" data-metric-info="'
+        + escapeHtml(stateId) + '">i</button></div>' + window.DataState.render(metric) + '</article>';
+    }
     var intake = window.OpportunityIntakePresentation && window.OpportunityIntakePresentation.opportunityIntakePresentation(metric);
     if (intake) {
       var intakeId = metric.metric_key || metric.key;
@@ -798,13 +750,12 @@
 
   function renderModalDetails(metric) {
     var definition = getDefinition(metric);
-    var status = metric.status || (metric.executable ? 'active' : 'planned');
     var value = formatMetricCardValue(metric);
     var audience = firstValue(getMetricMeta(metric, 'audience'), getMetricMeta(metric, 'primary_audience'), getMetricMeta(metric, 'primaryAudience'));
     var section = firstValue(metric.section, metric.group, metric.domain_group);
-    var reportHref = metric.report_link && metric.report_link.href || metric.reportHref || 'admin/reporting.html';
+    // Only a tile that belongs to a report opens one (report_link from the backend).
+    var reportLink = metric.report_link || null;
     var metricHref = buildMetricDetailHref(metric.metric_key || metric.key || '');
-    var message = metric.message || (metric.executable ? '' : 'Calculation is planned but not executable yet');
     var periodLabel = metric.period || metric.period_label || currentPeriod.label || 'Current period';
 
     // Humanize metadata fields. They arrive as snake_case identifiers from
@@ -813,8 +764,8 @@
     // raw because that field's purpose is to show the canonical identifier.
     return ''
       + '<div class="dash-metric-modal__value">' + escapeHtml(value) + '</div>'
+      + window.DataState.render(metric)
       + '<div class="dash-metric-modal__grid">'
-      + detailRow('Status', humanize(status))
       + detailRow('Audience', humanize(audience))
       + detailRow('Section', humanize(section))
       + detailRow('Domain', humanize(metric.domain || metric.domain_group))
@@ -822,7 +773,6 @@
       + detailRow('Metric Key', metric.metric_key)
       + '</div>'
       + detailBlock('Description', metric.description || 'Cataloged metric definition.')
-      + detailBlock('Message', message)
       + detailBlock('Calculation', definition.calculation || 'Defined in metric catalog')
       + detailBlock('Business Logic', definition.businessLogic)
       + detailBlock('Entities', definition.entities)
@@ -830,7 +780,7 @@
       + detailBlock('Dimensions', definition.dimensions)
       + '<div class="dash-metric-modal__footer">'
       + '<button class="dash-metric-card__link" type="button" data-metric-detail-link="' + escapeHtml(metricHref) + '">Open metric detail</button>'
-      + '<button class="dash-metric-card__link" type="button" data-report-link="' + escapeHtml(reportHref) + '">View report</button>'
+      + (reportLink ? '<button class="dash-metric-card__link" type="button" data-report-link="' + escapeHtml(reportLink.href) + '">' + escapeHtml(reportLink.label || 'Open full report') + '</button>' : '')
       + '</div>';
   }
 
@@ -883,7 +833,6 @@
     var filteredMetrics = filterMetrics(metrics, dashboardType);
     var groups = groupMetrics(filteredMetrics, dashboardType);
     metricInfoById = {};
-    renderSummary(allDashboardMetrics, summary, allGroups);
     renderViewContext(dashboardType, allDashboardMetrics, allGroups);
     renderTypeFilters(allGroups);
 
@@ -971,7 +920,11 @@
       setActiveDashboardBreadcrumb(dashboard);
       renderMetrics([], null, type);
 
-      var metricResponse = await api.getDashboardMetricCards(getMetricCardRequestParams(type, 500));
+      // A dashboard with its own tiles reads exactly those catalog keys.
+      var cardParams = getMetricCardRequestParams(type, 500);
+      var tileKeys = DashboardTiles.cardRequestKeys(layout);
+      if (tileKeys) cardParams.metric_keys = tileKeys;
+      var metricResponse = await api.getDashboardMetricCards(cardParams);
       if (myToken !== dashboardLoadToken) return;
       var normalized = normalizeCardResponse(metricResponse);
       allDashboardMetrics = normalized.metrics.filter(function (metric) {
@@ -1009,8 +962,9 @@
     }
   }
 
+  // Returns the default preset's promise: the first card load waits for it.
   function initPeriodControls() {
-    selectDashboardPeriodPreset('last7days', false);
+    var initialPeriod = selectDashboardPeriodPreset('last7days', false);
 
     var presets = el('dashboardPeriodPresets');
     if (presets) {
@@ -1039,6 +993,7 @@
     if (startInput) startInput.addEventListener('lex-change', handlePeriodChange);
     if (endInput) endInput.addEventListener('lex-change', handlePeriodChange);
     if (compare) compare.addEventListener('lex-change', handlePeriodChange);
+    return initialPeriod;
   }
 
   function init() {
@@ -1051,7 +1006,7 @@
       return;
     }
 
-    initPeriodControls();
+    var initialPeriod = initPeriodControls();
 
     content.addEventListener('click', function (event) {
       if (event.target.closest('#openReportingBtn')) {
@@ -1069,7 +1024,7 @@
 
       var reportBtn = event.target.closest('[data-report-link]');
       if (reportBtn) {
-        Lex.Nav.go(reportBtn.getAttribute('data-report-link') || 'admin/reporting.html');
+        Lex.Nav.go(reportBtn.getAttribute('data-report-link'));
       }
 
       var metricDetailBtn = event.target.closest('[data-metric-detail-link]');
@@ -1136,8 +1091,10 @@
 
     var params = getParams();
     var id = params.get('id');
-    if (id) loadDashboardById(id);
-    else loadMetrics(getCurrentType());
+    initialPeriod.then(function () {
+      if (id) loadDashboardById(id);
+      else loadMetrics(getCurrentType());
+    });
   }
 
   init();

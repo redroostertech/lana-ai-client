@@ -1,0 +1,19 @@
+/* The one-time "Set your firm time zone" prompt (js/shared/firm-timezone-prompt.js). */
+.firm-tz-prompt {
+  display: block;
+  margin-bottom: var(--lex-space-4, 16px);
+}
+
+.firm-tz-prompt-text {
+  margin: 0;
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-sm-size);
+  line-height: var(--lex-body-sm-height);
+}
+
+.firm-tz-prompt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}

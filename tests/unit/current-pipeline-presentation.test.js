@@ -43,6 +43,7 @@ function page(file, names) {
   if (end < 0) throw Error('Expected real page initialization seam');
   source = source.slice(0, end) + `  window.testExports = { ${names} };` + source.slice(end + '  init();'.length);
   const window = { CurrentPipelinePresentation: helper(), addEventListener() {} };
+  require('./helpers/report-shared-scripts').withReportSharedScripts(window);
   const context = { window, document: { addEventListener() {}, getElementById: () => null }, console,
     CurrentPipelinePresentation: helper(), Intl, URLSearchParams, setTimeout: jest.fn(), clearTimeout: jest.fn(),
     LanaTime: { nowMs: () => 0 } };

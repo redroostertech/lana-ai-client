@@ -104,6 +104,25 @@
     return Number.isFinite(date.getTime()) ? date.toISOString().split('T')[0] : '';
   }
 
+  // A label for a range of whole UTC days ("Nov 10 - Nov 16, 2026"). Takes
+  // plain YYYY-MM-DD days or instants and names their UTC day, so the label is
+  // the same in every time zone. Reports and dashboards share it.
+  function formatUtcDayRange(start, end) {
+    function utcDay(value) {
+      if (!value) return null;
+      var text = String(value);
+      var date = /^\d{4}-\d{2}-\d{2}$/.test(text) ? new Date(text + 'T00:00:00Z') : new Date(text);
+      return Number.isFinite(date.getTime()) ? date : null;
+    }
+    var from = utcDay(start);
+    var to = utcDay(end);
+    if (!from || !to) return '';
+    var sameYear = from.getUTCFullYear() === to.getUTCFullYear();
+    var day = { month: 'short', day: 'numeric', timeZone: 'UTC' };
+    var dayYear = { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' };
+    return from.toLocaleDateString('en-US', sameYear ? day : dayYear) + ' - ' + to.toLocaleDateString('en-US', dayYear);
+  }
+
   function startOfLocalQuarter(value) {
     var date = value === undefined ? nowDate() : value instanceof Date ? value : new Date(value);
     if (!Number.isFinite(date.getTime())) return new Date(NaN);
@@ -240,6 +259,43 @@
     return (n < 10 ? '0' : '') + n;
   }
 
+  // The calendar day of an instant in a time zone, as 'YYYY-MM-DD', or ''.
+  function dayInTimeZone(value, timeZone) {
+    var date = value === undefined ? nowDate() : value instanceof Date ? value : new Date(value);
+    if (!Number.isFinite(date.getTime())) return '';
+    var parts = {};
+    new Intl.DateTimeFormat('en-US', { timeZone: timeZone || SYSTEM_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' })
+      .formatToParts(date).forEach(function (part) { parts[part.type] = part.value; });
+    return parts.year + '-' + parts.month + '-' + parts.day;
+  }
+
+  // Plain-day arithmetic: 'YYYY-MM-DD' parts as a UTC date, so no zone or
+  // daylight saving change can move the day.
+  function plainDay(year, monthIndex, day) {
+    return formatUtcDateOnly(new Date(Date.UTC(year, monthIndex, day)));
+  }
+
+  // Report period presets as plain days (inclusive end) in a time zone. Firm
+  // reports pass the firm's zone (Lex.Utils.getFirmTimezone), so the days are
+  // the firm's whatever zone the person is in; the backend bounds them in the
+  // same zone.
+  function reportPresetDays(preset, timeZone, now) {
+    var today = dayInTimeZone(now === undefined ? nowDate() : now, timeZone);
+    var y = Number(today.slice(0, 4));
+    var m = Number(today.slice(5, 7)) - 1;
+    var d = Number(today.slice(8, 10));
+    switch (preset) {
+      case 'last30days': return { start: plainDay(y, m, d - 29), end: today };
+      case 'thisMonth': return { start: plainDay(y, m, 1), end: today };
+      case 'lastMonth': return { start: plainDay(y, m - 1, 1), end: plainDay(y, m, 0) };
+      case 'thisQuarter': return { start: plainDay(y, Math.floor(m / 3) * 3, 1), end: today };
+      case 'thisYear': return { start: plainDay(y, 0, 1), end: today };
+      case 'lastYear': return { start: plainDay(y - 1, 0, 1), end: plainDay(y - 1, 11, 31) };
+      case 'last7days':
+      default: return { start: plainDay(y, m, d - 6), end: today };
+    }
+  }
+
   // API contract converters: form inputs hold user-local wall time, the API
   // speaks ISO 8601 UTC instants. These are the only sanctioned bridges.
 
@@ -304,6 +360,7 @@
     startOfLocalYear: startOfLocalYear,
     endOfLocalYear: endOfLocalYear,
     formatUtcDateOnly: formatUtcDateOnly,
+    formatUtcDayRange: formatUtcDayRange,
     startOfLocalQuarter: startOfLocalQuarter,
     startOfUtcQuarter: startOfUtcQuarter,
     startOfUtcYear: startOfUtcYear,
@@ -315,6 +372,8 @@
     timeAgo: timeAgo,
     utcDayStart: utcDayStart,
     utcDayEnd: utcDayEnd,
+    dayInTimeZone: dayInTimeZone,
+    reportPresetDays: reportPresetDays,
     toIsoInstant: toIsoInstant,
     toLocalDateInputValue: toLocalDateInputValue,
     toLocalDatetimeInputValue: toLocalDatetimeInputValue,

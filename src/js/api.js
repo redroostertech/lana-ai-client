@@ -1930,6 +1930,10 @@ class ApiClient {
       organizationId: profile.org_id,
       organization_name: profile.organization_name,
       organization_timezone: profile.organization_timezone,
+      // The zone firm report periods are bounded in (Lex.Utils.getFirmTimezone).
+      firm_timezone: profile.firm_timezone,
+      // False when the firm never chose a zone (admins are asked to set one).
+      firm_timezone_set: profile.firm_timezone_set,
       department_id: profile.department_id,
       department_name: profile.department_name,
       role_id: profile.role_id,
@@ -1946,6 +1950,31 @@ class ApiClient {
     localStorage.setItem('user', JSON.stringify(this.user));
     
     return { user: this.user, profile };
+  }
+
+  /**
+   * Report presets pick the firm's days (Lex.Utils.getFirmTimezone reads
+   * firm_timezone on the stored user). A user stored before the profile
+   * named firm_timezone refetches the profile first; calls at once share one
+   * fetch. A failed fetch is logged and presets keep the stored zone.
+   */
+  async ensureFirmTimezone() {
+    if (this.demoMode) return;
+    const storedZone = () => {
+      let stored = null;
+      try { stored = JSON.parse(localStorage.getItem('user') || 'null'); } catch (_e) { stored = null; }
+      return stored && (stored.firm_timezone || stored.firmTimezone);
+    };
+    // Same keys as Lex.Utils.getFirmTimezone. A profile that names no zone is
+    // asked for once per session, not on every preset click.
+    if (storedZone() || this._firmTimezoneMissing) return;
+    if (!this._firmTimezoneLoad) {
+      this._firmTimezoneLoad = this.loadUserProfile()
+        .then(() => { if (!storedZone()) this._firmTimezoneMissing = true; })
+        .catch((err) => { console.warn('[API] Could not load the firm time zone:', err && err.message); })
+        .then(() => { this._firmTimezoneLoad = null; });
+    }
+    await this._firmTimezoneLoad;
   }
 
   async requestPasswordReset(email) {
@@ -3541,6 +3570,20 @@ class ApiClient {
     return this.get(`/api/v1/organizations/${orgId}/stats`);
   }
 
+  /**
+   * Organization settings, organization admins only (admin:manage_organization).
+   * GET -> { settings: { ..., firm_timezone: string|null, firm_timezone_set: boolean } }.
+   * A 403 or 404 (not an admin, or an older server) is not logged.
+   */
+  async getOrganizationSettings(orgId) {
+    return this.get(`/api/v1/organizations/${encodeURIComponent(orgId)}/settings`, { quietStatuses: [403, 404] });
+  }
+
+  /** PUT a partial settings body, e.g. { firm_timezone: 'America/New_York' } -> { message, settings }. 400 on an unknown zone. */
+  async updateOrganizationSettings(orgId, body) {
+    return this.put(`/api/v1/organizations/${encodeURIComponent(orgId)}/settings`, body);
+  }
+
   // ============================================================
   // Activity
   // ============================================================
@@ -3842,6 +3885,7 @@ class ApiClient {
     if (params.compareToPrevious !== undefined) queryParts.push('compareToPrevious=' + encodeURIComponent(String(params.compareToPrevious)));
     if (params.compareMode) queryParts.push('compareMode=' + encodeURIComponent(params.compareMode));
     if (params.periodType) queryParts.push('periodType=' + encodeURIComponent(params.periodType));
+    if (params.metric_keys) queryParts.push('metric_keys=' + encodeURIComponent(params.metric_keys));
     if (queryParts.length > 0) url += '?' + queryParts.join('&');
     return this.get(url);
   }
@@ -3948,6 +3992,7 @@ class ApiClient {
     if (params.sort) queryParts.push('sort=' + encodeURIComponent(params.sort));
     if (params.order) queryParts.push('order=' + encodeURIComponent(params.order));
     if (params.sharedWithMe !== undefined) queryParts.push('sharedWithMe=' + encodeURIComponent(String(params.sharedWithMe)));
+    if (params.writable !== undefined) queryParts.push('writable=' + encodeURIComponent(String(params.writable)));
     if (queryParts.length > 0) url += '?' + queryParts.join('&');
     return this.get(url, options);
   }
@@ -3962,6 +4007,11 @@ class ApiClient {
 
   async updateBIDashboard(id, data) {
     return this.put('/api/v1/business-intelligence/dashboards/' + encodeURIComponent(id), data);
+  }
+
+  // Add to dashboard: the server appends one catalog key to the tiles.
+  async addBIDashboardTile(id, metricKey) {
+    return this.post('/api/v1/business-intelligence/dashboards/' + encodeURIComponent(id) + '/tiles', { metric_key: metricKey });
   }
 
   async deleteBIDashboard(id) {

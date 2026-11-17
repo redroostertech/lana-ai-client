@@ -114,3 +114,18 @@ describe('reporting-goal-comparison-mapper', () => {
     });
   });
 });
+
+// With no comparison block the tile falls back to the flat fields, and the
+// backend's changePercent (shared delta rule) is one of them: 9.4 vs a prior
+// 11.2 showed "—" for % change.
+describe('flat-field fallback keeps the backend percent change', () => {
+  const m = require('../../src/js/shared/reporting-goal-comparison-mapper.js');
+  test('changePercent and changeDirection come through without a comparison block', () => {
+    const vm = m.buildGoalComparisonViewModel({ current: 9.4, prior: 11.2, changePercent: -16.1, changeDirection: 'down' });
+    expect(vm.priorValue).toBe(11.2);
+    expect(vm.percentChange).toBe(-16.1);
+  });
+  test('no prior means no percent change', () => {
+    expect(m.buildGoalComparisonViewModel({ current: 3, prior: null, changePercent: null }).percentChange).toBeNull();
+  });
+});

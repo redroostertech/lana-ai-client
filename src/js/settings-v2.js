@@ -614,38 +614,10 @@
     localStorage.setItem('user', JSON.stringify(user));
   }
 
-  function timezoneCityLabel(value) {
-    if (!value) return '';
-    var parts = String(value).split('/');
-    var city = parts[parts.length - 1] || value;
-    return city.replace(/_/g, ' ');
-  }
-
-  function timezoneDisplayName(value) {
-    if (!value) return '';
-    try {
-      var parts = new Intl.DateTimeFormat('en-US', {
-        timeZone: value,
-        timeZoneName: 'longGeneric'
-      }).formatToParts(LanaTime.nowDate());
-      for (var i = 0; i < parts.length; i++) {
-        if (parts[i].type === 'timeZoneName' && parts[i].value) {
-          return parts[i].value;
-        }
-      }
-    } catch (e) {
-      return timezoneCityLabel(value);
-    }
-    return timezoneCityLabel(value);
-  }
-
-  function timezoneOptionLabel(value) {
-    var display = timezoneDisplayName(value);
-    var city = timezoneCityLabel(value);
-    if (!display) return city || value;
-    if (!city || display === city) return display;
-    return display + ' - ' + city;
-  }
+  // Zone labels and the zone list: js/shared/time-zone-options.js.
+  var timezoneCityLabel = window.LanaTimeZoneOptions.cityLabel;
+  var timezoneDisplayName = window.LanaTimeZoneOptions.displayName;
+  var buildTimezoneOptions = window.LanaTimeZoneOptions.buildOptions;
 
   function timezoneStatusLabel(value, isDefault) {
     var label = timezoneDisplayName(value) || timezoneCityLabel(value) || 'UTC';
@@ -657,62 +629,6 @@
     } catch (e) {
       return (isDefault ? 'Browser default · ' : '') + label;
     }
-  }
-
-  function buildTimezoneOptions(currentValue) {
-    var zones = [];
-    if (typeof Intl.supportedValuesOf === 'function') {
-      try { zones = Intl.supportedValuesOf('timeZone'); } catch (e) { zones = []; }
-    }
-    if (!zones.length) {
-      zones = [
-        'UTC',
-        'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
-        'America/Anchorage', 'America/Phoenix', 'America/Toronto', 'America/Vancouver',
-        'America/Mexico_City', 'America/Sao_Paulo', 'America/Buenos_Aires',
-        'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Europe/Madrid',
-        'Europe/Rome', 'Europe/Amsterdam', 'Europe/Stockholm', 'Europe/Warsaw',
-        'Africa/Johannesburg', 'Africa/Cairo',
-        'Asia/Dubai', 'Asia/Kolkata', 'Asia/Singapore', 'Asia/Hong_Kong',
-        'Asia/Tokyo', 'Asia/Shanghai', 'Asia/Seoul',
-        'Australia/Sydney', 'Australia/Melbourne', 'Pacific/Auckland'
-      ];
-    }
-    if (currentValue && zones.indexOf(currentValue) === -1) zones.push(currentValue);
-
-    var groups = {};
-    for (var i = 0; i < zones.length; i++) {
-      var zone = zones[i];
-      var slash = zone.indexOf('/');
-      var region = slash === -1 ? 'Other' : zone.substring(0, slash);
-      if (!groups[region]) groups[region] = [];
-      groups[region].push(zone);
-    }
-
-    var regionOrder = ['America', 'Europe', 'Africa', 'Asia', 'Australia', 'Pacific', 'Atlantic', 'Indian', 'Antarctica', 'Arctic', 'Etc', 'Other'];
-    var seen = {};
-    var ordered = [];
-    for (var j = 0; j < regionOrder.length; j++) {
-      if (groups[regionOrder[j]]) { ordered.push(regionOrder[j]); seen[regionOrder[j]] = true; }
-    }
-    var keys = Object.keys(groups).sort();
-    for (var k = 0; k < keys.length; k++) {
-      if (!seen[keys[k]]) ordered.push(keys[k]);
-    }
-
-    var options = [];
-    for (var r = 0; r < ordered.length; r++) {
-      var region = ordered[r];
-      var list = groups[region].sort();
-      for (var z = 0; z < list.length; z++) {
-        options.push({
-          value: list[z],
-          label: timezoneOptionLabel(list[z]),
-          group: region
-        });
-      }
-    }
-    return options;
   }
 
   function renderTimezoneCurrent(value) {

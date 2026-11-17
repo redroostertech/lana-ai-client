@@ -29,6 +29,13 @@ describe('remembering a finished walkthrough', () => {
     });
     expect(W.withSeen({}, 'automate', 'now')).toEqual({ walkthroughs: { automate: 'now' } });
   });
+
+  test('marking an app keeps the rest of the onboarding group, like a dismissed prompt', () => {
+    const prefs = { onboarding: { walkthroughs: {}, prompts: { firm_timezone: '2026-11-16T00:00:00.000Z' } } };
+    expect(W.withSeen(prefs, 'agents', 'now')).toEqual({
+      walkthroughs: { agents: 'now' }, prompts: { firm_timezone: '2026-11-16T00:00:00.000Z' }
+    });
+  });
 });
 
 describe('the walkthrough pages', () => {

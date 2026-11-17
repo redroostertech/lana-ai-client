@@ -496,8 +496,8 @@
     },
 
     'admin/reporting.html': {
-      title: 'Analytics',
-      activeNav: 'reports',
+      title: 'Reports',
+      activeNav: 'insights-reports',
       scripts: [
         'js/shared/current-pipeline-presentation.js',
         'js/shared/acquisition-source-presentation.js',
@@ -509,6 +509,10 @@
         'js/drilldown-renderer.js',
         'js/shared/safe-url.js',
         'js/shared/safe-html.js',
+        'js/shared/data-state.js',
+        'js/admin/report-metric-card.js',
+        'js/shared/dashboard-tiles.js',
+        'js/admin/reports-list.js',
         'js/admin/reporting.js'
       ],
       stylesheets: [
@@ -531,8 +535,8 @@
     },
 
     'admin/dashboard-library.html': {
-      title: 'Library',
-      activeNav: 'insights-library',
+      title: 'All dashboards',
+      activeNav: 'insights-dashboards',
       scripts: [
         'js/lex/components/foundation/lex-badge.js',
         'js/lex/components/foundation/lex-modal.js',
@@ -541,6 +545,7 @@
         'js/shared/library-column-filters.js',
         'js/shared/metric-tables.js',
         'js/admin/dashboard-catalog.js',
+        'js/shared/data-state.js',
         'js/admin/dashboard-library.js'
       ],
       stylesheets: [
@@ -550,12 +555,14 @@
 
     'admin/dashboard-detail.html': {
       title: 'Dashboard',
-      activeNav: 'insights-dashboard',
+      activeNav: 'insights-dashboards',
       scripts: [
         'js/shared/current-pipeline-presentation.js',
         'js/shared/acquisition-source-presentation.js',
         'js/shared/opportunity-intake-presentation.js',
         'js/dashboard/metric-goal-comparison.js',
+        'js/shared/data-state.js',
+        'js/shared/dashboard-tiles.js',
         'js/admin/dashboard-detail.js'
       ],
       stylesheets: [
@@ -565,7 +572,7 @@
 
     'admin/dashboard-builder.html': {
       title: 'Dashboard Builder',
-      activeNav: 'insights-library',
+      activeNav: 'insights-dashboards',
       scripts: [
         'js/lex/components/form/lex-select.js',
         'js/admin/dashboard-builder.js'

@@ -44,16 +44,20 @@
   }
 
   /**
-   * The onboarding group with this app marked seen, keeping the other apps.
-   * The server replaces a whole preference group on save, so send all of it.
+   * The onboarding group with this app marked seen, keeping the other apps and the rest of
+   * the group (the prompts a person dismissed). The server replaces a whole preference group
+   * on save, so send all of it.
    */
   function withSeen(preferences, app, isoTime) {
     var onboarding = preferences && preferences.onboarding && typeof preferences.onboarding === 'object' ? preferences.onboarding : {};
     var walkthroughs = onboarding.walkthroughs && typeof onboarding.walkthroughs === 'object' ? onboarding.walkthroughs : {};
+    var group = {};
+    Object.keys(onboarding).forEach(function (key) { group[key] = onboarding[key]; });
     var next = {};
     Object.keys(walkthroughs).forEach(function (key) { next[key] = walkthroughs[key]; });
     next[app] = isoTime;
-    return { walkthroughs: next };
+    group.walkthroughs = next;
+    return group;
   }
 
   function apiClient() {

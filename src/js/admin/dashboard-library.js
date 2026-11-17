@@ -98,9 +98,15 @@
     return '<button type="button" class="' + cls + '" data-dashboard-pin-toggle="' + escapeHtml(item.id) + '" aria-pressed="' + pinned + '" title="' + escapeHtml(label) + '" aria-label="' + escapeHtml(label) + '">' + icon + '</button>';
   }
 
+  // One display label for a dashboard state, in the table and the Pinned card.
+  function stateLabel(state) {
+    return window.DataState.label(state || 'active');
+  }
+
   function statePill(state) {
-    var label = (state || 'Active');
-    return '<span class="insights-pinned-card__pill insights-pinned-card__pill--active">' + escapeHtml(String(label).toLowerCase()) + '</span>';
+    var label = stateLabel(state);
+    var cls = 'insights-pinned-card__pill' + (/^active$/i.test(label) ? ' insights-pinned-card__pill--active' : '');
+    return '<span class="' + cls + '">' + escapeHtml(label) + '</span>';
   }
 
   function audiencePill(audience) {
@@ -169,7 +175,7 @@
   }
 
   function muted() {
-    return '<span class="insights-library-muted">—</span>';
+    return '<span class="insights-library-muted">' + window.DataState.EMPTY_VALUE + '</span>';
   }
 
   function labelCell(text) {
@@ -203,7 +209,7 @@
       scope: function (value) { return labelCell(shared.capitalizeFirst(value)); },
       visibility: function (value) { return labelCell(shared.capitalizeFirst(value)); },
       state: function (value) {
-        var label = shared.humanizeLabel(value || 'Active');
+        var label = stateLabel(value);
         return '<lex-badge label="' + escapeHtml(label) + '" color="' + (/^active$/i.test(label) ? 'green' : 'gray') + '"></lex-badge>';
       },
       created_at: function (value) {
@@ -234,20 +240,16 @@
     var table = el('dashboardLibraryTable');
     if (!table || typeof table.setData !== 'function') return;
 
-    // Filter pinned dashboards out of the main table — they live in the
-    // strip above and shouldn't be duplicated below. Mirrors the matters
-    // list behavior in workspace.js (currentMatters minus pinned ids).
-    var unpinned = sourceDashboards.filter(function (item) {
-      return !(item && item.id && pinnedIds.has(item.id));
-    });
-    var filters = tables().dashboardFilterOptions(unpinned);
+    // Pinned dashboards stay in the table (filled pin) so its count names
+    // every dashboard; the pinned strip above is a shortcut, not a split.
+    var filters = tables().dashboardFilterOptions(sourceDashboards);
     table.setColumnFilterOptions(filters);
     var audienceSelect = el('dashboardLibraryAudienceFilter');
     if (audienceSelect) {
       audienceSelect.options = [{ value: 'all', label: 'All' }].concat(filters.audience.options);
     }
     syncEmptyState(table);
-    table.setData(unpinned);
+    table.setData(sourceDashboards);
     if (toolbar) {
       toolbar.updateCount();
       toolbar.syncToolbar();
@@ -356,7 +358,17 @@
         order: 'dashboardLibrarySortOrder',
         filter: 'dashboardLibraryAudienceFilter',
         counts: ['dashboardLibraryCount', 'dashboardLibrarySectionCount']
-      }, { filterKey: 'audience', noun: ['dashboard', 'dashboards'], defaultSort: 'updated_at' });
+      }, { filterKey: 'audience', noun: ['dashboard', 'dashboards'], defaultSort: 'updated_at',
+        // "12 dashboards, 1 pinned": the total, with the pinned split.
+        onCount: function (total) {
+          var pinned = (state.sourceDashboards || []).filter(function (item) { return item && item.id && pinnedIds.has(item.id); }).length;
+          if (!pinned) return;
+          var text = total + (total === 1 ? ' dashboard' : ' dashboards') + ', ' + pinned + ' pinned';
+          ['dashboardLibraryCount', 'dashboardLibrarySectionCount'].forEach(function (id) {
+            var node = el(id);
+            if (node) node.textContent = text;
+          });
+        } });
       table.addEventListener('lex-filter-change', function () { syncEmptyState(table); });
       table.addEventListener('empty-action', function () { Lex.Nav.go('admin/dashboard-builder.html'); });
     }

@@ -1,9 +1,12 @@
-/* Metric Detail — canonical drilldown for registry metrics. */
+/* Metric Detail: canonical drilldown for registry metrics. */
 
 (function () {
   'use strict';
 
   function el(id) { return document.getElementById(id); }
+
+  // Blank stats and cells use the shared empty token (js/shared/data-state.js).
+  var EMPTY = window.DataState.EMPTY_VALUE;
 
   // Lex.Nav stores the canonical query string in history.state.path for
   // SPA-routed navigations, so window.location.search can be empty or
@@ -18,7 +21,7 @@
 
   function setText(id, value) {
     var node = el(id);
-    if (node) node.textContent = value == null || value === '' ? '-' : String(value);
+    if (node) node.textContent = value == null || value === '' ? EMPTY : String(value);
   }
 
   // Snake/dot-case identifiers (`legal_operations`, `department_legal_family_law`,
@@ -34,20 +37,20 @@
       .replace(/\b\w/g, function (letter) { return letter.toUpperCase(); });
   }
 
-  // Zero is rendered as an em-dash everywhere a metric value, prior value,
-  // or movement is shown. Users want to read "—" as "no signal yet" for both
+  // Zero is rendered as the empty token everywhere a metric value, prior
+  // value, or movement is shown. Users read it as no signal yet for both
   // missing data and the legitimately-zero case so an empty dashboard
   // doesn't look populated by a wall of zeros.
   function formatNumber(value) {
     var numeric = Number(value);
-    if (!isFinite(numeric) || numeric === 0) return '-';
+    if (!isFinite(numeric) || numeric === 0) return EMPTY;
     return new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(numeric);
   }
 
   function formatValue(value, format) {
     var numeric = Number(value);
-    if (!isFinite(numeric)) return value == null ? '-' : String(value);
-    if (numeric === 0) return '-';
+    if (!isFinite(numeric)) return value == null ? EMPTY : String(value);
+    if (numeric === 0) return EMPTY;
     if (format === 'currency') {
       return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(numeric);
     }
@@ -58,11 +61,11 @@
   }
 
   function formatMovement(movement) {
-    if (!movement || movement.percent_change == null || !isFinite(Number(movement.percent_change))) return '-';
+    if (!movement || movement.percent_change == null || !isFinite(Number(movement.percent_change))) return EMPTY;
     var pct = Number(movement.percent_change);
-    if (pct === 0) return '-';
-    var sign = movement.direction === 'down' ? '-' : '+';
-    return sign + Math.abs(pct).toFixed(1) + '%';
+    if (pct === 0) return EMPTY;
+    var signed = movement.direction === 'down' ? -Math.abs(pct) : Math.abs(pct);
+    return (signed > 0 ? '+' : '') + signed.toFixed(1) + '%';
   }
 
   function escapeHtml(value) {
@@ -79,7 +82,7 @@
   }
 
   function muted() {
-    return '<span class="metric-detail-muted">\u2014</span>';
+    return '<span class="metric-detail-muted">' + EMPTY + '</span>';
   }
 
   // Dates go through Lex.Utils (API time is UTC; shown in the user's zone).
@@ -104,7 +107,7 @@
       created_at: dateTimeCell,
       value: function (value, row) {
         var text = formatValue(value, row.format);
-        return text === '-' ? muted() : escapeHtml(text);
+        return text === EMPTY ? muted() : escapeHtml(text);
       },
       status: function (value) {
         if (!value) return muted();
@@ -235,7 +238,9 @@
 
     // Preserve the period context the user selected on the dashboard. Without
     // these the detail page would silently fall back to defaults and surface
-    // numbers that don't match the modal the user opened.
+    // numbers that don't match the modal the user opened. The days are the
+    // firm's plain days, sent as they are: the backend bounds them in the
+    // firm's zone.
     var periodParams = {};
     var periodStart = qp.get('periodStart');
     var periodEnd = qp.get('periodEnd');
@@ -268,21 +273,23 @@
       renderBreadcrumb({ ...metric, title: title });
       setText('metricTitle', title);
       setText('metricDomain', humanize(metric.domain || current.domain) || 'Metric');
-      setText('metricStatus', humanize(current.status || metric.status) || '-');
+      setText('metricStatus', humanize(current.status || metric.status) || EMPTY);
       setText('metricDescription', current.description || metric.description || '');
-      setText('metricCalculation', metric.calculation || current.calculation || '-');
-      setText('metricBusinessLogic', metric.businessLogic || current.businessLogic || '-');
+      setText('metricCalculation', metric.calculation || current.calculation || EMPTY);
+      setText('metricBusinessLogic', metric.businessLogic || current.businessLogic || EMPTY);
       setText('metricCurrentValue', formatValue(current.value_numeric != null ? current.value_numeric : current.value, current.format));
-      setText('metricPriorValue', movement ? formatValue(movement.prior_value, current.format) : '-');
+      setText('metricPriorValue', movement ? formatValue(movement.prior_value, current.format) : EMPTY);
       setText('metricMovement', formatMovement(movement));
       // When the period had no movement (flat / 0% change), direction is
-      // also not meaningful — render as dash for consistency with the
-      // value cards on either side.
-      var directionLabel = '-';
+      // also not meaningful, so it shows the empty token like the value
+      // cards on either side.
+      var directionLabel = EMPTY;
       if (movement && movement.direction && movement.direction !== 'flat' && Number(movement.percent_change) !== 0) {
         directionLabel = movement.direction;
       }
       setText('metricDirection', directionLabel);
+      // The backend names the period in the firm's days (data.period.label).
+      setText('metricPeriod', payload.period && payload.period.label);
 
       renderSnapshots(payload.snapshots || []);
       renderRawData(payload.raw_data && payload.raw_data.rows ? payload.raw_data.rows : []);

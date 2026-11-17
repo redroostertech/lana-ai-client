@@ -130,6 +130,9 @@ createModalStructure() {
             <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
           </div>
 
+          <!-- Data state from the backend failure model (shared DataState block) -->
+          <div id="drilldown-state" class="py-6" hidden></div>
+
           <!-- Error state (metadata or request refused) -->
           <div id="drilldown-error" class="hidden text-center py-12">
             <h3 class="mt-2 text-sm font-medium text-gray-900">Error loading data</h3>
@@ -521,6 +524,16 @@ createModalStructure() {
         insightsLength: result.data && result.data.insights ? result.data.insights.length : 0
       });
 
+      // A 200 can still carry a non-ok data state (not enough data, no
+      // source): show the shared state block, not an empty table.
+      const dataState = typeof window !== 'undefined' ? window.DataState : null;
+      const stateItem = result && result.data && result.data.data_state ? result.data : result;
+      if (dataState && dataState.isProblem(stateItem)) {
+        this.currentData = null;
+        this.showFailure({ data: stateItem });
+        return;
+      }
+
       this.currentData = result.data;
 
       // Render the data
@@ -528,7 +541,7 @@ createModalStructure() {
     } catch (error) {
       if (!isCurrent()) return;
       console.error('[DrilldownRenderer] Error fetching drilldown data:', error);
-      this.showError(error.message || 'Failed to load drilldown data');
+      this.showFailure(error);
     }
   }
 
@@ -1850,6 +1863,8 @@ createModalStructure() {
     document.getElementById('drilldown-loading')?.classList.toggle('hidden', !firstLoad);
     if (firstLoad && table) table.hidden = true;
     document.getElementById('drilldown-error')?.classList.add('hidden');
+    const state = document.getElementById('drilldown-state');
+    if (state) state.hidden = true;
 
     const count = document.getElementById('drilldown-count');
     if (count && firstLoad) count.textContent = '';
@@ -1861,6 +1876,28 @@ createModalStructure() {
     if (summaryContainer) summaryContainer.classList.add('hidden');
     if (insightsContainer) insightsContainer.classList.add('hidden');
     if (breakdownContainer) breakdownContainer.classList.add('hidden');
+  }
+
+  /**
+   * A failed request: the backend's data state (shared DataState block) when
+   * it sent one, else the plain error message. Returns true when a state was shown.
+   */
+  showFailure(error) {
+    const item = error && error.data;
+    const dataState = typeof window !== 'undefined' ? window.DataState : null;
+    if (item && dataState && dataState.isProblem(item)) {
+      document.getElementById('drilldown-loading')?.classList.add('hidden');
+      const table = document.getElementById('drilldown-table');
+      if (table) table.hidden = true;
+      const state = document.getElementById('drilldown-state');
+      if (state) {
+        state.innerHTML = dataState.render(item);
+        state.hidden = false;
+      }
+      return true;
+    }
+    this.showError((error && error.message) || 'Failed to load drilldown data');
+    return false;
   }
 
   /**

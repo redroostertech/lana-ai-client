@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Firm Reporting - LANA AI</title>
+  <title>Reports - LANA AI</title>
 
   <!-- CSS in head -->
   <script src="../js/lex/lex.theme.js"></script>
@@ -36,8 +36,8 @@
     logo-src="../img/logo-light.png"
     logo-alt="LANA AI"
     logo-href="../dashboard.html"
-    active-nav-id="firm-reporting"
-    page-title="Firm Reporting"
+    active-nav-id="insights-reports"
+    page-title="Reports"
   ></lex-app>
 
   <template id="page-content">
@@ -49,13 +49,13 @@
         id="reportingBanner"
         variant="light"
         corners
-        heading="Firm Reporting"
-        subtitle="Firm-wide analytics, trends, and performance metrics"
+        heading="Reports"
+        subtitle="Pick a report, choose a period, and run it."
         lana
         lana-context-type="full_chat"
       >
         <lex-btn id="importReportBtn" variant="secondary" size="sm">
-          <span style="display:flex;align-items:center;gap:0.375rem;">
+          <span class="reporting-btn-content">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
             </svg>
@@ -68,35 +68,55 @@
 
       <!-- Breadcrumb back to analytics hub -->
       <lex-breadcrumb
-        crumbs='[{"label":"Analytics","href":"admin/analytics.html"},{"label":"Firm Reporting"}]'
+        crumbs='[{"label":"Dashboard","href":"admin/analytics.html"},{"label":"Reports"}]'
       ></lex-breadcrumb>
 
+      <!-- Reports open on a list. Each row comes from the report catalog
+           (purpose, audience, last run); picking one opens its controls. -->
+      <section id="reportsListSection" class="reporting-list" aria-labelledby="reportsListHeading">
+        <div class="reporting-list__toolbar" role="search" aria-label="Search reports">
+          <h2 id="reportsListHeading" class="reporting-list__heading">All reports</h2>
+          <lex-input id="reportsListSearch" class="reporting-list__search" placeholder="Search reports..." clearable="true" leading-icon="search"></lex-input>
+          <span id="reportsListCount" class="reporting-list__count" aria-live="polite"></span>
+        </div>
+        <lex-table
+          id="reportsListTable"
+          class="lex-table--card"
+          columns="name,purpose,audience,last_run_at"
+          labels="Report,What it shows,For,Last run"
+          sortable-columns="name,audience,last_run_at"
+          sort-by="name"
+          sort-dir="asc"
+          limit="20"
+          id-key="row_id"
+          empty-text="No reports yet"
+          aria-label="Reports"
+        ></lex-table>
+      </section>
+
       <!-- Report picker sits in the controls card; results stack below -->
-      <div id="reportingLayout" class="reporting-layout">
+      <div id="reportingLayout" class="reporting-layout" hidden>
 
         <!-- ── Main Content Column ────────────────────────────────── -->
-        <div id="reportingMainColumn" style="display:flex;flex-direction:column;gap:1.5rem;min-width:0;overflow-x:hidden;">
+        <div id="reportingMainColumn" class="reporting-main-column">
 
           <!-- Controls Card -->
           <lex-card id="controlsCard">
-            <!-- Report picker: searchable dropdown of report modules and imported reports -->
-            <div class="reporting-module-picker">
-              <lex-select
-                id="reportModuleSelect"
-                class="reporting-module-picker__select"
-                label="Report"
-                name="reportModuleSelect"
-                variant="outlined"
-                placeholder="Loading reports..."
-                searchable
-              ></lex-select>
+            <!-- The picked report: its name and purpose, a way back to the list -->
+            <div class="reporting-selected">
+              <lex-btn id="backToReportsBtn" class="reporting-selected__back" variant="ghost" size="sm">All reports</lex-btn>
+              <div class="reporting-selected__text">
+                <h2 id="selectedReportName" class="reporting-selected__name"></h2>
+                <p id="selectedReportPurpose" class="reporting-selected__purpose"></p>
+              </div>
+              <lex-badge id="selectedReportSavedBadge" class="reporting-selected__badge" label="Saved copy" color="gray" hidden></lex-badge>
               <lex-btn id="deleteImportedReportBtn" class="reporting-module-picker__delete" variant="ghost" size="sm" hidden>Delete report</lex-btn>
             </div>
 
             <!-- Period Presets -->
-            <div style="margin-bottom:1rem;">
-              <p class="lex-label lex-text-secondary" style="margin-bottom:0.5rem;">Quick Select Period</p>
-              <div id="periodPresets" style="display:flex;flex-wrap:wrap;gap:0.5rem;">
+            <div class="reporting-presets">
+              <p class="lex-label lex-text-secondary reporting-presets__label">Quick Select Period</p>
+              <div id="periodPresets" class="reporting-presets__list">
                 <lex-btn data-preset="last7days" variant="secondary" size="sm">Last 7 Days</lex-btn>
                 <lex-btn data-preset="last30days" variant="secondary" size="sm">Last 30 Days</lex-btn>
                 <lex-btn data-preset="thisMonth" variant="secondary" size="sm">This Month</lex-btn>
@@ -121,10 +141,10 @@
             </div>
 
             <!-- Execute + Customize Buttons -->
-            <div style="display:flex;gap:0.75rem;align-items:center;">
+            <div class="reporting-run-actions">
               <lex-btn id="executeBtn" variant="primary">Run Report</lex-btn>
-              <lex-btn id="customizeBtn" variant="secondary" size="sm" style="display:none;">
-                <span style="display:flex;align-items:center;gap:0.375rem;">
+              <lex-btn id="customizeBtn" class="reporting-customize-btn" variant="secondary" size="sm" hidden>
+                <span class="reporting-btn-content">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2z"/>
                     <circle cx="12" cy="12" r="3"/>
@@ -132,35 +152,36 @@
                   Customize
                 </span>
               </lex-btn>
-              <span id="customizationBadge" style="display:none;font-size:0.75rem;padding:0.125rem 0.5rem;border-radius:9999px;background:var(--lex-bg-accent-soft);color:var(--lex-text-accent);font-weight:500;"></span>
+              <span id="customizationBadge" class="reporting-customization-badge"></span>
             </div>
 
             <!-- Execution Feedback -->
-            <div id="executionInfo" style="display:none;margin-top:1rem;padding:0.75rem 1rem;background:var(--lex-bg-accent-soft);border:1px solid var(--lex-border-accent);border-radius:var(--lex-radius-md);">
+            <div id="executionInfo" class="reporting-execution-info">
               <p id="executionInfoText" class="lex-body-sm lex-text-accent"></p>
             </div>
-            <div id="executionError" style="display:none;margin-top:1rem;padding:0.75rem 1rem;background:var(--lex-status-danger-bg, #fef2f2);border:1px solid var(--lex-status-danger-border, #fecaca);border-radius:var(--lex-radius-md);">
-              <p class="lex-label-sm" style="color:var(--lex-status-danger);margin-bottom:0.25rem;">Execution Failed</p>
-              <p id="executionErrorText" class="lex-body-sm" style="color:var(--lex-status-danger);"></p>
+            <div id="executionError" class="reporting-execution-error">
+              <p class="lex-label-sm reporting-execution-error__title">Execution Failed</p>
+              <p id="executionErrorText" class="lex-body-sm reporting-execution-error__text"></p>
             </div>
+            <div id="executionState" class="reporting-run-state" hidden></div>
           </lex-card>
 
           <!-- Results Placeholder (shown when no report has run) -->
           <lex-empty
             id="reportingPlaceholder"
-            message="Select a report module"
-            description="Choose a report above, set your date range, and click Run Report"
+            message="Ready to run"
+            description="Set your dates, then click Run Report."
             icon="chart"
           ></lex-empty>
 
           <!-- Module Results (hidden until a report runs) -->
-          <div id="moduleResults" style="display:none;flex-direction:column;gap:1.5rem;">
+          <div id="moduleResults" class="reporting-module-results">
             <!-- Results Header Card -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <div class="flex items-center justify-between mb-4">
                 <div class="flex items-center gap-3">
                   <h2 id="moduleTitle" class="text-xl font-bold text-gray-900"></h2>
-                  <button onclick="window._reporting.showModuleInfo()" class="flex items-center gap-1 px-3 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg">Learn More</button>
+                  <button type="button" data-reporting-action="show-module-info" class="flex items-center gap-1 px-3 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg">Learn More</button>
                 </div>
               </div>
               <!--
@@ -175,7 +196,6 @@
                 <div class="min-w-0"><p class="text-xs text-gray-500">Compare By</p><p id="resultPeriodType" class="font-medium text-gray-900 break-words"></p></div>
                 <div class="min-w-0"><p class="text-xs text-gray-500">Current Period</p><p id="resultCurrentPeriod" class="font-medium text-gray-900 break-words"></p></div>
                 <div class="min-w-0"><p class="text-xs text-gray-500">Prior Period</p><p id="resultPriorPeriod" class="font-medium text-gray-900 break-words"></p></div>
-                <div class="min-w-0"><p class="text-xs text-gray-500">Execution Time</p><p id="executionTime" class="font-medium text-gray-900 break-words"></p></div>
                 <button id="missingEntitiesBtn" class="hidden col-span-1 flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 whitespace-nowrap">
                   <span id="missingEntitiesCount">0 Missing</span>
                 </button>
@@ -274,7 +294,7 @@
           <div class="bg-white rounded-lg shadow-xl">
             <div class="flex items-start justify-between p-5 border-b border-gray-200">
               <h3 class="text-xl font-semibold text-gray-900">Data Sources</h3>
-              <button onclick="window._reporting.closeDataSourcesModal()" class="text-gray-400 hover:text-gray-600">
+              <button type="button" data-reporting-action="close-data-sources" class="text-gray-400 hover:text-gray-600">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
               </button>
             </div>
@@ -283,7 +303,7 @@
               <div id="dataSourcesList" class="space-y-3"></div>
             </div>
             <div class="flex justify-end p-5 border-t border-gray-200">
-              <button onclick="window._reporting.closeDataSourcesModal()" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Close</button>
+              <button type="button" data-reporting-action="close-data-sources" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Close</button>
             </div>
           </div>
         </div>
@@ -295,7 +315,7 @@
           <div class="bg-white rounded-lg shadow-xl">
             <div class="flex items-start justify-between p-5 border-b border-gray-200">
               <h3 class="text-xl font-semibold text-gray-900">Missing Data Entities</h3>
-              <button onclick="window._reporting.closeMissingEntitiesModal()" class="text-gray-400 hover:text-gray-600">
+              <button type="button" data-reporting-action="close-missing-entities" class="text-gray-400 hover:text-gray-600">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
               </button>
             </div>
@@ -318,7 +338,7 @@
               </div>
             </div>
             <div class="flex justify-end p-5 border-t border-gray-200">
-              <button onclick="window._reporting.closeMissingEntitiesModal()" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Close</button>
+              <button type="button" data-reporting-action="close-missing-entities" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Close</button>
             </div>
           </div>
         </div>
@@ -330,7 +350,7 @@
           <div class="bg-white rounded-lg shadow-xl">
             <div class="flex items-start justify-between p-5 border-b border-gray-200">
               <h3 class="text-xl font-semibold text-gray-900">Import Report</h3>
-              <button onclick="window._reporting.closeImportModal()" class="text-gray-400 hover:text-gray-600">
+              <button type="button" data-reporting-action="close-import" class="text-gray-400 hover:text-gray-600">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
               </button>
             </div>
@@ -364,7 +384,7 @@
               </div>
             </div>
             <div class="flex justify-end gap-3 p-5 border-t border-gray-200">
-              <button onclick="window._reporting.closeImportModal()" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
+              <button type="button" data-reporting-action="close-import" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
               <button id="importSubmitBtn" disabled class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">Import</button>
             </div>
           </div>
@@ -377,7 +397,7 @@
           <div class="bg-white rounded-lg shadow-xl">
             <div class="flex items-start justify-between p-5 border-b border-gray-200">
               <h3 class="text-xl font-semibold text-gray-900">Module Information</h3>
-              <button onclick="window._reporting.closeModuleInfo()" class="text-gray-400 hover:text-gray-600">
+              <button type="button" data-reporting-action="close-module-info" class="text-gray-400 hover:text-gray-600">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
               </button>
             </div>
@@ -393,7 +413,7 @@
               <div><p class="text-xs text-gray-500">Status</p><span id="modalModuleStatus" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"></span></div>
             </div>
             <div class="flex justify-end p-5 border-t border-gray-200">
-              <button onclick="window._reporting.closeModuleInfo()" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Close</button>
+              <button type="button" data-reporting-action="close-module-info" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Close</button>
             </div>
           </div>
         </div>
@@ -404,7 +424,7 @@
   </template>
 
   <noscript>
-    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,sans-serif;color:#666;">
+    <div class="reporting-noscript">
       Please enable JavaScript to use LANA AI.
     </div>
   </noscript>
@@ -507,6 +527,10 @@
   <script src="../js/shared/library-column-filters.js"></script>
   <script src="../js/admin/admin-table-kit.js"></script>
   <script src="../js/admin/reporting-tables.js"></script>
+  <script src="../js/shared/data-state.js"></script>
+  <script src="../js/admin/report-metric-card.js"></script>
+  <script src="../js/shared/dashboard-tiles.js"></script>
+  <script src="../js/admin/reports-list.js"></script>
   <script src="../js/admin/reporting.js"></script>
 
   <!-- ES module bridge for visualization renderers -->

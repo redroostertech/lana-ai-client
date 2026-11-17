@@ -10,21 +10,22 @@
   // State
   // ==========================================================================
 
+  // The one empty token for blank values (never N/A or a dash).
+  var EMPTY = window.DataState.EMPTY_VALUE;
+
   var allModules = [];
   var moduleCategories = {};
   var selectedModuleKey = null;
-
-  // Period-over-period comparison mode for the next execute call. Presets carry
-  // a grain and compare against the matching calendar window; custom date edits
-  // compare against the immediately-preceding equal-length window.
-  // (METRIC_GOALS_DESIGN.md section 11.2.)
-  var selectedCompareMode = 'previous_calendar';
 
   // Visualization state
   var currentDataSources = [];
   var currentMissingEntities = [];
   var currentModuleMetadata = null;
   var currentModuleConfig = null;
+  // The plain days the report on screen ran for (null when it has none).
+  // Drilldowns read these, not the date inputs, so a drilldown lists the
+  // rows its tile counted even after the inputs change.
+  var runPeriodDays = null;
   var currentModuleData = null;
   var chartInstances = {};
   var drilldownRenderer = null;
@@ -36,12 +37,6 @@
   // Helpers
   // ==========================================================================
 
-  function formatDate(date) {
-    return window.Lex && window.Lex.Utils
-      ? window.Lex.Utils.formatUtcDateOnly(date)
-      : LanaTime.formatUtcDateOnly(date);
-  }
-
   function showInfo(message) {
     var infoEl = document.getElementById('executionInfo');
     var infoTextEl = document.getElementById('executionInfoText');
@@ -51,6 +46,16 @@
     if (errEl) errEl.style.display = 'none';
   }
 
+  function hideInfo() {
+    var infoEl = document.getElementById('executionInfo');
+    if (infoEl) infoEl.style.display = 'none';
+  }
+
+  function hideRunState() {
+    var stateEl = document.getElementById('executionState');
+    if (stateEl) { stateEl.hidden = true; stateEl.innerHTML = ''; }
+  }
+
   function showError(message) {
     var errEl = document.getElementById('executionError');
     var errTextEl = document.getElementById('executionErrorText');
@@ -58,23 +63,35 @@
     if (errTextEl) errTextEl.textContent = message;
     if (errEl) errEl.style.display = 'block';
     if (infoEl) infoEl.style.display = 'none';
+    hideRunState();
   }
 
   function hideError() {
     var errEl = document.getElementById('executionError');
     if (errEl) errEl.style.display = 'none';
+    hideRunState();
   }
 
-  // Escape HTML to prevent XSS when inserting values into innerHTML
-  function escapeHtml(str) {
-    var div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
+  // A failed run: the backend's data state (DataState.fromApiError) as the
+  // shared DataState block, else the error message.
+  function showRunFailure(error) {
+    var item = window.DataState.fromApiError(error);
+    if (!item) {
+      showError((error && error.message) || 'The report could not run. Please try again.');
+      return;
+    }
+    hideError();
+    hideInfo();
+    var stateEl = document.getElementById('executionState');
+    if (stateEl) {
+      stateEl.innerHTML = window.DataState.render(item);
+      stateEl.hidden = false;
+    }
   }
 
   // Format currency
   function formatCurrency(value) {
-    if (value === null || value === undefined) return 'N/A';
+    if (value === null || value === undefined) return EMPTY;
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
@@ -86,7 +103,7 @@
   // Format number
   function formatNumber(value, decimals) {
     if (decimals === undefined) decimals = 0;
-    if (value === null || value === undefined) return 'N/A';
+    if (value === null || value === undefined) return EMPTY;
     return new Intl.NumberFormat('en-US', {
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals
@@ -96,7 +113,7 @@
   // Format percentage
   function formatPercentage(value, decimals) {
     if (decimals === undefined) decimals = 1;
-    if (value === null || value === undefined) return 'N/A';
+    if (value === null || value === undefined) return EMPTY;
     return formatNumber(value, decimals) + '%';
   }
 
@@ -128,64 +145,39 @@
     return colors[color] || colors.gray;
   }
 
-  // Format date range using org timezone via canonical helper
-  function formatDateRange(start, end) {
-    return formatDateLong(start, { month: 'short' }) + ' - ' + formatDateLong(end, { month: 'short' });
-  }
 
   // ==========================================================================
   // Period Presets
   // ==========================================================================
 
-  function selectPeriodPreset(preset) {
-    var utils = window.Lex.Utils;
-    var today = utils.nowDate();
-    var startDate, endDate;
-
-    switch (preset) {
-      case 'last7days':
-        endDate = today;
-        startDate = utils.addDays(today, -6);
-        break;
-      case 'last30days':
-        endDate = today;
-        startDate = utils.addDays(today, -29);
-        break;
-      case 'thisMonth':
-        startDate = utils.startOfUtcMonth(today);
-        endDate = today;
-        break;
-      case 'lastMonth':
-        endDate = utils.addDays(utils.startOfUtcMonth(today), -1);
-        startDate = utils.startOfUtcMonth(endDate);
-        break;
-      case 'thisQuarter':
-        startDate = LanaTime.startOfUtcQuarter(today);
-        endDate = today;
-        break;
-      case 'thisYear':
-        startDate = LanaTime.startOfUtcYear(today);
-        endDate = today;
-        break;
-      case 'lastYear':
-        startDate = LanaTime.startOfUtcYear(LanaTime.addUtcMonths(today, -12));
-        endDate = LanaTime.endOfUtcYear(LanaTime.addUtcMonths(today, -12));
-        break;
-      default:
-        endDate = today;
-        startDate = utils.addDays(today, -7);
-    }
+  // Presets are the firm's days (the firm's zone, Lex.Utils.getFirmTimezone),
+  // so everyone in the firm runs the same period; the backend bounds the
+  // plain days in the same zone. A stored user without the firm's zone
+  // refetches the profile first (api.ensureFirmTimezone).
+  async function selectPeriodPreset(preset) {
+    await api.ensureFirmTimezone();
+    var days = LanaTime.reportPresetDays(preset, window.Lex.Utils.getFirmTimezone());
 
     var periodStartEl = document.getElementById('periodStart');
     var periodEndEl = document.getElementById('periodEnd');
-    if (periodStartEl) periodStartEl.value = formatDate(startDate);
-    if (periodEndEl) periodEndEl.value = formatDate(endDate);
+    if (periodStartEl) periodStartEl.value = days.start;
+    if (periodEndEl) periodEndEl.value = days.end;
 
-    // A preset selection compares against the matching calendar window.
-    selectedCompareMode = 'previous_calendar';
+    updateCompareByOptions(dayStartDate(days.start), dayEndDate(days.end), preset);
+    showInfo('Period set to: ' + days.start + ' to ' + days.end);
+  }
 
-    updateCompareByOptions(startDate, endDate, preset);
-    showInfo('Period set to: ' + formatDate(startDate) + ' to ' + formatDate(endDate));
+  // A plain day as a Date for span math only (the whole day, end inclusive).
+  function dayStartDate(day) { return new Date(day + 'T00:00:00Z'); }
+  function dayEndDate(day) { return new Date(day + 'T23:59:59Z'); }
+
+  // The days a run used as plain days (inclusive end): the days the
+  // backend labels its period with, else the days the run sent. The backend
+  // reads them as the firm's days.
+  function runDaysFrom(period, sentStart, sentEnd) {
+    var start = (period && period.startDate) || sentStart;
+    var end = (period && period.endDate) || sentEnd;
+    return start && end ? { periodStart: start, periodEnd: end } : null;
   }
 
   function updateCompareByOptions(startDate, endDate, preset) {
@@ -236,11 +228,8 @@
       periodStartEl.addEventListener('lex-change', function () {
         var startVal = periodStartEl.value;
         var endVal = periodEndEl ? periodEndEl.value : '';
-        // A manual date edit is a custom range: compare against the prior
-        // equal-length window.
-        selectedCompareMode = 'previous_period';
         if (startVal && endVal) {
-          updateCompareByOptions(new Date(startVal + 'T00:00:00'), new Date(endVal + 'T23:59:59'), null);
+          updateCompareByOptions(dayStartDate(startVal), dayEndDate(endVal), null);
         }
       });
     }
@@ -249,9 +238,8 @@
       periodEndEl.addEventListener('lex-change', function () {
         var startVal = periodStartEl ? periodStartEl.value : '';
         var endVal = periodEndEl.value;
-        selectedCompareMode = 'previous_period';
         if (startVal && endVal) {
-          updateCompareByOptions(new Date(startVal + 'T00:00:00'), new Date(endVal + 'T23:59:59'), null);
+          updateCompareByOptions(dayStartDate(startVal), dayEndDate(endVal), null);
         }
       });
     }
@@ -386,7 +374,7 @@
 
   function showModuleInfo() {
     if (!currentModuleMetadata) {
-      showError('No module data available. Please execute a module first.');
+      showError('Run a report first.');
       return;
     }
     var modal = document.getElementById('moduleInfoModal');
@@ -435,7 +423,7 @@
     }
 
     if (!selectedModuleKey) {
-      showError('Please select a report module from the sidebar.');
+      showError('Pick a report first.');
       return;
     }
 
@@ -461,34 +449,26 @@
       return;
     }
 
-    // Convert dates to ISO format
-    var periodStartISO = LanaTime.utcDayStart(startDate);
-    var periodEndISO = LanaTime.utcDayEnd(endDate);
-
     // Loading state
     if (executeBtn) executeBtn.loading = true;
     hideError();
-    showInfo('Executing ' + selectedModuleKey + ' from ' + startDate + ' to ' + endDate + '...');
+    showInfo('Running your report...');
 
     // Hide previous results while loading
     var resultsEl = document.getElementById('moduleResults');
     if (resultsEl) resultsEl.style.display = 'none';
 
     try {
-      var startTime = LanaTime.nowMs();
 
       var data = await api.post('/api/v1/modules/' + selectedModuleKey + '/execute', {
         periodType: periodType,
-        periodStart: periodStartISO,
-        periodEnd: periodEndISO,
+        // Plain days: the backend bounds them in the firm's zone.
+        periodStart: startDate,
+        periodEnd: endDate,
         compareBy: periodType,
         compareToPrevious: true,
-        compareMode: selectedCompareMode,
         useCache: false
       });
-
-      var endTime = LanaTime.nowMs();
-      var executionTimeMs = endTime - startTime;
 
       // Store module metadata for Learn More modal
       currentModuleMetadata = {
@@ -503,32 +483,19 @@
 
       // Store full module configuration
       currentModuleConfig = data;
+      runPeriodDays = runDaysFrom(data.period, startDate, endDate);
 
       // Update module header
       var moduleTitleEl = document.getElementById('moduleTitle');
-      var executionTimeEl = document.getElementById('executionTime');
-      if (moduleTitleEl) moduleTitleEl.textContent = data.moduleName || 'Module Results';
-      if (executionTimeEl) executionTimeEl.textContent = executionTimeMs + 'ms';
+      if (moduleTitleEl) moduleTitleEl.textContent = data.moduleName || 'Report';
 
-      // Update period info
-      var resultPeriodTypeEl = document.getElementById('resultPeriodType');
-      if (resultPeriodTypeEl) {
-        resultPeriodTypeEl.textContent = data.period.type || (periodType.charAt(0).toUpperCase() + periodType.slice(1));
-      }
-
-      var resultCurrentPeriodEl = document.getElementById('resultCurrentPeriod');
-      if (resultCurrentPeriodEl) {
-        resultCurrentPeriodEl.textContent = formatDateRange(data.period.start, data.period.end);
-      }
-
-      var resultPriorPeriodEl = document.getElementById('resultPriorPeriod');
-      if (resultPriorPeriodEl) {
-        if (data.priorPeriod && data.priorPeriod.start && data.priorPeriod.end) {
-          resultPriorPeriodEl.textContent = formatDateRange(data.priorPeriod.start, data.priorPeriod.end);
-        } else {
-          resultPriorPeriodEl.textContent = 'N/A';
-        }
-      }
+      // Update period info (ReportMetricCard.headerLabels: display label and UTC days)
+      var header = window.ReportMetricCard.headerLabels(data);
+      [['resultPeriodType', header.compareBy], ['resultCurrentPeriod', header.current], ['resultPriorPeriod', header.prior]]
+        .forEach(function (pair) {
+          var node = document.getElementById(pair[0]);
+          if (node) node.textContent = pair[1];
+        });
 
       // Update data sources
       updateDataSources(data.dataSources || []);
@@ -541,11 +508,11 @@
       if (placeholder) placeholder.style.display = 'none';
       if (resultsEl) resultsEl.style.display = 'flex';
 
-      showInfo('Module executed successfully in ' + executionTimeMs + 'ms. ' + (data.metrics ? data.metrics.length : 0) + ' metrics calculated.');
+      hideInfo();
 
     } catch (error) {
       console.error('[Reporting] Execution failed:', error);
-      showError(error.message || 'Failed to execute report. Please try again.');
+      showRunFailure(error);
     } finally {
       if (executeBtn) executeBtn.loading = false;
     }
@@ -676,10 +643,11 @@
     content.innerHTML = '<div class="text-center py-8"><lex-spinner></lex-spinner><p class="text-gray-600 mt-4">Loading leads...</p></div>';
 
     try {
-      var periodStart = LanaTime.utcDayStart(document.getElementById('periodStart').value);
-      var periodEnd = LanaTime.utcDayEnd(document.getElementById('periodEnd').value);
+      // Connector rows are read by instant: the run's own window (the
+      // backend's firm-zone bounds), so the list matches the tile.
+      var period = (currentModuleConfig && currentModuleConfig.period) || {};
       var tables = window.ReportingTables;
-      var result = await tables.loadAllLeads(function (url) { return api.get(url); }, source, periodStart, periodEnd);
+      var result = await tables.loadAllLeads(function (url) { return api.get(url); }, source, period.start, period.end);
 
       tables.mountClientTable(content, {
         id: 'reportingLeadsTable',
@@ -706,11 +674,20 @@
     }
   }
 
+  // The module whose results are on screen: the execute response declares
+  // it (moduleKey). Drilldowns never guess a report.
+  function resultModuleKey() {
+    return (currentModuleConfig && currentModuleConfig.moduleKey) || selectedModuleKey || null;
+  }
+
   async function openGenericDrilldown(metricKey, metricName) {
+    var moduleKey = resultModuleKey();
+    var days = runPeriodDays;
+    if (!moduleKey || !days) {
+      Lex.Modal.alert('Details unavailable', 'Run a report first, then open its details.');
+      return;
+    }
     try {
-      var periodStart = LanaTime.utcDayStart(document.getElementById('periodStart').value);
-      var periodEnd = LanaTime.utcDayEnd(document.getElementById('periodEnd').value);
-      var moduleKey = selectedModuleKey || 'growth-intake-performance';
 
       if (!drilldownRenderer) {
         drilldownRenderer = new DrilldownRenderer();
@@ -718,8 +695,8 @@
       }
 
       await drilldownRenderer.open(moduleKey, metricKey, {
-        periodStart: periodStart,
-        periodEnd: periodEnd
+        periodStart: days.periodStart,
+        periodEnd: days.periodEnd
       });
     } catch (error) {
       console.error('Failed to open drilldown:', error);
@@ -732,22 +709,22 @@
     if (modal) modal.open = false;
   }
 
-  async function showFunnelStageDrilldown(stageInfo) {
+  // metricKey: the metric the funnel visualization declares (viz.metrics).
+  async function showFunnelStageDrilldown(stageInfo, metricKey) {
+    var moduleKey = resultModuleKey();
+    var days = runPeriodDays;
+    if (!moduleKey || !metricKey || !days) return;
     try {
       var pipelineId = stageInfo.pipeline_id;
       var position = stageInfo.position !== undefined ? stageInfo.position : 0;
-      var periodStart = document.getElementById('periodStart') ? LanaTime.utcDayStart(document.getElementById('periodStart').value) : '';
-      var periodEnd = document.getElementById('periodEnd') ? LanaTime.utcDayEnd(document.getElementById('periodEnd').value) : '';
-      var moduleKey = selectedModuleKey || 'funnel-analysis-attribution';
-
       if (!drilldownRenderer) {
         drilldownRenderer = new DrilldownRenderer();
         window.drilldownRenderer = drilldownRenderer;
       }
 
-      await drilldownRenderer.open(moduleKey, 'funnel_stage_progression', {
-        periodStart: periodStart,
-        periodEnd: periodEnd,
+      await drilldownRenderer.open(moduleKey, metricKey, {
+        periodStart: days.periodStart,
+        periodEnd: days.periodEnd,
         drill_source: stageInfo.label || '',
         pipeline_id: pipelineId || '',
         position: position
@@ -755,20 +732,13 @@
     } catch (error) {
       console.error('Failed to open funnel drilldown:', error);
       // Fallback to simple modal if DrilldownRenderer fails
-      var content = openDrilldownModal((stageInfo.pipelineName || '') + ' — ' + (stageInfo.label || 'Stage'));
+      var content = openDrilldownModal((stageInfo.pipelineName ? stageInfo.pipelineName + ': ' : '') + (stageInfo.label || 'Stage'));
       if (content) {
         content.innerHTML = '<div class="text-center py-8 text-red-600">Failed to load drilldown: ' + escapeHtml(error.message || 'Unknown error') + '</div>';
       }
     }
   }
 
-
-  function escapeHtml(text) {
-    if (!text || text === 'N/A') return text || '';
-    var div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
 
   async function tryGenericDrilldown(content, moduleKey, metricKey, periodStart, periodEnd) {
     try {
@@ -797,11 +767,12 @@
     if (!content) return;
 
     try {
-      var periodStart = LanaTime.utcDayStart(document.getElementById('periodStart').value);
-      var periodEnd = LanaTime.utcDayEnd(document.getElementById('periodEnd').value);
-      var moduleKey = selectedModuleKey || 'growth-intake-performance';
+      var days = runPeriodDays;
+      var moduleKey = resultModuleKey();
 
-      var hasGenericDrilldown = await tryGenericDrilldown(content, moduleKey, metricKey, periodStart, periodEnd);
+      var hasGenericDrilldown = moduleKey && days
+        ? await tryGenericDrilldown(content, moduleKey, metricKey, days.periodStart, days.periodEnd)
+        : false;
       if (hasGenericDrilldown) return;
 
       // Default: drill-down not available for legacy metrics
@@ -857,24 +828,24 @@
       return '<div class="mb-6"><h4 class="text-md font-semibold text-gray-900 mb-3">' + renderMarkdownInline(section.heading) + '</h4>' + contentHTML + '</div>';
     }).join('');
 
-    return '<button onclick="document.getElementById(\'' + modalId + '\').classList.remove(\'hidden\')" class="ml-2 inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors" title="Click for help understanding this chart">' +
+    return '<button type="button" data-reporting-action="show-help" data-help-modal="' + modalId + '" class="ml-2 inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors" title="Click for help understanding this chart">' +
       '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></button>' +
       '<div id="' + modalId + '" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">' +
       '<div class="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">' +
       '<div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">' +
-      '<h3 class="text-xl font-bold text-gray-900">' + (helpText.title || 'Help') + '</h3>' +
-      '<button onclick="document.getElementById(\'' + modalId + '\').classList.add(\'hidden\')" class="text-gray-400 hover:text-gray-600 transition-colors">' +
+      '<h3 class="text-xl font-bold text-gray-900">' + escapeHtml(helpText.title || 'Help') + '</h3>' +
+      '<button type="button" data-reporting-action="hide-help" data-help-modal="' + modalId + '" class="text-gray-400 hover:text-gray-600 transition-colors">' +
       '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button></div>' +
       '<div class="px-6 py-6">' + sectionsHTML + '</div>' +
       '<div class="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4">' +
-      '<button onclick="document.getElementById(\'' + modalId + '\').classList.add(\'hidden\')" class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">Got it!</button></div></div></div>';
+      '<button type="button" data-reporting-action="hide-help" data-help-modal="' + modalId + '" class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">Got it!</button></div></div></div>';
   }
 
   // ==========================================================================
   // Metric Card Rendering
   // ==========================================================================
 
-  // Per-render registry of metrics so the inline onclick info handler can look
+  // Per-render registry of metrics so the info button handler can look
   // up description/helpText without round-tripping through DOM attributes.
   var _metricInfoRegistry = Object.create(null);
 
@@ -887,6 +858,17 @@
       .replace(/'/g, '&#39;');
   }
 
+  // Admin-only edit-goal icon: deep-links to the Metric Catalog goal editor.
+  function editGoalButtonHTML(metric) {
+    if (!isReportingGoalAdmin()) return '';
+    return '<button type="button" aria-label="Edit goal" title="Edit goal" ' +
+      'data-metric-edit-goal="' + escapeHtml(metric.key) + '" ' +
+      'class="text-gray-400 hover:text-indigo-600 transition-colors">' +
+      '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">' +
+      '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>' +
+      '</svg></button>';
+  }
+
   function infoIconButtonHTML(metric) {
     if (!metric || !metric.key) return '';
     _metricInfoRegistry[metric.key] = {
@@ -894,9 +876,8 @@
       description: metric.description || '',
       helpText: metric.helpText || null
     };
-    var key = String(metric.key).split("'").join("\\'");
     return '<button type="button" aria-label="About this metric" title="About this metric" ' +
-      'onclick="window._reporting.openMetricInfo(\'' + key + '\')" ' +
+      'data-metric-info="' + escapeHtml(metric.key) + '" ' +
       'class="text-gray-400 hover:text-indigo-600 transition-colors">' +
       '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">' +
       '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>' +
@@ -914,18 +895,18 @@
 
     // 1. Description.
     if (entry.description) {
-      parts.push('<p style="margin:0 0 0.75rem 0;color:var(--lex-text-secondary,#475569);line-height:1.55;">' +
+      parts.push('<p class="reporting-info__lead">' +
         escapeHtml(entry.description) + '</p>');
     }
 
     // 2. Help text (structured).
     if (entry.helpText && Array.isArray(entry.helpText.paragraphs) && entry.helpText.paragraphs.length) {
       if (entry.helpText.title) {
-        parts.push('<h4 style="margin:0.75rem 0 0.4rem 0;font-size:0.95rem;font-weight:600;color:var(--lex-text-primary,#0f172a);">' +
+        parts.push('<h4 class="reporting-info__heading reporting-info__heading--first">' +
           escapeHtml(entry.helpText.title) + '</h4>');
       }
       for (var i = 0; i < entry.helpText.paragraphs.length; i++) {
-        parts.push('<p style="margin:0 0 0.6rem 0;color:var(--lex-text-secondary,#475569);line-height:1.55;">' +
+        parts.push('<p class="reporting-info__text">' +
           escapeHtml(entry.helpText.paragraphs[i]) + '</p>');
       }
     }
@@ -933,26 +914,26 @@
     // 3. Business logic prose (if present in the catalog entry).
     var bizLogic = detail && detail.businessLogic;
     if (bizLogic && String(bizLogic).trim().length > 0) {
-      parts.push('<h4 style="margin:1rem 0 0.4rem 0;font-size:0.95rem;font-weight:600;color:var(--lex-text-primary,#0f172a);">Business logic</h4>');
-      parts.push('<p style="margin:0 0 0.6rem 0;color:var(--lex-text-secondary,#475569);line-height:1.55;">' +
+      parts.push('<h4 class="reporting-info__heading">Business logic</h4>');
+      parts.push('<p class="reporting-info__text">' +
         escapeHtml(bizLogic) + '</p>');
     }
 
     // 4. Data sources (entities + fields).
-    parts.push('<h4 style="margin:1rem 0 0.4rem 0;font-size:0.95rem;font-weight:600;color:var(--lex-text-primary,#0f172a);">Data sources</h4>');
+    parts.push('<h4 class="reporting-info__heading">Data sources</h4>');
     if (!detail) {
-      parts.push('<p style="margin:0 0 0.6rem 0;color:var(--lex-text-muted,#94a3b8);font-style:italic;">Loading…</p>');
+      parts.push('<p class="reporting-info__muted reporting-info__muted--loading">Loading…</p>');
     } else if (Array.isArray(detail.entities) && detail.entities.length > 0) {
       for (var j = 0; j < detail.entities.length; j++) {
         var ent = detail.entities[j];
         parts.push(
-          '<div style="margin:0 0 0.55rem 0;padding:0.5rem 0.75rem;background:var(--lex-bg-secondary,#f1f5f9);border-radius:6px;">' +
-            '<div style="font-size:0.8rem;font-weight:600;color:var(--lex-text-primary,#0f172a);">' +
+          '<div class="reporting-info__entity">' +
+            '<div class="reporting-info__entity-name">' +
               escapeHtml(ent.entity_type || '(unknown entity)') +
             '</div>' +
-            (ent.description ? '<div style="font-size:0.75rem;color:var(--lex-text-secondary,#475569);margin-top:0.15rem;">' + escapeHtml(ent.description) + '</div>' : '') +
+            (ent.description ? '<div class="reporting-info__entity-desc">' + escapeHtml(ent.description) + '</div>' : '') +
             (Array.isArray(ent.fields) && ent.fields.length
-              ? '<div style="font-size:0.7rem;color:var(--lex-text-muted,#64748b);margin-top:0.3rem;font-family:var(--lex-font-mono,monospace);">' +
+              ? '<div class="reporting-info__entity-fields">' +
                 ent.fields.map(escapeHtml).join(', ') +
                 '</div>'
               : '') +
@@ -960,38 +941,38 @@
         );
       }
     } else {
-      parts.push('<p style="margin:0 0 0.6rem 0;color:var(--lex-text-muted,#94a3b8);">No data sources declared.</p>');
+      parts.push('<p class="reporting-info__muted">No data sources declared.</p>');
     }
 
     // 5. How it's calculated (calculation shape).
-    parts.push('<h4 style="margin:1rem 0 0.4rem 0;font-size:0.95rem;font-weight:600;color:var(--lex-text-primary,#0f172a);">How it\'s calculated</h4>');
+    parts.push('<h4 class="reporting-info__heading">How it\'s calculated</h4>');
     if (!detail) {
-      parts.push('<p style="margin:0;color:var(--lex-text-muted,#94a3b8);font-style:italic;">Loading…</p>');
+      parts.push('<p class="reporting-info__muted reporting-info__muted--last reporting-info__muted--loading">Loading…</p>');
     } else {
       var calc = detail.calculation || {};
       if (typeof calc.ref === 'string' && calc.ref) {
         parts.push(
-          '<p style="margin:0 0 0.4rem 0;color:var(--lex-text-secondary,#475569);">Resolves to the central registry executor:</p>' +
-          '<code style="display:block;padding:0.5rem 0.75rem;background:var(--lex-bg-secondary,#f1f5f9);border-radius:6px;font-size:0.78rem;color:var(--lex-text-primary,#0f172a);">' +
+          '<p class="reporting-info__calc-intro">Resolves to the central registry executor:</p>' +
+          '<code class="reporting-info__code">' +
             escapeHtml(calc.ref) +
           '</code>'
         );
       } else if (calc.spec && typeof calc.spec === 'object') {
         parts.push(
-          '<p style="margin:0 0 0.4rem 0;color:var(--lex-text-secondary,#475569);">Computed from an inline spec:</p>' +
-          '<pre style="margin:0;padding:0.5rem 0.75rem;background:var(--lex-bg-secondary,#f1f5f9);border-radius:6px;font-size:0.72rem;color:var(--lex-text-primary,#0f172a);white-space:pre-wrap;word-break:break-word;max-height:200px;overflow:auto;">' +
+          '<p class="reporting-info__calc-intro">Computed from an inline spec:</p>' +
+          '<pre class="reporting-info__pre">' +
             escapeHtml(JSON.stringify(calc.spec, null, 2)) +
           '</pre>'
         );
       } else if (typeof calc.query === 'string' && calc.query) {
         parts.push(
-          '<p style="margin:0 0 0.4rem 0;color:var(--lex-text-secondary,#475569);">Inline SQL query (read-only):</p>' +
-          '<pre style="margin:0;padding:0.5rem 0.75rem;background:var(--lex-bg-secondary,#f1f5f9);border-radius:6px;font-size:0.72rem;color:var(--lex-text-primary,#0f172a);white-space:pre-wrap;word-break:break-word;max-height:240px;overflow:auto;">' +
+          '<p class="reporting-info__calc-intro">Inline SQL query (read-only):</p>' +
+          '<pre class="reporting-info__pre reporting-info__pre--tall">' +
             escapeHtml(calc.query) +
           '</pre>'
         );
       } else {
-        parts.push('<p style="margin:0;color:var(--lex-text-muted,#94a3b8);">Calculation details not declared.</p>');
+        parts.push('<p class="reporting-info__muted reporting-info__muted--last">Calculation details not declared.</p>');
       }
     }
 
@@ -1049,7 +1030,7 @@
 
   function createDistributionMetricCard(metric) {
     var canvasId = 'chart-' + metric.key;
-    var statusColor = metric.status === 'error' ? 'gray' : (metric.status || 'gray');
+    var statusColor = metric.status || 'gray';
     var totalCount = 0;
     if (Array.isArray(metric.current)) {
       totalCount = metric.current.reduce(function (sum, item) { return sum + (item.count || 0); }, 0);
@@ -1058,12 +1039,12 @@
 
     return '<div class="' + statusColors.bg + ' rounded-xl shadow-sm border ' + statusColors.border + ' p-6 hover:shadow-md transition-shadow">' +
       '<div class="flex items-start justify-between mb-4"><div class="flex-1">' +
-      '<h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide">' + metric.name + '</h3>' +
+      '<h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide">' + escapeHtml(metric.name) + '</h3>' +
       '<p class="text-xs text-indigo-600 mt-2 font-medium">Click any bar to see actual leads</p></div>' +
       '<div class="flex items-center gap-2">' + infoIconButtonHTML(metric) + '</div></div>' +
       '<div class="mb-4"><p class="text-xs text-gray-500 mb-1">Total Leads</p>' +
       '<p class="text-2xl font-bold text-gray-900">' + formatNumber(totalCount, 0) + '</p></div>' +
-      '<div class="mb-4"><canvas id="' + canvasId + '" style="max-height: 250px;"></canvas></div></div>';
+      '<div class="mb-4"><canvas id="' + canvasId + '" class="reporting-chart-canvas"></canvas></div></div>';
   }
 
   // Only system_admin / org_admin may set or edit goals (same Lex.Auth source
@@ -1090,7 +1071,26 @@
     }
   }
 
+  // A result tile that names a catalog key offers Add to dashboard in its
+  // footer (DashboardTiles); the key comes from the backend, never the page.
   function createMetricCard(metric) {
+    return renderMetricCardBody(metric);
+  }
+
+  function metricCardContext(metric) {
+    return {
+      goalPeriod: (document.getElementById('periodType') || {}).value || 'monthly',
+      footerStart: infoIconButtonHTML(metric) + editGoalButtonHTML(metric),
+      footerEnd: metric.catalogKey
+        ? '<lex-btn variant="ghost" size="sm" data-add-to-dashboard="' + escapeHtml(metric.catalogKey)
+          + '" data-metric-name="' + escapeHtml(metric.name || '') + '">Add to dashboard</lex-btn>'
+        : ''
+    };
+  }
+
+  function renderMetricCardBody(metric) {
+    // Any tile whose result is not ok shows the shared state block.
+    if (window.DataState.isProblem(metric)) return window.ReportMetricCard.render(metric, metricCardContext(metric));
     var intake = window.OpportunityIntakePresentation && window.OpportunityIntakePresentation.renderCard(metric);
     if (intake) return intake;
     var acquisition = window.AcquisitionSourcePresentation && window.AcquisitionSourcePresentation.renderCard(metric);
@@ -1101,162 +1101,7 @@
       return createDistributionMetricCard(metric);
     }
 
-    // Resolve the metric's display type from its format (object { type } or a
-    // string) or the legacy type/unit fields, so values render by type
-    // (currency, percentage, days) with comma grouping, not just currency-vs-number.
-    var fmtTypeRaw = (metric.format && typeof metric.format === 'object') ? (metric.format.type || metric.format.style) : metric.format;
-    var fmtType = String(fmtTypeRaw || metric.type || '').toLowerCase();
-    var isCurrency = fmtType === 'currency' || fmtType === 'currency_breakdown' || metric.type === 'currency' || metric.unit === 'dollars';
-    var isPercentage = fmtType === 'percentage' || fmtType === 'percent' || metric.type === 'percentage' || metric.unit === 'percent' || metric.unit === '%';
-    var isDays = fmtType === 'days' || metric.type === 'days' || metric.unit === 'days';
-
-    var fmtCurrency = function (value) {
-      if (value === null || value === undefined || isNaN(value)) return 'N/A';
-      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
-    };
-
-    // Prior and Target now flow from the backend-provided goal/comparison blocks
-    // (METRIC_GOALS_DESIGN.md sections 7 and 11). The metric layer owns the
-    // status band and the prior value; the mapper degrades onto the flat fields
-    // when a block is absent so older payloads keep rendering.
-    var vm = ReportingGoalComparisonMapper.buildGoalComparisonViewModel(metric);
-
-    var fmtValue = function (value) {
-      if (value === null || value === undefined || isNaN(value)) return 'N/A';
-      if (isCurrency) return fmtCurrency(value);
-      if (isPercentage) return formatPercentage(value, 1);
-      if (isDays) return formatNumber(value, 1) + (Number(value) === 1 ? ' day' : ' days');
-      return formatNumber(value, 0);
-    };
-
-    var currentValue = (metric.current !== null && metric.current !== undefined && !isNaN(metric.current))
-      ? fmtValue(metric.current)
-      : (metric.formattedCurrent || 'N/A');
-
-    var priorValue = vm.hasComparison
-      ? fmtValue(vm.priorValue)
-      : ((metric.prior !== null && metric.prior !== undefined)
-          ? fmtValue(metric.prior)
-          : (metric.formattedPrior || 'N/A'));
-
-    var statusColor = vm.statusColor;
-    // Direction drives the comparison arrow; prefer the comparison block.
-    var changeDirection = vm.changeDirection;
-    var upColor = metric.invertTrend ? 'text-red-600' : 'text-green-600';
-    var downColor = metric.invertTrend ? 'text-green-600' : 'text-red-600';
-
-    var changeArrow;
-    if (changeDirection === 'up') {
-      changeArrow = '<svg class="w-4 h-4 ' + upColor + '" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>';
-    } else if (changeDirection === 'down') {
-      changeArrow = '<svg class="w-4 h-4 ' + downColor + '" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>';
-    } else {
-      changeArrow = '<svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14"></path></svg>';
-    }
-
-    // Direction is purely numeric; invertTrend decides whether up/down is good
-    // or bad for the % Change coloring.
-    var isUp = changeDirection === 'up';
-    var isDown = changeDirection === 'down';
-
-    var changeColor;
-    if (metric.invertTrend) {
-      changeColor = isUp ? 'text-red-600' : isDown ? 'text-green-600' : 'text-gray-600';
-    } else {
-      changeColor = isUp ? 'text-green-600' : isDown ? 'text-red-600' : 'text-gray-600';
-    }
-
-    var statusColors = getStatusColors(statusColor);
-
-    // Drilldown button
-    var drilldownBtn = '';
-    if (metric.hasDrilldown === true) {
-      drilldownBtn = '<button onclick="window._reporting.openGenericDrilldown(\'' + metric.key + '\', \'' + metric.name + '\')" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 transition-colors whitespace-nowrap" title="View detailed data breakdown">' +
-        '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>Details</button>';
-    } else if (metric.hasDrilldown !== false) {
-      drilldownBtn = '<button onclick="window._reporting.showMetricDrilldown(\'' + metric.key + '\', \'' + metric.name + '\')" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 transition-colors whitespace-nowrap" title="View details">' +
-        '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>Details</button>';
-    }
-
-    // Period qualifier on the goal reflects the report's Compare By (the period
-    // the goal is evaluated at).
-    var goalPeriod = (document.getElementById('periodType') || {}).value || 'monthly';
-
-    // % Change cell: arrow + percent from the comparison block; em dash when
-    // there is no prior snapshot to compare against.
-    var pctChangeCell = (vm.hasComparison && vm.percentChange !== null)
-      ? '<span class="inline-flex items-center gap-1 ' + changeColor + '">' + changeArrow + formatPercentage(Math.abs(vm.percentChange), 1) + '</span>'
-      : '<span class="text-gray-400">—</span>';
-
-    // Goal(s) cell: resolved goal target + period qualifier; falls back to a flat
-    // configured target (no period) and em dash when neither exists.
-    var goalCell;
-    if (vm.hasGoal && vm.targetValue !== null) {
-      goalCell = fmtValue(vm.targetValue) + ' <span class="text-xs font-normal text-gray-400">(' + goalPeriod + ')</span>';
-    } else if (metric.target !== null && metric.target !== undefined) {
-      goalCell = fmtValue(metric.target);
-    } else {
-      goalCell = '—';
-    }
-
-    // Percent to Goal: backend attainment when a goal block exists; otherwise
-    // current / target client-side so flat-target cards still show progress.
-    var goalNumeric = (vm.hasGoal && isFinite(Number(vm.targetValue))) ? Number(vm.targetValue)
-      : ((metric.target !== null && metric.target !== undefined && isFinite(Number(metric.target))) ? Number(metric.target) : null);
-    var currentNumeric = (metric.current !== null && metric.current !== undefined && isFinite(Number(metric.current))) ? Number(metric.current) : null;
-    var pctToGoalNum = (vm.hasGoal && vm.attainmentPct !== null) ? vm.attainmentPct
-      : ((goalNumeric && goalNumeric !== 0 && currentNumeric !== null) ? (currentNumeric / goalNumeric * 100) : null);
-    var percentToGoalText = (pctToGoalNum !== null && isFinite(pctToGoalNum)) ? formatNumber(pctToGoalNum, 0) + '%' : '—';
-    // Percent to Goal: a +/- icon shows at/over (+) vs under (-) the goal
-    // (relative to 100% attainment); the value is tinted by the goal status band
-    // (inverse-aware via the backend status). Neutral dash when nothing to compare.
-    var pctToGoalCell;
-    if (pctToGoalNum !== null && isFinite(pctToGoalNum)) {
-      var goalIconPath = pctToGoalNum >= 100 ? 'M12 4v16m8-8H4' : 'M20 12H4';
-      var goalIcon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="' + goalIconPath + '"></path></svg>';
-      pctToGoalCell = '<span class="inline-flex items-center gap-1 ' + statusColors.text + '">' + goalIcon + percentToGoalText + '</span>';
-    } else {
-      pctToGoalCell = '<span class="text-gray-400">—</span>';
-    }
-
-    // Admin-only edit-goal icon: deep-links to the Metric Catalog goal editor.
-    var editGoalBtn = '';
-    if (isReportingGoalAdmin()) {
-      var egk = String(metric.key).split("'").join("\\'");
-      editGoalBtn = '<button type="button" aria-label="Edit goal" title="Edit goal" ' +
-        'onclick="window._reporting.editMetricGoal(\'' + egk + '\')" ' +
-        'class="text-gray-400 hover:text-indigo-600 transition-colors">' +
-        '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">' +
-        '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>' +
-        '</svg></button>';
-    }
-
-    return '<div data-metric-card class="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow" style="position:relative;padding:24px 24px 56px 24px;">' +
-      // Header: title (auto-fit, up to 2 lines, 14px -> 10px)
-      '<div class="mb-4"><div class="flex items-start justify-between gap-2">' +
-      '<h3 data-fit-text="14:10:2" class="font-medium text-gray-500 uppercase tracking-wide flex-1 min-w-0" style="font-size:14px;line-height:1.2;">' + metric.name + '</h3>' +
-      '</div></div>' +
-      // Current period value (auto-fit, 1 line, 30px -> 14px)
-      '<div class="mb-4"><div class="flex items-center justify-between mb-1"><p class="text-xs text-gray-500">Current Period</p></div>' +
-      '<p data-fit-text="30:14:1" class="font-bold text-gray-900" style="font-size:30px;line-height:1.1;white-space:nowrap;overflow:hidden;">' + currentValue + '</p></div>' +
-      // Row 1: Prior Period | % Change (bottom border doubles as the divider).
-      '<div class="grid grid-cols-2 gap-4 text-sm mb-4 pb-4 border-b border-gray-100">' +
-      '<div><p class="text-xs text-gray-500 mb-1">Prior Period</p>' +
-      '<p data-fit-text="16:11:1" class="font-semibold text-gray-700" style="font-size:16px;line-height:1.2;white-space:nowrap;overflow:hidden;">' + priorValue + '</p></div>' +
-      '<div><p class="text-xs text-gray-500 mb-1">% Change</p>' +
-      '<p class="font-semibold" style="font-size:16px;line-height:1.2;">' + pctChangeCell + '</p></div>' +
-      '</div>' +
-      // Row 2: Goal(s) | Percent to Goal.
-      '<div class="grid grid-cols-2 gap-4 text-sm">' +
-      '<div><p class="text-xs text-gray-500 mb-1">Goal(s)</p>' +
-      '<p data-fit-text="16:11:1" class="font-semibold text-gray-700" style="font-size:16px;line-height:1.2;white-space:nowrap;overflow:hidden;">' + goalCell + '</p></div>' +
-      '<div><p class="text-xs text-gray-500 mb-1">Percent to Goal</p>' +
-      '<p class="font-semibold" style="font-size:16px;line-height:1.2;">' + pctToGoalCell + '</p></div>' +
-      '</div>' +
-      // Footer: pinned to card bottom-left / bottom-right with 12px insets.
-      '<div style="position:absolute;left:12px;right:12px;bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">' +
-      '<div class="flex items-center gap-2">' + infoIconButtonHTML(metric) + editGoalBtn + '</div>' +
-      '<div>' + drilldownBtn + '</div></div></div>';
+    return window.ReportMetricCard.render(metric, metricCardContext(metric));
   }
 
   // Generic shrink-to-fit: walks every element with `data-fit-text="MAX:MIN:LINES"`
@@ -1327,70 +1172,121 @@
         });
       }
 
-      // Auto-select first available module
-      var firstAvailable = allModules.find(function (m) { return m.available; });
-      if (firstAvailable && !selectedImportedReportId) {
-        selectModule(firstAvailable.moduleKey);
-      }
-      renderReportSelect();
+      renderReportsList();
+      openReportFromUrl();
 
     } catch (error) {
       console.error('[Reporting] Failed to load modules:', error);
-      var select = document.getElementById('reportModuleSelect');
-      if (select) select.placeholder = 'Failed to load reports. Please refresh.';
+      showError('Reports could not load. Please refresh the page.');
     }
   }
 
   // ==========================================================================
-  // Report Picker (searchable dropdown of modules + imported reports)
+  // Reports list (first view). Rows come from the report catalog and saved
+  // reports (ReportsList); picking one opens its period and compare controls.
   // ==========================================================================
 
-  function currentReportSelectValue() {
-    if (selectedImportedReportId) return 'report:' + selectedImportedReportId;
-    if (selectedModuleKey) return 'module:' + selectedModuleKey;
-    return '';
+  var reportsListBound = false;
+
+  function reportsListRenderers() {
+    return {
+      name: function (value, row) {
+        return '<div class="reporting-list__name">' + escapeHtml(value)
+          + (row.saved ? ' <lex-badge label="Saved copy" color="gray"></lex-badge>' : '') + '</div>';
+      },
+      purpose: function (value) {
+        return value ? escapeHtml(value) : '<span class="reporting-list__muted">No description</span>';
+      },
+      audience: function (value) {
+        return value ? escapeHtml(value) : '<span class="reporting-list__muted">Anyone</span>';
+      },
+      last_run_at: function (value) {
+        var text = value ? LanaTime.timeAgo(value, { style: 'words' }) : '';
+        return text
+          ? '<time datetime="' + escapeHtml(value) + '">' + escapeHtml(text) + '</time>'
+          : '<span class="reporting-list__muted">Not run yet</span>';
+      }
+    };
   }
 
-  function renderReportSelect() {
-    var select = document.getElementById('reportModuleSelect');
-    if (!select) return;
-
-    var options = [];
-
-    var modulesByCategory = {};
-    allModules.forEach(function (module) {
-      var cat = module.category || 'other';
-      if (!modulesByCategory[cat]) modulesByCategory[cat] = [];
-      modulesByCategory[cat].push(module);
-    });
-    Object.keys(modulesByCategory).sort().forEach(function (category) {
-      modulesByCategory[category].forEach(function (module) {
-        options.push({
-          value: 'module:' + module.moduleKey,
-          label: module.name,
-          description: module.available ? '' : 'Requires connectors',
-          group: moduleCategories[category] || category,
-          disabled: !module.available
-        });
+  function renderReportsList() {
+    var table = document.getElementById('reportsListTable');
+    if (!table || typeof table.setData !== 'function') return;
+    if (!reportsListBound) {
+      reportsListBound = true;
+      table.setCellRenderers(reportsListRenderers());
+      table._getSearchColumns = function () { return ['name', 'purpose', 'audience']; };
+      table.addEventListener('row-click', function (event) {
+        var row = event.detail && event.detail.row;
+        if (row) openReport(row);
       });
-    });
+      var search = document.getElementById('reportsListSearch');
+      if (search) {
+        var runSearch = function (event) {
+          var value = event && event.detail && event.detail.value !== undefined ? event.detail.value : search.value;
+          if (table.dataSource) table.dataSource.setSearch(String(value || '').trim());
+        };
+        search.addEventListener('lex-input', runSearch);
+        search.addEventListener('lex-change', runSearch);
+      }
+    }
+    var entries = ReportsList.buildReportEntries(allModules, importedReports);
+    table.setData(entries);
+    var count = document.getElementById('reportsListCount');
+    if (count) count.textContent = entries.length + (entries.length === 1 ? ' report' : ' reports');
+  }
 
-    var reportsByCategory = {};
-    importedReports.forEach(function (report) {
-      var cat = report.category || 'other';
-      if (!reportsByCategory[cat]) reportsByCategory[cat] = [];
-      reportsByCategory[cat].push(report);
-    });
-    Object.keys(reportsByCategory).sort().forEach(function (cat) {
-      reportsByCategory[cat].forEach(function (report) {
-        options.push({ value: 'report:' + report.report_id, label: report.name, group: 'Imported' });
-      });
-    });
+  function findReportEntry(id) {
+    return ReportsList.buildReportEntries(allModules, importedReports).find(function (entry) { return entry.id === id; });
+  }
 
-    select.placeholder = options.length ? 'Select a report...' : 'No reports available';
-    select.options = options;
-    select.value = currentReportSelectValue();
-    syncDeleteReportButton();
+  // A link such as a dashboard tile opens one report directly (?report=<key>).
+  function openReportFromUrl() {
+    var key = new URLSearchParams(window.location.search).get('report');
+    if (!key) return;
+    var entry = findReportEntry('module:' + key);
+    if (entry) openReport(entry, { keepUrl: true });
+  }
+
+  function setReportUrl(key) {
+    if (!window.history || typeof window.history.replaceState !== 'function') return;
+    var url = new URL(window.location.href);
+    if (key) url.searchParams.set('report', key);
+    else url.searchParams.delete('report');
+    window.history.replaceState(window.history.state, '', url.toString());
+  }
+
+  function openReport(entry, opts) {
+    if (entry.kind === 'saved') selectImportedReport(entry.key);
+    else selectModule(entry.key);
+
+    var nameEl = document.getElementById('selectedReportName');
+    var purposeEl = document.getElementById('selectedReportPurpose');
+    var savedBadge = document.getElementById('selectedReportSavedBadge');
+    if (nameEl) nameEl.textContent = entry.name;
+    if (purposeEl) purposeEl.textContent = entry.purpose || '';
+    if (savedBadge) savedBadge.hidden = !entry.saved;
+
+    var results = document.getElementById('moduleResults');
+    var placeholder = document.getElementById('reportingPlaceholder');
+    if (results) results.style.display = 'none';
+    if (placeholder) placeholder.style.display = '';
+    hideInfo();
+    hideError();
+
+    document.getElementById('reportsListSection').hidden = true;
+    document.getElementById('reportingLayout').hidden = false;
+    if (entry.kind !== 'saved' && !(opts && opts.keepUrl)) setReportUrl(entry.key);
+  }
+
+  function showReportsList() {
+    selectedModuleKey = null;
+    selectedImportedReportId = null;
+    document.getElementById('reportingLayout').hidden = true;
+    document.getElementById('reportsListSection').hidden = false;
+    setReportUrl(null);
+    // Reload so a report just run shows its new last run time.
+    loadModules();
   }
 
   function selectModule(moduleKey) {
@@ -1413,18 +1309,10 @@
   }
 
   function initReportSelect() {
-    var select = document.getElementById('reportModuleSelect');
-    if (select && !select.dataset.bound) {
-      select.dataset.bound = 'true';
-      select.addEventListener('lex-change', function (e) {
-        var value = (e.detail && e.detail.value) || '';
-        if (value === currentReportSelectValue()) return;
-        if (value.indexOf('module:') === 0) {
-          selectModule(value.slice('module:'.length));
-        } else if (value.indexOf('report:') === 0) {
-          selectImportedReport(value.slice('report:'.length));
-        }
-      });
+    var backBtn = document.getElementById('backToReportsBtn');
+    if (backBtn && !backBtn.dataset.bound) {
+      backBtn.dataset.bound = 'true';
+      backBtn.addEventListener('click', showReportsList);
     }
 
     var deleteBtn = document.getElementById('deleteImportedReportBtn');
@@ -1605,8 +1493,8 @@
     var canvasId = 'chart-' + uniqueId;
     var helpTextHTML = renderHelpTextModal(viz.helpText, uniqueId);
 
-    div.innerHTML = '<div class="flex items-center mb-2"><h3 class="text-lg font-semibold text-gray-900">' + (viz.title || 'Metrics Over Time') + '</h3>' + helpTextHTML + '</div>' +
-      (viz.description ? '<p class="text-sm text-gray-600 mb-4">' + viz.description + '</p>' : '') +
+    div.innerHTML = '<div class="flex items-center mb-2"><h3 class="text-lg font-semibold text-gray-900">' + escapeHtml(viz.title || 'Metrics Over Time') + '</h3>' + helpTextHTML + '</div>' +
+      (viz.description ? '<p class="text-sm text-gray-600 mb-4">' + escapeHtml(viz.description) + '</p>' : '') +
       '<div class="h-96"><canvas id="' + canvasId + '"></canvas></div>';
 
     setTimeout(function () {
@@ -1635,7 +1523,7 @@
     var description = viz.description || 'Compare how your metrics changed from the previous period to now.';
 
     div.innerHTML = '<div class="mb-4"><div class="flex items-center justify-between mb-2"><div class="flex items-center">' +
-      '<h3 class="text-lg font-semibold text-gray-900">' + (viz.title || 'Current vs Prior Period') + '</h3>' + helpTextHTML + '</div></div>' +
+      '<h3 class="text-lg font-semibold text-gray-900">' + escapeHtml(viz.title || 'Current vs Prior Period') + '</h3>' + helpTextHTML + '</div></div>' +
       '<p class="text-sm text-gray-600 leading-relaxed">' + description + '</p>' +
       '<div class="flex items-center gap-6 mt-3 text-xs">' +
       '<div class="flex items-center gap-2"><div class="w-3 h-3 rounded bg-blue-500"></div><span class="text-gray-600">Current Period (Now)</span></div>' +
@@ -1734,8 +1622,8 @@
     containerDiv.className = 'mb-6';
 
     if (metric.current.length === 0) {
-      containerDiv.innerHTML = '<div class="bg-white rounded-lg shadow p-6"><h3 class="text-lg font-semibold mb-2">' + (viz.title || 'Distribution') + '</h3>' +
-        (viz.description ? '<p class="text-sm text-gray-600 mb-4">' + viz.description + '</p>' : '') +
+      containerDiv.innerHTML = '<div class="bg-white rounded-lg shadow p-6"><h3 class="text-lg font-semibold mb-2">' + escapeHtml(viz.title || 'Distribution') + '</h3>' +
+        (viz.description ? '<p class="text-sm text-gray-600 mb-4">' + escapeHtml(viz.description) + '</p>' : '') +
         '<div class="text-center py-12 text-gray-500"><p class="mt-2 text-sm">No data available for this period</p></div></div>';
       return containerDiv;
     }
@@ -1766,7 +1654,7 @@
     var renderer = new FunnelChartRenderer(containerId, metric.current, {
       title: viz.title || 'Funnel Chart', description: viz.description, helpText: viz.helpText,
       onStageClick: function (stageInfo) {
-        showFunnelStageDrilldown(stageInfo);
+        showFunnelStageDrilldown(stageInfo, metric.key);
       },
       onTabSwitch: function (tabInfo) {
         var insightContainer = document.getElementById('funnel-insights-container');
@@ -1890,7 +1778,7 @@
       }
       divider.innerHTML = '<h4 class="text-sm font-semibold text-gray-700 mb-1">Cross-Pipeline Tag Insights</h4>' +
         '<p class="text-xs text-gray-500 mb-3">Tag conversion rates across all pipelines combined</p>' +
-        (allCrossZero ? '<p class="text-xs text-amber-600 mb-3">All conversion rates are 0% \u2014 the won leads\' contacts don\'t have any of these tags assigned in your CRM.</p>' : '');
+        (allCrossZero ? '<p class="text-xs text-amber-600 mb-3">All conversion rates are 0%. The contacts on your won leads don\'t have any of these tags in your CRM.</p>' : '');
       divider.appendChild(buildTagTable(crossTagRows, 'win_rate', 10));
       card.appendChild(divider);
     }
@@ -1907,7 +1795,7 @@
     var panel = document.createElement('div');
     panel.className = 'rounded-lg border border-gray-100 p-4';
 
-    var ruleDesc = '<p class="text-xs text-gray-400 mt-1">Flags open leads that haven\'t moved to a new stage in 30+ days (30\u201360, 60\u201390, or 90+ day buckets).</p>';
+    var ruleDesc = '<p class="text-xs text-gray-400 mt-1">Flags open leads that haven\'t moved to a new stage in 30+ days (30 to 60, 60 to 90, or 90+ day buckets).</p>';
 
     if (rows.length === 0) {
       panel.innerHTML = '<div class="flex items-start gap-3">' +
@@ -2017,7 +1905,7 @@
 
     panel.innerHTML = headerHtml +
       '<p class="text-sm text-gray-500 mt-0.5">Tags that correlate with winning deals</p>' +
-      (allZero ? '<p class="text-xs text-amber-600 mt-1">All conversion rates are 0% \u2014 the won leads\' contacts don\'t have any of these tags assigned in your CRM.</p>' : '') +
+      (allZero ? '<p class="text-xs text-amber-600 mt-1">All conversion rates are 0%. The contacts on your won leads don\'t have any of these tags in your CRM.</p>' : '') +
       '</div></div>';
 
     panel.appendChild(buildTagTable(rows, 'win_rate', 8));
@@ -2046,7 +1934,7 @@
         '<td class="px-3 py-2 text-gray-900">' + escapeHtml(row.label || '') + '</td>' +
         '<td class="px-3 py-2 text-right text-gray-600">' + (parseInt(row.value) || 0).toLocaleString() + '</td>' +
         '<td class="px-3 py-2 text-right font-medium ' + textColor + '">' + winRate + '%</td>' +
-        '<td class="px-3 py-2"><div class="w-full bg-gray-200 rounded-full h-2"><div class="' + barColor + ' h-2 rounded-full" style="width: ' + Math.min(winRate, 100) + '%"></div></div></td></tr>';
+        '<td class="px-3 py-2"><div class="w-full bg-gray-200 rounded-full h-2"><div class="' + barColor + ' h-2 rounded-full reporting-bar" style="--bar: ' + Math.min(winRate, 100) + '%"></div></div></td></tr>';
     }
 
     html += '</tbody></table>';
@@ -2085,7 +1973,7 @@
       barRow.className = 'flex items-center gap-3';
       barRow.innerHTML =
         '<div class="w-48 text-sm text-gray-700 truncate" title="' + escapeHtml(row.label || '') + '">' + escapeHtml(row.label || '') + '</div>' +
-        '<div class="flex-1 bg-gray-200 rounded-full h-2.5"><div class="' + barColor + ' h-2.5 rounded-full" style="width: ' + Math.min(winRate, 100) + '%"></div></div>' +
+        '<div class="flex-1 bg-gray-200 rounded-full h-2.5"><div class="' + barColor + ' h-2.5 rounded-full reporting-bar" style="--bar: ' + Math.min(winRate, 100) + '%"></div></div>' +
         '<div class="w-24 text-right text-xs text-gray-500">' + winRate + '% (' + wonCount + '/' + decidedCount + ')</div>';
       barsDiv.appendChild(barRow);
     }
@@ -2113,8 +2001,8 @@
     containerDiv.className = 'mb-6';
 
     if (chartData.length === 0) {
-      containerDiv.innerHTML = '<div class="bg-white rounded-lg shadow p-6"><h3 class="text-lg font-semibold mb-2">' + (viz.title || 'Chart') + '</h3>' +
-        (viz.description ? '<p class="text-sm text-gray-600 mb-4">' + viz.description + '</p>' : '') +
+      containerDiv.innerHTML = '<div class="bg-white rounded-lg shadow p-6"><h3 class="text-lg font-semibold mb-2">' + escapeHtml(viz.title || 'Chart') + '</h3>' +
+        (viz.description ? '<p class="text-sm text-gray-600 mb-4">' + escapeHtml(viz.description) + '</p>' : '') +
         '<div class="text-center py-12 text-gray-500"><p class="mt-2 text-sm">No data available for this period</p></div></div>';
       return containerDiv;
     }
@@ -2139,223 +2027,198 @@
     return containerDiv;
   }
 
-  function renderAttributionSummary(viz, data, uniqueId) {
-    var metricKeys = viz.metrics || [];
-    var metricsMap = {};
-    for (var i = 0; i < metricKeys.length; i++) {
-      var key = metricKeys[i];
-      for (var j = 0; j < data.metrics.length; j++) {
-        if (data.metrics[j].key === key) {
-          metricsMap[key] = Array.isArray(data.metrics[j].current) ? data.metrics[j].current : [];
-          break;
-        }
-      }
-      if (!metricsMap[key]) metricsMap[key] = [];
-    }
+  // Attribution summary: the visualization declares its sections
+  // (sections: [{ role, metric }]). The role picks the layout below; the
+  // metric comes from the execute response by the declared key.
+  function attributionSectionHTML(title, note, body) {
+    return '<div class="mb-8">' +
+      '<h4 class="text-base font-semibold text-gray-700 mb-1">' + escapeHtml(title) + '</h4>' +
+      '<p class="text-xs text-gray-400 mb-3">' + escapeHtml(note) + '</p>' + body + '</div>';
+  }
 
-    var container = document.createElement('div');
-    container.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
+  function winRateBadgeColor(rate) {
+    return rate >= 40 ? 'bg-green-100 text-green-800' : (rate >= 20 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800');
+  }
 
-    var headerHTML = '<div class="mb-6">' +
-      '<h3 class="text-lg font-semibold text-gray-900">' + (viz.title || 'Attribution Insights') + '</h3>' +
-      (viz.description ? '<p class="text-sm text-gray-500 mt-1">' + viz.description + '</p>' : '') +
-      '</div>';
-
-    // Section 1: Lead Journey Paths
-    var multiTouchData = metricsMap['attribution_multi_touch_analysis'] || [];
-    var journeyData = metricsMap['attribution_lead_journeys'] || [];
-
-    // Build insight sentence from multi-touch data
-    var totalAttrLeads = 0;
+  function renderMultiTouchBody(rows) {
+    var total = 0;
     var multiLeads = 0;
     var multiConv = 0;
     var singleConv = 0;
-    for (var mt = 0; mt < multiTouchData.length; mt++) {
-      var mtRow = multiTouchData[mt];
-      var mtCount = parseInt(mtRow.value) || 0;
-      totalAttrLeads += mtCount;
-      if (mtRow.label === 'Single Touch') {
-        singleConv = parseFloat(mtRow.win_rate) || 0;
+    for (var i = 0; i < rows.length; i++) {
+      var count = parseInt(rows[i].value) || 0;
+      total += count;
+      if (rows[i].label === 'Single Touch') {
+        singleConv = parseFloat(rows[i].win_rate) || 0;
       } else {
-        multiLeads += mtCount;
-        multiConv = parseFloat(mtRow.win_rate) || 0;
+        multiLeads += count;
+        multiConv = parseFloat(rows[i].win_rate) || 0;
       }
     }
-    var multiPct = totalAttrLeads > 0 ? Math.round(100 * multiLeads / totalAttrLeads) : 0;
+    if (total === 0) return '<p class="text-sm text-gray-400">No multi-touch data available.</p>';
+    var multiPct = Math.round(100 * multiLeads / total);
+    return '<div class="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3">' +
+      '<p class="text-sm text-blue-800">' +
+      '<span class="font-semibold">' + multiPct + '%</span> of leads had 2+ marketing touchpoints. ' +
+      'Multi-touch: <span class="font-semibold">' + multiConv + '%</span> conversion · ' +
+      'Single-touch: <span class="font-semibold">' + singleConv + '%</span> conversion' +
+      '</p></div>';
+  }
 
-    var multiTouchHTML = '<div class="mb-8">' +
-      '<h4 class="text-base font-semibold text-gray-700 mb-1">Lead Journey Paths</h4>' +
-      '<p class="text-xs text-gray-400 mb-3">Across all pipelines \u2014 shows first \u2192 last marketing channel for each lead</p>';
-
-    // Insight banner
-    if (totalAttrLeads > 0) {
-      multiTouchHTML += '<div class="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 mb-4">' +
-        '<p class="text-sm text-blue-800">' +
-        '<span class="font-semibold">' + multiPct + '%</span> of leads had 2+ marketing touchpoints. ' +
-        'Multi-touch: <span class="font-semibold">' + multiConv + '%</span> conversion · ' +
-        'Single-touch: <span class="font-semibold">' + singleConv + '%</span> conversion' +
-        '</p></div>';
+  function renderJourneysBody(rows) {
+    if (rows.length === 0) return '<p class="text-sm text-gray-400">No journey path data available.</p>';
+    var html = '<div class="overflow-hidden rounded-lg border border-gray-200">' +
+      '<table class="w-full text-sm"><thead><tr class="bg-gray-50 border-b border-gray-200">' +
+      '<th class="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase">Journey (First → Last)</th>' +
+      '<th class="text-center px-3 py-2 text-xs font-medium text-gray-500 uppercase">Type</th>' +
+      '<th class="text-right px-3 py-2 text-xs font-medium text-gray-500 uppercase">Leads</th>' +
+      '<th class="text-right px-3 py-2 text-xs font-medium text-gray-500 uppercase">Won</th>' +
+      '<th class="text-right px-3 py-2 text-xs font-medium text-gray-500 uppercase">Conversion</th>' +
+      '</tr></thead><tbody>';
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var conv = parseFloat(row.win_rate) || 0;
+      var convColor = conv >= 40 ? 'text-green-700' : (conv >= 20 ? 'text-yellow-700' : 'text-red-600');
+      var convBg = conv >= 40 ? 'bg-green-50 text-green-700' : (conv >= 20 ? 'bg-yellow-50 text-yellow-700' : '');
+      var typeBadge = row.journey_type === 'single'
+        ? '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">Single</span>'
+        : '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Multi</span>';
+      html += '<tr class="border-b border-gray-100 ' + (i % 2 === 0 ? '' : 'bg-gray-50') + '">' +
+        '<td class="px-3 py-2 text-gray-900">' + escapeHtml(row.label || '') + '</td>' +
+        '<td class="px-3 py-2 text-center">' + typeBadge + '</td>' +
+        '<td class="px-3 py-2 text-right text-gray-600">' + (parseInt(row.value) || 0).toLocaleString() + '</td>' +
+        '<td class="px-3 py-2 text-right text-gray-600">' + (parseInt(row.won_count) || 0) + '</td>' +
+        '<td class="px-3 py-2 text-right font-medium ' + convColor + '">' +
+        (convBg ? '<span class="px-2 py-0.5 rounded ' + convBg + '">' + conv + '%</span>' : conv + '%') +
+        '</td></tr>';
     }
+    return html + '</tbody></table></div>';
+  }
 
-    // Journey paths table
-    if (journeyData.length === 0) {
-      multiTouchHTML += '<p class="text-sm text-gray-400">No journey path data available.</p>';
-    } else {
-      multiTouchHTML += '<div class="overflow-hidden rounded-lg border border-gray-200">' +
-        '<table class="w-full text-sm"><thead><tr class="bg-gray-50 border-b border-gray-200">' +
-        '<th class="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase">Journey (First \u2192 Last)</th>' +
-        '<th class="text-center px-3 py-2 text-xs font-medium text-gray-500 uppercase">Type</th>' +
-        '<th class="text-right px-3 py-2 text-xs font-medium text-gray-500 uppercase">Leads</th>' +
-        '<th class="text-right px-3 py-2 text-xs font-medium text-gray-500 uppercase">Won</th>' +
-        '<th class="text-right px-3 py-2 text-xs font-medium text-gray-500 uppercase">Conversion</th>' +
-        '</tr></thead><tbody>';
-      for (var jd = 0; jd < journeyData.length; jd++) {
-        var jRow = journeyData[jd];
-        var jConv = parseFloat(jRow.win_rate) || 0;
-        var jConvColor = jConv >= 40 ? 'text-green-700' : (jConv >= 20 ? 'text-yellow-700' : 'text-red-600');
-        var jConvBg = jConv >= 40 ? 'bg-green-50 text-green-700' : (jConv >= 20 ? 'bg-yellow-50 text-yellow-700' : '');
-        var jType = jRow.journey_type === 'single' ? 'Single' : 'Multi';
-        var jTypeBadge = jRow.journey_type === 'single'
-          ? '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">Single</span>'
-          : '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Multi</span>';
-        var bgRow = jd % 2 === 0 ? '' : 'bg-gray-50';
-        multiTouchHTML += '<tr class="border-b border-gray-100 ' + bgRow + '">' +
-          '<td class="px-3 py-2 text-gray-900">' + escapeHtml(jRow.label || '') + '</td>' +
-          '<td class="px-3 py-2 text-center">' + jTypeBadge + '</td>' +
-          '<td class="px-3 py-2 text-right text-gray-600">' + (parseInt(jRow.value) || 0).toLocaleString() + '</td>' +
-          '<td class="px-3 py-2 text-right text-gray-600">' + (parseInt(jRow.won_count) || 0) + '</td>' +
-          '<td class="px-3 py-2 text-right font-medium ' + jConvColor + '">' +
-          (jConvBg ? '<span class="px-2 py-0.5 rounded ' + jConvBg + '">' + jConv + '%</span>' : jConv + '%') +
-          '</td></tr>';
-      }
-      multiTouchHTML += '</tbody></table></div>';
+  function touchColumnHTML(heading, rows, barClass) {
+    var max = rows.length > 0 ? parseFloat(rows[0].value) || 1 : 1;
+    var html = '<div><h5 class="text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">' + heading + '</h5><div class="space-y-2">';
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var pct = Math.round((parseFloat(row.value) / max) * 100);
+      html += '<div class="flex items-center gap-3">' +
+        '<div class="w-28 text-sm text-gray-700 truncate" title="' + escapeHtml(row.channel || '') + '">' + escapeHtml(row.channel || 'Unknown') + '</div>' +
+        '<div class="flex-1 bg-gray-100 rounded-full h-5 relative">' +
+        '<div class="' + barClass + ' h-5 rounded-full reporting-bar" style="--bar: ' + pct + '%"></div>' +
+        '</div>' +
+        '<div class="w-12 text-sm text-gray-600 text-right">' + escapeHtml(row.value || 0) + '</div>' +
+        '<div class="w-14 text-xs text-gray-400 text-right">' + escapeHtml(row.win_rate || 0) + '%</div>' +
+        '</div>';
     }
-    multiTouchHTML += '</div>';
+    return html + '</div></div>';
+  }
 
-    // Section 2: First Touch vs Last Touch
-    var touchData = metricsMap['attribution_first_vs_last_touch'] || [];
-    var firstTouches = [];
-    var lastTouches = [];
-    for (var td = 0; td < touchData.length; td++) {
-      if (touchData[td].touch_type === 'first_touch') firstTouches.push(touchData[td]);
-      else if (touchData[td].touch_type === 'last_touch') lastTouches.push(touchData[td]);
-    }
-
-    var touchHTML = '<div class="mb-8">' +
-      '<h4 class="text-base font-semibold text-gray-700 mb-1">Discovery vs Conversion Channels</h4>' +
-      '<p class="text-xs text-gray-400 mb-3">Across all pipelines — only leads with UTM attribution data</p>';
+  function renderFirstVsLastTouchBody(rows) {
+    var firstTouches = rows.filter(function (row) { return row.touch_type === 'first_touch'; });
+    var lastTouches = rows.filter(function (row) { return row.touch_type === 'last_touch'; });
     if (firstTouches.length === 0 && lastTouches.length === 0) {
-      touchHTML += '<p class="text-sm text-gray-400">No first/last touch data available.</p>';
-    } else {
-      touchHTML += '<div class="grid grid-cols-1 md:grid-cols-2 gap-6">';
-
-      // First touch column
-      touchHTML += '<div><h5 class="text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">First Touch (Discovery)</h5>';
-      touchHTML += '<div class="space-y-2">';
-      var ftMax = firstTouches.length > 0 ? parseFloat(firstTouches[0].value) || 1 : 1;
-      for (var ft = 0; ft < firstTouches.length; ft++) {
-        var ftRow = firstTouches[ft];
-        var ftPct = Math.round((parseFloat(ftRow.value) / ftMax) * 100);
-        touchHTML += '<div class="flex items-center gap-3">' +
-          '<div class="w-28 text-sm text-gray-700 truncate" title="' + (ftRow.channel || '') + '">' + (ftRow.channel || 'Unknown') + '</div>' +
-          '<div class="flex-1 bg-gray-100 rounded-full h-5 relative">' +
-          '<div class="bg-blue-500 h-5 rounded-full" style="width:' + ftPct + '%"></div>' +
-          '</div>' +
-          '<div class="w-12 text-sm text-gray-600 text-right">' + (ftRow.value || 0) + '</div>' +
-          '<div class="w-14 text-xs text-gray-400 text-right">' + (ftRow.win_rate || 0) + '%</div>' +
-          '</div>';
-      }
-      touchHTML += '</div></div>';
-
-      // Last touch column
-      touchHTML += '<div><h5 class="text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">Last Touch (Conversion)</h5>';
-      touchHTML += '<div class="space-y-2">';
-      var ltMax = lastTouches.length > 0 ? parseFloat(lastTouches[0].value) || 1 : 1;
-      for (var lt = 0; lt < lastTouches.length; lt++) {
-        var ltRow = lastTouches[lt];
-        var ltPct = Math.round((parseFloat(ltRow.value) / ltMax) * 100);
-        touchHTML += '<div class="flex items-center gap-3">' +
-          '<div class="w-28 text-sm text-gray-700 truncate" title="' + (ltRow.channel || '') + '">' + (ltRow.channel || 'Unknown') + '</div>' +
-          '<div class="flex-1 bg-gray-100 rounded-full h-5 relative">' +
-          '<div class="bg-purple-500 h-5 rounded-full" style="width:' + ltPct + '%"></div>' +
-          '</div>' +
-          '<div class="w-12 text-sm text-gray-600 text-right">' + (ltRow.value || 0) + '</div>' +
-          '<div class="w-14 text-xs text-gray-400 text-right">' + (ltRow.win_rate || 0) + '%</div>' +
-          '</div>';
-      }
-      touchHTML += '</div></div>';
-      touchHTML += '</div>';
+      return '<p class="text-sm text-gray-400">No first/last touch data available.</p>';
     }
-    touchHTML += '</div>';
+    return '<div class="grid grid-cols-1 md:grid-cols-2 gap-6">' +
+      touchColumnHTML('First Touch (Discovery)', firstTouches, 'bg-blue-500') +
+      touchColumnHTML('Last Touch (Conversion)', lastTouches, 'bg-purple-500') +
+      '</div>';
+  }
 
-    // Section 3: Campaign Performance
-    var campaignData = metricsMap['attribution_campaign_performance'] || [];
-    var campaignHTML = '<div class="mb-8">' +
-      '<h4 class="text-base font-semibold text-gray-700 mb-1">Campaign Performance</h4>' +
-      '<p class="text-xs text-gray-400 mb-3">Across all pipelines — only leads with UTM campaign tags</p>';
-    if (campaignData.length === 0) {
-      campaignHTML += '<p class="text-sm text-gray-400">No UTM campaign data available. Campaigns require utmCampaign tags in your marketing URLs.</p>';
-    } else {
-      campaignHTML += '<table class="w-full text-sm">' +
-        '<thead><tr class="text-left text-gray-500 border-b border-gray-200">' +
-        '<th class="pb-2 font-medium">Campaign</th>' +
-        '<th class="pb-2 font-medium">Channel</th>' +
-        '<th class="pb-2 font-medium text-right">Leads</th>' +
-        '<th class="pb-2 font-medium text-right">Won</th>' +
-        '<th class="pb-2 font-medium text-right">Conversion</th>' +
-        '</tr></thead><tbody>';
-      for (var cp = 0; cp < campaignData.length; cp++) {
-        var cpRow = campaignData[cp];
-        var cpWinRate = parseFloat(cpRow.win_rate) || 0;
-        var cpColor = cpWinRate >= 40 ? 'bg-green-100 text-green-800' : (cpWinRate >= 20 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800');
-        var cpBg = cp % 2 === 1 ? ' bg-gray-50' : '';
-        campaignHTML += '<tr class="border-b border-gray-100' + cpBg + '">' +
-          '<td class="py-2 text-gray-700">' + (cpRow.label || 'Unknown') + '</td>' +
-          '<td class="py-2 text-gray-500">' + (cpRow.channel || '-') + '</td>' +
-          '<td class="py-2 text-right text-gray-700">' + (cpRow.value || 0) + '</td>' +
-          '<td class="py-2 text-right text-gray-700">' + (cpRow.won_count || 0) + '</td>' +
-          '<td class="py-2 text-right"><span class="inline-block px-2 py-0.5 rounded text-xs font-medium ' + cpColor + '">' + cpWinRate + '%</span></td>' +
-          '</tr>';
-      }
-      campaignHTML += '</tbody></table>';
+  function renderCampaignsBody(rows) {
+    if (rows.length === 0) {
+      return '<p class="text-sm text-gray-400">No UTM campaign data available. Campaigns require utmCampaign tags in your marketing URLs.</p>';
     }
-    campaignHTML += '</div>';
-
-    // Section 4: Top Landing Pages
-    var landingData = metricsMap['attribution_landing_pages'] || [];
-    var landingHTML = '<div class="mb-2">' +
-      '<h4 class="text-base font-semibold text-gray-700 mb-1">Top Landing Pages</h4>' +
-      '<p class="text-xs text-gray-400 mb-3">Across all pipelines — last-touch landing page before conversion</p>';
-    if (landingData.length === 0) {
-      landingHTML += '<p class="text-sm text-gray-400">No landing page data available.</p>';
-    } else {
-      landingHTML += '<table class="w-full text-sm">' +
-        '<thead><tr class="text-left text-gray-500 border-b border-gray-200">' +
-        '<th class="pb-2 font-medium">Landing Page</th>' +
-        '<th class="pb-2 font-medium text-right">Leads</th>' +
-        '<th class="pb-2 font-medium text-right">Won</th>' +
-        '<th class="pb-2 font-medium text-right">Conversion</th>' +
-        '</tr></thead><tbody>';
-      for (var lp = 0; lp < landingData.length; lp++) {
-        var lpRow = landingData[lp];
-        var lpWinRate = parseFloat(lpRow.win_rate) || 0;
-        var lpColor = lpWinRate >= 40 ? 'bg-green-100 text-green-800' : (lpWinRate >= 20 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800');
-        var lpBg = lp % 2 === 1 ? ' bg-gray-50' : '';
-        var displayUrl = lpRow.label || 'Unknown';
-        var fullUrl = lpRow.full_url || displayUrl;
-        if (displayUrl.length > 60) displayUrl = displayUrl.substring(0, 60) + '...';
-        landingHTML += '<tr class="border-b border-gray-100' + lpBg + '">' +
-          '<td class="py-2 text-gray-700 max-w-xs truncate" title="' + fullUrl + '">' + displayUrl + '</td>' +
-          '<td class="py-2 text-right text-gray-700">' + (lpRow.value || 0) + '</td>' +
-          '<td class="py-2 text-right text-gray-700">' + (lpRow.won_count || 0) + '</td>' +
-          '<td class="py-2 text-right"><span class="inline-block px-2 py-0.5 rounded text-xs font-medium ' + lpColor + '">' + lpWinRate + '%</span></td>' +
-          '</tr>';
-      }
-      landingHTML += '</tbody></table>';
+    var html = '<table class="w-full text-sm">' +
+      '<thead><tr class="text-left text-gray-500 border-b border-gray-200">' +
+      '<th class="pb-2 font-medium">Campaign</th>' +
+      '<th class="pb-2 font-medium">Channel</th>' +
+      '<th class="pb-2 font-medium text-right">Leads</th>' +
+      '<th class="pb-2 font-medium text-right">Won</th>' +
+      '<th class="pb-2 font-medium text-right">Conversion</th>' +
+      '</tr></thead><tbody>';
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var rate = parseFloat(row.win_rate) || 0;
+      html += '<tr class="border-b border-gray-100' + (i % 2 === 1 ? ' bg-gray-50' : '') + '">' +
+        '<td class="py-2 text-gray-700">' + escapeHtml(row.label || 'Unknown') + '</td>' +
+        '<td class="py-2 text-gray-500">' + escapeHtml(row.channel || EMPTY) + '</td>' +
+        '<td class="py-2 text-right text-gray-700">' + escapeHtml(row.value || 0) + '</td>' +
+        '<td class="py-2 text-right text-gray-700">' + escapeHtml(row.won_count || 0) + '</td>' +
+        '<td class="py-2 text-right"><span class="inline-block px-2 py-0.5 rounded text-xs font-medium ' + winRateBadgeColor(rate) + '">' + rate + '%</span></td>' +
+        '</tr>';
     }
-    landingHTML += '</div>';
+    return html + '</tbody></table>';
+  }
 
-    container.innerHTML = headerHTML + multiTouchHTML + touchHTML + campaignHTML + landingHTML;
+  function renderLandingPagesBody(rows) {
+    if (rows.length === 0) return '<p class="text-sm text-gray-400">No landing page data available.</p>';
+    var html = '<table class="w-full text-sm">' +
+      '<thead><tr class="text-left text-gray-500 border-b border-gray-200">' +
+      '<th class="pb-2 font-medium">Landing Page</th>' +
+      '<th class="pb-2 font-medium text-right">Leads</th>' +
+      '<th class="pb-2 font-medium text-right">Won</th>' +
+      '<th class="pb-2 font-medium text-right">Conversion</th>' +
+      '</tr></thead><tbody>';
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var rate = parseFloat(row.win_rate) || 0;
+      var displayUrl = row.label || 'Unknown';
+      var fullUrl = row.full_url || displayUrl;
+      if (displayUrl.length > 60) displayUrl = displayUrl.substring(0, 60) + '...';
+      html += '<tr class="border-b border-gray-100' + (i % 2 === 1 ? ' bg-gray-50' : '') + '">' +
+        '<td class="py-2 text-gray-700 max-w-xs truncate" title="' + escapeHtml(fullUrl) + '">' + escapeHtml(displayUrl) + '</td>' +
+        '<td class="py-2 text-right text-gray-700">' + escapeHtml(row.value || 0) + '</td>' +
+        '<td class="py-2 text-right text-gray-700">' + escapeHtml(row.won_count || 0) + '</td>' +
+        '<td class="py-2 text-right"><span class="inline-block px-2 py-0.5 rounded text-xs font-medium ' + winRateBadgeColor(rate) + '">' + rate + '%</span></td>' +
+        '</tr>';
+    }
+    return html + '</tbody></table>';
+  }
+
+  // Section roles (LANA-AI dashboard.schema.json visualization.sections.role).
+  var ATTRIBUTION_SECTIONS = {
+    multi_touch: { title: 'Multi-Touch Leads', note: 'Across all pipelines: leads with 2 or more marketing touchpoints', render: renderMultiTouchBody },
+    journeys: { title: 'Lead Journey Paths', note: 'Across all pipelines: the first and last marketing channel for each lead', render: renderJourneysBody },
+    first_vs_last_touch: { title: 'Discovery vs Conversion Channels', note: 'Across all pipelines, only leads with UTM attribution data', render: renderFirstVsLastTouchBody },
+    campaigns: { title: 'Campaign Performance', note: 'Across all pipelines, only leads with UTM campaign tags', render: renderCampaignsBody },
+    landing_pages: { title: 'Top Landing Pages', note: 'Across all pipelines: the last landing page before conversion', render: renderLandingPagesBody }
+  };
+
+  var MISSING_SECTION_METRIC = { data_state: 'engine_error', data_state_reason: 'The report did not send this part.' };
+  var NO_ATTRIBUTION_SECTIONS = { data_state: 'not_configured', data_state_reason: 'This report does not say what to show here yet.' };
+
+  function renderAttributionSummary(viz, data, uniqueId) {
+    var metrics = (data && Array.isArray(data.metrics)) ? data.metrics : [];
+    var sections = Array.isArray(viz.sections) ? viz.sections : [];
+
+    var html = '<div class="mb-6">' +
+      '<h3 class="text-lg font-semibold text-gray-900">' + escapeHtml(viz.title || 'Attribution Insights') + '</h3>' +
+      (viz.description ? '<p class="text-sm text-gray-500 mt-1">' + escapeHtml(viz.description) + '</p>' : '') +
+      '</div>';
+
+    var rendered = 0;
+    for (var i = 0; i < sections.length; i++) {
+      var section = sections[i] || {};
+      var layout = Object.prototype.hasOwnProperty.call(ATTRIBUTION_SECTIONS, section.role) ? ATTRIBUTION_SECTIONS[section.role] : null;
+      if (!layout) continue;
+      rendered += 1;
+      var metric = null;
+      for (var j = 0; j < metrics.length; j++) {
+        if (metrics[j] && metrics[j].key === section.metric) { metric = metrics[j]; break; }
+      }
+      var problem = !metric ? MISSING_SECTION_METRIC : (window.DataState.isProblem(metric) ? metric : null);
+      var body = problem
+        ? window.DataState.render(problem)
+        : layout.render(Array.isArray(metric.current) ? metric.current : []);
+      html += attributionSectionHTML(layout.title, layout.note, body);
+    }
+    // No section to show: the shared DataState block, not a bare heading.
+    if (!rendered) html += window.DataState.render(NO_ATTRIBUTION_SECTIONS);
+
+    var container = document.createElement('div');
+    container.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
+    container.innerHTML = html;
     return container;
   }
 
@@ -2365,8 +2228,8 @@
     var canvasId = 'chart-' + uniqueId;
     var helpTextHTML = renderHelpTextModal(viz.helpText, uniqueId);
 
-    div.innerHTML = '<div class="flex items-center mb-4"><h3 class="text-lg font-semibold text-gray-900">' + (viz.title || 'Bubble Chart') + '</h3>' + helpTextHTML + '</div>' +
-      (viz.description ? '<p class="text-sm text-gray-500 mb-4">' + viz.description + '</p>' : '') +
+    div.innerHTML = '<div class="flex items-center mb-4"><h3 class="text-lg font-semibold text-gray-900">' + escapeHtml(viz.title || 'Bubble Chart') + '</h3>' + helpTextHTML + '</div>' +
+      (viz.description ? '<p class="text-sm text-gray-500 mb-4">' + escapeHtml(viz.description) + '</p>' : '') +
       '<div class="h-96"><canvas id="' + canvasId + '"></canvas></div>';
 
     setTimeout(function () {
@@ -2427,8 +2290,8 @@
     var canvasId = 'chart-' + uniqueId;
     var helpTextHTML = renderHelpTextModal(viz.helpText, uniqueId);
 
-    div.innerHTML = '<div class="flex items-center mb-4"><h3 class="text-lg font-semibold text-gray-900">' + (viz.title || 'Grouped Bar Chart') + '</h3>' + helpTextHTML + '</div>' +
-      (viz.description ? '<p class="text-sm text-gray-500 mb-4">' + viz.description + '</p>' : '') +
+    div.innerHTML = '<div class="flex items-center mb-4"><h3 class="text-lg font-semibold text-gray-900">' + escapeHtml(viz.title || 'Grouped Bar Chart') + '</h3>' + helpTextHTML + '</div>' +
+      (viz.description ? '<p class="text-sm text-gray-500 mb-4">' + escapeHtml(viz.description) + '</p>' : '') +
       '<div class="h-96"><canvas id="' + canvasId + '"></canvas></div>';
 
     setTimeout(function () {
@@ -2583,7 +2446,7 @@
   function renderPlaceholderChart(viz, uniqueId) {
     var div = document.createElement('div');
     div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
-    div.innerHTML = '<h3 class="text-lg font-semibold text-gray-900 mb-4">' + (viz.title || viz.type) + '</h3>' +
+    div.innerHTML = '<h3 class="text-lg font-semibold text-gray-900 mb-4">' + escapeHtml(viz.title || viz.type) + '</h3>' +
       '<div class="h-64 flex items-center justify-center bg-gray-50 rounded"><p class="text-gray-500">Chart type "' + viz.type + '" will be implemented soon</p></div>';
     return div;
   }
@@ -2690,6 +2553,31 @@
   // Export Functions
   // ==========================================================================
 
+  // A cell value: the formatted text when there is one, else the raw value.
+  // Only a missing value is blank; a real 0 stays 0.
+  function exportCell(formatted, raw) {
+    if (formatted !== null && formatted !== undefined && formatted !== '') return formatted;
+    if (raw === null || raw === undefined || raw === '') return EMPTY;
+    return raw;
+  }
+
+  // Rows for the CSV (with Change %) and PDF (without) exports.
+  function buildExportRows(metrics, withChangePercent) {
+    return metrics.map(function (m) {
+      var hasPercent = m.changePercent !== null && m.changePercent !== undefined && m.changePercent !== '';
+      var row = [
+        m.name,
+        exportCell(m.formattedCurrent, m.current),
+        exportCell(m.formattedPrior, m.prior),
+        exportCell(m.formattedTarget, m.target),
+        exportCell(m.formattedChange, null)
+      ];
+      if (withChangePercent) row.push(hasPercent ? m.changePercent + '%' : EMPTY);
+      row.push(m.status ? m.status.toUpperCase() : EMPTY);
+      return row;
+    });
+  }
+
   function exportToPDF() {
     if (!currentModuleData) {
       Lex.Modal.alert('Nothing to export', 'Run a module first, then export its results.');
@@ -2701,29 +2589,18 @@
     var doc = new jsPDFLib.jsPDF();
 
     doc.setFontSize(20);
-    doc.text('Module Execution Report', 14, 20);
+    doc.text('Report', 14, 20);
 
     doc.setFontSize(12);
     var moduleTitleEl = document.getElementById('moduleTitle');
-    var executionTimeEl = document.getElementById('executionTime');
     var resultPeriodTypeEl = document.getElementById('resultPeriodType');
     var resultCurrentPeriodEl = document.getElementById('resultCurrentPeriod');
 
-    doc.text('Module: ' + (moduleTitleEl ? moduleTitleEl.textContent : ''), 14, 35);
-    doc.text('Execution Time: ' + (executionTimeEl ? executionTimeEl.textContent : ''), 14, 42);
-    doc.text('Period Type: ' + (resultPeriodTypeEl ? resultPeriodTypeEl.textContent : ''), 14, 49);
+    doc.text('Report: ' + (moduleTitleEl ? moduleTitleEl.textContent : ''), 14, 35);
+    doc.text('Compare By: ' + (resultPeriodTypeEl ? resultPeriodTypeEl.textContent : ''), 14, 49);
     doc.text('Current Period: ' + (resultCurrentPeriodEl ? resultCurrentPeriodEl.textContent : ''), 14, 56);
 
-    var tableData = currentModuleData.map(function (m) {
-      return [
-        m.name,
-        m.formattedCurrent || m.current,
-        m.formattedPrior || m.prior || 'N/A',
-        m.formattedTarget || m.target || 'N/A',
-        m.formattedChange || 'N/A',
-        m.status ? m.status.toUpperCase() : 'N/A'
-      ];
-    });
+    var tableData = buildExportRows(currentModuleData, false);
 
     doc.autoTable({
       startY: 65,
@@ -2746,17 +2623,7 @@
     }
 
     var headers = ['Metric', 'Current', 'Prior', 'Target', 'Change', 'Change %', 'Status'];
-    var rows = currentModuleData.map(function (m) {
-      return [
-        m.name,
-        m.formattedCurrent || m.current,
-        m.formattedPrior || m.prior || 'N/A',
-        m.formattedTarget || m.target || 'N/A',
-        m.formattedChange || 'N/A',
-        m.changePercent ? m.changePercent + '%' : 'N/A',
-        m.status ? m.status.toUpperCase() : 'N/A'
-      ];
-    });
+    var rows = buildExportRows(currentModuleData, true);
 
     var csvContent = headers.join(',') + '\n';
     rows.forEach(function (row) {
@@ -2805,21 +2672,14 @@
     } catch (error) {
       console.error('[Reporting] Failed to load imported reports:', error);
     }
-    renderReportSelect();
+    renderReportsList();
   }
 
   function selectImportedReport(reportId) {
     selectedImportedReportId = reportId;
     selectedModuleKey = null;
 
-    var select = document.getElementById('reportModuleSelect');
-    if (select && select.value !== 'report:' + reportId) select.value = 'report:' + reportId;
     syncDeleteReportButton();
-
-    var report = importedReports.find(function (r) { return r.report_id === reportId; });
-    if (report) {
-      showInfo('Selected: ' + report.name + '. Click "Run Report" to execute.');
-    }
   }
 
   function deleteImportedReport(reportId, reportName) {
@@ -2836,7 +2696,7 @@
       await api.delete('/api/v1/reporting/reports/' + reportId);
       showInfo('Report "' + reportName + '" deleted.');
       if (selectedImportedReportId === reportId) {
-        selectedImportedReportId = null;
+        showReportsList();
       }
       await loadImportedReports();
     } catch (error) {
@@ -2854,21 +2714,18 @@
 
     var report = importedReports.find(function (r) { return r.report_id === selectedImportedReportId; });
     var reportName = report ? report.name : 'Imported Report';
-    showInfo('Executing ' + reportName + '...');
+    showInfo('Running your report...');
 
     // Hide previous results
     var resultsEl = document.getElementById('moduleResults');
     if (resultsEl) resultsEl.style.display = 'none';
 
     try {
-      var startTime = LanaTime.nowMs();
 
       var result = await api.post('/api/v1/reporting/reports/' + selectedImportedReportId + '/execute', {
         filters: {},
         bypass_cache: false
       });
-
-      var executionTimeMs = Lex.Utils.millisecondsSince(startTime);
 
       // Store metadata for display
       currentModuleMetadata = {
@@ -2881,12 +2738,11 @@
         status: 'stable'
       };
       currentModuleConfig = result;
+      runPeriodDays = runDaysFrom(result.period, null, null);
 
       // Update header
       var moduleTitleEl = document.getElementById('moduleTitle');
-      var executionTimeEl = document.getElementById('executionTime');
       if (moduleTitleEl) moduleTitleEl.textContent = result.report ? result.report.name : reportName;
-      if (executionTimeEl) executionTimeEl.textContent = (result.execution_time_ms || executionTimeMs) + 'ms';
 
       // Update period info
       var resultPeriodTypeEl = document.getElementById('resultPeriodType');
@@ -2896,7 +2752,7 @@
       if (resultCurrentPeriodEl) resultCurrentPeriodEl.textContent = result.cached ? 'Cached' : 'Live';
 
       var resultPriorPeriodEl = document.getElementById('resultPriorPeriod');
-      if (resultPriorPeriodEl) resultPriorPeriodEl.textContent = 'N/A';
+      if (resultPriorPeriodEl) resultPriorPeriodEl.textContent = window.DataState.EMPTY_VALUE;
 
       // Update data sources
       updateDataSources([]);
@@ -2910,7 +2766,11 @@
         var rows = result.data || [];
         var rowCount = result.row_count || rows.length;
 
-        if (!rows.length) {
+        if (window.DataState.isProblem(result)) {
+          // The backend's failure model: one shared state block.
+          vizContainer.innerHTML = '<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">'
+            + window.DataState.render(result) + '</div>';
+        } else if (!rows.length) {
           vizContainer.innerHTML = '<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center">' +
             '<p class="text-gray-500">No data returned. Check your report configuration and data sources.</p></div>';
         } else {
@@ -2942,11 +2802,11 @@
         }
       }
 
-      showInfo('Report executed successfully. ' + (result.row_count || 0) + ' rows returned in ' + (result.execution_time_ms || executionTimeMs) + 'ms' + (result.cached ? ' (cached)' : '') + '.');
+      hideInfo();
 
     } catch (error) {
       console.error('[Reporting] V2 execution failed:', error);
-      showError(error.message || 'Failed to execute report.');
+      showRunFailure(error);
     } finally {
       if (executeBtn) executeBtn.loading = false;
     }
@@ -3196,8 +3056,8 @@
           + (item.description ? '<p class="text-xs text-gray-500 mt-0.5">' + escapeHtml(item.description) + '</p>' : '')
           + '</div>'
           + '<div class="flex items-center gap-2">'
-          + (item.is_default ? '' : '<button onclick="window._reporting.setCustomizationDefault(\'' + item.id + '\')" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Set Default</button>')
-          + '<button onclick="window._reporting.deleteCustomization(\'' + item.id + '\')" class="text-xs text-red-600 hover:text-red-800 font-medium">Delete</button>'
+          + (item.is_default ? '' : '<button type="button" data-reporting-action="set-default-customization" data-customization-id="' + escapeHtml(item.id) + '" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Set Default</button>')
+          + '<button type="button" data-reporting-action="delete-customization" data-customization-id="' + escapeHtml(item.id) + '" class="text-xs text-red-600 hover:text-red-800 font-medium">Delete</button>'
           + '</div>'
           + '</div>';
       }
@@ -3227,7 +3087,7 @@
     var row = document.createElement('div');
     row.className = 'flex items-center gap-2';
     row.innerHTML = '<input type="text" placeholder="e.g. count.id" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm cust-metric-input" maxlength="100">'
-      + '<button type="button" class="text-red-500 hover:text-red-700 text-xs" onclick="this.parentElement.remove()">Remove</button>';
+      + '<button type="button" class="text-red-500 hover:text-red-700 text-xs" data-reporting-action="remove-row">Remove</button>';
     container.appendChild(row);
   }
 
@@ -3254,7 +3114,7 @@
     var row = document.createElement('div');
     row.className = 'flex items-center gap-2';
     row.innerHTML = '<lex-select class="flex-1 cust-dimension-input" value="" searchable options="' + escapeHtml(JSON.stringify(options)) + '"></lex-select>'
-      + '<button type="button" class="text-red-500 hover:text-red-700 text-xs" onclick="this.parentElement.remove()">Remove</button>';
+      + '<button type="button" class="text-red-500 hover:text-red-700 text-xs" data-reporting-action="remove-row">Remove</button>';
     container.appendChild(row);
   }
 
@@ -3275,7 +3135,7 @@
     row.innerHTML = '<input type="text" placeholder="Column" class="w-28 border border-gray-300 rounded px-2 py-1 text-sm cust-filter-col" maxlength="100">'
       + '<lex-select class="w-32 cust-filter-op" value="equals" options="' + escapeHtml(JSON.stringify(FILTER_OPERATOR_OPTIONS)) + '"></lex-select>'
       + '<input type="text" placeholder="Value" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm cust-filter-val" maxlength="255">'
-      + '<button type="button" class="text-red-500 hover:text-red-700 text-xs" onclick="this.parentElement.remove()">Remove</button>';
+      + '<button type="button" class="text-red-500 hover:text-red-700 text-xs" data-reporting-action="remove-row">Remove</button>';
     container.appendChild(row);
   }
 
@@ -3346,7 +3206,7 @@
   async function saveCustomization(setAsDefault) {
     var data = collectCustomizationData();
     if (!data.module_key || !data.customization_name) {
-      showError('Module and customization name are required');
+      showError('Pick a report and name your view.');
       return;
     }
 
@@ -3378,6 +3238,11 @@
   }
 
   async function deleteCustomization(id) {
+    var confirmed = await Lex.Modal.confirmAsync('Delete customization', 'Delete this saved customization? This cannot be undone.', {
+      variant: 'danger',
+      confirmText: 'Delete'
+    });
+    if (!confirmed) return;
     try {
       await api.delete('/api/v1/module-customizations/' + id);
       showInfo('Customization deleted');
@@ -3461,7 +3326,7 @@
   // Show the customize button when a module is selected.
   function showCustomizeButton() {
     var btn = document.getElementById('customizeBtn');
-    if (btn) btn.style.display = '';
+    if (btn) btn.hidden = false;
     updateCustomizationBadge();
   }
 
@@ -3486,7 +3351,7 @@
     deleteCustomization: deleteCustomization
   };
 
-  // Also expose individually for V1 compat onclick handlers
+  // Also expose individually for older callers
   window.showMetricDrilldown = showMetricDrilldown;
   window.openGenericDrilldown = openGenericDrilldown;
   window.closeDrilldownModal = closeDrilldownModal;
@@ -3499,7 +3364,109 @@
   // Init
   // ==========================================================================
 
+  // "Add to dashboard": pick one of the firm's dashboards and add the tile.
+  async function openAddToDashboard(metricKey, metricName) {
+    var list;
+    try {
+      var response = await api.listBIDashboards({ limit: 100, offset: 0, sort: 'name', order: 'asc', writable: 'true' });
+      list = response && Array.isArray(response.data) ? response.data : [];
+    } catch (error) {
+      showError('Dashboards could not load. Please try again.');
+      return;
+    }
+    if (!list.length) {
+      Lex.Modal.alert('No dashboards you can change', 'Create a dashboard, or ask its owner to share it with you, then add this to it.');
+      return;
+    }
+    var options = list.map(function (d) { return { value: d.id, label: d.name || 'Untitled dashboard' }; });
+    var modal = Lex.Modal.open({
+      heading: 'Add to dashboard',
+      size: 'sm',
+      content: '<p class="reporting-add-tile__text">Add ' + escapeHtml(metricName || 'this number')
+        + ' to a dashboard. It will show there as a tile that opens this report.</p>'
+        + '<lex-select id="addTileDashboardSelect" label="Dashboard" value="' + escapeHtml(options[0].value) + '"></lex-select>',
+      confirmText: 'Add',
+      onConfirm: async function () {
+        var select = document.getElementById('addTileDashboardSelect');
+        var dashboardId = select ? select.value : options[0].value;
+        try {
+          var result = await DashboardTiles.addTileToDashboard(api, dashboardId, metricKey);
+          var where = result.name ? ' "' + result.name + '"' : '';
+          Lex.Toast.success(result.added ? 'Added to' + where + '.' : 'Already on' + where + '.');
+        } catch (error) {
+          Lex.Toast.error(error.message || 'Could not add it. Please try again.');
+        }
+      }
+    });
+    var select = modal.querySelector('#addTileDashboardSelect');
+    if (select) select.options = options;
+  }
+
+  // Tile buttons carry data attributes; this one listener runs them.
+  function onTileClick(event) {
+    var target = event.target;
+    var add = target.closest('[data-add-to-dashboard]');
+    if (add) return openAddToDashboard(add.getAttribute('data-add-to-dashboard'), add.getAttribute('data-metric-name'));
+    var drill = target.closest('[data-metric-drilldown]');
+    if (drill) {
+      var key = drill.getAttribute('data-metric-key');
+      var name = drill.getAttribute('data-metric-name');
+      return drill.getAttribute('data-metric-drilldown') === 'generic' ? openGenericDrilldown(key, name) : showMetricDrilldown(key, name);
+    }
+    var info = target.closest('[data-metric-info]');
+    if (info) return openMetricInfo(info.getAttribute('data-metric-info'));
+    var goal = target.closest('[data-metric-edit-goal]');
+    if (goal) return editMetricGoal(goal.getAttribute('data-metric-edit-goal'));
+  }
+
+  // Page buttons (help panels, modal close, customizations, Remove rows)
+  // carry data-reporting-action; this one document listener runs them, so
+  // buttons inside drawers and modals work wherever Lex mounts them.
+  var PAGE_ACTIONS = {
+    'show-module-info': function () { showModuleInfo(); },
+    'close-module-info': function () { closeModuleInfo(); },
+    'close-data-sources': function () { closeDataSourcesModal(); },
+    'close-missing-entities': function () { closeMissingEntitiesModal(); },
+    'close-import': function () { closeImportModal(); },
+    'show-help': function (el) {
+      var panel = document.getElementById(el.getAttribute('data-help-modal'));
+      if (panel) panel.classList.remove('hidden');
+    },
+    'hide-help': function (el) {
+      var panel = document.getElementById(el.getAttribute('data-help-modal'));
+      if (panel) panel.classList.add('hidden');
+    },
+    'set-default-customization': function (el) { setCustomizationDefault(el.getAttribute('data-customization-id')); },
+    'delete-customization': function (el) { deleteCustomization(el.getAttribute('data-customization-id')); },
+    'remove-row': function (el) { if (el.parentElement) el.parentElement.remove(); }
+  };
+
+  function onPageAction(event) {
+    var target = event.target;
+    var el = target && target.closest ? target.closest('[data-reporting-action]') : null;
+    if (!el) return;
+    var run = PAGE_ACTIONS[el.getAttribute('data-reporting-action')];
+    if (run) run(el);
+  }
+
+  // Scripts run once per app session (LexRouter); bind the listener once.
+  var pageActionsBound = false;
+  function initPageActions() {
+    if (pageActionsBound) return;
+    pageActionsBound = true;
+    document.addEventListener('click', onPageAction);
+  }
+
+  function initTileActions() {
+    var container = document.getElementById('reportingMainColumn');
+    if (!container || container.dataset.tileActionsBound) return;
+    container.dataset.tileActionsBound = 'true';
+    container.addEventListener('click', onTileClick);
+  }
+
   function init() {
+    initPageActions();
+    initTileActions();
     loadModules();
     loadImportedReports();
     initReportSelect();

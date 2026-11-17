@@ -991,10 +991,10 @@
       }
       const mainItems = appContext === 'insights'
         ? [
-            { id: 'insights-create', label: 'New Dashboard', icon: 'plus', href: 'admin/dashboard-builder.html', isButton: true, variant: 'create-chat' },
-            { id: 'insights-dashboard', label: 'Dashboard', icon: 'home', href: 'admin/analytics.html' },
-            { id: 'insights-library', label: 'Library', icon: 'book-open', href: 'admin/dashboard-library.html' },
-            { id: 'firm-reporting', label: 'Firm Reporting', icon: 'bar-chart-2', href: 'admin/reporting.html' },
+            // Reports run an analysis for a period; All dashboards lists the saved views.
+            { id: 'insights-dashboard', home: true, href: 'admin/analytics.html' }, // Dashboard, grid icon (Lex.SidebarNav.HOME)
+            { id: 'insights-reports', label: 'Reports', icon: 'bar-chart-2', href: 'admin/reporting.html' },
+            { id: 'insights-dashboards', label: 'All dashboards', icon: 'book-open', href: 'admin/dashboard-library.html' },
             { id: 'billable-hours', label: 'Billable Hours', icon: 'clock', href: 'admin/billable-hours.html' }
           ]
         : [

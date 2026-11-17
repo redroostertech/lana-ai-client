@@ -127,6 +127,15 @@
     ) || browserTimezone() || SYSTEM_TIME_ZONE;
   }
 
+  // The firm's (organization's) zone for firm report periods: the profile's
+  // firm_timezone, the same zone the backend bounds report periods in. UTC
+  // when unset, as the backend reads it. Display-only times keep using
+  // getOrganizationTimezone (the person's zone first).
+  function getFirmTimezone() {
+    var user = readStoredUser();
+    return validTimezone(user.firm_timezone || user.firmTimezone) || SYSTEM_TIME_ZONE;
+  }
+
   function timestampHasExplicitTimezone(value) {
     if (!value || typeof value !== 'string') return false;
     var timeIndex = value.indexOf('T');
@@ -525,6 +534,7 @@
     decodeHtmlEntities: decodeHtmlEntities,
     formatFileSize:     formatFileSize,
     getOrganizationTimezone: getOrganizationTimezone,
+    getFirmTimezone: getFirmTimezone,
     formatDate:         formatDate,
     formatDateTime:     formatDateTime,
     capitalizeFirst:    capitalizeFirst,

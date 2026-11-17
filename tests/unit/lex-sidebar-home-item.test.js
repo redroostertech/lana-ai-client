@@ -45,17 +45,12 @@ describe('sidebar home item', () => {
     ['Workspaces (main)', 'js/lex/components/layout/lex-app.js', "{ id: 'dashboard',"],
     ['Briefs', 'js/lex/components/layout/lex-app.js', "{ id: 'briefs-dashboard',"],
     ['Agents', 'agents/app.js', "{ id: 'catalog',"],
-    ['Automate', 'automation/js/constants.js', "{ id: 'library',"]
+    ['Automate', 'automation/js/constants.js', "{ id: 'library',"],
+    ['Insights', 'js/lex/components/layout/lex-app.js', "{ id: 'insights-dashboard',"]
   ])('%s marks its first nav item home: true and does not set its own label or icon', (_app, file, anchor) => {
     const item = firstNavItem(read(file), anchor);
     expect(item).toMatch(/home: true/);
     expect(item).not.toMatch(/label:|icon:/);
-  });
-
-  test('Insights: its sidebar is being renamed on feat/insights-reports-dashboards; allowed until that lands', () => {
-    // When that branch lands, its home item must also be { id: ..., home: true }: move it into the table above.
-    const item = firstNavItem(read('js/lex/components/layout/lex-app.js'), "{ id: 'insights-dashboard',");
-    expect(item).toMatch(/home: true|label: 'Dashboard'/);
   });
 
   test('Automate calls its home Dashboard everywhere: page title and breadcrumbs', () => {

@@ -74,6 +74,8 @@
       changeDirection = comparison.direction || 'flat';
     } else {
       priorValue = isNumber(m.prior) ? m.prior : null;
+      // The backend's live change (shared delta rule) when no snapshot block came.
+      percentChange = priorValue !== null && isNumber(m.changePercent) ? m.changePercent : null;
       changeDirection = m.changeDirection || 'flat';
     }
 

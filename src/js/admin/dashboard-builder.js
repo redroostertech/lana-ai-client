@@ -486,7 +486,7 @@
     if (breadcrumb) {
       breadcrumb.items = [
         { label: 'Dashboard', href: 'admin/analytics.html' },
-        { label: 'Library', href: 'admin/dashboard-library.html' },
+        { label: 'All dashboards', href: 'admin/dashboard-library.html' },
         { label: dashboardId ? 'Edit Dashboard' : 'Create Dashboard' },
       ];
     }

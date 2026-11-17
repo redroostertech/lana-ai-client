@@ -3002,6 +3002,11 @@
     // ── 1b. First-run onboarding (needs roles for first-step gating) ─────
     launchOnboarding();
 
+    // ── 1c. Admins whose firm has no time zone are asked once to set it ──
+    if (window.LanaFirmTimezonePrompt) {
+      window.LanaFirmTimezonePrompt.mount(el('ccFirmTimezonePrompt'), { user: api.user, isAdmin: isAdmin() });
+    }
+
     // ── 2. Initialize shell-level components ──────────────────────────────
     if (typeof ConversationActionsModal !== 'undefined') {
       ConversationActionsModal.init();

@@ -20,6 +20,7 @@
 
   <link rel="stylesheet" href="css/lex-chat.css">
   <link rel="stylesheet" href="css/lex-onboarding.css">
+  <link rel="stylesheet" href="css/firm-timezone-prompt.css">
 </head>
 <body>
 
@@ -42,6 +43,9 @@
   <template id="page-content">
 
     <main class="cc-main">
+
+      <!-- One-time prompt for admins whose firm has no time zone (js/shared/firm-timezone-prompt.js). -->
+      <div id="ccFirmTimezonePrompt"></div>
 
       <!-- ================================================================
            Zone A — Morning Orientation Bar (full width)
@@ -524,6 +528,7 @@
   <script src="js/lex/components/foundation/lex-onboarding.js"></script>
 
   <!-- Page controller (MUST be last before auth-guard) -->
+  <script src="js/shared/firm-timezone-prompt.js"></script>
   <script src="js/dashboard/dashboard.js"></script>
 
   <!-- PAC bridge consent handler (Lex modal for token requests) -->

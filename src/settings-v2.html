@@ -567,6 +567,24 @@
         </lex-card>
       </section>
 
+      <!-- Firm time zone, organization admins only (settings-firm-timezone.js)
+           ══════════════════════════════════════════════════════════════ -->
+      <section id="sv2-section-firm-timezone" class="sv2-general" hidden>
+        <lex-card heading="Firm time zone" subtitle="The time zone your whole firm's reports use">
+          <lex-stack direction="vertical" gap="3">
+            <lex-select id="sv2-firm-timezone-select"
+              name="firm_timezone"
+              label="Firm time zone"
+              placeholder="Choose your firm's time zone..."
+              help="Reports count days and months in this time zone. Everyone in your firm sees the same numbers."
+              searchable="true">
+            </lex-select>
+            <p id="sv2-firm-timezone-note" class="sv2-general-note"></p>
+            <p id="sv2-firm-timezone-error" class="sv2-general-message" role="alert" hidden></p>
+          </lex-stack>
+        </lex-card>
+      </section>
+
       <!-- Location (settings-location.js; main process side in electron-location.js)
            ══════════════════════════════════════════════════════════════ -->
       <section id="sv2-section-location" class="sv2-general" hidden>
@@ -959,6 +977,7 @@
 
   <!-- Page controller (MUST be last before auth-guard) -->
   <script src="js/shared/mfa-enrollment.js"></script>
+  <script src="js/shared/time-zone-options.js"></script>
   <script src="js/settings-v2.js"></script>
   <script src="js/pages/settings-billing.js"></script>
   <script src="js/pages/settings-personalization.js"></script>
@@ -969,6 +988,9 @@
   <script src="js/settings-general.model.js"></script>
   <script src="js/pages/settings-appearance.js"></script>
   <script src="js/pages/settings-general.js"></script>
+  <script src="js/shared/firm-timezone-prompt.js"></script>
+  <script src="js/settings-firm-timezone.model.js"></script>
+  <script src="js/pages/settings-firm-timezone.js"></script>
   <script src="js/location-permission.model.js"></script>
   <script src="js/pages/settings-location.js"></script>
   <script src="js/engine-status.js"></script>
