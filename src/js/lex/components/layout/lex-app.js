@@ -1024,6 +1024,8 @@
         : [
             // New Chat moved into the LANA dock (rail bubble + RECENTS "+")
             { id: 'dashboard', home: true, href: 'dashboard.html' }, // Dashboard, grid icon (Lex.SidebarNav.HOME)
+            // Calendar: the person's agenda from LANA and connected apps (every member).
+            { id: 'calendar', label: 'Calendar', icon: 'calendar', href: 'calendar.html' },
             { id: 'library', label: 'Library', icon: 'folder', href: 'drive.html', children: [
               { id: 'library-all-sources', label: 'All Sources', href: 'drive.html' },
               { id: 'document-library', label: 'Documents', href: 'document-library.html' },
@@ -1033,9 +1035,7 @@
               // Templates and Studio ship in 3.1.0 (LanaConfig.TEMPLATES_AND_STUDIO_ENABLED)
               if (item.id !== 'library-templates' && item.id !== 'library-document-studio') return true;
               return !!(window.LanaConfig && window.LanaConfig.TEMPLATES_AND_STUDIO_ENABLED === true);
-            }) },
-            // Calendar: the person's agenda from LANA and connected apps (every member).
-            { id: 'calendar', label: 'Calendar', icon: 'calendar', href: 'calendar.html' }
+            }) }
           ];
 
       const sections = [
