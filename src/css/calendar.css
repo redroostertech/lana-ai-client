@@ -1,0 +1,153 @@
+/* Calendar page (calendar.html, js/calendar/calendar-page.js).
+   The grid itself is styled in css/lex-calendar-grid.css. */
+
+.cal-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-md);
+  min-width: 0;
+  container: cal-page / inline-size;
+}
+
+.cal-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lex-space-md);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.cal-toolbar-nav,
+.cal-toolbar-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--lex-space-sm);
+  min-width: 0;
+}
+
+.cal-range-title {
+  margin: 0 0 0 var(--lex-space-xs);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--lex-text-primary);
+  white-space: nowrap;
+}
+
+.cal-people {
+  width: 320px;
+  min-width: 0;
+}
+
+.cal-people lex-select .lex-select-trigger--multiple {
+  height: auto;
+}
+
+.cal-notice {
+  margin: 0;
+  padding: var(--lex-space-sm) var(--lex-space-md);
+  border: 1px solid var(--lex-status-warning-border);
+  border-radius: var(--lex-radius-md);
+  background: var(--lex-status-warning-bg);
+  color: var(--lex-status-warning-text);
+  font-size: 13px;
+}
+
+.cal-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lex-space-md);
+  font-size: 13px;
+  color: var(--lex-text-secondary);
+}
+
+.cal-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* The person color slots are defined on lex-calendar-grid (and the
+   .lex-cal-person-N classes in lex-calendar-grid.css pick one); the legend
+   sits outside the grid, so it repeats the slot values. */
+.cal-legend { --cal-person-0: var(--lex-accent); --cal-person-1: var(--lex-chart-color-2); --cal-person-2: var(--lex-chart-color-3);
+  --cal-person-3: var(--lex-chart-color-4); --cal-person-4: var(--lex-chart-color-5); --cal-person-5: var(--lex-chart-color-6); }
+
+.cal-legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--lex-radius-full);
+  background: var(--cal-color);
+}
+
+.cal-zone-note,
+.cal-help {
+  margin: 0;
+  font-size: 12px;
+  color: var(--lex-text-tertiary);
+}
+
+.cal-firm-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-sm);
+  padding: var(--lex-space-md);
+  border: 1px solid var(--lex-border-default);
+  border-radius: var(--lex-card-radius);
+  background: var(--lex-bg-card);
+}
+
+.cal-section-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--lex-text-primary);
+}
+
+.cal-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-md);
+}
+
+.cal-detail-when {
+  margin: 0;
+  font-size: 14px;
+  color: var(--lex-text-primary);
+}
+
+.cal-detail-list {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-sm);
+}
+
+.cal-detail-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: var(--lex-space-sm);
+  font-size: 13px;
+}
+
+.cal-detail-row dt {
+  color: var(--lex-text-tertiary);
+}
+
+.cal-detail-row dd {
+  margin: 0;
+  color: var(--lex-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.cal-noscript {
+  padding: var(--lex-space-lg);
+  text-align: center;
+}
+
+/* Narrow content column: stack the toolbar and let the picker fill it. */
+@container cal-page (max-width: 719px) {
+  .cal-toolbar { flex-direction: column; align-items: stretch; }
+  .cal-toolbar-controls { flex-wrap: wrap; }
+  .cal-people { width: 100%; }
+}

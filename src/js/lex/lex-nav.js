@@ -85,6 +85,7 @@
     'auth_error.html':                        { type: 'string', message: 'string', return: 'string' },
     'automation/index.html':                  { automationId: 'string' },
     'brainchild/index.html':                  { vault: 'string', path: 'string' },
+    'calendar.html':                          { view: 'string', date: 'string' },
     'dashboard.html':                         { tour: 'string' },
     'data-connectors.html':                   { connector: 'string', source: 'string', matter_id: 'string' },
     'deck-studio/index.html':                 { id: 'string', deck_id: 'string', matter_id: 'string', matter_name: 'string', view: 'string' },

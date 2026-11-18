@@ -1,0 +1,279 @@
+/* Lex UI - Calendar Grid (js/lex/components/data/lex-calendar-grid.js).
+   Geometry comes from the component as custom properties:
+   --cal-days, --cal-lanes on the grid; --cal-top, --cal-height, --cal-left,
+   --cal-width on timed events; --cal-col-start, --cal-col-span, --cal-lane on
+   all-day bars. Colors are semantic tokens so the dark theme applies. */
+
+lex-calendar-grid {
+  display: block;
+  min-width: 0;
+  container: lex-calendar-grid / inline-size;
+  --cal-gutter: 56px;
+  --cal-hour-height: 48px;
+  --cal-person-0: var(--lex-accent);
+  --cal-person-1: var(--lex-chart-color-2);
+  --cal-person-2: var(--lex-chart-color-3);
+  --cal-person-3: var(--lex-chart-color-4);
+  --cal-person-4: var(--lex-chart-color-5);
+  --cal-person-5: var(--lex-chart-color-6);
+}
+
+.lex-cal-grid {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--lex-border-default);
+  border-radius: var(--lex-card-radius);
+  background: var(--lex-bg-card);
+  overflow: hidden;
+  position: relative;
+}
+
+.lex-cal-grid[aria-busy="true"] {
+  opacity: 0.6;
+}
+
+.lex-cal-head,
+.lex-cal-allday,
+.lex-cal-body {
+  display: grid;
+  grid-template-columns: var(--cal-gutter) minmax(0, 1fr);
+}
+
+.lex-cal-head {
+  grid-template-columns: var(--cal-gutter) repeat(var(--cal-days, 7), minmax(0, 1fr));
+  border-bottom: 1px solid var(--lex-border-default);
+}
+
+.lex-cal-day-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--lex-space-sm) var(--lex-space-xs);
+  border-left: 1px solid var(--lex-border-subtle);
+  color: var(--lex-text-secondary);
+  min-width: 0;
+}
+
+.lex-cal-day-weekday {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.lex-cal-day-date {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--lex-text-primary);
+}
+
+.lex-cal-day-head--today .lex-cal-day-date {
+  color: var(--lex-text-accent);
+}
+
+.lex-cal-day-note {
+  font-size: 11px;
+  color: var(--lex-text-tertiary);
+}
+
+.lex-cal-allday {
+  border-bottom: 1px solid var(--lex-border-default);
+  min-height: 32px;
+}
+
+.lex-cal-allday-label {
+  font-size: 11px;
+  color: var(--lex-text-tertiary);
+  padding: var(--lex-space-xs);
+  text-align: right;
+}
+
+.lex-cal-allday-track {
+  display: grid;
+  grid-template-columns: repeat(var(--cal-days, 7), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--cal-lanes, 1), 24px);
+  gap: 2px;
+  padding: 4px 2px;
+  min-width: 0;
+}
+
+.lex-cal-body {
+  max-height: 640px;
+  overflow-y: auto;
+}
+
+.lex-cal-gutter {
+  display: flex;
+  flex-direction: column;
+}
+
+.lex-cal-hour {
+  height: var(--cal-hour-height);
+  flex: 0 0 auto;
+  position: relative;
+  font-size: 11px;
+  color: var(--lex-text-tertiary);
+}
+
+.lex-cal-hour span {
+  position: absolute;
+  top: -7px;
+  right: 6px;
+}
+
+.lex-cal-columns {
+  display: grid;
+  grid-template-columns: repeat(var(--cal-days, 7), minmax(0, 1fr));
+  height: calc(var(--cal-hour-height) * 24);
+  background-image: linear-gradient(to bottom, var(--lex-border-subtle) 1px, transparent 1px);
+  background-size: 100% var(--cal-hour-height);
+}
+
+.lex-cal-column {
+  position: relative;
+  border-left: 1px solid var(--lex-border-subtle);
+  min-width: 0;
+}
+
+/* Events */
+
+.lex-cal-event {
+  --cal-color: var(--cal-person-0);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 2px 6px;
+  border: 0;
+  border-left: 3px solid var(--cal-color);
+  border-radius: var(--lex-radius-sm);
+  background: color-mix(in srgb, var(--cal-color) 16%, var(--lex-bg-card));
+  color: var(--lex-text-primary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.25;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lex-cal-event:hover {
+  background: color-mix(in srgb, var(--cal-color) 26%, var(--lex-bg-card));
+}
+
+.lex-cal-event:focus-visible {
+  outline: 2px solid var(--lex-border-focus);
+  outline-offset: 1px;
+}
+
+.lex-cal-person-0 { --cal-color: var(--cal-person-0); }
+.lex-cal-person-1 { --cal-color: var(--cal-person-1); }
+.lex-cal-person-2 { --cal-color: var(--cal-person-2); }
+.lex-cal-person-3 { --cal-color: var(--cal-person-3); }
+.lex-cal-person-4 { --cal-color: var(--cal-person-4); }
+.lex-cal-person-5 { --cal-color: var(--cal-person-5); }
+
+/* A coworker's event: lighter, so the viewer's own stand out. */
+.lex-cal-event--coworker {
+  background: color-mix(in srgb, var(--cal-color) 8%, var(--lex-bg-card));
+  color: var(--lex-text-secondary);
+}
+
+/* A busy block: no title, hatched. */
+.lex-cal-event--busy {
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--cal-color) 14%, var(--lex-bg-card)) 0 6px,
+    var(--lex-bg-card) 6px 12px
+  );
+  color: var(--lex-text-secondary);
+  cursor: default;
+}
+
+.lex-cal-event--past-status .lex-cal-event-title {
+  text-decoration: line-through;
+  text-decoration-color: var(--lex-text-tertiary);
+}
+
+.lex-cal-timed {
+  position: absolute;
+  top: var(--cal-top);
+  height: var(--cal-height);
+  left: calc(var(--cal-left) + 1px);
+  width: calc(var(--cal-width) - 3px);
+}
+
+.lex-cal-allday-bar {
+  grid-column: var(--cal-col-start) / span var(--cal-col-span);
+  grid-row: var(--cal-lane);
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+}
+
+.lex-cal-event-title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.lex-cal-event-time {
+  color: var(--lex-text-secondary);
+  white-space: nowrap;
+}
+
+.lex-cal-continues {
+  color: var(--lex-text-tertiary);
+}
+
+.lex-cal-badge {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0 6px;
+  border-radius: var(--lex-radius-full);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: var(--lex-bg-muted);
+  color: var(--lex-text-secondary);
+}
+
+.lex-cal-badge--lana {
+  background: var(--lex-bg-accent-muted);
+  color: var(--lex-text-accent);
+}
+
+.lex-cal-now {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--cal-top);
+  border-top: 2px solid var(--lex-status-danger);
+  pointer-events: none;
+}
+
+.lex-cal-empty {
+  margin: 0;
+  padding: var(--lex-space-sm) var(--lex-space-md);
+  border-top: 1px solid var(--lex-border-subtle);
+  color: var(--lex-text-secondary);
+  font-size: 13px;
+}
+
+/* Narrow column: shorter gutter, hide the time line inside short blocks. */
+@container lex-calendar-grid (max-width: 559px) {
+  .lex-cal-grid { --cal-gutter: 40px; }
+  .lex-cal-day-date { font-size: 16px; }
+  .lex-cal-event-time,
+  .lex-cal-badge { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lex-cal-event { transition: none; }
+}

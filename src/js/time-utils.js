@@ -275,6 +275,82 @@
     return formatUtcDateOnly(new Date(Date.UTC(year, monthIndex, day)));
   }
 
+  // Plain-day arithmetic on a 'YYYY-MM-DD' value (no zone or daylight saving
+  // change can move it): the day `days` later (earlier when negative), or ''.
+  function addPlainDays(dayValue, days) {
+    var text = String(dayValue || '');
+    var y = Number(text.slice(0, 4));
+    var m = Number(text.slice(5, 7)) - 1;
+    var d = Number(text.slice(8, 10));
+    if (text.length !== 10 || !Number.isFinite(y + m + d)) return '';
+    return plainDay(y, m, d + Number(days || 0));
+  }
+
+  // Day of the week of a 'YYYY-MM-DD' value: 0 Sunday to 6 Saturday, or NaN.
+  function plainDayOfWeek(dayValue) {
+    var text = String(dayValue || '');
+    var time = Date.UTC(Number(text.slice(0, 4)), Number(text.slice(5, 7)) - 1, Number(text.slice(8, 10)));
+    return Number.isFinite(time) ? new Date(time).getUTCDay() : NaN;
+  }
+
+  // The wall clock of an instant in a time zone: { day: 'YYYY-MM-DD',
+  // minutes: minutes since that day's local midnight on the wall clock }, or
+  // null for an invalid instant. On a day saving time ends the repeated hour
+  // reads the same wall minutes twice; on the day it starts the skipped hour
+  // never appears.
+  function wallClockInTimeZone(value, timeZone) {
+    var date = value instanceof Date ? value : new Date(value);
+    if (!Number.isFinite(date.getTime())) return null;
+    var parts = {};
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: timeZone || SYSTEM_TIME_ZONE, hourCycle: 'h23',
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit'
+    }).formatToParts(date).forEach(function (part) { parts[part.type] = part.value; });
+    var hour = Number(parts.hour) % 24;
+    return {
+      day: parts.year + '-' + parts.month + '-' + parts.day,
+      minutes: hour * 60 + Number(parts.minute) + Number(parts.second) / 60
+    };
+  }
+
+  // Wall clock minus UTC, in milliseconds, for an instant in a time zone.
+  function timeZoneOffsetMs(value, timeZone) {
+    var date = value instanceof Date ? value : new Date(value);
+    var wall = wallClockInTimeZone(date, timeZone);
+    if (!wall) return NaN;
+    var wallMs = Date.UTC(Number(wall.day.slice(0, 4)), Number(wall.day.slice(5, 7)) - 1, Number(wall.day.slice(8, 10)))
+      + Math.round(wall.minutes * MS_PER_MINUTE);
+    return wallMs - Math.floor(date.getTime() / 1000) * 1000;
+  }
+
+  // The first instant of a plain day in a time zone (its local midnight, or
+  // the first instant that exists when a zone skips midnight), as a Date; an
+  // invalid Date for a bad day.
+  function startOfDayInTimeZone(dayValue, timeZone) {
+    var text = String(dayValue || '');
+    var guess = Date.UTC(Number(text.slice(0, 4)), Number(text.slice(5, 7)) - 1, Number(text.slice(8, 10)));
+    if (!Number.isFinite(guess)) return new Date(NaN);
+    var zone = timeZone || SYSTEM_TIME_ZONE;
+    var first = guess - timeZoneOffsetMs(new Date(guess), zone);
+    var second = guess - timeZoneOffsetMs(new Date(first), zone);
+    var candidate = new Date(second);
+    var wall = wallClockInTimeZone(candidate, zone);
+    // Midnight did not exist (the clock jumped past it): the day starts at
+    // the first instant whose wall day is this day.
+    if (wall && wall.day < text) {
+      // Search to the minute for the first instant on this day (gaps are at
+      // most a few hours).
+      var lo = second;
+      var hi = second + 3 * MS_PER_HOUR;
+      while (hi - lo > MS_PER_MINUTE) {
+        var mid = lo + Math.max(1, Math.floor((hi - lo) / 2 / MS_PER_MINUTE)) * MS_PER_MINUTE;
+        if (wallClockInTimeZone(new Date(mid), zone).day < text) lo = mid; else hi = mid;
+      }
+      return new Date(hi);
+    }
+    return candidate;
+  }
+
   // Report period presets as plain days (inclusive end) in a time zone. Firm
   // reports pass the firm's zone (Lex.Utils.getFirmTimezone), so the days are
   // the firm's whatever zone the person is in; the backend bounds them in the
@@ -373,6 +449,11 @@
     utcDayStart: utcDayStart,
     utcDayEnd: utcDayEnd,
     dayInTimeZone: dayInTimeZone,
+    addPlainDays: addPlainDays,
+    plainDayOfWeek: plainDayOfWeek,
+    wallClockInTimeZone: wallClockInTimeZone,
+    timeZoneOffsetMs: timeZoneOffsetMs,
+    startOfDayInTimeZone: startOfDayInTimeZone,
     reportPresetDays: reportPresetDays,
     toIsoInstant: toIsoInstant,
     toLocalDateInputValue: toLocalDateInputValue,

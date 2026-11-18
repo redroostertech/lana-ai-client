@@ -1934,6 +1934,9 @@ class ApiClient {
       firm_timezone: profile.firm_timezone,
       // False when the firm never chose a zone (admins are asked to set one).
       firm_timezone_set: profile.firm_timezone_set,
+      // The person's own zone (users.time_zone), null when they have none;
+      // read first by Lex.Utils.getOrganizationTimezone.
+      timezone: profile.timezone || null,
       department_id: profile.department_id,
       department_name: profile.department_name,
       role_id: profile.role_id,
@@ -1950,6 +1953,16 @@ class ApiClient {
     localStorage.setItem('user', JSON.stringify(this.user));
     
     return { user: this.user, profile };
+  }
+
+  /**
+   * Keep the person's own time zone on the stored user after the server
+   * saved it (the first-run computer zone, js/shared/device-time-zone.js).
+   */
+  rememberUserTimezone(timezone) {
+    if (!this.user) return;
+    this.user = { ...this.user, timezone: timezone || null };
+    localStorage.setItem('user', JSON.stringify(this.user));
   }
 
   /**

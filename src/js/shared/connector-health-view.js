@@ -38,7 +38,10 @@
     provider_unavailable: 'The provider was unavailable for several syncs, so syncing paused.',
     sync_error: 'The last sync failed.',
     stale_sync: 'No successful sync in the last day.',
-    recent_failures: 'Some syncs failed today.'
+    recent_failures: 'Some syncs failed today.',
+    // The last sync skipped data the calendar needs (team members, events)
+    // because the sign-in predates the permission it needs.
+    calendar_people_need_reconnect: 'Reconnect to link calendar people.'
   };
   // What to do next, in the words of the connector viewer's tabs. The backend
   // lists reasons in precedence order, so the first one picks the step.
@@ -54,7 +57,8 @@
     provider_unavailable: 'Run a sync from the Run tab once the provider is back.',
     sync_error: 'Open Execution Logs to see what failed, then run a sync from Run.',
     stale_sync: 'Run a sync from the Run tab.',
-    recent_failures: 'Open Execution Logs to see what failed.'
+    recent_failures: 'Open Execution Logs to see what failed.',
+    calendar_people_need_reconnect: 'Go to Configuration and sign in again, or use a new key that allows reading users, so the calendar can link its people.'
   };
   var NOT_SIGNED_IN = ['auth_expired', 'api_key_invalid', 'credentials_invalid',
     'firm_app_credentials_invalid', 'app_credentials_invalid', 'not_connected'];
@@ -65,7 +69,8 @@
     api_key_invalid: 'Check the API key',
     credentials_invalid: 'Check the connection details',
     firm_app_credentials_invalid: 'Fix the app credentials',
-    not_connected: 'Check the connection'
+    not_connected: 'Check the connection',
+    calendar_people_need_reconnect: 'Reconnect'
   };
   var FALLBACK_REASON = 'Something needs a look.';
   var ATTENTION_LIST_MAX = 5;

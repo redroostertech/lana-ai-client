@@ -577,6 +577,7 @@ describe('call sites that render untrusted content', () => {
     'automation/js/views/library-detail.js': ['getApiUrl(`/api/v1/automation/artifacts/${encodeURIComponent(artifactId)}/download`)'],
     'doc-studio/app.js': ['url'],
     'integrations/connector-viewer.html': ['authUrl'],
+    'js/calendar/calendar-page.js': ['safeUrl'],
     'js/components/doc-studio-create-modal.js': ['safeUrl'],
     'js/connect-wizard.js': ['url'],
     'js/connector-config-renderer.js': ['authUrl'],

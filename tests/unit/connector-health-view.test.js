@@ -56,6 +56,13 @@ describe('connection health summary', () => {
     for (const text of Object.values(H.REASON_COPY)) expect(text).not.toMatch(/[\u2013\u2014]/);
   });
 
+  test('a connection whose last sync skipped calendar data asks for a reconnect', () => {
+    const view = H.healthView({ data: { connections: [{ id: SOURCE_A, connector_id: 'leadly', name: 'Leadli', scope: 'organization',
+      status: 'needs_attention', reasons: ['calendar_people_need_reconnect'] }] } });
+    expect(view.items[0]).toMatchObject({ reasons: ['Reconnect to link calendar people.'], action: 'Reconnect' });
+    expect(view.items[0].nextStep).toMatch(/sign in again/);
+  });
+
   test('only needs_attention connections become items, with their reasons and action', () => {
     const view = H.healthView(HEALTH);
     expect(view.needsAttention).toBe(2);

@@ -3007,6 +3007,15 @@
       window.LanaFirmTimezonePrompt.mount(el('ccFirmTimezonePrompt'), { user: api.user, isAdmin: isAdmin() });
     }
 
+    // ── 1d. A person with no time zone gets the computer's, once ─────────
+    if (window.LanaDeviceTimeZone) {
+      window.LanaDeviceTimeZone.ensure({
+        user: api.user,
+        api: api,
+        onSaved: function (zone) { api.rememberUserTimezone(zone); }
+      });
+    }
+
     // ── 2. Initialize shell-level components ──────────────────────────────
     if (typeof ConversationActionsModal !== 'undefined') {
       ConversationActionsModal.init();

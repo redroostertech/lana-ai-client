@@ -1,0 +1,304 @@
+/* Calendar - page controller for calendar.html.
+   Standalone page (not routed). Day and week views of the viewer's agenda
+   (LANA events and connected-app appointments), with chosen coworkers' busy
+   time on top. The backend decides what each viewer may see: a coworker's
+   event the viewer could not open arrives as a busy block with no title.
+
+   Layout math lives in js/calendar/calendar-layout.js (drawn by
+   lex-calendar-grid), payload mapping in js/calendar/calendar-page.model.js
+   and the calls in js/services/calendar-api.service.js; this file only wires
+   them to the Lex components on the page.
+
+   Pattern: IIFE + direct init() call.
+*/
+
+(function () {
+  'use strict';
+
+  var Model = window.LanaCalendarPageModel;
+  var Layout = window.LanaCalendarLayout;
+  var T = window.LanaTime;
+  var Calendar = window.LanaCalendarApi.create(window.api);
+
+  var state = {
+    view: 'week',
+    day: '',
+    timeZone: '',
+    coworkers: [],
+    viewerId: '',
+    canManage: false,
+    loadSequence: 0,
+    agenda: null
+  };
+
+  function el(id) { return document.getElementById(id); }
+
+  function show(node, visible) {
+    if (node) node.classList.toggle('hidden', !visible);
+  }
+
+  function setText(id, value) {
+    var node = el(id);
+    if (node) node.textContent = value || '';
+  }
+
+  function storedUser() {
+    return (window.api && window.api.user) || (window.Lex && window.Lex.Auth && window.Lex.Auth.user) || {};
+  }
+
+  function isAdmin() {
+    return !!(window.Lex && window.Lex.Auth && typeof window.Lex.Auth.isAdmin === 'function' && window.Lex.Auth.isAdmin());
+  }
+
+  // The zone days are laid out in: the agenda's (the viewer's own zone, else
+  // the firm's), and before the first agenda the stored person's zone.
+  function currentZone() {
+    if (state.timeZone) return state.timeZone;
+    var utils = window.Lex && window.Lex.Utils;
+    return (utils && typeof utils.getOrganizationTimezone === 'function' && utils.getOrganizationTimezone()) || T.SYSTEM_TIME_ZONE;
+  }
+
+  function notice(message) {
+    setText('calNotice', message);
+    show(el('calNotice'), !!message);
+  }
+
+  function readParams() {
+    var params = window.Lex && window.Lex.Nav ? window.Lex.Nav.getParams() : new URLSearchParams(window.location.search);
+    state.view = Model.normalizeView(params.get('view'));
+    var day = params.get('date') || '';
+    state.day = /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : T.dayInTimeZone(T.nowDate(), currentZone());
+  }
+
+  function writeParams() {
+    if (window.Lex && window.Lex.Nav && typeof window.Lex.Nav.updateParams === 'function') {
+      window.Lex.Nav.updateParams({ view: state.view, date: state.day });
+    }
+  }
+
+  function renderLegend(agenda) {
+    var legend = el('calLegend');
+    if (!legend) return;
+    var people = (agenda && agenda.people) || [];
+    if (people.length < 2) { legend.innerHTML = ''; show(legend, false); return; }
+    var slots = Model.peopleIndex(people, state.viewerId);
+    var esc = window.Lex.Utils.escapeHtml;
+    legend.innerHTML = people.map(function (person) {
+      var label = person.user_id === state.viewerId ? 'You' : (person.name || person.email || 'Coworker');
+      return '<span class="cal-legend-item lex-cal-person-' + (slots[person.user_id] || 0) + '">'
+        + '<span class="cal-legend-swatch" aria-hidden="true"></span>' + esc(label) + '</span>';
+    }).join('');
+    show(legend, true);
+  }
+
+  function render(agenda) {
+    var grid = el('calGrid');
+    var days = Layout.viewDays(state.view, state.day);
+    setText('calRangeTitle', Model.rangeTitle(days, currentZone()));
+    if (!grid) return;
+    grid.timeZone = currentZone();
+    grid.days = days;
+    grid.items = agenda ? Model.toGridItems(agenda, state.viewerId) : [];
+    renderLegend(agenda);
+    setText('calZoneNote', agenda ? Model.zoneNote(agenda) : '');
+  }
+
+  function load() {
+    var sequence = ++state.loadSequence;
+    var days = Layout.viewDays(state.view, state.day);
+    var window_ = Layout.windowFor(days, currentZone());
+    var grid = el('calGrid');
+    if (grid) grid.loading = true;
+    render(state.agenda);
+    return Calendar.agenda({ from: window_.from, to: window_.to, userIds: state.coworkers })
+      .then(function (agenda) {
+        if (sequence !== state.loadSequence) return;
+        var zoneChanged = agenda && agenda.time_zone && agenda.time_zone !== state.timeZone;
+        state.agenda = agenda;
+        if (zoneChanged) {
+          // Days are the viewer's own: reload once in the zone the server named.
+          state.timeZone = agenda.time_zone;
+          var expected = Layout.windowFor(days, state.timeZone);
+          if (expected.from !== window_.from || expected.to !== window_.to) { load(); return; }
+        }
+        notice(agenda && agenda.complete === false
+          ? 'Some events in this range are not shown. Narrow the range or the people to see them all.' : '');
+        render(agenda);
+      })
+      .catch(function (error) {
+        if (sequence !== state.loadSequence) return;
+        state.agenda = null;
+        render(null);
+        notice(error && error.status === 403 && state.coworkers.length
+          ? 'Your firm shows each person only their own calendar, so coworkers cannot be added.'
+          : 'The calendar could not be loaded. Try again in a moment.');
+      })
+      .then(function () {
+        if (sequence === state.loadSequence && grid) grid.loading = false;
+      });
+  }
+
+  function loadPeople() {
+    return Calendar.people().then(function (people) {
+      var picker = el('calCoworkers');
+      state.canManage = people && people.can_manage === true;
+      if (picker) {
+        picker.options = Model.coworkerOptions(people, state.viewerId);
+        show(picker.closest('.cal-people'), people.freebusy_visible !== false || state.canManage);
+      }
+      return state.canManage ? Calendar.policy() : null;
+    }).then(function (policy) {
+      var section = el('calFirmSettings');
+      show(section, !!policy);
+      var toggle = el('calFreeBusyToggle');
+      if (policy && toggle) toggle.checked = policy.freebusy_visible_to_members !== false;
+    }).catch(function () {
+      // The picker stays empty; the viewer's own calendar still loads.
+    });
+  }
+
+  function formatWhen(item) {
+    var zone = currentZone();
+    if (item.is_all_day) {
+      var dayFmt = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'long', month: 'long', day: 'numeric' });
+      var first = item.start_date || T.dayInTimeZone(item.start, zone);
+      return 'All day, ' + dayFmt.format(new Date(first + 'T12:00:00Z'));
+    }
+    var fmt = new Intl.DateTimeFormat('en-US', { timeZone: zone, weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    var timeFmt = new Intl.DateTimeFormat('en-US', { timeZone: zone, hour: 'numeric', minute: '2-digit' });
+    var start = new Date(item.start);
+    var end = new Date(item.end);
+    var sameDay = T.dayInTimeZone(start, zone) === T.dayInTimeZone(end, zone);
+    return fmt.format(start) + ' to ' + (sameDay ? timeFmt.format(end) : fmt.format(end));
+  }
+
+  var STATUS_LABELS = { scheduled: 'Scheduled', confirmed: 'Confirmed', no_show: 'No show', completed: 'Completed' };
+
+  function openEvent(item) {
+    var drawer = el('calEventDrawer');
+    if (!drawer || !item) return;
+    drawer.heading = item.title;
+    setText('calDetailWhen', formatWhen(item));
+    setText('calDetailSource', item.busy ? 'Not shared with you' : (item.badge ? item.badge.label : 'LANA'));
+    setText('calDetailStatus', STATUS_LABELS[item.status] || '');
+    show(el('calDetailStatusRow'), !!STATUS_LABELS[item.status]);
+    setText('calDetailOrganizer', item.organizer);
+    show(el('calDetailOrganizerRow'), !!item.organizer);
+    var matter = item.matter;
+    setText('calDetailMatter', matter ? (matter.name || matter.matter_id || '') : '');
+    show(el('calDetailMatterRow'), !!matter);
+
+    var readOnlyNote = el('calDetailReadOnly');
+    var target = Model.openTargetFor(item.busy ? { busy_only: true } : { source: item.source }, {
+      isAdmin: isAdmin(),
+      safeHttpUrl: window.LanaSafeUrl && window.LanaSafeUrl.safeHttpUrl
+    });
+    if (item.busy) {
+      setText('calDetailReadOnly', 'This time is busy on a coworker\'s calendar. Only they can see what it is.');
+    } else if (item.readOnly && item.source && item.source.kind === 'connector') {
+      setText('calDetailReadOnly', 'This event comes from ' + (item.badge ? item.badge.label : 'a connected app') + '. Change it there.');
+    } else {
+      setText('calDetailReadOnly', '');
+    }
+    show(readOnlyNote, !!(readOnlyNote && readOnlyNote.textContent));
+    state.openTarget = target;
+    show(el('calOpenSourceBtn'), !!target);
+    drawer.open = true;
+  }
+
+  function openSource() {
+    var target = state.openTarget;
+    if (!target) return;
+    if (target.type === 'external') {
+      // Only an http(s) link from the source app (LanaSafeUrl), parsed again here.
+      var safeUrl = window.LanaSafeUrl ? window.LanaSafeUrl.safeHttpUrl(target.url) : '';
+      if (!safeUrl) return;
+      if (window.electronAPI && typeof window.electronAPI.openExternal === 'function') {
+        window.electronAPI.openExternal(safeUrl);
+      } else {
+        window.open(safeUrl, '_blank', 'noopener,noreferrer');
+      }
+      return;
+    }
+    if (target.type === 'app' && window.Lex && window.Lex.Nav) window.Lex.Nav.go(target.href);
+  }
+
+  function saveFreeBusy(visible) {
+    var toggle = el('calFreeBusyToggle');
+    Calendar.setFreeBusyVisible(visible).then(function (policy) {
+      if (toggle) toggle.checked = !policy || policy.freebusy_visible_to_members !== false;
+      if (window.Lex && window.Lex.Toast) window.Lex.Toast.success(visible ? 'Coworkers can now see each other\'s free/busy.' : 'Each person now sees only their own calendar.');
+      return loadPeople().then(load);
+    }).catch(function () {
+      if (toggle) toggle.checked = !visible;
+      if (window.Lex && window.Lex.Toast) window.Lex.Toast.error('The setting could not be saved. Try again.');
+    });
+  }
+
+  function bind() {
+    var page = el('calendarPage');
+    if (!page || page.dataset.bound === 'true') return;
+    page.dataset.bound = 'true';
+    el('calTodayBtn').addEventListener('click', function () {
+      state.day = T.dayInTimeZone(T.nowDate(), currentZone());
+      writeParams();
+      load();
+    });
+    el('calPrevBtn').addEventListener('click', function () {
+      state.day = Model.shiftDay(state.day, state.view, -1);
+      writeParams();
+      load();
+    });
+    el('calNextBtn').addEventListener('click', function () {
+      state.day = Model.shiftDay(state.day, state.view, 1);
+      writeParams();
+      load();
+    });
+    el('calViewToggle').addEventListener('lex-change', function (e) {
+      state.view = Model.normalizeView(e.detail && e.detail.value);
+      writeParams();
+      load();
+    });
+    el('calCoworkers').addEventListener('lex-change', function (e) {
+      state.coworkers = Model.selectedUserIds(e.detail && e.detail.value);
+      load();
+    });
+    el('calGrid').addEventListener('lex-calendar-open', function (e) {
+      openEvent(e.detail && e.detail.item);
+    });
+    el('calOpenSourceBtn').addEventListener('click', openSource);
+    el('calFreeBusyToggle').addEventListener('lex-change', function (e) {
+      saveFreeBusy(!!(e.detail && e.detail.value));
+    });
+  }
+
+  function init() {
+    if (!el('calendarPage')) return;
+    var user = storedUser();
+    state.viewerId = user.id || '';
+    state.agenda = null;
+    state.timeZone = '';
+    readParams();
+    var toggle = el('calViewToggle');
+    if (toggle) toggle.value = state.view;
+    bind();
+    // A person with no time zone of their own gets the computer's, once.
+    if (window.LanaDeviceTimeZone && window.api) {
+      window.LanaDeviceTimeZone.ensure({
+        user: user,
+        api: window.api,
+        onSaved: function (zone) {
+          if (typeof window.api.rememberUserTimezone === 'function') window.api.rememberUserTimezone(zone);
+          load();
+        }
+      });
+    }
+    loadPeople();
+    load();
+  }
+
+  if (window.LexRouter && typeof window.LexRouter.registerPageInit === 'function') {
+    window.LexRouter.registerPageInit('calendar.html', init);
+  }
+  init();
+})();
