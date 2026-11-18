@@ -459,6 +459,11 @@
     if (resultsEl) resultsEl.style.display = 'none';
 
     try {
+      // The edit-goal icon follows the backend's goal permission; have it
+      // before the tiles render.
+      if (window.Lex && Lex.Auth && typeof Lex.Auth.loadMetricGoalPermission === 'function') {
+        await Lex.Auth.loadMetricGoalPermission();
+      }
 
       var data = await api.post('/api/v1/modules/' + selectedModuleKey + '/execute', {
         periodType: periodType,
@@ -1047,13 +1052,11 @@
       '<div class="mb-4"><canvas id="' + canvasId + '" class="reporting-chart-canvas"></canvas></div></div>';
   }
 
-  // Only system_admin / org_admin may set or edit goals (same Lex.Auth source
-  // the Metric Catalog gates on). Drives the admin-only edit-goal icon.
+  // Only people the backend lets set goals see the edit-goal icon
+  // (Lex.Auth.canEditMetricGoals, loaded from the backend before tiles render).
   function isReportingGoalAdmin() {
-    return !!(window.Lex && Lex.Auth && (
-      (typeof Lex.Auth.isSystemAdmin === 'function' && Lex.Auth.isSystemAdmin()) ||
-      (typeof Lex.Auth.isOrgAdmin === 'function' && Lex.Auth.isOrgAdmin())
-    ));
+    return !!(window.Lex && Lex.Auth && typeof Lex.Auth.canEditMetricGoals === 'function'
+      && Lex.Auth.canEditMetricGoals());
   }
 
   // Admin-only: deep-link to the Metric Catalog with the goal editor open for
@@ -2722,10 +2725,13 @@
 
     try {
 
-      var result = await api.post('/api/v1/reporting/reports/' + selectedImportedReportId + '/execute', {
-        filters: {},
-        bypass_cache: false
-      });
+      var periodStartEl = document.getElementById('periodStart');
+      var periodEndEl = document.getElementById('periodEnd');
+      var result = await api.post('/api/v1/reporting/reports/' + selectedImportedReportId + '/execute',
+        window.ReportBuilder.runReportBody(report, {
+          start: periodStartEl ? periodStartEl.value : '',
+          end: periodEndEl ? periodEndEl.value : ''
+        }));
 
       // Store metadata for display
       currentModuleMetadata = {
@@ -2776,7 +2782,9 @@
         } else {
           // Every returned row in a client-side lex-table.
           var tables = window.ReportingTables;
-          var resultCols = tables.resultColumns(rows);
+          // A metric-rows report names its columns (the module's headers).
+          var declaredCols = window.ReportBuilder.declaredTableColumns(result);
+          var resultCols = declaredCols ? tables.breakdownColumns({ columns: declaredCols }, rows) : tables.resultColumns(rows);
           var resultRows = rows.map(function (row, idx) { return tables.mapResultRow(row, resultCols, idx); });
           var card = document.createElement('div');
           card.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6';
@@ -2810,6 +2818,132 @@
     } finally {
       if (executeBtn) executeBtn.loading = false;
     }
+  }
+
+  // ==========================================================================
+  // New report: from the metric catalog, or build your own
+  // ==========================================================================
+
+  // Two paths. From the metric catalog: a catalog metric's value, or the rows
+  // behind it (only metrics the catalog marks has_rows). Build your own: a
+  // custom report definition, imported as before. The backend refuses any
+  // key that is not in the catalog.
+  var NEW_REPORT_PATHS = [
+    { value: 'catalog', label: 'From the metric catalog' },
+    { value: 'custom', label: 'Build your own' }
+  ];
+  function newReportShowOptions() {
+    return [
+      { value: window.ReportBuilder.KINDS.value, label: 'Its value' },
+      { value: window.ReportBuilder.KINDS.rows, label: 'The rows behind it' }
+    ];
+  }
+
+  function newReportContent() {
+    return '<div class="reporting-new-report">'
+      + '<lex-segmented id="newReportPath" name="newReportPath"></lex-segmented>'
+      + '<div id="newReportCatalog" class="reporting-new-report__section">'
+      + '<p class="reporting-new-report__text">Pick a metric from the metric catalog. The report shows its value for the period you run it for, or the rows behind that number.</p>'
+      + '<lex-segmented id="newReportShow" name="newReportShow"></lex-segmented>'
+      + '<lex-select id="newReportMetric" name="newReportMetric" label="Metric" searchable placeholder="Loading metrics..."></lex-select>'
+      + '<lex-input id="newReportName" name="newReportName" label="Report name"></lex-input>'
+      + '<p id="newReportError" class="reporting-new-report__error" role="alert" hidden></p>'
+      + '</div>'
+      + '<div id="newReportCustom" class="reporting-new-report__section" hidden>'
+      + '<p class="reporting-new-report__text">Make your own report from your firm\'s tables. Write a report definition file (JSON, or a ZIP with report.json) and import it.</p>'
+      + '</div>'
+      + '</div>';
+  }
+
+  async function openNewReport() {
+    var modal = Lex.Modal.open({ heading: 'New report', size: 'md', content: newReportContent() });
+    modal.hideActions = false;
+    modal.confirmText = 'Save report';
+    modal.cancelText = 'Cancel';
+
+    var root = modal.contentRoot || modal;
+    var pathEl = root.querySelector('#newReportPath');
+    var showEl = root.querySelector('#newReportShow');
+    var metricEl = root.querySelector('#newReportMetric');
+    var nameEl = root.querySelector('#newReportName');
+    var errorEl = root.querySelector('#newReportError');
+    var catalogEl = root.querySelector('#newReportCatalog');
+    var customEl = root.querySelector('#newReportCustom');
+    var catalogMetrics = [];
+    var path = 'catalog';
+    var kind = window.ReportBuilder.KINDS.value;
+
+    function showError(message) {
+      errorEl.textContent = message || '';
+      errorEl.hidden = !message;
+    }
+    function refreshMetricOptions() {
+      var options = window.ReportBuilder.catalogMetricOptions(catalogMetrics, kind);
+      var current = metricEl.value;
+      metricEl.options = options;
+      metricEl.placeholder = options.length ? 'Pick a metric' : 'No metrics to pick';
+      if (!options.some(function (o) { return o.value === current; })) metricEl.value = '';
+    }
+
+    pathEl.options = NEW_REPORT_PATHS;
+    pathEl.value = path;
+    showEl.options = newReportShowOptions();
+    showEl.value = kind;
+    pathEl.addEventListener('lex-change', function (event) {
+      path = event.detail.value;
+      catalogEl.hidden = path !== 'catalog';
+      customEl.hidden = path !== 'custom';
+      modal.confirmText = path === 'custom' ? 'Import a definition' : 'Save report';
+      showError('');
+    });
+    showEl.addEventListener('lex-change', function (event) {
+      kind = event.detail.value;
+      refreshMetricOptions();
+    });
+    metricEl.addEventListener('lex-change', function (event) {
+      var picked = catalogMetrics.find(function (m) { return m.key === event.detail.value; });
+      if (picked && !nameEl.value) nameEl.value = picked.display_name || picked.title || picked.name || picked.key;
+    });
+
+    modal.addEventListener('lex-confirm', function () {
+      modal.keepOpen();
+      if (path === 'custom') {
+        modal.removeAfterClose();
+        openImportModal();
+        return;
+      }
+      var built = window.ReportBuilder.catalogReportDefinition({ kind: kind, metricKey: metricEl.value, name: nameEl.value });
+      if (built.problem) { showError(built.problem); return; }
+      showError('');
+      saveCatalogReport(built.body).then(function (saved) {
+        if (saved) modal.removeAfterClose();
+      }).catch(function (error) {
+        showError(error.message || 'The report could not be saved. Please try again.');
+      });
+    });
+
+    try {
+      var response = await api.getMetricCatalog({ limit: 1000 });
+      catalogMetrics = (response && response.data) || [];
+      refreshMetricOptions();
+    } catch (error) {
+      showError('The metric catalog could not load. Please try again.');
+    }
+  }
+
+  async function saveCatalogReport(body) {
+    var result = await api.post('/api/v1/reporting/reports', body);
+    var report = result && (result.data || result);
+    await loadImportedReports();
+    if (report && report.report_id) {
+      var entry = findReportEntry('saved:' + report.report_id);
+      if (entry) {
+        openReport(entry);
+        executeImportedReport();
+      }
+    }
+    Lex.Toast.success('Report saved.');
+    return true;
   }
 
   // Import modal
@@ -2945,6 +3079,11 @@
   }
 
   function initImportControls() {
+    var newReportBtn = document.getElementById('newReportBtn');
+    if (newReportBtn) {
+      newReportBtn.addEventListener('click', openNewReport);
+    }
+
     var importBtn = document.getElementById('importReportBtn');
     if (importBtn) {
       importBtn.addEventListener('click', openImportModal);

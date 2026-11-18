@@ -512,6 +512,7 @@
         'js/shared/data-state.js',
         'js/admin/report-metric-card.js',
         'js/shared/dashboard-tiles.js',
+        'js/admin/report-builder.js',
         'js/admin/reports-list.js',
         'js/admin/reporting.js'
       ],

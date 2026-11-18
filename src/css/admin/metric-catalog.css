@@ -266,6 +266,18 @@
   margin-top: 0;
 }
 
+/* A goal for this metric cannot be tracked yet: the editor says why. */
+.metric-catalog-goal-notice {
+  margin: 0 0 0.75rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--lex-text-primary, #111827);
+  background: var(--lex-color-warning-50, var(--lex-bg-secondary));
+  border-left: 3px solid var(--lex-color-warning-500, #f59e0b);
+  border-radius: 0.375rem;
+  padding: 0.5rem 0.75rem;
+}
+
 textarea.metric-catalog-goal-field__input {
   resize: vertical;
   font-family: inherit;

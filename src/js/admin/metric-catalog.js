@@ -106,7 +106,7 @@
   // innerHTML on period/type change, so renderGoalForm reads the metric's
   // format token and the cached per-period goal recommendation from here rather
   // than threading them through every call. Reset each time the editor opens.
-  var goalEditorState = { formatToken: '', recommendations: {} };
+  var goalEditorState = { formatToken: '', recommendations: {}, trackingNotice: null };
 
   function goalMapper() {
     return (typeof window !== 'undefined' && window.MetricGoalFormMapper) || null;
@@ -1018,6 +1018,13 @@
       + '</div>';
   }
 
+  // A metric whose goal always evaluates 'unknown' says why, instead of a
+  // silent unknown status later (goal_tracking from the catalog entry).
+  function goalTrackingNoticeHtml() {
+    if (!goalEditorState.trackingNotice) return '';
+    return '<p class="metric-catalog-goal-notice" role="note">' + escapeHtml(goalEditorState.trackingNotice) + '</p>';
+  }
+
   // Build the editor form for a metric, pre-filled with the goal for the
   // currently selected period (period defaults to monthly).
   function renderGoalForm(metric, period) {
@@ -1033,6 +1040,7 @@
     }
 
     var html = '<div class="metric-catalog-goal-form">';
+    html += '<div id="metricGoalTrackingSlot">' + goalTrackingNoticeHtml() + '</div>';
     html += '<div class="metric-catalog-drawer__section">';
     html += '<div class="metric-catalog-drawer__label">Metric</div>';
     html += '<code class="metric-catalog-key">' + escapeHtml(metric.key) + '</code>';
@@ -1122,7 +1130,7 @@
     // these (label has no unit, no suggestion); both are patched in once the
     // catalog entry and recommendation fetches resolve. definitionFetched
     // guards the one-time format fetch.
-    goalEditorState = { formatToken: '', recommendations: {} };
+    goalEditorState = { formatToken: '', recommendations: {}, trackingNotice: null };
     var definitionFetched = false;
 
     var drawer = Lex.Drawer.open({
@@ -1175,6 +1183,9 @@
         if (def && mapper.formatToken) {
           goalEditorState.formatToken = mapper.formatToken(def.format);
         }
+        goalEditorState.trackingNotice = mapper.goalTrackingNotice ? mapper.goalTrackingNotice(def) : null;
+        var trackingSlot = el('metricGoalTrackingSlot');
+        if (trackingSlot) trackingSlot.innerHTML = goalTrackingNoticeHtml();
         var labelNode = el('metricGoalTargetValueLabel');
         if (labelNode) labelNode.textContent = targetValueLabel(currentType());
         var hintNode = el('metricGoalTargetValueHint');
@@ -1473,23 +1484,29 @@
   }
 
   function init() {
-    if (window.Lex && Lex.Auth && !Lex.Auth.isAdmin()) {
-      Lex.Nav.go('dashboard.html', { replace: true });
-      return;
-    }
-    // Only system_admin / org_admin may set or edit goals. Reuse the same
-    // Lex.Auth role source the page already gates access on; non-admins reach
-    // the catalog but see no Goal action.
-    isGoalAdmin = !!(window.Lex && Lex.Auth && (Lex.Auth.isSystemAdmin() || Lex.Auth.isOrgAdmin()));
-    var ready = window.customElements && typeof window.customElements.whenDefined === 'function'
-      ? window.customElements.whenDefined('lex-table')
-      : Promise.resolve();
-    ready.then(function () {
-      var table = el('metricCatalogTable');
-      // Renderers must be registered before the first setData.
-      if (table && typeof table.setCellRenderers === 'function') table.setCellRenderers(cellRenderers());
-      wireToolbar();
-      load();
+    var auth = window.Lex && Lex.Auth;
+    // The backend says whether this person may set goals (the same rule as
+    // its goal writes). The page is open to admins and to anyone who may set
+    // goals (super_admin and system administrator roles are not isAdmin());
+    // only those who may set goals see the Goal action.
+    var permission = auth && typeof auth.loadMetricGoalPermission === 'function'
+      ? auth.loadMetricGoalPermission() : Promise.resolve(false);
+    Promise.resolve(permission).then(function (canEdit) {
+      if (auth && !auth.isAdmin() && !canEdit) {
+        Lex.Nav.go('dashboard.html', { replace: true });
+        return;
+      }
+      isGoalAdmin = canEdit === true;
+      var ready = window.customElements && typeof window.customElements.whenDefined === 'function'
+        ? window.customElements.whenDefined('lex-table')
+        : Promise.resolve();
+      ready.then(function () {
+        var table = el('metricCatalogTable');
+        // Renderers must be registered before the first setData.
+        if (table && typeof table.setCellRenderers === 'function') table.setCellRenderers(cellRenderers());
+        wireToolbar();
+        load();
+      });
     });
   }
 

@@ -964,7 +964,6 @@
           <p class="text-xs text-gray-500 mb-3 line-clamp-2">${metric.description}</p>
 
           <div class="flex items-center justify-between text-xs text-gray-400 mb-3">
-            <span><i class="fas fa-bullseye mr-1"></i>Target: ${metric.defaultTarget}</span>
             <span><i class="fas fa-${metric.visualization?.chartType === 'line' ? 'chart-line' : 'chart-bar'} mr-1"></i>${metric.type}</span>
           </div>
 
@@ -1060,9 +1059,6 @@
               <div class="flex-1 min-w-0">
                 <p class="font-medium text-sm text-gray-900 truncate">${metric.label}</p>
                 <p class="text-xs text-gray-500 truncate">${category.name}</p>
-              </div>
-              <div class="flex items-center gap-2 text-xs text-gray-500">
-                <span><i class="fas fa-bullseye mr-1"></i>${metric.defaultTarget}</span>
               </div>
             </div>
             <button onclick="removeMetricFromBoard('${metricKey}')" class="ml-3 text-gray-400 hover:text-red-600 transition">

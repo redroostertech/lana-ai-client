@@ -80,7 +80,6 @@ Two-column grid layout using Lex UI components:
 | `moduleTitle` | Active module name |
 | `visualizationsContainer` | Chart target |
 | `drilldownModal` | Detail table modal |
-| `dataOverridePanel` | Override drawer |
 | `dataSourcesModal` | Data sources info |
 | `missingEntitiesModal` | Missing data warning |
 | `moduleInfoModal` | Module metadata |
@@ -110,7 +109,6 @@ Methods callable from inline `onclick` handlers:
 | `showModuleInfo()` | Open module info modal |
 | `closeModuleInfo()` | Close module info modal |
 | `closeDrilldownModal()` | Close drilldown modal |
-| `closeDataOverridePanel()` | Close override panel |
 | `closeDataSourcesModal()` | Close data sources modal |
 | `closeMissingEntitiesModal()` | Close missing entities modal |
 
@@ -259,7 +257,6 @@ Modal-based paginated table for metric detail data.
 | Modal | Trigger | Purpose |
 |-------|---------|---------|
 | `#drilldownModal` | "Details" button on metric card | Paginated detail table |
-| `#dataOverridePanel` | "Override" button on metric card | Slide-out target override form |
 | `#dataSourcesModal` | "X Connectors" button in header | Lists data sources used |
 | `#missingEntitiesModal` | "X Missing" button in header | Missing data entity warnings |
 | `#moduleInfoModal` | "Learn More" button in header | Module metadata (version, tier, status) |

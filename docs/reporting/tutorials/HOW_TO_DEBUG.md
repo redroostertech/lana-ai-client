@@ -207,7 +207,6 @@ console.log(el.value, el.getAttribute('value'));
 window._reporting.showModuleInfo()         // Open module info modal
 window._reporting.closeModuleInfo()        // Close module info modal
 window._reporting.closeDrilldownModal()    // Close drilldown modal
-window._reporting.closeDataOverridePanel() // Close override panel
 window._reporting.closeDataSourcesModal()  // Close data sources modal
 window._reporting.closeMissingEntitiesModal() // Close missing entities modal
 ```

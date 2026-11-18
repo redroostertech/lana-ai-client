@@ -142,15 +142,15 @@
       ? '<span class="inline-flex items-center gap-1 ' + changeColor + '">' + changeArrow + formatPercentage(Math.abs(vm.percentChange), 1) + '</span>'
       : '<span class="text-gray-400">' + EMPTY + '</span>';
 
-    // Goal(s) cell: resolved goal target + period qualifier; falls back to a flat
-    // configured target (no period) and the empty token when neither exists.
+    // Goal(s) cell: resolved goal target + period qualifier; falls back to the
+    // card target (only ever a Metric Catalog goal) and "No goal set" otherwise.
     var goalCell;
     if (vm.hasGoal && vm.targetValue !== null) {
       goalCell = fmtValue(vm.targetValue) + ' <span class="text-xs font-normal text-gray-400">(' + goalPeriod + ')</span>';
     } else if (metric.target !== null && metric.target !== undefined) {
       goalCell = fmtValue(metric.target);
     } else {
-      goalCell = '<span class="text-gray-400">' + EMPTY + '</span>';
+      goalCell = '<span class="text-gray-400">No goal set</span>';
     }
 
     // Percent to Goal: backend attainment when a goal block exists; otherwise

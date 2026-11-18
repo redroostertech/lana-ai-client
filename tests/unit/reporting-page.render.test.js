@@ -42,7 +42,7 @@ test('a tile with no current or prior value shows the empty token, never N/A', (
 });
 
 describe('tile buttons run through one delegated listener', () => {
-  function setup() {
+  function setup({ goalAdmin = true } = {}) {
     const ids = { periodStart: { value: '2026-11-10' }, periodEnd: { value: '2026-11-16' } };
     let source = fs.readFileSync(path.join(__dirname, '../../src/js/admin/reporting.js'), 'utf8');
     const end = source.lastIndexOf('  init();');
@@ -51,7 +51,7 @@ describe('tile buttons run through one delegated listener', () => {
     window.ReportingGoalComparisonMapper = require('../../src/js/shared/reporting-goal-comparison-mapper.js');
     const open = jest.fn().mockResolvedValue();
     const modalOpen = jest.fn(() => ({ querySelector: () => null }));
-    window.Lex = { Modal: { open: modalOpen, alert: jest.fn() }, Auth: { isOrgAdmin: () => true },
+    window.Lex = { Modal: { open: modalOpen, alert: jest.fn() }, Auth: { canEditMetricGoals: () => goalAdmin },
       Nav: { go: jest.fn() } };
     const timeWin = { Date };
     new Function('window', fs.readFileSync(path.join(__dirname, '../../src/js/time-utils.js'), 'utf8'))(timeWin);
@@ -94,5 +94,11 @@ describe('tile buttons run through one delegated listener', () => {
     const html = s.exports.renderMetricCardBody(metric);
     s.exports.onTileClick(clickOn(html, 'data-metric-edit-goal'));
     expect(s.Lex.Nav.go).toHaveBeenCalledWith(expect.stringContaining('editGoal=k1'));
+  });
+
+  // One admin rule with the backend: a role it refuses gets no goal action.
+  test('control: a role that cannot set goals gets no edit goal button', () => {
+    const html = setup({ goalAdmin: false }).exports.renderMetricCardBody(metric);
+    expect(html).not.toContain('data-metric-edit-goal');
   });
 });

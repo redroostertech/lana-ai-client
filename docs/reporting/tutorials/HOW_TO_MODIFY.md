@@ -116,29 +116,6 @@ The `#moduleSearchInput` filters modules by name using string matching. The sear
 
 ---
 
-## Changing the Override Panel
-
-The data override panel (`#dataOverridePanel`) is a slide-out drawer. To modify:
-
-1. **HTML structure:** Edit the panel markup in `reporting.html`
-2. **Form fields:** Modify the form inside `#overrideForm`
-3. **Submit handler:** Update the `overrideForm` submit handler in `reporting.js`
-
-### Override Form Fields
-
-| Field | ID | Purpose |
-|-------|-----|---------|
-| New Value | `overrideValue` | Target override value (required) |
-| Notes | `overrideNotes` | Reason for override (optional) |
-| Hidden: Type | `overrideType` | Always "manual" |
-| Hidden: Period Start | `overridePeriodStart` | Auto-filled |
-| Hidden: Period End | `overridePeriodEnd` | Auto-filled |
-| Hidden: Period Type | `overridePeriodType` | Auto-filled |
-| Hidden: Module Key | `overrideModuleKey` | Auto-filled |
-| Hidden: Metric Key | `overrideMetricKey` | Auto-filled |
-
----
-
 ## Changing Number Formatting
 
 ### Currency

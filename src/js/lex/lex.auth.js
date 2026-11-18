@@ -28,6 +28,45 @@
     return hasRole('system_admin') || hasRole('org_admin');
   }
 
+  // Whether this person may set or remove metric goals. The backend answers
+  // (GET /api/v1/modules/metric-goals/permission) with the same rule its
+  // requireAdminRole enforces on the goal writes, so the client holds no role
+  // list of its own and the two cannot disagree. Until the answer arrives,
+  // and on any failure, the Goal actions stay hidden.
+  var goalPermission = null;
+  var goalPermissionUser = null;
+  var canEditGoals = false;
+
+  function currentUserId() {
+    var user = getUser();
+    return user ? (user.id || user.user_id || null) : null;
+  }
+
+  function loadMetricGoalPermission() {
+    var userId = currentUserId();
+    if (goalPermission && goalPermissionUser === userId) return goalPermission;
+    goalPermissionUser = userId;
+    canEditGoals = false;
+    if (!userId || typeof api === 'undefined' || !api || typeof api.get !== 'function') {
+      goalPermission = Promise.resolve(false);
+      return goalPermission;
+    }
+    goalPermission = Promise.resolve(api.get('/api/v1/modules/metric-goals/permission')).then(function (resp) {
+      var body = resp && resp.data && typeof resp.data === 'object' ? resp.data : resp;
+      canEditGoals = !!(body && body.can_edit_goals === true);
+      return canEditGoals;
+    }).catch(function () {
+      goalPermission = null;
+      canEditGoals = false;
+      return false;
+    });
+    return goalPermission;
+  }
+
+  function canEditMetricGoals() {
+    return canEditGoals && goalPermissionUser === currentUserId();
+  }
+
   global.Lex.Auth = {
     get user() { return getUser(); },
 
@@ -40,6 +79,10 @@
     isAdmin: function () { return hasRole('system_admin') || hasRole('org_admin') || hasRole('organization_admin') || hasRole('admin'); },
 
     canAccessAdminPages: canAccessAdminPages,
+
+    canEditMetricGoals: canEditMetricGoals,
+
+    loadMetricGoalPermission: loadMetricGoalPermission,
 
     canViewSystemStatus: function () { return hasRole('system_admin') || hasRole('org_admin') || hasRole('organization_admin'); }
   };

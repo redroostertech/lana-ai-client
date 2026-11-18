@@ -213,6 +213,18 @@
     };
   }
 
+  // Why a goal saved for this metric cannot be tracked yet, from the catalog
+  // entry's goal_tracking (the backend decides; GET /metric-catalog/:metricKey).
+  // Returns the sentence to show in the goal editor, or null when the goal can
+  // be tracked (or the entry has not loaded).
+  function goalTrackingNotice(catalogEntry) {
+    var tracking = catalogEntry && catalogEntry.goal_tracking;
+    if (!tracking || tracking.trackable !== false) return null;
+    return typeof tracking.message === 'string' && tracking.message
+      ? tracking.message
+      : 'LANA cannot track a goal for this metric yet.';
+  }
+
   var api = {
     TARGET_TYPES: TARGET_TYPES,
     TARGET_PERIODS: TARGET_PERIODS,
@@ -224,7 +236,8 @@
     targetValueLabel: targetValueLabel,
     formatGoalValue: formatGoalValue,
     buildRecommendationView: buildRecommendationView,
-    buildThresholdSuggestionView: buildThresholdSuggestionView
+    buildThresholdSuggestionView: buildThresholdSuggestionView,
+    goalTrackingNotice: goalTrackingNotice
   };
 
   if (typeof module !== 'undefined' && module.exports) {

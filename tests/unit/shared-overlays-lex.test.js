@@ -1,7 +1,7 @@
 /**
  * Shared overlays on lex components (UI standard section 11, wave 3b).
  *
- * The notifications, activity and data-override slide-overs are lex-drawers,
+ * The notifications and activity slide-overs are lex-drawers,
  * and the conflict, contact-search, conversation-search and note dialogs are
  * lex-modals. These tests run the real modules and the real components in
  * jsdom.
@@ -137,51 +137,6 @@ describe('ActivityPanel on lex-drawer', () => {
     window.eval(read('activity.js'));
     window.eval('window.ActivityPanel.init()');
     expect(window.document.querySelectorAll('lex-drawer').length).toBe(1);
-  });
-});
-
-describe('DataOverridePanel on lex-drawer', () => {
-  function bootOverride() {
-    const window = boot('', { components: ['lex-modal', 'lex-drawer', 'lex-btn'] });
-    const source = read('components/data-override-panel.js')
-      .replace('export class DataOverridePanel', 'window.DataOverridePanel = class DataOverridePanel')
-      .replace('export default DataOverridePanel;', '');
-    window.eval(source);
-    window.eval('var LanaTime = { utcDayStart: (d) => d + "T00:00:00Z", utcDayEnd: (d) => d + "T23:59:59Z" };');
-    return window;
-  }
-
-  test('builds a drawer with Save/Cancel in its footer and opens/closes it', async () => {
-    const window = bootOverride();
-    const apiClient = { get: jest.fn(async () => []), post: jest.fn(), delete: jest.fn() };
-    const panel = new window.DataOverridePanel({ apiClient, onError: () => {}, formatDateRange: () => 'January 2026' });
-    const drawer = window.document.getElementById('dataOverridePanel');
-    expect(drawer.tagName).toBe('LEX-DRAWER');
-    expect(window.document.getElementById('dataOverrideOverlay')).toBeNull();
-
-    const footer = drawer.querySelector('.lex-drawer-footer');
-    const save = footer.querySelector('#saveOverrideBtn');
-    expect(save.getAttribute('form')).toBe('overrideForm');
-    expect(save.getAttribute('type')).toBe('submit');
-    expect(footer.querySelector('#cancelOverrideBtn')).not.toBeNull();
-
-    panel.open('revenue', 'Revenue', 'Total', 100, {
-      periodStart: '2026-01-01', periodEnd: '2026-01-31', periodType: 'monthly', moduleKey: 'finance'
-    });
-    expect(drawer.open).toBe(true);
-    expect(window.document.getElementById('overrideMetricName').textContent).toBe('Revenue');
-
-    click(window, footer.querySelector('#cancelOverrideBtn'));
-    expect(drawer.open).toBeFalsy();
-    expect(panel.currentMetric).toBeNull();
-  });
-
-  test('a second instance reuses the mounted drawer', () => {
-    const window = bootOverride();
-    const apiClient = { get: jest.fn(), post: jest.fn(), delete: jest.fn() };
-    new window.DataOverridePanel({ apiClient });
-    new window.DataOverridePanel({ apiClient });
-    expect(window.document.querySelectorAll('#dataOverridePanel').length).toBe(1);
   });
 });
 

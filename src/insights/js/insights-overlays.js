@@ -12,7 +12,6 @@
  *                                              HTML for a chart's help icon; clicking it opens a lex-modal
  *   InsightsOverlays.pageModal(id, opts)       a persistent lex-modal built from a <template id="<id>Template">
  *   InsightsOverlays.openModal(id, opts) / closeModal(id)
- *   InsightsOverlays.overridePanel(opts)       the shared DataOverridePanel (js/components/data-override-panel.js)
  *
  * The modals are created in JS rather than declared in page markup: a lex-modal
  * parsed after lex-modal.js is defined (dashboard.html loads it in <head>)
@@ -24,7 +23,6 @@
   var DRILLDOWN_ID = 'drilldownModal';
   var helpRegistry = Object.create(null);
   var helpListenerInstalled = false;
-  var overrideInstance = null;
 
   function doc() { return global.document; }
 
@@ -184,24 +182,6 @@
       '</svg></button>';
   }
 
-  // ---------------------------------------------------------------------------
-  // Data override (lex-drawer, via the shared DataOverridePanel component)
-  // ---------------------------------------------------------------------------
-
-  /**
-   * The one DataOverridePanel for the page, created on first use (the
-   * component module sets window.DataOverridePanel). opts are its config
-   * (apiClient, onSaveSuccess, onDeleteSuccess, onError, formatNumber,
-   * formatDateRange). Returns null if the component is not loaded.
-   */
-  function overridePanel(opts) {
-    if (overrideInstance) return overrideInstance;
-    var Panel = global.DataOverridePanel;
-    if (typeof Panel !== 'function') return null;
-    overrideInstance = new Panel(opts || {});
-    return overrideInstance;
-  }
-
   var InsightsOverlays = {
     pageModal: pageModal,
     openModal: openModal,
@@ -211,9 +191,7 @@
     closeDrilldown: closeDrilldown,
     helpButton: helpButton,
     openHelp: openHelp,
-    overridePanel: overridePanel,
     _reset: function () {
-      overrideInstance = null;
       helpRegistry = Object.create(null);
     }
   };

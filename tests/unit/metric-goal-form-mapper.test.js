@@ -285,3 +285,22 @@ describe('metric-goal-form-mapper', () => {
     });
   });
 });
+
+// Metric families whose goal always evaluates 'unknown' (a breakdown, an
+// amount per currency, a current snapshot) say why in the goal editor; the
+// backend decides which (GET /metric-catalog/:metricKey goal_tracking).
+describe('goalTrackingNotice', () => {
+  test('a goal that cannot be tracked shows the backend reason', () => {
+    const message = 'This metric splits paid work by practice area instead of giving one number, so LANA cannot compare it with a goal yet.';
+    expect(mapper.goalTrackingNotice({ goal_tracking: { trackable: false, reason: 'distribution_goal_unavailable', message } })).toBe(message);
+    expect(mapper.goalTrackingNotice({ goal_tracking: { trackable: false, reason: 'x' } })).toBe('LANA cannot track a goal for this metric yet.');
+  });
+
+  test.each([
+    ['a trackable metric', { goal_tracking: { trackable: true, reason: null, message: null } }],
+    ['an entry without goal_tracking', { key: 'k' }],
+    ['no entry', null],
+  ])('control: %s shows no notice', (_label, entry) => {
+    expect(mapper.goalTrackingNotice(entry)).toBeNull();
+  });
+});

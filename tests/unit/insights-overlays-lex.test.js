@@ -2,7 +2,7 @@
  * Insights overlays on lex components (UI standard section 11, wave 3b part 2B).
  *
  * insights/module-execution.html and insights/dashboard.html share their
- * drilldown, chart-help, page and data-override dialogs through
+ * drilldown, chart-help and page dialogs through
  * src/insights/js/insights-overlays.js. These tests run that module with the
  * real lex components in jsdom, and check the pages no longer ship the
  * hand-built overlays.
@@ -139,46 +139,6 @@ describe('InsightsOverlays page modals from templates', () => {
   });
 });
 
-describe('InsightsOverlays data override panel', () => {
-  function bootOverride() {
-    const window = boot();
-    const source = read('js/components/data-override-panel.js')
-      .replace('export class DataOverridePanel', 'window.DataOverridePanel = class DataOverridePanel')
-      .replace('export default DataOverridePanel;', '');
-    window.eval(source);
-    window.eval('var LanaTime = { utcDayStart: (d) => d + "T00:00:00Z", utcDayEnd: (d) => d + "T23:59:59Z" };');
-    window.eval('var formatDate = (d) => String(d);');
-    return window;
-  }
-
-  test('returns null until the component is loaded', () => {
-    const window = boot();
-    expect(window.InsightsOverlays.overridePanel({})).toBeNull();
-  });
-
-  test('is one shared lex-drawer; existing overrides can be deleted', async () => {
-    const window = bootOverride();
-    const overrides = [{ override_id: 'ov-1', metric_key: 'revenue', override_value: 5, period_start: 'a', period_end: 'b', notes: '<b>x</b>', created_at: '2026-01-02' }];
-    const apiClient = { get: jest.fn(async () => overrides), post: jest.fn(async () => ({})), delete: jest.fn(async () => ({})) };
-    const onDeleteSuccess = jest.fn();
-    window.Lex.Modal.confirmAsync = jest.fn(async () => true);
-
-    const panel = window.InsightsOverlays.overridePanel({ apiClient, onError: () => {}, onDeleteSuccess, formatDateRange: () => 'Jan' });
-    expect(window.InsightsOverlays.overridePanel({})).toBe(panel);
-    expect(window.document.querySelectorAll('#dataOverridePanel').length).toBe(1);
-
-    panel.open('revenue', 'Revenue', '', 100, { periodStart: '2026-01-01', periodEnd: '2026-01-31', periodType: 'monthly', moduleKey: 'growth' });
-    await tick(window);
-    const list = window.document.getElementById('existingOverridesList');
-    // Notes are escaped.
-    expect(list.querySelector('b')).toBeNull();
-    click(window, list.querySelector('.delete-override-btn'));
-    await tick(window);
-    expect(apiClient.delete).toHaveBeenCalledWith('/api/v1/modules/growth/data-overrides/ov-1');
-    expect(onDeleteSuccess).toHaveBeenCalledWith('ov-1');
-  });
-});
-
 describe('insights pages ship no hand-built overlays', () => {
   const pages = ['insights/module-execution.html', 'insights/dashboard.html', 'insights/predictions.html'];
 
@@ -198,7 +158,17 @@ describe('insights pages ship no hand-built overlays', () => {
   test.each(['insights/module-execution.html', 'insights/dashboard.html'])('%s loads the shared overlays module', (page) => {
     const html = read(page);
     expect(html).toContain('js/insights-overlays.js');
-    expect(html).toContain("import { DataOverridePanel } from '../js/components/data-override-panel.js'");
     expect(html).not.toMatch(/id="drilldownModal"/);
+  });
+
+  // A target is a metric goal, set only in the Metric Catalog: the cards have
+  // no "Override target" path and render the goal cell instead.
+  test.each(['insights/module-execution.html', 'insights/dashboard.html'])('%s has no Override target path', (page) => {
+    const html = read(page);
+    expect(html).not.toMatch(/openDataOverridePanel|DataOverridePanel|'target'\)/);
+    expect(html).toContain('MetricGoalCell.goalCellHtml(metric');
+    expect(html).toContain('js/metric-goal-cell.js');
+    expect(html).toContain('../js/dashboard/metric-goal-comparison.js');
+    expect(html).toContain('../js/lex/lex.auth.js');
   });
 });

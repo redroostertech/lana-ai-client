@@ -35,7 +35,7 @@ test('empty cells use the shared empty token, never a dash', () => {
   const html = win.ReportMetricCard.render({ key: 'c', name: 'Count', type: 'count', current: 3, prior: null, data_state: 'ok' }, ctx);
   expect(html).not.toMatch(/[–—]/);
   expect(text(html)).toContain('% Change ' + win.DataState.EMPTY_VALUE);
-  expect(text(html)).toContain('Goal(s) ' + win.DataState.EMPTY_VALUE);
+  expect(text(html)).toContain('Goal(s) No goal set');
 });
 
 test('a tile that is not ok shows its state and reason, not N/A numbers', () => {
@@ -123,10 +123,11 @@ describe('tile markup is safe', () => {
   });
 });
 
-test('an empty Goal(s) cell is muted like the other empty cells', () => {
-  const html = win.ReportMetricCard.render({ key: 'c', name: 'Count', current: 3, prior: 2, data_state: 'ok' }, ctx);
+// A metric with no goal set in the Metric Catalog says so; no default target.
+test('a Goal(s) cell with no goal says "No goal set", muted like the other empty cells', () => {
+  const html = win.ReportMetricCard.render({ key: 'c', name: 'Count', current: 3, prior: 2, target: null, data_state: 'ok' }, ctx);
   const goal = html.slice(html.indexOf('Goal(s)'), html.indexOf('Percent to Goal'));
-  expect(goal).toContain('<span class="text-gray-400">' + win.DataState.EMPTY_VALUE + '</span>');
+  expect(goal).toContain('<span class="text-gray-400">No goal set</span>');
 });
 
 describe('tile styles live in reporting.css, not inline', () => {

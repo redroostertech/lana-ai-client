@@ -201,6 +201,31 @@
   margin: 0 0 1rem;
 }
 
+/* New report: from the metric catalog, or build your own. */
+.reporting-new-report,
+.reporting-new-report__section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.reporting-new-report__section[hidden],
+.reporting-new-report__error[hidden] {
+  display: none;
+}
+
+.reporting-new-report__text {
+  color: var(--lex-text-secondary);
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.reporting-new-report__error {
+  color: var(--lex-danger);
+  font-size: 0.875rem;
+  margin: 0;
+}
+
 /* A failed run's data state (shared DataState block) under the run controls. */
 .reporting-run-state {
   margin-top: 1rem;

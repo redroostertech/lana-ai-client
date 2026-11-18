@@ -37,11 +37,10 @@
   <script src="js/record-table-kit.js"></script>
   <script src="js/insights-tables.js"></script>
   <script src="js/insights-overlays.js"></script>
-  <!-- Shared data-override lex-drawer (used through InsightsOverlays.overridePanel) -->
-  <script type="module">
-    import { DataOverridePanel } from '../js/components/data-override-panel.js';
-    window.DataOverridePanel = DataOverridePanel;
-  </script>
+  <!-- Goal cell on each card: the goal from the Metric Catalog, edited only there -->
+  <script src="../js/dashboard/metric-goal-comparison.js"></script>
+  <script src="js/metric-goal-cell.js"></script>
+  <script src="../js/lex/lex.auth.js"></script>
 </head>
 <body class="bg-gray-50 min-h-screen">
   <!-- Sidebar -->
@@ -85,8 +84,6 @@
     </header>
 
     <!-- Notifications: js/notifications.js mounts its own lex-drawer (#notificationPanel). -->
-
-    <!-- Data override: InsightsOverlays.overridePanel() mounts the shared lex-drawer (#dataOverridePanel). -->
 
     <main class="p-4 lg:p-8">
       <!-- Module Execution Controls -->
@@ -2415,9 +2412,6 @@
         changeText = metric.formattedChange || (change !== null ? formatNumber(Math.abs(change), 1) : 'N/A');
       }
 
-      // Determine if override button should be shown (for N/A or 0 values, or always show)
-      const showOverrideButton = true; // Show for all metrics - user can override any value
-
       return `
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
           <!-- Metric Header -->
@@ -2458,29 +2452,17 @@
             </span>
           </div>
 
-          <!-- Prior Period & Target -->
+          <!-- Prior Period & Goal -->
           <div class="grid grid-cols-2 gap-4 text-sm">
             <div>
               <p class="text-xs text-gray-500 mb-1">Prior Period</p>
               <p class="font-semibold text-gray-700">${priorValue}</p>
             </div>
             <div>
-              <div class="flex items-center justify-between mb-1">
-                <p class="text-xs text-gray-500">Target</p>
-                ${showOverrideButton ? `
-                  <button
-                    onclick="openDataOverridePanel('${metric.key}', '${metric.name}', '${metric.description || ''}', ${metric.target}, 'target')"
-                    class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1"
-                    title="Override target value"
-                  >
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                    </svg>
-                    Override
-                  </button>
-                ` : ''}
-              </div>
-              <p class="font-semibold text-gray-700">${targetValue}</p>
+              ${MetricGoalCell.goalCellHtml(metric, {
+                targetDisplay: targetValue,
+                canEdit: !!(window.Lex && Lex.Auth && typeof Lex.Auth.canEditMetricGoals === 'function' && Lex.Auth.canEditMetricGoals())
+              })}
             </div>
           </div>
         </div>
@@ -3229,6 +3211,10 @@
 
     // Execute module
     async function executeModule() {
+      // The Goal cell's Set goal link follows the backend's goal permission.
+      if (window.Lex && Lex.Auth && typeof Lex.Auth.loadMetricGoalPermission === 'function') {
+        await Lex.Auth.loadMetricGoalPermission();
+      }
       const moduleKey = document.getElementById('moduleSelect').value;
       const periodType = lexSelectValue(document.getElementById('periodType'));
       const periodStart = document.getElementById('periodStart').value;
@@ -3642,42 +3628,6 @@
       }
     });
 
-    // ========================================================================
-    // DATA OVERRIDE PANEL (shared lex-drawer: js/components/data-override-panel.js)
-    // ========================================================================
-
-    // The page's one DataOverridePanel, created on first use.
-    function dataOverridePanel() {
-      return InsightsOverlays.overridePanel({
-        apiClient: api,
-        formatNumber,
-        formatDateRange,
-        onError: (error) => showError(error.message || 'Failed to save override. Please try again.'),
-        onSaveSuccess: (metricName) => showInfo(`Override saved for ${metricName}. Re-execute module to see updated values.`),
-        onDeleteSuccess: () => showInfo('Override deleted successfully. Re-execute module to see updated values.')
-      });
-    }
-
-    // Open data override panel
-    function openDataOverridePanel(metricKey, metricName, metricDescription, currentValue, overrideType = 'target') {
-      const panel = dataOverridePanel();
-      if (!panel) {
-        showError('The override panel could not be loaded. Please reload the page.');
-        return;
-      }
-      panel.open(metricKey, metricName, metricDescription, currentValue, {
-        periodStart: document.getElementById('periodStart').value,
-        periodEnd: document.getElementById('periodEnd').value,
-        periodType: lexSelectValue(document.getElementById('periodType')),
-        moduleKey: document.getElementById('moduleSelect').value
-      }, overrideType);
-    }
-
-    // Close data override panel
-    function closeDataOverridePanel() {
-      const panel = dataOverridePanel();
-      if (panel) panel.close();
-    }
 
     // Initialize dynamic menu
     renderMenu('#mainNav');

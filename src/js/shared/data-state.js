@@ -12,6 +12,7 @@
   var TITLES = {
     no_data_source: 'No data source',
     not_configured: 'Not set up yet',
+    no_goal: 'No goal set',
     insufficient_data: 'Not enough data',
     timeout: 'Took too long',
     invalid_request: 'Check the request',

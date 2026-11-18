@@ -14,8 +14,7 @@
  * const renderer = new MetricGridRenderer('metrics-container', metrics, {
  *   showComparison: true,
  *   gridColumns: 'md:grid-cols-2 lg:grid-cols-3',
- *   onMetricClick: (metricKey, metricName) => { console.log('Clicked:', metricKey); },
- *   onOverrideClick: (metricKey, metricName, description, targetValue, overrideType) => { ... }
+ *   onMetricClick: (metricKey, metricName) => { console.log('Clicked:', metricKey); }
  * });
  *
  * renderer.render();
@@ -62,7 +61,6 @@ export class MetricGridRenderer {
    * @param {boolean} [config.showComparison=true] - Whether to show prior period comparison
    * @param {string} [config.gridColumns='md:grid-cols-2 lg:grid-cols-3'] - Tailwind grid classes
    * @param {Function} [config.onMetricClick] - Callback when metric details button clicked (metricKey, metricName)
-   * @param {Function} [config.onOverrideClick] - Callback when override button clicked (metricKey, metricName, description, targetValue, overrideType)
    * @param {Function} [config.onGenericDrilldownClick] - Callback for generic drilldown (metricKey, metricName)
    * @param {Function} [config.onDistributionSegmentClick] - Callback when distribution chart segment clicked (metricKey, segmentLabel)
    * @param {string} [config.uniqueId] - Unique identifier for this grid instance
@@ -83,7 +81,6 @@ export class MetricGridRenderer {
       showComparison: true,
       gridColumns: 'md:grid-cols-2 lg:grid-cols-3',
       onMetricClick: null,
-      onOverrideClick: null,
       onGenericDrilldownClick: null,
       onDistributionSegmentClick: null,
       uniqueId: `metric-grid-${LanaTime.nowMs()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -194,7 +191,10 @@ export class MetricGridRenderer {
     const isCurrency = metric.type === 'currency' || metric.unit === 'dollars';
     const currentValue = this.formatMetricValue(metric.current, metric.formattedCurrent, isCurrency);
     const priorValue = this.formatMetricValue(metric.prior, metric.formattedPrior, isCurrency);
-    const targetValue = this.formatMetricValue(metric.target, metric.formattedTarget, isCurrency);
+    // The target is the goal set in the Metric Catalog; there is no default.
+    const targetValue = metric.target === null || metric.target === undefined
+      ? 'No goal set'
+      : this.formatMetricValue(metric.target, metric.formattedTarget, isCurrency);
 
     // Status and change
     const statusColor = metric.status === 'error' ? 'gray' : (metric.status || 'gray');
@@ -235,16 +235,15 @@ export class MetricGridRenderer {
       </div>
       ` : ''}
 
-      <!-- Prior Period + Target side-by-side; Override sits next to Target value -->
+      <!-- Prior Period + Goal side-by-side (goals are set in the Metric Catalog) -->
       <div class="grid grid-cols-2 gap-4 text-sm">
         <div>
           <p class="text-xs text-gray-500 mb-1">Prior Period</p>
           <p class="font-semibold text-gray-700">${priorValue}</p>
         </div>
         <div>
-          <p class="text-xs text-gray-500 mb-1">Target</p>
+          <p class="text-xs text-gray-500 mb-1">Goal</p>
           <p class="font-semibold text-gray-700">${targetValue}</p>
-          <div class="mt-1">${this.getOverrideButtonHTML(metric)}</div>
         </div>
       </div>
 
@@ -452,22 +451,6 @@ export class MetricGridRenderer {
           this.config.onGenericDrilldownClick(metric.key, metric.name);
         } else if (this.config.onMetricClick) {
           this.config.onMetricClick(metric.key, metric.name);
-        }
-      });
-    }
-
-    // Override button
-    const overrideBtn = card.querySelector('[data-override-btn]');
-    if (overrideBtn) {
-      overrideBtn.addEventListener('click', () => {
-        if (this.config.onOverrideClick) {
-          this.config.onOverrideClick(
-            metric.key,
-            metric.name,
-            metric.description || '',
-            metric.target,
-            'target'
-          );
         }
       });
     }
@@ -780,27 +763,6 @@ export class MetricGridRenderer {
           }
         </svg>
         Details
-      </button>
-    `;
-  }
-
-  /**
-   * Get override button HTML
-   * @private
-   * @param {Object} metric - Metric object
-   * @returns {string} Button HTML
-   */
-  getOverrideButtonHTML(metric) {
-    return `
-      <button
-        data-override-btn
-        class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1"
-        title="Override target value"
-      >
-        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-        </svg>
-        Override
       </button>
     `;
   }
