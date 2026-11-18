@@ -96,6 +96,7 @@
     'faq.html':                               { section: 'string' },
     'file-viewer.html':                       { id: 'string', matter_id: 'string', page: 'string', quote: 'string', chunk: 'string' },
     'file-editor.html':                       { id: 'string', matter_id: 'string' },
+    'firm-handbook.html':                     { id: 'string' },
     'folder.html':                            { matter_id: 'string', matter_name: 'string', folder_id: 'string', tab: 'string' },
     'help.html':                              { section: 'string' },
     'insights/dashboard.html':                { matter_id: 'string', module: 'string', tab: 'string' },

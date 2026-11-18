@@ -310,10 +310,64 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Account menus (pure; exposed as LexApp.buildUserMenuItems /
+  // LexApp.buildTopbarMenuItems for tests)
+  // ---------------------------------------------------------------------------
+
+  function buildUserMenuItems(options) {
+    const showAdmin = !!(options && options.showAdmin);
+    const isLanaOne = !!(options && options.isLanaOne);
+    const menuItems = [];
+    if (showAdmin) {
+      menuItems.push({ id: 'admin', label: 'Administration', icon: 'users', href: 'admin/index.html' });
+    }
+    // Data Connectors is admin-only: the connector endpoints sit behind the
+    // API permission middleware, so a non-admin following this link lands on
+    // a page that cannot load. Gated on the same showAdmin flag as
+    // Administration above.
+    if (showAdmin) {
+      menuItems.push({ id: 'connectors', label: 'Data Connectors', icon: 'plug', href: 'data-connectors.html' });
+    }
+    // Firm Handbook is for every member: members read what is published to
+    // them, admins also manage it (the backend enforces both).
+    menuItems.push({ id: 'firm-handbook', label: 'Firm Handbook', icon: 'book-open', href: 'firm-handbook.html' });
+    if (isLanaOne) {
+      menuItems.push({ id: 'billing', label: 'Plan and billing', icon: 'credit-card', href: 'settings-v2.html#billing' });
+    }
+    menuItems.push({ id: 'settings', label: 'Settings', icon: 'settings', href: 'settings-v2.html' });
+    menuItems.push({ id: 'help', label: 'Help & Support', icon: 'help-circle', href: 'help.html' });
+    menuItems.push({ id: 'tour', label: 'Replay the tour', icon: 'play', href: 'dashboard.html?tour=replay' });
+    menuItems.push({ id: 'signout', label: 'Sign Out', icon: 'log-out', action: 'signout', danger: true });
+    return menuItems;
+  }
+
+  // Topbar settings menu: mirrors the sidebar user menu links.
+  function buildTopbarMenuItems(options) {
+    const showAdmin = !!(options && options.showAdmin);
+    const topbarMenuItems = [];
+    if (showAdmin) {
+      topbarMenuItems.push({ id: 'admin', label: 'Administration', icon: 'users' });
+    }
+    if (showAdmin) {
+      topbarMenuItems.push({ id: 'connectors', label: 'Data Connectors', icon: 'plug' });
+    }
+    topbarMenuItems.push({ id: 'firm-handbook', label: 'Firm Handbook', icon: 'book-open' });
+    topbarMenuItems.push({ id: 'settings', label: 'Settings', icon: 'settings' });
+    topbarMenuItems.push({ id: 'help', label: 'Help & Support', icon: 'help-circle' });
+    topbarMenuItems.push({ divider: true });
+    topbarMenuItems.push({ id: 'logout', label: 'Sign out', icon: 'log-out', variant: 'danger' });
+    return topbarMenuItems;
+  }
+
+  // ---------------------------------------------------------------------------
   // LexApp Component
   // ---------------------------------------------------------------------------
 
   class LexApp extends LexElement {
+
+    static buildUserMenuItems(options) { return buildUserMenuItems(options); }
+
+    static buildTopbarMenuItems(options) { return buildTopbarMenuItems(options); }
 
     static get properties() {
       return {
@@ -683,6 +737,7 @@
         var routes = {
           admin: 'admin/index.html',
           connectors: 'data-connectors.html',
+          'firm-handbook': 'firm-handbook.html',
           settings: 'settings-v2.html',
           help: 'help.html'
         };
@@ -900,40 +955,9 @@
         }
         this._applyBriefsStatus();
 
-        // User menu items (role-gated)
-        const menuItems = [];
-        if (showAdmin) {
-          menuItems.push({ id: 'admin', label: 'Administration', icon: 'users', href: 'admin/index.html' });
-        }
-        // Data Connectors is admin-only: the connector endpoints sit behind the
-        // API permission middleware, so a non-admin following this link lands on
-        // a page that cannot load. Gated on the same showAdmin flag as
-        // Administration above.
-        if (showAdmin) {
-          menuItems.push({ id: 'connectors', label: 'Data Connectors', icon: 'plug', href: 'data-connectors.html' });
-        }
-        if (this._isLanaOne) {
-          menuItems.push({ id: 'billing', label: 'Plan and billing', icon: 'credit-card', href: 'settings-v2.html#billing' });
-        }
-        menuItems.push({ id: 'settings', label: 'Settings', icon: 'settings', href: 'settings-v2.html' });
-        menuItems.push({ id: 'help', label: 'Help & Support', icon: 'help-circle', href: 'help.html' });
-        menuItems.push({ id: 'tour', label: 'Replay the tour', icon: 'play', href: 'dashboard.html?tour=replay' });
-        menuItems.push({ id: 'signout', label: 'Sign Out', icon: 'log-out', action: 'signout', danger: true });
-        this.setUserMenuItems(menuItems);
-
-        // Topbar settings menu — mirror the sidebar user menu links
-        const topbarMenuItems = [];
-        if (showAdmin) {
-          topbarMenuItems.push({ id: 'admin', label: 'Administration', icon: 'users' });
-        }
-        if (showAdmin) {
-          topbarMenuItems.push({ id: 'connectors', label: 'Data Connectors', icon: 'plug' });
-        }
-        topbarMenuItems.push({ id: 'settings', label: 'Settings', icon: 'settings' });
-        topbarMenuItems.push({ id: 'help', label: 'Help & Support', icon: 'help-circle' });
-        topbarMenuItems.push({ divider: true });
-        topbarMenuItems.push({ id: 'logout', label: 'Sign out', icon: 'log-out', variant: 'danger' });
-        this.setTopbarMenuItems(topbarMenuItems);
+        // User menu items (role-gated) and the topbar settings menu that mirrors them.
+        this.setUserMenuItems(buildUserMenuItems({ showAdmin: showAdmin, isLanaOne: this._isLanaOne }));
+        this.setTopbarMenuItems(buildTopbarMenuItems({ showAdmin: showAdmin }));
       }
     }
 

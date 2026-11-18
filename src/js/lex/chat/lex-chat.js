@@ -2622,6 +2622,19 @@
       const citation = detail && detail.citation ? detail.citation : {};
       const sourceType = String((citation && (citation.sourceType || citation.source_type)) || '').toLowerCase();
       const source = String((citation && citation.source) || '').toLowerCase();
+      // A Firm Handbook passage opens the item in the handbook reader, not the
+      // file viewer: its snapshot document belongs to no workspace.
+      const Evidence = Chat.Evidence;
+      if (Evidence && typeof Evidence.isFirmHandbookCitation === 'function' && Evidence.isFirmHandbookCitation(citation)) {
+        const itemId = citation.handbook_item_id || citation.handbookItemId;
+        const Nav = global.Lex && global.Lex.Nav;
+        if (itemId && Nav && typeof Nav.go === 'function') {
+          Nav.go('firm-handbook.html', { params: { id: String(itemId) } });
+        } else {
+          await this._showCitationSourceDetails(detail);
+        }
+        return;
+      }
       const explicitDocId = detail && (detail.documentId || citation.document_id || citation.documentId || citation.doc_id);
       const docId = explicitDocId || (sourceType === 'document' || sourceType === 'chunk' ? citation.sourceRef : null);
 
@@ -2829,6 +2842,12 @@
     _getCitationSourceKind(citation) {
       const source = String(citation && citation.source || '').toLowerCase();
       const sourceType = String(citation && (citation.sourceType || citation.source_type) || '').toLowerCase();
+      if (Chat.Evidence && typeof Chat.Evidence.isFirmHandbookCitation === 'function' && Chat.Evidence.isFirmHandbookCitation(citation)) {
+        return {
+          label: 'Firm Handbook',
+          description: 'Published by your firm. LANA treats it as how your firm works, ahead of other documents.'
+        };
+      }
       if (source === 'domain_pack' || sourceType === 'domain_pack') {
         return {
           label: 'Legal authority',

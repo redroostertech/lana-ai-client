@@ -700,6 +700,7 @@
 
     // ── Integrations ──
     // data-connectors.html — standalone page (not routed)
+    // firm-handbook.html - standalone page (not routed)
 
     'integrations/connector-viewer.html': {
       title: 'Connector',

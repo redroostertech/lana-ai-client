@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Firm Handbook - LANA AI</title>
+
+  <!-- CSS in head; behavioral scripts at end of body. -->
+  <link rel="stylesheet" href="css/lex-tokens.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/tailwind-output.css">
+  <link rel="stylesheet" href="css/firm-handbook.css">
+  <script src="js/tailwind-loader.js"></script>
+
+  <link rel="stylesheet" href="css/lex-chat.css">
+</head>
+<body>
+
+  <lex-loader theme="light"></lex-loader>
+
+  <lex-app
+    logo-src="img/logo-light.png"
+    logo-alt="LANA AI"
+    logo-href="dashboard.html"
+    active-nav-id="firm-handbook"
+    page-title="Firm Handbook"
+  ></lex-app>
+
+  <template id="page-content">
+    <main id="firmHandbook" class="fh-page">
+
+      <lex-banner
+        id="fhBanner"
+        variant="light"
+        heading="Firm Handbook"
+        subtitle="How your firm works: policies, pricing and ways of working. LANA uses what is published here when it answers."
+        lana
+        lana-context-type="full_chat"
+      >
+        <lex-btn id="fhNewBtn" class="hidden" variant="primary" leading-icon="plus">New item</lex-btn>
+      </lex-banner>
+
+      <lex-tabs id="fhTabs" class="fh-tabs hidden" active="published"></lex-tabs>
+
+      <!-- Published: what this person can read -->
+      <section id="fhPublishedPanel" class="fh-panel">
+        <div class="fh-toolbar" role="search" aria-label="Search the handbook">
+          <div class="fh-toolbar-search">
+            <lex-input id="fhSearch" placeholder="Search the handbook" clearable="true" leading-icon="search"></lex-input>
+          </div>
+        </div>
+        <div class="fh-section-head">
+          <h2 class="fh-section-title">Published</h2>
+          <span id="fhPublishedCount" class="fh-section-count"></span>
+        </div>
+        <lex-table
+          id="fhPublishedTable"
+          class="fh-table lex-table--card"
+          column-filters
+          server-paging
+          columns="title,version,published_at,created_at"
+          labels="Title,Version,Published,Created"
+          sortable-columns=""
+          limit="20"
+          id-key="id"
+          empty-text="Nothing has been published to you yet"
+          aria-label="Published handbook items"
+        ></lex-table>
+      </section>
+
+      <!-- Manage: admins and org admins only -->
+      <section id="fhManagePanel" class="fh-panel hidden">
+        <div class="fh-toolbar" role="search" aria-label="Search handbook items">
+          <div class="fh-toolbar-search">
+            <lex-input id="fhManageSearch" placeholder="Search items" clearable="true" leading-icon="search"></lex-input>
+          </div>
+        </div>
+        <div class="fh-section-head">
+          <h2 class="fh-section-title">All items</h2>
+          <span id="fhManageCount" class="fh-section-count"></span>
+        </div>
+        <lex-table
+          id="fhManageTable"
+          class="fh-table lex-table--card"
+          column-filters
+          columns="title,status,visibility,version,published_at,created_at"
+          labels="Title,Status,Visibility,Published version,Published,Created"
+          search-keys="title,summary"
+          sort-by="created_at"
+          sort-dir="desc"
+          limit="20"
+          id-key="id"
+          empty-text="No handbook items yet"
+          empty-action-label="New item"
+          aria-label="Handbook items"
+        ></lex-table>
+      </section>
+
+      <!-- Reader -->
+      <lex-drawer id="fhReaderDrawer" data-hoist heading="Firm Handbook" width="lg">
+        <article class="fh-reader">
+          <p id="fhReaderMeta" class="fh-reader-meta"></p>
+          <p id="fhReaderSummary" class="fh-reader-summary"></p>
+          <div id="fhReaderContent" class="fh-reader-content"></div>
+        </article>
+      </lex-drawer>
+
+      <!-- New item -->
+      <lex-drawer id="fhCreateDrawer" data-hoist heading="New handbook item" width="lg" show-footer confirm-text="Create" cancel-text="Cancel">
+        <div class="fh-form">
+          <lex-input id="fhCreateTitle" label="Title" placeholder="Payment schedules" maxlength="500" required></lex-input>
+          <lex-textarea id="fhCreateSummary" label="Summary" rows="3" maxlength="600" show-count
+            help="One or two sentences. LANA keeps this in mind in every chat."></lex-textarea>
+          <div class="fh-source">
+            <p class="fh-field-label">Content</p>
+            <lex-segmented id="fhCreateSource" value="blank"
+              options='[{"value":"blank","label":"Start blank"},{"value":"upload","label":"Upload a file"}]'></lex-segmented>
+            <div id="fhCreateUpload" class="fh-upload hidden">
+              <p class="fh-help">A Word document (.docx), a PDF or a plain text file (.txt), up to 100 MB.</p>
+              <div class="fh-upload-row">
+                <lex-btn id="fhCreateChooseBtn" variant="secondary" leading-icon="upload">Choose file</lex-btn>
+                <span id="fhCreateFileName" class="fh-upload-name">No file chosen</span>
+              </div>
+              <input type="file" id="fhCreateFileInput" class="fh-file-input" accept=".docx,.pdf,.txt">
+            </div>
+          </div>
+          <div class="fh-visibility" data-visibility="create">
+            <p class="fh-field-label">Who can see it</p>
+            <lex-segmented id="fhCreateMode" value="organization"
+              options='[{"value":"organization","label":"Everyone in the firm"},{"value":"restricted","label":"Restricted"}]'></lex-segmented>
+            <div class="fh-recipients hidden" data-recipients>
+              <p class="fh-help">Only the roles, groups and people you choose can see it, plus admins.</p>
+              <lex-select id="fhCreateRoles" label="Roles" multiple searchable placeholder="Choose roles"></lex-select>
+              <lex-select id="fhCreateGroups" label="Groups" multiple searchable placeholder="Choose groups"></lex-select>
+              <lex-select id="fhCreateUsers" label="People" multiple searchable placeholder="Choose people"></lex-select>
+            </div>
+          </div>
+          <p id="fhCreateError" class="fh-error hidden" role="alert"></p>
+          <p class="fh-help">After you create it, open it in the editor to write or check the content. Members see it once you publish.</p>
+        </div>
+      </lex-drawer>
+
+      <!-- Manage one item -->
+      <lex-drawer id="fhManageDrawer" data-hoist heading="Handbook item" width="xl">
+        <div class="fh-manage">
+          <div id="fhManageChips" class="fh-chips" aria-live="polite"></div>
+          <div class="fh-actions">
+            <lex-btn id="fhOpenEditorBtn" variant="secondary" leading-icon="edit">Open in editor</lex-btn>
+            <lex-btn id="fhPublishBtn" variant="primary" leading-icon="upload">Publish current version</lex-btn>
+            <lex-btn id="fhUnpublishBtn" variant="secondary">Unpublish</lex-btn>
+            <lex-btn id="fhDeleteBtn" variant="danger" leading-icon="trash">Delete</lex-btn>
+          </div>
+          <p id="fhPublishNote" class="fh-help hidden" aria-live="polite"></p>
+
+          <lex-tabs id="fhManageTabs" class="fh-tabs" active="details"></lex-tabs>
+
+          <section class="fh-manage-panel" data-panel="details">
+            <div class="fh-form">
+              <lex-input id="fhEditTitle" label="Title" maxlength="500" required></lex-input>
+              <lex-textarea id="fhEditSummary" label="Summary" rows="3" maxlength="600" show-count
+                help="One or two sentences. LANA keeps this in mind in every chat."></lex-textarea>
+              <p id="fhEditError" class="fh-error hidden" role="alert"></p>
+              <div class="fh-form-actions">
+                <lex-btn id="fhSaveDetailsBtn" variant="primary">Save details</lex-btn>
+              </div>
+            </div>
+          </section>
+
+          <section class="fh-manage-panel hidden" data-panel="visibility">
+            <div class="fh-form">
+              <div class="fh-visibility" data-visibility="edit">
+                <p class="fh-field-label">Who can see it</p>
+                <lex-segmented id="fhEditMode" value="organization"
+                  options='[{"value":"organization","label":"Everyone in the firm"},{"value":"restricted","label":"Restricted"}]'></lex-segmented>
+                <div class="fh-recipients hidden" data-recipients>
+                  <p class="fh-help">Only the roles, groups and people you choose can see it, plus admins.</p>
+                  <lex-select id="fhEditRoles" label="Roles" multiple searchable placeholder="Choose roles"></lex-select>
+                  <lex-select id="fhEditGroups" label="Groups" multiple searchable placeholder="Choose groups"></lex-select>
+                  <lex-select id="fhEditUsers" label="People" multiple searchable placeholder="Choose people"></lex-select>
+                </div>
+              </div>
+              <p id="fhVisibilityError" class="fh-error hidden" role="alert"></p>
+              <div class="fh-form-actions">
+                <lex-btn id="fhSaveVisibilityBtn" variant="primary">Save visibility</lex-btn>
+              </div>
+            </div>
+          </section>
+
+          <section class="fh-manage-panel hidden" data-panel="versions">
+            <p class="fh-help">Each save in the editor makes a new version. Publish shares the current one. To share an older version, restore it here. LANA reads it again, and you can publish it once that is done.</p>
+            <ul id="fhVersionsList" class="fh-list" aria-live="polite"></ul>
+          </section>
+
+          <section class="fh-manage-panel hidden" data-panel="history">
+            <ul id="fhHistoryList" class="fh-list" aria-live="polite"></ul>
+          </section>
+        </div>
+      </lex-drawer>
+
+    </main>
+  </template>
+
+  <noscript>
+    <div class="fh-noscript">Please enable JavaScript to use LANA AI.</div>
+  </noscript>
+
+  <script src="js/error-reporter.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/mock-data.js"></script>
+  <script src="js/time-utils.js"></script>
+  <script src="js/shared/request-retry.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/components.js"></script>
+  <script src="js/version.js"></script>
+  <script src="js/menu.js"></script>
+  <script src="js/navigation-helpers.js"></script>
+  <script src="js/conversation-search-modal.js"></script>
+  <script src="js/contact-search-modal.js"></script>
+  <script src="js/notifications.js"></script>
+
+  <script src="js/lex/lex.core.js"></script>
+  <script src="js/lex/lex.icons.js"></script>
+  <script src="js/lex/lex.data.js"></script>
+  <script src="js/lex/lex.forms.js"></script>
+  <script src="js/lex/lex.state.js"></script>
+  <script src="js/lex/lex.utils.js"></script>
+  <script src="js/lex/lex.auth.js"></script>
+  <script src="js/lex/lex-nav.js"></script>
+
+  <script src="js/lex/components/foundation/lex-loader.js"></script>
+  <script src="js/lex/components/foundation/lex-toast.js"></script>
+  <script src="js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="js/lex/components/foundation/lex-btn.js"></script>
+  <script src="js/lex/components/foundation/lex-empty.js"></script>
+  <script src="js/lex/components/form/lex-segmented.js"></script>
+  <script src="js/lex/components/layout/lex-sidebar.js"></script>
+  <script src="js/lex/components/layout/lex-topbar.js"></script>
+  <script src="js/lex/components/layout/lex-conversation-item.js"></script>
+  <script src="js/lex/components/layout/lex-notification-panel.js"></script>
+  <script src="js/lex/components/layout/lex-app.js"></script>
+
+  <!-- Page components, loaded BEFORE the template is injected -->
+  <script src="js/lex/components/foundation/lex-banner.js"></script>
+  <script src="js/lex/components/foundation/lex-badge.js"></script>
+  <script src="js/lex/components/foundation/lex-modal.js"></script>
+  <script src="js/lex/components/foundation/lex-drawer.js"></script>
+  <script src="js/lex/components/foundation/lex-tabs.js"></script>
+  <script src="js/lex/components/form/lex-input.js"></script>
+  <script src="js/lex/components/form/lex-textarea.js"></script>
+  <script src="js/lex/components/form/lex-select.js"></script>
+  <script src="js/lex/components/data/lex-table.js"></script>
+
+  <script src="js/lex/lex-page-init.js"></script>
+  <script src="js/services/firm-handbook-api.service.js"></script>
+  <script src="js/firm-handbook/firm-handbook.models.js"></script>
+  <script src="js/firm-handbook.js"></script>
+
+  <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>
+  <!-- LANA dock (IDE-style docked chat panel) -->
+  <script src="js/lex/chat/lex-chat.format.js"></script>
+  <script src="js/lex/chat/lex-chat.conversations-api.js"></script>
+  <script src="js/lex/chat/lex-chat.source.js"></script>
+  <script src="js/lex/chat/lex-chat.message.js"></script>
+  <script src="js/lex/chat/lex-chat-progress-events.js"></script>
+  <script src="js/lex/chat/lex-chat.activity.js"></script>
+  <script src="js/lex/chat/lex-chat.documents.js"></script>
+  <script src="js/lex/chat/lex-chat.composer-mentions.js"></script>
+  <script src="js/services/slash-commands.service.js"></script>
+  <script src="js/lex/chat/lex-chat.composer-slash.js"></script>
+  <script src="js/lex/chat/lex-chat.composer.js"></script>
+  <script src="js/lex/chat/lex-chat.thread.js"></script>
+  <script src="js/lex/chat/lex-chat.threads.js"></script>
+  <script src="js/lex/chat/lex-chat.js"></script>
+  <script src="js/lex/chat/lex-dynamic-card.renderer.js"></script>
+  <script src="js/lex/chat/lex-agentic-plan-card.js"></script>
+  <script src="js/lex/chat/lex-chat.index.js"></script>
+  <script src="js/lex/components/chat/lex-lana-panel.js"></script>
+  <script src="js/lex/components/layout/lex-lana-dock.js"></script>
+
+  <script src="js/auth-guard.js"></script>
+</body>
+</html>

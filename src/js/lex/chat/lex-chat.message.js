@@ -19,8 +19,29 @@
     return global.Lex && global.Lex.Chat && global.Lex.Chat.ContextPromotion;
   }
 
+  // Firm Handbook passages (source/authority 'firm_handbook'): the firm's own
+  // published rules, cited by item and version.
+  function isFirmHandbookCitation(citation) {
+    const c = citation || {};
+    return String(c.source || '').toLowerCase() === 'firm_handbook'
+      || String(c.sourceType || c.source_type || '').toLowerCase() === 'firm_handbook'
+      || String(c.authority || '').toLowerCase() === 'firm_handbook';
+  }
+
+  // "Payment schedules (v3)": the server label (the snapshot is named
+  // "<title> (v<N>)"), or the title plus the version when only those come.
+  function firmHandbookCitationLabel(citation) {
+    const c = citation || {};
+    const label = String(c.label || c.filename || c.citation || '').trim();
+    if (label) return label;
+    const title = String(c.title || c.name || 'Firm Handbook').trim();
+    const version = c.handbook_version_number || c.version_number;
+    return version ? title + ' (v' + version + ')' : title;
+  }
+
   // Presentation only: original upload labels never replace document routing identity.
   function documentCitationDisplayName(citation) {
+    if (isFirmHandbookCitation(citation)) return firmHandbookCitationLabel(citation);
     const source = String(citation.source || '').toLowerCase();
     const type = String(citation.sourceType || citation.source_type || '').toLowerCase();
     if (source === 'domain_pack' || type === 'domain_pack' || type === 'legal_authority'
@@ -47,11 +68,12 @@
     return '';
   }
 
-  /** 'authority' | 'document' | 'other' for one citation. */
+  /** 'handbook' | 'authority' | 'document' | 'other' for one citation. */
   function citationKind(citation) {
     const c = citation || {};
     const source = String(c.source || '').toLowerCase();
     const type = String(c.sourceType || c.source_type || '').toLowerCase();
+    if (isFirmHandbookCitation(c)) return 'handbook';
     if (source === 'domain_pack' || type === 'domain_pack' || type === 'legal_authority'
       || c.authority_id || c.authorityId) return 'authority';
     if (type === 'document' || type === 'chunk' || c.document_id || c.documentId || c.doc_id) return 'document';
@@ -121,6 +143,7 @@
    * click handling use it); record items keep their index in `references`.
    */
   function groupEvidence(citations, references) {
+    const handbook = [];
     const docs = [];
     const authorities = [];
     const others = [];
@@ -128,7 +151,8 @@
       if (!item || typeof item !== 'object') return;
       const kind = citationKind(item);
       const entry = { type: 'citation', index, item };
-      if (kind === 'authority') authorities.push(entry);
+      if (kind === 'handbook') handbook.push(entry);
+      else if (kind === 'authority') authorities.push(entry);
       else if (kind === 'document') docs.push(entry);
       else others.push(entry);
     });
@@ -137,6 +161,7 @@
       if (item && typeof item === 'object') records.push({ type: 'reference', index, item });
     });
     const groups = [
+      { key: 'handbook', label: 'Firm Handbook', items: handbook },
       { key: 'documents', label: 'Documents', items: docs },
       { key: 'authority', label: 'Legal authority', items: authorities },
       { key: 'records', label: 'Records', items: records },
@@ -736,9 +761,15 @@
       this.delegate('click', '.lex-chat-citation-link', (e, target) => {
         e.preventDefault();
         const index = parseInt(target.dataset.citationIndex, 10);
-        const citation = Number.isFinite(index) && Array.isArray(this.citations)
+        let citation = Number.isFinite(index) && Array.isArray(this.citations)
           ? (this.citations[index] || null)
           : null;
+        // Inline "(extracts N)" markers carry only the number. A Firm Handbook
+        // passage must open by its item, never through document routes (its
+        // snapshot document 404s there), so resolve it to its citation.
+        const num = parseInt(target.dataset.citationNum, 10);
+        const numbered = !citation && Number.isFinite(num) && Array.isArray(this.citations) ? this.citations[num - 1] : null;
+        if (numbered && isFirmHandbookCitation(numbered)) citation = numbered;
         this.emit('lex-citation-click', {
           documentId: target.dataset.documentId,
           filename: target.dataset.filename,
@@ -1546,6 +1577,8 @@
   global.Lex.Chat.documentCitationDisplayName = documentCitationDisplayName;
   global.Lex.Chat.Evidence = {
     citationKind,
+    isFirmHandbookCitation,
+    firmHandbookCitationLabel,
     citationPassage,
     truncatePassage,
     citationPage,

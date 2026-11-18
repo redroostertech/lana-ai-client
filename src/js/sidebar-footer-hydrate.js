@@ -75,6 +75,7 @@
       items.push({ id: 'admin', label: 'Administration', icon: 'users', href: prefix + 'admin/index.html' });
     }
     items.push({ id: 'connectors', label: 'Data Connectors', icon: 'plug', href: prefix + 'data-connectors.html' });
+    items.push({ id: 'firm-handbook', label: 'Firm Handbook', icon: 'book-open', href: prefix + 'firm-handbook.html' });
     items.push({ id: 'billing', label: 'Plan and billing', icon: 'credit-card', href: prefix + 'settings-v2.html#billing' });
     items.push({ id: 'personalization', label: 'Personalization', icon: 'sparkles', href: prefix + 'settings-v2.html#personalization' });
     items.push({ id: 'profile', label: 'Profile', icon: 'user', href: prefix + 'settings-v2.html#profile' });
