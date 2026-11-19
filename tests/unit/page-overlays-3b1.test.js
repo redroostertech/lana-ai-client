@@ -41,37 +41,6 @@ describe('index.html activity heatmap info modal', () => {
   });
 });
 
-describe('skills-marketplace.html modals', () => {
-  const html = read('skills-marketplace.html');
-  const js = read('js/skills-marketplace.js');
-  const ids = ['skill-details-modal', 'matter-selector-modal', 'skill-import-modal'];
-
-  test.each(ids)('%s is a lex-modal', (id) => {
-    expect(block(html, id, 'lex-modal')).not.toBeNull();
-    expectNoHandBuiltOverlay(html, id);
-  });
-
-  test('footer buttons keep the ids the script binds, in the footer slot', () => {
-    ['modal-cancel-btn', 'modal-install-btn', 'matter-modal-cancel-btn', 'matter-modal-install-btn',
-      'skill-import-cancel-btn', 'skill-import-confirm-btn'].forEach((id) => {
-      expect(html).toMatch(new RegExp(`data-slot="footer" id="${id}"`));
-    });
-    expect(html).not.toMatch(/modal-overlay|modal-close/);
-  });
-
-  test('page loads lex-modal', () => {
-    expect(html).toContain('js/lex/lex.core.js');
-    expect(html).toContain('js/lex/components/foundation/lex-modal.js');
-  });
-
-  test('script toggles open and resets state on lex-close', () => {
-    expect(js).not.toMatch(/Modal\.classList\.(add|remove)\('hidden'\)/);
-    expect(js).not.toMatch(/modal\.classList\.(add|remove)\('hidden'\)/);
-    expect(js).toMatch(/addEventListener\('lex-close', closeAllModals\)/);
-    expect(js).toMatch(/skillDetailsModal\.open = false/);
-  });
-});
-
 describe('admin/integrations.html modals', () => {
   const html = read('admin/integrations.html');
 

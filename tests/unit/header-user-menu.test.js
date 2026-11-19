@@ -138,7 +138,6 @@ describe('pages use the shared header menu', () => {
     'admin/onboarding_management.html',
     'admin/search-analytics.html',
     'admin/settings.html',
-    'admin/management-boards.html',
   ];
 
   test.each(PAGES)('%s holds a placeholder, loads the module, and has no copied dropdown', (page) => {

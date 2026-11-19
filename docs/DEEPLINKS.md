@@ -25,9 +25,9 @@ Use these when linking to common app objects:
 | Doc Studio document | `lana-ai://doc-studio/<document-id>` |
 | Deck Studio deck | `lana-ai://deck/<deck-id>` |
 | Settings section | `lana-ai://settings/<section>` |
-| Insights dashboard | `lana-ai://insights/dashboard` |
-| Insights predictions | `lana-ai://insights/predictions` |
-| Insights module execution | `lana-ai://insights/module-execution?id=<execution-id>` |
+| Insights dashboard | `lana-ai://insights/dashboard` (opens `admin/analytics.html`) |
+| Insights predictions | `lana-ai://insights/predictions` (opens `admin/analytics.html`) |
+| Insights report | `lana-ai://insights/module-execution?module=<report-key>` (opens `admin/reporting.html?report=<report-key>`) |
 | Connector detail | `lana-ai://connector/<connector-id>` |
 
 ## Generic Route Links
@@ -55,13 +55,16 @@ These client routes are supported by the OS protocol handler for this phase:
 | Documents | `file-viewer.html`, `drive.html`, `folder.html`, `doc-studio/index.html`, `deck-studio/index.html`, `document-library-templates.html` |
 | Agents | `agents/index.html` with hashes: `catalog`, `activity`, `create`, `tools/browse`, `agent/<slug>`, `run/<run-id>`, `activity/<id>` |
 | Automations | `automation/index.html` with hashes: `home`, `library`, `builder`, `runs`, `approvals`, `connectors`, `automation/<automation-id>` |
-| Insights | `insights/dashboard.html`, `insights/predictions.html`, `insights/module-execution.html` |
 | Integrations | `data-connectors.html`, `integrations/connectors.html`, `integrations/connector-viewer.html`, `integrations/actionstep.html`, `integrations/connector-case.html`, `integrations/connector-communications.html`, `integrations/connector-crm.html`, `integrations/connector-documents.html`, `integrations/connector-financial.html`, `integrations/data_connectors.html`, `integrations/integration-config.html`, `integrations/leadly.html`, `integrations/sync-status.html` |
-| Skills and workflows | `skills.html`, `skills-marketplace.html`, `matter-skills.html`, `workflows/active.html`, `workflows/builder.html`, `workflows/dashboard.html`, `workflows/execution-logs.html`, `workflows/follow-up-cadences.html`, `workflows/retargeting.html`, `workflows/templates.html` |
-| Admin | `admin/index.html`, `admin/alerts.html`, `admin/analytics.html`, `admin/audit.html`, `admin/billable-hours.html`, `admin/block-billing-rules.html`, `admin/communications.html`, `admin/console.html`, `admin/dashboard-builder.html`, `admin/dashboard-detail.html`, `admin/dashboard-library.html`, `admin/data-visualization.html`, `admin/health.html`, `admin/integrations.html`, `admin/management-boards.html`, `admin/metric-catalog.html`, `admin/metric_detail.html`, `admin/onboarding_management.html`, `admin/organizations.html`, `admin/plugins.html`, `admin/relevance-labeling.html`, `admin/reporting.html`, `admin/roles.html`, `admin/roles_manager.html`, `admin/search-analytics.html`, `admin/session-details.html`, `admin/sessions.html`, `admin/settings.html`, `admin/task-plans.html`, `admin/traces.html`, `admin/updates.html`, `admin/user-details.html`, `admin/users.html`, `admin/workspace-analytics.html` |
-| Help and misc | `article.html`, `help.html`, `faq.html`, `docs/api-documentation.html`, `model-pricing.html`, `recordings.html`, `recording-detail.html`, `brainchild/index.html` |
+| Workflows | `workflows/active.html`, `workflows/builder.html`, `workflows/dashboard.html`, `workflows/execution-logs.html`, `workflows/follow-up-cadences.html`, `workflows/retargeting.html`, `workflows/templates.html` |
+| Admin | `admin/index.html`, `admin/alerts.html`, `admin/analytics.html`, `admin/audit.html`, `admin/billable-hours.html`, `admin/block-billing-rules.html`, `admin/communications.html`, `admin/console.html`, `admin/dashboard-builder.html`, `admin/dashboard-detail.html`, `admin/dashboard-library.html`, `admin/data-visualization.html`, `admin/health.html`, `admin/integrations.html`, `admin/metric-catalog.html`, `admin/metric_detail.html`, `admin/onboarding_management.html`, `admin/organizations.html`, `admin/plugins.html`, `admin/relevance-labeling.html`, `admin/reporting.html`, `admin/roles.html`, `admin/roles_manager.html`, `admin/search-analytics.html`, `admin/session-details.html`, `admin/sessions.html`, `admin/settings.html`, `admin/task-plans.html`, `admin/traces.html`, `admin/updates.html`, `admin/user-details.html`, `admin/users.html`, `admin/workspace-analytics.html` |
+| Help and misc | `article.html`, `help.html`, `faq.html`, `docs/api-documentation.html`, `recordings.html`, `recording-detail.html`, `brainchild/index.html` |
 
 `admin/dashboard.html` is retired. An old link to it, or a last page saved on it, opens `admin/index.html` (Administration) instead.
+
+`insights/module-execution.html` (the old Reports page) is retired: an old link opens `admin/reporting.html`, with `?module=<key>` carried as `?report=<key>`. `insights/dashboard.html` and `insights/predictions.html` open `admin/analytics.html` (the Insights Dashboard), and `admin/management-boards.html` opens `admin/dashboard-library.html` (All dashboards). `skills.html`, `skills-marketplace.html` and `matter-skills.html` are retired: skills are automations, and old links open the Automate app (`automation/index.html`). Their other params named their own records and are dropped.
+
+`model-pricing.html` is a fragment of the app shell, not a destination of its own: in-app links open it inside `app.html`.
 
 `matters.html` is retired; the matters list is `workspaces.html`. An old link to it opens `workspaces.html`, keeping `action`, `status`, `sort_by` and `sort_order`; the page applies `status`, `sort_by` and `sort_order` only when they are values its toolbar offers. A link to one matter (`?matter_id=<id>` or `?open=<id>`, with an optional `tab`) opens that matter at `workspace-details.html?id=<id>`. This holds for `lana-ai://open?route=matters.html`, for in-app links and saved last pages, and for the voice agent's `matters.html` destination.
 

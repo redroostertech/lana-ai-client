@@ -688,8 +688,6 @@ describe('call sites that render untrusted content', () => {
   // marked output is model or backend text: it goes through LanaSafeHtml.
   test.each([
     ['js/workspace-details.js', /el\.innerHTML = window\.LanaSafeHtml \? window\.LanaSafeHtml\.renderMarkdown\(fullText\) : /],
-    ['insights/module-execution.html', /return window\.LanaSafeHtml \? window\.LanaSafeHtml\.renderMarkdown\(text, \{ inline: true, breaks: true \}\)/],
-    ['insights/module-execution.html', /return window\.LanaSafeHtml \? window\.LanaSafeHtml\.renderMarkdown\(text, \{ unwrapParagraph: true, breaks: true \}\)/],
     ['js/admin/reporting.js', /return window\.LanaSafeHtml \? window\.LanaSafeHtml\.renderMarkdown\(text, \{ inline: true, breaks: true \}\)/],
     ['js/admin/reporting.js', /return window\.LanaSafeHtml \? window\.LanaSafeHtml\.renderMarkdown\(text, \{ unwrapParagraph: true, breaks: true \}\)/],
     ['js/components/document-metadata-viewer.js', /return window\.LanaSafeHtml \? window\.LanaSafeHtml\.renderMarkdown\(text\) : this\.escapeHtml\(text\);/],
@@ -758,8 +756,6 @@ describe('call sites that render untrusted content', () => {
     expect(policy).toMatch(/apiToken: api && api\.token/);
   });
   test.each([
-    ['insights/module-execution.html', /renderMarkdown\(text, \{ inline: true, breaks: true \}\)/],
-    ['insights/module-execution.html', /renderMarkdown\(text, \{ unwrapParagraph: true, breaks: true \}\)/],
     ['js/admin/reporting.js', /renderMarkdown\(text, \{ inline: true, breaks: true \}\)/],
     ['js/admin/reporting.js', /renderMarkdown\(text, \{ unwrapParagraph: true, breaks: true \}\)/],
     ['js/drilldown-renderer.js', /renderMarkdown\(text, \{ inline: true, breaks: true \}\)/],

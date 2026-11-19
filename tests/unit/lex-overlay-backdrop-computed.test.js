@@ -1,6 +1,6 @@
 /**
  * Lex overlay backdrops, as the browser computes them: on a page without
- * lex-tokens.css (matter-skills.html, skills-marketplace.html) the drawer and
+ * lex-tokens.css the drawer and
  * modal backdrops still dim with the light overlay fallback, and with the
  * tokens in dark they use the dark --lex-modal-overlay. jsdom does not resolve
  * var(), so this drives Chromium through the client's Playwright.

@@ -686,7 +686,6 @@ const DEEP_LINK_CLIENT_ROUTES = Object.freeze({
   'admin/health.html': ['service'],
   'admin/index.html': ['tab'],
   'admin/integrations.html': ['connector', 'source'],
-  'admin/management-boards.html': ['id', 'board'],
   'admin/metric-catalog.html': ['id', 'q'],
   'admin/metric_detail.html': ['id'],
   'admin/onboarding_management.html': ['id'],
@@ -725,9 +724,6 @@ const DEEP_LINK_CLIENT_ROUTES = Object.freeze({
   'file-viewer.html': ['id', 'matter_id', 'page'],
   'folder.html': ['matter_id', 'matter_name', 'folder_id', 'tab'],
   'help.html': ['section'],
-  'insights/dashboard.html': ['matter_id', 'module', 'tab'],
-  'insights/module-execution.html': ['id', 'module', 'matter_id'],
-  'insights/predictions.html': ['matter_id', 'type', 'tab'],
   'integrations/actionstep.html': ['matter_id', 'source'],
   'integrations/connector-case.html': ['connectorId', 'sourceId', 'matter_id'],
   'integrations/connector-communications.html': ['connectorId', 'sourceId', 'matter_id'],
@@ -740,9 +736,7 @@ const DEEP_LINK_CLIENT_ROUTES = Object.freeze({
   'integrations/integration-config.html': ['connectorId', 'sourceId'],
   'integrations/leadly.html': ['matter_id', 'source'],
   'integrations/sync-status.html': ['connectorId', 'sourceId', 'status'],
-  'matter-skills.html': ['matterSkillId', 'tab'],
   'matters/timeline.html': ['id'],
-  'model-pricing.html': ['model', 'provider'],
   'my-tasks.html': ['task', 'task_id', 'status', 'assignee', 'matter_id'],
   'notifications.html': ['id', 'filter', 'type'],
   'document-library.html': [],
@@ -751,8 +745,6 @@ const DEEP_LINK_CLIENT_ROUTES = Object.freeze({
   'search-conversations.html': ['q', 'conversation_id'],
   'search-results.html': ['q'],
   'settings-v2.html': ['capability', 'section'],
-  'skills.html': ['category', 'id'],
-  'skills-marketplace.html': ['category', 'id'],
   'workflows/active.html': ['id', 'status'],
   'workflows/builder.html': ['id', 'template'],
   'workflows/dashboard.html': ['id'],
@@ -846,8 +838,28 @@ function prefixedHash(prefix, value) {
 // Retired pages: an old link to one opens the page that replaced it.
 const RETIRED_CLIENT_ROUTES = Object.freeze({
   'admin/dashboard.html': 'admin/index.html',
-  'matters.html': 'workspaces.html'
+  'admin/management-boards.html': 'admin/dashboard-library.html',
+  'insights/dashboard.html': 'admin/analytics.html',
+  'insights/module-execution.html': 'admin/reporting.html',
+  'insights/predictions.html': 'admin/analytics.html',
+  'matter-skills.html': 'automation/index.html',
+  'matters.html': 'workspaces.html',
+  'skills-marketplace.html': 'automation/index.html',
+  'skills.html': 'automation/index.html'
 });
+
+// What a retired page's link keeps (as Lex.Nav.redirectFor): the old Reports
+// page's ?module= opens that report (?report=); the other old Insights (Dashboard, Predictions),
+// Management Boards and Skills pages' params named their own records, so the
+// replacement opens on its home or list. Other routes keep their params.
+function retiredPageParams(route, params) {
+  const asked = stripLeadingSlashes(route).trim();
+  if (asked === 'matters.html' || asked === 'admin/dashboard.html') return params;
+  if (!Object.prototype.hasOwnProperty.call(RETIRED_CLIENT_ROUTES, asked)) return params;
+  const kept = new URLSearchParams();
+  if (asked === 'insights/module-execution.html' && params.get('module')) kept.set('report', params.get('module'));
+  return kept;
+}
 
 // The old Matters page's link to one matter (?matter_id= or ?open=) opens that
 // matter's page; the matter id moves to ?id= and ?tab= comes along.
@@ -960,9 +972,10 @@ async function navigateClientDeepLink(urlObj) {
     if (firstSegment) params.set('connectorId', firstSegment);
   }
 
-  route = sanitizeClientRoute(retiredMatterRoute(route, params));
+  const linkParams = retiredPageParams(route, params);
+  route = sanitizeClientRoute(retiredMatterRoute(route, linkParams));
   const target = new URL(appPageUrl(route));
-  addSafeDeepLinkParams(target, params, DEEP_LINK_CLIENT_ROUTES[route]);
+  addSafeDeepLinkParams(target, linkParams, DEEP_LINK_CLIENT_ROUTES[route]);
   setSafeHash(target, hash);
 
   if (mainWindow.isMinimized()) mainWindow.restore();

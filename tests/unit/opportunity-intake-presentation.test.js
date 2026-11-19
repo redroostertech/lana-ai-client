@@ -105,7 +105,7 @@ test('actual drilldown summary retains full-window denominators independently of
 });
 test('router loads the intake helper before every existing report/dashboard consumer', () => {
   const source = fs.readFileSync(path.join(__dirname, '../../src/js/lex/lex-router.pages.js'), 'utf8');
-  expect(source.split("'js/shared/opportunity-intake-presentation.js'")).toHaveLength(4);
+  expect(source.split("'js/shared/opportunity-intake-presentation.js'")).toHaveLength(3);
   const windows = source.split("'js/shared/acquisition-source-presentation.js'").slice(1);
   for (const part of windows) expect(part.indexOf("'js/shared/opportunity-intake-presentation.js'")).toBeLessThan(100);
 });

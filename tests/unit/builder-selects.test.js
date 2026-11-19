@@ -36,7 +36,6 @@ describe('builder dropdowns are lex-select', () => {
   test.each([
     'automation/js/views/builder.js',
     'js/workflow-builder.js',
-    'js/skill-builder.js',
   ])('%s has no native select', (rel) => {
     expect(read(rel)).not.toMatch(/<select[\s>]|createElement\(['"]select['"]\)/);
   });

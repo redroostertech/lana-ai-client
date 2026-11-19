@@ -107,12 +107,12 @@ test('both actual preview cards use the typed distribution and keep legacy detai
   } finally { global.CurrentPipelinePresentation = saved; }
 });
 test('standalone and routed page mounts load the typed helper before its consumers', () => {
-  for (const file of ['admin/dashboard-detail.html', 'admin/reporting.html', 'admin/metric-catalog.html', 'insights/module-execution.html']) {
+  for (const file of ['admin/dashboard-detail.html', 'admin/reporting.html', 'admin/metric-catalog.html']) {
     const text = fs.readFileSync(path.join(sourceRoot, file), 'utf8');
     expect(text).toContain('js/shared/current-pipeline-presentation.js');
   }
   const routes = fs.readFileSync(path.join(sourceRoot, 'js/lex/lex-router.pages.js'), 'utf8');
-  expect(routes.match(/current-pipeline-presentation\.js/g)).toHaveLength(3);
+  expect(routes.match(/current-pipeline-presentation\.js/g)).toHaveLength(2);
 });
 test('partial known currency amounts remain visible and hostile metadata stays escaped', () => {
   const m = metric(); m.status = m.metadata.observation_receipt.status = 'partial';

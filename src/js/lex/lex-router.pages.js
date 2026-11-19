@@ -93,11 +93,6 @@
         'js/components/task-detail-drawer.js',
         'js/components/workspace-artifacts-view.js',
         'js/matter-notes.js',
-        'js/shared/event-catalog.js',
-        'js/shared/event-browser.js',
-        'js/matter-skills.js',
-        'js/vendor/drawflow.min.js',
-        'js/workflow-builder.js',
         'js/vendor/pdf.min.js',
         'js/shared/safe-html.js',
         'js/shared/preview-frame-policy.js',
@@ -121,7 +116,6 @@
         'css/matter-runnables.css',
         'css/workspace-summary.css',
         'css/workspace-switcher.css',
-        'css/vendor/drawflow.min.css',
         'css/lana-ask-btn.css'
       ]
     },
@@ -133,18 +127,6 @@
         'js/lex/components/form/lex-select.js'
       ],
       stylesheets: []
-    },
-
-    'matter-skills.html': {
-      title: 'Matter Skills',
-      activeNav: 'workspaces',
-      scripts: [
-        'js/lex/components/form/lex-select.js',
-        'js/matter-skills.js'
-      ],
-      stylesheets: [
-        'css/matter-skills.css'
-      ]
     },
 
     'document-library.html': {
@@ -435,9 +417,6 @@
       stylesheets: []
     },
 
-    // ── Skills ──
-    // skills.html — standalone page (uses <lex-app> shell, not routed)
-
     // ── Admin ──
     // admin/index.html — standalone page (not routed)
 
@@ -623,29 +602,6 @@
       stylesheets: []
     },
 
-    'admin/management-boards.html': {
-      title: 'Management Boards',
-      activeNav: 'admin',
-      scripts: [
-        'js/services/feature-tracker.js',
-        'js/services/management-board-service.js',
-        'js/components/management-board-components.js',
-        'js/vendor/chart.js',
-        'js/services/session-tracking-service.js',
-        'js/lex/components/form/lex-select.js',
-        'js/lex/components/data/lex-table.js',
-        'js/shared/library-column-filters.js',
-        'js/admin/admin-table-kit.js',
-        'js/pages/management-boards-team-performance.js',
-        'js/pages/management-boards-main.js'
-      ],
-      stylesheets: [
-        'css/session-tracking.css',
-        'css/admin/admin-tables.css',
-        'css/vendor/fontawesome/css/all.min.css'
-      ]
-    },
-
     'admin/onboarding_management.html': {
       title: 'Onboarding Management',
       activeNav: 'admin',
@@ -655,50 +611,6 @@
       stylesheets: [
         'css/vendor/fontawesome/css/all.min.css'
       ]
-    },
-
-    // ── Insights ──
-    'insights/module-execution.html': {
-      title: 'Analytics',
-      activeNav: 'reports',
-      scripts: [
-        'js/lex/components/form/lex-select.js',
-        'js/shared/current-pipeline-presentation.js',
-        'js/shared/acquisition-source-presentation.js',
-        'js/shared/opportunity-intake-presentation.js',
-        'js/vendor/chart.js',
-        'js/vendor/jspdf.umd.min.js',
-        'js/vendor/jspdf.plugin.autotable.min.js',
-        'js/vendor/marked.min.js',
-        'js/shared/safe-url.js',
-        'js/shared/safe-html.js',
-        'js/drilldown-renderer.js',
-        'insights/raw-data-viewer.js'
-      ],
-      stylesheets: [
-        'insights/raw-data-viewer.css'
-      ]
-    },
-
-    'insights/dashboard.html': {
-      title: 'Module Execution Dashboard',
-      activeNav: 'reports',
-      scripts: [
-        'js/lex/components/form/lex-select.js',
-        'js/vendor/chart.js',
-        'js/vendor/jspdf.umd.min.js',
-        'js/vendor/jspdf.plugin.autotable.min.js'
-      ],
-      stylesheets: []
-    },
-
-    'insights/predictions.html': {
-      title: 'AI Predictions',
-      activeNav: 'reports',
-      scripts: [
-        'js/insights.js'
-      ],
-      stylesheets: []
     },
 
     // ── Integrations ──

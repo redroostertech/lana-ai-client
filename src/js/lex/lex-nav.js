@@ -55,7 +55,6 @@
     'admin/health.html':                      { service: 'string' },
     'admin/index.html':                       { tab: 'string' },
     'admin/integrations.html':                { connector: 'string', source: 'string' },
-    'admin/management-boards.html':           { id: 'string', board: 'string' },
     'admin/metric-catalog.html':              { id: 'string', q: 'string' },
     'admin/metric_detail.html':               { id: 'string' },
     'admin/onboarding_management.html':        { id: 'string' },
@@ -100,9 +99,6 @@
     'firm-handbook.html':                     { id: 'string' },
     'folder.html':                            { matter_id: 'string', matter_name: 'string', folder_id: 'string', tab: 'string' },
     'help.html':                              { section: 'string' },
-    'insights/dashboard.html':                { matter_id: 'string', module: 'string', tab: 'string' },
-    'insights/module-execution.html':         { id: 'string', module: 'string', matter_id: 'string' },
-    'insights/predictions.html':              { matter_id: 'string', type: 'string', tab: 'string' },
     'integrations/actionstep.html':           { matter_id: 'string', source: 'string' },
     'integrations/connector-case.html':       { connectorId: 'string', sourceId: 'string', matter_id: 'string' },
     'integrations/connector-communications.html': { connectorId: 'string', sourceId: 'string', matter_id: 'string' },
@@ -116,9 +112,7 @@
     'integrations/leadly.html':               { matter_id: 'string', source: 'string' },
     'integrations/sync-status.html':          { connectorId: 'string', sourceId: 'string', status: 'string' },
     'login.html':                             { return: 'string' },
-    'matter-skills.html':                     { matterSkillId: 'string', tab: 'string' },
     'matters/timeline.html':                  { id: 'string' },
-    'model-pricing.html':                     { model: 'string', provider: 'string' },
     'my-tasks.html':                          { task: 'string', task_id: 'string', status: 'string', assignee: 'string', matter_id: 'string' },
     'notifications.html':                     { id: 'string', filter: 'string', type: 'string' },
     'onboarding.html':                        { token: 'string' },
@@ -129,8 +123,6 @@
     'search-results.html':                    { q: 'string' },
     'session_expired.html':                   { return: 'string' },
     'settings-v2.html':                       { capability: 'string', section: 'string' },
-    'skills.html':                            { category: 'string', id: 'string' },
-    'skills-marketplace.html':                { category: 'string', id: 'string' },
     'workflows/active.html':                  { id: 'string', status: 'string' },
     'workflows/builder.html':                 { id: 'string', template: 'string' },
     'workflows/dashboard.html':               { id: 'string' },
@@ -359,7 +351,20 @@
   // An old link or a saved last page to a retired page opens the page that replaced it.
   var _retiredPages = {
     'admin/dashboard.html': 'admin/index.html',
-    'matters.html': 'workspaces.html'
+    'admin/management-boards.html': 'admin/dashboard-library.html',
+    'insights/dashboard.html': 'admin/analytics.html',
+    'insights/module-execution.html': 'admin/reporting.html',
+    'insights/predictions.html': 'admin/analytics.html',
+    'matter-skills.html': 'automation/index.html',
+    'matters.html': 'workspaces.html',
+    'skills-marketplace.html': 'automation/index.html',
+    'skills.html': 'automation/index.html'
+  };
+
+  // Pages that are only a fragment of the app shell (app.html): opened on their own they render raw.
+  var _shellFragmentPages = {
+    'model-pricing.html': true,
+    'open-source-licenses.html': true
   };
 
   /**
@@ -389,6 +394,9 @@
    * The old Matters page (matters.html) is now workspaces.html (keeping
    * action, status, sort_by and sort_order); its link to one matter
    * (?matter_id= or ?open=, with ?tab=) opens that matter's page.
+   * The old Insights Reports page's ?module= opens that report (?report=).
+   * The other old Insights (Dashboard, Predictions), Management Boards and Skills pages' params named
+   * their own records, so their replacement opens on its home or list.
    * @param {string} pageKey - e.g. 'matters.html'
    * @param {Object} [params] - the link's query values
    * @returns {{page: string, params: Object|null}|null} params null keeps the link's own params
@@ -396,8 +404,12 @@
   function redirectFor(pageKey, params) {
     var page = replacementFor(pageKey);
     if (!page) return null;
-    if (pageKey !== 'matters.html') return { page: page, params: null };
     var values = params || {};
+    if (pageKey === 'admin/dashboard.html') return { page: page, params: null };
+    if (pageKey === 'insights/module-execution.html') {
+      return { page: page, params: values.module ? { report: String(values.module) } : {} };
+    }
+    if (pageKey !== 'matters.html') return { page: page, params: {} };
     var matterId = values.matter_id || values.open;
     if (matterId) {
       var details = { id: String(matterId) };
@@ -537,7 +549,7 @@
     }
 
     // 5. Fallback: no router available (pre-init or outside SPA shell)
-    if (extractPageKey(pathname) === 'search-results.html') {
+    if (extractPageKey(pathname) === 'search-results.html' || _shellFragmentPages[extractPageKey(pathname)] === true) {
       try { sessionStorage.setItem('_lex_last_path', finalUrl); } catch (e) {}
       window.location.href = rootRelativeUrl('app.html');
       return;

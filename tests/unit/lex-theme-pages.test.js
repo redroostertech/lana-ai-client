@@ -33,7 +33,7 @@ test.each(themed.map((p) => [p.rel, p]))('%s loads lex.theme.js in <head>, befor
 });
 
 test('the pages without lex-tokens.css and the separate windows load the theme script too', () => {
-  ['auth_error.html', 'error.html', 'logged_out.html', 'session_expired.html', 'skills-marketplace.html', 'update-dialog.html',
+  ['auth_error.html', 'error.html', 'logged_out.html', 'session_expired.html', 'update-dialog.html',
     'screen-voice/overlay/index.html', 'briefs/index.html', 'briefs/dashboard.html'].forEach((rel) => {
     expect(themed.map((p) => p.rel)).toContain(rel);
   });

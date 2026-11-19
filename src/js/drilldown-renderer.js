@@ -6,7 +6,7 @@
  * @description Data-driven component that fetches and renders drilldown data based on metric configuration
  */
 
-// Marked library is loaded globally via script tag (see module-execution.html)
+// Marked library is loaded globally via script tag (see admin/reporting.html)
 // The UMD build creates a global 'marked' object
 // Configure marked if available
 if (typeof marked !== 'undefined' && marked) {
@@ -1453,7 +1453,7 @@ createModalStructure() {
 
   /**
    * Load the Lex components the drilldown needs when the host page lacks
-   * them (module-execution.html and reporting load different sets).
+   * them (a host page may not load every one).
    * @returns {Promise<void>}
    */
   ensureComponents() {

@@ -3,8 +3,7 @@
  * Builds a standard record table (docs/TABLE-STANDARD.md) from a column spec:
  * toolbar card (search, Sort by, order, count), section heading with count,
  * and a lex-table.lex-table--card with column filters, cell renderers and
- * widths. Shared by the Insights pages (dashboard, module-execution,
- * predictions) and the Integrations pages (leadly, actionstep,
+ * widths. Shared by the Integrations pages (leadly, actionstep,
  * connector-viewer, sync-status, connector-crm), which used to hand-build
  * their <table> markup, sort, search and pagers.
  *

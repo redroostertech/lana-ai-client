@@ -125,27 +125,16 @@ test('mixed visualization preserves ordinary sibling settings and never combines
   } finally { global.document = saved; }
 });
 test('mounted standalone and routed pages load the helper before consumers', () => {
-  for (const file of ['admin/dashboard-detail.html', 'admin/reporting.html', 'admin/metric-catalog.html', 'insights/module-execution.html']) {
+  for (const file of ['admin/dashboard-detail.html', 'admin/reporting.html', 'admin/metric-catalog.html']) {
     const source = fs.readFileSync(path.join(sourceRoot, file), 'utf8');
     expect(source).toContain('js/shared/acquisition-source-presentation.js');
   }
   const routes = fs.readFileSync(path.join(sourceRoot, 'js/lex/lex-router.pages.js'), 'utf8');
-  expect(routes.match(/acquisition-source-presentation\.js/g)).toHaveLength(3);
+  expect(routes.match(/acquisition-source-presentation\.js/g)).toHaveLength(2);
 });
 test('ordinary bare custom key keeps its existing rendering contract', () => {
   expect(helper.isAcquisitionSource({ key: 'top_performing_sources' })).toBe(false);
   expect(page('js/admin/dashboard-detail.js', 'renderMetricCard').renderMetricCard({ metric_key: 'custom', value: 7, format: 'number' })).toContain('7');
-});
-test('actual standalone module card uses the source owner, not its generic array chart', () => {
-  const source = fs.readFileSync(path.join(sourceRoot, 'insights/module-execution.html'), 'utf8');
-  const begin = source.indexOf('    function createMetricCard(metric) {');
-  const end = source.indexOf('\n    function ', begin + 1);
-  expect(begin).toBeGreaterThan(0); expect(end).toBeGreaterThan(begin);
-  const context = { window: { AcquisitionSourcePresentation: helper } };
-  vm.runInNewContext(source.slice(begin, end), context);
-  const html = context.createMetricCard(metric());
-  expect(html).toContain('-9007199254740993.0123456789'); expect(html).toContain('USD');
-  expect(html).not.toContain('<canvas');
 });
 test('known source namespace and uncertainty cannot be relabeled as complete', () => {
   const altered = clone(metric()); altered.metadata.observation_receipt.coverage.unknown_amount_count = 1;

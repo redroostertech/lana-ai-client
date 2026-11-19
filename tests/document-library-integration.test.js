@@ -623,17 +623,6 @@ describe('Library dates use the shared date utils', () => {
     expect(read('js/admin/admin-users.js')).toContain('created_at: function (val) { return kit.timeCell(val); }');
     expect(read('js/admin/admin-table-kit.js')).toContain("formatted('formatDateTime', value, 'Never')");
     expect(read('js/pages/model-pricing.js')).toContain('formatDateTime(row.created_at)');
-    // Skills leaves created_at raw so lex-table formats it (formatDateTime) and sorts it as a date.
-    expect(read('js/skills.js')).not.toContain("out.created_at = formatDateLong");
-    for (const page of ['insights/dashboard.html', 'insights/module-execution.html']) {
-      const html = read(page);
-      expect(html).not.toContain('${new Date(lead.source_created_at).toLocaleDateString()}');
-      // The drill-down tables come from insights-tables.js: rows keep the raw
-      // source_created_at and the record-table kit's Created cell formats it.
-      expect(html).toContain('js/insights-tables.js');
-      expect(html).not.toContain('toLocaleString()');
-    }
-    expect(read('insights/js/insights-tables.js')).toContain("created_at: opp.source_created_at || ''");
     expect(read('insights/js/record-table-kit.js')).toContain("formatted('formatDateTime', value)");
   });
 

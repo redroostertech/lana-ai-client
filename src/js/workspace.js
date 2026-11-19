@@ -5,8 +5,7 @@
    Dependencies (loaded via page descriptor before this file):
      - feature-tracker, mammoth, conflict-detection, similar-matters-widget
      - analytics, metadata-formatter/service, marked, document-metadata-viewer
-     - tiptap-bundle, matter-notes (api client + components), matter-skills
-     - drawflow, workflow-builder
+     - tiptap-bundle, matter-notes (api client + components)
 */
 (function () {
   'use strict';
