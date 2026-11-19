@@ -28,6 +28,12 @@
     return index;
   }
 
+  function occurrenceKey(event, index) {
+    var R = global.LanaCalendarRepeat;
+    if (R) return R.occurrenceKey(event, index);
+    return (event && event.id) ? String(event.id) : 'busy-' + index;
+  }
+
   function badgeFor(source) {
     if (!source || source.kind !== 'connector') return { label: 'LANA', kind: 'lana' };
     return { label: source.label || source.connector_id || 'Connected app', kind: 'connector' };
@@ -79,8 +85,14 @@
       var firstOther = users.filter(function (id) { return id !== viewerId; })[0];
       var busy = event.busy_only === true;
       var badge = busy ? null : badgeFor(event.source);
+      var repeating = !busy && event.recurring === true;
       return {
-        id: event.id || ('busy-' + i),
+        // One key per occurrence (a repeating event's occurrences share its id).
+        id: occurrenceKey(event, i),
+        eventId: busy ? null : (event.id || null),
+        occurrenceStart: repeating ? (event.occurrence_start || null) : null,
+        seriesId: repeating ? (event.series_id || null) : null,
+        recurrenceText: repeating ? (event.recurrence_text || '') : '',
         start: event.start,
         end: event.end,
         is_all_day: event.is_all_day === true,
@@ -91,9 +103,8 @@
         colorSlot: mine ? (colors[viewerId] || 0) : (colors[firstOther] !== undefined ? colors[firstOther] : 0),
         badge: badge,
         readOnly: busy || event.editable !== true,
-        // A repeating event's time is not changed here until repeating
-        // events are expanded (stage 2 part 6): not draggable.
-        recurring: !busy && event.recurring === true,
+        // A repeating event: dragging one occurrence asks this / following / all.
+        recurring: repeating,
         status: busy ? null : (event.status || null),
         organizer: busy ? '' : organizerText(event.organizer),
         matter: busy ? null : (event.matter || null),

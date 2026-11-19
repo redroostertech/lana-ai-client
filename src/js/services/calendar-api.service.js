@@ -55,8 +55,16 @@
       updateEvent: function (id, body) {
         return Promise.resolve(api().patch(EVENTS + '/' + encodeURIComponent(id), body)).then(unwrap);
       },
-      deleteEvent: function (id) {
-        return Promise.resolve(api().delete(EVENTS + '/' + encodeURIComponent(id))).then(unwrap);
+      // A repeating event: options { scope: 'this'|'following'|'all', occurrence_start }.
+      deleteEvent: function (id, options) {
+        var o = options || {};
+        var query = o.scope ? '?scope=' + encodeURIComponent(o.scope)
+          + (o.occurrence_start ? '&occurrence_start=' + encodeURIComponent(o.occurrence_start) : '') : '';
+        return Promise.resolve(api().delete(EVENTS + '/' + encodeURIComponent(id) + query)).then(unwrap);
+      },
+      // The repeat picker's rule in words, before saving (the backend words it).
+      previewRepeat: function (body) {
+        return Promise.resolve(api().post(EVENTS + '/repeat-preview', body)).then(unwrap);
       },
       invite: function (id, invitees) {
         return Promise.resolve(api().post(EVENTS + '/' + encodeURIComponent(id) + '/attendees', { invitees: invitees })).then(unwrap);

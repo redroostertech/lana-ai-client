@@ -186,9 +186,9 @@ describe('event drawer model', () => {
       // A private block never shows a title, even if one arrived.
       { user_id: 'u3', name: 'Cy', title: 'Secret', private: true, start: '2026-11-18T14:00:00Z', end: '2026-11-18T15:00:00Z' }
     ], 'me', NY);
-    expect(lines[2]).toBe('Cy: busy, Wed 9:00 AM to 10:00 AM');
-    expect(lines[0]).toBe('You: Hearing, Wed 9:00 AM to 10:00 AM');
-    expect(lines[1]).toBe('Ben: busy, Wed 9:00 AM to 10:00 AM');
+    expect(lines[2]).toBe('Cy: busy, Wed, Nov 18, 9:00 AM to 10:00 AM');
+    expect(lines[0]).toBe('You: Hearing, Wed, Nov 18, 9:00 AM to 10:00 AM');
+    expect(lines[1]).toBe('Ben: busy, Wed, Nov 18, 9:00 AM to 10:00 AM');
   });
 
   test('isConflict reads the 409 CALENDAR_CONFLICT error only', () => {

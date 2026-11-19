@@ -290,3 +290,16 @@
 [class*=" cal-"].hidden {
   display: none;
 }
+
+/* Repeat picker in the event drawer (calendar part 6). */
+.cal-repeat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-md);
+}
+
+
+/* The this / following / all question opens over the event drawer. */
+#calScopeModal {
+  --lex-z-modal: 41;
+}

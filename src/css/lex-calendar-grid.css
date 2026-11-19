@@ -258,26 +258,34 @@ lex-calendar-grid {
   text-overflow: ellipsis;
 }
 
-/* A short event: one line, title first, then the time; it clips at the end. */
+/* A short event: one line, the title first. The time keeps its full width
+   and wraps onto a second line the block has no room for, so it is dropped
+   (it stays in the tooltip) rather than squeezing the title. */
 .lex-cal-timed--short {
   flex-direction: row;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 4px;
+  align-content: flex-start;
+  column-gap: 4px;
+  row-gap: 0;
   padding-top: 0;
   padding-bottom: 0;
+  /* A 15 minute block is 12px tall: a tight line keeps descenders inside it. */
+  line-height: 1.05;
   white-space: nowrap;
   overflow: hidden;
 }
 
 .lex-cal-timed--short .lex-cal-event-title {
   flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .lex-cal-timed--short .lex-cal-event-time {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex: 0 0 auto;
 }
 
 /* Drag to move or resize (an editable event only). */
@@ -335,6 +343,21 @@ lex-calendar-grid {
 
 .lex-cal-continues {
   color: var(--lex-text-tertiary);
+}
+
+/* Repeating event marker (calendar part 6): a small icon before the title. */
+.lex-cal-repeat {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  margin-right: 3px;
+  vertical-align: -1px;
+  opacity: 0.75;
+}
+
+.lex-cal-repeat svg {
+  width: 11px;
+  height: 11px;
 }
 
 .lex-cal-badge {

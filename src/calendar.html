@@ -86,6 +86,7 @@
           <p id="calDetailWhen" class="cal-detail-when"></p>
           <dl class="cal-detail-list">
             <div class="cal-detail-row"><dt>Source</dt><dd id="calDetailSource"></dd></div>
+            <div id="calDetailRepeatRow" class="cal-detail-row hidden"><dt>Repeats</dt><dd id="calDetailRepeat"></dd></div>
             <div id="calDetailStatusRow" class="cal-detail-row"><dt>Status</dt><dd id="calDetailStatus"></dd></div>
             <div id="calDetailOrganizerRow" class="cal-detail-row"><dt>Organizer</dt><dd id="calDetailOrganizer"></dd></div>
             <div id="calDetailLocationRow" class="cal-detail-row hidden"><dt>Location</dt><dd id="calDetailLocation"></dd></div>
@@ -119,7 +120,21 @@
             <lex-segmented id="calFieldVisibility" name="visibility" value="public" aria-labelledby="calFieldVisibilityLabel"
               options='[{"value":"public","label":"Firm"},{"value":"private","label":"Only invited people"}]'></lex-segmented>
           </div>
-          <p id="calRecurringNote" class="cal-help hidden">This event repeats. Its time cannot be changed here yet; you can still change its details.</p>
+          <div id="calRepeatSection" class="cal-repeat">
+            <lex-select id="calFieldRepeat" name="repeat" label="Repeat"></lex-select>
+            <div id="calRepeatIntervalRow" class="cal-form-row hidden">
+              <lex-input id="calFieldRepeatInterval" name="repeat_interval" type="number" label="Every" min="1" max="99"></lex-input>
+              <lex-select id="calFieldRepeatUnit" name="repeat_unit" label="Unit" aria-label="Repeat unit"></lex-select>
+            </div>
+            <lex-select id="calFieldRepeatDays" name="repeat_days" label="On" multiple class="hidden" placeholder="Choose days"></lex-select>
+            <div id="calRepeatEndsRow" class="cal-form-field hidden">
+              <span class="cal-form-label" id="calFieldRepeatEndsLabel">Ends</span>
+              <lex-segmented id="calFieldRepeatEnds" name="repeat_ends" value="never" aria-labelledby="calFieldRepeatEndsLabel"></lex-segmented>
+            </div>
+            <lex-input id="calFieldRepeatUntil" name="repeat_until" type="date" label="Last day" class="hidden"></lex-input>
+            <lex-input id="calFieldRepeatCount" name="repeat_count" type="number" label="Times" min="1" max="730" class="hidden"></lex-input>
+            <p id="calRepeatText" class="cal-help hidden"></p>
+          </div>
           <lex-textarea id="calFieldDescription" name="description" label="Description" rows="3" auto-resize></lex-textarea>
         </lex-form>
 
@@ -140,6 +155,10 @@
           <lex-btn id="calDeleteBtn" class="hidden" variant="danger" size="sm" leading-icon="trash-2">Delete event</lex-btn>
         </div>
       </lex-drawer>
+      <lex-modal id="calScopeModal" heading="Change a repeating event" size="sm" expandable="false" confirm-text="Continue" cancel-text="Cancel">
+        <lex-radio id="calScopeChoice" name="scope" value="this"
+          options='[{"value":"this","label":"This event"},{"value":"following","label":"This and following events"},{"value":"all","label":"All events"}]'></lex-radio>
+      </lex-modal>
     </main>
   </template>
 
@@ -195,12 +214,14 @@
   <script src="js/lex/components/form/lex-input.js"></script>
   <script src="js/lex/components/form/lex-textarea.js"></script>
   <script src="js/lex/components/form/lex-form.js"></script>
+  <script src="js/lex/components/form/lex-radio.js"></script>
   <script src="js/calendar/calendar-layout.js"></script>
   <script src="js/lex/components/data/lex-calendar-grid.js"></script>
 
   <script src="js/lex/lex-page-init.js"></script>
   <script src="js/shared/device-time-zone.js"></script>
   <script src="js/services/calendar-api.service.js"></script>
+  <script src="js/calendar/calendar-repeat.model.js"></script>
   <script src="js/calendar/calendar-page.model.js"></script>
   <script src="js/calendar/calendar-event-form.model.js"></script>
   <script src="js/calendar/calendar-event-drawer.js"></script>

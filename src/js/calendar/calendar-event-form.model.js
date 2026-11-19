@@ -119,9 +119,17 @@
     };
   }
 
-  /** Values for an existing event (GET /calendar-events/:id) in its own zone. */
-  function draftFromEvent(detail, fallbackZone) {
-    var event = detail || {};
+  /**
+   * Values for an existing event (GET /calendar-events/:id) in its own zone.
+   * occurrence: { start, end } of the occurrence of a repeating event that
+   * was opened; its times fill the form.
+   */
+  function draftFromEvent(detail, fallbackZone, occurrence) {
+    var event = Object.assign({}, detail || {});
+    if (occurrence && occurrence.start) {
+      event.start_time = occurrence.start;
+      event.end_time = occurrence.end || occurrence.start;
+    }
     var zone = event.timezone || fallbackZone || 'UTC';
     var T = time();
     var start = wallOf(event.start_time, zone) || { day: '', minutes: 0 };
@@ -146,7 +154,7 @@
       visibility: event.visibility === 'private' ? 'private' : 'public',
       description: event.description || '',
       links: (event.links || []).slice(),
-      recurring: !!event.recurrence_rule,
+      recurring: !!(event.series_id || event.recurrence_rule),
       can_delete: event.can_delete === true
     };
   }
@@ -156,16 +164,8 @@
    * wrong. Only the fields the drawer edits; invitations and links go
    * through their own calls.
    */
-  function toPayload(values, options) {
+  function toPayload(values) {
     var v = values || {};
-    var keepTimes = !!(options && options.keepTimes);
-    if (keepTimes) {
-      // A repeating event: only the details change; its times are left as
-      // stored until repeating events can be edited (stage 2 part 6).
-      var keptTitle = String(v.title || '').trim();
-      if (!keptTitle) return { errors: [{ name: 'title', message: 'Give the event a title.' }] };
-      return { body: { title: keptTitle, visibility: v.visibility === 'private' ? 'private' : 'public', description: String(v.description || ''), location: String(v.location || '').trim() } };
-    }
     var T = time();
     var errors = [];
     var title = String(v.title || '').trim();
@@ -257,8 +257,9 @@
    * only what the agenda gave.
    */
   function detailId(item) {
-    if (!item || item.busy || !item.id) return null;
-    return /^cd:/.test(String(item.id)) ? null : String(item.id);
+    var id = item && (item.eventId !== undefined ? item.eventId : item.id);
+    if (!item || item.busy || !id) return null;
+    return /^cd:/.test(String(id)) ? null : String(id);
   }
 
   /** The location row: from the detail, never on a busy block (like the title). */
@@ -286,7 +287,8 @@
    * block, in the viewer's zone. A block the viewer may not read says Busy.
    */
   function conflictLines(conflicts, viewerId, zone) {
-    var fmt = new Intl.DateTimeFormat('en-US', { timeZone: zone || 'UTC', weekday: 'short', hour: 'numeric', minute: '2-digit' });
+    // The date as well as the time: a repeating event's clash may be months away.
+    var fmt = new Intl.DateTimeFormat('en-US', { timeZone: zone || 'UTC', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     var timeFmt = new Intl.DateTimeFormat('en-US', { timeZone: zone || 'UTC', hour: 'numeric', minute: '2-digit' });
     return (conflicts || []).map(function (c) {
       var who = c.user_id === viewerId ? 'You' : (c.name || 'A coworker');
@@ -294,6 +296,31 @@
       var when = c.is_all_day ? 'all day' : fmt.format(new Date(c.start)) + ' to ' + timeFmt.format(new Date(c.end));
       return who + ': ' + what + ', ' + when;
     });
+  }
+
+  /**
+   * The first clashing date the 409 names (first_conflict_date, a plain day in
+   * the event's zone) in words, "Tue, Dec 28, 2027", or ''.
+   */
+  function firstConflictText(error, zone) {
+    var day = error && error.data && error.data.first_conflict_date;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(day || ''))) return '';
+    var T = time();
+    // Noon of the plain day in the zone: the label never slips a day.
+    var noon = new Date(T.startOfDayInTimeZone(day, zone || 'UTC').getTime() + 12 * T.MS_PER_HOUR);
+    return new Intl.DateTimeFormat('en-US', { timeZone: zone || 'UTC', weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).format(noon);
+  }
+
+  /**
+   * Did the person change the event's times in the form? Only then does a
+   * save send them (a repeating event's All or Following measures any move
+   * from them).
+   */
+  function timesChanged(before, after) {
+    if (!before || !after) return true;
+    return ['start_date', 'start_time', 'end_date', 'end_time', 'time_zone'].some(function (name) {
+      return String(before[name] || '') !== String(after[name] || '');
+    }) || Boolean(before.is_all_day) !== Boolean(after.is_all_day);
   }
 
   /** True when an API error is the conflict warning. */
@@ -321,6 +348,8 @@
     detailLocation: detailLocation,
     detailLinks: detailLinks,
     conflictLines: conflictLines,
+    firstConflictText: firstConflictText,
+    timesChanged: timesChanged,
     isConflict: isConflict,
     conflictsOf: conflictsOf
   };

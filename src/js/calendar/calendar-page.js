@@ -185,6 +185,9 @@
     drawer.heading = item.title;
     setText('calDetailWhen', formatWhen(item));
     setText('calDetailSource', item.busy ? 'Not shared with you' : (item.badge ? item.badge.label : 'LANA'));
+    // A repeating event: its rule in words, from the agenda.
+    setText('calDetailRepeat', item.recurrenceText || '');
+    show(el('calDetailRepeatRow'), !!item.recurrenceText);
     setText('calDetailStatus', STATUS_LABELS[item.status] || '');
     show(el('calDetailStatusRow'), !!STATUS_LABELS[item.status]);
     setText('calDetailOrganizer', item.organizer);
@@ -300,7 +303,9 @@
     el('calEditBtn').addEventListener('click', function () {
       var item = state.openItem;
       el('calEventDrawer').open = false;
-      if (item && editor) editor.openEdit(item.id);
+      if (item && editor) {
+        editor.openEdit(item.eventId || item.id, item.recurring ? { start: item.start, end: item.end, occurrenceStart: item.occurrenceStart } : null);
+      }
     });
     el('calNewBtn').addEventListener('click', function () {
       if (editor) editor.openNew({ day: state.view === 'month' ? T.dayInTimeZone(T.nowDate(), currentZone()) : state.day });

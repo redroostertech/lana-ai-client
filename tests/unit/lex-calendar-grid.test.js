@@ -124,12 +124,19 @@ describe('lex-calendar-grid', () => {
       expect(grid.querySelectorAll('[data-cal-resize]')).toHaveLength(0);
     });
 
-    test('a repeating event cannot be dragged until repeating events can be edited (review C5)', async () => {
+    test('an occurrence of a repeating event is draggable, carries the repeat marker and says its rule (part 6)', async () => {
       const { grid } = await mount({ timeZone: 'UTC', days: ['2026-11-18'], items: [
-        { id: 'w', title: 'Weekly', start: '2026-11-18T10:00:00Z', end: '2026-11-18T11:00:00Z', variant: 'mine', recurring: true },
-        { id: 'o', title: 'Once', start: '2026-11-18T12:00:00Z', end: '2026-11-18T13:00:00Z', variant: 'mine' }
+        { id: 'w@1', title: 'Weekly', start: '2026-11-18T10:00:00Z', end: '2026-11-18T11:00:00Z', variant: 'mine', recurring: true, recurrenceText: 'Every Wednesday' },
+        { id: 'o', title: 'Once', start: '2026-11-18T12:00:00Z', end: '2026-11-18T13:00:00Z', variant: 'mine' },
+        { id: 'r', title: 'Theirs', start: '2026-11-18T14:00:00Z', end: '2026-11-18T15:00:00Z', variant: 'mine', recurring: true, readOnly: true }
       ] });
-      expect(Array.from(grid.querySelectorAll('[data-draggable]')).map((n) => n.querySelector('.lex-cal-event-title').textContent)).toEqual(['Once']);
+      expect(Array.from(grid.querySelectorAll('[data-draggable]')).map((n) => n.querySelector('.lex-cal-event-title').textContent.trim())).toEqual(['Weekly', 'Once']);
+      const weekly = Array.from(grid.querySelectorAll('.lex-cal-timed')).find((n) => n.textContent.includes('Weekly'));
+      expect(weekly.querySelector('.lex-cal-repeat')).not.toBeNull();
+      expect(weekly.getAttribute('title')).toContain('Every Wednesday');
+      expect(weekly.getAttribute('aria-label')).toContain('Every Wednesday');
+      const once = Array.from(grid.querySelectorAll('.lex-cal-timed')).find((n) => n.textContent.includes('Once'));
+      expect(once.querySelector('.lex-cal-repeat')).toBeNull();
     });
 
     test('clicking an empty slot asks for a new event at that half hour', async () => {

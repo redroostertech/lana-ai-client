@@ -34,10 +34,12 @@ describe('location field model', () => {
     expect(F.toPayload(values).body.location).toBe('');
   });
 
-  test('a repeating event still saves its location with the other details', () => {
-    expect(F.toPayload({ title: 'Standup', location: 'Zoom' }, { keepTimes: true }).body).toEqual({
-      title: 'Standup', visibility: 'public', description: '', location: 'Zoom'
-    });
+  test('an occurrence of a repeating event opens on its own times, in the event zone', () => {
+    const detail = { calendar_event_id: 'CAL-5', title: 'Standup', start_time: '2026-10-28T13:00:00.000Z', end_time: '2026-10-28T13:15:00.000Z',
+      timezone: NY, series_id: 'CAL-5' };
+    // After the clock change, the same 9:00 occurrence.
+    const draft = F.draftFromEvent(detail, 'UTC', { start: '2026-11-04T14:00:00.000Z', end: '2026-11-04T14:15:00.000Z' });
+    expect([draft.start_date, draft.start_time, draft.end_time, draft.recurring]).toEqual(['2026-11-04', '09:00', '09:15', true]);
   });
 });
 

@@ -166,8 +166,8 @@ describe('calendar page', () => {
     const grid = doc.getElementById('calGrid');
     const base = grid.items.find((i) => i.title === 'Client call');
     const open = (item) => grid.dispatchEvent(new w.CustomEvent('lex-calendar-open', { detail: { item }, bubbles: true }));
-    open({ ...base, id: 'EVENT-A', title: 'A' });
-    open({ ...base, id: 'EVENT-B', title: 'B' });
+    open({ ...base, id: 'EVENT-A', eventId: 'EVENT-A', title: 'A' });
+    open({ ...base, id: 'EVENT-B', eventId: 'EVENT-B', title: 'B' });
     heldDetails['EVENT-B']();
     await settle(w);
     expect(doc.getElementById('calDetailLocation').textContent).toBe('Room of EVENT-B');
