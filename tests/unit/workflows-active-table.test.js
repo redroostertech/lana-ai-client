@@ -83,6 +83,17 @@ describe('Active Workflows table', () => {
   });
 
   test('every data column has a header filter with capitalised labels', () => {
+    // The date filters measure from the clock: pin it to NOW so "older than
+    // 30 days" does not flip once the real date is 30 days past NOW.
+    jest.useFakeTimers({ now: NOW, doNotFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'setImmediate', 'clearImmediate', 'nextTick', 'queueMicrotask'] });
+    try {
+      checkFilters();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  function checkFilters() {
     const f = t.filterOptions();
     expect(Object.keys(f).sort()).toEqual(['created_at', 'executions', 'last_run', 'name', 'status', 'success_rate', 'trigger_type']);
     expect(f.name.text).toBe(true);
@@ -96,7 +107,7 @@ describe('Active Workflows table', () => {
     expect(f.created_at.single).toBe(true);
     expect(f.created_at.match(NOW.toISOString(), ['older'])).toBe(false);
     expect(f.last_run.match('', ['7d'])).toBe(false);
-  });
+  }
 
   test('deep-link params: id and a known status', () => {
     expect(plain(t.readParams(new URLSearchParams('id=wf-1&status=Paused')))).toEqual({ id: 'wf-1', status: 'paused' });
