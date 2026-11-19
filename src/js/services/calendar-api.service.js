@@ -11,6 +11,7 @@
   'use strict';
 
   var BASE = '/api/v1/calendars';
+  var EVENTS = '/api/v1/calendar-events';
 
   function unwrap(response) {
     return response && response.data !== undefined && response.data !== null ? response.data : response;
@@ -40,11 +41,39 @@
       },
       setFreeBusyVisible: function (visible) {
         return Promise.resolve(api().patch(BASE + '/policy', { freebusy_visible_to_members: visible === true })).then(unwrap);
+      },
+      // LANA events (calendar stage 2). A create or edit that asks
+      // check_conflicts rejects with status 409, code CALENDAR_CONFLICT and
+      // data.conflicts when the time overlaps busy time; repeat with
+      // override: true to book it anyway.
+      getEvent: function (id) {
+        return Promise.resolve(api().get(EVENTS + '/' + encodeURIComponent(id))).then(unwrap);
+      },
+      createEvent: function (body) {
+        return Promise.resolve(api().post(EVENTS, body)).then(unwrap);
+      },
+      updateEvent: function (id, body) {
+        return Promise.resolve(api().patch(EVENTS + '/' + encodeURIComponent(id), body)).then(unwrap);
+      },
+      deleteEvent: function (id) {
+        return Promise.resolve(api().delete(EVENTS + '/' + encodeURIComponent(id))).then(unwrap);
+      },
+      invite: function (id, invitees) {
+        return Promise.resolve(api().post(EVENTS + '/' + encodeURIComponent(id) + '/attendees', { invitees: invitees })).then(unwrap);
+      },
+      removeAttendee: function (id, attendeeId) {
+        return Promise.resolve(api().delete(EVENTS + '/' + encodeURIComponent(id) + '/attendees/' + encodeURIComponent(attendeeId))).then(unwrap);
+      },
+      addLink: function (id, link) {
+        return Promise.resolve(api().post(EVENTS + '/' + encodeURIComponent(id) + '/links', link)).then(unwrap);
+      },
+      removeLink: function (id, link) {
+        return Promise.resolve(api().delete(EVENTS + '/' + encodeURIComponent(id) + '/links', link)).then(unwrap);
       }
     };
   }
 
-  var exported = { BASE: BASE, create: create, unwrap: unwrap };
+  var exported = { BASE: BASE, EVENTS: EVENTS, create: create, unwrap: unwrap };
   global.LanaCalendarApi = exported;
   if (typeof module !== 'undefined' && module.exports) module.exports = exported;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -351,6 +351,31 @@
     return candidate;
   }
 
+  // The instant a wall clock reading names in a time zone: a plain day and
+  // minutes after its local midnight on the wall clock (the inverse of
+  // wallClockInTimeZone). A reading in the hour skipped when saving time
+  // starts lands just after the jump; one in the hour repeated when it ends
+  // is the first of the two. An invalid Date for a bad day.
+  function instantFromWallClock(dayValue, minutes, timeZone) {
+    var text = String(dayValue || '');
+    var guess = Date.UTC(Number(text.slice(0, 4)), Number(text.slice(5, 7)) - 1, Number(text.slice(8, 10)))
+      + Math.round(Number(minutes) * MS_PER_MINUTE);
+    if (!Number.isFinite(guess)) return new Date(NaN);
+    var zone = timeZone || SYSTEM_TIME_ZONE;
+    var early = guess - timeZoneOffsetMs(new Date(guess - 12 * MS_PER_HOUR), zone);
+    var late = guess - timeZoneOffsetMs(new Date(guess + 12 * MS_PER_HOUR), zone);
+    var first = Math.min(early, late);
+    var second = Math.max(early, late);
+    function reads(ms) {
+      var wall = wallClockInTimeZone(new Date(ms), zone);
+      return wall && wall.day === text && Math.abs(wall.minutes - Number(minutes)) < 1 / 60;
+    }
+    if (reads(first)) return new Date(first);
+    if (reads(second)) return new Date(second);
+    // In a skipped hour: the clock after the jump.
+    return new Date(Math.max(early, late));
+  }
+
   // Report period presets as plain days (inclusive end) in a time zone. Firm
   // reports pass the firm's zone (Lex.Utils.getFirmTimezone), so the days are
   // the firm's whatever zone the person is in; the backend bounds them in the
@@ -454,6 +479,7 @@
     wallClockInTimeZone: wallClockInTimeZone,
     timeZoneOffsetMs: timeZoneOffsetMs,
     startOfDayInTimeZone: startOfDayInTimeZone,
+    instantFromWallClock: instantFromWallClock,
     reportPresetDays: reportPresetDays,
     toIsoInstant: toIsoInstant,
     toLocalDateInputValue: toLocalDateInputValue,

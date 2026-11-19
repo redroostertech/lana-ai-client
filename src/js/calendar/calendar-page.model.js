@@ -9,7 +9,7 @@
 
   var UNLINKED_LABEL = 'not linked to a LANA user';
   var BUSY_LABEL = 'Busy';
-  var VIEWS = ['day', 'week'];
+  var VIEWS = ['day', 'workweek', 'week', 'month'];
   var PERSON_COLORS = 6; // CSS defines --cal-person-0 .. --cal-person-5
 
   function personName(person) {
@@ -91,6 +91,9 @@
         colorSlot: mine ? (colors[viewerId] || 0) : (colors[firstOther] !== undefined ? colors[firstOther] : 0),
         badge: badge,
         readOnly: busy || event.editable !== true,
+        // A repeating event's time is not changed here until repeating
+        // events are expanded (stage 2 part 6): not draggable.
+        recurring: !busy && event.recurring === true,
         status: busy ? null : (event.status || null),
         organizer: busy ? '' : organizerText(event.organizer),
         matter: busy ? null : (event.matter || null),
@@ -129,21 +132,36 @@
     return VIEWS.indexOf(value) !== -1 ? value : 'week';
   }
 
-  /** The day to move to from `day` by `step` views (prev -1, next +1). */
+  /**
+   * The day to move to from `day` by `step` views (prev -1, next +1): a
+   * month for the month view (the first of that month), a week for the week
+   * views, else a day.
+   */
   function shiftDay(day, view, step) {
     var T = global.LanaTime;
-    return T.addPlainDays(day, (normalizeView(view) === 'week' ? 7 : 1) * step);
+    var v = normalizeView(view);
+    if (v === 'month') {
+      var year = Number(String(day).slice(0, 4));
+      var month = Number(String(day).slice(5, 7)) - 1 + step;
+      var date = new Date(Date.UTC(year, month, 1));
+      return date.toISOString().slice(0, 10);
+    }
+    return T.addPlainDays(day, (v === 'week' || v === 'workweek' ? 7 : 1) * step);
   }
 
-  /** The heading for the shown range, e.g. "Nov 15 to 21, 2026". */
-  function rangeTitle(days, timeZone) {
+  /**
+   * The heading for the shown range, e.g. "Nov 15 to 21, 2026", or for the
+   * month view (pass view 'month' and the day in that month) "November 2026".
+   */
+  function rangeTitle(days, timeZone, view, day) {
     if (!days || !days.length) return '';
     var T = global.LanaTime;
-    function fmt(day, options) {
+    function fmt(d, options) {
       // Noon of the plain day in the zone: the label never slips a day.
-      var instant = new Date(T.startOfDayInTimeZone(day, timeZone).getTime() + 12 * T.MS_PER_HOUR);
+      var instant = new Date(T.startOfDayInTimeZone(d, timeZone).getTime() + 12 * T.MS_PER_HOUR);
       return new Intl.DateTimeFormat('en-US', Object.assign({ timeZone: timeZone }, options)).format(instant);
     }
+    if (view === 'month') return fmt(day || days[7], { month: 'long', year: 'numeric' });
     if (days.length === 1) return fmt(days[0], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
     var first = days[0];
     var last = days[days.length - 1];

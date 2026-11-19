@@ -547,7 +547,14 @@
       const showClear = this.clearable && this._selectedValues.size > 0 &&
         (this.multiple || !!this._findOption(this._singleValue()));
       const clearHtml = showClear
-        ? `<button type="button" class="lex-select-clear" data-action="clear" tabindex="-1" aria-label="Clear selection">${CLEAR_SVG}</button>`
+        // A span, not a button: a <button> inside the trigger <button> is
+        // invalid HTML, so the parser closed the trigger early and the clear
+        // mark and chevron fell out under it (a clearable multi-select
+        // stacked its parts after the first pick).
+        // Mouse only: hidden from assistive tech (its label would join the
+        // trigger's name); the keyboard clears with Delete or Backspace on
+        // the trigger.
+        ? `<span class="lex-select-clear" aria-hidden="true" data-action="clear">${CLEAR_SVG}</span>`
         : '';
 
       let html = `<div class="lex-select-wrap">`;
@@ -802,6 +809,18 @@
 
       // Keyboard on trigger (when not searchable)
       const trigger = this.querySelector('[data-action="toggle"]');
+      // Delete or Backspace on the closed trigger clears a clearable select
+      // (the keyboard path to the clear mark, which is mouse only).
+      if (trigger && this.clearable) {
+        this.listen(trigger, 'keydown', (e) => {
+          if (this._open || (e.key !== 'Delete' && e.key !== 'Backspace') || this._selectedValues.size === 0) return;
+          e.preventDefault();
+          this._selectedValues.clear();
+          this._emitChange(this.multiple ? [] : '');
+          this._refocusTrigger = true;
+          this._scheduleUpdate();
+        });
+      }
       if (trigger && !this.searchable) {
         this.listen(trigger, 'keydown', (e) => {
           const opts = this._getFilteredOptions();

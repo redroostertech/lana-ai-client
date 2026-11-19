@@ -2,6 +2,14 @@
    data-connectors.html.
    Columns: Pin, Name, Category, Auth, Scope, Status, Version, Created, Actions */
 
+/* The search, sort and filter bar: a surface token, so it follows the theme. */
+.connector-table-toolbar {
+  background: var(--lex-bg-elevated);
+  border: 1px solid var(--lex-border-default);
+  border-radius: var(--lex-radius-lg);
+  box-shadow: var(--lex-shadow-sm);
+}
+
 .connector-table table { min-width: 1310px; table-layout: fixed; }
 .connector-table th { white-space: nowrap; }
 .connector-table td { overflow: hidden; }

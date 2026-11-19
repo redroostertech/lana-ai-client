@@ -14,7 +14,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--lex-space-md);
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   min-width: 0;
 }
 
@@ -26,27 +26,42 @@
   min-width: 0;
 }
 
+.cal-toolbar-nav {
+  flex: 1 1 auto;
+}
+
+.cal-toolbar-controls {
+  flex: 0 1 auto;
+}
+
+/* A long day title ("Wednesday, November 18, 2026") shortens instead of
+   pushing the controls onto a second row. */
 .cal-range-title {
   margin: 0 0 0 var(--lex-space-xs);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 18px;
   font-weight: 600;
   color: var(--lex-text-primary);
   white-space: nowrap;
 }
 
+/* The coworker picker keeps one line in the toolbar; pills that do not fit
+   the trigger's width are clipped (the legend under it lists everyone). */
 .cal-people {
-  width: 320px;
-  min-width: 0;
+  flex: 0 1 260px;
+  min-width: 160px;
 }
 
-.cal-people lex-select .lex-select-trigger--multiple {
-  height: auto;
+.cal-people .lex-select-pills {
+  flex-wrap: nowrap;
 }
 
 .cal-notice {
   margin: 0;
   padding: var(--lex-space-sm) var(--lex-space-md);
-  border: 1px solid var(--lex-status-warning-border);
+  border: 1px solid color-mix(in srgb, var(--lex-status-warning-text) 35%, transparent);
   border-radius: var(--lex-radius-md);
   background: var(--lex-status-warning-bg);
   color: var(--lex-status-warning-text);
@@ -70,7 +85,7 @@
 /* The person color slots are defined on lex-calendar-grid (and the
    .lex-cal-person-N classes in lex-calendar-grid.css pick one); the legend
    sits outside the grid, so it repeats the slot values. */
-.cal-legend { --cal-person-0: var(--lex-accent); --cal-person-1: var(--lex-chart-color-2); --cal-person-2: var(--lex-chart-color-3);
+.cal-legend { --cal-person-0: var(--lex-chart-color-3); --cal-person-1: var(--lex-chart-color-2); --cal-person-2: var(--lex-chart-color-1);
   --cal-person-3: var(--lex-chart-color-4); --cal-person-4: var(--lex-chart-color-5); --cal-person-5: var(--lex-chart-color-6); }
 
 .cal-legend-swatch {
@@ -94,7 +109,7 @@
   padding: var(--lex-space-md);
   border: 1px solid var(--lex-border-default);
   border-radius: var(--lex-card-radius);
-  background: var(--lex-bg-card);
+  background: var(--lex-bg-elevated);
 }
 
 .cal-section-title {
@@ -149,5 +164,119 @@
 @container cal-page (max-width: 719px) {
   .cal-toolbar { flex-direction: column; align-items: stretch; }
   .cal-toolbar-controls { flex-wrap: wrap; }
-  .cal-people { width: 100%; }
+  .cal-people { flex: 1 1 100%; }
+}
+
+/* Event drawer (js/calendar/calendar-event-drawer.js). */
+.cal-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-md);
+}
+
+.cal-form-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--lex-space-sm);
+}
+
+.cal-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-xs);
+}
+
+.cal-form-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--lex-text-primary);
+}
+
+.cal-form-error {
+  margin: var(--lex-space-md) 0 0;
+  font-size: 13px;
+  color: var(--lex-status-danger);
+}
+
+.cal-links {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-sm);
+  margin-top: var(--lex-space-lg);
+  padding-top: var(--lex-space-md);
+  border-top: 1px solid var(--lex-border-subtle);
+}
+
+.cal-link-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cal-link-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lex-space-sm);
+  padding: var(--lex-space-xs) var(--lex-space-sm);
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: var(--lex-radius-sm);
+  font-size: 13px;
+  color: var(--lex-text-primary);
+}
+
+.cal-link-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--lex-space-sm);
+  align-items: center;
+}
+
+.cal-link-add lex-segmented {
+  grid-column: 1 / -1;
+}
+
+.cal-edit-danger {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: var(--lex-space-lg);
+  /* Room under the last controls so the drawer footer never covers them. */
+  padding-bottom: var(--lex-space-2xl, 48px);
+}
+
+/* Focused link controls scroll clear of the footer. */
+.cal-links lex-segmented,
+.cal-links lex-select,
+.cal-links lex-btn {
+  scroll-margin-bottom: 96px;
+}
+
+/* The conflict warning (Lex.Modal.confirmAsync with "Book anyway"). */
+.cal-conflict-intro {
+  margin: 0 0 var(--lex-space-xs);
+  color: var(--lex-text-primary);
+  font-size: 13px;
+}
+
+.cal-conflict-list {
+  margin: 0;
+  padding-left: var(--lex-space-lg);
+  color: var(--lex-text-secondary);
+  font-size: 13px;
+}
+
+@container cal-page (max-width: 559px) {
+  .cal-form-row { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Shown and hidden from calendar-page.js with the shared .hidden class. A
+   calendar class that sets display (a detail row is a grid, the legend and
+   firm settings are flex) would otherwise win over .hidden, which loads
+   first, and an empty row such as Matter would show on every event. */
+[class^="cal-"].hidden,
+[class*=" cal-"].hidden {
+  display: none;
 }

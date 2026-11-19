@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-lex-theme="auto">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -34,14 +34,15 @@
       <lex-banner
         id="calBanner"
         variant="light"
+        size="compact"
         heading="Calendar"
-        subtitle="Your meetings and appointments from LANA and your connected apps, with coworkers' busy time when you add them."
         lana
         lana-context-type="full_chat"
       ></lex-banner>
 
       <div class="cal-toolbar" role="toolbar" aria-label="Calendar view">
         <div class="cal-toolbar-nav">
+          <lex-btn id="calNewBtn" variant="primary" size="sm" leading-icon="plus">New event</lex-btn>
           <lex-btn id="calTodayBtn" variant="secondary" size="sm">Today</lex-btn>
           <lex-btn id="calPrevBtn" variant="ghost" size="sm" icon leading-icon="chevron-left" aria-label="Previous"></lex-btn>
           <lex-btn id="calNextBtn" variant="ghost" size="sm" icon leading-icon="chevron-right" aria-label="Next"></lex-btn>
@@ -61,7 +62,7 @@
           <lex-segmented
             id="calViewToggle"
             value="week"
-            options='[{"value":"day","label":"Day"},{"value":"week","label":"Week"}]'
+            options='[{"value":"day","label":"Day"},{"value":"workweek","label":"Work week"},{"value":"week","label":"Week"},{"value":"month","label":"Month"}]'
           ></lex-segmented>
         </div>
       </div>
@@ -91,8 +92,50 @@
           </dl>
           <p id="calDetailReadOnly" class="cal-help hidden"></p>
           <div class="cal-detail-actions">
+            <lex-btn id="calEditBtn" class="hidden" variant="primary" leading-icon="pencil">Edit</lex-btn>
             <lex-btn id="calOpenSourceBtn" class="hidden" variant="secondary" leading-icon="external-link">Open in source app</lex-btn>
           </div>
+        </div>
+      </lex-drawer>
+
+      <lex-drawer id="calEditDrawer" heading="New event" width="md" show-footer confirm-text="Save" cancel-text="Cancel" data-hoist>
+        <lex-form id="calEventForm" class="cal-form">
+          <lex-input id="calFieldTitle" name="title" label="Title" required maxlength="500"></lex-input>
+          <lex-toggle id="calFieldAllDay" name="is_all_day" label="All day"></lex-toggle>
+          <div class="cal-form-row">
+            <lex-input id="calFieldStartDate" name="start_date" type="date" label="Starts" required></lex-input>
+            <lex-input id="calFieldStartTime" name="start_time" type="time" label="Start time" class="cal-time-field"></lex-input>
+          </div>
+          <div class="cal-form-row">
+            <lex-input id="calFieldEndDate" name="end_date" type="date" label="Ends" required></lex-input>
+            <lex-input id="calFieldEndTime" name="end_time" type="time" label="End time" class="cal-time-field"></lex-input>
+          </div>
+          <lex-select id="calFieldZone" name="time_zone" label="Time zone" searchable></lex-select>
+          <lex-select id="calFieldAttendees" name="attendees" label="Invite people" multiple searchable clearable placeholder="Add people from your firm"></lex-select>
+          <div class="cal-form-field">
+            <span class="cal-form-label" id="calFieldVisibilityLabel">Who can see the details</span>
+            <lex-segmented id="calFieldVisibility" name="visibility" value="public" aria-labelledby="calFieldVisibilityLabel"
+              options='[{"value":"public","label":"Firm"},{"value":"private","label":"Only invited people"}]'></lex-segmented>
+          </div>
+          <p id="calRecurringNote" class="cal-help hidden">This event repeats. Its time cannot be changed here yet; you can still change its details.</p>
+          <lex-textarea id="calFieldDescription" name="description" label="Description" rows="3" auto-resize></lex-textarea>
+        </lex-form>
+
+        <section class="cal-links" aria-labelledby="calLinksTitle">
+          <h3 id="calLinksTitle" class="cal-section-title">Linked to</h3>
+          <ul id="calLinkList" class="cal-link-list"></ul>
+          <p id="calLinkEmpty" class="cal-help">Not linked to a matter, workspace or task.</p>
+          <div class="cal-link-add">
+            <lex-segmented id="calLinkType" value="matter"
+              options='[{"value":"matter","label":"Matter"},{"value":"workspace","label":"Workspace"},{"value":"task","label":"Task"}]'></lex-segmented>
+            <lex-select id="calLinkTarget" searchable placeholder="Choose one" aria-label="What to link"></lex-select>
+            <lex-btn id="calLinkAddBtn" variant="secondary" size="sm" leading-icon="link">Link</lex-btn>
+          </div>
+        </section>
+
+        <p id="calEditError" class="cal-form-error hidden" role="alert"></p>
+        <div class="cal-edit-danger">
+          <lex-btn id="calDeleteBtn" class="hidden" variant="danger" size="sm" leading-icon="trash-2">Delete event</lex-btn>
         </div>
       </lex-drawer>
     </main>
@@ -144,8 +187,12 @@
   <script src="js/lex/components/foundation/lex-banner.js"></script>
   <script src="js/lex/components/foundation/lex-badge.js"></script>
   <script src="js/lex/components/foundation/lex-drawer.js"></script>
+  <script src="js/lex/components/foundation/lex-modal.js"></script>
   <script src="js/lex/components/form/lex-select.js"></script>
   <script src="js/lex/components/form/lex-toggle.js"></script>
+  <script src="js/lex/components/form/lex-input.js"></script>
+  <script src="js/lex/components/form/lex-textarea.js"></script>
+  <script src="js/lex/components/form/lex-form.js"></script>
   <script src="js/calendar/calendar-layout.js"></script>
   <script src="js/lex/components/data/lex-calendar-grid.js"></script>
 
@@ -153,6 +200,8 @@
   <script src="js/shared/device-time-zone.js"></script>
   <script src="js/services/calendar-api.service.js"></script>
   <script src="js/calendar/calendar-page.model.js"></script>
+  <script src="js/calendar/calendar-event-form.model.js"></script>
+  <script src="js/calendar/calendar-event-drawer.js"></script>
   <script src="js/calendar/calendar-page.js"></script>
 
   <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>

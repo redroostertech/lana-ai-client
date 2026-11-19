@@ -54,9 +54,22 @@
     return Number.isFinite(dow) ? time().addPlainDays(day, -dow) : '';
   }
 
-  /** The days a view shows: one for 'day', Sunday to Saturday for 'week'. */
+  /** The first day of the month holding `day`. */
+  function monthStart(day) {
+    return String(day || '').slice(0, 8) + '01';
+  }
+
+  /**
+   * The days a view shows: one for 'day', Sunday to Saturday for 'week',
+   * Monday to Friday for 'workweek', and for 'month' six whole weeks from
+   * the Sunday on or before the first of the month (42 days, so every month
+   * has the same grid).
+   */
   function viewDays(view, day) {
-    return view === 'week' ? daysFrom(weekStart(day), 7) : daysFrom(day, 1);
+    if (view === 'week') return daysFrom(weekStart(day), 7);
+    if (view === 'workweek') return daysFrom(time().addPlainDays(weekStart(day), 1), 5);
+    if (view === 'month') return daysFrom(weekStart(monthStart(day)), 42);
+    return daysFrom(day, 1);
   }
 
   /** The agenda window for these days in a zone: { from, to } ISO instants. */
@@ -143,7 +156,20 @@
     var columnEnds = [];
     var clusterEnd = -1;
     function close() {
-      cluster.forEach(function (seg) { seg.columns = columnEnds.length; });
+      cluster.forEach(function (seg) {
+        seg.columns = columnEnds.length;
+        // Use the width there is: widen into each column to the right that
+        // nothing in the cluster occupies while this segment runs.
+        var span = 1;
+        for (var col = seg.column + 1; col < seg.columns; col += 1) {
+          var taken = cluster.some(function (other) {
+            return other !== seg && other.column === col && other.top < seg.bottom && seg.top < other.bottom;
+          });
+          if (taken) break;
+          span += 1;
+        }
+        seg.span = span;
+      });
       cluster = [];
       columnEnds = [];
     }
@@ -236,6 +262,145 @@
     return { days: columns, allDay: bars, allDayLanes: laneEnds.length };
   }
 
+  // The plain days a timed event covers in a zone: from the day it starts to
+  // the day holding its last instant (an event ending at midnight does not
+  // reach the next day).
+  function timedDays(event, timeZone) {
+    var T = time();
+    var start = ms(event.start);
+    var end = ms(event.end);
+    if (!Number.isFinite(start)) return null;
+    if (!Number.isFinite(end) || end < start) end = start;
+    var first = T.dayInTimeZone(new Date(start), timeZone);
+    var last = T.dayInTimeZone(new Date(end > start ? end - 1 : start), timeZone);
+    return { startDay: first, endDay: T.addPlainDays(last, 1) };
+  }
+
+  /**
+   * Month grid: the 42 days in weeks of seven, each day with the events that
+   * touch it (all-day first, then by start), as many as fit shown and the
+   * rest counted in `more`. A multi-day event is listed on every day it
+   * covers, marked continuesBefore / continuesAfter.
+   *
+   * @param {{ days: string[], month: string, timeZone: string, events: Array<Object>, capacity?: number }} input
+   *   month is any day of the month shown ('YYYY-MM-DD'); days outside it are
+   *   marked outside. capacity is how many event rows fit in a cell with no
+   *   "more" line (monthCapacity measures it); a day with more events shows
+   *   one row fewer and the "more" line, so "1 more" never sits beside room
+   *   for that one event.
+   * @returns {{ weeks: Array<Array<{ day, outside, items: Array<{ event, continuesBefore, continuesAfter }>, more }>> }}
+   */
+  function monthLayout(input) {
+    var days = (input && input.days) || [];
+    var timeZone = (input && input.timeZone) || time().SYSTEM_TIME_ZONE;
+    var monthKey = String((input && input.month) || days[Math.min(days.length - 1, 7)] || '').slice(0, 7);
+    var capacity = input && Number.isFinite(input.capacity) ? Math.max(1, Math.floor(input.capacity)) : 4;
+    var spans = ((input && input.events) || []).map(function (event) {
+      var span = event.is_all_day ? allDaySpan(event, timeZone) : timedDays(event, timeZone);
+      return span ? { event: event, startDay: span.startDay, endDay: span.endDay, startMs: ms(event.start) } : null;
+    }).filter(Boolean).sort(function (a, b) {
+      var allDayFirst = (b.event.is_all_day ? 1 : 0) - (a.event.is_all_day ? 1 : 0);
+      return allDayFirst || a.startMs - b.startMs || String(a.event.id || '').localeCompare(String(b.event.id || ''));
+    });
+    var cells = days.map(function (day) {
+      var touching = spans.filter(function (span) { return span.startDay <= day && span.endDay > day; });
+      var shown = touching.length <= capacity ? touching.length : Math.max(0, capacity - 1);
+      return {
+        day: day,
+        outside: day.slice(0, 7) !== monthKey,
+        items: touching.slice(0, shown).map(function (span) {
+          return { event: span.event, continuesBefore: span.startDay < day, continuesAfter: time().addPlainDays(day, 1) < span.endDay };
+        }),
+        more: touching.length - shown
+      };
+    });
+    var weeks = [];
+    for (var i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+    return { weeks: weeks };
+  }
+
+  /**
+   * How many event rows fit in a month cell with no "more" line: the cell's
+   * height less its date, over one row's height (at least 1).
+   */
+  function monthCapacity(cellHeight, dateHeight, rowHeight) {
+    if (!(cellHeight > 0) || !(rowHeight > 0)) return 4;
+    return Math.max(1, Math.floor((cellHeight - (dateHeight || 0)) / rowHeight));
+  }
+
+  // The work day starts at 8 AM until the firm can set its own hours.
+  var WORKDAY_START_MINUTES = 8 * 60;
+  var WORKDAY_END_MINUTES = 18 * 60;
+
+  /**
+   * Where a day or week grid opens, in wall minutes: about an hour before
+   * now when today is shown and now is inside the work day, else the start
+   * of the work day.
+   */
+  function initialScrollMinutes(days, timeZone, now) {
+    var wall = time().wallClockInTimeZone(now === undefined ? time().nowDate() : now, timeZone);
+    if (wall && (days || []).indexOf(wall.day) !== -1 && wall.minutes >= WORKDAY_START_MINUTES && wall.minutes < WORKDAY_END_MINUTES) {
+      return Math.max(0, Math.floor((wall.minutes - 60) / 30) * 30);
+    }
+    return WORKDAY_START_MINUTES;
+  }
+
+  /** Minutes snapped to the nearest `step` (15 by default). */
+  function snapMinutes(minutes, step) {
+    var size = step || 15;
+    return Math.round(Number(minutes) / size) * size;
+  }
+
+  // A wall reading with minutes outside one day carried into the next or
+  // previous day.
+  function carryWall(day, minutes) {
+    var T = time();
+    var d = day;
+    var m = minutes;
+    while (m >= MINUTES_PER_DAY) { m -= MINUTES_PER_DAY; d = T.addPlainDays(d, 1); }
+    while (m < 0) { m += MINUTES_PER_DAY; d = T.addPlainDays(d, -1); }
+    return { day: d, minutes: m };
+  }
+
+  /**
+   * Where a timed event lands after a drag, on the wall clock of the zone
+   * the grid shows. 'move' shifts its start by dayDelta days and
+   * minuteDelta minutes and keeps its real length; 'resize' moves only its
+   * end, never closer than MIN_MINUTES to the start. A day the clocks change
+   * keeps the wall time (a 9 AM meeting moved across the change is still at
+   * 9 AM).
+   *
+   * @returns {{ start: string, end: string }|null} ISO instants, or null for an unusable event
+   */
+  function dragResult(event, change, timeZone) {
+    var T = time();
+    var start = ms(event && event.start);
+    var end = ms(event && event.end);
+    if (!Number.isFinite(start)) return null;
+    if (!Number.isFinite(end) || end < start) end = start;
+    var c = change || {};
+    var dayDelta = Math.round(Number(c.dayDelta) || 0);
+    var minuteDelta = snapMinutes(Number(c.minuteDelta) || 0);
+    if (c.mode === 'resize') {
+      var endWall = T.wallClockInTimeZone(new Date(end), timeZone);
+      var moved = carryWall(endWall.day, endWall.minutes + minuteDelta);
+      var newEnd = T.instantFromWallClock(moved.day, moved.minutes, timeZone).getTime();
+      newEnd = Math.max(newEnd, start + MIN_MINUTES * T.MS_PER_MINUTE);
+      return { start: new Date(start).toISOString(), end: new Date(newEnd).toISOString() };
+    }
+    var startWall = T.wallClockInTimeZone(new Date(start), timeZone);
+    var to = carryWall(T.addPlainDays(startWall.day, dayDelta), startWall.minutes + minuteDelta);
+    var newStart = T.instantFromWallClock(to.day, to.minutes, timeZone).getTime();
+    return { start: new Date(newStart).toISOString(), end: new Date(newStart + (end - start)).toISOString() };
+  }
+
+  /** Wall minutes for a pointer at `offsetY` in a column `height` pixels tall, snapped. */
+  function minutesAtOffset(offsetY, height, step) {
+    if (!(height > 0)) return 0;
+    var raw = Math.max(0, Math.min(MINUTES_PER_DAY, (offsetY / height) * MINUTES_PER_DAY));
+    return Math.min(MINUTES_PER_DAY - (step || 15), snapMinutes(raw, step));
+  }
+
   /**
    * Hour labels for the gutter: the wall hours 0 to 23 as the zone shows
    * them on that day (labels only; rows are always the 24 wall hours).
@@ -258,6 +423,14 @@
     daysFrom: daysFrom,
     weekStart: weekStart,
     viewDays: viewDays,
+    monthStart: monthStart,
+    monthLayout: monthLayout,
+    monthCapacity: monthCapacity,
+    initialScrollMinutes: initialScrollMinutes,
+    WORKDAY_START_MINUTES: WORKDAY_START_MINUTES,
+    snapMinutes: snapMinutes,
+    dragResult: dragResult,
+    minutesAtOffset: minutesAtOffset,
     windowFor: windowFor,
     dayLengthHours: dayLengthHours,
     layout: layout,

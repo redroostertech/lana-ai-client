@@ -53,6 +53,14 @@ describe('agenda to grid items', () => {
     const [item] = M.toGridItems({ events: [{ busy_only: true, title: 'Leaked', start: 'x', end: 'y', user_ids: [] }] }, VIEWER);
     expect(item.title).toBe('Busy');
   });
+
+  test('a repeating event is marked recurring (not draggable); a busy block never is', () => {
+    const items = M.toGridItems({ events: [
+      { id: 'w', title: 'Weekly', editable: true, recurring: true, start: 'x', end: 'y', user_ids: [VIEWER] },
+      { busy_only: true, recurring: true, start: 'x', end: 'y', user_ids: [] }
+    ] }, VIEWER);
+    expect(items.map((i) => i.recurring)).toEqual([true, false]);
+  });
 });
 
 describe('where a connector event opens', () => {
@@ -97,10 +105,19 @@ describe('coworker picker', () => {
 });
 
 describe('navigation and labels', () => {
-  test('previous and next move by a week or a day', () => {
+  test('previous and next move by a month, a week or a day', () => {
     expect(M.shiftDay('2026-11-18', 'week', 1)).toBe('2026-11-25');
+    expect(M.shiftDay('2026-11-18', 'workweek', -1)).toBe('2026-11-11');
     expect(M.shiftDay('2026-11-18', 'day', -1)).toBe('2026-11-17');
-    expect(M.normalizeView('month')).toBe('week');
+    expect(M.shiftDay('2026-01-31', 'month', -1)).toBe('2025-12-01');
+    expect(M.shiftDay('2026-12-15', 'month', 1)).toBe('2027-01-01');
+    expect(M.normalizeView('month')).toBe('month');
+    expect(M.normalizeView('workweek')).toBe('workweek');
+    expect(M.normalizeView('year')).toBe('week');
+  });
+
+  test('the month view is titled by its month', () => {
+    expect(M.rangeTitle(['2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06', '2026-11-07', '2026-11-08'], 'America/New_York', 'month', '2026-11-18')).toBe('November 2026');
   });
 
   test('range titles', () => {

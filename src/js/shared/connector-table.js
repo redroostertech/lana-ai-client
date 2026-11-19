@@ -270,7 +270,7 @@
     var sortDir = query.sortDir === 'asc' ? 'asc' : 'desc';
     var pinnedFilter = query.filters && query.filters.pinned ? 'yes' : 'all';
     return '' +
-      '<div class="connector-table-toolbar bg-white rounded-lg shadow-sm border mb-4 mt-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and filter connectors">' +
+      '<div class="connector-table-toolbar mb-4 mt-4 p-4" role="search" aria-label="Search and filter connectors">' +
         '<div class="flex items-center gap-4 flex-wrap">' +
           '<div class="flex-1 min-w-[200px]">' +
             '<lex-input id="' + esc(prefix) + 'Search" placeholder="Search connectors by name, vendor, or description..." clearable="true" leading-icon="search" value="' + esc(query.search || '') + '"></lex-input>' +

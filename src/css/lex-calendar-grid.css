@@ -10,9 +10,9 @@ lex-calendar-grid {
   container: lex-calendar-grid / inline-size;
   --cal-gutter: 56px;
   --cal-hour-height: 48px;
-  --cal-person-0: var(--lex-accent);
+  --cal-person-0: var(--lex-chart-color-3);
   --cal-person-1: var(--lex-chart-color-2);
-  --cal-person-2: var(--lex-chart-color-3);
+  --cal-person-2: var(--lex-chart-color-1);
   --cal-person-3: var(--lex-chart-color-4);
   --cal-person-4: var(--lex-chart-color-5);
   --cal-person-5: var(--lex-chart-color-6);
@@ -24,7 +24,7 @@ lex-calendar-grid {
   min-width: 0;
   border: 1px solid var(--lex-border-default);
   border-radius: var(--lex-card-radius);
-  background: var(--lex-bg-card);
+  background: var(--lex-bg-elevated);
   overflow: hidden;
   position: relative;
 }
@@ -150,7 +150,7 @@ lex-calendar-grid {
   border: 0;
   border-left: 3px solid var(--cal-color);
   border-radius: var(--lex-radius-sm);
-  background: color-mix(in srgb, var(--cal-color) 16%, var(--lex-bg-card));
+  background: color-mix(in srgb, var(--cal-color) 16%, var(--lex-bg-elevated));
   color: var(--lex-text-primary);
   font: inherit;
   font-size: 12px;
@@ -160,7 +160,7 @@ lex-calendar-grid {
 }
 
 .lex-cal-event:hover {
-  background: color-mix(in srgb, var(--cal-color) 26%, var(--lex-bg-card));
+  background: color-mix(in srgb, var(--cal-color) 26%, var(--lex-bg-elevated));
 }
 
 .lex-cal-event:focus-visible {
@@ -177,7 +177,7 @@ lex-calendar-grid {
 
 /* A coworker's event: lighter, so the viewer's own stand out. */
 .lex-cal-event--coworker {
-  background: color-mix(in srgb, var(--cal-color) 8%, var(--lex-bg-card));
+  background: color-mix(in srgb, var(--cal-color) 8%, var(--lex-bg-elevated));
   color: var(--lex-text-secondary);
 }
 
@@ -185,8 +185,8 @@ lex-calendar-grid {
 .lex-cal-event--busy {
   background: repeating-linear-gradient(
     135deg,
-    color-mix(in srgb, var(--cal-color) 14%, var(--lex-bg-card)) 0 6px,
-    var(--lex-bg-card) 6px 12px
+    color-mix(in srgb, var(--cal-color) 14%, var(--lex-bg-elevated)) 0 6px,
+    var(--lex-bg-elevated) 6px 12px
   );
   color: var(--lex-text-secondary);
   cursor: default;
@@ -200,9 +200,76 @@ lex-calendar-grid {
 .lex-cal-timed {
   position: absolute;
   top: var(--cal-top);
-  height: var(--cal-height);
+  height: calc(var(--cal-height) + var(--cal-drag-grow, 0px));
   left: calc(var(--cal-left) + 1px);
   width: calc(var(--cal-width) - 3px);
+  transform: translate(var(--cal-drag-x, 0px), var(--cal-drag-y, 0px));
+}
+
+/* An event of 75 minutes or more lets its title use two lines before it
+   clips, so a narrow overlapping event still reads; shorter ones keep one
+   line so the time is never drawn over a cut second line. */
+.lex-cal-timed--tall .lex-cal-event-title {
+  flex-shrink: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* A short event: one line, title first, then the time; it clips at the end. */
+.lex-cal-timed--short {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 4px;
+  padding-top: 0;
+  padding-bottom: 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.lex-cal-timed--short .lex-cal-event-title {
+  flex: 0 1 auto;
+}
+
+.lex-cal-timed--short .lex-cal-event-time {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Drag to move or resize (an editable event only). */
+.lex-cal-timed[data-draggable] {
+  cursor: grab;
+  touch-action: none;
+}
+
+.lex-cal-event--dragging,
+.lex-cal-event--resizing {
+  z-index: 3;
+  box-shadow: var(--lex-shadow-md);
+  opacity: 0.9;
+  cursor: grabbing;
+}
+
+.lex-cal-resize {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 6px;
+  cursor: ns-resize;
+}
+
+/* An event the viewer may not change: no move affordance. */
+.lex-cal-event--readonly:not(.lex-cal-event--busy) {
+  cursor: pointer;
+}
+
+.lex-cal-column {
+  cursor: cell;
 }
 
 .lex-cal-allday-bar {
@@ -240,7 +307,7 @@ lex-calendar-grid {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  background: var(--lex-bg-muted);
+  background: var(--lex-bg-tertiary);
   color: var(--lex-text-secondary);
 }
 
@@ -266,14 +333,132 @@ lex-calendar-grid {
   font-size: 13px;
 }
 
+/* Month view: six weeks of day cells. */
+.lex-cal-month-head,
+.lex-cal-month-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.lex-cal-month-head {
+  border-bottom: 1px solid var(--lex-border-default);
+}
+
+.lex-cal-month-weekday {
+  padding: var(--lex-space-xs);
+  text-align: center;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--lex-text-secondary);
+}
+
+.lex-cal-month-week + .lex-cal-month-week {
+  border-top: 1px solid var(--lex-border-subtle);
+}
+
+.lex-cal-month-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  min-height: 104px;
+  padding: 4px;
+}
+
+.lex-cal-month-cell + .lex-cal-month-cell {
+  border-left: 1px solid var(--lex-border-subtle);
+}
+
+/* Days of the other months: a surface that differs from the grid's in both
+   themes (--lex-bg-secondary is the grid's own color in dark). */
+.lex-cal-month-cell--outside {
+  background: var(--lex-bg-tertiary);
+}
+
+.lex-cal-month-cell--outside .lex-cal-month-date {
+  color: var(--lex-text-tertiary);
+}
+
+.lex-cal-month-date {
+  align-self: flex-start;
+  min-width: 24px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--lex-radius-full);
+  background: transparent;
+  color: var(--lex-text-primary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lex-cal-month-date:hover {
+  background: var(--lex-bg-tertiary);
+}
+
+.lex-cal-month-cell--today .lex-cal-month-date {
+  background: var(--lex-bg-accent-muted);
+  color: var(--lex-text-accent);
+}
+
+.lex-cal-month-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.lex-cal-month-item {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 4px;
+  padding: 1px 4px;
+}
+
+.lex-cal-month-item:not(.lex-cal-month-item--bar) {
+  border-left-width: 0;
+  background: transparent;
+}
+
+.lex-cal-month-item:not(.lex-cal-month-item--bar)::before {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--lex-radius-full);
+  background: var(--cal-color);
+  align-self: center;
+}
+
+.lex-cal-month-more {
+  align-self: flex-start;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--lex-text-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.lex-cal-month-more:hover {
+  color: var(--lex-text-primary);
+  text-decoration: underline;
+}
+
 /* Narrow column: shorter gutter, hide the time line inside short blocks. */
 @container lex-calendar-grid (max-width: 559px) {
   .lex-cal-grid { --cal-gutter: 40px; }
   .lex-cal-day-date { font-size: 16px; }
   .lex-cal-event-time,
   .lex-cal-badge { display: none; }
+  .lex-cal-month-cell { min-height: 72px; padding: 2px; }
+  .lex-cal-month-item .lex-cal-event-title { font-weight: 500; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .lex-cal-event { transition: none; }
+  .lex-cal-event--dragging { box-shadow: none; }
 }
