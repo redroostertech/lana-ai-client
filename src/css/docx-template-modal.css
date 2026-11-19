@@ -1,0 +1,68 @@
+/* docx-template-modal.css
+ * The template preview overlay (DocxTemplateModal previewTemplate,
+ * js/services/docx-template-modal.js). Moved out of inline styles; the
+ * values are the ones the markup carried. */
+
+.dtm-preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dtm-preview-dialog {
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 900px;
+  height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.dtm-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.dtm-preview-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.dtm-preview-close {
+  padding: 4px;
+  border-radius: 6px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: #6b7280;
+}
+
+.dtm-preview-body {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f9fafb;
+}
+
+.dtm-preview-loading {
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+.dtm-preview-error {
+  color: #ef4444;
+  font-size: 14px;
+}

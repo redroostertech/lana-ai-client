@@ -110,6 +110,7 @@
       stylesheets: [
         'css/components/document-metadata.css',
         'css/document-create-modal.css',
+        'css/docx-template-modal.css',
         'css/matter-notes.css',
         'css/server-form.css',
         'css/matter-generic-tabs.css',

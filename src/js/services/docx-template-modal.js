@@ -730,17 +730,17 @@
     // Build overlay
     var overlay = document.createElement('div');
     overlay.id = 'dtm-template-preview-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;';
+    overlay.className = 'dtm-preview-overlay';
     overlay.innerHTML =
-      '<div style="background:white;border-radius:12px;width:90%;max-width:900px;height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);">' +
-        '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #e5e7eb;">' +
-          '<span style="font-size:14px;font-weight:600;color:#111827;">' + _escapeHtml(docName) + '</span>' +
-          '<button id="dtm-preview-close" style="padding:4px;border-radius:6px;border:none;background:none;cursor:pointer;color:#6b7280;" title="Close">' +
+      '<div class="dtm-preview-dialog">' +
+        '<div class="dtm-preview-header">' +
+          '<span class="dtm-preview-title">' + _escapeHtml(docName) + '</span>' +
+          '<button id="dtm-preview-close" class="dtm-preview-close" title="Close">' +
             '<svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>' +
           '</button>' +
         '</div>' +
-        '<div id="dtm-preview-body" style="flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#f9fafb;">' +
-          '<div style="color:#9ca3af;font-size:14px;">Loading preview...</div>' +
+        '<div id="dtm-preview-body" class="dtm-preview-body">' +
+          '<div class="dtm-preview-loading">Loading preview...</div>' +
         '</div>' +
       '</div>';
 
@@ -781,7 +781,7 @@
       })));
     })
     .catch(function (err) {
-      previewBody.innerHTML = '<div style="color:#ef4444;font-size:14px;">Failed to load preview: ' + _escapeHtml(err.message) + '</div>';
+      previewBody.innerHTML = '<div class="dtm-preview-error">Failed to load preview: ' + _escapeHtml(err.message) + '</div>';
     });
   };
 
