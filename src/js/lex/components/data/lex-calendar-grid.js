@@ -51,6 +51,9 @@
         monthCapacity: { type: Number, default: 0, attribute: false },
         // Wall minutes a day or week view opens at; null: LanaCalendarLayout.initialScrollMinutes.
         scrollMinutes: { type: Number, default: null, attribute: false },
+        // Work hours per shown day ([[{ top, bottom }], ...], wall minutes,
+        // LanaCalendarWorkHours.segmentsForDays); null: no shading.
+        workHours: { type: Array, default: null, attribute: false },
         loading: { type: Boolean, default: false, reflect: true },
         emptyText: { type: String, default: '' }
       };
@@ -212,7 +215,11 @@
         }).join('');
         const now = L.nowMinutes(column.day, this.timeZone);
         const nowLine = now === null ? '' : `<div class="lex-cal-now" data-top="${now}" aria-hidden="true"></div>`;
-        return `<div class="lex-cal-column" role="gridcell" data-day="${this.escapeHtml(column.day)}">${events}${nowLine}</div>`;
+        // Work hours: the time outside them is shaded (the hour lines show through).
+        const hours = Array.isArray(this.workHours) ? (this.workHours[dayIndex] || []) : null;
+        const off = hours ? L.complementMinutes(hours) : [];
+        const shade = off.map((s) => `<div class="lex-cal-offhours" data-top="${s.top}" data-bottom="${s.bottom}" aria-hidden="true"></div>`).join('');
+        return `<div class="lex-cal-column" role="gridcell" data-day="${this.escapeHtml(column.day)}">${shade}${events}${nowLine}</div>`;
       }).join('');
 
       const empty = !(this.items || []).length && this.emptyText
@@ -259,6 +266,11 @@
         node.style.setProperty('--cal-height', ((bottom - top) / perDay * 100) + '%');
         node.style.setProperty('--cal-left', (column / columns * 100) + '%');
         node.style.setProperty('--cal-width', (span / columns * 100) + '%');
+      });
+      this.querySelectorAll('.lex-cal-offhours').forEach((node) => {
+        const top = Number(node.getAttribute('data-top'));
+        node.style.setProperty('--cal-top', (top / perDay * 100) + '%');
+        node.style.setProperty('--cal-height', ((Number(node.getAttribute('data-bottom')) - top) / perDay * 100) + '%');
       });
       this.querySelectorAll('.lex-cal-now').forEach((node) => {
         node.style.setProperty('--cal-top', (Number(node.getAttribute('data-top')) / perDay * 100) + '%');

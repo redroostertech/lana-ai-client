@@ -30,6 +30,7 @@ const COMPONENTS = [
   'js/lex/components/foundation/lex-btn.js',
   'js/lex/components/foundation/lex-empty.js',
   'js/lex/components/form/lex-segmented.js',
+  'js/lex/components/form/lex-toggle.js',
   'js/lex/components/foundation/lex-banner.js',
   'js/lex/components/foundation/lex-badge.js',
   'js/lex/components/foundation/lex-modal.js',
@@ -97,6 +98,8 @@ function boot({ roles, routes }) {
   w.document.getElementById('lex-main-content').innerHTML = templateContent();
   w.eval(read('js/services/firm-handbook-api.service.js'));
   w.eval(read('js/firm-handbook/firm-handbook.models.js'));
+  w.eval(read('js/firm-handbook/firm-handbook-structured.models.js'));
+  w.eval(read('js/firm-handbook/firm-handbook-structured-forms.js'));
   w.eval(read('js/firm-handbook.js'));
   windows.push(w);
   return { w, calls };
@@ -190,6 +193,22 @@ describe('firm handbook page for a member', () => {
     expect(doc.getElementById('fhReaderContent').textContent).toBe('Pay in three parts.');
   });
 
+  test('a structured item reads as the server\'s own words (one renderer), not a summary rebuilt from its data', async () => {
+    const words = 'The firm\'s work hours, in the firm\'s time zone:\nMonday: 9:00 AM to 5:00 PM\nSunday: closed';
+    const { w } = boot({ roles: ['user'], routes: [
+      ['GET /api/v1/firm-handbook/items/wh', { id: 'wh', kind: 'work_hours', title: 'Work hours', version_number: 1, published_at: '2026-11-10T00:00:00Z',
+        content: words, data: { days: { monday: { start: '09:00', end: '17:00' } } }, document_id: 'snap-wh' }],
+      ...memberRoutes()
+    ] });
+    await tick(w, 80);
+    const doc = w.document;
+    doc.getElementById('fhPublishedTable').dispatchEvent(new w.CustomEvent('row-click', { bubbles: true, detail: { row: { id: 'wh' } } }));
+    await tick(w, 30);
+    expect(doc.getElementById('fhReaderDrawer').heading).toBe('Work hours');
+    expect(doc.getElementById('fhReaderContent').textContent).toBe(words);
+    expect(doc.getElementById('fhReaderContent').classList.contains('hidden')).toBe(false);
+  });
+
   test('a failed list shows a plain error instead of breaking the page', async () => {
     const error = Object.assign(new Error('nope'), { status: 500 });
     const { w } = boot({ roles: ['user'], routes: [['GET /api/v1/firm-handbook/items?', error]] });
@@ -251,6 +270,80 @@ describe('firm handbook page for an admin', () => {
     });
     // The new item opens for management.
     expect(doc.getElementById('fhManageDrawer').open).toBe(true);
+  });
+
+  test('a work hours item: the type picker shows the days grid, a bad day is refused, then kind and data are sent', async () => {
+    const { w, calls } = boot({
+      roles: ['org_admin'],
+      routes: adminRoutes([
+        ['GET /api/v1/firm-handbook/types', { types: [
+          { kind: 'text', label: 'Text', cardinality: 'many' },
+          { kind: 'work_hours', label: 'Work hours', cardinality: 'one', description: 'The days and times your firm works.' },
+          { kind: 'followup_rule', label: 'Follow-up rule', cardinality: 'many' }
+        ] }],
+        ['POST /api/v1/firm-handbook/items', { id: 'wh1', kind: 'work_hours', item: {} }]
+      ])
+    });
+    await tick(w, 80);
+    const doc = w.document;
+    doc.getElementById('fhNewBtn').dispatchEvent(new w.Event('click'));
+    await tick(w, 30);
+    const kind = doc.getElementById('fhCreateKind');
+    kind.value = 'work_hours';
+    kind.dispatchEvent(new w.CustomEvent('lex-change', { bubbles: true, detail: { value: 'work_hours' } }));
+    await tick(w, 30);
+    const grid = doc.getElementById('fhCreateStructured');
+    expect(grid.querySelectorAll('.fh-wh-row')).toHaveLength(7);
+    expect(doc.querySelector('[data-kind-section="text"]').classList.contains('hidden')).toBe(true);
+    expect(doc.getElementById('fhCreateTitle').value).toBe('Work hours');
+
+    const monday = grid.querySelector('.fh-wh-row[data-day="monday"]');
+    monday.querySelector('[data-wh-end]').value = '07:00';
+    doc.getElementById('fhCreateDrawer').dispatchEvent(new w.CustomEvent('lex-confirm'));
+    await tick(w, 30);
+    expect(doc.getElementById('fhCreateError').textContent).toBe('On Monday, the end time must be after the start time.');
+    expect(calls.some((c) => c.method === 'POST')).toBe(false);
+
+    monday.querySelector('[data-wh-end]').value = '17:00';
+    doc.getElementById('fhCreateDrawer').dispatchEvent(new w.CustomEvent('lex-confirm'));
+    await tick(w, 80);
+    const post = calls.find((c) => c.method === 'POST');
+    expect(post.body).toMatchObject({ kind: 'work_hours', title: 'Work hours', publish: false });
+    expect(post.body.data.days.monday).toEqual({ start: '08:00', end: '17:00' });
+    expect(post.body.data.days.sunday).toBeNull();
+    expect(post.body.template).toBeUndefined();
+  });
+
+  test('work hours are for everyone: the viewer picker hides for that type and the item is sent as everyone (control: a rule keeps it)', async () => {
+    const { w, calls } = boot({
+      roles: ['org_admin'],
+      routes: adminRoutes([
+        ['GET /api/v1/firm-handbook/types', { types: [
+          { kind: 'text', label: 'Text', cardinality: 'many', fixed_visibility: null },
+          { kind: 'work_hours', label: 'Work hours', cardinality: 'one', fixed_visibility: 'organization' },
+          { kind: 'followup_rule', label: 'Follow-up rule', cardinality: 'many', fixed_visibility: null }
+        ] }],
+        ['POST /api/v1/firm-handbook/items', { id: 'wh1', kind: 'work_hours', item: {} }]
+      ])
+    });
+    await tick(w, 80);
+    const doc = w.document;
+    doc.getElementById('fhNewBtn').dispatchEvent(new w.Event('click'));
+    await tick(w, 30);
+    const kind = doc.getElementById('fhCreateKind');
+    const pick = (value) => { kind.value = value; kind.dispatchEvent(new w.CustomEvent('lex-change', { bubbles: true, detail: { value } })); };
+    const box = doc.querySelector('[data-visibility="create"]');
+    pick('followup_rule');
+    await tick(w, 30);
+    expect(box.classList.contains('hidden')).toBe(false);
+    pick('work_hours');
+    await tick(w, 30);
+    expect(box.classList.contains('hidden')).toBe(true);
+    doc.getElementById('fhCreateMode').setAttribute('value', 'restricted');
+    doc.getElementById('fhCreateDrawer').dispatchEvent(new w.CustomEvent('lex-confirm'));
+    await tick(w, 80);
+    const post = calls.find((c) => c.method === 'POST');
+    expect(post.body.visibility).toEqual({ mode: 'organization', role_ids: [], group_ids: [], user_ids: [] });
   });
 
   test('publish asks first, sends the current version, and explains VERSION_NOT_READY plainly', async () => {

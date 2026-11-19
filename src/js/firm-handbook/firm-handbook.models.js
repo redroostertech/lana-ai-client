@@ -126,6 +126,7 @@
     var publishedAt = text(published.published_at || item.published_at);
     return {
       id: text(item.id),
+      kind: text(item.kind) || 'text',
       title: text(item.title),
       summary: text(item.summary),
       versionNumber: versionNumber,
@@ -154,6 +155,8 @@
     var versionNumber = numberOrNull(item.version_number);
     return {
       id: text(item.id),
+      kind: text(item.kind) || 'text',
+      data: item.data && typeof item.data === 'object' ? item.data : null,
       title: text(item.title),
       summary: text(item.summary),
       content: text(item.content),
@@ -222,6 +225,12 @@
     var status = trimmed(item.status).toLowerCase();
     var view = {
       id: base.id,
+      kind: text(item.kind) || 'text',
+      typeLabel: text(item.type_label),
+      data: item.data && typeof item.data === 'object' ? item.data : null,
+      summaryText: text(item.summary_text),
+      notes: item.notes && typeof item.notes === 'object' ? item.notes : null,
+      suggestedByLana: !!item.suggested_by_lana,
       title: base.title,
       summary: base.summary,
       versionNumber: base.versionNumber,
@@ -267,6 +276,8 @@
         isCurrent: !!v.is_current,
         isPublished: !!v.is_published,
         signed: !!v.signed,
+        data: v.data && typeof v.data === 'object' ? v.data : null,
+        summaryText: text(v.summary_text),
         canRestore: !v.is_current && number !== null
       };
     }).sort(function (a, b) { return (b.versionNumber || 0) - (a.versionNumber || 0); });
@@ -442,6 +453,7 @@
   function describeError(error, fallback) {
     var e = error || {};
     if (errorCode(e) === 'VERSION_NOT_READY') return MESSAGES.notReady[errorReason(e)] || MESSAGES.versionNotReady;
+    if ((errorCode(e) === 'STRUCTURED_ITEM_EXISTS' || errorCode(e) === 'NOT_STRUCTURED') && e.message) return text(e.message);
     if (e.status === 403) return 'You do not have permission to do that.';
     if (e.status === 404) return 'That item is no longer available.';
     if (e.status === 400 && e.message) return text(e.message);

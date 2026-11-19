@@ -9,7 +9,8 @@
    are hoisted to <body>, so their parts are listed too. */
 .fh-page .hidden,
 .fh-manage .hidden,
-.fh-form .hidden {
+.fh-form .hidden,
+.fh-reader .hidden {
   display: none;
 }
 
@@ -330,5 +331,139 @@
 .fh-noscript {
   padding: 2rem;
   text-align: center;
+  color: var(--lex-text-secondary);
+}
+
+/* ── Structured items (work hours, follow-up rules) ── */
+
+.fh-title-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--lex-spacing-xs, 0.5rem);
+  min-width: 0;
+}
+
+.fh-kind {
+  flex: 0 0 auto;
+}
+
+.fh-type-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-spacing-xs, 0.375rem);
+}
+
+.fh-structured-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-spacing-md, 0.75rem);
+}
+
+/* The typed form follows the title and summary in the Details tab. */
+.fh-manage-panel > .fh-structured-section {
+  margin-top: var(--lex-spacing-lg, 1.5rem);
+  padding-top: var(--lex-spacing-lg, 1.5rem);
+  border-top: 1px solid var(--lex-border-default);
+}
+
+.fh-structured-form {
+  container: fh-structured / inline-size;
+  padding: var(--lex-spacing-md, 1rem);
+  border: 1px solid var(--lex-border-default);
+  border-radius: var(--lex-card-radius);
+  background: var(--lex-bg-secondary, var(--lex-bg-primary));
+}
+
+/* Work hours: day, open, start, end */
+.fh-wh-head,
+.fh-wh-row {
+  display: grid;
+  grid-template-columns: minmax(6rem, 1fr) 4rem minmax(7rem, 1fr) minmax(7rem, 1fr);
+  align-items: center;
+  gap: var(--lex-spacing-sm, 0.75rem);
+}
+
+.fh-wh-head {
+  padding-bottom: var(--lex-spacing-xs, 0.5rem);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--lex-text-secondary);
+}
+
+.fh-wh-row {
+  padding: var(--lex-spacing-xs, 0.375rem) 0;
+  border-top: 1px solid var(--lex-border-default);
+}
+
+.fh-wh-day {
+  font-weight: 600;
+  color: var(--lex-text-primary);
+}
+
+.fh-wh-row--closed lex-input {
+  visibility: hidden;
+}
+
+.fh-wh-row--closed .fh-wh-day {
+  color: var(--lex-text-secondary);
+}
+
+@container fh-structured (max-width: 419px) {
+  .fh-wh-head {
+    display: none;
+  }
+
+  .fh-wh-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .fh-wh-row lex-input {
+    grid-column: span 1;
+  }
+}
+
+/* Follow-up rule */
+.fh-rule-grid,
+.fh-rule-payment-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--lex-spacing-md, 0.75rem);
+}
+
+.fh-rule-payment {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-spacing-md, 0.75rem);
+  margin-top: var(--lex-spacing-md, 1rem);
+  padding-top: var(--lex-spacing-md, 1rem);
+  border-top: 1px solid var(--lex-border-default);
+}
+
+@container fh-structured (max-width: 479px) {
+  .fh-rule-grid,
+  .fh-rule-payment-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.fh-rule-grid .hidden,
+.fh-rule-payment .hidden {
+  display: none;
+}
+
+/* LANA's evidence for a suggested rule */
+.fh-evidence-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.875rem;
+  color: var(--lex-text-secondary);
+}
+
+.fh-version-words {
+  white-space: pre-line;
+  font-size: 0.8125rem;
   color: var(--lex-text-secondary);
 }

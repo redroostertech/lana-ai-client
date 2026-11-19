@@ -16,6 +16,7 @@ describe('member views', () => {
     expect(page).toEqual({
       items: [{
         id: 'i1',
+        kind: 'text',
         title: 'Payment schedules',
         summary: 'How we bill',
         versionNumber: 3,

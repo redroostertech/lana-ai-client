@@ -379,6 +379,19 @@ lex-calendar-grid {
   color: var(--lex-text-accent);
 }
 
+/* Outside the firm's work hours: a light shade under the events that the
+   hour lines show through and that never takes a click (an empty slot
+   still makes a new event). */
+.lex-cal-offhours {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--cal-top);
+  height: var(--cal-height);
+  background: color-mix(in srgb, var(--lex-text-primary) 6%, transparent);
+  pointer-events: none;
+}
+
 .lex-cal-now {
   position: absolute;
   left: 0;

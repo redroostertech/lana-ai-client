@@ -19,6 +19,7 @@
   var Model = window.LanaCalendarPageModel;
   var Form = window.LanaCalendarEventForm;
   var Layout = window.LanaCalendarLayout;
+  var WorkHours = window.LanaCalendarWorkHours;
   var T = window.LanaTime;
   var Calendar = window.LanaCalendarApi.create(window.api);
   var editor = null;
@@ -32,8 +33,14 @@
     canManage: false,
     loadSequence: 0,
     detailSequence: 0,
-    agenda: null
+    agenda: null,
+    workHours: null      // GET /firm-handbook/work-hours (firm zone)
   };
+
+  // The days the view shows: the work week follows the firm's work hours.
+  function shownDays() {
+    return Layout.viewDays(state.view, state.day, WorkHours ? WorkHours.workWeekdays(state.workHours) : null);
+  }
 
   function el(id) { return document.getElementById(id); }
 
@@ -97,12 +104,15 @@
 
   function render(agenda) {
     var grid = el('calGrid');
-    var days = Layout.viewDays(state.view, state.day);
+    var days = shownDays();
     setText('calRangeTitle', Model.rangeTitle(days, currentZone(), state.view, state.day));
     if (!grid) return;
     grid.timeZone = currentZone();
     grid.view = state.view;
     grid.days = days;
+    var hours = WorkHours && state.view !== 'month' ? WorkHours.segmentsForDays(state.workHours, days, currentZone()) : null;
+    grid.workHours = hours;
+    grid.scrollMinutes = hours ? WorkHours.scrollMinutes(hours, days, currentZone()) : null;
     grid.items = agenda ? Model.toGridItems(agenda, state.viewerId) : [];
     renderLegend(agenda);
     setText('calZoneNote', agenda ? Model.zoneNote(agenda) : '');
@@ -110,7 +120,7 @@
 
   function load() {
     var sequence = ++state.loadSequence;
-    var days = Layout.viewDays(state.view, state.day);
+    var days = shownDays();
     var window_ = Layout.windowFor(days, currentZone());
     var grid = el('calGrid');
     if (grid) grid.loading = true;
@@ -357,6 +367,15 @@
       });
     }
     loadPeople();
+    // The firm's work hours (once): the work week's days and the shading.
+    if (typeof Calendar.workHours === 'function') {
+      Calendar.workHours().then(function (hours) {
+        state.workHours = hours || null;
+        load();
+      }).catch(function () {
+        // No shading; the work week stays Monday to Friday.
+      });
+    }
     load();
   }
 

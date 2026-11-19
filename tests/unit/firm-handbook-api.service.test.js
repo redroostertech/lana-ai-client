@@ -44,6 +44,12 @@ describe('LanaFirmHandbookApi member calls', () => {
     await expect(bare.getPublished('y')).resolves.toEqual({ id: 'y' });
   });
 
+  test('a structured item keeps its own data field (it is not an envelope)', async () => {
+    const item = { id: 'wh', kind: 'work_hours', title: 'Work hours', data: { days: { monday: null } } };
+    await expect(service.create(makeClient(item)).getPublished('wh')).resolves.toEqual(item);
+    await expect(service.create(makeClient(item)).saveVersion('wh', item.data, false)).resolves.toEqual(item);
+  });
+
   test('passes API errors through untouched, so callers can read status and code', async () => {
     const error = Object.assign(new Error('Not ready'), { status: 409, code: 'VERSION_NOT_READY' });
     const client = makeClient(() => { throw error; });

@@ -36,6 +36,11 @@
       people: function () {
         return Promise.resolve(api().get(BASE + '/people')).then(unwrap);
       },
+      // The work hours this person's calendar uses (the Firm Handbook's
+      // published work hours they may read, else the firm's default).
+      workHours: function () {
+        return Promise.resolve(api().get('/api/v1/firm-handbook/work-hours')).then(unwrap);
+      },
       policy: function () {
         return Promise.resolve(api().get(BASE + '/policy')).then(unwrap);
       },

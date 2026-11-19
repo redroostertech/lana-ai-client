@@ -16,6 +16,8 @@
   'use strict';
 
   var Models = window.LanaFirmHandbookModels;
+  var Structured = window.LanaFirmHandbookStructuredModels;
+  var Forms = window.LanaFirmHandbookStructuredForms;
   var Handbook = window.LanaFirmHandbookApi.create(window.api);
 
   var SEARCH_DEBOUNCE_MS = 350;
@@ -29,6 +31,8 @@
     versions: [],
     recipients: null,       // Promise of { roles, groups, users } options
     createFile: null,       // File chosen for "Upload a file"
+    types: null,            // GET /types payload (the item types, declared as data)
+    createKind: 'text',
     busy: false
   };
 
@@ -74,9 +78,38 @@
 
   function setBusy(busy) {
     state.busy = busy;
-    ['fhPublishBtn', 'fhUnpublishBtn', 'fhDeleteBtn', 'fhSaveDetailsBtn', 'fhSaveVisibilityBtn'].forEach(function (id) {
+    ['fhPublishBtn', 'fhUnpublishBtn', 'fhDeleteBtn', 'fhSaveDetailsBtn', 'fhSaveVisibilityBtn', 'fhSaveVersionBtn', 'fhSaveVersionPublishBtn'].forEach(function (id) {
       var btn = el(id);
       if (btn) btn.disabled = busy;
+    });
+  }
+
+  // ── Item types ─────────────────────────────────────────────────────
+
+  function typeOf(kind) {
+    return Structured.findType(state.types, kind);
+  }
+
+  /** The visibility a kind is fixed to ('organization' for work hours), or ''. */
+  function fixedVisibility(kind) {
+    var type = typeOf(kind);
+    return type && type.fixed_visibility ? String(type.fixed_visibility) : '';
+  }
+
+  function typeLabel(kind) {
+    var type = typeOf(kind);
+    return type ? type.label : (kind === Structured.KIND_WORK_HOURS ? 'Work hours' : 'Follow-up rule');
+  }
+
+  function loadTypes() {
+    return Handbook.listTypes().then(function (payload) {
+      state.types = payload;
+      var picker = el('fhCreateKind');
+      if (picker) {
+        picker.options = Structured.typeChoices(payload, state.managed).map(function (c) { return { value: c.value, label: c.label }; });
+      }
+    }).catch(function () {
+      // The page still reads and writes text items; the type picker keeps its built-in labels.
     });
   }
 
@@ -86,8 +119,11 @@
     return {
       title: function (val, row) {
         var summary = row._raw && row._raw.summary;
+        var kind = row._raw && row._raw.kind;
+        var typeBadge = Structured.isStructured(kind)
+          ? '<span class="fh-kind">' + badge({ label: typeLabel(kind), color: 'indigo' }) + '</span>' : '';
         return '<span class="fh-title-cell">' +
-            '<span class="fh-title" title="' + esc(val) + '">' + esc(val) + '</span>' +
+            '<span class="fh-title-line"><span class="fh-title" title="' + esc(val) + '">' + esc(val) + '</span>' + typeBadge + '</span>' +
             (summary ? '<span class="fh-summary">' + esc(summary) + '</span>' : '') +
           '</span>';
       },
@@ -148,6 +184,7 @@
       drawer.heading = view.title || 'Firm Handbook';
       setText('fhReaderMeta', view.meta);
       setText('fhReaderSummary', view.summary);
+      // Text and structured items alike: the server's words (one renderer).
       setText('fhReaderContent', view.content || 'This item has no text yet.');
     } catch (error) {
       drawer.heading = 'Firm Handbook';
@@ -288,9 +325,41 @@
     el('fhCreateSource').setAttribute('value', Models.CREATE_BLANK);
     setCreateFile(null);
     syncCreateSource();
+    var picker = el('fhCreateKind');
+    if (picker) picker.value = Structured.KIND_TEXT;
+    var publishNow = el('fhCreatePublish');
+    if (publishNow) publishNow.checked = false;
+    syncCreateKind(Structured.KIND_TEXT);
     setError('fhCreateError', '');
     fillVisibility('fhCreate', null);
     drawer.open = true;
+  }
+
+  /** Show the parts of the create form the chosen type uses, and draw its typed form. */
+  function syncCreateKind(kind) {
+    state.createKind = kind || Structured.KIND_TEXT;
+    var structured = Structured.isStructured(state.createKind);
+    var sections = document.querySelectorAll('#fhCreateDrawer [data-kind-section]');
+    for (var i = 0; i < sections.length; i++) {
+      var section = sections[i].getAttribute('data-kind-section');
+      show(sections[i], structured ? section === 'structured' : section === 'text');
+    }
+    var choice = null;
+    Structured.typeChoices(state.types, state.managed).forEach(function (c) { if (c.value === state.createKind) choice = c; });
+    setText('fhCreateKindHelp', choice ? (choice.reason || choice.description) : '');
+    var title = el('fhCreateTitle');
+    if (title) {
+      title.placeholder = state.createKind === Structured.KIND_WORK_HOURS ? 'Work hours'
+        : (state.createKind === Structured.KIND_FOLLOWUP_RULE ? 'Follow-up rule: Consultation' : 'Payment schedules');
+      if (state.createKind === Structured.KIND_WORK_HOURS && !title.value) title.value = 'Work hours';
+    }
+    setText('fhCreateNote', structured
+      ? 'Members see it once you publish. LANA reads the published version and cites it by title and version.'
+      : 'After you create it, open it in the editor to write or check the content. Members see it once you publish.');
+    if (structured) Forms.render(el('fhCreateStructured'), state.createKind, null, typeOf(state.createKind));
+    // A type whose visibility is fixed (work hours: everyone) shows no picker.
+    show(document.querySelector('#fhCreateDrawer [data-visibility="create"]'), !fixedVisibility(state.createKind));
+    setError('fhCreateError', '');
   }
 
   function syncCreateSource() {
@@ -305,8 +374,48 @@
     if (!file && input) input.value = '';
   }
 
+  async function submitCreateStructured() {
+    var kind = state.createKind;
+    var choice = null;
+    Structured.typeChoices(state.types, state.managed).forEach(function (c) { if (c.value === kind) choice = c; });
+    if (choice && choice.disabled) { setError('fhCreateError', choice.reason); return; }
+    var content = Forms.read(el('fhCreateStructured'));
+    if (!content.valid) { setError('fhCreateError', content.message); return; }
+    var titleValue = el('fhCreateTitle').value;
+    if (!String(titleValue || '').trim() && kind === Structured.KIND_FOLLOWUP_RULE) {
+      titleValue = Structured.suggestedRuleTitle(content.data.label);
+    }
+    var details = Models.buildDetailsPayload({ title: titleValue, summary: el('fhCreateSummary').value });
+    if (!details.valid) { setError('fhCreateError', details.message); return; }
+    var visibility = fixedVisibility(kind)
+      ? Models.buildVisibilityPayload({ mode: fixedVisibility(kind) })
+      : Models.buildVisibilityPayload(readVisibility('fhCreate'));
+    var check = Models.validateVisibility(visibility);
+    if (!check.valid) { setError('fhCreateError', check.message); return; }
+    var publishNow = !!(el('fhCreatePublish') && el('fhCreatePublish').checked);
+    setError('fhCreateError', '');
+    setBusy(true);
+    try {
+      var created = await Handbook.createItem({
+        kind: kind, title: details.payload.title, summary: details.payload.summary,
+        visibility: visibility, data: content.data, publish: publishNow
+      });
+      el('fhCreateDrawer').open = false;
+      Lex.Toast.success(publishNow ? 'Item created and published.' : 'Item created. Publish it when it is ready.');
+      await loadManaged();
+      reloadPublished();
+      var item = findManaged(created && created.id);
+      if (item) openManage(item);
+    } catch (error) {
+      setError('fhCreateError', Models.describeError(error, 'The item could not be created. Try again.'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function submitCreate() {
     if (state.busy) return;
+    if (Structured.isStructured(state.createKind)) { await submitCreateStructured(); return; }
     var form = readVisibility('fhCreate');
     form.title = el('fhCreateTitle').value;
     form.summary = el('fhCreateSummary').value;
@@ -345,6 +454,8 @@
     el('fhManageChips').innerHTML = item.chips.map(badge).join('');
     show(el('fhUnpublishBtn'), item.status === 'published');
     var openBtn = el('fhOpenEditorBtn');
+    var structured = Structured.isStructured(item.kind);
+    show(openBtn, !structured);
     if (openBtn) openBtn.disabled = !Models.editorParams(item);
     if (item.status === 'published') {
       var reading = item.ingestionPending ? '. ' + Models.MESSAGES.ingestionPending + '.' : '';
@@ -363,10 +474,52 @@
     if (tab === 'history') loadHistory();
   }
 
+  /** The typed form (structured items) in the Details tab, with LANA's evidence. */
+  function renderStructuredEditor(item) {
+    var structured = Structured.isStructured(item.kind);
+    show(el('fhEditStructured'), structured);
+    // Visibility tab: a fixed type (work hours) says who sees it instead of offering the picker.
+    var fixed = structured && fixedVisibility(item.kind);
+    show(document.querySelector('#fhManageDrawer [data-visibility="edit"]'), !fixed);
+    show(el('fhSaveVisibilityBtn'), !fixed);
+    setText('fhVisibilityFixed', fixed ? typeLabel(item.kind) + ' are for everyone in the firm. Every member\'s calendar uses them.' : '');
+    show(el('fhVisibilityFixed'), !!fixed);
+    setError('fhStructuredError', '');
+    setText('fhVersionsHelp', structured
+      ? 'Each save makes a new version. Publish shares the current one. To share an older version, restore it here: it is saved as the newest version, then you can publish it.'
+      : 'Each save in the editor makes a new version. Publish shares the current one. To share an older version, restore it here. LANA reads it again, and you can publish it once that is done.');
+    if (!structured) return;
+    Forms.render(el('fhEditStructuredForm'), item.kind, item.data, typeOf(item.kind));
+    var lines = Structured.evidenceLines(item.notes);
+    var list = el('fhEditEvidenceList');
+    if (list) list.innerHTML = lines.map(function (line) { return '<li>' + esc(line) + '</li>'; }).join('');
+    show(el('fhEditEvidence'), item.suggestedByLana && lines.length > 0);
+  }
+
+  async function saveStructured(publish) {
+    var item = state.current;
+    if (!item || state.busy) return;
+    var content = Forms.read(el('fhEditStructuredForm'));
+    if (!content.valid) { setError('fhStructuredError', content.message); return; }
+    setError('fhStructuredError', '');
+    setBusy(true);
+    try {
+      await Handbook.saveVersion(item.id, content.data, publish);
+      Lex.Toast.success(publish ? 'Saved and published.' : 'Saved as a new version. Publish it when it is ready.');
+      await refreshAll();
+      if (state.current) renderStructuredEditor(state.current);
+    } catch (error) {
+      setError('fhStructuredError', Models.describeError(error, 'The changes could not be saved. Try again.'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function openManage(item) {
     if (!item) return;
     state.current = item;
     state.versions = [];
+    renderStructuredEditor(item);
     el('fhEditTitle').value = item.title;
     el('fhEditSummary').value = item.summary;
     setError('fhEditError', '');
@@ -437,12 +590,13 @@
         if (row.isPublished) chips.push({ label: 'Published', color: 'green' });
         if (row.signed) chips.push({ label: 'Signed', color: 'indigo' });
         var meta = [row.createdLabel, row.createdBy ? 'by ' + row.createdBy : ''].filter(Boolean).join(' ');
+        var words = row.summaryText ? '<span class="fh-version-words">' + esc(row.summaryText) + '</span>' : '';
         var restore = row.canRestore
           ? '<lex-btn variant="secondary" size="sm" data-restore-version="' + esc(row.versionNumber) + '">Restore</lex-btn>'
           : '';
         return '<li class="fh-list-item">' +
             '<span class="fh-list-main"><span class="fh-list-title">' + esc(row.label) + '</span>' +
-            (meta ? '<span class="fh-list-meta">' + esc(meta) + '</span>' : '') + '</span>' +
+            (meta ? '<span class="fh-list-meta">' + esc(meta) + '</span>' : '') + words + '</span>' +
             '<span class="fh-version-actions"><span class="fh-chips">' + chips.map(badge).join('') + '</span>' + restore + '</span>' +
           '</li>';
       }).join('') : '<li class="fh-list-empty">No saved versions yet. Open it in the editor and save.</li>';
@@ -475,9 +629,34 @@
     }
   }
 
+  async function restoreStructuredVersion(item, versionNumber) {
+    var row = null;
+    state.versions.forEach(function (v) { if (v.versionNumber === versionNumber) row = v; });
+    if (!row || !row.data) return;
+    var ok = await Lex.Modal.confirmAsync(
+      'Restore version ' + versionNumber + '?',
+      'It is saved as the newest version. Publish it to share it. Newer versions stay in the list.',
+      { confirmText: 'Restore' }
+    );
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await Handbook.saveVersion(item.id, row.data, false);
+      Lex.Toast.success('Version ' + versionNumber + ' restored as the newest version.');
+      await loadVersions();
+      await loadManaged();
+      if (state.current) renderStructuredEditor(state.current);
+    } catch (error) {
+      Lex.Toast.error(Models.describeError(error, 'That version could not be restored. Try again.'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function restoreVersion(versionNumber) {
     var item = state.current;
     if (!item || state.busy || !versionNumber) return;
+    if (Structured.isStructured(item.kind)) { await restoreStructuredVersion(item, versionNumber); return; }
     var ok = await Lex.Modal.confirmAsync(
       'Restore version ' + versionNumber + '?',
       'It becomes the current version. LANA reads it again, and you can publish it once that is done. Newer versions stay in the list.',
@@ -625,6 +804,7 @@
       var id = event.target && event.target.id;
       if (id === 'fhCreateMode') syncRecipientsVisible('fhCreate');
       if (id === 'fhCreateSource') syncCreateSource();
+      if (id === 'fhCreateKind') syncCreateKind(event.detail && event.detail.value);
       if (id === 'fhEditMode') syncRecipientsVisible('fhEdit');
     });
 
@@ -661,7 +841,9 @@
       fhUnpublishBtn: unpublish,
       fhDeleteBtn: deleteItem,
       fhSaveDetailsBtn: saveDetails,
-      fhSaveVisibilityBtn: saveVisibility
+      fhSaveVisibilityBtn: saveVisibility,
+      fhSaveVersionBtn: function () { saveStructured(false); },
+      fhSaveVersionPublishBtn: function () { saveStructured(true); }
     };
     Object.keys(clicks).forEach(function (id) {
       var btn = el(id);
@@ -719,7 +901,9 @@
       var manage = el('fhManageTable');
       if (manage && state.canManage) {
         manage.setCellRenderers(manageRenderers());
-        loadManaged();
+        loadManaged().then(loadTypes);
+      } else {
+        loadTypes();
       }
       // firm-handbook.html?id=<item> opens that item in the reader.
       var params = Lex.Nav && typeof Lex.Nav.getParams === 'function' ? Lex.Nav.getParams() : null;

@@ -61,12 +61,16 @@
 
   /**
    * The days a view shows: one for 'day', Sunday to Saturday for 'week',
-   * Monday to Friday for 'workweek', and for 'month' six whole weeks from
-   * the Sunday on or before the first of the month (42 days, so every month
-   * has the same grid).
+   * the firm's working days for 'workweek' (`workWeekdays`, 0 Sunday to 6
+   * Saturday, from its work hours; Monday to Friday without them), and for
+   * 'month' six whole weeks from the Sunday on or before the first of the
+   * month (42 days, so every month has the same grid).
    */
-  function viewDays(view, day) {
+  function viewDays(view, day, workWeekdays) {
     if (view === 'week') return daysFrom(weekStart(day), 7);
+    if (view === 'workweek' && Array.isArray(workWeekdays) && workWeekdays.length) {
+      return daysFrom(weekStart(day), 7).filter(function (d) { return workWeekdays.indexOf(time().plainDayOfWeek(d)) !== -1; });
+    }
     if (view === 'workweek') return daysFrom(time().addPlainDays(weekStart(day), 1), 5);
     if (view === 'month') return daysFrom(weekStart(monthStart(day)), 42);
     return daysFrom(day, 1);
@@ -328,7 +332,8 @@
     return Math.max(1, Math.floor((cellHeight - (dateHeight || 0)) / rowHeight));
   }
 
-  // The work day starts at 8 AM until the firm can set its own hours.
+  // The work day when the firm's work hours are not known (the calendar
+  // reads them from the Firm Handbook, js/calendar/calendar-work-hours.js).
   var WORKDAY_START_MINUTES = 8 * 60;
   var WORKDAY_END_MINUTES = 18 * 60;
 
@@ -343,6 +348,22 @@
       return Math.max(0, Math.floor((wall.minutes - 60) / 30) * 30);
     }
     return WORKDAY_START_MINUTES;
+  }
+
+  /**
+   * The parts of a day (0 to MINUTES_PER_DAY wall minutes) outside the given
+   * segments ([{ top, bottom }]): where the grid shades time outside work
+   * hours. No segments: the whole day.
+   */
+  function complementMinutes(segments) {
+    var gaps = [];
+    var at = 0;
+    (segments || []).slice().sort(function (a, b) { return a.top - b.top; }).forEach(function (s) {
+      if (s.top > at) gaps.push({ top: at, bottom: s.top });
+      at = Math.max(at, s.bottom);
+    });
+    if (at < MINUTES_PER_DAY) gaps.push({ top: at, bottom: MINUTES_PER_DAY });
+    return gaps;
   }
 
   /** Minutes snapped to the nearest `step` (15 by default). */
@@ -427,6 +448,7 @@
     monthLayout: monthLayout,
     monthCapacity: monthCapacity,
     initialScrollMinutes: initialScrollMinutes,
+    complementMinutes: complementMinutes,
     WORKDAY_START_MINUTES: WORKDAY_START_MINUTES,
     WORKDAY_END_MINUTES: WORKDAY_END_MINUTES,
     snapMinutes: snapMinutes,

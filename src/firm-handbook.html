@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-lex-theme="auto">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -109,10 +109,16 @@
       <!-- New item -->
       <lex-drawer id="fhCreateDrawer" data-hoist heading="New handbook item" width="lg" show-footer confirm-text="Create" cancel-text="Cancel">
         <div class="fh-form">
+          <div class="fh-type-picker">
+            <p class="fh-field-label">Type</p>
+            <lex-segmented id="fhCreateKind" value="text"
+              options='[{"value":"text","label":"Text"},{"value":"work_hours","label":"Work hours"},{"value":"followup_rule","label":"Follow-up rule"}]'></lex-segmented>
+            <p id="fhCreateKindHelp" class="fh-help"></p>
+          </div>
           <lex-input id="fhCreateTitle" label="Title" placeholder="Payment schedules" maxlength="500" required></lex-input>
           <lex-textarea id="fhCreateSummary" label="Summary" rows="3" maxlength="600" show-count
             help="One or two sentences. LANA keeps this in mind in every chat."></lex-textarea>
-          <div class="fh-source">
+          <div class="fh-source" data-kind-section="text">
             <p class="fh-field-label">Content</p>
             <lex-segmented id="fhCreateSource" value="blank"
               options='[{"value":"blank","label":"Start blank"},{"value":"upload","label":"Upload a file"}]'></lex-segmented>
@@ -124,6 +130,11 @@
               </div>
               <input type="file" id="fhCreateFileInput" class="fh-file-input" accept=".docx,.pdf,.txt">
             </div>
+          </div>
+          <div class="fh-structured-section hidden" data-kind-section="structured">
+            <p class="fh-field-label">Content</p>
+            <div id="fhCreateStructured" class="fh-structured-form"></div>
+            <lex-toggle id="fhCreatePublish" label="Publish it now"></lex-toggle>
           </div>
           <div class="fh-visibility" data-visibility="create">
             <p class="fh-field-label">Who can see it</p>
@@ -137,7 +148,7 @@
             </div>
           </div>
           <p id="fhCreateError" class="fh-error hidden" role="alert"></p>
-          <p class="fh-help">After you create it, open it in the editor to write or check the content. Members see it once you publish.</p>
+          <p id="fhCreateNote" class="fh-help">After you create it, open it in the editor to write or check the content. Members see it once you publish.</p>
         </div>
       </lex-drawer>
 
@@ -165,6 +176,19 @@
                 <lex-btn id="fhSaveDetailsBtn" variant="primary">Save details</lex-btn>
               </div>
             </div>
+            <div id="fhEditStructured" class="fh-form fh-structured-section hidden">
+              <p class="fh-field-label">Content</p>
+              <div id="fhEditStructuredForm" class="fh-structured-form"></div>
+              <div id="fhEditEvidence" class="fh-evidence hidden">
+                <p class="fh-field-label">Why LANA suggested it</p>
+                <ul id="fhEditEvidenceList" class="fh-evidence-list"></ul>
+              </div>
+              <p id="fhStructuredError" class="fh-error hidden" role="alert"></p>
+              <div class="fh-form-actions">
+                <lex-btn id="fhSaveVersionBtn" variant="secondary">Save new version</lex-btn>
+                <lex-btn id="fhSaveVersionPublishBtn" variant="primary">Save and publish</lex-btn>
+              </div>
+            </div>
           </section>
 
           <section class="fh-manage-panel hidden" data-panel="visibility">
@@ -180,6 +204,7 @@
                   <lex-select id="fhEditUsers" label="People" multiple searchable placeholder="Choose people"></lex-select>
                 </div>
               </div>
+              <p id="fhVisibilityFixed" class="fh-help hidden"></p>
               <p id="fhVisibilityError" class="fh-error hidden" role="alert"></p>
               <div class="fh-form-actions">
                 <lex-btn id="fhSaveVisibilityBtn" variant="primary">Save visibility</lex-btn>
@@ -188,7 +213,7 @@
           </section>
 
           <section class="fh-manage-panel hidden" data-panel="versions">
-            <p class="fh-help">Each save in the editor makes a new version. Publish shares the current one. To share an older version, restore it here. LANA reads it again, and you can publish it once that is done.</p>
+            <p id="fhVersionsHelp" class="fh-help">Each save in the editor makes a new version. Publish shares the current one. To share an older version, restore it here. LANA reads it again, and you can publish it once that is done.</p>
             <ul id="fhVersionsList" class="fh-list" aria-live="polite"></ul>
           </section>
 
@@ -237,6 +262,7 @@
   <script src="js/lex/components/foundation/lex-btn.js"></script>
   <script src="js/lex/components/foundation/lex-empty.js"></script>
   <script src="js/lex/components/form/lex-segmented.js"></script>
+  <script src="js/lex/components/form/lex-toggle.js"></script>
   <script src="js/lex/components/layout/lex-sidebar.js"></script>
   <script src="js/lex/components/layout/lex-topbar.js"></script>
   <script src="js/lex/components/layout/lex-conversation-item.js"></script>
@@ -257,6 +283,8 @@
   <script src="js/lex/lex-page-init.js"></script>
   <script src="js/services/firm-handbook-api.service.js"></script>
   <script src="js/firm-handbook/firm-handbook.models.js"></script>
+  <script src="js/firm-handbook/firm-handbook-structured.models.js"></script>
+  <script src="js/firm-handbook/firm-handbook-structured-forms.js"></script>
   <script src="js/firm-handbook.js"></script>
 
   <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>
