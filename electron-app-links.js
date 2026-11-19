@@ -74,6 +74,24 @@ function normalizeOrgId(value) {
 }
 
 /**
+ * The org id of a lana-ai://connect/<org-id> link, or null. Any website can open
+ * that link, so the id must be exactly one path segment matching the org id
+ * pattern; it reaches the sign-in page as data (IPC), never as page script.
+ * @param {URL} urlObj
+ */
+function connectLinkOrgId(urlObj) {
+  const segments = String((urlObj && urlObj.pathname) || '').replace(/^\/+/, '').replace(/\/$/, '').split('/');
+  if (segments.length !== 1) {return null;}
+  let raw;
+  try {
+    raw = decodeURIComponent(segments[0]);
+  } catch (_) {
+    return null;
+  }
+  return normalizeOrgId(raw);
+}
+
+/**
  * Parse and validate one app link. Only the contract's keys are accepted for
  * each action; anything else (an unknown key, a repeated key, a path, a value
  * of the wrong shape) rejects the whole link.
@@ -514,6 +532,7 @@ module.exports = {
   isAppLinkAction,
   normalizeDomain,
   normalizeOrgId,
+  connectLinkOrgId,
   discoveryTarget,
   parseAppLink,
   describeForLog,

@@ -351,6 +351,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   /**
+   * lana-ai://connect/<org-id>: the main process checked the id; the sign-in page fills it in.
+   */
+  onConnectOrg: (callback) => {
+    ipcRenderer.on('connect-link:org', (_event, data) => {
+      const orgId = data && typeof data.orgId === 'string' ? data.orgId : null;
+      if (orgId) callback(orgId);
+    });
+  },
+
+  /**
    * Generate a CSRF-safe OAuth state parameter (local, deprecated)
    */
   generateOAuthState: () => ipcRenderer.invoke('generate-oauth-state'),

@@ -98,7 +98,7 @@ const { refreshHostedDiscovery, verifyServer, discoverByDomain } = require('./el
 // the control plane's SHA-256 only; everything else keeps default checks.
 const chefPin = require('./electron-chef-pin');
 const { decideWindowOpen } = require('./electron-window-open-policy');
-const { createAppLinkRouter, createFirmSignOut, oldSessionNotice, registerAppLinkIpc, createColdStartQueue, deepLinkFromArgv } = require('./electron-app-links');
+const { createAppLinkRouter, createFirmSignOut, oldSessionNotice, registerAppLinkIpc, createColdStartQueue, deepLinkFromArgv, connectLinkOrgId } = require('./electron-app-links');
 const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified, saveBrainchildLink, getBrainchildLink, clearBrainchildLink, setBrainchildAutoBindDisabled, isBrainchildAutoBindDisabled, authTokenPersistence, offlineKeyPersistence, getLocalEnginePreferences, updateLocalEnginePreferences, firstLaunchPersistence, locationPersistence, appearancePersistence } = require('./electron-storage');
 chefPin.configure({ getSavedServer });
 const { createLocalEngineHost } = require('./electron-local-engine');
@@ -2331,21 +2331,19 @@ const handleOAuthCallback = (urlObj) => {
  * lana-ai://connect/<org-id>
  */
 const handleConnectLink = (urlObj) => {
-  const orgId = urlObj.pathname.replace(/^\/+/, '');
+  // Any website can open this link: only an id matching the org id pattern is used, and it
+  // reaches the sign-in page as data over IPC (login.html onConnectOrg), never as script.
+  const orgId = connectLinkOrgId(urlObj);
 
   if (!orgId) {
-    logError('No org ID in connect deep link');
+    logError('No valid org ID in connect deep link');
     dialog.showErrorBox('Connection Error', 'Invalid connection link.');
     return;
   }
 
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.focus();
-    mainWindow.webContents.executeJavaScript(`
-      if (document.getElementById('orgId')) {
-        document.getElementById('orgId').value = '${orgId}';
-      }
-    `);
+    mainWindow.webContents.send('connect-link:org', { orgId });
   } else {
     createLoginWindow();
   }

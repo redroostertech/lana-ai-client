@@ -289,6 +289,12 @@
     const step2 = document.getElementById('step2');
     const discoveryForm = document.getElementById('discoveryForm');
     const orgIdInput = document.getElementById('orgId');
+    // lana-ai://connect/<org-id>: the main process sends the checked id (electron-main.js handleConnectLink).
+    if (window.electronAPI && typeof window.electronAPI.onConnectOrg === 'function') {
+      window.electronAPI.onConnectOrg((orgId) => {
+        if (orgIdInput) orgIdInput.value = orgId;
+      });
+    }
     const serverUrlInput = document.getElementById('serverUrl');
     const devApiOverrideInput = document.getElementById('devApiOverride');
     const toggleCustomUrlBtn = document.getElementById('toggleCustomUrl');
