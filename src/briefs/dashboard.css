@@ -224,7 +224,7 @@
   padding: 0 6px;
   border-radius: 9999px;
   background: var(--bt-accent);
-  color: #ffffff;
+  color: var(--bt-on-accent);
   font-size: 12px;
   font-weight: 600;
   line-height: 20px;

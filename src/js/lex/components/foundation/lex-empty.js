@@ -61,7 +61,7 @@
       }
 
       .lex-empty .lex-empty__message {
-        color: #111827;
+        color: var(--lex-text-primary, #111827);
         font-family: var(--lex-font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
         font-size: 1.125rem;
         font-weight: 600;
@@ -70,7 +70,7 @@
       }
 
       .lex-empty .lex-empty__description {
-        color: #6b7280;
+        color: var(--lex-text-secondary, #6b7280);
         font-family: var(--lex-font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
         font-size: 1rem;
         line-height: 1.5;

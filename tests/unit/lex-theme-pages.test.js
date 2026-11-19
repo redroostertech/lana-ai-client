@@ -41,7 +41,7 @@ test('the pages without lex-tokens.css and the separate windows load the theme s
 
 test('only pages already dark-ready ask for the theme on <html> (the batches add the rest)', () => {
   const marked = pages.filter((p) => /<html[^>]*data-lex-theme="auto"/.test(p.html)).map((p) => p.rel).sort();
-  expect(marked).toEqual(['accept-invite.html', 'activate.html', 'calendar.html', 'data-connectors.html', 'firm-handbook.html', 'first-launch.html', 'mfa-setup.html', 'settings-v2.html', 'shared-link.html']);
+  expect(marked).toEqual(['accept-invite.html', 'activate.html', 'briefs/dashboard.html', 'briefs/index.html', 'calendar.html', 'data-connectors.html', 'firm-handbook.html', 'first-launch.html', 'mfa-setup.html', 'settings-v2.html', 'shared-link.html']);
 });
 
 test('the app-link pages are themed on <html> and no longer read prefers-color-scheme themselves', () => {
@@ -57,4 +57,8 @@ test('the Data Connectors search and sort bar uses a surface token, not a fixed 
   expect(js).toContain('class="connector-table-toolbar');
   expect(js).not.toMatch(/connector-table-toolbar[^"]*bg-white/);
   expect(fs.readFileSync(path.join(SRC, 'css/connector-table.css'), 'utf8')).toMatch(/\.connector-table-toolbar\s*\{[^}]*background:\s*var\(--lex-bg-elevated\)/);
+});
+
+test("Briefs follows the shared appearance preference", () => {
+  expect(fs.readFileSync(path.join(SRC, "briefs/app.js"), "utf8")).not.toContain("prefers-color-scheme");
 });

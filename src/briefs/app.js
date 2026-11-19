@@ -2051,24 +2051,9 @@
     }
   }
 
-  /** The page's dark theme follows the computer's setting (styles.css scopes the tokens to this page). */
-  const darkScheme = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
-  function applyTheme() {
-    const scroll = document.querySelector('.briefs-scroll');
-    if (scroll) scroll.setAttribute('data-lex-theme', darkScheme && darkScheme.matches ? 'dark' : 'light');
-  }
-  let themeBound = false;
-  function followTheme() {
-    applyTheme();
-    if (themeBound || !darkScheme || !darkScheme.addEventListener) return;
-    themeBound = true;
-    darkScheme.addEventListener('change', applyTheme);
-  }
-
   function init() {
     els.list = byId('briefs-detail');
     if (!els.list) return;
-    followTheme();
     if (player) player.close();
     player = null;
     state.selectedId = null;

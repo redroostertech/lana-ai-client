@@ -18,6 +18,7 @@
   /* The transcript work area keeps LANA Briefs' own look (selection, clips, markers):
      the standalone app's tokens (lana-notes packages/ui tokens.css). */
   --bt-accent: #2f7d5f;
+  --bt-on-accent: #ffffff;
   --bt-accent-strong: #3d9a75;
   --bt-flag: #a86a17;
   --bt-ink: #14110f;
@@ -31,53 +32,20 @@
   --bt-radius-xl: 16px;
 }
 
-/* Dark theme, this page only (the client's pattern, as in first-launch.css): app.js sets
-   data-lex-theme on .briefs-scroll from the computer's setting, and while that element is on the
-   page the root (shell included) takes these tokens, so every token built from them follows.
-   Leaving the page drops them. */
-:root:has(.briefs-scroll[data-lex-theme="dark"]) {
-  color-scheme: dark;
-  --lex-bg-primary: #151715;
-  --lex-bg-secondary: #0f110f;
-  --lex-bg-tertiary: #232723;
-  --lex-text-primary: #eef1ee;
-  --lex-text-secondary: #b2b9b2;
-  --lex-text-tertiary: #8b938b;
-  --lex-text-accent: #67c9a0;
-  --lex-border-default: #343a34;
-  --lex-border-subtle: #2a2f2a;
-  --lex-border-strong: #4a514a;
-  --lex-status-neutral-bg: #232723;
-  --lex-status-neutral-text: #c9cfc9;
-  --lex-border-accent: #67c9a0;
-  --lex-border-focus: #67c9a0;
-  --lex-bg-accent: #e8ece8;
-  --lex-bg-accent-hover: #ffffff;
-  --lex-text-on-accent: #151715;
-  --lex-bg-accent-soft: rgba(103, 201, 160, 0.16);
-  --lex-color-warning-50: #3a2e1a;
-  --lex-status-warning-bg: #3a2e1a;
-  --lex-status-warning-text: #f0c27a;
-  --lex-status-danger-bg: #3d1f1f;
-  --lex-status-danger-text: #f2a7a7;
-
-  --bt-accent: #67c9a0;
-  --bt-accent-strong: #84d7b3;
-  --bt-flag: #f0b45a;
-  --bt-ink: #eef1ee;
-  --bt-muted: #b2b9b2;
-  --bt-faint: #8b938b;
-  --bt-hairline: rgb(238 241 238 / 0.14);
-  --bt-surface: #1c1f1c;
-  --bt-surface-raised: #262a26;
-}
-
-/* Lex buttons and hovers take the gray scale directly; it changes inside the page only, since the
-   shell's sidebar reads the same grays for its light text. */
-.briefs-scroll[data-lex-theme="dark"] {
-  --lex-color-gray-100: #232723;
-  --lex-color-gray-200: #2e332e;
-  --lex-color-gray-300: #3b413b;
+/* Transcript colors follow the shared page theme; printed pages keep the light palette. */
+@media screen {
+  :root[data-lex-theme="dark"] {
+    --bt-accent: #67c9a0;
+    --bt-on-accent: #151715;
+    --bt-accent-strong: #84d7b3;
+    --bt-flag: #f0b45a;
+    --bt-ink: #eef1ee;
+    --bt-muted: #b2b9b2;
+    --bt-faint: #8b938b;
+    --bt-hairline: rgb(238 241 238 / 0.14);
+    --bt-surface: #1c1f1c;
+    --bt-surface-raised: #262a26;
+  }
 }
 
 html,
@@ -1779,7 +1747,7 @@ lex-walkthrough.briefs-tour {
   padding: 6px 12px;
   border-radius: var(--lex-radius-md);
   background: var(--bt-accent);
-  color: #ffffff;
+  color: var(--bt-on-accent);
   font-size: 13px;
   font-weight: 600;
 }
