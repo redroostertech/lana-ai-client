@@ -11,9 +11,11 @@ const { app, dialog, BrowserWindow, ipcMain } = require('electron');
 const axios = require('axios');
 // The box Chef's certificate pin; other hosts (the update service) keep the default checks.
 const chefPin = require('./electron-chef-pin');
-const path = require('path');
-const url = require('url');
+const { appPageUrl } = require('./electron-app-protocol');
 const { logInfo, logError, logWarn } = require('./electron-logger');
+const { refusalFor } = require('./electron-ipc-guard');
+const { clientPreloadPath } = require('./electron-preload-path');
+const { IPC_POLICY } = require('./electron-ipc-policy');
 
 // Update state
 let updateCheckInProgress = false;
@@ -234,29 +236,15 @@ async function downloadAndInstallUpdate(serverUrl, authToken = null, orgId = nul
 let updateDialogWindow = null;
 
 /**
- * Create a file:// URL for the update dialog
+ * The update dialog's app URL (electron-app-protocol.js)
  * @param {Object} params - Query parameters
- * @returns {string} File URL with query params
+ * @returns {string} App URL with query params
  */
 function createUpdateDialogUrl(params) {
-  const dialogPath = path.join(__dirname, 'public_html', 'update-dialog.html');
   const queryString = Object.entries(params)
     .map(([k, v]) => `${k}=${encodeURIComponent(v || '')}`)
     .join('&');
-
-  let normalizedPath = dialogPath;
-  if (process.platform === 'win32') {
-    normalizedPath = dialogPath.replace(/\\/g, '/');
-    if (!normalizedPath.startsWith('/')) {
-      normalizedPath = '/' + normalizedPath;
-    }
-  }
-
-  return url.format({
-    pathname: normalizedPath,
-    protocol: 'file:',
-    slashes: true
-  }) + '?' + queryString;
+  return appPageUrl('update-dialog.html') + '?' + queryString;
 }
 
 /**
@@ -287,8 +275,10 @@ function showUpdateDialog(updateInfo, parentWindow, type = 'optional') {
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
-        preload: path.join(__dirname, 'electron-preload.js'),
-        sandbox: false
+        // electron-preload.js as one bundled file (electron-preload-path.js), so it runs sandboxed.
+        preload: clientPreloadPath({ isPackaged: app.isPackaged, rootDir: __dirname }),
+        webSecurity: true,
+        sandbox: true
       }
     });
 
@@ -311,6 +301,14 @@ function showUpdateDialog(updateInfo, parentWindow, type = 'optional') {
     // Use ipcMain.on (not .handle) so it can receive multiple messages (e.g. retry)
     const responseChannel = 'update-dialog-response';
     const responseHandler = async (event, choice) => {
+      // Only this update window's own page, with one of its four answers (electron-ipc-policy.js).
+      const fromDialog = updateDialogWindow && !updateDialogWindow.isDestroyed()
+        && event.sender === updateDialogWindow.webContents;
+      const refusal = fromDialog ? refusalFor(event, IPC_POLICY[responseChannel], [choice]) : 'wrong_window';
+      if (refusal) {
+        logWarn(`Update dialog response refused: ${refusal}`);
+        return;
+      }
       logInfo(`Update dialog response: ${choice}`);
 
       if (choice === 'update') {

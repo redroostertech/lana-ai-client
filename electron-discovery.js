@@ -14,8 +14,13 @@
 const axios = require('axios');
 const { logInfo, logError } = require('./electron-logger');
 const chefPin = require('./electron-chef-pin');
+const { withoutFirmSecrets, firmSecretsFromDiscovery } = require('./electron-api-base');
 
 const HOSTED_DISCOVERY_URL = 'https://www.redroostertec.com/lana-ai/v1/discovery';
+// The control plane endpoints the app's pages call themselves: the help center
+// (help.js, faq.js, article.js). The page CSP allows exactly these origins
+// (electron-csp.js). Discovery is not one: main asks it (discovery:resolve).
+const CONTROL_PLANE_URLS = Object.freeze(['https://redroostertec.com/lana-ai/v1/help']);
 
 function hasOwn(value, key) {
   return Boolean(value && Object.prototype.hasOwnProperty.call(value, key));
@@ -147,6 +152,52 @@ async function discoverByDomain(domain, orgIdHint, options = {}) {
   }
 }
 
+// What a page may ask hosted discovery for (discovery:resolve, electron-ipc-policy.js).
+const ORG_ID_MAX = 128;
+const DOMAIN_MAX = 253;
+
+/**
+ * Ask hosted discovery for an organization on a page's behalf (the sign-in and
+ * activation pages). Main makes the request so the answer's firm service keys
+ * never reach the page; the caller strips them (electron-api-base.js
+ * withoutFirmSecrets) and keeps them. Never throws.
+ *
+ * @param {{ orgId: string, domain: string }} request - the domain is a bare host name
+ * @returns {Promise<{ invalid: true } | { reached: false } | { reached: true, status: number, body: object|null }>}
+ */
+async function requestDiscovery(request, options = {}) {
+  const orgId = request && typeof request.orgId === 'string' ? request.orgId.trim() : '';
+  const domain = request && typeof request.domain === 'string' ? request.domain.trim() : '';
+  if (!orgId || orgId.length > ORG_ID_MAX || domain.length > DOMAIN_MAX) return { invalid: true };
+  const http = options.http || axios;
+  const endpoint = options.endpoint || HOSTED_DISCOVERY_URL;
+  let response;
+  try {
+    response = await http.post(endpoint, { org_id: orgId, domain }, {
+      timeout: options.timeout || 15000,
+      // Every answer comes back to the page, which turns it into its message.
+      validateStatus: () => true,
+      headers: { 'Content-Type': 'application/json', 'User-Agent': 'LanaAI-Client/1.0' }
+    });
+  } catch (_error) {
+    return { reached: false };
+  }
+  const body = response.data && typeof response.data === 'object' && !Array.isArray(response.data) ? response.data : null;
+  return { reached: true, status: response.status, body };
+}
+
+/**
+ * The discovery:resolve handler (electron-main.js): the answer for the page, without the firm's
+ * service keys, which go to remember(secrets) instead ({ orgId, burstApiKey, forgeApiKey }).
+ */
+async function discoveryForPage(request, { remember = () => {}, ...options } = {}) {
+  const answer = await requestDiscovery(request, options);
+  if (!answer.reached) return answer;
+  const secrets = firmSecretsFromDiscovery(answer.body);
+  if (secrets) remember(secrets);
+  return { reached: true, status: answer.status, body: withoutFirmSecrets(answer.body) };
+}
+
 /**
  * Verify server is reachable and return updated info with retry
  * @param {string} serverUrl - Full server URL (e.g., 'http://192.168.1.100:8080')
@@ -209,6 +260,9 @@ async function verifyServer(serverUrl, retries = 2, options = {}) {
 
 module.exports = {
   HOSTED_DISCOVERY_URL,
+  CONTROL_PLANE_URLS,
+  requestDiscovery,
+  discoveryForPage,
   mergeHostedDiscovery,
   refreshHostedDiscovery,
   serverFromDiscovery,

@@ -9,7 +9,7 @@ const source = fs.readFileSync(SOURCE_PATH, 'utf8');
 
 function loadMentionHelpers() {
   const start = source.indexOf('  function firstDefined()');
-  const end = source.indexOf('  // Escape a string for safe inclusion inside a single-quoted JS string literal');
+  const end = source.indexOf('  function formatDate(dateStr) {');
   if (start === -1 || end === -1 || end <= start) {
     throw new Error('Unable to locate workspace mention helper block');
   }

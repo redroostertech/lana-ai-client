@@ -89,7 +89,7 @@ class TeamPerformanceBoard {
               <p class="text-gray-600 mt-1">Real-time productivity insights and team metrics</p>
             </div>
             ${this.options.isModal ? `
-              <button onclick="closeTeamPerformanceModal()" class="text-gray-400 hover:text-gray-600 transition">
+              <button${window.LanaDomActions.on('click', 'closeTeamPerformanceModal', [])} class="text-gray-400 hover:text-gray-600 transition">
                 <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                 </svg>
@@ -123,7 +123,7 @@ class TeamPerformanceBoard {
               <p class="text-gray-600 mt-1">Real-time productivity insights and team metrics</p>
             </div>
             ${this.options.isModal ? `
-              <button onclick="closeTeamPerformanceModal()" class="text-gray-400 hover:text-gray-600 transition">
+              <button${window.LanaDomActions.on('click', 'closeTeamPerformanceModal', [])} class="text-gray-400 hover:text-gray-600 transition">
                 <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                 </svg>
@@ -180,7 +180,7 @@ class TeamPerformanceBoard {
 
               <!-- Close Button (if modal) -->
               ${this.options.isModal ? `
-                <button onclick="closeTeamPerformanceModal()" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition">
+                <button${window.LanaDomActions.on('click', 'closeTeamPerformanceModal', [])} class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition">
                   <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                   </svg>
@@ -844,3 +844,8 @@ if (typeof window !== 'undefined') {
   window.TeamPerformanceBoard = TeamPerformanceBoard;
   window.TeamContributorsTable = TeamPerformanceBoard.contributorsTable;
 }
+
+// Actions named by this file's markup (js/shared/dom-actions.js).
+window.LanaDomActions.registerGlobals([
+  'closeTeamPerformanceModal'
+]);

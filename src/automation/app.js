@@ -1328,7 +1328,7 @@ async function onAppClick(event) {
       window.open(
         getApiUrl(`/api/v1/automation/artifacts/${encodeURIComponent(artifactId)}/download`),
         '_blank',
-        'noopener,noreferrer'
+        'noopener'
       );
     }
     return;

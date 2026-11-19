@@ -8,7 +8,10 @@ const {
   resolveEngineConfig,
   resolveApiBase,
   presentServer,
-  toStoredServer
+  toStoredServer,
+  withoutFirmSecrets,
+  keepStoredFirmSecrets,
+  firmSecretsFromDiscovery
 } = require('../../electron-api-base');
 
 const CHEF = 'https://chef.example.test';
@@ -93,5 +96,62 @@ describe('presentServer / toStoredServer', () => {
 
   test('the bare engine address without chefUrl keeps the stored Chef URL', () => {
     expect(toStoredServer({ url: ENGINE, orgId: 'org-1' }, { engineUrl: ENGINE, storedUrl: CHEF }).url).toBe(CHEF);
+  });
+});
+
+describe('the firm\'s service keys stay in the main process', () => {
+  const stored = { orgId: 'org-1', url: CHEF, burstApiKey: 'burst-secret', forgeApiKey: 'forge-secret', forgeUrl: 'https://forge.example' };
+
+  test('a page never gets them', () => {
+    const page = withoutFirmSecrets(presentServer(stored, { mode: 'off' }));
+    expect(page).not.toHaveProperty('burstApiKey');
+    expect(page).not.toHaveProperty('forgeApiKey');
+    expect(page.forgeUrl).toBe('https://forge.example');
+    expect(stored.burstApiKey).toBe('burst-secret');
+  });
+
+  test('a page cannot set them: the stored keys stay for the same firm', () => {
+    const saved = keepStoredFirmSecrets({ orgId: 'org-1', url: CHEF, forgeUrl: 'https://forge.example', burstApiKey: 'page-value', forgeApiKey: 'page-value' }, stored);
+    expect(saved).toMatchObject({ burstApiKey: 'burst-secret', forgeApiKey: 'forge-secret' });
+  });
+
+  test('another firm starts without keys until main\'s own discovery fetches them', () => {
+    const saved = keepStoredFirmSecrets({ orgId: 'org-2', url: CHEF, burstApiKey: 'page-value' }, stored);
+    expect(saved).not.toHaveProperty('burstApiKey');
+    expect(saved).not.toHaveProperty('forgeApiKey');
+    expect(keepStoredFirmSecrets({ orgId: 'org-1' }, null)).toEqual({ orgId: 'org-1' });
+  });
+});
+
+describe('the firm\'s service keys in a discovery answer', () => {
+  test('stripped for the page and read for main', () => {
+    const body = { server: { org_id: 'org-1' }, burst_api_key: 'b', forge_api_key: 'f', forge_url: 'https://forge.example' };
+    expect(withoutFirmSecrets(body)).toEqual({ server: { org_id: 'org-1' }, forge_url: 'https://forge.example' });
+    expect(firmSecretsFromDiscovery(body)).toEqual({ orgId: 'org-1', burstApiKey: 'b', forgeApiKey: 'f', forgeUrl: 'https://forge.example' });
+    expect(firmSecretsFromDiscovery({ server: { org_id: 'org-1' } })).toEqual({ orgId: 'org-1' });
+    expect(firmSecretsFromDiscovery({ error: 'nope' })).toBe(null);
+  });
+});
+
+describe('a firm key goes only with its own service address', () => {
+  const stored = { orgId: 'org-1', burstApiKey: 'burst-secret', burstUrl: 'https://burst.example', forgeApiKey: 'forge-secret', forgeUrl: 'https://forge.example' };
+
+  test('same org and same address: the stored key stays', () => {
+    const saved = keepStoredFirmSecrets({ orgId: 'org-1', burstUrl: 'https://burst.example', forgeUrl: 'https://forge.example/' }, stored);
+    expect(saved).toMatchObject({ burstApiKey: 'burst-secret', forgeApiKey: 'forge-secret' });
+  });
+
+  test('a page that changes a service address does not get the key sent there', () => {
+    const saved = keepStoredFirmSecrets({ orgId: 'org-1', burstUrl: 'https://burst.example', forgeUrl: 'https://evil.example' }, stored);
+    expect(saved.burstApiKey).toBe('burst-secret');
+    expect(saved).not.toHaveProperty('forgeApiKey');
+    const noUrl = keepStoredFirmSecrets({ orgId: 'org-1' }, stored);
+    expect(noUrl).not.toHaveProperty('burstApiKey');
+    expect(noUrl).not.toHaveProperty('forgeApiKey');
+  });
+
+  test('keys read from discovery carry their addresses', () => {
+    const body = { server: { org_id: 'org-1' }, burst_api_key: 'b', burst_url: 'https://burst.example', forge_api_key: 'f', forge_url: 'https://forge.example' };
+    expect(firmSecretsFromDiscovery(body)).toEqual({ orgId: 'org-1', burstApiKey: 'b', burstUrl: 'https://burst.example', forgeApiKey: 'f', forgeUrl: 'https://forge.example' });
   });
 });

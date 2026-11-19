@@ -790,6 +790,10 @@
     var script = document.createElement('script');
     script.id = 'lana-editor-import-map';
     script.type = 'importmap';
+    // The page CSP runs only script that carries this page's nonce
+    // (electron-app-protocol.js puts it on the page's own <script> tags).
+    var nonceSource = document.querySelector('script[nonce]');
+    if (nonceSource && nonceSource.nonce) script.nonce = nonceSource.nonce;
     script.textContent = JSON.stringify({
       imports: {
         '@lana/ooxml-kernel/browser': baseUrl + '/kernel/browser.js',

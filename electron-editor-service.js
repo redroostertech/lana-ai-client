@@ -33,6 +33,7 @@
 const path = require('path');
 const crypto = require('crypto');
 const { createKeptProcess, DEFAULTS } = require('./electron-process-keeper');
+const { isAppUrl } = require('./electron-app-protocol');
 
 const HOST = '127.0.0.1';
 const SERVICE_NAME = '@lana/redline-service';
@@ -98,7 +99,7 @@ async function checkEditorService(fetch, url, token, { starting, timeoutMs }) {
 
 /**
  * Headers for one request from the session, with the editor's token added when an xhr/fetch
- * request goes to the editor's /v1 API from one of the app's own pages (file://). Any other request,
+ * request goes to the editor's /v1 API from one of the app's own pages (lana-app://app). Any other request,
  * one from a web page the app shows, or one the renderer marked as an untrusted fetch
  * (X-Lana-Untrusted-Fetch, sent by the preview PDF hydrator for backend or model URLs) is
  * left as it is.
@@ -109,7 +110,7 @@ function authorizeEditorRequest({ url, pageUrl, resourceType, headers }, { baseU
   // script tag, navigation or anything else that could load an editor URL.
   if (resourceType !== 'xhr' && resourceType !== 'fetch') {return headers;}
   if (Object.keys(headers || {}).some((name) => name.toLowerCase() === 'x-lana-untrusted-fetch')) {return headers;}
-  if (typeof pageUrl !== 'string' || !pageUrl.startsWith('file:')) {return headers;}
+  if (!isAppUrl(pageUrl)) {return headers;}
   const out = {};
   for (const [name, value] of Object.entries(headers || {})) {
     if (name.toLowerCase() !== 'authorization') {out[name] = value;}

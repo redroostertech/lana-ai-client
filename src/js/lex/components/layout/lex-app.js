@@ -1416,7 +1416,7 @@
       // 3. Browser origin fallback (non-Electron, non-file)
       if (!window.electronAPI) {
         var origin = window.location.origin;
-        if (window.location.protocol !== 'file:' && origin && origin !== 'null') {
+        if ((window.location.protocol !== 'file:' && window.location.protocol !== 'lana-app:') && origin && origin !== 'null') {
           if (window.api) window.api.baseUrl = origin;
           return origin;
         }

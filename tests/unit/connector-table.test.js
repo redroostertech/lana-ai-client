@@ -8,6 +8,7 @@
  */
 
 const fs = require('fs');
+const { actionCalls } = require('./helpers/dom-action-calls');
 const path = require('path');
 
 const SRC = path.join(__dirname, '..', '..', 'src');
@@ -353,6 +354,7 @@ describe('Data Connectors row mapping', () => {
     win.addEventListener = () => {};
     win.Lex.Toast = { error: () => {}, warning: () => {} };
     // eslint-disable-next-line no-new-func
+    new Function('window', read('js/shared/dom-actions.js'))(win);
     new Function('window', 'document', 'ConnectorRegistry', 'Connectors', 'api', 'Lex', read('js/data_connectors.js'))(
       win, doc, win.ConnectorRegistry, {}, {}, win.Lex
     );
@@ -381,12 +383,12 @@ describe('Data Connectors row mapping', () => {
     const page = loadPage();
     const connected = page.mapConnectorRow({ id: 'src-1', connector_id: 'gmail', name: 'Gmail', status: 'connected' }, [], []);
     const html = page.connectorActionsCell(connected);
-    expect(html).toContain("openConnectorManage('src-1')");
-    expect(html).toContain("showConnectorDetails('src-1', event)");
-    expect(html).toContain("openConnectorUpdateModal('src-1', event)");
+    expect(actionCalls(html)).toContain("openConnectorManage('src-1')");
+    expect(actionCalls(html)).toContain("showConnectorDetails('src-1', event)");
+    expect(actionCalls(html)).toContain("openConnectorUpdateModal('src-1', event)");
 
     const notConnected = page.mapConnectorRow({ id: 'leadly', name: 'Leadly' }, [], []);
-    expect(page.connectorActionsCell(notConnected)).toContain("installConnector('leadly', event)");
+    expect(actionCalls(page.connectorActionsCell(notConnected))).toContain("installConnector('leadly', event)");
 
     const soon = page.mapConnectorRow({ id: 'x', name: 'X', status: 'coming_soon' }, [], []);
     const soonHtml = page.connectorActionsCell(soon);

@@ -17,35 +17,35 @@ const HEALTHY = {
   enabled_apps: ['agents']
 };
 
-function fakeFetch(status, body) {
+// The main process's answer (electron-main.js discovery:resolve), as the page gets it.
+function fakeDiscover(status, body) {
   const calls = [];
-  const fn = async (url, init) => {
-    calls.push({ url, init });
-    return { ok: status >= 200 && status < 300, status, json: async () => body };
+  const fn = async (orgId, domain) => {
+    calls.push({ orgId, domain });
+    return { reached: true, status, body };
   };
   fn.calls = calls;
   return fn;
 }
 
-describe('buildDiscoveryRequest', () => {
-  test('posts org_id and the bare domain', () => {
-    const req = discovery.buildDiscoveryRequest('smithlaw', 'https://smithlaw.lanaai.io:443/x');
-    expect(req.url).toBe(discovery.DISCOVERY_URL);
-    expect(req.init.method).toBe('POST');
-    expect(JSON.parse(req.init.body)).toEqual({ org_id: 'smithlaw', domain: 'smithlaw.lanaai.io' });
-  });
-
-  test('server name comes from the org id', () => {
+describe('server names', () => {
+  test('server name comes from the org id; the domain sent is the bare host', () => {
     expect(discovery.generateServerUrl(' SmithLaw ')).toBe('smithlaw.lanaai.io');
     expect(discovery.generateServerUrl('')).toBe('');
+    expect(discovery.extractDomain('https://smithlaw.lanaai.io:443/x')).toBe('smithlaw.lanaai.io');
+  });
+
+  test('the page has no discovery address: main asks', () => {
+    expect(discovery.DISCOVERY_URL).toBeUndefined();
+    expect(discovery.buildDiscoveryRequest).toBeUndefined();
   });
 });
 
 describe('resolveOrganization', () => {
   test('reads a healthy answer into server info', async () => {
-    const fetch = fakeFetch(200, HEALTHY);
-    const info = await discovery.resolveOrganization('smithlaw', 'smithlaw.lanaai.io', { fetch });
-    expect(fetch.calls).toHaveLength(1);
+    const discover = fakeDiscover(200, HEALTHY);
+    const info = await discovery.resolveOrganization('smithlaw', 'https://smithlaw.lanaai.io:443/x', { discover });
+    expect(discover.calls).toEqual([{ orgId: 'smithlaw', domain: 'smithlaw.lanaai.io' }]);
     expect(info).toMatchObject({
       url: 'https://10.0.0.5:8080',
       orgId: 'smithlaw',
@@ -56,17 +56,25 @@ describe('resolveOrganization', () => {
     });
   });
 
+  test('the firm\'s service keys are not kept by the page (the main process holds them)', async () => {
+    const withKeys = { ...HEALTHY, burst_api_key: 'burst-secret', forge_api_key: 'forge-secret', burst_url: 'https://burst.example', forge_url: 'https://forge.example' };
+    const info = await discovery.resolveOrganization('smithlaw', 'smithlaw.lanaai.io', { discover: fakeDiscover(200, withKeys) });
+    expect(info).not.toHaveProperty('burstApiKey');
+    expect(info).not.toHaveProperty('forgeApiKey');
+    expect(info).toMatchObject({ burstUrl: 'https://burst.example', forgeUrl: 'https://forge.example' });
+  });
+
   test('a hardware box carries the control plane pin and is reached over https', async () => {
     const pin = 'AB:'.repeat(31) + 'AB';
     const box = { ...HEALTHY, discovery: { static_ip: '10.0.0.5', port: 8080, is_secure_ssl: false, chef_cert_sha256: pin } };
-    const info = await discovery.resolveOrganization('smithlaw', 'smithlaw.lanaai.io', { fetch: fakeFetch(200, box) });
+    const info = await discovery.resolveOrganization('smithlaw', 'smithlaw.lanaai.io', { discover: fakeDiscover(200, box) });
     expect(info).toMatchObject({ url: 'https://10.0.0.5:8080', chefCertSha256: 'ab'.repeat(32), isSecure: true });
     expect(discovery.chefCertPin({ chef_cert_sha256: 'cd'.repeat(32) })).toBe('cd'.repeat(32));
   });
 
   test('the box\'s own certSha256 is never taken as the pin', async () => {
     const tofu = { ...HEALTHY, discovery: { static_ip: '10.0.0.5', port: 8080, is_secure_ssl: false, certSha256: 'ab'.repeat(32) } };
-    const info = await discovery.resolveOrganization('smithlaw', 'smithlaw.lanaai.io', { fetch: fakeFetch(200, tofu) });
+    const info = await discovery.resolveOrganization('smithlaw', 'smithlaw.lanaai.io', { discover: fakeDiscover(200, tofu) });
     expect(info).toMatchObject({ url: 'http://10.0.0.5:8080', chefCertSha256: null });
   });
 
@@ -76,18 +84,24 @@ describe('resolveOrganization', () => {
     [500, {}, 'service'],
     [200, { status: 'degraded' }, 'unavailable']
   ])('status %i is a %s failure', async (status, body, kind) => {
-    await expect(discovery.resolveOrganization('x', 'x.lanaai.io', { fetch: fakeFetch(status, body) }))
+    await expect(discovery.resolveOrganization('x', 'x.lanaai.io', { discover: fakeDiscover(status, body) }))
       .rejects.toMatchObject({ kind });
   });
 
-  test('no network is an offline failure', async () => {
-    const fetch = async () => { throw new TypeError('Failed to fetch'); };
-    await expect(discovery.resolveOrganization('x', 'x.lanaai.io', { fetch })).rejects.toMatchObject({ kind: 'offline' });
+  test('no network, or no main process to ask, is an offline failure', async () => {
+    const unreached = async () => ({ reached: false });
+    await expect(discovery.resolveOrganization('x', 'x.lanaai.io', { discover: unreached })).rejects.toMatchObject({ kind: 'offline' });
+    const throws = async () => { throw new Error('Refused: wrong_page'); };
+    await expect(discovery.resolveOrganization('x', 'x.lanaai.io', { discover: throws })).rejects.toMatchObject({ kind: 'offline' });
+  });
+
+  test('an Organization ID main refused (empty or too long) is an invalid failure', async () => {
+    const invalid = async () => ({ invalid: true });
+    await expect(discovery.resolveOrganization('', 'x.lanaai.io', { discover: invalid })).rejects.toMatchObject({ kind: 'invalid' });
   });
 
   test('a body that is not JSON on a 200 is a service failure', async () => {
-    const fetch = async () => ({ ok: true, status: 200, json: async () => { throw new SyntaxError('bad'); } });
-    await expect(discovery.resolveOrganization('x', 'x.lanaai.io', { fetch })).rejects.toMatchObject({ kind: 'service' });
+    await expect(discovery.resolveOrganization('x', 'x.lanaai.io', { discover: fakeDiscover(200, null) })).rejects.toMatchObject({ kind: 'service' });
   });
 });
 

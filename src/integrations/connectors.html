@@ -505,6 +505,7 @@
     <lex-btn data-slot="footer" id="detailsActionBtn" variant="primary" label="Connect"></lex-btn>
   </lex-modal>
 
+  <script src="../js/shared/dom-actions.js"></script>
   <script>
     if (!api.requireAuth()) throw new Error('Not authenticated');
 
@@ -549,8 +550,22 @@
 
     // A JS string argument inside a double-quoted onclick attribute: JSON
     // quoting for the script, then HTML escaping for the attribute.
-    function connectorJsArg(value) {
-      return Lex.escapeHtml(JSON.stringify(value == null ? '' : String(value)));
+    // A connector logo that fails to load shows the connector's first letter.
+    LanaDomActions.register('showConnectorLogoFallback', function (target, className, letter) {
+      var img = this;
+      var span = document.createElement('span');
+      span.className = className;
+      span.textContent = letter;
+      if (target === 'parent' && img.parentElement) {
+        img.parentElement.replaceChildren(span);
+      } else {
+        img.replaceWith(span);
+      }
+    });
+
+    // A connector field as an action argument (js/shared/dom-actions.js): a string, never null.
+    function connectorArg(value) {
+      return value == null ? '' : String(value);
     }
 
     // Render connector card
@@ -612,11 +627,11 @@
 
       // Logo rendering
       const logoHtml = normalizedConnector.logo_url
-        ? `<img src="${Lex.escapeHtml(normalizedConnector.logo_url)}" alt="${Lex.escapeHtml(normalizedConnector.name)}" class="w-10 h-10 object-contain" onerror="this.parentElement.innerHTML='<span class=\\'text-lg font-bold text-gray-400\\'>${Lex.escapeHtml(Lex.escapeHtml(normalizedConnector.name.charAt(0)))}</span>'">`
+        ? `<img src="${Lex.escapeHtml(normalizedConnector.logo_url)}" alt="${Lex.escapeHtml(normalizedConnector.name)}" class="w-10 h-10 object-contain" ${LanaDomActions.on('error', 'showConnectorLogoFallback', ['parent', 'text-lg font-bold text-gray-400', String(normalizedConnector.name.charAt(0))])}>`
         : `<span class="text-lg font-bold text-gray-400">${Lex.escapeHtml(normalizedConnector.name.charAt(0))}</span>`;
 
       return `
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 ${isComingSoon ? 'opacity-60' : 'hover:shadow-md'} transition-shadow ${isComingSoon ? '' : 'cursor-pointer'}" ${isComingSoon ? '' : hasCustomUI ? `onclick="openCustomConnectorUI(${connectorJsArg(normalizedConnector.ui_entry_point)}, ${connectorJsArg(normalizedConnector.name)}, ${connectorJsArg(normalizedConnector.id)}, ${connectorJsArg(normalizedConnector.connector_id || normalizedConnector.connector_type || '')})"` : `onclick="openConnector(${connectorJsArg(normalizedConnector.id)}, ${connectorJsArg(normalizedConnector.category)})"`}>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 ${isComingSoon ? 'opacity-60' : 'hover:shadow-md'} transition-shadow ${isComingSoon ? '' : 'cursor-pointer'}" ${isComingSoon ? '' : hasCustomUI ? `${LanaDomActions.on('click', 'openCustomConnectorUI', [connectorArg(normalizedConnector.ui_entry_point), connectorArg(normalizedConnector.name), connectorArg(normalizedConnector.id), connectorArg(normalizedConnector.connector_id || normalizedConnector.connector_type || '')])}` : `${LanaDomActions.on('click', 'openConnector', [connectorArg(normalizedConnector.id), connectorArg(normalizedConnector.category)])}`}>
           <div class="flex items-start justify-between mb-4">
             <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
               ${logoHtml}
@@ -637,36 +652,36 @@
           ` : ''}
 
           ${isComingSoon ? `
-            <button onclick="showConnectorDetails(${connectorJsArg(normalizedConnector.id)}, event)" class="w-full px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors">
+            <button${LanaDomActions.on('click', 'showConnectorDetails', [connectorArg(normalizedConnector.id), LanaDomActions.EVENT])} class="w-full px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors">
               View Details
             </button>
           ` : isActive ? `
             <!-- Active Connector - Manage + Info -->
             <div class="flex gap-2">
-              <button onclick="showConnectorActionsModal(${connectorJsArg(normalizedConnector.id)}); event.stopPropagation();" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
+              <button${LanaDomActions.on('click', 'showConnectorActionsModal', [connectorArg(normalizedConnector.id)], { stop: true })} class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
                 Manage
               </button>
-              <button onclick="showConnectorDetails(${connectorJsArg(normalizedConnector.id)}, event)" class="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors">
+              <button${LanaDomActions.on('click', 'showConnectorDetails', [connectorArg(normalizedConnector.id), LanaDomActions.EVENT])} class="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
               </button>
             </div>
           ` : isInstalled ? `
             <!-- Installed Connector - Configure + Info -->
             <div class="flex gap-2">
-              <button onclick="showConnectorActionsModal(${connectorJsArg(normalizedConnector.id)}); event.stopPropagation();" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
+              <button${LanaDomActions.on('click', 'showConnectorActionsModal', [connectorArg(normalizedConnector.id)], { stop: true })} class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
                 Configure
               </button>
-              <button onclick="showConnectorDetails(${connectorJsArg(normalizedConnector.id)}, event)" class="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors">
+              <button${LanaDomActions.on('click', 'showConnectorDetails', [connectorArg(normalizedConnector.id), LanaDomActions.EVENT])} class="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
               </button>
             </div>
           ` : `
             <!-- Disconnected Connector - Connect + Info -->
             <div class="flex gap-2">
-              <button onclick="showConnectorActionsModal(${connectorJsArg(normalizedConnector.id)}); event.stopPropagation();" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
+              <button${LanaDomActions.on('click', 'showConnectorActionsModal', [connectorArg(normalizedConnector.id)], { stop: true })} class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
                 Connect
               </button>
-              <button onclick="showConnectorDetails(${connectorJsArg(normalizedConnector.id)}, event)" class="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors">
+              <button${LanaDomActions.on('click', 'showConnectorDetails', [connectorArg(normalizedConnector.id), LanaDomActions.EVENT])} class="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
               </button>
             </div>
@@ -745,7 +760,7 @@
 
       // Logo rendering
       const logoHtml = connector.logo_url
-        ? `<img src="${Lex.escapeHtml(connector.logo_url)}" alt="${Lex.escapeHtml(connector.name)}" class="w-10 h-10 object-contain" onerror="this.parentElement.innerHTML='<span class=\\'text-lg font-bold text-indigo-600\\'>${Lex.escapeHtml(Lex.escapeHtml(connector.name.charAt(0)))}</span>'">`
+        ? `<img src="${Lex.escapeHtml(connector.logo_url)}" alt="${Lex.escapeHtml(connector.name)}" class="w-10 h-10 object-contain" ${LanaDomActions.on('error', 'showConnectorLogoFallback', ['parent', 'text-lg font-bold text-indigo-600', String(connector.name.charAt(0))])}>`
         : `<span class="text-lg font-bold text-indigo-600">${Lex.escapeHtml(connector.name.charAt(0))}</span>`;
 
       // Status badge
@@ -782,17 +797,17 @@
         `;
       } else if (isComingSoon) {
         actionButton = `
-          <button onclick="showConnectorDetails(${connectorJsArg(connector.id)}, event)" class="w-full px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors">
+          <button${LanaDomActions.on('click', 'showConnectorDetails', [connectorArg(connector.id), LanaDomActions.EVENT])} class="w-full px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors">
             View Details
           </button>
         `;
       } else {
         actionButton = `
           <div class="flex gap-2">
-            <button onclick="installConnector(${connectorJsArg(connector.id)})" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
+            <button${LanaDomActions.on('click', 'installConnector', [connectorArg(connector.id)])} class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
               Set Up
             </button>
-            <button onclick="showConnectorDetails(${connectorJsArg(connector.id)}, event)" class="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors">
+            <button${LanaDomActions.on('click', 'showConnectorDetails', [connectorArg(connector.id), LanaDomActions.EVENT])} class="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             </button>
           </div>
@@ -1012,7 +1027,7 @@
       // Populate logo
       const logoEl = document.getElementById('detailsLogo');
       if (normalizedConnector.logo_url) {
-        logoEl.innerHTML = `<img src="${Lex.escapeHtml(normalizedConnector.logo_url)}" alt="${Lex.escapeHtml(normalizedConnector.name)}" class="w-12 h-12 object-contain" onerror="this.innerHTML='<span class=\\'text-2xl font-bold text-gray-400\\'>${Lex.escapeHtml(Lex.escapeHtml(normalizedConnector.name.charAt(0)))}</span>'">`;
+        logoEl.innerHTML = `<img src="${Lex.escapeHtml(normalizedConnector.logo_url)}" alt="${Lex.escapeHtml(normalizedConnector.name)}" class="w-12 h-12 object-contain" ${LanaDomActions.on('error', 'showConnectorLogoFallback', ['self', 'text-2xl font-bold text-gray-400', String(normalizedConnector.name.charAt(0))])}>`;
       } else {
         logoEl.innerHTML = `<span class="text-2xl font-bold text-gray-400">${Lex.escapeHtml(normalizedConnector.name.charAt(0))}</span>`;
       }
@@ -1153,7 +1168,7 @@
       if (logoUrl) {
         // Show connector logo
         modalIcon.className = 'w-20 h-20 mx-auto mb-4 bg-white border-2 border-gray-200 rounded-2xl flex items-center justify-center p-3';
-        modalIcon.innerHTML = `<img src="${logoUrl}" alt="${connectorName}" class="w-full h-full object-contain" onerror="this.parentElement.innerHTML='<span class=\\'text-3xl font-bold text-gray-400\\'>${connectorName.charAt(0)}</span>'">`;
+        modalIcon.innerHTML = `<img src="${logoUrl}" alt="${connectorName}" class="w-full h-full object-contain" ${LanaDomActions.on('error', 'showConnectorLogoFallback', ['parent', 'text-3xl font-bold text-gray-400', String(connectorName.charAt(0))])}>`;
       } else {
         // Show default icon with first letter
         modalIcon.className = 'w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center';
@@ -2040,6 +2055,15 @@
     document.addEventListener('lex-close', (event) => {
       if (event.target && event.target.id === 'importConnectorModal') clearConnectorFile();
     });
+
+    // Actions named by this page's markup (js/shared/dom-actions.js).
+    LanaDomActions.registerGlobals([
+      'installConnector',
+      'openConnector',
+      'openCustomConnectorUI',
+      'showConnectorActionsModal',
+      'showConnectorDetails'
+    ]);
   </script>
 
   <!-- Import Connector Modal -->

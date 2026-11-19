@@ -31,6 +31,14 @@ const ContactSearchModal = {
     this.modal = document.getElementById('contactSearchModal');
     this.searchInput = document.getElementById('contactSearchInput');
     this.resultsContainer = document.getElementById('contactSearchResults');
+    // Link buttons use one delegated listener (inline handlers are blocked by the page CSP).
+    if (this.resultsContainer) {
+      this.resultsContainer.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-link-contact]');
+        if (!button || !this.resultsContainer.contains(button)) return;
+        this.linkContact(button.getAttribute('data-link-contact'));
+      });
+    }
 
     this.setupEventListeners();
     return true;
@@ -298,7 +306,8 @@ const ContactSearchModal = {
               options="${this.escapeAttr(JSON.stringify(roleOptions))}"
             ></lex-select>
             <button
-              onclick="ContactSearchModal.linkContact('${escapedContactId}')"
+              type="button"
+              data-link-contact="${escapedContactId}"
               class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 font-medium transition-colors shadow-sm"
             >
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

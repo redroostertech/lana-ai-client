@@ -3,15 +3,16 @@
 /** Settings > General > Location: the main-process permission handlers and IPC (electron-location.js). */
 const path = require('path');
 const { pathToFileURL } = require('url');
+const { appPageUrl } = require('../../electron-app-protocol');
 const { isAppPage, allowGeolocation, installLocationPermissionHandlers, registerLocationIpc, systemSettingsUrl } = require('../../electron-location');
 
 const appRoot = path.join(path.sep, 'Applications', 'Lana AI.app', 'Contents', 'Resources', 'app.asar', 'public_html');
-const appPage = pathToFileURL(path.join(appRoot, 'settings-v2.html')).toString() + '?section=general';
+const appPage = appPageUrl('settings-v2.html?section=general');
 
 describe('isAppPage', () => {
   test('a page under public_html is the app', () => {
     expect(isAppPage(appPage, appRoot)).toBe(true);
-    expect(isAppPage(pathToFileURL(path.join(appRoot, 'briefs', 'capture.html')).toString(), appRoot)).toBe(true);
+    expect(isAppPage(appPageUrl('briefs/capture.html'), appRoot)).toBe(true);
   });
 
   test('other origins, other files and path escapes are not', () => {
@@ -20,6 +21,10 @@ describe('isAppPage', () => {
     expect(isAppPage(pathToFileURL(path.join(path.sep, 'tmp', 'page.html')).toString(), appRoot)).toBe(false);
     expect(isAppPage(pathToFileURL(appRoot + '-evil' + path.sep + 'page.html').toString(), appRoot)).toBe(false);
     expect(isAppPage(pathToFileURL(appRoot).toString() + '/../../secret.html', appRoot)).toBe(false);
+    // A file:// copy of an app page is not the app origin.
+    expect(isAppPage(pathToFileURL(path.join(appRoot, 'settings-v2.html')).toString(), appRoot)).toBe(false);
+    expect(isAppPage('lana-app://app/public_html/%2e%2e/%2e%2e/secret.html', appRoot)).toBe(false);
+    expect(isAppPage('lana-app://other/public_html/settings-v2.html', appRoot)).toBe(false);
     expect(isAppPage('', appRoot)).toBe(false);
     expect(isAppPage('not a url', appRoot)).toBe(false);
     expect(isAppPage(appPage, '')).toBe(false);
@@ -68,12 +73,35 @@ describe('installLocationPermissionHandlers', () => {
     expect(request(session, 'geolocation', undefined, { getURL: () => 'https://evil.example/' })).toBe(false);
   });
 
-  test('every other permission keeps Electron\'s default (allowed)', () => {
+  test('every other permission: the app\'s own pages keep it, other origins are denied', () => {
     const session = install(false);
     ['media', 'notifications', 'clipboard-read', 'fullscreen'].forEach((permission) => {
-      expect(request(session, permission, 'https://evil.example/')).toBe(true);
-      expect(session.check({}, permission, 'https://evil.example', {})).toBe(true);
+      expect(request(session, permission, appPage)).toBe(true);
+      expect(request(session, permission, 'https://evil.example/')).toBe(false);
+      expect(session.check({}, permission, 'lana-app://app', {})).toBe(true);
+      expect(session.check({}, permission, 'https://evil.example', {})).toBe(false);
+      expect(session.check({}, permission, 'https://evil.example', { requestingUrl: 'https://evil.example/' })).toBe(false);
     });
+  });
+
+  test('openExternal is denied everywhere: custom-scheme links go through the app\'s own opener instead', () => {
+    const session = install(true);
+    expect(request(session, 'openExternal', appPage)).toBe(false);
+    expect(session.check({}, 'openExternal', 'lana-app://app', {})).toBe(false);
+    expect(request(session, 'openExternal', 'https://evil.example/')).toBe(false);
+  });
+
+  test('the same policy is handed to Briefs, which sets its own handlers while it runs', () => {
+    const session = {};
+    session.setPermissionRequestHandler = jest.fn();
+    session.setPermissionCheckHandler = jest.fn();
+    const policy = installLocationPermissionHandlers(session, { appRoot, isAllowed: () => true });
+    expect(policy.decide({}, 'geolocation', { requestingUrl: appPage })).toBe(true);
+    expect(policy.decide({}, 'notifications', { requestingOrigin: 'lana-app://app' })).toBe(true);
+    expect(policy.decide({}, 'notifications', { requestingUrl: 'https://evil.example/' })).toBe(false);
+    policy.restore();
+    expect(session.setPermissionRequestHandler).toHaveBeenCalledTimes(2);
+    expect(session.setPermissionCheckHandler).toHaveBeenCalledTimes(2);
   });
 });
 

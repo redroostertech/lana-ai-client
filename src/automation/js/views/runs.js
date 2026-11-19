@@ -204,7 +204,7 @@ function renderSelectedArtifactPreview(context, artifacts) {
         </div>
         <div class="row-actions">
           ${selected?.workspace_url ? `<lex-btn variant="secondary" size="sm" data-run-artifact-open-workspace="${escapeAttribute(selected.workspace_url)}">Open in Workspace</lex-btn>` : ''}
-          ${safeArtifactUrl(selected?.download_url) ? `<a href="${escapeAttribute(safeArtifactUrl(selected.download_url))}" target="_blank" rel="noopener noreferrer">Open in new window</a>` : ''}
+          ${safeArtifactUrl(selected?.download_url) ? `<a href="${escapeAttribute(safeArtifactUrl(selected.download_url))}" target="_blank" rel="noopener">Open in new window</a>` : ''}
           <lex-btn variant="ghost" size="sm" data-close-run-artifact-preview>Close</lex-btn>
         </div>
       </div>
@@ -264,7 +264,7 @@ function renderMatterLink(lanaClientUrl, matterId, matterName) {
   const href = buildMatterDetailUrl(lanaClientUrl, matterId);
   if (!href) return escapeHtml(label);
 
-  return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" data-run-matter-link="true" style="color:var(--lex-color-primary-600,#2563eb);text-decoration:none;" onclick="event.stopPropagation()">${escapeHtml(label)}</a>`;
+  return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener" data-run-matter-link="true" style="color:var(--lex-color-primary-600,#2563eb);text-decoration:none;">${escapeHtml(label)}</a>`;
 }
 
 function normalizeScopeType(value) {
@@ -691,4 +691,14 @@ function keepRunDetailLive(context) {
       fillRunTrace(context);
     }
   }).start());
+}
+
+// A matter link inside a clickable row opens the matter, not the row. Capture
+// phase, so the row never sees the click; the link still follows its href.
+// (Replaces an inline onclick, which the page CSP blocks.)
+if (typeof document !== 'undefined' && !document.__lanaRunMatterLinkStop) {
+  document.__lanaRunMatterLinkStop = true;
+  document.addEventListener('click', (event) => {
+    if (event.target && event.target.closest && event.target.closest('[data-run-matter-link]')) event.stopPropagation();
+  }, true);
 }

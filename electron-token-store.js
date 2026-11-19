@@ -18,6 +18,8 @@
 
 'use strict';
 
+const { isAppUrl } = require('./electron-app-protocol');
+
 const MAX_TOKEN_LENGTH = 16 * 1024;
 
 const CHANNELS = Object.freeze({
@@ -142,15 +144,12 @@ function tokenExpiresAt(token) {
   return payload && Number.isFinite(payload.exp) ? payload.exp * 1000 : null;
 }
 
-// Only the app's own pages (file://) may read or change the token. A remote
-// page that ends up in an app window gets nothing.
+// Only the app's own pages (lana-app://app, electron-app-protocol.js) may read
+// or change the token. A remote page or a stray local file in an app window
+// gets nothing.
 function isTrustedSender(event) {
-  try {
-    const frameUrl = (event && event.senderFrame && event.senderFrame.url) || '';
-    return new URL(frameUrl).protocol === 'file:';
-  } catch (_) {
-    return false;
-  }
+  const frameUrl = (event && event.senderFrame && event.senderFrame.url) || '';
+  return isAppUrl(frameUrl);
 }
 
 /**

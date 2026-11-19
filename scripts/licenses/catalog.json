@@ -134,6 +134,33 @@
       "texts": [{ "title": "Chart.js, MIT License", "file": "scripts/licenses/texts/chart.js-MIT.txt" }]
     },
     {
+      "id": "font-awesome-free",
+      "section": "vendored",
+      "name": "Font Awesome Free (CSS and web fonts)",
+      "version": "6.4.0",
+      "file": "public_html/css/vendor/fontawesome/css/all.min.css",
+      "license": "OFL-1.1 AND MIT AND CC-BY-4.0",
+      "licenseName": "SIL OFL 1.1 for the fonts; MIT for the CSS; CC BY 4.0 for the icons",
+      "copyright": "Copyright (c) Fonticons, Inc. (https://fontawesome.com)",
+      "source": "https://github.com/FortAwesome/Font-Awesome",
+      "purl": "pkg:npm/%40fortawesome/fontawesome-free",
+      "notes": "Shipped with the app instead of loaded from a CDN (content security policy). Only the woff2 fonts are included.",
+      "texts": [{ "title": "Font Awesome Free License", "file": "scripts/licenses/texts/fontawesome-free-LICENSE.txt" }]
+    },
+    {
+      "id": "drawflow",
+      "section": "vendored",
+      "name": "Drawflow",
+      "version": "0.0.60",
+      "file": "public_html/js/vendor/drawflow.min.js",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2020 Jero Soler",
+      "source": "https://github.com/jerosoler/Drawflow",
+      "purl": "pkg:npm/drawflow",
+      "notes": "Shipped with the app instead of loaded from a CDN (content security policy).",
+      "texts": [{ "title": "Drawflow, MIT License", "file": "scripts/licenses/texts/drawflow-MIT.txt" }]
+    },
+    {
       "id": "jspdf",
       "section": "vendored",
       "name": "jsPDF",

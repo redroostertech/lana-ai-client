@@ -67,7 +67,7 @@ describe('LanaSafeHtml.renderMarkdown (merged from Lex.Utils.renderMarkdownSafe)
     const out = Utils.renderMarkdownSafe(input);
     expect(out).toContain('href="https://example.com/"');
     expect(out).toContain('target="_blank"');
-    expect(out).toContain('rel="noopener noreferrer"');
+    expect(out).toContain('rel="noopener"');
     expect(out).not.toContain('javascript:');
     expect(out).toContain('evil'); // label survives as text
   });

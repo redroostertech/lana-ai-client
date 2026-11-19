@@ -702,7 +702,7 @@
       var dataAttrs = 'data-is-matter="true" data-matter-id="' + escapeHtml(folder.matter_id) + '" data-name="' + escapeHtml(folder.name) + '"';
 
       return [
-        '<div class="grid-item rounded-lg border p-4 cursor-pointer hover:shadow-md transition-shadow relative group" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)" ' + dataAttrs + ' onclick="handleFolderClick(this)">',
+        '<div class="grid-item rounded-lg border p-4 cursor-pointer hover:shadow-md transition-shadow relative group" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)" ' + dataAttrs + '' + window.LanaDomActions.on('click', 'handleFolderClick', [window.LanaDomActions.ELEMENT]) + '>',
         '  ' + matterMenuHtml(folder.matter_id, folder.name, folder.is_pinned, folder.source, 'absolute top-2 right-2'),
         '  <div class="flex flex-col items-center">',
         '    <svg class="w-16 h-16 mb-2" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
@@ -1184,7 +1184,7 @@
 
       return [
         '<div class="file-card rounded-lg shadow-sm border p-4 cursor-pointer relative group hover:shadow-md transition-shadow" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)"',
-        '     onclick="openRecentFile(' + escapeHtml(JSON.stringify(file.id)) + ', ' + escapeHtml(JSON.stringify(file.client_matter || '')) + ')">',
+        '' + window.LanaDomActions.on('click', 'openRecentFile', [file.id, file.client_matter || '']) + '>',
         '  <div class="flex flex-col items-center text-center">',
         '    <div class="w-12 h-12 mb-3 flex items-center justify-center">' + fileIcon + '</div>',
         '    <p class="text-sm font-medium truncate w-full mb-1" style="color: var(--lex-text-primary)" title="' + fileName + '">' + fileName + '</p>',
@@ -2207,7 +2207,7 @@
       ' data-matter-id="' + escapeHtml(matterId) + '" data-matter-name="' + escapeHtml(matterName) + '"' +
       ' data-is-pinned="' + (isPinned ? 'true' : 'false') + '" data-source="' + escapeHtml(source || 'lana') + '"' +
       ' icon="more-vertical" icon-only variant="ghost" align="end" floating aria-label="Folder actions"' +
-      ' options="' + json + '" onclick="event.stopPropagation()"></lex-dropdown-btn>';
+      ' options="' + json + '"' + window.LanaDomActions.on('click', null, [], { stop: true }) + '></lex-dropdown-btn>';
   }
 
   /**
@@ -2452,7 +2452,7 @@
 
     return [
       '<div class="file-card rounded-lg shadow-sm border p-4 cursor-pointer relative group hover:shadow-md transition-shadow" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)"',
-      '     onclick="openRecentFile(' + escapeHtml(JSON.stringify(file.id)) + ', ' + escapeHtml(JSON.stringify(file.client_matter || '')) + ')">',
+      '' + window.LanaDomActions.on('click', 'openRecentFile', [file.id, file.client_matter || '']) + '>',
       '  <div class="flex flex-col items-center text-center">',
       '    <div class="w-12 h-12 mb-3 flex items-center justify-center">' + fileIcon + '</div>',
       '    <p class="text-sm font-medium truncate w-full mb-1" style="color: var(--lex-text-primary)" title="' + fileName + '">' + fileName + '</p>',
@@ -2544,7 +2544,7 @@
 
     return [
       '<div class="file-card rounded-lg shadow-sm border p-4 cursor-pointer relative group hover:shadow-md transition-shadow" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)"',
-      '     onclick="navigateToMatter(' + escapeHtml(JSON.stringify(matter.matter_id)) + ', ' + escapeHtml(JSON.stringify(matter.name || matter.matter_id)) + ')">',
+      '' + window.LanaDomActions.on('click', 'navigateToMatter', [matter.matter_id, matter.name || matter.matter_id]) + '>',
       isPinned
         ? '<div class="absolute top-2 right-8 p-1 rounded-full" style="background: var(--lex-status-warning-bg); border: 1px solid var(--lex-status-warning-border)" title="Pinned"><svg class="w-3 h-3" style="color: var(--lex-status-warning-text)" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg></div>'
         : '',
@@ -2729,3 +2729,10 @@
   }
 
 })();
+
+// Actions named by this file's markup (js/shared/dom-actions.js).
+window.LanaDomActions.registerGlobals([
+  'handleFolderClick',
+  'navigateToMatter',
+  'openRecentFile'
+]);

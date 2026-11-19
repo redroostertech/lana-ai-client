@@ -116,8 +116,8 @@ describe('starting the editor service', () => {
     const service1 = createEditorService({ script: SCRIPT, execPath: 'e', keyDir: KEYS, spawn: () => fakeChild(1), fetch: async () => ({ ok: false, status: 503 }), pickPort: async () => 1, fsImpl: { mkdirSync() {} } });
     const service2 = createEditorService({ script: SCRIPT, execPath: 'e', keyDir: KEYS, spawn: () => fakeChild(2), fetch: async () => ({ ok: false, status: 503 }), pickPort: async () => 1, fsImpl: { mkdirSync() {} } });
     return Promise.all([service1.start(), service2.start()]).then(() => {
-      const t1 = service1.requestHeaders({ url: 'http://127.0.0.1:1/v1/redline', pageUrl: 'file:///app/x.html', resourceType: 'xhr', headers: {} }).Authorization;
-      const t2 = service2.requestHeaders({ url: 'http://127.0.0.1:1/v1/redline', pageUrl: 'file:///app/x.html', resourceType: 'xhr', headers: {} }).Authorization;
+      const t1 = service1.requestHeaders({ url: 'http://127.0.0.1:1/v1/redline', pageUrl: 'lana-app://app/public_html/x.html', resourceType: 'xhr', headers: {} }).Authorization;
+      const t2 = service2.requestHeaders({ url: 'http://127.0.0.1:1/v1/redline', pageUrl: 'lana-app://app/public_html/x.html', resourceType: 'xhr', headers: {} }).Authorization;
       expect(t1).toMatch(/^Bearer [0-9a-f]{64}$/);
       expect(t1).not.toBe(t2);
       return Promise.all([service1.stop(), service2.stop()]);
@@ -194,7 +194,12 @@ describe('restarts and stopping', () => {
 
 describe('which requests get the token', () => {
   const editor = { baseUrl: 'http://127.0.0.1:53117', token: TOKEN };
-  const page = 'file:///Applications/LANA.app/Contents/Resources/app.asar/public_html/file-viewer.html';
+  const page = 'lana-app://app/public_html/file-viewer.html';
+
+  test('a file:// page (not the app origin) gets nothing', () => {
+    const headers = {};
+    expect(authorizeEditorRequest({ url: 'http://127.0.0.1:53117/v1/redline', pageUrl: 'file:///Applications/LANA.app/public_html/file-viewer.html', resourceType: 'fetch', headers }, editor)).toBe(headers);
+  });
 
   test('the app\'s own pages calling the editor\'s /v1 API get it, replacing any they sent', () => {
     expect(authorizeEditorRequest({ url: 'http://127.0.0.1:53117/v1/documents/xml', pageUrl: page, resourceType: 'xhr', headers: { 'Content-Type': 'application/octet-stream', authorization: 'Bearer chef-jwt' } }, editor))

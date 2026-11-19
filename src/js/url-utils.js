@@ -23,7 +23,7 @@ window.URLUtils = {
     if (!url || url === 'null' || url === 'undefined') {
       return true;
     }
-    if (String(url).startsWith('file:')) {
+    if (String(url).startsWith('file:') || String(url).startsWith('lana-app:')) {
       return true;
     }
     return false;

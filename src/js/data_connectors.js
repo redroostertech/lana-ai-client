@@ -602,26 +602,25 @@
 
   /** Actions cell: Set up / Open / View details, plus Update for packages. */
   function connectorActionsCell(row) {
-    var safeId = escapeAttribute(row.id);
     var safeName = escapeAttribute(row.name);
     if (isMcpConnector(row._raw)) {
-      return '<lex-btn variant="primary" size="sm" onclick="openMcpServerPanel(\'' + safeId + '\', event)">Manage</lex-btn>';
+      return '<lex-btn variant="primary" size="sm"' + window.LanaDomActions.on('click', 'openMcpServerPanel', [String(row.id), window.LanaDomActions.EVENT]) + '>Manage</lex-btn>';
     }
     var action = getConnectorAction(row._raw, currentInstalledConnectors);
-    var details = '<lex-btn variant="ghost" size="sm" icon="true" onclick="showConnectorDetails(\'' + safeId + '\', event)" aria-label="View details of ' + safeName + '" title="View details">' + INFO_ICON + '</lex-btn>';
+    var details = '<lex-btn variant="ghost" size="sm" icon="true"' + window.LanaDomActions.on('click', 'showConnectorDetails', [String(row.id), window.LanaDomActions.EVENT]) + ' aria-label="View details of ' + safeName + '" title="View details">' + INFO_ICON + '</lex-btn>';
     var html;
     if (action === 'install') {
-      html = '<lex-btn variant="primary" size="sm" onclick="installConnector(\'' + safeId + '\', event)">Set up</lex-btn>' + details;
+      html = '<lex-btn variant="primary" size="sm"' + window.LanaDomActions.on('click', 'installConnector', [String(row.id), window.LanaDomActions.EVENT]) + '>Set up</lex-btn>' + details;
     } else if (action === 'details') {
-      html = '<lex-btn variant="ghost" size="sm" onclick="showConnectorDetails(\'' + safeId + '\', event)">View details</lex-btn>';
+      html = '<lex-btn variant="ghost" size="sm"' + window.LanaDomActions.on('click', 'showConnectorDetails', [String(row.id), window.LanaDomActions.EVENT]) + '>View details</lex-btn>';
     } else {
-      html = '<lex-btn variant="primary" size="sm" onclick="openConnectorManage(\'' + safeId + '\')">Open</lex-btn>' + details;
+      html = '<lex-btn variant="primary" size="sm"' + window.LanaDomActions.on('click', 'openConnectorManage', [String(row.id)]) + '>Open</lex-btn>' + details;
     }
     if (row.update_slug) {
-      html += '<lex-btn variant="ghost" size="sm" icon="true" onclick="openConnectorUpdateModal(\'' + safeId + '\', event)" aria-label="Update ' + safeName + '" title="Update connector">' + UPDATE_ICON + '</lex-btn>';
+      html += '<lex-btn variant="ghost" size="sm" icon="true"' + window.LanaDomActions.on('click', 'openConnectorUpdateModal', [String(row.id), window.LanaDomActions.EVENT]) + ' aria-label="Update ' + safeName + '" title="Update connector">' + UPDATE_ICON + '</lex-btn>';
     }
     if (row.instance_slug && canAddInstance()) {
-      html += '<lex-btn variant="ghost" size="sm" icon="true" onclick="openAddInstanceModal(\'' + safeId + '\', event)" aria-label="Add another ' + safeName + '" title="Add another">' + PLUS_ICON + '</lex-btn>';
+      html += '<lex-btn variant="ghost" size="sm" icon="true"' + window.LanaDomActions.on('click', 'openAddInstanceModal', [String(row.id), window.LanaDomActions.EVENT]) + ' aria-label="Add another ' + safeName + '" title="Add another">' + PLUS_ICON + '</lex-btn>';
     }
     return html;
   }
@@ -1785,7 +1784,7 @@
 
     var setDefaultBtn = isDefault
       ? '<span class="text-xs" style="color:var(--lex-text-tertiary)">Default account</span>'
-      : '<lex-btn variant="ghost" size="sm" onclick="setConnectorDefault(\'' + sourceId + '\')">Set as default</lex-btn>';
+      : '<lex-btn variant="ghost" size="sm"' + window.LanaDomActions.on('click', 'setConnectorDefault', [String(sourceId)]) + '>Set as default</lex-btn>';
 
     return '<div class="flex items-center gap-3 px-4 py-3 rounded-xl" style="background:var(--lex-card-bg);border:1px solid var(--lex-card-border)">' +
       '<div class="flex-1 min-w-0">' +
@@ -2060,8 +2059,8 @@
       var frame = document.getElementById('connectorDashboardFrame');
       if (!frame || event.source !== frame.contentWindow) return;
 
-      if (window.electronAPI && typeof window.electronAPI.invoke === 'function') {
-        window.electronAPI.invoke('open-external-url', data.url).catch(function (error) {
+      if (window.electronAPI && typeof window.electronAPI.openExternal === 'function') {
+        window.electronAPI.openExternal(data.url).catch(function (error) {
           console.error('Failed to open external URL:', error);
         });
       } else {
@@ -2180,3 +2179,14 @@
   onEnter();
 
 })();
+
+// Actions named by this file's markup (js/shared/dom-actions.js).
+window.LanaDomActions.registerGlobals([
+  'installConnector',
+  'openAddInstanceModal',
+  'openConnectorManage',
+  'openConnectorUpdateModal',
+  'openMcpServerPanel',
+  'setConnectorDefault',
+  'showConnectorDetails'
+]);

@@ -19,6 +19,8 @@ jest.mock('electron', () => ({
 const { ElectronScreenVoice } = require('../../src/screen-voice/electron-screen-voice');
 const { globalShortcut, ipcMain, systemPreferences } = require('electron');
 const macTest = process.platform === 'darwin' ? test : test.skip;
+// The overlay page's top frame, as electron-ipc-guard.js expects it.
+const overlayFrame = { parent: null, url: 'lana-app://app/public_html/screen-voice/overlay/index.html?flavor=lana' };
 
 const fingerprint = { platform: 'darwin', processId: 9, bundleId: 'com.editor', processName: 'Editor',
   windowTitle: 'Doc', role: 'AXTextArea', name: 'Body', bounds: null, selectionHash: null };
@@ -195,7 +197,7 @@ describe('Electron screen voice orchestration', () => {
     manager.registerIpc();
     const registration = ipcMain.handle.mock.calls.find((call) => call[0] === 'screen-voice:open-settings');
 
-    await registration[1]({ sender: { id: manager.overlay.webContents.id } }, {});
+    await registration[1]({ sender: { id: manager.overlay.webContents.id }, senderFrame: overlayFrame }, {});
 
     expect(openClientSettings).toHaveBeenCalled();
     expect(manager.overlay.hide).not.toHaveBeenCalled();
@@ -681,7 +683,7 @@ describe('Electron screen voice orchestration', () => {
     manager.realtimeActive = true;
 
     const dismissRegistration = ipcMain.handle.mock.calls.find(([channel]) => channel === 'screen-voice:dismiss');
-    const result = await dismissRegistration[1]({ sender: { id: manager.overlay.webContents.id } }, {});
+    const result = await dismissRegistration[1]({ sender: { id: manager.overlay.webContents.id }, senderFrame: overlayFrame }, {});
 
     expect(result).toEqual({ ok: true });
     expect(manager.realtimeActive).toBe(false);

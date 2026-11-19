@@ -192,13 +192,13 @@
 
     var matterName = folderState.currentMatterName || folderState.currentMatterId;
 
-    var html = '<a href="#" onclick="navigateToRoot(); return false;" class="cursor-pointer" style="color: var(--lex-text-secondary)">Home</a>';
+    var html = '<a href="#"' + window.LanaDomActions.on('click', 'navigateToRoot', [], { prevent: true }) + ' class="cursor-pointer" style="color: var(--lex-text-secondary)">Home</a>';
 
     html += '<span class="breadcrumb-separator">/</span>';
     if (!folderState.currentFolderId) {
       html += '<span class="font-medium" style="color: var(--lex-text-primary)">' + escapeHtml(matterName) + '</span>';
     } else {
-      html += '<a href="#" onclick="navigateToMatterBreadcrumb(' + JSON.stringify(folderState.currentMatterId) + ', ' + JSON.stringify(matterName) + '); return false;" class="cursor-pointer" style="color: var(--lex-text-secondary)">' + escapeHtml(matterName) + '</a>';
+      html += '<a href="#"' + window.LanaDomActions.on('click', 'navigateToMatterBreadcrumb', [folderState.currentMatterId, matterName], { prevent: true }) + ' class="cursor-pointer" style="color: var(--lex-text-secondary)">' + escapeHtml(matterName) + '</a>';
     }
 
     folderState.currentFolderPath.forEach(function (folder, index) {
@@ -206,7 +206,7 @@
       if (index === folderState.currentFolderPath.length - 1) {
         html += '<span class="font-medium" style="color: var(--lex-text-primary)">' + escapeHtml(folder.name) + '</span>';
       } else {
-        html += '<a href="#" style="color: var(--lex-text-secondary)" onclick="navigateToFolder(' + JSON.stringify(folder.id) + ', ' + JSON.stringify(folder.name) + '); return false;">' + escapeHtml(folder.name) + '</a>';
+        html += '<a href="#" style="color: var(--lex-text-secondary)"' + window.LanaDomActions.on('click', 'navigateToFolder', [folder.id, folder.name], { prevent: true }) + '>' + escapeHtml(folder.name) + '</a>';
       }
     });
 
@@ -553,7 +553,7 @@
    */
   function folderCardHtml(folder) {
     return [
-      '<div class="lf-card" data-folder-id="' + escapeHtml(folder.id) + '" data-name="' + escapeHtml(folder.name) + '" onclick="handleFolderClick(this)">',
+      '<div class="lf-card" data-folder-id="' + escapeHtml(folder.id) + '" data-name="' + escapeHtml(folder.name) + '"' + window.LanaDomActions.on('click', 'handleFolderClick', [window.LanaDomActions.ELEMENT]) + '>',
       '  ' + folderMenuHtml(folder, 'lf-card-menu'),
       '  <div class="lf-card-body">',
       '    <svg class="lf-card-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
@@ -572,7 +572,7 @@
    */
   function folderRowHtml(folder) {
     return [
-      '<div class="lf-row" data-folder-id="' + escapeHtml(folder.id) + '" data-name="' + escapeHtml(folder.name) + '" onclick="handleFolderClick(this)">',
+      '<div class="lf-row" data-folder-id="' + escapeHtml(folder.id) + '" data-name="' + escapeHtml(folder.name) + '"' + window.LanaDomActions.on('click', 'handleFolderClick', [window.LanaDomActions.ELEMENT]) + '>',
       '  <div class="lf-row-name">',
       '    <svg class="lf-row-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
       '      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>',
@@ -1022,7 +1022,7 @@
   function folderMenuHtml(folder, className) {
     return '<lex-dropdown-btn class="' + className + '" data-folder-menu data-folder-id="' + escapeHtml(folder.id) + '"' +
       ' icon="more-vertical" icon-only variant="ghost" align="end" floating aria-label="Folder actions"' +
-      ' options="' + jsonAttr(FOLDER_ITEM_MENU) + '" onclick="event.stopPropagation()"></lex-dropdown-btn>';
+      ' options="' + jsonAttr(FOLDER_ITEM_MENU) + '"' + window.LanaDomActions.on('click', null, [], { stop: true }) + '></lex-dropdown-btn>';
   }
 
   function findFolder(folderId) {
@@ -1360,3 +1360,11 @@
   }
 
 })();
+
+// Actions named by this file's markup (js/shared/dom-actions.js).
+window.LanaDomActions.registerGlobals([
+  'handleFolderClick',
+  'navigateToFolder',
+  'navigateToMatterBreadcrumb',
+  'navigateToRoot'
+]);

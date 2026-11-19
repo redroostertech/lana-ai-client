@@ -460,6 +460,7 @@
   <script src="js/connector-viewer-tables.js"></script>
   <script src="../js/shared/connector-health-view.js"></script>
 
+  <script src="../js/shared/dom-actions.js"></script>
   <script>
     const urlParams = new URLSearchParams(window.location.search);
     const state = {
@@ -1836,7 +1837,7 @@
                 <div class="mb-4 flex items-center justify-between gap-3">
                   <div class="text-sm font-semibold text-gray-900">${escapeHtml((field.item_label_prefix || 'Base') + ' ' + (index + 1))}</div>
                   ${items.length > 1 ? `
-                    <button type="button" onclick="removeArrayFieldItem('${escapeHtml(field.name)}', ${index})" class="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50">
+                    <button type="button"${LanaDomActions.on('click', 'removeArrayFieldItem', [String(field.name), index])} class="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50">
                       Remove
                     </button>
                   ` : ''}
@@ -1861,7 +1862,7 @@
           </div>
           ${(!field.max_items || items.length < field.max_items) ? `
             <div class="mt-4">
-              <button type="button" onclick="addArrayFieldItem('${escapeHtml(field.name)}')" class="rounded-xl border border-yellow-300 bg-yellow-50 px-4 py-2 text-sm font-semibold text-yellow-800 hover:bg-yellow-100">
+              <button type="button"${LanaDomActions.on('click', 'addArrayFieldItem', [String(field.name)])} class="rounded-xl border border-yellow-300 bg-yellow-50 px-4 py-2 text-sm font-semibold text-yellow-800 hover:bg-yellow-100">
                 Add ${escapeHtml(field.item_label_prefix || 'Base')}
               </button>
             </div>
@@ -2029,8 +2030,8 @@
           Any running sync schedule will stop. You&rsquo;ll need to re-enter credentials and re-authorize to use this connector again.
           This action cannot be undone.
         </p>
-        <lex-btn data-slot="footer" variant="secondary" onclick="closeDeleteConfigModal()">Cancel</lex-btn>
-        <lex-btn data-slot="footer" id="confirmDeleteConfigBtn" variant="danger" onclick="confirmDeleteConfig()">Delete Configuration</lex-btn>
+        <lex-btn data-slot="footer" variant="secondary"${LanaDomActions.on('click', 'closeDeleteConfigModal', [])}>Cancel</lex-btn>
+        <lex-btn data-slot="footer" id="confirmDeleteConfigBtn" variant="danger"${LanaDomActions.on('click', 'confirmDeleteConfig', [])}>Delete Configuration</lex-btn>
       `;
       modal.addEventListener('lex-close', () => closeDeleteConfigModal());
       document.body.appendChild(modal);
@@ -2294,7 +2295,7 @@
             ${audienceNote ? `<p class="mt-2 max-w-3xl text-xs text-gray-500">${escapeHtml(audienceNote)}</p>` : ''}
           </div>
           ${docsUrl ? `
-            <a href="${escapeHtml(docsUrl)}" target="_blank" rel="noreferrer" class="rounded-xl border border-blue-300 bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
+            <a href="${escapeHtml(docsUrl)}" target="_blank" rel="noopener" class="rounded-xl border border-blue-300 bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
               Vendor API Docs
             </a>
           ` : ''}
@@ -2375,7 +2376,7 @@
               ` : ''}
 
               ${link && safeExternalLink(link.url) ? `
-                <a href="${escapeHtml(safeExternalLink(link.url))}" target="_blank" rel="noreferrer" class="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-blue-700 hover:text-blue-800">
+                <a href="${escapeHtml(safeExternalLink(link.url))}" target="_blank" rel="noopener" class="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-blue-700 hover:text-blue-800">
                   ${escapeHtml(link.label || 'Open link')}
                   <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
                 </a>
@@ -2386,7 +2387,7 @@
                   ${code.label ? `<div class="text-xs font-semibold uppercase tracking-wide text-gray-500">${escapeHtml(code.label)}</div>` : ''}
                   <div class="mt-1 flex items-center gap-2">
                     <code class="connector-mono break-all text-xs text-gray-900">${escapeHtml(code.value || '')}</code>
-                    <button type="button" class="shrink-0 rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-white" onclick="copyTextToClipboard('${escapeJsString(code.value || '')}')">Copy</button>
+                    <button type="button" class="shrink-0 rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-white"${LanaDomActions.on('click', 'copyTextToClipboard', [String(code.value || '')])}>Copy</button>
                   </div>
                 </div>
               ` : ''}
@@ -2545,7 +2546,7 @@
                       <p class="mb-1 text-sm font-medium text-yellow-900">Configuration Required</p>
                       <p class="text-sm text-yellow-700">This integration needs credentials or setup before LANA can sync data from it.</p>
                     </div>
-                    <button type="button" onclick="switchTab('configuration')" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+                    <button type="button"${LanaDomActions.on('click', 'switchTab', ['configuration'])} class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
                       Go to Configuration
                     </button>
                   `}
@@ -2625,9 +2626,9 @@
             <section>
               <h3 class="mb-3 text-lg font-semibold text-gray-900">Support</h3>
               <p class="mb-3 text-gray-600">${escapeHtml(documentation.support)}</p>
-              <button type="button" onclick="window.location.href='/help.html'" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+              <a href="/help.html" class="inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
                 Submit Support Ticket
-              </button>
+              </a>
             </section>
           </div>
         </div>
@@ -2675,17 +2676,17 @@
           </div>
           <div class="flex flex-wrap gap-2">
             ${isOauthConnector ? `
-              <button type="button" id="connectOAuthBtn" onclick="connectOAuthConnector()" class="rounded-xl border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
+              <button type="button" id="connectOAuthBtn"${LanaDomActions.on('click', 'connectOAuthConnector', [])} class="rounded-xl border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
                 ${oauthAuthorized ? 'Reconnect' : (configured || usingLanaManaged) ? 'Authorize' : 'Save & Authorize'}
               </button>
             ` : ''}
             ${supportsCredentialTest ? `
-              <button type="button" id="testConnectionBtn" onclick="testConnection()" class="rounded-xl border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
+              <button type="button" id="testConnectionBtn"${LanaDomActions.on('click', 'testConnection', [])} class="rounded-xl border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
                 Test Connection
               </button>
             ` : ''}
             ${configured || oauthAuthorized ? `
-              <button type="button" id="disconnectConnectorBtn" onclick="disconnectConnector()" class="rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50">
+              <button type="button" id="disconnectConnectorBtn"${LanaDomActions.on('click', 'disconnectConnector', [])} class="rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50">
                 Disconnect
               </button>
             ` : ''}
@@ -2716,7 +2717,7 @@
           <div class="rounded-xl border border-gray-200 p-4">
             <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">API Base</div>
             <div class="mt-3 break-all text-sm font-semibold text-gray-900">${escapeHtml(effectiveApiBase)}</div>
-            <div class="mt-2 text-sm text-gray-500">${docsUrl ? `<a href="${escapeHtml(docsUrl)}" target="_blank" rel="noreferrer" class="text-blue-600 hover:text-blue-700">API Documentation</a>` : 'Connector docs not provided in catalog.'}</div>
+            <div class="mt-2 text-sm text-gray-500">${docsUrl ? `<a href="${escapeHtml(docsUrl)}" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-700">API Documentation</a>` : 'Connector docs not provided in catalog.'}</div>
           </div>
         </div>
 
@@ -2759,19 +2760,19 @@
           ` : ''}
 
           <div class="flex flex-wrap gap-3 pt-2">
-            <button type="button" onclick="enterEditConfigMode()" class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+            <button type="button"${LanaDomActions.on('click', 'enterEditConfigMode', [])} class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
               Edit
             </button>
-            <button type="button" onclick="openDeleteConfigModal()" class="rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50">
+            <button type="button"${LanaDomActions.on('click', 'openDeleteConfigModal', [])} class="rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50">
               Delete
             </button>
             ${lanaAvailable && getCredentialSource() === 'firm' ? `
-              <button type="button" onclick="switchToLanaManagedCredentials()" class="rounded-xl border border-green-200 px-4 py-2 text-sm font-semibold text-green-700 hover:bg-green-50">
+              <button type="button"${LanaDomActions.on('click', 'switchToLanaManagedCredentials', [])} class="rounded-xl border border-green-200 px-4 py-2 text-sm font-semibold text-green-700 hover:bg-green-50">
                 Switch to LANA-managed
               </button>
             ` : ''}
             ${supportsCredentialTest ? `
-              <button type="button" onclick="testConnection()" class="rounded-xl border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
+              <button type="button"${LanaDomActions.on('click', 'testConnection', [])} class="rounded-xl border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
                 Test Connection
               </button>
             ` : ''}
@@ -2795,7 +2796,7 @@
                     <div class="mt-2 text-xs text-green-700">Client ID: <span class="font-mono">${escapeHtml(state.configResponse.lana_client_id)}</span></div>
                   ` : ''}
                 </div>
-                <button type="button" onclick="useOwnOAuthAppMode()" class="text-sm font-semibold text-green-800 underline hover:text-green-900">
+                <button type="button"${LanaDomActions.on('click', 'useOwnOAuthAppMode', [])} class="text-sm font-semibold text-green-800 underline hover:text-green-900">
                   Use your own OAuth app instead
                 </button>
               </div>
@@ -2809,7 +2810,7 @@
             ${lanaAvailable && state.useOwnOAuthApp ? `
               <div class="rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600">
                 Prefer zero setup? LANA-managed credentials are available for this connector.
-                <button type="button" onclick="useLanaManagedMode()" class="ml-1 font-semibold text-blue-600 underline hover:text-blue-700">Use LANA-managed credentials</button>
+                <button type="button"${LanaDomActions.on('click', 'useLanaManagedMode', [])} class="ml-1 font-semibold text-blue-600 underline hover:text-blue-700">Use LANA-managed credentials</button>
               </div>
             ` : ''}
             ${authModes.length > 1 ? `
@@ -2837,16 +2838,16 @@
 
           ${dynamicFields.map((field) => `<div id="dynamic-field-${escapeHtml(field.name)}"></div>`).join('')}
           <div class="flex flex-wrap gap-3 pt-2">
-            <button type="button" onclick="saveConfigurationAndExitEdit()" class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+            <button type="button"${LanaDomActions.on('click', 'saveConfigurationAndExitEdit', [])} class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
               Save Configuration
             </button>
             ${isConnectorConfigured() ? `
-              <button type="button" onclick="cancelEditConfigMode()" class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+              <button type="button"${LanaDomActions.on('click', 'cancelEditConfigMode', [])} class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
                 Cancel
               </button>
             ` : ''}
             ${supportsCredentialTest ? `
-              <button type="button" onclick="testConnection()" class="rounded-xl border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
+              <button type="button"${LanaDomActions.on('click', 'testConnection', [])} class="rounded-xl border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
                 Test Connection
               </button>
             ` : ''}
@@ -2948,7 +2949,7 @@
             <div class="mt-2 text-sm text-gray-500">Use this generated instance URL when registering ${escapeHtml(state.connectorName)} webhooks. Each configured connector instance gets its own endpoint.</div>
             <div class="mt-5 flex flex-wrap items-center gap-3">
               <code class="min-w-0 flex-1 break-all rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900">${escapeHtml(generatedEndpointUrl)}</code>
-              <button type="button" onclick="copyWebhookEndpointUrl()" class="rounded-xl border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
+              <button type="button"${LanaDomActions.on('click', 'copyWebhookEndpointUrl', [])} class="rounded-xl border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
                 Copy URL
               </button>
             </div>
@@ -2964,11 +2965,11 @@
             ${hasGeneratedEndpointField ? `<input type="hidden" name="webhook_endpoint_url" value="${escapeHtml(generatedEndpointUrl)}">` : ''}
             ${webhookFields.map((field) => renderField(field, currentConfig[field.name])).join('')}
             <div class="flex flex-wrap gap-3 pt-2">
-              <button type="button" onclick="saveConfiguration()" class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+              <button type="button"${LanaDomActions.on('click', 'saveConfiguration', [])} class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
                 Save Configuration
               </button>
               ${supportsCredentialTest ? `
-                <button type="button" onclick="testConnection()" class="rounded-xl border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
+                <button type="button"${LanaDomActions.on('click', 'testConnection', [])} class="rounded-xl border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
                   Test Connection
                 </button>
               ` : ''}
@@ -3087,7 +3088,7 @@
                   ${runModel.quickRanges.length ? `
                     <div class="mt-6 flex flex-wrap gap-3">
                       ${runModel.quickRanges.map((days) => `
-                        <button type="button" onclick="setDateRange(${days})" ${disabledAttr} class="rounded-xl border border-green-200 bg-white px-3 py-2 text-sm font-semibold text-green-700 hover:bg-green-100${buttonDisabledClass}">${days === 7 ? 'Last 7 days' : days === 30 ? 'Last 30 days' : days === 90 ? 'Last 90 days' : days === 180 ? 'Last 6 months' : 'Last year'}</button>
+                        <button type="button"${LanaDomActions.on('click', 'setDateRange', [days])} ${disabledAttr} class="rounded-xl border border-green-200 bg-white px-3 py-2 text-sm font-semibold text-green-700 hover:bg-green-100${buttonDisabledClass}">${days === 7 ? 'Last 7 days' : days === 30 ? 'Last 30 days' : days === 90 ? 'Last 90 days' : days === 180 ? 'Last 6 months' : 'Last year'}</button>
                       `).join('')}
                     </div>
                     <div class="mt-6 grid gap-6 md:grid-cols-2">
@@ -3113,14 +3114,14 @@
                       </summary>
                       <div class="border-t border-green-200 px-4 py-4">
                         ${runModel.optionsDescription ? `<p class="mb-4 text-xs text-gray-500">${escapeHtml(runModel.optionsDescription)}</p>` : ''}
-                        <form id="runOptionsForm" class="space-y-4" onsubmit="event.preventDefault()">
+                        <form id="runOptionsForm" class="space-y-4"${LanaDomActions.on('submit', null, [], { prevent: true })}>
                           ${runModel.options.map((option) => renderField(option, getRunOptionPrefillValue(option))).join('')}
                         </form>
                       </div>
                     </details>
                   ` : ''}
                   <div class="mt-6">
-                    <button type="button" onclick="runManualSync()" ${disabledAttr} class="rounded-xl bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700${buttonDisabledClass}">
+                    <button type="button"${LanaDomActions.on('click', 'runManualSync', [])} ${disabledAttr} class="rounded-xl bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700${buttonDisabledClass}">
                       ${escapeHtml(runModel.buttonLabel)}
                     </button>
                   </div>
@@ -3140,7 +3141,7 @@
                     <div class="connector-label">Validation Harness</div>
                     <div class="mt-2 text-sm text-gray-500">Make ad-hoc API requests against ${escapeHtml(state.connectorName)} to validate credentials, inspect payloads, or test specific endpoints.</div>
                   </div>
-                  ${docsUrl ? `<a href="${escapeHtml(docsUrl)}" target="_blank" rel="noreferrer" class="text-sm font-semibold text-blue-600 hover:text-blue-700">API Documentation</a>` : ''}
+                  ${docsUrl ? `<a href="${escapeHtml(docsUrl)}" target="_blank" rel="noopener" class="text-sm font-semibold text-blue-600 hover:text-blue-700">API Documentation</a>` : ''}
                 </div>
                 <div class="mt-8 space-y-8">
                   <div class="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
@@ -3172,10 +3173,10 @@
                   </div>
 
                   <div class="flex flex-wrap gap-3">
-                    <button type="button" onclick="executeCustomApiRequest()" ${disabledAttr} class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700${buttonDisabledClass}">
+                    <button type="button"${LanaDomActions.on('click', 'executeCustomApiRequest', [])} ${disabledAttr} class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700${buttonDisabledClass}">
                       Execute Request
                     </button>
-                    <button type="button" onclick="clearCustomApiRequest()" ${disabledAttr} class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50${buttonDisabledClass}">
+                    <button type="button"${LanaDomActions.on('click', 'clearCustomApiRequest', [])} ${disabledAttr} class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50${buttonDisabledClass}">
                       Clear
                     </button>
                   </div>
@@ -3187,7 +3188,7 @@
               <div class="rounded-2xl border border-gray-200 bg-gray-50 p-5">
                 <div class="connector-label">Validation Harness</div>
                 <div class="mt-3 text-sm text-gray-600">This connector signs requests through package hooks, so the shared ad-hoc request harness is not available yet. Save the configuration and use a manual sync as the validation path for now.</div>
-                ${docsUrl ? `<div class="mt-4"><a href="${escapeHtml(docsUrl)}" target="_blank" rel="noreferrer" class="text-sm font-semibold text-blue-600 hover:text-blue-700">API Documentation</a></div>` : ''}
+                ${docsUrl ? `<div class="mt-4"><a href="${escapeHtml(docsUrl)}" target="_blank" rel="noopener" class="text-sm font-semibold text-blue-600 hover:text-blue-700">API Documentation</a></div>` : ''}
               </div>
             ` : ''}
           </div>
@@ -3267,7 +3268,7 @@
           <div class="data-rule-row space-y-2 rounded-xl border border-gray-200 bg-gray-50 p-3" data-index="${index}" data-mode="${treatAsDataPath ? 'data' : 'indexed'}">
             <div class="flex items-start gap-2">
               <lex-select data-role="field" data-rule-index="${index}" class="flex-1 min-w-0" size="sm" searchable placeholder="Pick a field…" options="${fieldOptionsAttr}" value="${escapeHtml(fieldSelectValue)}"></lex-select>
-              <button type="button" onclick="removeDataRule(${index})" aria-label="Remove rule" class="shrink-0 rounded-lg border border-gray-200 bg-white p-2 text-gray-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600">
+              <button type="button"${LanaDomActions.on('click', 'removeDataRule', [index])} aria-label="Remove rule" class="shrink-0 rounded-lg border border-gray-200 bg-white p-2 text-gray-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
                   <path d="M18 6 6 18" /><path d="m6 6 12 12" />
                 </svg>
@@ -3452,8 +3453,7 @@
             <div class="mb-2 flex flex-wrap items-center justify-between gap-3">
               <div class="text-sm font-medium text-gray-900">${safeLabel} ${requiredMark}</div>
               <button
-                type="button"
-                onclick="discoverDynamicFieldOptions('${escapeHtml(field.name)}')"
+                type="button"${LanaDomActions.on('click', 'discoverDynamicFieldOptions', [String(field.name)])}
                 class="rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50 ${isLoading ? 'opacity-60 cursor-wait' : ''}"
                 ${isLoading ? 'disabled aria-disabled="true"' : ''}
               >
@@ -3566,13 +3566,13 @@
 
       const buttons = [];
       if (pageCount > 0) {
-        buttons.push(`<button type="button" onclick="selectPageRows()" class="rounded-lg border border-gray-300 bg-white px-2 py-1 font-semibold text-gray-700 hover:bg-gray-50">Select page (${formatNumber(pageCount)})</button>`);
+        buttons.push(`<button type="button"${LanaDomActions.on('click', 'selectPageRows', [])} class="rounded-lg border border-gray-300 bg-white px-2 py-1 font-semibold text-gray-700 hover:bg-gray-50">Select page (${formatNumber(pageCount)})</button>`);
       }
       if (canSelectAllFiltered) {
-        buttons.push(`<button type="button" onclick="selectAllFiltered()" class="rounded-lg border border-blue-300 bg-blue-50 px-2 py-1 font-semibold text-blue-700 hover:bg-blue-100">Select all filtered (${formatNumber(filteredTotal)})</button>`);
+        buttons.push(`<button type="button"${LanaDomActions.on('click', 'selectAllFiltered', [])} class="rounded-lg border border-blue-300 bg-blue-50 px-2 py-1 font-semibold text-blue-700 hover:bg-blue-100">Select all filtered (${formatNumber(filteredTotal)})</button>`);
       }
       if (hasSelection) {
-        buttons.push(`<button type="button" onclick="clearAssignSelection()" class="rounded-lg border border-gray-300 bg-white px-2 py-1 font-semibold text-gray-700 hover:bg-gray-50">Clear</button>`);
+        buttons.push(`<button type="button"${LanaDomActions.on('click', 'clearAssignSelection', [])} class="rounded-lg border border-gray-300 bg-white px-2 py-1 font-semibold text-gray-700 hover:bg-gray-50">Clear</button>`);
       }
 
       node.innerHTML = `
@@ -4031,7 +4031,7 @@
       const lines = [];
       lines.push(`
         <label class="flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-3">
-          <input id="${checkboxId}" type="checkbox" ${state.cascadeEnabled ? 'checked' : ''} onchange="setCascadeEnabled(this.checked)" class="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+          <input id="${checkboxId}" type="checkbox" ${state.cascadeEnabled ? 'checked' : ''}${LanaDomActions.on('change', 'setCascadeEnabled', [LanaDomActions.CHECKED])} class="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
           <div>
             <div class="text-sm font-medium text-gray-900">Also assign linked records</div>
             <div class="mt-1 text-xs text-gray-500">When on, assigning rows to a matter also assigns their linked records (${parentEntities.map(titleCase).join(', ')} relationships). Match counts below reflect the current selection.</div>
@@ -4049,7 +4049,7 @@
             rows.push(`
               <label class="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2">
                 <div class="flex items-start gap-3">
-                  <input type="checkbox" ${disabled ? '' : 'checked'} onchange="toggleCascadeRel('${escapeHtml(parent)}','${escapeHtml(rel.entity_type)}','', !this.checked)" class="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                  <input type="checkbox" ${disabled ? '' : 'checked'} ${LanaDomActions.on('change', 'toggleCascadeRelFromCheckbox', [String(parent), String(rel.entity_type), '', LanaDomActions.CHECKED])} class="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
                   <div>
                     <div class="text-sm text-gray-900">${escapeHtml(rel.label)}</div>
                     <div class="text-xs text-gray-500">${escapeHtml(titleCase(parent))} &rarr; ${escapeHtml(rel.entity_type)} via <code>${escapeHtml(rel.via)}</code></div>
@@ -4066,7 +4066,7 @@
                 rows.push(`
                   <label class="ml-6 flex items-center justify-between gap-3 rounded-lg border border-dashed border-gray-200 bg-white px-3 py-2">
                     <div class="flex items-start gap-3">
-                      <input type="checkbox" ${tdisabled ? '' : 'checked'} onchange="toggleCascadeRel('${escapeHtml(parent)}','${escapeHtml(rel.entity_type)}','${escapeHtml(trans.entity_type)}', !this.checked)" class="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                      <input type="checkbox" ${tdisabled ? '' : 'checked'} ${LanaDomActions.on('change', 'toggleCascadeRelFromCheckbox', [String(parent), String(rel.entity_type), String(trans.entity_type), LanaDomActions.CHECKED])} class="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
                       <div>
                         <div class="text-sm text-gray-900">${escapeHtml(trans.label)}</div>
                         <div class="text-xs text-gray-500">${escapeHtml(rel.entity_type)} &rarr; ${escapeHtml(trans.entity_type)} via <code>${escapeHtml(trans.via)}</code></div>
@@ -4437,14 +4437,14 @@
           <div class="text-xs font-medium text-gray-700">Creation strategy</div>
           <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-6">
             <label class="flex items-start gap-2 text-sm text-gray-700">
-              <input type="radio" name="assignDialogPerRow" value="single" ${oneMatterPerRow ? '' : 'checked'} onchange="setAssignDialogOneMatterPerRow(false)" class="mt-1" />
+              <input type="radio" name="assignDialogPerRow" value="single" ${oneMatterPerRow ? '' : 'checked'}${LanaDomActions.on('change', 'setAssignDialogOneMatterPerRow', [false])} class="mt-1" />
               <span>
                 <span class="font-medium">Single new matter</span>
                 <span class="block text-xs text-gray-500">All selected rows and linked records go into one matter.</span>
               </span>
             </label>
             <label class="flex items-start gap-2 text-sm text-gray-700">
-              <input type="radio" name="assignDialogPerRow" value="perRow" ${oneMatterPerRow ? 'checked' : ''} onchange="setAssignDialogOneMatterPerRow(true)" ${ctxParentRows.length > 0 ? '' : 'disabled'} />
+              <input type="radio" name="assignDialogPerRow" value="perRow" ${oneMatterPerRow ? 'checked' : ''}${LanaDomActions.on('change', 'setAssignDialogOneMatterPerRow', [true])} ${ctxParentRows.length > 0 ? '' : 'disabled'} />
               <span>
                 <span class="font-medium">One matter per selected row</span>
                 <span class="block text-xs text-gray-500">Each selected row becomes its own matter; linked records are partitioned per parent.</span>
@@ -4465,19 +4465,19 @@
       const singleCreateFieldsHtml = !oneMatterPerRow ? `
         <label class="block sm:col-span-2">
           <div class="text-xs font-medium text-gray-700">Name<span class="text-red-500">*</span></div>
-          <input type="text" value="${escapeHtml(form.name || '')}" oninput="updateAssignDialogField('name', this.value); refreshAssignDialogTotals();" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" />
+          <input type="text" value="${escapeHtml(form.name || '')}" ${LanaDomActions.on('input', 'updateAssignDialogName', [LanaDomActions.VALUE])} class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" />
         </label>
         <label class="block">
           <div class="text-xs font-medium text-gray-700">Client Name</div>
-          <input type="text" value="${escapeHtml(form.client_name || '')}" oninput="updateAssignDialogField('client_name', this.value)" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" />
+          <input type="text" value="${escapeHtml(form.client_name || '')}"${LanaDomActions.on('input', 'updateAssignDialogField', ['client_name', LanaDomActions.VALUE])} class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" />
         </label>
         <label class="block">
           <div class="text-xs font-medium text-gray-700">Case Number</div>
-          <input type="text" value="${escapeHtml(form.case_number || '')}" oninput="updateAssignDialogField('case_number', this.value)" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" />
+          <input type="text" value="${escapeHtml(form.case_number || '')}"${LanaDomActions.on('input', 'updateAssignDialogField', ['case_number', LanaDomActions.VALUE])} class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" />
         </label>
         <label class="block sm:col-span-2">
           <div class="text-xs font-medium text-gray-700">Description</div>
-          <textarea rows="2" oninput="updateAssignDialogField('description', this.value)" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">${escapeHtml(form.description || '')}</textarea>
+          <textarea rows="2"${LanaDomActions.on('input', 'updateAssignDialogField', ['description', LanaDomActions.VALUE])} class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">${escapeHtml(form.description || '')}</textarea>
         </label>` : '';
 
       const createPanelHtml = dialog.mode === 'create' ? `
@@ -4543,11 +4543,11 @@
               <div class="text-sm font-semibold text-gray-900">Target</div>
               <div class="mt-2 flex flex-wrap gap-4">
                 <label class="flex items-center gap-2 text-sm text-gray-700">
-                  <input type="radio" name="assignDialogMode" value="existing" ${dialog.mode === 'existing' ? 'checked' : ''} onchange="setAssignDialogMode('existing')" />
+                  <input type="radio" name="assignDialogMode" value="existing" ${dialog.mode === 'existing' ? 'checked' : ''}${LanaDomActions.on('change', 'setAssignDialogMode', ['existing'])} />
                   Existing matter
                 </label>
                 <label class="flex items-center gap-2 text-sm text-gray-700">
-                  <input type="radio" name="assignDialogMode" value="create" ${dialog.mode === 'create' ? 'checked' : ''} onchange="setAssignDialogMode('create')" />
+                  <input type="radio" name="assignDialogMode" value="create" ${dialog.mode === 'create' ? 'checked' : ''}${LanaDomActions.on('change', 'setAssignDialogMode', ['create'])} />
                   Create new matter
                 </label>
               </div>
@@ -4564,8 +4564,8 @@
         </div>
       `;
       modal.setFooterContent(`
-        <lex-btn variant="secondary" onclick="closeAssignDialog()">Cancel</lex-btn>
-        <lex-btn variant="primary" id="assignDialogConfirmBtn" onclick="confirmAssignDialog()" label="${escapeHtml(confirmLabel)}" ${canConfirm ? '' : 'disabled'}></lex-btn>
+        <lex-btn variant="secondary"${LanaDomActions.on('click', 'closeAssignDialog', [])}>Cancel</lex-btn>
+        <lex-btn variant="primary" id="assignDialogConfirmBtn"${LanaDomActions.on('click', 'confirmAssignDialog', [])} label="${escapeHtml(confirmLabel)}" ${canConfirm ? '' : 'disabled'}></lex-btn>
       `);
       modal.open = true;
     }
@@ -5085,7 +5085,7 @@
           const keyLabel = leadingKey == null
             ? ''
             : `<span class="text-teal-100">${escapeHtml(JSON.stringify(leadingKey))}</span><span class="text-gray-300">: </span>`;
-          lines.push(`<button type="button" onclick="prefillCorrectionFromPath('${escapeHtml(path)}')" class="block w-full text-left rounded px-2 py-0.5 text-gray-100 hover:bg-gray-800" style="${padStyle}">${keyLabel}<span class="text-emerald-100">${escapeHtml(display)}</span></button>`);
+          lines.push(`<button type="button"${LanaDomActions.on('click', 'prefillCorrectionFromPath', [String(path)])} class="block w-full text-left rounded px-2 py-0.5 text-gray-100 hover:bg-gray-800" style="${padStyle}">${keyLabel}<span class="text-emerald-100">${escapeHtml(display)}</span></button>`);
           return;
         }
         if (Array.isArray(value)) {
@@ -5231,7 +5231,7 @@
               </div>
               <div class="flex items-center gap-3">
                 <span class="text-xs text-gray-500">${escapeHtml(formatDateTime(c.created_at))}</span>
-                <button type="button" onclick="deleteRecordAnnotation('${escapeHtml(c.id)}')" class="rounded-md border border-red-200 bg-white px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50" title="Withdraw correction">
+                <button type="button"${LanaDomActions.on('click', 'deleteRecordAnnotation', [String(c.id)])} class="rounded-md border border-red-200 bg-white px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50" title="Withdraw correction">
                   Withdraw
                 </button>
               </div>
@@ -5314,7 +5314,7 @@
                 <div class="block">
                   <div class="mb-2 text-sm font-medium text-gray-900">Field</div>
                   <lex-select id="recordCorrectionFieldSelect" searchable placeholder="Select a field…" options="${lexSelectOptionsAttr(renderCorrectionFieldOptions(record))}" value=""></lex-select>
-                  <input id="recordCorrectionFieldCustom" type="text" placeholder="Custom path, e.g. address.city" oninput="updateCurrentValueDisplay()" class="mt-2 hidden w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                  <input id="recordCorrectionFieldCustom" type="text" placeholder="Custom path, e.g. address.city"${LanaDomActions.on('input', 'updateCurrentValueDisplay', [])} class="mt-2 hidden w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
                 </div>
                 <div id="recordCorrectionCurrentValueWrap" class="hidden rounded-lg border border-gray-200 bg-gray-50 p-3">
                   <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Current Value</div>
@@ -5328,7 +5328,7 @@
                   <div class="mb-2 text-sm font-medium text-gray-900">Notes</div>
                   <textarea id="recordCorrectionNotes" rows="3" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" placeholder="Why this should be corrected or reviewed"></textarea>
                 </label>
-                <button type="button" onclick="submitRecordCorrection()" class="rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600">
+                <button type="button"${LanaDomActions.on('click', 'submitRecordCorrection', [])} class="rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600">
                   Shortlist Correction
                 </button>
               </div>
@@ -5347,7 +5347,7 @@
                         <span>${renderLogStatus(annotation.annotation_type || 'note')}</span>
                         <div class="flex items-center gap-3">
                           <span class="text-xs text-gray-500">${escapeHtml(formatDateTime(annotation.created_at))}</span>
-                          <button type="button" onclick="deleteRecordAnnotation('${escapeHtml(annotation.id)}')" class="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50" title="Delete annotation">
+                          <button type="button"${LanaDomActions.on('click', 'deleteRecordAnnotation', [String(annotation.id)])} class="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50" title="Delete annotation">
                             Delete
                           </button>
                         </div>
@@ -5413,7 +5413,7 @@
         if (medium === 'calendar') targetEntity = 'calendar';
         else if (medium === 'form' || medium === 'survey' || medium === 'quiz') targetEntity = 'form';
         if (targetEntity) {
-          return `<button type="button" class="connector-mono text-xs font-semibold text-blue-600 hover:underline" onclick="filterDataPreviewToRecord('${escapeHtml(targetEntity)}','${escapeHtml(id)}')" title="Open ${escapeHtml(targetEntity)} ${escapeHtml(id)}">${escapeHtml(id)}</button>`;
+          return `<button type="button" class="connector-mono text-xs font-semibold text-blue-600 hover:underline"${LanaDomActions.on('click', 'filterDataPreviewToRecord', [String(targetEntity), String(id)])} title="Open ${escapeHtml(targetEntity)} ${escapeHtml(id)}">${escapeHtml(id)}</button>`;
         }
         return `<span class="connector-mono text-xs text-gray-700">${escapeHtml(id)}</span>`;
       };
@@ -5550,7 +5550,7 @@
       if (!panel) {
         bodyHtml = `
           <div class="mt-3 text-sm text-gray-500">Look up the records this row points back at.</div>
-          <div class="mt-3"><button type="button" onclick="refreshParentRecordsForOpenRecord()" class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Load Parents</button></div>
+          <div class="mt-3"><button type="button"${LanaDomActions.on('click', 'refreshParentRecordsForOpenRecord', [])} class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Load Parents</button></div>
         `;
       } else if (panel.loading) {
         bodyHtml = '<div class="mt-3 text-sm text-gray-500">Loading parents...</div>';
@@ -5561,7 +5561,7 @@
           const found = b.row && b.count > 0;
           const name = found ? (b.row.data && (b.row.data.name || b.row.data.title || b.row.data.firstName + ' ' + (b.row.data.lastName || '') || b.row.external_id)) : '(not synced)';
           const action = found
-            ? `<button type="button" onclick="openParentRecord('${escapeHtml(b.parent_entity_type)}','${escapeHtml(b.row.external_id || b.fk_value)}','${escapeHtml(b.row.id)}')" class="rounded-lg border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50">Open</button>`
+            ? `<button type="button"${LanaDomActions.on('click', 'openParentRecord', [String(b.parent_entity_type), String(b.row.external_id || b.fk_value), String(b.row.id)])} class="rounded-lg border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50">Open</button>`
             : `<span class="text-xs text-gray-500">id: ${escapeHtml(b.fk_value)}</span>`;
           return `
             <div class="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
@@ -5586,7 +5586,7 @@
               <div class="text-sm font-semibold text-gray-900">Parents</div>
               <div class="mt-1 text-xs text-gray-500">Records this row references via foreign keys on its own data.</div>
             </div>
-            <button type="button" onclick="refreshParentRecordsForOpenRecord()" class="rounded-lg border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50">Refresh</button>
+            <button type="button"${LanaDomActions.on('click', 'refreshParentRecordsForOpenRecord', [])} class="rounded-lg border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50">Refresh</button>
           </div>
           ${bodyHtml}
         </div>
@@ -5601,7 +5601,7 @@
       if (!panel) {
         bodyHtml = `
           <div class="mt-3 text-sm text-gray-500">Discover related rows for this record.</div>
-          <div class="mt-3"><button type="button" onclick="refreshLinkedRecordsForOpenRecord()" class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Load Linked Records</button></div>
+          <div class="mt-3"><button type="button"${LanaDomActions.on('click', 'refreshLinkedRecordsForOpenRecord', [])} class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Load Linked Records</button></div>
         `;
       } else if (panel.loading) {
         bodyHtml = '<div class="mt-3 text-sm text-gray-500">Loading linked records…</div>';
@@ -5618,7 +5618,7 @@
               </div>
               <div class="flex items-center gap-3">
                 <span class="text-sm font-semibold text-gray-900">${formatNumber(row.count)}</span>
-                <button type="button" onclick="filterToLinkedRecords('${escapeHtml(record.id)}','${escapeHtml(row.entity_type)}')" class="rounded-lg border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50">View</button>
+                <button type="button"${LanaDomActions.on('click', 'filterToLinkedRecords', [String(record.id), String(row.entity_type)])} class="rounded-lg border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50">View</button>
               </div>
             </div>
           `).join('');
@@ -5634,7 +5634,7 @@
               <div class="text-sm font-semibold text-gray-900">Linked Records</div>
               <div class="mt-1 text-xs text-gray-500">Rows in other entity types that reference this record.</div>
             </div>
-            <button type="button" onclick="refreshLinkedRecordsForOpenRecord()" class="rounded-lg border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50">Refresh</button>
+            <button type="button"${LanaDomActions.on('click', 'refreshLinkedRecordsForOpenRecord', [])} class="rounded-lg border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50">Refresh</button>
           </div>
           ${bodyHtml}
         </div>
@@ -5651,7 +5651,7 @@
           <div class="text-sm font-semibold text-gray-900">Assign To Matter</div>
           <div class="mt-1 text-xs text-gray-500">Uses the matter selected in the Bulk Actions panel. ${escapeHtml(cascadeLabel)}</div>
           <div class="mt-3 flex flex-wrap gap-2">
-            <button type="button" onclick="assignSingleRecordWithCascade('${escapeHtml(record.id)}')" class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Assign Record</button>
+            <button type="button"${LanaDomActions.on('click', 'assignSingleRecordWithCascade', [String(record.id)])} class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Assign Record</button>
           </div>
         </div>
       `;
@@ -6552,8 +6552,8 @@
     }
 
     async function openOAuthAuthorizationUrl(authUrl, { sameWindow = false } = {}) {
-      if (window.electronAPI && typeof window.electronAPI.invoke === 'function') {
-        await window.electronAPI.invoke('open-external-url', authUrl);
+      if (window.electronAPI && typeof window.electronAPI.openExternal === 'function') {
+        await window.electronAPI.openExternal(authUrl);
         startAuthorizationStatusPolling();
         return;
       }
@@ -6619,7 +6619,7 @@
     }
 
     function shouldUseElectronOAuthExchangeFlow() {
-      return Boolean(window.isElectron || window.electronAPI || window.location.protocol === 'file:');
+      return Boolean(window.isElectron || window.electronAPI || (window.location.protocol === 'file:' || window.location.protocol === 'lana-app:'));
     }
 
     async function fetchAuthorizationUrl({ force = false } = {}) {
@@ -7299,8 +7299,8 @@
         </p>
         ${dialog.createdAt ? `<p class="mt-2 text-xs text-gray-500">Created ${escapeHtml(formatDateTime(dialog.createdAt))}</p>` : ''}
         <p class="mt-2 text-sm text-gray-600">This action cannot be undone.</p>
-        <lex-btn data-slot="footer" variant="secondary" onclick="closeDeleteAnnotationModal()">Cancel</lex-btn>
-        <lex-btn data-slot="footer" id="confirmDeleteAnnotationBtn" variant="danger" onclick="confirmDeleteAnnotation()">Delete Annotation</lex-btn>
+        <lex-btn data-slot="footer" variant="secondary"${LanaDomActions.on('click', 'closeDeleteAnnotationModal', [])}>Cancel</lex-btn>
+        <lex-btn data-slot="footer" id="confirmDeleteAnnotationBtn" variant="danger"${LanaDomActions.on('click', 'confirmDeleteAnnotation', [])}>Delete Annotation</lex-btn>
       `;
       modal.addEventListener('lex-close', () => closeDeleteAnnotationModal());
       document.body.appendChild(modal);
@@ -7749,6 +7749,14 @@
     window.assignSingleRecordWithCascade = assignSingleRecordWithCascade;
     window.setCascadeEnabled = setCascadeEnabled;
     window.toggleCascadeRel = toggleCascadeRel;
+    // A cascade checkbox: checked means the relation is enabled.
+    LanaDomActions.register('toggleCascadeRelFromCheckbox', function (parentEntity, childEntity, transChild, checked) {
+      return toggleCascadeRel(parentEntity, childEntity, transChild, !checked);
+    });
+    LanaDomActions.register('updateAssignDialogName', function (value) {
+      updateAssignDialogField('name', value);
+      refreshAssignDialogTotals();
+    });
     window.refreshLinkedRecordsForOpenRecord = refreshLinkedRecordsForOpenRecord;
     window.filterToLinkedRecords = filterToLinkedRecords;
     window.closeAssignDialog = closeAssignDialog;
@@ -7768,6 +7776,55 @@
     window.discoverDynamicFieldOptions = discoverDynamicFieldOptions;
 
     init();
+
+    // Actions named by this page's markup (js/shared/dom-actions.js).
+    LanaDomActions.registerGlobals([
+      'addArrayFieldItem',
+      'assignSingleRecordWithCascade',
+      'cancelEditConfigMode',
+      'clearAssignSelection',
+      'clearCustomApiRequest',
+      'closeAssignDialog',
+      'closeDeleteAnnotationModal',
+      'closeDeleteConfigModal',
+      'confirmAssignDialog',
+      'confirmDeleteAnnotation',
+      'confirmDeleteConfig',
+      'connectOAuthConnector',
+      'copyTextToClipboard',
+      'copyWebhookEndpointUrl',
+      'deleteRecordAnnotation',
+      'disconnectConnector',
+      'discoverDynamicFieldOptions',
+      'enterEditConfigMode',
+      'executeCustomApiRequest',
+      'filterDataPreviewToRecord',
+      'filterToLinkedRecords',
+      'openDeleteConfigModal',
+      'openParentRecord',
+      'prefillCorrectionFromPath',
+      'refreshLinkedRecordsForOpenRecord',
+      'refreshParentRecordsForOpenRecord',
+      'removeArrayFieldItem',
+      'removeDataRule',
+      'runManualSync',
+      'saveConfiguration',
+      'saveConfigurationAndExitEdit',
+      'selectAllFiltered',
+      'selectPageRows',
+      'setAssignDialogMode',
+      'setAssignDialogOneMatterPerRow',
+      'setCascadeEnabled',
+      'setDateRange',
+      'submitRecordCorrection',
+      'switchTab',
+      'switchToLanaManagedCredentials',
+      'testConnection',
+      'updateAssignDialogField',
+      'updateCurrentValueDisplay',
+      'useLanaManagedMode',
+      'useOwnOAuthAppMode'
+    ]);
   </script>
 
   <script src="../js/auth-guard.js"></script>

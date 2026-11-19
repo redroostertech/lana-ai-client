@@ -83,7 +83,7 @@ const API_BASE_URL = (() => {
     ? window.LanaConfig.API_BASE_URL.trim()
     : '';
   if (configured) return configured.replace(/\/+$/, '');
-  if (window.location.protocol === 'file:') return (savedServerUrl() || 'http://localhost:8080').replace(/\/+$/, '');
+  if ((window.location.protocol === 'file:' || window.location.protocol === 'lana-app:')) return (savedServerUrl() || 'http://localhost:8080').replace(/\/+$/, '');
   return '';
 })();
 
@@ -114,7 +114,7 @@ function apiFetch(path, options = {}) {
 function clientDeckUrl(path) {
   if (!path) return window.location.href;
   const productPath = path.replace(/^\/deck-studio(?=\/|\?|$)/, '/doc-studio');
-  if (window.location.protocol !== 'file:') return productPath;
+  if ((window.location.protocol !== 'file:' && window.location.protocol !== 'lana-app:')) return productPath;
   const queryIndex = productPath.indexOf('?');
   const query = queryIndex >= 0 ? productPath.substring(queryIndex) : '';
   return `index.html${query}`;
@@ -2447,7 +2447,7 @@ async function shareCurrentPresentation() {
         confirmText: 'Done'
       });
     }
-    window.open(url, '_blank', 'noopener,noreferrer');
+    window.open(url, '_blank', 'noopener');
   } catch (error) {
     setStatus(error.message);
   } finally {

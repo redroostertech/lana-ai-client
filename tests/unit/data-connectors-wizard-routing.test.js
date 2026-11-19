@@ -24,6 +24,7 @@ function loadPage(config, withWizard) {
   win.addEventListener = () => {};
   const doc = { getElementById: () => null, querySelectorAll: () => [], addEventListener: () => {} };
   // eslint-disable-next-line no-new-func
+  new Function('window', read('js/shared/dom-actions.js'))(win);
   new Function('window', 'document', 'ConnectorRegistry', 'Connectors', 'api', 'Lex', read('js/data_connectors.js'))(
     win, doc, win.ConnectorRegistry, {}, {}, win.Lex
   );

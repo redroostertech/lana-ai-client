@@ -187,29 +187,6 @@
     ).map(normalizeMentionUser);
   }
 
-  // Escape a string for safe inclusion inside a single-quoted JS string literal
-  // that itself lives in an HTML double-quoted attribute (e.g. onclick="..."
-  // where args are wrapped in '...'). NO regex — per LEX-COMPONENT-RULES.
-  function escapeJsForHtmlAttr(text) {
-    if (text === null || text === undefined) return '';
-    var str = String(text);
-    var result = '';
-    for (var i = 0; i < str.length; i++) {
-      var ch = str[i];
-      if (ch === '\\') result += '\\\\';
-      else if (ch === "'") result += "\\'";
-      else if (ch === '"') result += '&quot;'; // safe inside double-quoted attr
-      else if (ch === '&') result += '&amp;';
-      else if (ch === '<') result += '&lt;';
-      else if (ch === '>') result += '&gt;';
-      else if (ch === '\n') result += '\\n';
-      else if (ch === '\r') result += '\\r';
-      else if (ch === '\t') result += '\\t';
-      else result += ch;
-    }
-    return result;
-  }
-
   function formatDate(dateStr) {
     if (!dateStr) return 'N/A';
     var date = parseApiUtcDate(dateStr);
@@ -268,7 +245,7 @@
     var lastInitial = (person.last_name || '')[0] || '';
     var label = firstName + (lastInitial ? ' ' + lastInitial + '.' : '');
     var initial = (firstName[0] || 'U');
-    return '<button onclick="showSharedUserInfo(' + index + ')" class="inline-flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-full text-xs font-medium cursor-pointer transition-all hover:shadow-sm lex-bg-accent-muted lex-text-accent">' +
+    return '<button' + window.LanaDomActions.on('click', 'showSharedUserInfo', [index]) + ' class="inline-flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-full text-xs font-medium cursor-pointer transition-all hover:shadow-sm lex-bg-accent-muted lex-text-accent">' +
       '<span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white lex-bg-accent">' + initial + '</span>' +
       escapeHtml(label) +
     '</button>';
@@ -330,7 +307,7 @@
     var actions = options.actions || '';
 
     return '<div class="mb-4" id="section-' + sectionId + '">' +
-      '<button onclick="toggleSection(\'' + sectionId + '\')" class="w-full flex items-center justify-between py-2 text-left group">' +
+      '<button' + window.LanaDomActions.on('click', 'toggleSection', [String(sectionId)]) + ' class="w-full flex items-center justify-between py-2 text-left group">' +
         '<div class="flex items-center gap-2">' +
           '<svg class="w-4 h-4 text-gray-400 transition-transform ' + (isExpanded ? 'rotate-90' : '') + '" id="chevron-' + sectionId + '" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
             '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>' +
@@ -1158,7 +1135,7 @@
     var descriptionBlock = '<div class="pb-2.5 mb-2.5 border-b border-gray-100">' +
         '<div class="flex items-center justify-between gap-3 mb-1.5">' +
           '<span class="text-gray-500">Description</span>' +
-          '<button type="button" onclick="openMatterDescriptionEditor()" class="text-xs font-medium lex-text-accent hover:underline">Edit</button>' +
+          '<button type="button"' + window.LanaDomActions.on('click', 'openMatterDescriptionEditor', []) + ' class="text-xs font-medium lex-text-accent hover:underline">Edit</button>' +
         '</div>' +
         (descriptionText
           ? '<p class="text-gray-900" style="white-space:pre-wrap;line-height:1.5;margin:0;">' + escapeHtml(descriptionText) + '</p>'
@@ -1231,7 +1208,7 @@
         html += buildUserChip(permissions[si], si);
       }
       if (permissions.length > 3) {
-        html += '<button onclick="openSharedWithDrawer()" class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium cursor-pointer lex-bg-neutral lex-text-neutral transition-all hover:shadow-sm">+' + (permissions.length - 3) + ' more</button>';
+        html += '<button' + window.LanaDomActions.on('click', 'openSharedWithDrawer', []) + ' class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium cursor-pointer lex-bg-neutral lex-text-neutral transition-all hover:shadow-sm">+' + (permissions.length - 3) + ' more</button>';
       }
       html += '</div>';
     } else {
@@ -1599,7 +1576,7 @@
     var lastInitial = (contact.last_name || '')[0] || '';
     var label = firstName + (lastInitial ? ' ' + lastInitial + '.' : '');
     var initial = (firstName[0] || 'C');
-    return '<button onclick="openContactDetail(\'' + contact.id + '\', \'' + matterId + '\')" class="inline-flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-full text-xs font-medium cursor-pointer transition-all hover:shadow-sm" style="background: var(--lex-color-blue-50, #eff6ff); color: var(--lex-color-blue-700, #1d4ed8)">' +
+    return '<button' + window.LanaDomActions.on('click', 'openContactDetail', [String(contact.id), String(matterId)]) + ' class="inline-flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-full text-xs font-medium cursor-pointer transition-all hover:shadow-sm" style="background: var(--lex-color-blue-50, #eff6ff); color: var(--lex-color-blue-700, #1d4ed8)">' +
       '<span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white" style="background: var(--lex-color-blue-600, #2563eb)">' + initial + '</span>' +
       escapeHtml(label) +
     '</button>';
@@ -1620,7 +1597,7 @@
     var name = link.linked_name || 'Unknown';
     var linkedId = link.linked_entity_id || '';
     var initial = (name[0] || 'M');
-    return '<button onclick="navigateToMatter(\'' + linkedId + '\')" class="inline-flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-full text-xs font-medium cursor-pointer transition-all hover:shadow-sm" style="background: var(--lex-color-green-50, #f0fdf4); color: var(--lex-color-green-700, #15803d)">' +
+    return '<button' + window.LanaDomActions.on('click', 'navigateToMatter', [String(linkedId)]) + ' class="inline-flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-full text-xs font-medium cursor-pointer transition-all hover:shadow-sm" style="background: var(--lex-color-green-50, #f0fdf4); color: var(--lex-color-green-700, #15803d)">' +
       '<span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white" style="background: var(--lex-color-green-600, #16a34a)">' + initial + '</span>' +
       escapeHtml(name) +
     '</button>';
@@ -1681,7 +1658,7 @@
           html += buildLinkedMatterChip(allLinks[si]);
         }
         if (allLinks.length > 3) {
-          html += '<button onclick="openLinkedMattersDrawer()" class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium cursor-pointer lex-bg-neutral lex-text-neutral transition-all hover:shadow-sm">+' + (allLinks.length - 3) + ' more</button>';
+          html += '<button' + window.LanaDomActions.on('click', 'openLinkedMattersDrawer', []) + ' class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium cursor-pointer lex-bg-neutral lex-text-neutral transition-all hover:shadow-sm">+' + (allLinks.length - 3) + ' more</button>';
         }
         html += '</div>';
       }
@@ -1730,7 +1707,7 @@
         var c = contacts[i];
         var name = c.display_name || ((c.first_name || '') + ' ' + (c.last_name || '')).trim() || 'Unknown';
         var initial = (c.first_name || name)[0] || 'C';
-        html += '<button onclick="openContactDetail(\'' + c.id + '\', \'' + matterId + '\')" class="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 text-left transition-colors">' +
+        html += '<button' + window.LanaDomActions.on('click', 'openContactDetail', [String(c.id), String(matterId)]) + ' class="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 text-left transition-colors">' +
           '<div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style="background: var(--lex-color-blue-600, #2563eb)">' + initial + '</div>' +
           '<div class="flex-1 min-w-0">' +
             '<p class="text-sm text-gray-900 truncate font-medium">' + escapeHtml(name) + '</p>' +
@@ -1770,7 +1747,7 @@
         var linkedId = link.linked_entity_id || '';
         var initial = (name[0] || 'M');
         var typeLabel = link.link_type ? link.link_type.split('_').join(' ') : '';
-        html += '<button onclick="navigateToMatter(\'' + linkedId + '\')" class="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 text-left transition-colors">' +
+        html += '<button' + window.LanaDomActions.on('click', 'navigateToMatter', [String(linkedId)]) + ' class="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 text-left transition-colors">' +
           '<div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style="background: var(--lex-color-green-600, #16a34a)">' + initial + '</div>' +
           '<div class="flex-1 min-w-0">' +
             '<p class="text-sm text-gray-900 truncate font-medium">' + escapeHtml(name) + '</p>' +
@@ -3637,7 +3614,7 @@
       Lex.Toast.error('This Doc Studio preview link is not one LANA can open safely. Open the document from Doc Studio instead.');
       return;
     }
-    window.open(safeUrl, '_blank', 'noopener,noreferrer');
+    window.open(safeUrl, '_blank', 'noopener');
   }
 
   function buildDocStudioDocumentRequest(format, style, title, prompt, matterContext) {
@@ -4171,18 +4148,13 @@
       : '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>';
     var pinColor = isPinned ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-400 hover:text-yellow-600';
 
-    // Safe attribute payload for the kebab. The ConversationActionsModal
-    // implements rename/archive/delete-permanent through the canonical
-    // conversation API. The title comes from user input so it MUST be escaped
-    // for both HTML-attribute context and JS-string-literal context.
-    var matterAttr = matterId ? "'" + escapeJsForHtmlAttr(matterId) + "'" : 'null';
-    var convIdAttr = escapeJsForHtmlAttr(conversationId);
-    var titleAttr = escapeJsForHtmlAttr(rawTitle);
-    var kebabOnClick = "event.stopPropagation(); " +
-      "if (typeof window.openConversationActionsModal === 'function') { " +
-      "window.openConversationActionsModal('" + convIdAttr + "', '" + titleAttr + "', " + matterAttr + ", " + (isPinned ? 'true' : 'false') + "); }";
+    // The kebab opens ConversationActionsModal (rename/archive/delete through
+    // the canonical conversation API). The title comes from user input; it
+    // travels as JSON data in the action's arguments, never as script.
+    var kebabAction = window.LanaDomActions.on('click', 'openConversationActionsModal',
+      [String(conversationId), String(rawTitle == null ? '' : rawTitle), matterId ? String(matterId) : null, Boolean(isPinned)], { stop: true });
 
-    return '<div data-thread-id="' + escapeHtml(conversationId) + '" onclick="NavigationHelpers.navigateToConversation(\'' + conversationId + '\', \'' + matterId + '\')" class="block bg-white border border-gray-200 hover:lex-border-accent hover:shadow-sm rounded-lg p-4 transition-all group cursor-pointer">' +
+    return '<div data-thread-id="' + escapeHtml(conversationId) + '"' + window.LanaDomActions.on('click', 'NavigationHelpers.navigateToConversation', [String(conversationId), String(matterId)]) + ' class="block bg-white border border-gray-200 hover:lex-border-accent hover:shadow-sm rounded-lg p-4 transition-all group cursor-pointer">' +
       '<div class="flex items-start gap-3">' +
         '<div class="w-10 h-10 bg-gradient-to-br lex-bg-accent rounded-lg flex items-center justify-center flex-shrink-0">' +
           '<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
@@ -4196,10 +4168,10 @@
             msgCount +
           '</p>' +
         '</div>' +
-        '<button type="button" onclick="event.stopPropagation(); toggleConversationPin(\'' + matterId + '\', \'' + conversationId + '\', ' + (isPinned ? 'true' : 'false') + ')" class="' + pinColor + ' transition-colors flex-shrink-0 p-1" title="' + pinTitle + '" aria-label="' + pinTitle + '">' +
+        '<button type="button"' + window.LanaDomActions.on('click', 'toggleConversationPin', [String(matterId), String(conversationId), Boolean(isPinned)], { stop: true }) + ' class="' + pinColor + ' transition-colors flex-shrink-0 p-1" title="' + pinTitle + '" aria-label="' + pinTitle + '">' +
           pinSvg +
         '</button>' +
-        '<button type="button" onclick="' + kebabOnClick + '" class="text-gray-400 hover:text-gray-700 transition-colors flex-shrink-0 p-1 rounded hover:bg-gray-100" title="More actions — rename, archive, delete" aria-label="Conversation actions">' +
+        '<button type="button"' + kebabAction + ' class="text-gray-400 hover:text-gray-700 transition-colors flex-shrink-0 p-1 rounded hover:bg-gray-100" title="More actions — rename, archive, delete" aria-label="Conversation actions">' +
           '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
             '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>' +
           '</svg>' +
@@ -4292,7 +4264,7 @@
       '<div class="space-y-4">' +
         '<div class="flex items-center justify-between">' +
           '<p class="text-sm text-gray-500">' + total + ' conversation' + (total !== 1 ? 's' : '') + '</p>' +
-          '<button onclick="createMatterConversation(\'' + matter.matter_id + '\')" class="inline-flex items-center gap-2 px-3 py-1.5 lex-bg-accent hover:lex-bg-accent text-white text-sm rounded-lg font-medium">' +
+          '<button' + window.LanaDomActions.on('click', 'createMatterConversation', [String(matter.matter_id)]) + ' class="inline-flex items-center gap-2 px-3 py-1.5 lex-bg-accent hover:lex-bg-accent text-white text-sm rounded-lg font-medium">' +
             '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
               '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>' +
             '</svg>' +
@@ -5322,7 +5294,7 @@
             '<p class="text-sm text-gray-500">' + lanaCount + ' LANA tasks, ' + externalCount + ' external tasks</p>' +
           '</div>' +
           '<div class="flex flex-wrap gap-2">' +
-            '<button onclick="openCreateTaskModal(\'' + matterId + '\')" class="px-4 py-2 lex-bg-accent text-white rounded-lg hover:lex-bg-accent transition-colors text-sm font-medium flex items-center gap-2">' +
+            '<button' + window.LanaDomActions.on('click', 'openCreateTaskModal', [String(matterId)]) + ' class="px-4 py-2 lex-bg-accent text-white rounded-lg hover:lex-bg-accent transition-colors text-sm font-medium flex items-center gap-2">' +
               '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>' +
               'Create Task' +
             '</button>' +
@@ -5365,11 +5337,11 @@
 
     var paginationHtml = totalPages > 1
       ? '<div class="bg-white border-2 border-t-0 ' + borderClass + ' rounded-b-lg px-3 py-2 flex items-center justify-between text-xs">' +
-          '<button onclick="changeKanbanPage(\'' + status + '\', ' + (pagination.page - 1) + ')" class="px-2 py-1 rounded ' + (hasPrevious ? 'lex-text-accent hover:bg-gray-50' : 'text-gray-300 cursor-not-allowed') + '" ' + (!hasPrevious ? 'disabled' : '') + '>' +
+          '<button' + window.LanaDomActions.on('click', 'changeKanbanPage', [String(status), (pagination.page - 1)]) + ' class="px-2 py-1 rounded ' + (hasPrevious ? 'lex-text-accent hover:bg-gray-50' : 'text-gray-300 cursor-not-allowed') + '" ' + (!hasPrevious ? 'disabled' : '') + '>' +
             '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>' +
           '</button>' +
           '<span class="text-gray-600">Page ' + formatNumber(pagination.page) + ' of ' + formatNumber(totalPages) + '</span>' +
-          '<button onclick="changeKanbanPage(\'' + status + '\', ' + (pagination.page + 1) + ')" class="px-2 py-1 rounded ' + (hasMore ? 'lex-text-accent hover:bg-gray-50' : 'text-gray-300 cursor-not-allowed') + '" ' + (!hasMore ? 'disabled' : '') + '>' +
+          '<button' + window.LanaDomActions.on('click', 'changeKanbanPage', [String(status), (pagination.page + 1)]) + ' class="px-2 py-1 rounded ' + (hasMore ? 'lex-text-accent hover:bg-gray-50' : 'text-gray-300 cursor-not-allowed') + '" ' + (!hasMore ? 'disabled' : '') + '>' +
             '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>' +
           '</button>' +
         '</div>'
@@ -5382,7 +5354,7 @@
           '<span class="px-2 py-0.5 text-xs font-medium ' + textClass + ' bg-white rounded-full">' + tasks.length + '</span>' +
         '</div>' +
       '</div>' +
-      '<div class="flex-1 bg-gray-50 border-x-2 border-b-2 ' + borderClass + ' rounded-b-lg overflow-y-auto p-3 space-y-3" data-status="' + status + '" ondrop="handleKanbanDrop(event, \'' + status + '\')" ondragover="handleKanbanDragOver(event)" ondragleave="handleKanbanDragLeave(event)">' +
+      '<div class="flex-1 bg-gray-50 border-x-2 border-b-2 ' + borderClass + ' rounded-b-lg overflow-y-auto p-3 space-y-3" data-status="' + status + '"' + window.LanaDomActions.on('drop', 'handleKanbanDrop', [window.LanaDomActions.EVENT, String(status)]) + '' + window.LanaDomActions.on('dragover', 'handleKanbanDragOver', [window.LanaDomActions.EVENT]) + '' + window.LanaDomActions.on('dragleave', 'handleKanbanDragLeave', [window.LanaDomActions.EVENT]) + '>' +
         taskCardsHtml +
       '</div>' +
       paginationHtml +
@@ -5416,7 +5388,7 @@
   // The "..." menu shown on hover over a LANA task card.
   function _kanbanTaskMenuHtml(task) {
     var items = LanaBoardWorkItems.taskMenuItems(task);
-    return '<div class="kanban-card__menu" onclick="event.stopPropagation()">' +
+    return '<div class="kanban-card__menu"' + window.LanaDomActions.on('click', null, [], { stop: true }) + '>' +
       '<lex-dropdown-btn floating icon="more-horizontal" icon-only variant="ghost" align="end" aria-label="Task actions"' +
         ' data-board-task-menu="' + escapeHtml(String(task.id)) + '" options="' + escapeHtml(JSON.stringify(items)) + '"></lex-dropdown-btn>' +
     '</div>';
@@ -5424,7 +5396,7 @@
 
   function _kanbanSubtaskMenuHtml(item) {
     var items = LanaBoardWorkItems.subtaskMenuItems(item);
-    return '<div class="kanban-card__menu" onclick="event.stopPropagation()">' +
+    return '<div class="kanban-card__menu"' + window.LanaDomActions.on('click', null, [], { stop: true }) + '>' +
       '<lex-dropdown-btn floating icon="more-horizontal" icon-only variant="ghost" align="end" aria-label="Subtask actions"' +
         ' data-board-subtask-menu="' + escapeHtml(item.id) + '" data-parent-task-id="' + escapeHtml(item.parent_id) + '"' +
         ' options="' + escapeHtml(JSON.stringify(items)) + '"></lex-dropdown-btn>' +
@@ -5437,7 +5409,7 @@
       ? '<div class="flex items-center gap-1 text-xs text-gray-500 mt-2">' + formatDueDate(item.due_date) + '</div>'
       : '';
     return '<div class="kanban-card kanban-card--has-menu bg-white border border-gray-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-all cursor-move" draggable="true" ' + dataAttr +
-      ' ondragstart="handleKanbanDragStart(event)" ondragend="handleKanbanDragEnd(event)" onclick="openTaskQuickView(\'' + escapeHtml(item.parent_id) + '\')">' +
+      '' + window.LanaDomActions.on('dragstart', 'handleKanbanDragStart', [window.LanaDomActions.EVENT]) + '' + window.LanaDomActions.on('dragend', 'handleKanbanDragEnd', [window.LanaDomActions.EVENT]) + '' + window.LanaDomActions.on('click', 'openTaskQuickView', [String(item.parent_id)]) + '>' +
       _kanbanSubtaskMenuHtml(item) +
       _kanbanTitleHtml(item.title) +
       _kanbanCapsulesHtml('Subtask', item.priority || 'normal') +
@@ -5476,7 +5448,7 @@
     var taskDataAttr = 'data-task-id="' + task.id + '" data-task-status="' + escapeHtml(task.status) + '"';
 
     var hasMenu = isLana && task.editable !== false;
-    return '<div class="kanban-card' + (hasMenu ? ' kanban-card--has-menu' : '') + ' bg-white border border-gray-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-all ' + (isLana ? 'cursor-move' : 'cursor-default') + '" draggable="' + isLana + '" ' + taskDataAttr + ' ondragstart="handleKanbanDragStart(event)" ondragend="handleKanbanDragEnd(event)" onclick="openTaskQuickView(\'' + task.id + '\')">' +
+    return '<div class="kanban-card' + (hasMenu ? ' kanban-card--has-menu' : '') + ' bg-white border border-gray-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-all ' + (isLana ? 'cursor-move' : 'cursor-default') + '" draggable="' + isLana + '" ' + taskDataAttr + '' + window.LanaDomActions.on('dragstart', 'handleKanbanDragStart', [window.LanaDomActions.EVENT]) + '' + window.LanaDomActions.on('dragend', 'handleKanbanDragEnd', [window.LanaDomActions.EVENT]) + '' + window.LanaDomActions.on('click', 'openTaskQuickView', [String(task.id)]) + '>' +
       (hasMenu ? _kanbanTaskMenuHtml(task) : '') +
       _kanbanTitleHtml(task.title || task.task_name || '') +
       _kanbanCapsulesHtml(isLana ? 'Task' : '', task.priority || 'normal', externalBadge) +
@@ -5763,7 +5735,7 @@
         '<div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">' +
           '<div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">' +
             '<h3 class="text-lg font-semibold text-gray-900">' + title + '</h3>' +
-            '<button onclick="closeTaskReadonlyModal()" class="text-gray-400 hover:text-gray-600">' +
+            '<button' + window.LanaDomActions.on('click', 'closeTaskReadonlyModal', []) + ' class="text-gray-400 hover:text-gray-600">' +
               '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>' +
             '</button>' +
           '</div>' +
@@ -5779,7 +5751,7 @@
             notesHtml +
           '</div>' +
           '<div class="px-6 py-4 border-t border-gray-200 flex justify-end">' +
-            '<button onclick="closeTaskReadonlyModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors">Close</button>' +
+            '<button' + window.LanaDomActions.on('click', 'closeTaskReadonlyModal', []) + ' class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors">Close</button>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -6053,11 +6025,11 @@
           '</div>' +
           connectorNote +
           '<div class="flex justify-end gap-3 pt-6 border-t border-gray-200">' +
-            '<button onclick="confirmDeleteContact(\'' + escapeHtml(contact.id) + '\', \'' + escapeHtml(displayName) + '\')" class="px-4 py-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg font-medium transition-colors flex items-center gap-2">' +
+            '<button' + window.LanaDomActions.on('click', 'confirmDeleteContact', [String(contact.id), String(displayName)]) + ' class="px-4 py-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg font-medium transition-colors flex items-center gap-2">' +
               '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>' +
               'Delete Contact' +
             '</button>' +
-            '<button onclick="openEditContactModal(\'' + escapeHtml(contact.id) + '\')" class="px-4 py-2 lex-bg-accent hover:lex-bg-accent text-white rounded-lg font-medium transition-colors flex items-center gap-2">' +
+            '<button' + window.LanaDomActions.on('click', 'openEditContactModal', [String(contact.id)]) + ' class="px-4 py-2 lex-bg-accent hover:lex-bg-accent text-white rounded-lg font-medium transition-colors flex items-center gap-2">' +
               '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>' +
               'Edit Contact' +
             '</button>' +
@@ -6276,10 +6248,10 @@
     if (isWorkspace) {
       linkedMattersActions =
         '<div class="flex items-center gap-1">' +
-          '<button onclick="openCreateLinkModal(\'' + matter.matter_id + '\', true)" class="inline-flex items-center justify-center w-6 h-6 text-white rounded lex-bg-accent hover:lex-bg-accent transition-colors" title="Link Existing Matter">' +
+          '<button' + window.LanaDomActions.on('click', 'openCreateLinkModal', [String(matter.matter_id), true]) + ' class="inline-flex items-center justify-center w-6 h-6 text-white rounded lex-bg-accent hover:lex-bg-accent transition-colors" title="Link Existing Matter">' +
             '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>' +
           '</button>' +
-          '<button onclick="openCreateMatterDrawer(\'' + matter.matter_id + '\')" class="inline-flex items-center justify-center w-6 h-6 text-white rounded lex-bg-accent hover:lex-bg-accent transition-colors" title="Create New Matter">' +
+          '<button' + window.LanaDomActions.on('click', 'openCreateMatterDrawer', [String(matter.matter_id)]) + ' class="inline-flex items-center justify-center w-6 h-6 text-white rounded lex-bg-accent hover:lex-bg-accent transition-colors" title="Create New Matter">' +
             '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>' +
           '</button>' +
         '</div>';
@@ -6290,11 +6262,11 @@
       if (isWorkspace) {
         emptyContent +=
           '<div class="flex items-center justify-center gap-2 pb-2">' +
-            '<button onclick="openCreateLinkModal(\'' + matter.matter_id + '\', true)" class="px-3 py-1.5 lex-bg-accent hover:lex-bg-accent text-white text-xs font-medium rounded-lg transition-colors flex items-center gap-1">' +
+            '<button' + window.LanaDomActions.on('click', 'openCreateLinkModal', [String(matter.matter_id), true]) + ' class="px-3 py-1.5 lex-bg-accent hover:lex-bg-accent text-white text-xs font-medium rounded-lg transition-colors flex items-center gap-1">' +
               '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>' +
               'Link Matter' +
             '</button>' +
-            '<button onclick="openCreateMatterDrawer(\'' + matter.matter_id + '\')" class="px-3 py-1.5 lex-bg-accent hover:lex-bg-accent text-white text-xs font-medium rounded-lg transition-colors flex items-center gap-1">' +
+            '<button' + window.LanaDomActions.on('click', 'openCreateMatterDrawer', [String(matter.matter_id)]) + ' class="px-3 py-1.5 lex-bg-accent hover:lex-bg-accent text-white text-xs font-medium rounded-lg transition-colors flex items-center gap-1">' +
               '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>' +
               'New Matter' +
             '</button>' +
@@ -6389,7 +6361,7 @@
       : '';
 
     var actionBtn = canDelete
-      ? '<button onclick="deleteLinkConfirm(\'' + escapeHtml(linkId) + '\', \'' + escapeHtml(linkedName) + '\')" class="flex-shrink-0 text-red-500 hover:text-red-700 p-1 rounded transition-colors" title="Remove link">' +
+      ? '<button' + window.LanaDomActions.on('click', 'deleteLinkConfirm', [String(linkId), String(linkedName)]) + ' class="flex-shrink-0 text-red-500 hover:text-red-700 p-1 rounded transition-colors" title="Remove link">' +
           '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>' +
         '</button>'
       : '<span class="flex-shrink-0 text-gray-300 p-1" title="' + (isReadOnly ? 'System-generated link' : 'Link ID missing') + '">' +
@@ -6398,7 +6370,7 @@
 
     return '<div class="bg-white border border-gray-200 hover:lex-border-accent rounded-lg p-2 flex items-center justify-between gap-2 transition-all">' +
       '<div class="flex-1 min-w-0">' +
-        '<button onclick="refreshCurrentMatter()" class="text-xs font-medium lex-text-accent hover:lex-text-accent truncate block">' + escapeHtml(linkedName) + '</button>' +
+        '<button' + window.LanaDomActions.on('click', 'refreshCurrentMatter', []) + ' class="text-xs font-medium lex-text-accent hover:lex-text-accent truncate block">' + escapeHtml(linkedName) + '</button>' +
         '<span class="text-xs text-gray-400 font-mono">' + escapeHtml(linkedId || '') + '</span>' +
         metaLine +
       '</div>' +
@@ -6799,8 +6771,6 @@
     var clientName = matter.client_name || (matter.client && matter.client.name) || '';
     var matterName = matter.name || matter.matter_name || 'Untitled Matter';
     var status = matter.status || 'Active';
-    // Escape single quotes in name for onclick attribute: no regex — use split/join
-    var safeName = matterName.split("'").join('&apos;');
 
     var pinIcon = isPinned
       ? '<svg class="w-4 h-4 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>'
@@ -6808,7 +6778,7 @@
 
     var statusClass = status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700';
 
-    return '<button type="button" onclick="selectLinkMatter(\'' + escapeHtml(matter.matter_id) + '\', \'' + safeName + '\', \'' + escapeHtml(matter.matter_type) + '\')" class="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 transition-colors">' +
+    return '<button type="button"' + window.LanaDomActions.on('click', 'selectLinkMatter', [String(matter.matter_id), String(matterName), String(matter.matter_type)]) + ' class="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 transition-colors">' +
       '<div class="flex items-start gap-2">' +
         pinIcon +
         '<div class="flex-1 min-w-0">' +
@@ -7463,7 +7433,7 @@
             'value="' + escapeAttr(item.title || '') + '" ' +
             'style="flex:1;">' +
           '</lex-input>' +
-          '<button type="button" onclick="removeTaskPlanItem(' + idx + ')" ' +
+          '<button type="button"' + window.LanaDomActions.on('click', 'removeTaskPlanItem', [idx]) + ' ' +
             'class="p-2 text-gray-400 hover:text-red-600 transition-colors" title="Remove item">' +
             '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
               '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>' +
@@ -8116,7 +8086,7 @@
           '<p class="text-xs text-gray-500 mt-1">' + escapeHtml(subtitle) + '</p>' +
           '<p class="text-xs text-gray-400 mt-1">ID: ' + escapeHtml(item.external_id || '') + '</p>' +
         '</div>' +
-        '<button onclick="linkConnectorData(\'' + escapeHtml(item.id) + '\')" ' +
+        '<button' + window.LanaDomActions.on('click', 'linkConnectorData', [String(item.id)]) + ' ' +
           'class="ml-4 flex-shrink-0 inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white lex-bg-accent hover:lex-bg-accent focus:outline-none focus:ring-2 focus:ring-offset-2 lex-ring-focus">' +
           '<svg class="-ml-0.5 mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
             '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>' +
@@ -8574,7 +8544,7 @@
             '<label class="block text-xs font-medium text-gray-700 mb-1">Dropdown Options (comma-separated)</label>' +
             '<input type="text" value="' + escapeHtml(optionsJoined) + '"' +
               (lockProps ? ' readonly' : '') +
-              ' onchange="updateFieldDefinition(' + i + ', \'options\', this.value.split(\',\').map(function(s){return s.trim();}).filter(function(s){return s;}))"' +
+              window.LanaDomActions.on('change', 'updateFieldOptions', [i, window.LanaDomActions.VALUE]) +
               ' placeholder="e.g., Active, Pending, Closed"' +
               ' class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus" />' +
           '</div>';
@@ -8588,7 +8558,7 @@
               '<label class="block text-xs font-medium text-gray-700 mb-1">Field Key</label>' +
               '<input type="text" value="' + escapeHtml(def.key || '') + '"' +
                 (def.id ? ' readonly title="A saved field key cannot change"' : '') +
-                ' onchange="updateFieldDefinition(' + i + ', \'key\', this.value)"' +
+                '' + window.LanaDomActions.on('change', 'updateFieldDefinition', [i, 'key', window.LanaDomActions.VALUE]) + '' +
                 ' placeholder="e.g., case_number"' +
                 ' class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus" />' +
             '</div>' +
@@ -8596,7 +8566,7 @@
               '<label class="block text-xs font-medium text-gray-700 mb-1">Display Name</label>' +
               '<input type="text" value="' + escapeHtml(def.display_name || '') + '"' +
                 (lockProps ? ' readonly' : '') +
-                ' onchange="updateFieldDefinition(' + i + ', \'display_name\', this.value)"' +
+                '' + window.LanaDomActions.on('change', 'updateFieldDefinition', [i, 'display_name', window.LanaDomActions.VALUE]) + '' +
                 ' placeholder="e.g., Case Number"' +
                 ' class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus" />' +
             '</div>' +
@@ -8612,13 +8582,13 @@
               '<label class="flex items-center px-3 py-2">' +
                 '<input type="checkbox"' + (def.required ? ' checked' : '') +
                   (lockProps ? ' disabled' : '') +
-                  ' onchange="updateFieldDefinition(' + i + ', \'required\', this.checked)"' +
+                  '' + window.LanaDomActions.on('change', 'updateFieldDefinition', [i, 'required', window.LanaDomActions.CHECKED]) + '' +
                   ' class="rounded border-gray-300 lex-text-accent lex-ring-focus" />' +
                 '<span class="ml-2 text-sm text-gray-700">Yes</span>' +
               '</label>' +
             '</div>' +
             '<div class="col-span-1 flex items-end">' +
-              '<button onclick="removeCustomField(' + i + ')"' +
+              '<button' + window.LanaDomActions.on('click', 'removeCustomField', [i]) + '' +
                 ' class="p-2 text-red-600 hover:text-red-800 hover:bg-red-100 rounded-md transition-colors" title="Remove field">' +
                 '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
                   '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>' +
@@ -8658,7 +8628,7 @@
     switch (def.type) {
       case 'number':
         return '<input type="number" value="' + escapeHtml(currentValue || '') + '"' +
-          ' onchange="updateFieldValue(\'' + key + '\', this.value)"' +
+          '' + window.LanaDomActions.on('change', 'updateFieldValue', [String(def.key || ''), window.LanaDomActions.VALUE]) + '' +
           ' placeholder="' + escapeHtml(LanaMatterFields.placeholderFor(def)) + '"' +
           ' class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus" />';
 
@@ -8668,20 +8638,20 @@
             '<span class="text-gray-500 sm:text-sm">$</span>' +
           '</div>' +
           '<input type="number" step="0.01" value="' + escapeHtml(currentValue || '') + '"' +
-            ' onchange="updateFieldValue(\'' + key + '\', this.value)"' +
+            '' + window.LanaDomActions.on('change', 'updateFieldValue', [String(def.key || ''), window.LanaDomActions.VALUE]) + '' +
             ' placeholder="' + escapeHtml(def.default_value != null && def.default_value !== '' ? LanaMatterFields.placeholderFor(def) : '0.00') + '"' +
             ' class="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus" />' +
         '</div>';
 
       case 'date':
         return '<input type="date" value="' + escapeHtml(currentValue || '') + '"' +
-          ' onchange="updateFieldValue(\'' + key + '\', this.value)"' +
+          '' + window.LanaDomActions.on('change', 'updateFieldValue', [String(def.key || ''), window.LanaDomActions.VALUE]) + '' +
           ' class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus" />';
 
       case 'boolean':
         return '<label class="flex items-center px-3 py-2">' +
           '<input type="checkbox"' + (currentValue === true || currentValue === 'true' ? ' checked' : '') +
-            ' onchange="updateFieldValue(\'' + key + '\', this.checked)"' +
+            '' + window.LanaDomActions.on('change', 'updateFieldValue', [String(def.key || ''), window.LanaDomActions.CHECKED]) + '' +
             ' class="rounded border-gray-300 lex-text-accent lex-ring-focus" />' +
           '<span class="ml-2 text-sm text-gray-700">' + displayName + '</span>' +
         '</label>';
@@ -8708,7 +8678,7 @@
       case 'text':
       default:
         return '<input type="text" value="' + escapeHtml(currentValue || '') + '"' +
-          ' onchange="updateFieldValue(\'' + key + '\', this.value)"' +
+          '' + window.LanaDomActions.on('change', 'updateFieldValue', [String(def.key || ''), window.LanaDomActions.VALUE]) + '' +
           ' placeholder="' + escapeHtml(LanaMatterFields.placeholderFor(def)) + '"' +
           ' class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus" />';
     }
@@ -8921,6 +8891,10 @@
   window.renderCustomFieldsModal = renderCustomFieldsModal;
   window.addCustomField = addCustomField;
   window.updateFieldDefinition = updateFieldDefinition;
+  // Dropdown options typed as "a, b, c" (comma-separated, blanks dropped).
+  window.LanaDomActions.register('updateFieldOptions', function (index, text) {
+    updateFieldDefinition(index, 'options', String(text || '').split(',').map(function (s) { return s.trim(); }).filter(function (s) { return s; }));
+  });
   window.updateFieldValue = updateFieldValue;
   window.removeCustomField = removeCustomField;
   window.openCustomFieldLibrary = openCustomFieldLibrary;
@@ -9020,7 +8994,7 @@
       }
       html += '</dl>';
       if (fieldsToDisplay.length > 6) {
-        html += '<button onclick="openCustomFieldsDrawer()" class="mt-2 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium cursor-pointer lex-bg-neutral lex-text-neutral transition-all hover:shadow-sm">+' + (fieldsToDisplay.length - 6) + ' more</button>';
+        html += '<button' + window.LanaDomActions.on('click', 'openCustomFieldsDrawer', []) + ' class="mt-2 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium cursor-pointer lex-bg-neutral lex-text-neutral transition-all hover:shadow-sm">+' + (fieldsToDisplay.length - 6) + ' more</button>';
       }
     }
     html += '</lex-card>';
@@ -9178,7 +9152,7 @@
             '</div>' +
           '</div>' +
           '<div class="mt-3">' +
-            '<lex-btn onclick="generateMatterIntelligence(\'' + matter.matter_id + '\')" variant="lana" size="sm">Generate insights</lex-btn>' +
+            '<lex-btn' + window.LanaDomActions.on('click', 'generateMatterIntelligence', [String(matter.matter_id)]) + ' variant="lana" size="sm">Generate insights</lex-btn>' +
           '</div>';
       } else if (!hasContent) {
         // Profile exists but empty
@@ -9194,7 +9168,7 @@
             '</div>' +
           '</div>' +
           '<div class="mt-3">' +
-            '<lex-btn onclick="generateMatterIntelligence(\'' + matter.matter_id + '\')" variant="lana" size="sm">Regenerate insights</lex-btn>' +
+            '<lex-btn' + window.LanaDomActions.on('click', 'generateMatterIntelligence', [String(matter.matter_id)]) + ' variant="lana" size="sm">Regenerate insights</lex-btn>' +
           '</div>';
       } else {
         // Has content — render brand voice + themes
@@ -9330,7 +9304,7 @@
                   '<p class="text-xs text-gray-500 mt-0.5">Could not generate matter intelligence. Please try again.</p>' +
                 '</div>' +
               '</div>' +
-              '<button onclick="generateMatterIntelligence(\'' + matterId + '\')"' +
+              '<button' + window.LanaDomActions.on('click', 'generateMatterIntelligence', [String(matterId)]) + '' +
                 ' class="inline-flex items-center gap-1.5 px-4 py-2 lex-bg-accent hover:lex-bg-accent text-white text-sm rounded-lg font-medium transition-colors shadow-sm flex-shrink-0 ml-4">' +
                 '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
                   '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>' +
@@ -9956,7 +9930,7 @@
               '</div>' +
               '<div class="flex items-center gap-3">' +
                 '<div class="flex gap-2">' + connectorBadges + '</div>' +
-                '<button onclick="showManualConnectModal(\'' + matter.matter_id + '\')"' +
+                '<button' + window.LanaDomActions.on('click', 'showManualConnectModal', [String(matter.matter_id)]) + '' +
                   ' class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md lex-text-accent bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 lex-ring-focus">' +
                   '<svg class="-ml-0.5 mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
                     '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>' +
@@ -9980,7 +9954,7 @@
           '<div class="space-y-3">' +
             '<div class="flex items-center justify-between">' +
               '<h4 class="text-lg font-semibold text-gray-900">' + escapeHtml(entityLabel) + ' (' + records.length + ')</h4>' +
-              '<button onclick="toggleEntityGroup(\'' + entityType + '\')" class="text-sm lex-text-accent hover:lex-text-accent">' +
+              '<button' + window.LanaDomActions.on('click', 'toggleEntityGroup', [String(entityType)]) + ' class="text-sm lex-text-accent hover:lex-text-accent">' +
                 '<span id="toggle-' + entityType + '">Collapse All</span>' +
               '</button>' +
             '</div>' +
@@ -10061,7 +10035,7 @@
               '<span>' + timeAgo(record.created_at) + '</span>' +
             '</div>' +
           '</div>' +
-          '<button onclick="toggleConnectorDetails(\'' + detailsId + '\')" class="lex-text-accent hover:lex-text-accent p-1" title="Toggle details">' +
+          '<button' + window.LanaDomActions.on('click', 'toggleConnectorDetails', [String(detailsId)]) + ' class="lex-text-accent hover:lex-text-accent p-1" title="Toggle details">' +
             '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
               '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>' +
             '</svg>' +
@@ -10226,11 +10200,11 @@
           '</div>' +
         '</div>' +
         '<div class="flex flex-col gap-2 flex-shrink-0">' +
-          '<button onclick="showApprovePendingMatchModal(\'' + id + '\', \'' + matterId + '\')"' +
+          '<button' + window.LanaDomActions.on('click', 'showApprovePendingMatchModal', [String(id), String(matterId)]) + '' +
             ' class="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 transition-colors" title="Approve this match">' +
             'Approve' +
           '</button>' +
-          '<button onclick="showDeclinePendingMatchModal(\'' + id + '\', \'' + matterId + '\')"' +
+          '<button' + window.LanaDomActions.on('click', 'showDeclinePendingMatchModal', [String(id), String(matterId)]) + '' +
             ' class="px-3 py-1.5 bg-gray-200 text-gray-700 text-xs font-medium rounded hover:bg-gray-300 transition-colors" title="Decline this match">' +
             'Decline' +
           '</button>' +
@@ -10294,8 +10268,8 @@
               ' class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 lex-ring-focus"' +
               ' placeholder="E.g., Wrong client, Different matter, Incorrect data..."></textarea>' +
             '<div class="mt-6 flex gap-3 justify-end">' +
-              '<button onclick="closeDeclineMatchModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Cancel</button>' +
-              '<button onclick="confirmDeclinePendingMatch(\'' + matchId + '\', \'' + matterId + '\')" class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700">Decline Match</button>' +
+              '<button' + window.LanaDomActions.on('click', 'closeDeclineMatchModal', []) + ' class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Cancel</button>' +
+              '<button' + window.LanaDomActions.on('click', 'confirmDeclinePendingMatch', [String(matchId), String(matterId)]) + ' class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700">Decline Match</button>' +
             '</div>' +
           '</div>' +
         '</div>' +
@@ -10427,7 +10401,7 @@
 
     // Section 1: Learned Document Types
     var typesHtml = buildDocumentTypesContent(docGenState.documentTypes);
-    var analyzeBtn = '<span onclick="event.stopPropagation(); analyzeDocumentStructure()" class="text-xs font-medium px-2 py-1 rounded cursor-pointer transition-colors" style="color: var(--lex-text-accent); background: var(--lex-bg-accent-muted)">Analyze Documents</span>';
+    var analyzeBtn = '<span' + window.LanaDomActions.on('click', 'analyzeDocumentStructure', [], { stop: true }) + ' class="text-xs font-medium px-2 py-1 rounded cursor-pointer transition-colors" style="color: var(--lex-text-accent); background: var(--lex-bg-accent-muted)">Analyze Documents</span>';
     var typesBadge = docGenState.documentTypes.length > 0
       ? '<span class="ml-2 text-xs font-medium px-1.5 py-0.5 rounded-full" style="background: var(--lex-bg-accent-muted); color: var(--lex-text-accent)">' + docGenState.documentTypes.length + '</span>'
       : '';
@@ -10439,7 +10413,7 @@
 
     // Section 2: Template Sets
     var setsHtml = buildTemplateSetsContent(docGenState.templateSets);
-    var createSetBtn = '<span onclick="event.stopPropagation(); openTemplateSetModal()" class="text-xs font-medium px-2 py-1 rounded cursor-pointer transition-colors" style="color: var(--lex-text-accent); background: var(--lex-bg-accent-muted)">Create Set</span>';
+    var createSetBtn = '<span' + window.LanaDomActions.on('click', 'openTemplateSetModal', [], { stop: true }) + ' class="text-xs font-medium px-2 py-1 rounded cursor-pointer transition-colors" style="color: var(--lex-text-accent); background: var(--lex-bg-accent-muted)">Create Set</span>';
     var setsBadge = docGenState.templateSets.length > 0
       ? '<span class="ml-2 text-xs font-medium px-1.5 py-0.5 rounded-full" style="background: var(--lex-bg-accent-muted); color: var(--lex-text-accent)">' + docGenState.templateSets.length + '</span>'
       : '';
@@ -10556,10 +10530,10 @@
         '<p class="text-xs text-gray-500 mb-3">' + docCount + ' document' + (docCount !== 1 ? 's' : '') + '</p>' +
         (s.description ? '<p class="text-xs text-gray-400 mb-3 line-clamp-2">' + escapeHtml(s.description) + '</p>' : '') +
         '<div class="flex items-center gap-2 flex-wrap">' +
-          '<button onclick="manageSetDocuments(\'' + s.id + '\', \'' + escapeHtml(s.name) + '\')" class="text-xs font-medium px-2 py-1 rounded transition-colors text-blue-700 bg-blue-50 hover:bg-blue-100">Documents</button>' +
-          '<button onclick="editTemplateSet(\'' + s.id + '\')" class="text-xs font-medium px-2 py-1 rounded transition-colors" style="color: var(--lex-text-accent); background: var(--lex-bg-accent-muted)">Edit</button>' +
-          '<button onclick="analyzeTemplateSet(\'' + s.id + '\')" class="text-xs font-medium px-2 py-1 rounded transition-colors text-gray-600 bg-gray-100 hover:bg-gray-200">Analyze</button>' +
-          '<button onclick="deleteTemplateSet(\'' + s.id + '\')" class="text-xs font-medium px-2 py-1 rounded transition-colors text-red-600 bg-red-50 hover:bg-red-100">Delete</button>' +
+          '<button' + window.LanaDomActions.on('click', 'manageSetDocuments', [String(s.id), String(s.name)]) + ' class="text-xs font-medium px-2 py-1 rounded transition-colors text-blue-700 bg-blue-50 hover:bg-blue-100">Documents</button>' +
+          '<button' + window.LanaDomActions.on('click', 'editTemplateSet', [String(s.id)]) + ' class="text-xs font-medium px-2 py-1 rounded transition-colors" style="color: var(--lex-text-accent); background: var(--lex-bg-accent-muted)">Edit</button>' +
+          '<button' + window.LanaDomActions.on('click', 'analyzeTemplateSet', [String(s.id)]) + ' class="text-xs font-medium px-2 py-1 rounded transition-colors text-gray-600 bg-gray-100 hover:bg-gray-200">Analyze</button>' +
+          '<button' + window.LanaDomActions.on('click', 'deleteTemplateSet', [String(s.id)]) + ' class="text-xs font-medium px-2 py-1 rounded transition-colors text-red-600 bg-red-50 hover:bg-red-100">Delete</button>' +
         '</div>' +
       '</div>';
     }
@@ -10592,7 +10566,7 @@
       }
     }
 
-    return '<form id="docGenForm" onsubmit="submitDocGeneration(event)" class="space-y-4">' +
+    return '<form id="docGenForm"' + window.LanaDomActions.on('submit', 'submitDocGeneration', [window.LanaDomActions.EVENT]) + ' class="space-y-4">' +
       '<div>' +
         '<label class="block text-sm font-medium text-gray-700 mb-1">Document Type</label>' +
         '<lex-select id="dgDocType" searchable required placeholder="Select document type" options="' + escapeHtml(JSON.stringify(docTypeOptions)) + '" value=""></lex-select>' +
@@ -10609,7 +10583,7 @@
       '<div>' +
         '<label class="block text-sm font-medium text-gray-700 mb-1">Custom Variables</label>' +
         '<div id="dgCustomVars" class="space-y-2"></div>' +
-        '<button type="button" onclick="addDocGenCustomVar()" class="mt-2 text-xs font-medium px-2 py-1 rounded transition-colors" style="color: var(--lex-text-accent); background: var(--lex-bg-accent-muted)">+ Add Variable</button>' +
+        '<button type="button"' + window.LanaDomActions.on('click', 'addDocGenCustomVar', []) + ' class="mt-2 text-xs font-medium px-2 py-1 rounded transition-colors" style="color: var(--lex-text-accent); background: var(--lex-bg-accent-muted)">+ Add Variable</button>' +
       '</div>' +
       '<div class="flex items-center gap-2">' +
         '<input type="checkbox" id="dgStream" checked class="rounded border-gray-300">' +
@@ -10632,7 +10606,7 @@
     row.innerHTML =
       '<input type="text" placeholder="Variable name" class="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm" data-var-key="' + idx + '">' +
       '<input type="text" placeholder="Value" class="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm" data-var-val="' + idx + '">' +
-      '<button type="button" onclick="removeDocGenCustomVar(' + idx + ')" class="text-gray-400 hover:text-red-500 p-1">' +
+      '<button type="button"' + window.LanaDomActions.on('click', 'removeDocGenCustomVar', [idx]) + ' class="text-gray-400 hover:text-red-500 p-1">' +
         '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>' +
       '</button>';
     container.appendChild(row);
@@ -10826,7 +10800,7 @@
               '<p class="text-sm text-gray-800 truncate">' + escapeHtml(fname) + '</p>' +
               '<p class="text-xs text-gray-400">' + escapeHtml(d.content_type || '') + '</p>' +
             '</div>' +
-            '<button onclick="removeDocFromSet(\'' + setId + '\', \'' + d.document_id + '\', this)" class="ml-2 text-xs font-medium px-2 py-1 rounded text-red-600 bg-red-50 hover:bg-red-100 transition-colors flex-shrink-0">Remove</button>' +
+            '<button' + window.LanaDomActions.on('click', 'removeDocFromSet', [String(setId), String(d.document_id), window.LanaDomActions.ELEMENT]) + ' class="ml-2 text-xs font-medium px-2 py-1 rounded text-red-600 bg-red-50 hover:bg-red-100 transition-colors flex-shrink-0">Remove</button>' +
           '</div>';
         }
         listContainer.innerHTML = listHtml;
@@ -10839,7 +10813,7 @@
       addSection.innerHTML = '<p style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px;">Add Document from Matter</p>' +
         '<div style="display:flex;gap:8px;">' +
           '<lex-select id="tsDocSelect" size="sm" searchable style="flex:1;" placeholder="Loading documents..." options="[]" value=""></lex-select>' +
-          '<button id="tsDocAddBtn" onclick="addDocToSet(\'' + setId + '\')" style="padding:6px 14px;border-radius:6px;border:none;background:#7c3aed;color:white;font-size:13px;font-weight:500;cursor:pointer;">Add</button>' +
+          '<button id="tsDocAddBtn"' + window.LanaDomActions.on('click', 'addDocToSet', [String(setId)]) + ' style="padding:6px 14px;border-radius:6px;border:none;background:#7c3aed;color:white;font-size:13px;font-weight:500;cursor:pointer;">Add</button>' +
         '</div>';
       panel.appendChild(addSection);
 
@@ -11666,3 +11640,59 @@
   }
 
 })();
+
+// Actions named by this file's markup (js/shared/dom-actions.js).
+window.LanaDomActions.registerGlobals([
+  'NavigationHelpers.navigateToConversation',
+  'addDocGenCustomVar',
+  'addDocToSet',
+  'analyzeDocumentStructure',
+  'analyzeTemplateSet',
+  'changeKanbanPage',
+  'closeDeclineMatchModal',
+  'closeTaskReadonlyModal',
+  'confirmDeclinePendingMatch',
+  'confirmDeleteContact',
+  'createMatterConversation',
+  'deleteLinkConfirm',
+  'deleteTemplateSet',
+  'editTemplateSet',
+  'generateMatterIntelligence',
+  'handleKanbanDragEnd',
+  'handleKanbanDragLeave',
+  'handleKanbanDragOver',
+  'handleKanbanDragStart',
+  'handleKanbanDrop',
+  'linkConnectorData',
+  'manageSetDocuments',
+  'navigateToMatter',
+  'openContactDetail',
+  'openConversationActionsModal',
+  'openCreateLinkModal',
+  'openCreateMatterDrawer',
+  'openCreateTaskModal',
+  'openCustomFieldsDrawer',
+  'openEditContactModal',
+  'openLinkedMattersDrawer',
+  'openMatterDescriptionEditor',
+  'openSharedWithDrawer',
+  'openTaskQuickView',
+  'openTemplateSetModal',
+  'refreshCurrentMatter',
+  'removeCustomField',
+  'removeDocFromSet',
+  'removeDocGenCustomVar',
+  'removeTaskPlanItem',
+  'selectLinkMatter',
+  'showApprovePendingMatchModal',
+  'showDeclinePendingMatchModal',
+  'showManualConnectModal',
+  'showSharedUserInfo',
+  'submitDocGeneration',
+  'toggleConnectorDetails',
+  'toggleConversationPin',
+  'toggleEntityGroup',
+  'toggleSection',
+  'updateFieldDefinition',
+  'updateFieldValue'
+]);

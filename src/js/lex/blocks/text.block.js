@@ -222,7 +222,7 @@
         // Only http(s) and mailto open a new tab; app paths stay in the
         // window so lex-router handles them.
         ? '<a href="' + escapeAttr(href) + '" class="lex-text-link underline"' +
-          (window.LanaSafeUrl.safeLinkHref(href) ? ' target="_blank" rel="noopener noreferrer"' : '') + '>' + linkText + '</a>'
+          (window.LanaSafeUrl.safeLinkHref(href) ? ' target="_blank" rel="noopener"' : '') + '>' + linkText + '</a>'
         : linkText;
       remaining = remaining.substring(closeParen + 1);
     }

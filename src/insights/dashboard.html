@@ -288,6 +288,7 @@
     </main>
   </div>
 
+  <script src="../js/shared/dom-actions.js"></script>
   <script>
     // ---------------------------------------------------------------------------
     // Active Alerts Panel
@@ -992,7 +993,7 @@
         }
         container.querySelector('[data-ql-nav]').innerHTML = viewKey === 'contacts' ? '' : `
           <div class="flex justify-end mb-2">
-            <button onclick="window.renderContactTable('all', 'contacts')" class="text-sm text-indigo-600 hover:text-indigo-800">Back to Contacts</button>
+            <button${LanaDomActions.on('click', 'renderContactTable', ['all', 'contacts'])} class="text-sm text-indigo-600 hover:text-indigo-800">Back to Contacts</button>
           </div>`;
         LanaInsightsTables.render(container.querySelector('[data-ql-table]'), view.key, state, { segment: state.currentFilter, title: view.title });
       };
@@ -1047,7 +1048,7 @@
           <h4 class="font-semibold text-gray-900 mb-4">Lead Relationship Breakdown</h4>
           <div class="grid grid-cols-2 gap-4 mb-4">
             <!-- Qualified (Have Opportunities) -->
-            <div onclick="window.renderContactTable('qualified', 'contacts')" class="bg-green-50 border border-green-200 rounded-lg p-4 cursor-pointer hover:bg-green-100 hover:shadow-md transition-all duration-200">
+            <div${LanaDomActions.on('click', 'renderContactTable', ['qualified', 'contacts'])} class="bg-green-50 border border-green-200 rounded-lg p-4 cursor-pointer hover:bg-green-100 hover:shadow-md transition-all duration-200">
               <div class="flex items-center justify-between mb-2">
                 <p class="text-sm font-medium text-gray-900">✅ Qualified (Have Opportunities)</p>
               </div>
@@ -1056,7 +1057,7 @@
             </div>
 
             <!-- Not Yet Qualified (No Opportunities) -->
-            <div onclick="window.renderContactTable('not_qualified', 'contacts')" class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 cursor-pointer hover:bg-yellow-100 hover:shadow-md transition-all duration-200">
+            <div${LanaDomActions.on('click', 'renderContactTable', ['not_qualified', 'contacts'])} class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 cursor-pointer hover:bg-yellow-100 hover:shadow-md transition-all duration-200">
               <div class="flex items-center justify-between mb-2">
                 <p class="text-sm font-medium text-gray-900">⚠️ Not Yet Qualified (No Opportunities)</p>
               </div>
@@ -1067,14 +1068,14 @@
 
           <!-- Reference Information -->
           <div class="grid grid-cols-2 gap-4">
-            <div onclick="window.renderContactTable('all', 'contacts')" class="bg-blue-50 border border-blue-200 rounded-lg p-4 cursor-pointer hover:bg-blue-100 hover:shadow-md transition-all duration-200">
+            <div${LanaDomActions.on('click', 'renderContactTable', ['all', 'contacts'])} class="bg-blue-50 border border-blue-200 rounded-lg p-4 cursor-pointer hover:bg-blue-100 hover:shadow-md transition-all duration-200">
               <div class="flex items-center justify-between mb-2">
                 <p class="text-sm font-medium text-gray-900">ℹ️ Total Contacts</p>
               </div>
               <p class="text-2xl font-bold text-blue-700">${totalContacts}</p>
               <p class="text-xs text-gray-500 mt-1">Total contact records in system for this period · Click to view</p>
             </div>
-            <div onclick="window.renderContactTable('all', 'opportunities')" class="bg-blue-50 border border-blue-200 rounded-lg p-4 cursor-pointer hover:bg-blue-100 hover:shadow-md transition-all duration-200">
+            <div${LanaDomActions.on('click', 'renderContactTable', ['all', 'opportunities'])} class="bg-blue-50 border border-blue-200 rounded-lg p-4 cursor-pointer hover:bg-blue-100 hover:shadow-md transition-all duration-200">
               <div class="flex items-center justify-between mb-2">
                 <p class="text-sm font-medium text-gray-900">ℹ️ Total Opportunities</p>
               </div>
@@ -1089,7 +1090,7 @@
           <h4 class="font-semibold text-gray-900 mb-4">Data Quality Insights</h4>
           <div class="grid grid-cols-3 gap-4">
             <!-- Unique Contact IDs in Opportunities -->
-            <div onclick="window.renderContactTable('all', 'unique_contact_ids')" class="bg-purple-50 border border-purple-200 rounded-lg p-4 cursor-pointer hover:bg-purple-100 hover:shadow-md transition-all duration-200">
+            <div${LanaDomActions.on('click', 'renderContactTable', ['all', 'unique_contact_ids'])} class="bg-purple-50 border border-purple-200 rounded-lg p-4 cursor-pointer hover:bg-purple-100 hover:shadow-md transition-all duration-200">
               <div class="flex items-center justify-between mb-2">
                 <p class="text-sm font-medium text-gray-900">📋 Unique Contact IDs</p>
               </div>
@@ -1099,7 +1100,7 @@
 
             <!-- Missing Contacts -->
             ${contactsOnlyInOpportunities > 0 ? `
-            <div onclick="window.renderContactTable('missing_contacts', 'opportunities')" class="bg-red-50 border border-red-200 rounded-lg p-4 cursor-pointer hover:bg-red-100 hover:shadow-md transition-all duration-200">
+            <div${LanaDomActions.on('click', 'renderContactTable', ['missing_contacts', 'opportunities'])} class="bg-red-50 border border-red-200 rounded-lg p-4 cursor-pointer hover:bg-red-100 hover:shadow-md transition-all duration-200">
               <div class="flex items-center justify-between mb-2">
                 <p class="text-sm font-medium text-gray-900">🔴 Missing Contacts</p>
               </div>
@@ -1107,7 +1108,7 @@
               <p class="text-xs text-gray-500 mt-1">Contact IDs in opportunities but no contact record · Click to view opportunities</p>
             </div>
             ` : `
-            <div onclick="window.renderContactTable('qualified', 'contacts')" class="bg-green-50 border border-green-200 rounded-lg p-4 cursor-pointer hover:bg-green-100 hover:shadow-md transition-all duration-200">
+            <div${LanaDomActions.on('click', 'renderContactTable', ['qualified', 'contacts'])} class="bg-green-50 border border-green-200 rounded-lg p-4 cursor-pointer hover:bg-green-100 hover:shadow-md transition-all duration-200">
               <div class="flex items-center justify-between mb-2">
                 <p class="text-sm font-medium text-gray-900">✅ No Missing Contacts</p>
               </div>
@@ -1117,7 +1118,7 @@
             `}
 
             <!-- Opportunities per Contact -->
-            <div onclick="window.renderContactTable('qualified', 'contact_opportunities')" class="bg-orange-50 border border-orange-200 rounded-lg p-4 cursor-pointer hover:bg-orange-100 hover:shadow-md transition-all duration-200">
+            <div${LanaDomActions.on('click', 'renderContactTable', ['qualified', 'contact_opportunities'])} class="bg-orange-50 border border-orange-200 rounded-lg p-4 cursor-pointer hover:bg-orange-100 hover:shadow-md transition-all duration-200">
               <div class="flex items-center justify-between mb-2">
                 <p class="text-sm font-medium text-gray-900">🔄 Opportunities/Contact</p>
               </div>
@@ -1207,12 +1208,12 @@
         // Render summary cards with active state
         const isActive = (cardFilter) => cardFilter === filter ? 'ring-2 ring-indigo-600 shadow-lg' : '';
         const summaryCardsHTML = `
-          <div onclick="window.renderConsultationBookingTable('all')" class="bg-white border border-gray-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('all')}">
+          <div${LanaDomActions.on('click', 'renderConsultationBookingTable', ['all'])} class="bg-white border border-gray-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('all')}">
             <p class="text-sm text-gray-600">Total Opportunities</p>
             <p class="text-2xl font-bold text-gray-900">${state.allOpportunities.length}</p>
             <p class="text-xs text-gray-500">${bookingRate}% booking rate</p>
           </div>
-          <div onclick="window.renderConsultationBookingTable('booked')" class="bg-green-50 border border-green-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('booked')}">
+          <div${LanaDomActions.on('click', 'renderConsultationBookingTable', ['booked'])} class="bg-green-50 border border-green-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('booked')}">
             <p class="text-sm text-gray-600 flex items-center gap-1">
               <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
               Booked
@@ -1220,7 +1221,7 @@
             <p class="text-2xl font-bold text-green-700">${state.booked.length}</p>
             <p class="text-xs text-gray-500">${formatCurrency(bookedValue)}</p>
           </div>
-          <div onclick="window.renderConsultationBookingTable('not_booked')" class="bg-orange-50 border border-orange-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('not_booked')}">
+          <div${LanaDomActions.on('click', 'renderConsultationBookingTable', ['not_booked'])} class="bg-orange-50 border border-orange-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('not_booked')}">
             <p class="text-sm text-gray-600 flex items-center gap-1">
               <svg class="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
               Not Booked
@@ -1463,17 +1464,17 @@
 
         <!-- Summary Cards -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div onclick="window.renderResponseTimeTable('all')" class="bg-white border border-gray-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow">
+          <div${LanaDomActions.on('click', 'renderResponseTimeTable', ['all'])} class="bg-white border border-gray-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow">
             <p class="text-sm text-gray-600">Total Qualified Leads</p>
             <p class="text-2xl font-bold text-gray-900">${allQualifiedLeads.length}</p>
             <p class="text-xs text-gray-500">${contacts.length} contacts + ${opportunities.filter(o => o.data?.contactId && !contacts.find(c => c.data?.id === o.data.contactId)).length} from opps</p>
           </div>
-          <div onclick="window.renderResponseTimeTable('responded')" class="bg-green-50 border border-green-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow">
+          <div${LanaDomActions.on('click', 'renderResponseTimeTable', ['responded'])} class="bg-green-50 border border-green-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow">
             <p class="text-sm text-gray-600">✅ Responded</p>
             <p class="text-2xl font-bold text-green-700">${respondedContacts.length}</p>
             <p class="text-xs text-gray-500">${responseRate.toFixed(1)}% response rate</p>
           </div>
-          <div onclick="window.renderResponseTimeTable('awaiting_response')" class="bg-amber-50 border border-amber-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow">
+          <div${LanaDomActions.on('click', 'renderResponseTimeTable', ['awaiting_response'])} class="bg-amber-50 border border-amber-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow">
             <p class="text-sm text-gray-600">⏳ Awaiting Response</p>
             <p class="text-2xl font-bold text-amber-700">${awaitingResponseContacts.length}</p>
             <p class="text-xs text-amber-600">Action needed!</p>
@@ -1708,27 +1709,27 @@
         // Render summary cards with active state
         const isActive = (cardFilter) => cardFilter === filter ? 'ring-2 ring-indigo-600 shadow-lg' : '';
         const summaryCardsHTML = `
-          <div onclick="window.renderShowRateTable('all')" class="bg-white border border-gray-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('all')}">
+          <div${LanaDomActions.on('click', 'renderShowRateTable', ['all'])} class="bg-white border border-gray-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('all')}">
             <p class="text-sm text-gray-600">Total Booked</p>
             <p class="text-2xl font-bold text-gray-900">${state.allOpportunities.length}</p>
             <p class="text-xs text-gray-500">${formatCurrency(totalValue)} total value</p>
           </div>
-          <div onclick="window.renderShowRateTable('showed')" class="bg-green-50 border border-green-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('showed')}">
+          <div${LanaDomActions.on('click', 'renderShowRateTable', ['showed'])} class="bg-green-50 border border-green-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('showed')}">
             <p class="text-sm text-green-600 font-medium">✅ Showed</p>
             <p class="text-2xl font-bold text-green-700">${state.showed.length}</p>
             <p class="text-xs text-gray-500">${showRate}% show rate</p>
           </div>
-          <div onclick="window.renderShowRateTable('no_show')" class="bg-red-50 border border-red-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('no_show')}">
+          <div${LanaDomActions.on('click', 'renderShowRateTable', ['no_show'])} class="bg-red-50 border border-red-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('no_show')}">
             <p class="text-sm text-red-600 font-medium">❌ No-Show</p>
             <p class="text-2xl font-bold text-red-700">${state.noShow.length}</p>
             <p class="text-xs text-gray-500">Missed consultations</p>
           </div>
-          <div onclick="window.renderShowRateTable('cancelled')" class="bg-orange-50 border border-orange-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('cancelled')}">
+          <div${LanaDomActions.on('click', 'renderShowRateTable', ['cancelled'])} class="bg-orange-50 border border-orange-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('cancelled')}">
             <p class="text-sm text-orange-600 font-medium">🚫 Cancelled</p>
             <p class="text-2xl font-bold text-orange-700">${state.cancelled.length}</p>
             <p class="text-xs text-gray-500">Cancelled appointments</p>
           </div>
-          <div onclick="window.renderShowRateTable('pending')" class="bg-blue-50 border border-blue-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('pending')}">
+          <div${LanaDomActions.on('click', 'renderShowRateTable', ['pending'])} class="bg-blue-50 border border-blue-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('pending')}">
             <p class="text-sm text-blue-600 font-medium">⏳ Pending</p>
             <p class="text-2xl font-bold text-blue-700">${state.pending.length}</p>
             <p class="text-xs text-gray-500">Awaiting consultation</p>
@@ -1920,22 +1921,22 @@
             ` : ''}
           </div>
 
-          <div onclick="window.renderCaseValueTable('all')" class="bg-white border border-gray-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('all')}">
+          <div${LanaDomActions.on('click', 'renderCaseValueTable', ['all'])} class="bg-white border border-gray-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('all')}">
             <p class="text-sm text-gray-600">Total Opportunities</p>
             <p class="text-2xl font-bold text-gray-900">${totalOpportunities}</p>
             <p class="text-xs text-gray-500">${formatCurrency(totalValue)} total</p>
           </div>
-          <div onclick="window.renderCaseValueTable('open')" class="bg-blue-50 border border-blue-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('open')}">
+          <div${LanaDomActions.on('click', 'renderCaseValueTable', ['open'])} class="bg-blue-50 border border-blue-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('open')}">
             <p class="text-sm text-gray-600">Open</p>
             <p class="text-2xl font-bold text-blue-700">${byStatus.open.length}</p>
             <p class="text-xs text-gray-500">${formatCurrency(byStatus.open.reduce((s, o) => s + parseFloat(o.data?.monetaryValue || 0), 0))}</p>
           </div>
-          <div onclick="window.renderCaseValueTable('won')" class="bg-green-50 border border-green-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('won')}">
+          <div${LanaDomActions.on('click', 'renderCaseValueTable', ['won'])} class="bg-green-50 border border-green-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('won')}">
             <p class="text-sm text-gray-600">Won</p>
             <p class="text-2xl font-bold text-green-700">${byStatus.won.length}</p>
             <p class="text-xs text-gray-500">${formatCurrency(byStatus.won.reduce((s, o) => s + parseFloat(o.data?.monetaryValue || 0), 0))}</p>
           </div>
-          <div onclick="window.renderCaseValueTable('lost')" class="bg-red-50 border border-red-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('lost')}">
+          <div${LanaDomActions.on('click', 'renderCaseValueTable', ['lost'])} class="bg-red-50 border border-red-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('lost')}">
             <p class="text-sm text-gray-600 flex items-center gap-1">
               Lost
               ${byStatus.lost.length > 0 ? '<svg class="w-3 h-3 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>' : ''}
@@ -2090,32 +2091,32 @@
         // Render summary cards with active state
         const isActive = (cardFilter) => cardFilter === filter ? 'ring-2 ring-indigo-600 shadow-lg' : '';
         const summaryCardsHTML = `
-          <div onclick="window.renderConsultationsHeldTable('all')" class="bg-white border border-gray-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('all')}">
+          <div${LanaDomActions.on('click', 'renderConsultationsHeldTable', ['all'])} class="bg-white border border-gray-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('all')}">
             <p class="text-sm text-gray-600">Total Opportunities</p>
             <p class="text-2xl font-bold text-gray-900">${state.allOpportunities.length}</p>
             <p class="text-xs text-gray-500">${formatCurrency(totalValue)} total value</p>
           </div>
-          <div onclick="window.renderConsultationsHeldTable('booked')" class="bg-blue-50 border border-blue-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('booked')}">
+          <div${LanaDomActions.on('click', 'renderConsultationsHeldTable', ['booked'])} class="bg-blue-50 border border-blue-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('booked')}">
             <p class="text-sm text-blue-600 font-medium">📅 Calendar Bookings</p>
             <p class="text-2xl font-bold text-blue-700">${state.withCalendarBooking.length}</p>
             <p class="text-xs text-gray-500">${calendarBookingRate}% of all opps</p>
           </div>
-          <div onclick="window.renderConsultationsHeldTable('not_booked')" class="bg-red-50 border border-red-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('not_booked')}">
+          <div${LanaDomActions.on('click', 'renderConsultationsHeldTable', ['not_booked'])} class="bg-red-50 border border-red-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('not_booked')}">
             <p class="text-sm text-red-600 font-medium">❌ Not Booked</p>
             <p class="text-2xl font-bold text-red-700">${state.notBooked.length}</p>
             <p class="text-xs text-gray-500">${formatCurrency(notBookedValue)} at risk</p>
           </div>
-          <div onclick="window.renderConsultationsHeldTable('confirmed')" class="bg-green-50 border border-green-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('confirmed')}">
+          <div${LanaDomActions.on('click', 'renderConsultationsHeldTable', ['confirmed'])} class="bg-green-50 border border-green-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('confirmed')}">
             <p class="text-sm text-green-600 font-medium">✅ Confirmed Showed</p>
             <p class="text-2xl font-bold text-green-700">${state.confirmedShowed.length}</p>
             <p class="text-xs text-gray-500">Explicitly marked</p>
           </div>
-          <div onclick="window.renderConsultationsHeldTable('progressed')" class="bg-purple-50 border border-purple-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('progressed')}">
+          <div${LanaDomActions.on('click', 'renderConsultationsHeldTable', ['progressed'])} class="bg-purple-50 border border-purple-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('progressed')}">
             <p class="text-sm text-purple-600 font-medium">🚀 Progressed</p>
             <p class="text-2xl font-bold text-purple-700">${state.progressed.length}</p>
             <p class="text-xs text-gray-500">Won or Active</p>
           </div>
-          <div onclick="window.renderConsultationsHeldTable('open')" class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('open')}">
+          <div${LanaDomActions.on('click', 'renderConsultationsHeldTable', ['open'])} class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('open')}">
             <p class="text-sm text-yellow-600 font-medium">⏳ Still Open</p>
             <p class="text-2xl font-bold text-yellow-700">${state.stillOpen.length}</p>
             <p class="text-xs text-gray-500">Pending outcome</p>
@@ -2229,31 +2230,31 @@
       // Summary cards with clickable filters
       const summaryCardsHTML = `
         <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
-          <div class="bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-indigo-500" onclick="window.renderEngagementTable('all')">
+          <div class="bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 border-indigo-500"${LanaDomActions.on('click', 'renderEngagementTable', ['all'])}>
             <div class="text-2xl font-bold text-indigo-600">${totalEngaged}</div>
             <div class="text-xs text-gray-600 mt-1">Total Engaged</div>
             <div class="text-xs text-gray-500 mt-2">${formatCurrency(totalValue)}</div>
           </div>
 
-          <div class="bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-lg transition-shadow" onclick="window.renderEngagementTable('same_day')">
+          <div class="bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-lg transition-shadow"${LanaDomActions.on('click', 'renderEngagementTable', ['same_day'])}>
             <div class="text-2xl font-bold text-green-600">${sameDayCount}</div>
             <div class="text-xs text-gray-600 mt-1">⚡ Same Day</div>
             <div class="text-xs text-gray-500 mt-2">0 days</div>
           </div>
 
-          <div class="bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-lg transition-shadow" onclick="window.renderEngagementTable('fast')">
+          <div class="bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-lg transition-shadow"${LanaDomActions.on('click', 'renderEngagementTable', ['fast'])}>
             <div class="text-2xl font-bold text-blue-600">${fastCount}</div>
             <div class="text-xs text-gray-600 mt-1">🚀 Fast</div>
             <div class="text-xs text-gray-500 mt-2">≤1 day</div>
           </div>
 
-          <div class="bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-lg transition-shadow" onclick="window.renderEngagementTable('medium')">
+          <div class="bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-lg transition-shadow"${LanaDomActions.on('click', 'renderEngagementTable', ['medium'])}>
             <div class="text-2xl font-bold text-yellow-600">${mediumCount}</div>
             <div class="text-xs text-gray-600 mt-1">⏱️ Medium</div>
             <div class="text-xs text-gray-500 mt-2">1-3 days</div>
           </div>
 
-          <div class="bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-lg transition-shadow" onclick="window.renderEngagementTable('slow')">
+          <div class="bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-lg transition-shadow"${LanaDomActions.on('click', 'renderEngagementTable', ['slow'])}>
             <div class="text-2xl font-bold text-red-600">${slowCount}</div>
             <div class="text-xs text-gray-600 mt-1">🐌 Slow</div>
             <div class="text-xs text-gray-500 mt-2">&gt;3 days</div>
@@ -2422,8 +2423,7 @@
             </div>
             <div class="flex items-center gap-2">
               ${getStatusBadge(statusColor)}
-              <button
-                onclick="showMetricDrilldown('${metric.key}', '${metric.name}')"
+              <button${LanaDomActions.on('click', 'showMetricDrilldown', [String(metric.key), String(metric.name)])}
                 class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 transition-colors"
                 title="View details and see how this is calculated"
               >
@@ -3631,6 +3631,18 @@
 
     // Initialize dynamic menu
     renderMenu('#mainNav');
+
+    // Actions named by this page's markup (js/shared/dom-actions.js).
+    LanaDomActions.registerGlobals([
+      'renderCaseValueTable',
+      'renderConsultationBookingTable',
+      'renderConsultationsHeldTable',
+      'renderContactTable',
+      'renderEngagementTable',
+      'renderResponseTimeTable',
+      'renderShowRateTable',
+      'showMetricDrilldown'
+    ]);
   </script>
 
   <!-- Drill-down modal: InsightsOverlays.openDrilldown() mounts a full-size lex-modal (#drilldownModal). -->

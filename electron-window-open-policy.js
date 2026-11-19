@@ -17,14 +17,13 @@
  *  - about:blank, '' and blob:: opened isolated (no preload, sandbox and web
  *    security on, no plugins). No app code opens these today; kept for
  *    print or dynamic content.
- *  - file: only for pages under the app's public_html (resolved real path),
- *    opened with the same isolated options. Everything else is denied.
+ *  - the app's own pages (lana-app://app/public_html/..., resolved real path
+ *    inside public_html), opened with the same isolated options. file: and
+ *    everything else is denied.
  *  - javascript:, data:, about:srcdoc, chrome: and anything unparsable: denied.
  */
 
-const fs = require('fs');
-const path = require('path');
-const { fileURLToPath } = require('url');
+const { APP_SCHEME, resolveAppFile } = require('./electron-app-protocol');
 
 const ISOLATED_POPUP_OPTIONS = Object.freeze({
   webPreferences: Object.freeze({
@@ -42,33 +41,10 @@ const ALLOW_ISOLATED = Object.freeze({
   response: Object.freeze({ action: 'allow', overrideBrowserWindowOptions: ISOLATED_POPUP_OPTIONS })
 });
 
-function realpathOrNull(p) {
-  try {
-    return fs.realpathSync(p);
-  } catch (_) {
-    return null;
-  }
-}
-
-function isInside(child, parent) {
-  const rel = path.relative(parent, child);
-  return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
-}
-
+// Inside public_html lexically and after symlinks resolve (resolveAppFile),
+// so neither '..' nor a symlink can escape.
 function isAppPage(parsed, appRoot) {
-  if (!appRoot) return false;
-  let filePath;
-  try {
-    filePath = fileURLToPath(parsed);
-  } catch (_) {
-    return false;
-  }
-  // Lexically inside public_html, and (when it exists) still inside after
-  // symlinks resolve, so neither '..' nor a symlink can escape.
-  const root = path.resolve(appRoot);
-  if (!isInside(path.resolve(filePath), root)) return false;
-  const realFile = realpathOrNull(filePath);
-  return realFile === null || isInside(realFile, realpathOrNull(root) || root);
+  return Boolean(appRoot) && resolveAppFile(parsed.href, appRoot) !== null;
 }
 
 /**
@@ -101,7 +77,7 @@ function decideWindowOpen(url, options) {
       return parsed.href === 'about:blank' ? ALLOW_ISOLATED : DENY;
     case 'blob:':
       return ALLOW_ISOLATED;
-    case 'file:':
+    case `${APP_SCHEME}:`:
       return isAppPage(parsed, appRoot) ? ALLOW_ISOLATED : DENY;
     default:
       return DENY;

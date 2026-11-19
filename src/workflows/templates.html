@@ -99,6 +99,7 @@
   <script src="../js/lex/components/foundation/lex-modal.js"></script>
   <script src="../js/lex/components/foundation/lex-btn.js"></script>
 
+  <script src="../js/shared/dom-actions.js"></script>
   <script>
     if (!api.requireAuth()) throw new Error('Not authenticated');
     renderMenu('#mainNav');
@@ -164,7 +165,7 @@
       container.innerHTML = templates.map(t => {
         const colors = getColorClass(t.category);
         return `
-          <div class="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer" onclick="showTemplateDetails('${t.id}')">
+          <div class="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer"${LanaDomActions.on('click', 'showTemplateDetails', [String(t.id)])}>
             <div class="p-6">
               <div class="flex items-start justify-between mb-4">
                 <div class="${colors.bg} w-12 h-12 rounded-lg flex items-center justify-center ${colors.text}">
@@ -257,6 +258,11 @@
     }
 
     loadTemplates();
+
+    // Actions named by this page's markup (js/shared/dom-actions.js).
+    LanaDomActions.registerGlobals([
+      'showTemplateDetails'
+    ]);
   </script>
 </body>
 </html>

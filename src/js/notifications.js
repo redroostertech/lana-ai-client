@@ -789,9 +789,11 @@ window.NotificationPanel = (function() {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
             </svg>
             <p class="text-gray-500">Failed to load notifications</p>
-            <button onclick="NotificationPanel.loadNotifications(true)" class="mt-2 text-indigo-600 hover:text-indigo-800 text-sm font-medium">Try again</button>
+            <button type="button" data-notifications-retry class="mt-2 text-indigo-600 hover:text-indigo-800 text-sm font-medium">Try again</button>
           </div>
         `;
+        const retry = elements.list.querySelector('[data-notifications-retry]');
+        if (retry) retry.addEventListener('click', () => loadNotifications(true));
       }
     } finally {
       state.isLoading = false;

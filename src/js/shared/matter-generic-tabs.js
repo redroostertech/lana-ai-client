@@ -193,7 +193,7 @@
 
   function openExternal(url) {
     if (global.electronAPI && typeof global.electronAPI.openExternal === 'function') global.electronAPI.openExternal(url);
-    else global.open(url, '_blank', 'noopener,noreferrer');
+    else global.open(url, '_blank', 'noopener');
   }
 
   function citations(doc, items) {
@@ -203,7 +203,7 @@
       if (!url) { wrap.appendChild(el(doc, 'p', 'matter-generic-tab__citation', citation.label)); return; }
       var link = el(doc, 'a', 'matter-generic-tab__citation matter-generic-tab__citation--link', citation.label || url);
       link.href = url;
-      link.rel = 'noopener noreferrer';
+      link.rel = 'noopener';
       link.addEventListener('click', function (event) { event.preventDefault(); openExternal(url); });
       wrap.appendChild(link);
     });

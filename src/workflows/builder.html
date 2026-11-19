@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="../css/lex-tokens.css">
   <script src="../js/tailwind-loader.js"></script>
   <script src="../js/error-reporter.js"></script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jerosoler/Drawflow/dist/drawflow.min.css">
+  <link rel="stylesheet" href="../css/vendor/drawflow.min.css">
   <script src="../js/config.js"></script>
   <script src="../js/mock-data.js"></script>
   <script src="../js/time-utils.js"></script>
@@ -24,6 +24,7 @@
   <script src="../js/workflows.js"></script>
   <script src="../js/shared/event-catalog.js"></script>
   <script src="../js/shared/event-browser.js"></script>
+  <script src="../js/shared/dom-actions.js"></script>
   <script src="../js/workflow-builder.js"></script>
   <style>
     /* Drawflow customizations */
@@ -193,7 +194,7 @@
        (lex-modal.js loads in <head>, so declarative markup here would upgrade
        before its children are parsed). -->
 
-  <script src="https://cdn.jsdelivr.net/gh/jerosoler/Drawflow/dist/drawflow.min.js"></script>
+  <script src="../js/vendor/drawflow.min.js"></script>
   <script>
     if (!api.requireAuth()) throw new Error('Not authenticated');
     renderMenu('#mainNav');
@@ -389,8 +390,7 @@
     function renderTemplateList(templates) {
       const container = document.getElementById('templateList');
       container.innerHTML = templates.map(t => `
-        <div class="p-4 border border-gray-200 rounded-lg hover:border-indigo-300 hover:bg-indigo-50 cursor-pointer transition-colors"
-             onclick="selectTemplate('${t.id}')">
+        <div class="p-4 border border-gray-200 rounded-lg hover:border-indigo-300 hover:bg-indigo-50 cursor-pointer transition-colors"${LanaDomActions.on('click', 'selectTemplate', [String(t.id)])}>
           <div class="flex items-center gap-3 mb-2">
             <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600">
               ${getTemplateIcon(t.icon)}
@@ -507,6 +507,11 @@
 
     // Initialize
     initBuilder();
+
+    // Actions named by this page's markup (js/shared/dom-actions.js).
+    LanaDomActions.registerGlobals([
+      'selectTemplate'
+    ]);
   </script>
 </body>
 </html>

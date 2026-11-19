@@ -1119,8 +1119,7 @@ async function loadTeamAssignments(boardId) {
             <span class="px-2 py-1 text-xs font-medium rounded ${getAccessLevelBadgeClass(assignment.access_level)}">
               ${capitalizeFirst(assignment.access_level)}
             </span>
-            <button
-              onclick="removeTeamMember('${boardId}', '${assignment.user_id}')"
+            <button${window.LanaDomActions.on('click', 'removeTeamMember', [String(boardId), String(assignment.user_id)])}
               class="text-gray-400 hover:text-red-600 transition p-1"
               title="Remove user">
               <i class="fas fa-trash text-sm"></i>
@@ -1162,7 +1161,7 @@ async function loadBoardMetrics(boardId, boardData) {
           <i class="fas fa-chart-line text-6xl text-gray-300 mb-4"></i>
           <h3 class="text-lg font-medium text-gray-900 mb-2">No metrics configured yet</h3>
           <p class="text-gray-500 mb-4">Add metrics to this board to start tracking performance</p>
-          <button onclick="switchBoardDetailTab('metrics')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition">
+          <button${window.LanaDomActions.on('click', 'switchBoardDetailTab', ['metrics'])} class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition">
             <i class="fas fa-plus mr-2"></i>Add Metrics
           </button>
         </div>
@@ -1180,7 +1179,7 @@ async function loadBoardMetrics(boardId, boardData) {
         <i class="fas fa-exclamation-triangle text-6xl text-red-300 mb-4"></i>
         <h3 class="text-lg font-medium text-gray-900 mb-2">Failed to load metrics</h3>
         <p class="text-gray-500 mb-4">${error.message || 'Please try again'}</p>
-        <button onclick="viewBoardDetail('${boardId}')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition">
+        <button${window.LanaDomActions.on('click', 'viewBoardDetail', [String(boardId)])} class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition">
           Try Again
         </button>
       </div>
@@ -1441,3 +1440,10 @@ window.ManagementBoardsTable = {
   SORT_BY_COLUMN: BOARD_SORT_BY_COLUMN,
   METRIC_RANGES: BOARD_METRIC_RANGES
 };
+
+// Actions named by this file's markup (js/shared/dom-actions.js).
+window.LanaDomActions.registerGlobals([
+  'removeTeamMember',
+  'switchBoardDetailTab',
+  'viewBoardDetail'
+]);

@@ -96,7 +96,7 @@
         'js/shared/event-catalog.js',
         'js/shared/event-browser.js',
         'js/matter-skills.js',
-        'https://cdn.jsdelivr.net/npm/drawflow@0.0.60/dist/drawflow.min.js',
+        'js/vendor/drawflow.min.js',
         'js/workflow-builder.js',
         'js/vendor/pdf.min.js',
         'js/shared/safe-html.js',
@@ -120,7 +120,7 @@
         'css/matter-runnables.css',
         'css/workspace-summary.css',
         'css/workspace-switcher.css',
-        'https://cdn.jsdelivr.net/npm/drawflow@0.0.60/dist/drawflow.min.css',
+        'css/vendor/drawflow.min.css',
         'css/lana-ask-btn.css'
       ]
     },
@@ -457,7 +457,7 @@
       activeNav: 'admin',
       scripts: [],
       stylesheets: [
-        'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
+        'css/vendor/fontawesome/css/all.min.css'
       ]
     },
 
@@ -466,7 +466,7 @@
       activeNav: 'admin',
       scripts: [],
       stylesheets: [
-        'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
+        'css/vendor/fontawesome/css/all.min.css'
       ]
     },
 
@@ -480,7 +480,7 @@
       activeNav: 'admin',
       scripts: [],
       stylesheets: [
-        'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
+        'css/vendor/fontawesome/css/all.min.css'
       ]
     },
 
@@ -491,7 +491,7 @@
         'js/services/feature-tracker.js'
       ],
       stylesheets: [
-        'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
+        'css/vendor/fontawesome/css/all.min.css'
       ]
     },
 
@@ -606,7 +606,7 @@
       title: 'Search Analytics',
       activeNav: 'admin',
       scripts: [
-        'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js',
+        'js/vendor/chart.js',
         'js/search-analytics.js'
       ],
       stylesheets: []
@@ -628,7 +628,7 @@
         'js/services/feature-tracker.js',
         'js/services/management-board-service.js',
         'js/components/management-board-components.js',
-        'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js',
+        'js/vendor/chart.js',
         'js/services/session-tracking-service.js',
         'js/lex/components/form/lex-select.js',
         'js/lex/components/data/lex-table.js',
@@ -640,7 +640,7 @@
       stylesheets: [
         'css/session-tracking.css',
         'css/admin/admin-tables.css',
-        'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
+        'css/vendor/fontawesome/css/all.min.css'
       ]
     },
 
@@ -651,7 +651,7 @@
         'js/lex/components/form/lex-select.js'
       ],
       stylesheets: [
-        'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
+        'css/vendor/fontawesome/css/all.min.css'
       ]
     },
 
@@ -810,10 +810,10 @@
         'js/services/feature-tracker.js',
         'js/workflows.js',
         'js/workflow-builder.js',
-        'https://cdn.jsdelivr.net/npm/drawflow@0.0.60/dist/drawflow.min.js'
+        'js/vendor/drawflow.min.js'
       ],
       stylesheets: [
-        'https://cdn.jsdelivr.net/npm/drawflow@0.0.60/dist/drawflow.min.css'
+        'css/vendor/drawflow.min.css'
       ]
     },
 

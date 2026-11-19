@@ -92,6 +92,30 @@ function connectLinkOrgId(urlObj) {
 }
 
 /**
+ * A connect link's org id, kept for the sign-in window the link opened until its page is
+ * ready to take it. Only the newest one, for PENDING_TTL_MS, only a valid org id, and only
+ * for that window: a take from any other window drops it, and so does clear() (sign-out).
+ */
+function createConnectOrgQueue({ now = () => Date.now(), ttlMs = PENDING_TTL_MS } = {}) {
+  let pending = null;
+  return {
+    offer(orgId, contentsId) {
+      const valid = normalizeOrgId(orgId);
+      pending = valid && contentsId !== undefined ? { orgId: valid, contentsId, at: now() } : null;
+    },
+    take(contentsId) {
+      const current = pending;
+      pending = null;
+      if (!current || current.contentsId !== contentsId) return null;
+      return now() - current.at <= ttlMs ? current.orgId : null;
+    },
+    clear() {
+      pending = null;
+    }
+  };
+}
+
+/**
  * Parse and validate one app link. Only the contract's keys are accepted for
  * each action; anything else (an unknown key, a repeated key, a path, a value
  * of the wrong shape) rejects the whole link.
@@ -533,6 +557,7 @@ module.exports = {
   normalizeDomain,
   normalizeOrgId,
   connectLinkOrgId,
+  createConnectOrgQueue,
   discoveryTarget,
   parseAppLink,
   describeForLog,

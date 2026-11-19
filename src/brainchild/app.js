@@ -77,7 +77,7 @@
       ? window.LanaConfig.API_BASE_URL.trim()
       : '';
     if (configured) return trimTrailingSlashes(configured);
-    if (window.location.protocol === 'file:') {
+    if ((window.location.protocol === 'file:' || window.location.protocol === 'lana-app:')) {
       return trimTrailingSlashes(savedServerUrl() || 'http://localhost:8080');
     }
     return '';

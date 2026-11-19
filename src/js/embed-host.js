@@ -95,7 +95,7 @@
       var link = global.document.createElement('a');
       link.href = fallbackHref;
       link.target = '_blank';
-      link.rel = 'noopener noreferrer';
+      link.rel = 'noopener';
       link.textContent = 'Open ' + app.label + ' in your browser';
       link.style.cssText = 'text-decoration:underline;';
       box.appendChild(link);

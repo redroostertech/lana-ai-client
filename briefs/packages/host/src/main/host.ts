@@ -15,7 +15,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { RECORDING_FRAME_CHANNEL, RECORDING_LEVELS_CHANNEL, TALK_FRAME_CHANNEL, type AccessStatus, type LanaEvent, type ModelID, type PlatformInfo, type RecordingFrame, type RecordingPermissions, type ThemePreference } from "../shared/api.js";
 import { openGatewayRuntime, StartupError, type GatewayRuntime } from "./gateway/gatewayRuntime.js";
-import { EventHub, registerServices } from "./ipc.js";
+import { EventHub, registerServices, trustedTopFrame } from "./ipc.js";
 import { createMainLog, type MainLog } from "./log.js";
 import { AUDIO_SCHEME } from "./services/meetingAudio.js";
 import { createRealServices } from "./services/realServices.js";
@@ -46,6 +46,24 @@ export interface BriefsHostOptions {
   readonly directory: string;
   /** The client's own pages: only they may call Briefs, open the microphone or record meeting audio. */
   readonly isTrustedURL: (url: string) => boolean;
+  /** The client's own origin, for the permission check handler, which gets an origin, not a page URL. */
+  readonly isTrustedOrigin?: (origin: string) => boolean;
+  /**
+   * The client's permission policy for everything but media (location, notifications...), and how
+   * to put the client's own handlers back when Briefs stops. Without it, other permissions are denied.
+   */
+  readonly ipcLimits?: {
+    /** The client's payload measure (electron-ipc-guard.js payloadBytes). */
+    readonly measure: (value: unknown, stopAt?: number) => number;
+    readonly bridgeCall: number;
+    readonly recordingFrame: number;
+    readonly recordingLevels: number;
+    readonly talkFrame: number;
+  };
+  readonly permissions?: {
+    decide(contents: unknown, permission: string, details: unknown): boolean;
+    restore(): void;
+  };
   /** The local AI engine's address while it is in use, else null: every language model call goes to its runtime route. */
   readonly engineBase: () => string | null;
   /** The LANA client's session, read when needed. There is one session: Briefs has no sign-in of its own. */
@@ -185,15 +203,21 @@ export async function startBriefsHost(options: BriefsHostOptions): Promise<Brief
   };
 
   try {
-    // The client had no permission handler: Electron's default grants everything. These keep
-    // that for every permission but media, and grant media (the microphone for dictation, Talk
-    // and recording) only to the client's own pages.
-    electron.session.setPermissionRequestHandler((_contents, permission, callback, details) => {
-      if (permission !== "media") return callback(true);
-      const media = details as { requestingUrl?: string };
-      callback(options.isTrustedURL(media.requestingUrl ?? ""));
+    // Media (the microphone for dictation, Talk and recording) only for the client's own pages;
+    // everything else as the client's own policy says, and denied without one.
+    const isTrustedRequester = (details: unknown, origin?: string): boolean => {
+      const url = (details as { requestingUrl?: string } | null)?.requestingUrl;
+      if (url) return options.isTrustedURL(url);
+      return origin !== undefined && options.isTrustedOrigin !== undefined && options.isTrustedOrigin(origin);
+    };
+    const otherPermission = (contents: unknown, permission: string, details: unknown): boolean =>
+      options.permissions === undefined ? false : options.permissions.decide(contents, permission, details);
+    electron.session.setPermissionRequestHandler((contents, permission, callback, details) => {
+      callback(permission === "media" ? isTrustedRequester(details) : otherPermission(contents, permission, details));
     });
-    electron.session.setPermissionCheckHandler((_contents, permission, origin) => (permission === "media" ? options.isTrustedURL(origin) : true));
+    electron.session.setPermissionCheckHandler((contents, permission, origin, details) =>
+      permission === "media" ? isTrustedRequester(details, origin) : otherPermission(contents, permission, { ...(details as object), requestingOrigin: origin }),
+    );
     // Meeting audio (everyone else in the call): display-media capture with loopback audio, only
     // for the client's own pages and only while a recording is starting. The page stops the
     // screen's video track at once and keeps the audio.
@@ -205,10 +229,14 @@ export async function startBriefsHost(options: BriefsHostOptions): Promise<Brief
         () => deny(),
       );
     });
-    // Back to the client's own behavior: no handlers (Electron's defaults).
+    // Back to the client's own handlers (or none, without them).
     undo.push(() => {
-      electron.session.setPermissionRequestHandler(null);
-      electron.session.setPermissionCheckHandler(null);
+      if (options.permissions !== undefined) {
+        options.permissions.restore();
+      } else {
+        electron.session.setPermissionRequestHandler(null);
+        electron.session.setPermissionCheckHandler(null);
+      }
       electron.session.setDisplayMediaRequestHandler(null);
     });
 
@@ -256,16 +284,19 @@ export async function startBriefsHost(options: BriefsHostOptions): Promise<Brief
       created.stop();
     });
 
-    const isTrustedSender = (event: { readonly senderFrame?: { readonly url: string } | null }): boolean => options.isTrustedURL(event.senderFrame?.url ?? "");
+    const isTrustedSender = trustedTopFrame(options.isTrustedURL);
+    // Size limits from the client's IPC policy (electron-ipc-policy.js RAW_IPC_LIMITS); none without it.
+    const limits = options.ipcLimits;
+    const fits = (value: unknown, max: number | undefined): boolean => limits === undefined || max === undefined || limits.measure(value, max) <= max;
     const onRecordingFrame = (event: IpcMainEvent, frame: RecordingFrame): void => {
-      if (isTrustedSender(event) && typeof frame === "object" && frame !== null) created.recording.frame(frame);
+      if (isTrustedSender(event) && typeof frame === "object" && frame !== null && fits(frame, limits?.recordingFrame)) created.recording.frame(frame);
     };
     const onTalkFrame = (event: IpcMainEvent, frame: unknown): void => {
-      if (isTrustedSender(event) && frame instanceof Float32Array) created.talkAudio.frame(frame);
+      if (isTrustedSender(event) && frame instanceof Float32Array && fits(frame, limits?.talkFrame)) created.talkAudio.frame(frame);
     };
     // The capture window's meters go to the pages as events. Two numbers, never audio.
     const onRecordingLevels = (event: IpcMainEvent, levels: unknown): void => {
-      if (!isTrustedSender(event) || typeof levels !== "object" || levels === null) return;
+      if (!isTrustedSender(event) || typeof levels !== "object" || levels === null || !fits(levels, limits?.recordingLevels)) return;
       const { mic, meeting } = levels as { mic?: unknown; meeting?: unknown };
       if (typeof mic === "number" && typeof meeting === "number") hub.emit({ type: "recordingLevels", mic, meeting });
     };
@@ -296,7 +327,7 @@ export async function startBriefsHost(options: BriefsHostOptions): Promise<Brief
     });
     electron.protocol.handle(AUDIO_SCHEME, (request) => created.audio.handle(request.url, request.headers.get("range")));
     undo.push(() => electron.protocol.unhandle(AUDIO_SCHEME));
-    undo.push(registerServices(created.services, isTrustedSender, gate));
+    undo.push(registerServices(created.services, isTrustedSender, gate, limits === undefined ? undefined : { measure: limits.measure, maxBytes: limits.bridgeCall }));
     created.start();
     log.info("startup.host_ready");
 

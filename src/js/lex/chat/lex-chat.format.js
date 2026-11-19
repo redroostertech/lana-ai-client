@@ -579,7 +579,7 @@
         if (!href) return escapeHtml(text);
         // Only http(s) and mailto open a new tab; app paths and #anchors stay
         // in the window so lex-router handles them.
-        const external = global.LanaSafeUrl.safeLinkHref(href) ? ' target="_blank" rel="noopener noreferrer"' : '';
+        const external = global.LanaSafeUrl.safeLinkHref(href) ? ' target="_blank" rel="noopener"' : '';
         return `<a href="${escapeHtml(encodeHref(href))}"${external} class="text-indigo-600 hover:text-indigo-800 hover:underline font-medium">${escapeHtml(text)}</a>`;
       });
 

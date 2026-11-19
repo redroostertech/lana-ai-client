@@ -36,7 +36,7 @@
 
   function resolveOrganization(orgId) {
     return Discovery.resolveOrganization(orgId, linkDomain || Discovery.generateServerUrl(orgId), {
-      fetch: function (url, init) { return fetch(url, init); },
+      discover: Discovery.electronDiscover,
       normalizeEnabledApps: normalizeEnabledApps
     }).then(Kit.preparePin);
   }

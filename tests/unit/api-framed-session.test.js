@@ -96,12 +96,13 @@ test('control: the top window ApiClient still starts session services', () => {
 
 test('startSessionServices called directly in a frame starts nothing', async () => {
   const { api, context, timers } = loadApi({ framed: true, token: soon() });
-  context.electronAPI = { invoke: jest.fn() };
+  context.electronAPI = { sessionTracking: { initialize: jest.fn(), start: jest.fn() } };
   await api.startSessionServices();
   expect(timers.setTimeout).not.toHaveBeenCalled();
   expect(timers.setInterval).not.toHaveBeenCalled();
   expect(context.document.addEventListener).not.toHaveBeenCalled();
-  expect(context.electronAPI.invoke).not.toHaveBeenCalled();
+  expect(context.electronAPI.sessionTracking.initialize).not.toHaveBeenCalled();
+  expect(context.electronAPI.sessionTracking.start).not.toHaveBeenCalled();
 });
 
 test('performTokenRefresh in a frame neither calls the server nor writes the top token', async () => {

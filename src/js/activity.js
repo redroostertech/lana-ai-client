@@ -249,9 +249,11 @@ window.ActivityPanel = (function() {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
             </svg>
             <p class="text-gray-500">Failed to load activity</p>
-            <button onclick="ActivityPanel.loadActivities(true)" class="mt-2 text-indigo-600 hover:text-indigo-800 text-sm font-medium">Try again</button>
+            <button type="button" data-activity-retry class="mt-2 text-indigo-600 hover:text-indigo-800 text-sm font-medium">Try again</button>
           </div>
         `;
+        const retry = elements.list.querySelector('[data-activity-retry]');
+        if (retry) retry.addEventListener('click', () => loadActivities(true));
       }
     } finally {
       state.isLoading = false;
@@ -481,9 +483,11 @@ window.ActivityPanel = (function() {
       container.innerHTML = `
         <div class="p-6 text-center">
           <p class="text-gray-500">Failed to load activity</p>
-          <button onclick="ActivityPanel.loadDashboardFeed(10)" class="mt-2 text-indigo-600 hover:text-indigo-800 text-sm font-medium">Try again</button>
+          <button type="button" data-activity-feed-retry class="mt-2 text-indigo-600 hover:text-indigo-800 text-sm font-medium">Try again</button>
         </div>
       `;
+      const retry = container.querySelector('[data-activity-feed-retry]');
+      if (retry) retry.addEventListener('click', () => loadDashboardFeed(10));
     }
   }
 

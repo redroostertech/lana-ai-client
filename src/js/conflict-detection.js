@@ -85,7 +85,7 @@ class ConflictDetection {
               ${party.party_role ? `<div class="flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg><span>${this.escapeHtml(party.party_role)}</span></div>` : ''}
             </div>
           </div>
-          <button type="button" onclick="conflictDetection.removeParty(${index})" class="text-gray-400 hover:text-red-600 p-1 flex-shrink-0">
+          <button type="button"${window.LanaDomActions.on('click', 'conflictDetection.removeParty', [index])} class="text-gray-400 hover:text-red-600 p-1 flex-shrink-0">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
           </button>
         </div>
@@ -294,16 +294,14 @@ class ConflictDetection {
                 <input
                   type="checkbox"
                   id="acknowledgeConflict"
-                  ${this.conflictsCleared ? 'checked' : ''}
-                  onchange="conflictDetection.toggleConflictAcknowledgment(this.checked)"
+                  ${this.conflictsCleared ? 'checked' : ''}${window.LanaDomActions.on('change', 'conflictDetection.toggleConflictAcknowledgment', [window.LanaDomActions.CHECKED])}
                   class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
                 <span class="font-medium">
                   I acknowledge these conflicts and wish to proceed
                 </span>
               </label>
               <button
-                type="button"
-                onclick="conflictDetection.showConflictDetails()"
+                type="button"${window.LanaDomActions.on('click', 'conflictDetection.showConflictDetails', [])}
                 class="ml-auto text-sm font-medium ${criticalCount > 0 ? 'text-red-700 hover:text-red-800' : 'text-yellow-700 hover:text-yellow-800'} underline">
                 View Details
               </button>
@@ -579,3 +577,10 @@ class ConflictDetection {
 
 // Export for the create-matter modals (workspaces.html, workspace-details.html)
 window.ConflictDetection = ConflictDetection;
+
+// Actions named by this file's markup (js/shared/dom-actions.js).
+window.LanaDomActions.registerGlobals([
+  'conflictDetection.removeParty',
+  'conflictDetection.showConflictDetails',
+  'conflictDetection.toggleConflictAcknowledgment'
+]);

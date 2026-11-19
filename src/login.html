@@ -180,9 +180,8 @@
     // Set app version from centralized version system
     document.getElementById('app-version').textContent = window.APP_VERSION?.getVersion() || 'v0.0.0';
 
-    // Hosted discovery endpoint (js/shared/org-discovery.js)
+    // Hosted discovery (js/shared/org-discovery.js), asked by the main process
     const OrgDiscovery = window.LanaOrgDiscovery;
-    const HOSTED_DISCOVERY_URL = OrgDiscovery.DISCOVERY_URL;
 
     function normalizeEnabledApps(enabledApps) {
       if (window.LanaClientApps && typeof window.LanaClientApps.normalizeEnabledAppList === 'function') {
@@ -294,6 +293,10 @@
       window.electronAPI.onConnectOrg((orgId) => {
         if (orgIdInput) orgIdInput.value = orgId;
       });
+      // One that came before this page showed (the app was starting, or another page was open).
+      window.electronAPI.takeConnectOrg().then((orgId) => {
+        if (orgId && orgIdInput) orgIdInput.value = orgId;
+      }).catch(() => {});
     }
     const serverUrlInput = document.getElementById('serverUrl');
     const devApiOverrideInput = document.getElementById('devApiOverride');
@@ -531,7 +534,7 @@
      */
     function resolveOrganization(orgId, serverUrl) {
       return OrgDiscovery.resolveOrganization(orgId, serverUrl, {
-        fetch: (url, init) => fetch(url, init),
+        discover: OrgDiscovery.electronDiscover,
         normalizeEnabledApps
       });
     }
@@ -548,18 +551,11 @@
         return;
       }
       try {
-        const response = await fetch(HOSTED_DISCOVERY_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            org_id: savedServer.orgId,
-            domain: savedServer.domain
-          }),
-          signal: AbortSignal.timeout(5000)
-        });
-        if (!response.ok) return;
-        const data = await response.json();
-        if (data.status !== 'healthy' || !data.server) return;
+        // Main asks discovery and keeps the firm's service keys (electron-main.js discovery:resolve).
+        const answer = await OrgDiscovery.electronDiscover(savedServer.orgId, OrgDiscovery.extractDomain(savedServer.domain));
+        if (!answer || !answer.reached || answer.status < 200 || answer.status >= 300) return;
+        const data = answer.body;
+        if (!data || data.status !== 'healthy' || !data.server) return;
 
         const freshPin = OrgDiscovery.chefCertPin(data);
         const merged = {
@@ -571,7 +567,6 @@
           apiVersion: data.server.api_version || savedServer.apiVersion,
           tier: data.tier || 'standard',
           rateLimit: data.rate_limit || 100,
-          burstApiKey: data.burst_api_key || null,
           burstUrl: data.burst_url || null,
           // A new pin from the control plane (the box's certificate changed).
           chefCertSha256: freshPin || savedServer.chefCertSha256 || null,
@@ -743,11 +738,8 @@
           port: serverInfo.port,
           // A hardware box's Chef certificate pin (control plane), or null.
           chefCertSha256: serverInfo.chefCertSha256 || null,
-          // Burst API configuration for direct calls
-          burstApiKey: serverInfo.burstApiKey,
+          // Burst and Forge addresses. Their keys stay in the main process.
           burstUrl: serverInfo.burstUrl,
-          // Forge agents platform configuration (Phase 1)
-          forgeApiKey: serverInfo.forgeApiKey,
           forgeUrl: serverInfo.forgeUrl,
           forgeSovereign: serverInfo.forgeSovereign,
           tier: serverInfo.tier,

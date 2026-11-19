@@ -13,7 +13,7 @@
     <script src="../js/shared/request-retry.js"></script>
     <script src="../js/api.js"></script>
     <script src="../js/components.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/vendor/fontawesome/css/all.min.css">
   <script src="../js/menu.js"></script>
 
   <!-- Inline preloader styles - Pure CSS, no dependencies -->
@@ -188,6 +188,7 @@
         </div>
     </div>
 
+    <script src="../js/shared/dom-actions.js"></script>
     <script>
 
         // Auth check
@@ -291,7 +292,7 @@
                 <div class="permission-category" data-category="${category}">
                     <div class="flex items-center justify-between mb-3">
                         <h4 class="font-medium text-gray-900 capitalize">${category.replace(/_/g, ' ')}</h4>
-                        <button onclick="toggleCategory('${category}')" class="text-xs text-blue-600 hover:underline">Toggle All</button>
+                        <button${LanaDomActions.on('click', 'toggleCategory', [String(category)])} class="text-xs text-blue-600 hover:underline">Toggle All</button>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         ${perms.map(perm => `
@@ -427,7 +428,12 @@
                 timeout = setTimeout(later, wait);
             };
         }
-    </script>
+
+    // Actions named by this page's markup (js/shared/dom-actions.js).
+    LanaDomActions.registerGlobals([
+      'toggleCategory'
+    ]);
+  </script>
   </div>
         <script src="../js/auth-guard.js"></script>
 </body>

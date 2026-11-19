@@ -53,7 +53,7 @@
     var h = helpers();
     var electron = typeof h.isElectronFlow === 'function'
       ? h.isElectronFlow()
-      : Boolean(window.isElectron || window.electronAPI || window.location.protocol === 'file:');
+      : Boolean(window.isElectron || window.electronAPI || (window.location.protocol === 'file:' || window.location.protocol === 'lana-app:'));
     return electron ? 'electron' : 'web';
   }
 

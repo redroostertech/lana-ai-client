@@ -6,9 +6,8 @@
      Security    — password change (live validation) + MFA (conditional)
      Preferences — desktop and in-app notification toggles (conditional)
      Sessions    — see pages/settings-sessions.js
-     VPN         — VPN status, config download, setup/reset (Electron only)
 
-   Conditional sections (Preferences, VPN) are shown/hidden based on config.
+   Conditional sections (Preferences) are shown/hidden based on config.
 
    No regex. No classes. No top-level const/let.
    ========================================================================== */
@@ -80,7 +79,6 @@
 
     // Conditional sections
     dom.preferencesSection = document.getElementById('sv2-section-preferences');
-    dom.vpnSection         = document.getElementById('sv2-section-vpn');
 
     // Regional / Time Zone
     dom.timezoneSelect = document.getElementById('sv2-timezone-select');
@@ -93,9 +91,6 @@
     dom.inAppTypesToggle = document.getElementById('sv2-in-app-types-toggle');
     dom.inAppTypes = document.getElementById('sv2-in-app-types');
 
-
-    // VPN
-    dom.vpnContent = document.getElementById('sv2-vpn-content');
 
     // Connected Apps (bridge consents)
     dom.connectedAppsSection = document.getElementById('sv2-section-connected-apps');
@@ -953,175 +948,6 @@
 
 
   // =========================================================================
-  // VPN
-  // =========================================================================
-
-  function loadVpnStatus() {
-    if (typeof vpnManager === 'undefined') return;
-
-    vpnManager.isConfigured().then(function (isConfigured) {
-      return vpnManager.isRegistered().then(function (isRegistered) {
-        if (isConfigured) {
-          return vpnManager._loadKeys().then(function (keys) {
-            renderVpnConfigured(keys, isRegistered);
-          });
-        } else {
-          renderVpnNotConfigured();
-        }
-      });
-    }).catch(function (error) {
-      console.error('[Settings V2] Failed to load VPN status:', error);
-      if (dom.vpnContent) {
-        dom.vpnContent.innerHTML =
-          '<lex-card heading="VPN Status">' +
-            '<lex-empty message="Failed to load VPN status" icon="inbox"></lex-empty>' +
-          '</lex-card>';
-      }
-    });
-  }
-
-  function renderVpnConfigured(keys, isRegistered) {
-    if (!dom.vpnContent) return;
-    var statusBadge = isRegistered
-      ? '<lex-badge label="Registered" color="green" size="sm"></lex-badge>'
-      : '<lex-badge label="Pending Registration" color="yellow" size="sm"></lex-badge>';
-
-    var deviceId = keys.deviceId ? keys.deviceId.substring(0, 8) + '...' : 'Unknown';
-    var clientIp = keys.clientIp || 'Not assigned';
-    var registration = isRegistered ? 'Registered' : 'Pending';
-    var createdAt = keys.createdAt ? Lex.Utils.formatDate(keys.createdAt) : 'Unknown';
-
-    dom.vpnContent.innerHTML =
-      '<lex-card heading="VPN Status">' +
-        '<div class="sv2-mfa-header">' +
-          '<lex-text variant="secondary" size="body-sm">Secure remote access connection</lex-text>' +
-          statusBadge +
-        '</div>' +
-        '<div class="sv2-vpn-banner sv2-vpn-banner--ok">' +
-          '<svg width="20" height="20" fill="none" stroke="var(--lex-status-success-text)" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>' +
-          '<div>' +
-            '<lex-text variant="primary" size="body-sm" weight="medium">VPN Configured</lex-text>' +
-            '<lex-text variant="secondary" size="body-xs">Your device is set up for secure remote access.</lex-text>' +
-          '</div>' +
-        '</div>' +
-        '<div class="sv2-vpn-grid">' +
-          '<lex-kv label="Device ID" value="' + esc(deviceId) + '"></lex-kv>' +
-          '<lex-kv label="VPN IP Address" value="' + esc(clientIp) + '"></lex-kv>' +
-          '<lex-kv label="Registration" value="' + esc(registration) + '"></lex-kv>' +
-          '<lex-kv label="Created" value="' + esc(createdAt) + '"></lex-kv>' +
-        '</div>' +
-        '<div class="sv2-form-actions">' +
-          '<lex-btn id="sv2-vpn-download-btn" variant="primary" size="sm" icon="download">Download Config</lex-btn>' +
-          '<lex-btn id="sv2-vpn-reset-btn" variant="ghost" size="sm">Reset</lex-btn>' +
-        '</div>' +
-      '</lex-card>';
-
-    wireVpnButtons();
-  }
-
-  function renderVpnNotConfigured() {
-    if (!dom.vpnContent) return;
-    dom.vpnContent.innerHTML =
-      '<lex-card heading="VPN Status">' +
-        '<div class="sv2-mfa-header">' +
-          '<lex-text variant="secondary" size="body-sm">Secure remote access connection</lex-text>' +
-          '<lex-badge label="Not Configured" color="gray" size="sm"></lex-badge>' +
-        '</div>' +
-        '<div class="sv2-vpn-banner sv2-vpn-banner--warn">' +
-          '<svg width="20" height="20" fill="none" stroke="var(--lex-status-warning-text)" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>' +
-          '<div>' +
-            '<lex-text variant="primary" size="body-sm" weight="medium">VPN Not Configured</lex-text>' +
-            '<lex-text variant="secondary" size="body-xs">Set up VPN to access LanaAI securely from outside your network.</lex-text>' +
-          '</div>' +
-        '</div>' +
-        '<lex-btn id="sv2-vpn-setup-btn" variant="primary" size="sm" icon="plus">Set Up VPN</lex-btn>' +
-      '</lex-card>';
-
-    wireVpnButtons();
-  }
-
-  function wireVpnButtons() {
-    var downloadBtn = document.getElementById('sv2-vpn-download-btn');
-    var resetBtn = document.getElementById('sv2-vpn-reset-btn');
-    var setupBtn = document.getElementById('sv2-vpn-setup-btn');
-
-    if (downloadBtn) {
-      downloadBtn.addEventListener('click', function () {
-        var savedServerJson = localStorage.getItem('lana_saved_server');
-        if (!savedServerJson) {
-          Lex.Toast.error('No server connection found. Please log in again.');
-          return;
-        }
-
-        var serverInfo;
-        try { serverInfo = JSON.parse(savedServerJson); } catch (e) {
-          Lex.Toast.error('Invalid server configuration.');
-          return;
-        }
-
-        if (!serverInfo.vpn) {
-          Lex.Toast.error('VPN configuration not available from server.');
-          return;
-        }
-
-        downloadBtn.loading = true;
-        vpnManager.getOrCreateConfig(serverInfo.vpn).then(function (config) {
-          var filename = vpnManager.downloadConfigFile(config.configFile, serverInfo.orgName || serverInfo.orgId);
-          Lex.Toast.success('Downloaded: ' + filename);
-          downloadBtn.loading = false;
-        }).catch(function (error) {
-          Lex.Toast.error(error.message || 'Failed to download VPN configuration');
-          downloadBtn.loading = false;
-        });
-      });
-    }
-
-    if (resetBtn) {
-      resetBtn.addEventListener('click', function () {
-        Lex.Modal.confirm('Reset VPN Configuration', 'This will remove your VPN keys. You will need to set up VPN again. Continue?', function () {
-          vpnManager.clearKeys().then(function () {
-            Lex.Toast.success('VPN configuration reset');
-            loadVpnStatus();
-          }).catch(function (error) {
-            Lex.Toast.error(error.message || 'Failed to reset VPN');
-          });
-        }, {
-          variant: 'danger',
-          confirmText: 'Reset'
-        });
-      });
-    }
-
-    if (setupBtn) {
-      setupBtn.addEventListener('click', function () {
-        var savedServerJson = localStorage.getItem('lana_saved_server');
-        if (!savedServerJson) {
-          Lex.Toast.error('No server connection found. Please log out and reconnect.');
-          return;
-        }
-        var serverInfo;
-        try { serverInfo = JSON.parse(savedServerJson); } catch (e) {
-          Lex.Toast.error('Invalid server configuration.');
-          return;
-        }
-        // There is no in-app setup page: discovery advertises that the org sits
-        // behind a VPN but ships no endpoint, key, or PSK to configure, so the
-        // connection is made with the provider's own client. Navigating to a
-        // setup page here previously landed on a URL that does not exist and
-        // blanked the window.
-        var vpnType = (serverInfo.vpn && serverInfo.vpn.type) ? serverInfo.vpn.type : '';
-        var vpnName = vpnType ? vpnType.charAt(0).toUpperCase() + vpnType.slice(1) : 'the';
-        Lex.Toast.info(
-          (serverInfo.orgName || serverInfo.orgId || 'This organization') +
-          ' uses ' + vpnName + ' VPN for remote access. Install and sign in to it on this device, ' +
-          'then reconnect — there is no setup step inside LanaAI.'
-        );
-      });
-    }
-  }
-
-
-  // =========================================================================
   // Connected Apps (Companion Bridge consents)
   //
   // The bridge stores per-app consents in an electron-store named
@@ -1723,7 +1549,7 @@
       window.electronAPI.openExternal(url);
       return;
     }
-    window.open(url, '_blank', 'noopener,noreferrer');
+    window.open(url, '_blank', 'noopener');
   }
 
   function connectUserConnector(btn, connectorId) {

@@ -6,6 +6,12 @@
  * leaves " and ' raw, so any value placed inside a quoted attribute could
  * close the attribute and add new ones (onfocus, autofocus, ...). These
  * tests pin the shared helper and a few of the converted call sites.
+ *
+ * Markup that scripts build no longer carries inline handlers (the page CSP
+ * blocks them): it names an action and passes ids and names as JSON data
+ * (js/shared/dom-actions.js). The handler tests below click the real elements
+ * through that dispatcher, so an id or name that broke out of its attribute,
+ * or reached markup unescaped, still fails them.
  */
 'use strict';
 
@@ -18,6 +24,20 @@ const tick = (window, ms = 20) => new Promise((resolve) => window.setTimeout(res
 
 const ATTACK = 'x" autofocus onfocus="window.__pwned=1" data-pwn="1';
 const SINGLE_ATTACK = "x' onmouseover='window.__pwned=1' data-pwn='1";
+
+// Click every element that names a click action, as a person would; the
+// registered globals record the first argument they receive.
+function clickActions(window, host, names) {
+  const calls = [];
+  names.forEach((n) => { window[n] = (id) => calls.push(id); });
+  window.LanaDomActions.registerGlobals(names);
+  if (!host.isConnected) window.document.body.appendChild(host);
+  expect(host.querySelectorAll('[onclick], [onchange], [onerror], [onmouseover], [onfocus]').length).toBe(0);
+  host.querySelectorAll('[data-on-click]').forEach((el) => {
+    if (names.includes(el.getAttribute('data-on-click'))) el.click();
+  });
+  return calls;
+}
 
 function boot(scripts, before) {
   const dom = new JSDOM('<!doctype html><body></body>', {
@@ -221,7 +241,7 @@ describe('workflow-builder node config form', () => {
   const TAG_ATTACK = '</textarea><img src=x onerror="window.__pwned=1">' + ATTACK;
 
   test('every config input and textarea keeps hostile values as values', () => {
-    const window = boot(['time-utils.js', 'lex/lex.core.js', 'workflow-builder.js']);
+    const window = boot(['time-utils.js', 'lex/lex.core.js', 'shared/dom-actions.js', 'workflow-builder.js']);
     const all = [].concat(...Object.values(window.WorkflowNodeTypes));
     const proto = window.WorkflowBuilder.prototype;
     let checked = 0;
@@ -248,7 +268,7 @@ describe('admin onboarding_management.html steps', () => {
     const start = html.indexOf('function renderSteps()');
     const end = html.indexOf('\n        }\n', start) + '\n        }\n'.length;
     expect(start).toBeGreaterThan(-1);
-    const window = boot(['time-utils.js', 'lex/lex.core.js']);
+    const window = boot(['time-utils.js', 'lex/lex.core.js', 'shared/dom-actions.js']);
     window.document.body.innerHTML = '<div id="stepsContainer"></div>';
     window.onboardingSteps = [{ id: 1, name: ATTACK, description: SINGLE_ATTACK.replace(/'/g, '"'), required: false, enabled: true }];
     window.eval(html.slice(start, end) + '\nrenderSteps();');
@@ -306,22 +326,12 @@ describe('workspaces page renderers (js/workspace.js)', () => {
   const EVIL = "m1');window.__pwned=1;//";
 
   function load() {
-    const window = boot(['time-utils.js', 'lex/lex.core.js']);
+    const window = boot(['time-utils.js', 'lex/lex.core.js', 'shared/dom-actions.js']);
     window.eval('var selectedMatters = new Set(); function statusBadge() { return \'\'; } function formatDate(v) { return String(v || \'\'); }\n'
-      + extract('escapeHtml') + '\n' + extract('jsArg') + '\n' + extract('matterOptionsMenuHtml') + '\n'
+      + extract('escapeHtml') + '\n' + extract('act') + '\n' + extract('matterOptionsMenuHtml') + '\n'
       + extract('renderMatterCard') + '\n' + extract('renderPinnedCard')
       + '\nwindow.renderMatterCard = renderMatterCard; window.renderPinnedCard = renderPinnedCard;');
     return window;
-  }
-
-  function runHandlers(window, host, names) {
-    const calls = [];
-    names.forEach((n) => { window[n] = (id) => calls.push(id); });
-    host.querySelectorAll('[onclick]').forEach((el) => {
-      const code = el.getAttribute('onclick');
-      if (new RegExp(names.join('|')).test(code)) new window.Function('event', code)({ stopPropagation() {} });
-    });
-    return calls;
   }
 
   test('matter card handlers get the matter id as one string', () => {
@@ -330,7 +340,7 @@ describe('workspaces page renderers (js/workspace.js)', () => {
     host.innerHTML = window.renderMatterCard({ matter_id: EVIL, name: HOSTILE, client_name: HOSTILE, description: HOSTILE, source: EVIL, is_pinned: '1);window.__pwned=1;//' });
     expect(host.querySelector('img')).toBeNull();
     expect(host.querySelector('[onfocus], [data-pwn]')).toBeNull();
-    const calls = runHandlers(window, host, ['toggleMatterSelection', 'viewMatter', 'togglePin']);
+    const calls = clickActions(window, host, ['toggleMatterSelection', 'viewMatter', 'togglePin']);
     expect(window.__pwned).toBeUndefined();
     expect(calls).toEqual([EVIL, EVIL, EVIL]);
   });
@@ -340,7 +350,7 @@ describe('workspaces page renderers (js/workspace.js)', () => {
     const host = window.document.createElement('div');
     host.innerHTML = window.renderPinnedCard({ matter_id: EVIL, name: HOSTILE, client_name: HOSTILE, source: EVIL, status: 'active' });
     expect(host.querySelector('img')).toBeNull();
-    const calls = runHandlers(window, host, ['viewMatter', 'togglePin']);
+    const calls = clickActions(window, host, ['viewMatter', 'togglePin']);
     expect(window.__pwned).toBeUndefined();
     expect(calls).toEqual([EVIL, EVIL]);
   });
@@ -348,8 +358,9 @@ describe('workspaces page renderers (js/workspace.js)', () => {
   test('share pickers render user fields as text and pass the id as one string', () => {
     const js = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'js', 'workspace.js'), 'utf8');
     ['addUserToShare', 'removeUserFromShare', 'addWorkspaceUserToShare', 'removeWorkspaceUserFromShare'].forEach((fn) => {
-      expect(js).toContain('onclick="' + fn + '(${jsArg(u.id)})"');
+      expect(js).toContain("${act('click', '" + fn + "', [u.id])}");
       expect(js).not.toContain(fn + "('${u.id}')");
+      expect(js).not.toContain('on' + "click=\"" + fn);
     });
     expect(js).not.toMatch(/\$\{u\.(email|first_name|last_name)\}/);
   });
@@ -397,8 +408,8 @@ describe('integrations/connectors.html cards', () => {
   const EVIL_ID = "x');window.__pwned=1;//";
 
   function load() {
-    const window = boot(['time-utils.js', 'lex/lex.core.js']);
-    const helpers = PAGE.includes('function connectorJsArg(') ? extract('connectorJsArg') : '';
+    const window = boot(['time-utils.js', 'lex/lex.core.js', 'shared/dom-actions.js']);
+    const helpers = extract('connectorArg');
     window.eval('var ConnectorRegistry = { isConnectorInstalled: function () { return false; } };\n'
       + 'function getConnectorWithDefaults(c) { return c; }\nfunction timeAgo() { return \'now\'; }\n'
       + helpers + '\n' + extract('formatText') + '\n' + extract('renderConnectorCard') + '\n' + extract('renderAvailableConnectorCard')
@@ -413,9 +424,7 @@ describe('integrations/connectors.html cards', () => {
     const img = host.querySelector('img');
     expect(img.getAttribute('alt')).toBe(HOSTILE);
     expect(host.querySelector('[onfocus], [data-pwn]')).toBeNull();
-    const calls = [];
-    ['showConnectorDetails', 'showConnectorActionsModal', 'installConnector', 'openConnector'].forEach((n) => { window[n] = (id) => calls.push(id); });
-    host.querySelectorAll('button[onclick]').forEach((el) => new window.Function('event', el.getAttribute('onclick'))({ stopPropagation() {} }));
+    const calls = clickActions(window, host, ['showConnectorDetails', 'showConnectorActionsModal', 'installConnector', 'openConnector']);
     expect(window.__pwned).toBeUndefined();
     expect(calls.length).toBeGreaterThan(0);
     calls.forEach((id) => expect(id).toBe(EVIL_ID));

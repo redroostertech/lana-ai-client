@@ -50,7 +50,31 @@ function makeStorage() {
   };
 }
 
+// Discovery is asked by the main process (discovery:resolve). The test's fetch plays the
+// control plane; this answers the page the way main does.
+function discoveryThroughMain(fetch) {
+  return {
+    resolve: async (orgId, domain) => {
+      let response;
+      try {
+        response = await fetch('https://control-plane.test/lana-ai/v1/discovery', { method: 'POST', body: JSON.stringify({ org_id: orgId, domain }) });
+      } catch (_) {
+        return { reached: false };
+      }
+      let body = null;
+      try { body = await response.json(); } catch (_) { body = null; }
+      return { reached: true, status: response.status, body };
+    }
+  };
+}
+
 function loadLogin({ fetch, electronAPI = undefined, reachability = null }) {
+  electronAPI = {
+    getConfig: async () => ({}),
+    saveSettings: async () => ({ success: true }),
+    ...(electronAPI || {}),
+    discovery: discoveryThroughMain(fetch)
+  };
   const loginHtml = fs.readFileSync(path.join(ROOT, 'src/login.html'), 'utf8');
   const inlineScripts = [...loginHtml.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
   const mainScript = inlineScripts.reduce((a, b) => (b.length > a.length ? b : a));

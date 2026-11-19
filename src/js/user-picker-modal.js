@@ -208,15 +208,13 @@ const UserPickerModal = {
     if (!id) return '';
     var label = user.label || user.username || user.email || 'User';
     var sub = user.email || user.username || '';
-    var safeId = UserPickerModal.escapeHtml(id);
     var safeLabel = UserPickerModal.escapeHtml(label);
-    var safeLabelJs = UserPickerModal.escapeJs(label);
     var safeSub = UserPickerModal.escapeHtml(sub);
 
     return '<div class="upm-user-item" style="padding:12px 14px;border-radius:var(--lex-radius-md,8px);border:1px solid var(--lex-border-subtle,rgba(0,0,0,0.08));cursor:pointer;margin-bottom:8px;transition:border-color 0.15s,background 0.15s" '
-      + 'onmouseenter="this.style.borderColor=\'var(--lex-border-accent,#6366f1)\';this.style.background=\'var(--lex-bg-secondary)\'" '
-      + 'onmouseleave="this.style.borderColor=\'var(--lex-border-subtle,rgba(0,0,0,0.08))\';this.style.background=\'transparent\'" '
-      + 'onclick="UserPickerModal.selectUser(\'' + safeId + '\', \'' + safeLabelJs + '\')">'
+      + window.LanaDomActions.on('mouseenter', 'pickerItemHover', [window.LanaDomActions.ELEMENT, true])
+      + window.LanaDomActions.on('mouseleave', 'pickerItemHover', [window.LanaDomActions.ELEMENT, false])
+      + window.LanaDomActions.on('click', 'UserPickerModal.selectUser', [String(id), String(label)]) + '>'
       + '<div style="font-weight:500;color:var(--lex-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + safeLabel + '</div>'
       + (sub ? '<p style="font-size:var(--lex-body-sm-size,0.8125rem);color:var(--lex-text-secondary);margin:2px 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + safeSub + '</p>' : '')
       + '</div>';
@@ -280,26 +278,22 @@ const UserPickerModal = {
       else                out += c;
     }
     return out;
-  },
-
-  escapeJs(value) {
-    if (value === null || value === undefined) return '';
-    var s = String(value);
-    var out = '';
-    for (var i = 0; i < s.length; i++) {
-      var c = s.charAt(i);
-      if (c === '\\')      out += '\\\\';
-      else if (c === "'")  out += "\\'";
-      else if (c === '"')  out += '\\"';
-      else if (c === '\n') out += '\\n';
-      else if (c === '\r') out += '\\r';
-      else                 out += c;
-    }
-    return out;
   }
 };
 
-// Expose globally so inline onclick handlers in renderUserItem can find it.
+// Expose globally (the item actions in renderUserItem name it).
 if (typeof window !== 'undefined') {
   window.UserPickerModal = UserPickerModal;
+}
+
+// Item hover and choice for markup built above (js/shared/dom-actions.js; the
+// page CSP blocks inline handlers).
+if (typeof window !== 'undefined' && window.LanaDomActions) {
+  if (!window.LanaDomActions.has('pickerItemHover')) {
+    window.LanaDomActions.register('pickerItemHover', function (el, on) {
+      el.style.borderColor = on ? 'var(--lex-border-accent,#6366f1)' : 'var(--lex-border-subtle,rgba(0,0,0,0.08))';
+      el.style.background = on ? 'var(--lex-bg-secondary)' : 'transparent';
+    });
+  }
+  window.LanaDomActions.registerGlobals(['UserPickerModal.selectUser']);
 }

@@ -282,7 +282,6 @@ const MatterPickerModal = {
     }
 
     var safeName = this.escapeHtml(matterName);
-    var safeNameJs = this.escapeJs(matterName);
     var safeClient = this.escapeHtml(clientName);
     var safeId = this.escapeHtml(matterIdString);
 
@@ -295,9 +294,9 @@ const MatterPickerModal = {
       : '';
 
     return '<div class="npm-matter-item" style="padding:12px 14px;border-radius:var(--lex-radius-md,8px);border:1px solid var(--lex-border-subtle,rgba(0,0,0,0.08));cursor:pointer;margin-bottom:8px;transition:border-color 0.15s,background 0.15s" '
-      + 'onmouseenter="this.style.borderColor=\'var(--lex-border-accent,#6366f1)\';this.style.background=\'var(--lex-bg-secondary)\'" '
-      + 'onmouseleave="this.style.borderColor=\'var(--lex-border-subtle,rgba(0,0,0,0.08))\';this.style.background=\'transparent\'" '
-      + 'onclick="MatterPickerModal.selectMatter(\'' + safeId + '\', \'' + safeNameJs + '\')">'
+      + window.LanaDomActions.on('mouseenter', 'pickerItemHover', [window.LanaDomActions.ELEMENT, true])
+      + window.LanaDomActions.on('mouseleave', 'pickerItemHover', [window.LanaDomActions.ELEMENT, false])
+      + window.LanaDomActions.on('click', 'MatterPickerModal.selectMatter', [String(matterIdString), String(matterName)]) + '>'
       + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">'
       + pinHtml
       + '<span style="font-weight:500;color:var(--lex-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + safeName + '</span>'
@@ -452,16 +451,6 @@ const MatterPickerModal = {
   escapeHtml(text) {
     if (!text) return '';
     return window.Lex.escapeHtml(text);
-  },
-
-  escapeJs(text) {
-    if (!text) return '';
-    return String(text)
-      .split('\\').join('\\\\')
-      .split("'").join("\\'")
-      .split('"').join('\\"')
-      .split('\n').join('\\n')
-      .split('\r').join('\\r');
   }
 };
 
@@ -478,4 +467,16 @@ if (typeof window !== 'undefined') {
 // Export for module usage
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = MatterPickerModal;
+}
+
+// Item hover and choice for markup built above (js/shared/dom-actions.js; the
+// page CSP blocks inline handlers).
+if (typeof window !== 'undefined' && window.LanaDomActions) {
+  if (!window.LanaDomActions.has('pickerItemHover')) {
+    window.LanaDomActions.register('pickerItemHover', function (el, on) {
+      el.style.borderColor = on ? 'var(--lex-border-accent,#6366f1)' : 'var(--lex-border-subtle,rgba(0,0,0,0.08))';
+      el.style.background = on ? 'var(--lex-bg-secondary)' : 'transparent';
+    });
+  }
+  window.LanaDomActions.registerGlobals(['MatterPickerModal.selectMatter']);
 }

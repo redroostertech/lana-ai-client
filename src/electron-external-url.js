@@ -36,4 +36,35 @@ function isAllowedExternalUrl(value) {
   return false;
 }
 
-module.exports = { isAllowedExternalUrl };
+// Mail link fields the app never uses and a page must not set: a local file to attach, and
+// hidden or extra recipients.
+const DROPPED_MAIL_FIELDS = new Set(['attach', 'attachment', 'cc', 'bcc']);
+
+/**
+ * The URL to hand to the system, or null when it may not be opened: an allowed URL as is,
+ * except that a mailto: link loses its attach, attachment, cc and bcc fields (the other
+ * fields stay exactly as written).
+ * @param {string} value
+ * @returns {string|null}
+ */
+function sanitizeExternalUrl(value) {
+  if (!isAllowedExternalUrl(value)) return null;
+  const url = parse(value);
+  if (url.protocol !== 'mailto:') return url.href;
+  // No line breaks anywhere in a mail link, raw or percent-encoded: they would start new
+  // mail headers in the mail app (a hidden Bcc, for example).
+  const text = value.trim().replace(/[\r\n]/g, '').replace(/%0[da]/gi, '');
+  // Stripping can rebuild an encoded break from nested text (%%0D0D becomes %0D): refuse it.
+  if (/%0[da]/i.test(text)) return null;
+  const queryAt = text.indexOf('?');
+  if (queryAt === -1) return text;
+  const kept = text.slice(queryAt + 1).split('&').filter((pair) => {
+    const name = pair.split('=')[0];
+    let decoded;
+    try { decoded = decodeURIComponent(name); } catch (_) { decoded = name; }
+    return pair !== '' && !DROPPED_MAIL_FIELDS.has(decoded.trim().toLowerCase());
+  });
+  return text.slice(0, queryAt) + (kept.length ? `?${kept.join('&')}` : '');
+}
+
+module.exports = { isAllowedExternalUrl, sanitizeExternalUrl };

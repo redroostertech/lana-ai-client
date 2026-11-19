@@ -80,9 +80,21 @@ contextBridge.exposeInMainWorld('lanaAuthToken', {
 });
 
 /**
- * Expose protected methods that allow the renderer process to use
- * ipcRenderer without exposing the entire object
+ * The app functions a page may call. Each names its own channel; there is no
+ * generic invoke or send, so a page (or script injected into one) can reach
+ * only these. The main process checks the sender and the arguments of every
+ * channel again (electron-ipc-guard.js, electron-ipc-policy.js;
+ * docs/plans/harden-ipc.md).
  */
+const LOG_MESSAGE_MAX = 8000;
+function logDetails(error) {
+  if (!error) return null;
+  return {
+    message: String(error.message || '').slice(0, LOG_MESSAGE_MAX),
+    stack: String(error.stack || '').slice(0, LOG_MESSAGE_MAX)
+  };
+}
+
 contextBridge.exposeInMainWorld('electronAPI', {
   /**
    * Application configuration
@@ -92,14 +104,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   /**
    * Debug logging - sends logs to main process for export
    */
-  logError: (message, error) => ipcRenderer.invoke('renderer-log-error', message, error),
-  logInfo: (message) => ipcRenderer.invoke('renderer-log-info', message),
+  logError: (message, error) => ipcRenderer.invoke('renderer-log-error', String(message).slice(0, LOG_MESSAGE_MAX), logDetails(error)),
+  logInfo: (message) => ipcRenderer.invoke('renderer-log-info', String(message).slice(0, LOG_MESSAGE_MAX)),
 
   /**
-   * Settings management (used by login to save resolved server info)
+   * Save the firm this app connects to (sign-in and app-link pages only)
    */
   saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
-  loadSettings: () => ipcRenderer.invoke('load-settings'),
+
+  /**
+   * Hosted discovery (sign-in and activation pages): main asks the control plane and returns
+   * { invalid } | { reached: false } | { reached: true, status, body }, without the firm's
+   * service keys. js/shared/org-discovery.js turns it into server info or a message.
+   */
+  discovery: {
+    resolve: (orgId, domain) => ipcRenderer.invoke('discovery:resolve', { orgId: String(orgId || ''), domain: String(domain || '') })
+  },
 
   /**
    * A hardware box's Chef certificate pin (electron-chef-pin.js). prepare: pin
@@ -123,16 +143,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getVersion: () => ipcRenderer.invoke('get-version'),
 
   /**
-   * Server connection (after hosted discovery resolves org)
-   */
-  connectToServer: (server) => ipcRenderer.invoke('connect-to-server', server),
-  verifyServer: (serverUrl) => ipcRenderer.invoke('verify-server', serverUrl),
-
-  /**
    * Server storage
    */
   getSavedServer: () => ipcRenderer.invoke('get-saved-server'),
-  clearSavedServer: () => ipcRenderer.invoke('clear-saved-server'),
 
   /**
    * App links from Chef's emails (electron-app-links.js). The sign-in page asks
@@ -239,30 +252,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   /**
-   * Updates
+   * Updates. The update server is always the saved firm's: a page passes nothing.
    */
-  checkUpdates: (serverUrl) => ipcRenderer.invoke('check-updates', serverUrl),
-  installUpdate: (serverUrl) => ipcRenderer.invoke('install-update', serverUrl),
+  checkUpdates: () => ipcRenderer.invoke('check-updates', null),
+  installUpdate: () => ipcRenderer.invoke('install-update', null),
 
   /**
-   * VPN Management (secure key storage)
+   * The update window's answer: 'update' | 'later' | 'skip' | 'retry' (src/update-dialog.html).
    */
-  vpn: {
-    generateKeyPair: () => ipcRenderer.invoke('vpn-generate-keypair'),
-    saveKeys: (keys) => ipcRenderer.invoke('vpn-save-keys', keys),
-    loadKeys: () => ipcRenderer.invoke('vpn-load-keys'),
-    clearKeys: () => ipcRenderer.invoke('vpn-clear-keys'),
-    getDeviceId: () => ipcRenderer.invoke('vpn-get-device-id')
+  updateDialog: {
+    respond: (choice) => ipcRenderer.send('update-dialog-response', choice)
   },
 
   /**
-   * Session Tracking (time tracking and activity monitoring)
+   * Session Tracking (time tracking and activity monitoring). The main process
+   * supplies the API base and the login token.
    */
   sessionTracking: {
-    getStatus: () => ipcRenderer.invoke('session-tracker:getStatus'),
-    updateMatter: (matterId) => ipcRenderer.invoke('session-tracker:updateMatter', matterId),
-    start: () => ipcRenderer.invoke('session-tracker:start'),
-    end: (reason) => ipcRenderer.invoke('session-tracker:end', reason)
+    initialize: () => ipcRenderer.invoke('session-tracker:initialize'),
+    start: () => ipcRenderer.invoke('session-tracker:start')
   },
 
   /**
@@ -305,11 +313,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   /**
-   * Generic IPC invoke (for extensibility)
-   */
-  invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
-
-  /**
    * Open a URL in the user's system browser via shell.openExternal.
    *
    * Used by the Apps section pages (knowledge-base.html, etc.) to launch
@@ -318,11 +321,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
    * so we route through the existing 'open-external-url' main-process handler.
    */
   openExternal: (url) => ipcRenderer.invoke('open-external-url', url),
-
-  /**
-   * Generic IPC send (fire-and-forget, for one-way messages to main process)
-   */
-  send: (channel, ...args) => ipcRenderer.send(channel, ...args),
 
   /**
    * Event listeners (one-way communication from main to renderer)
@@ -353,6 +351,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   /**
    * lana-ai://connect/<org-id>: the main process checked the id; the sign-in page fills it in.
    */
+  takeConnectOrg: () => ipcRenderer.invoke('connect-link:take').then((answer) => (answer && typeof answer.orgId === 'string' ? answer.orgId : null)),
   onConnectOrg: (callback) => {
     ipcRenderer.on('connect-link:org', (_event, data) => {
       const orgId = data && typeof data.orgId === 'string' ? data.orgId : null;
@@ -364,20 +363,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
    * Generate a CSRF-safe OAuth state parameter (local, deprecated)
    */
   generateOAuthState: () => ipcRenderer.invoke('generate-oauth-state'),
-
-  /**
-   * OAuth State Management (Backend-based)
-   * Creates a state token in the backend database for CSRF protection
-   */
-  createOAuthState: (provider, connectorId, matterId) =>
-    ipcRenderer.invoke('create-oauth-state', { provider, connectorId, matterId }),
-
-  /**
-   * OAuth Code Exchange (Backend-based)
-   * Exchanges authorization code for tokens via backend
-   */
-  exchangeOAuthCode: (code, state, provider, connectorId, redirectUri, realmId) =>
-    ipcRenderer.invoke('exchange-oauth-code', { code, state, provider, connectorId, redirectUri, realmId }),
 
   /**
    * PAC bridge (companion bridge) — in-app consent prompt

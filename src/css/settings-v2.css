@@ -346,8 +346,7 @@
 /* Card-level rules below query the panel column (.sv2-panels), so they
    follow the space the cards actually get, not the window. */
 @container sv2-panels (max-width: 479px) {
-  .sv2-kv-grid,
-  .sv2-vpn-grid {
+  .sv2-kv-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -409,41 +408,6 @@
   gap: 2px;
   min-width: 0;
   flex: 1;
-}
-
-
-/* ── VPN Status Banners ───────────────────────────────────────────── */
-
-.sv2-vpn-banner {
-  padding: 16px;
-  border-radius: var(--lex-radius-lg);
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.sv2-vpn-banner--ok {
-  background: var(--lex-status-success-bg);
-  border: 1px solid var(--lex-color-success-100);
-}
-
-.sv2-vpn-banner--warn {
-  background: var(--lex-status-warning-bg);
-  border: 1px solid var(--lex-color-warning-100);
-}
-
-
-/* ── VPN Device Grid ──────────────────────────────────────────────── */
-
-.sv2-vpn-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
-  background: var(--lex-bg-secondary);
-  border-radius: var(--lex-radius-lg);
-  padding: 16px;
-  margin-bottom: 16px;
 }
 
 

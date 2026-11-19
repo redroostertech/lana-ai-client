@@ -253,8 +253,6 @@
         + ' style="padding:8px 16px;font-size:13px;font-weight:500;border-radius:6px;'
         + 'border:1px solid #d1d5db;background:#fff;color:#374151;cursor:pointer;'
         + 'transition:all 0.15s ease;"'
-        + ' onmouseover="if(!this.disabled){this.style.background=\'#f3f4f6\'}"'
-        + ' onmouseout="if(!this.disabled){this.style.background=\'#fff\'}"'
         + '>'
         + (canTrigger ? 'Run Now' : 'Run Now (wait 10 min)')
         + '</button>'
@@ -309,6 +307,13 @@
       if (triggerBtn) {
         triggerBtn.addEventListener('click', function () {
           triggerManualHeartbeat();
+        });
+        // Hover shade (inline handlers are blocked by the page CSP).
+        triggerBtn.addEventListener('mouseover', function () {
+          if (!triggerBtn.disabled) triggerBtn.style.background = '#f3f4f6';
+        });
+        triggerBtn.addEventListener('mouseout', function () {
+          if (!triggerBtn.disabled) triggerBtn.style.background = '#fff';
         });
       }
     }, 100);

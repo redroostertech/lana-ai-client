@@ -259,7 +259,7 @@
       if (window.electronAPI && typeof window.electronAPI.openExternal === 'function') {
         window.electronAPI.openExternal(safeUrl);
       } else {
-        window.open(safeUrl, '_blank', 'noopener,noreferrer');
+        window.open(safeUrl, '_blank', 'noopener');
       }
       return;
     }

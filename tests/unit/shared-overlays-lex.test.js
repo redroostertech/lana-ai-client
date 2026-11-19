@@ -179,6 +179,7 @@ describe('Search modals on lex-modal', () => {
 describe('ConflictDetection details on Lex.Modal', () => {
   test('showConflictDetails opens one lex-modal; close removes it', async () => {
     const window = boot();
+    window.eval(read('shared/dom-actions.js'));
     window.eval(read('conflict-detection.js'));
     const detection = new window.ConflictDetection({});
     detection.conflicts = [{

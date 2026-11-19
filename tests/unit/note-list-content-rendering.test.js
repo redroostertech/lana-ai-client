@@ -79,7 +79,7 @@ describe('NoteListComponent content rendering', () => {
     expect(component.renderNoteContent('<a href="jav&#x09;ascript:alert(1)">bad</a>'))
       .toBe('<a>bad</a>');
     expect(component.renderNoteContent('<a href="https://example.com" target="_blank">safe</a>'))
-      .toBe('<a href="https://example.com" target="_blank" rel="noopener noreferrer">safe</a>');
+      .toBe('<a href="https://example.com" target="_blank" rel="noopener">safe</a>');
   });
 
   test('preloads plain text notes for editing without collapsing newlines', async () => {

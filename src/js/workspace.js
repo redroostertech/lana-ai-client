@@ -104,11 +104,22 @@
         .split("'").join('&#039;');
     }
 
-    // A JS string argument inside a double-quoted onclick attribute: JSON
-    // quoting for the script, then HTML escaping for the attribute.
-    function jsArg(value) {
-      return escapeHtml(JSON.stringify(value == null ? '' : String(value)));
+    // Event attributes for markup built here (js/shared/dom-actions.js): the
+    // action name plus its arguments as escaped JSON, never inline script.
+    // Ids and names are passed as strings, as the old inline handlers did.
+    function act(type, name, args, options) {
+      return window.LanaDomActions.on(type, name, (args || []).map(function (value) {
+        return typeof value === 'boolean' ? value : (value == null ? '' : String(value));
+      }), options);
     }
+    window.LanaDomActions.registerGlobals([
+      'toggleMatterSelection', 'viewMatter', 'togglePin', 'loadMorePinnedMatters',
+      'addUserToShare', 'removeUserFromShare', 'addWorkspaceUserToShare', 'removeWorkspaceUserFromShare'
+    ]);
+    window.LanaDomActions.register('clickCreateMatter', function () {
+      var button = document.getElementById('createMatterBtn');
+      if (button) button.click();
+    });
 
     // Matter options menu (Edit / Archive or Unarchive / Delete) on grid
     // cards, list rows and pinned cards: a lex-dropdown-btn carrying the
@@ -125,7 +136,7 @@
       return '<lex-dropdown-btn class="matter-options-menu' + (className ? ' ' + className : '') + '"' +
         ' data-matter-id="' + escapeHtml(matter.matter_id) + '" icon="more-vertical" icon-only variant="ghost" align="end" floating' +
         ' aria-label="More options" options="' + escapeHtml(JSON.stringify(items)) + '"' +
-        ' onclick="event.stopPropagation()"></lex-dropdown-btn>';
+        act('click', null, [], { stop: true }) + '></lex-dropdown-btn>';
     }
 
     // Helper function to render a single matter card
@@ -145,10 +156,10 @@
                    class="matter-checkbox w-5 h-5 lex-text-accent border-gray-300 rounded lex-ring-focus"
                    data-matter-id="${escapedMatterId}"
                    ${selectedMatters.has(matter.matter_id) ? 'checked' : ''}
-                   onclick="event.stopPropagation(); toggleMatterSelection(${jsArg(matter.matter_id)})">
+                   ${act('click', 'toggleMatterSelection', [matter.matter_id], { stop: true })}>
           </div>
 
-          <div class="cursor-pointer pl-8" onclick="viewMatter(${jsArg(matter.matter_id)})">
+          <div class="cursor-pointer pl-8"${act('click', 'viewMatter', [matter.matter_id])}>
             <div class="flex items-start justify-between mb-4">
               <div class="flex-1 min-w-0">
                 <span class="text-xs text-gray-400 font-mono block truncate" title="${escapedMatterId}">${escapedMatterId}</span>
@@ -158,7 +169,7 @@
               <div class="flex items-center gap-2">
                 <!-- Pin Button -->
                 <button
-                  onclick="event.stopPropagation(); togglePin(${jsArg(matter.matter_id)}, ${jsArg(matter.source || 'lana')}, ${matter.is_pinned ? 'true' : 'false'})"
+                  ${act('click', 'togglePin', [matter.matter_id, matter.source || 'lana', Boolean(matter.is_pinned)], { stop: true })}
                   class="pin-button ${matter.is_pinned ? 'text-yellow-500' : 'text-gray-400'} hover:text-yellow-600 transition-colors"
                   title="${matter.is_pinned ? 'Unpin matter' : 'Pin matter'}"
                   data-matter-id="${escapedMatterId}"
@@ -216,8 +227,8 @@
         : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Workspace</span>';
 
       return [
-        '<div class="flex-shrink-0 w-56 rounded-lg border p-4 cursor-pointer hover:shadow-md transition-shadow relative group" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)" onclick="viewMatter(' + jsArg(matter.matter_id) + ')">',
-        '  <button onclick="event.stopPropagation(); togglePin(' + jsArg(matter.matter_id) + ', ' + jsArg(matter.source || 'lana') + ', true)"',
+        '<div class="flex-shrink-0 w-56 rounded-lg border p-4 cursor-pointer hover:shadow-md transition-shadow relative group" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)"' + act('click', 'viewMatter', [matter.matter_id]) + '>',
+        '  <button' + act('click', 'togglePin', [matter.matter_id, matter.source || 'lana', true], { stop: true }),
         '          class="pin-button absolute top-2 right-2 text-yellow-500 hover:text-yellow-600 transition-colors" data-matter-id="' + escapedMatterId + '" title="Unpin">',
         '    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg>',
         '  </button>',
@@ -503,7 +514,7 @@
             var content = escapeHtml(evt.content || '');
             if (content.length > 80) content = content.substring(0, 80) + '...';
             var ago = formatTimeAgoLocal(evt.created_at);
-            html += '<div class="flex items-start gap-3 py-3 px-1 hover:bg-gray-50 rounded cursor-pointer" onclick="viewMatter(' + jsArg(evt.matter_id || '') + ')">';
+            html += '<div class="flex items-start gap-3 py-3 px-1 hover:bg-gray-50 rounded cursor-pointer"' + act('click', 'viewMatter', [evt.matter_id || '']) + '>';
             html += '  <div class="flex-shrink-0 w-8 h-8 rounded-full lex-bg-accent-muted flex items-center justify-center">';
             html += '    <span class="lex-text-accent text-xs font-semibold">' + actorName.charAt(0) + '</span>';
             html += '  </div>';
@@ -687,7 +698,7 @@
                 </div>
                 <h3 class="text-xl font-semibold text-gray-900 mb-2">No matters yet</h3>
                 <p class="text-gray-500 mb-6">Get started by creating your first matter to organize your documents and collaborate with your team.</p>
-                <button onclick="document.getElementById('createMatterBtn').click()" class="inline-flex items-center gap-2 px-6 py-3 lex-bg-accent hover:lex-bg-accent text-white font-medium rounded-lg transition-colors shadow-lg shadow-stone-200">
+                <button type="button"${act('click', 'clickCreateMatter', [])} class="inline-flex items-center gap-2 px-6 py-3 lex-bg-accent hover:lex-bg-accent text-white font-medium rounded-lg transition-colors shadow-lg shadow-stone-200">
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                   </svg>
@@ -746,7 +757,7 @@
                 <button
                   id="showMorePinnedBtn"
                   class="w-full py-3 px-4 mt-4 bg-white border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-400 transition-colors flex items-center justify-center gap-2"
-                  onclick="loadMorePinnedMatters()"
+                  ${act('click', 'loadMorePinnedMatters', [])}
                 >
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -1185,7 +1196,7 @@
         if (userSearchResults) userSearchResults.innerHTML = '<div class="p-3 text-sm text-gray-500">No users found</div>';
       } else {
         if (userSearchResults) userSearchResults.innerHTML = filtered.map(u => `
-          <div class="p-2 hover:bg-gray-50 cursor-pointer flex items-center gap-2" onclick="addUserToShare(${jsArg(u.id)})">
+          <div class="p-2 hover:bg-gray-50 cursor-pointer flex items-center gap-2"${act('click', 'addUserToShare', [u.id])}>
             <div class="w-8 h-8 lex-bg-accent-soft rounded-full flex items-center justify-center flex-shrink-0">
               <span class="text-xs font-medium lex-text-accent">${escapeHtml((u.first_name?.[0] || '') + (u.last_name?.[0] || '') || u.email?.[0]?.toUpperCase() || 'U')}</span>
             </div>
@@ -1271,7 +1282,7 @@
               <p class="text-xs text-gray-500">${escapeHtml(u.email)}</p>
             </div>
           </div>
-          <button type="button" onclick="removeUserFromShare(${jsArg(u.id)})" class="text-gray-400 hover:text-red-600 p-1">
+          <button type="button"${act('click', 'removeUserFromShare', [u.id])} class="text-gray-400 hover:text-red-600 p-1">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
           </button>
         </div>
@@ -2081,7 +2092,7 @@
         resultsDiv.innerHTML = '<p class="p-3 text-sm text-gray-500">No users found</p>';
       } else {
         resultsDiv.innerHTML = filtered.map(u => `
-          <button type="button" onclick="addWorkspaceUserToShare(${jsArg(u.id)})"
+          <button type="button"${act('click', 'addWorkspaceUserToShare', [u.id])}
             class="w-full text-left px-3 py-2 hover:bg-gray-50 transition-colors">
             <div class="font-medium text-sm">${escapeHtml(u.first_name || '')} ${escapeHtml(u.last_name || '')}</div>
             <div class="text-xs text-gray-500">${escapeHtml(u.email)}</div>
@@ -2123,7 +2134,7 @@
               <div class="font-medium text-sm">${escapeHtml(u.first_name || '')} ${escapeHtml(u.last_name || '')}</div>
               <div class="text-xs text-gray-500 truncate">${escapeHtml(u.email)}</div>
             </div>
-            <button type="button" onclick="removeWorkspaceUserFromShare(${jsArg(u.id)})"
+            <button type="button"${act('click', 'removeWorkspaceUserFromShare', [u.id])}
               class="ml-2 text-red-600 hover:text-red-800 p-1">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>

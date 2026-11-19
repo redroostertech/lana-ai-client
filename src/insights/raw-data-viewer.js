@@ -43,7 +43,7 @@ class RawDataViewer {
             <span class="field-count">${fieldCount} fields</span>
           </div>
           <div class="flex items-center gap-2">
-            <button class="copy-json-btn" onclick="copyRawDataToClipboard(this)" title="Copy JSON to clipboard">
+            <button class="copy-json-btn"${window.LanaDomActions.on('click', 'copyRawDataToClipboard', [window.LanaDomActions.ELEMENT])} title="Copy JSON to clipboard">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
               </svg>
@@ -119,7 +119,7 @@ class RawDataViewer {
         <span class="field-value string long">
           <span class="truncated" id="${id}-truncated">"${this.escapeHtml(truncated)}..."</span>
           <span class="full-text hidden" id="${id}-full">"${this.escapeHtml(value)}"</span>
-          <button class="show-more-btn" onclick="toggleLongText('${id}')">Show more</button>
+          <button class="show-more-btn"${window.LanaDomActions.on('click', 'toggleLongText', [String(id)])}>Show more</button>
         </span>
       `;
     }
@@ -139,7 +139,7 @@ class RawDataViewer {
 
       return `
         <div class="field-value nested-object ${isExpanded ? 'expanded' : 'collapsed'}">
-          <button class="toggle-nested-btn" onclick="toggleNestedObject(this, '${path}')">
+          <button class="toggle-nested-btn"${window.LanaDomActions.on('click', 'toggleNestedObject', [window.LanaDomActions.ELEMENT, String(path)])}>
             <svg class="toggle-icon ${isExpanded ? 'expanded' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
             </svg>
@@ -168,7 +168,7 @@ class RawDataViewer {
 
       return `
         <div class="field-value nested-object ${isExpanded ? 'expanded' : 'collapsed'}">
-          <button class="toggle-nested-btn" onclick="toggleNestedObject(this, '${path}')">
+          <button class="toggle-nested-btn"${window.LanaDomActions.on('click', 'toggleNestedObject', [window.LanaDomActions.ELEMENT, String(path)])}>
             <svg class="toggle-icon ${isExpanded ? 'expanded' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
             </svg>
@@ -312,3 +312,10 @@ function copyRawDataToClipboard(button) {
     }
   }
 }
+
+// Actions named by this file's markup (js/shared/dom-actions.js).
+window.LanaDomActions.registerGlobals([
+  'copyRawDataToClipboard',
+  'toggleLongText',
+  'toggleNestedObject'
+]);

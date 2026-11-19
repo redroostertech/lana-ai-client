@@ -171,6 +171,7 @@ describe('data-connectors dashboard modal', () => {
     window.ConnectorRegistry = registry;
     window.Lex.ConnectorRegistry = registry;
     window.api = { get: async () => ({}), post: async () => ({}) };
+    window.eval(read('js/shared/dom-actions.js'));
     window.eval(read('js/data_connectors.js'));
     return window;
   }

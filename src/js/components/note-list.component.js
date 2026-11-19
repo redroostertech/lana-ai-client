@@ -878,7 +878,7 @@ class NoteListComponent {
       });
 
       if (node.tagName === 'A' && node.getAttribute('target') === '_blank') {
-        node.setAttribute('rel', 'noopener noreferrer');
+        node.setAttribute('rel', 'noopener');
       }
     });
 

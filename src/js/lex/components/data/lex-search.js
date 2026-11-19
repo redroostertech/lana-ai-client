@@ -46,8 +46,6 @@
               type="text"
               class="w-full pl-10 py-2 text-sm focus:outline-none"
               style="background:var(--lex-color-gray-50);border:none;border-width:0;border-radius:var(--lex-input-radius);transition:box-shadow 0.2s ease;padding-right:${inputPaddingRight};"
-              onfocus="this.style.boxShadow='0 0 0 2px var(--lex-input-border-focus,var(--lex-color-brand-500))'"
-              onblur="this.style.boxShadow='none'"
               placeholder="${this.escapeHtml(this.placeholder)}"
               value="${this.escapeHtml(this.value)}"
               data-input="search"
@@ -81,6 +79,10 @@
     updated() {
       const input = this.$('[data-input="search"]');
       if (input) {
+        // Focus ring (inline handlers are blocked by the page CSP). The input is
+        // re-created on every render, so these bind to the new element.
+        input.addEventListener('focus', () => { input.style.boxShadow = '0 0 0 2px var(--lex-input-border-focus,var(--lex-color-brand-500))'; });
+        input.addEventListener('blur', () => { input.style.boxShadow = 'none'; });
         // Restore focus and cursor after re-render (e.g. after clearing dropdown or loading)
         if (this._hadFocus != null) {
           input.focus();

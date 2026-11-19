@@ -573,7 +573,6 @@ describe('call sites that render untrusted content', () => {
     'js/calendar/calendar-page.js': ['safeUrl'],
     'js/components/doc-studio-create-modal.js': ['safeUrl'],
     'js/connect-wizard.js': ['url'],
-    'js/connector-config-renderer.js': ['authUrl'],
     'js/data_connectors.js': ['data.url'],
     'js/lex/components/chat/lex-lana-panel.js': ['downloadUrl'],
     'js/mcp-connect.js': ['url'],

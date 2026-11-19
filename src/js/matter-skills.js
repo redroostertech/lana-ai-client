@@ -40,8 +40,8 @@ async function renderSkillsTab(matter) {
             <p class="text-sm text-gray-500 mt-1">Automate workflows and enhance productivity with AI-powered skills</p>
           </div>
           <div class="flex gap-2">
-            <lex-btn variant="primary" size="sm" onclick="createNewSkill('${matter.matter_id}')">+ Create Skill</lex-btn>
-            <lex-btn variant="outline" size="sm" onclick="importSkill('${matter.matter_id}')">Import</lex-btn>
+            <lex-btn variant="primary" size="sm"${window.LanaDomActions.on('click', 'createNewSkill', [String(matter.matter_id)])}>+ Create Skill</lex-btn>
+            <lex-btn variant="outline" size="sm"${window.LanaDomActions.on('click', 'importSkill', [String(matter.matter_id)])}>Import</lex-btn>
           </div>
         </div>
 
@@ -57,8 +57,8 @@ async function renderSkillsTab(matter) {
               <h3 class="text-lg font-semibold text-gray-900 mb-2">No Skills Enabled Yet</h3>
               <p class="text-gray-500 mb-6">Create a new skill or import an existing one to automate tasks and workflows for this matter.</p>
               <div class="flex gap-3 justify-center">
-                <lex-btn variant="primary" onclick="createNewSkill('${matter.matter_id}')">+ Create Skill</lex-btn>
-                <lex-btn variant="outline" onclick="importSkill('${matter.matter_id}')">Import Skill</lex-btn>
+                <lex-btn variant="primary"${window.LanaDomActions.on('click', 'createNewSkill', [String(matter.matter_id)])}>+ Create Skill</lex-btn>
+                <lex-btn variant="outline"${window.LanaDomActions.on('click', 'importSkill', [String(matter.matter_id)])}>Import Skill</lex-btn>
               </div>
             </div>
           ` : matterSkills.map(ms => `
@@ -85,20 +85,20 @@ async function renderSkillsTab(matter) {
 
                 <!-- Actions -->
                 <div class="flex items-center gap-2">
-                  <button onclick="toggleMatterSkill('${matter.matter_id}', '${ms.skill_id}', ${!ms.is_enabled})"
+                  <button${window.LanaDomActions.on('click', 'toggleMatterSkill', [String(matter.matter_id), String(ms.skill_id), !ms.is_enabled])}
                           class="px-3 py-1.5 text-sm font-medium rounded-lg ${ms.is_enabled ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'} transition-colors">
                     ${ms.is_enabled ? 'Disable' : 'Enable'}
                   </button>
-                  <button onclick="executeMatterSkill('${matter.matter_id}', '${ms.skill_id}')"
+                  <button${window.LanaDomActions.on('click', 'executeMatterSkill', [String(matter.matter_id), String(ms.skill_id)])}
                           class="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors ${ms.is_enabled ? '' : 'opacity-50 cursor-not-allowed'}"
                           ${ms.is_enabled ? '' : 'disabled'}>
                     Execute
                   </button>
-                  <button onclick="editMatterSkill('${ms.matter_skill_id}')"
+                  <button${window.LanaDomActions.on('click', 'editMatterSkill', [String(ms.matter_skill_id)])}
                           class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
                     Configure
                   </button>
-                  <button onclick="viewSkillExecutions('${ms.matter_skill_id}')"
+                  <button${window.LanaDomActions.on('click', 'viewSkillExecutions', [String(ms.matter_skill_id)])}
                           class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
                     View Logs
                   </button>
@@ -115,7 +115,7 @@ async function renderSkillsTab(matter) {
     content.innerHTML = `
       <div class="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
         <p class="text-red-800">Failed to load skills. Please try again.</p>
-        <button onclick="switchMatterTab('skills')" class="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+        <button${window.LanaDomActions.on('click', 'switchMatterTab', ['skills'])} class="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
           Retry
         </button>
       </div>
@@ -879,7 +879,7 @@ function addWorkflowStep() {
               <code class="block mt-1 text-xs font-mono text-gray-500">step_${stepIndex + 1}.*</code>
             </div>
           </div>
-          <button onclick="removeWorkflowStep('${stepId}')" class="text-gray-400 hover:text-red-600 transition-colors">
+          <button${window.LanaDomActions.on('click', 'removeWorkflowStep', [String(stepId)])} class="text-gray-400 hover:text-red-600 transition-colors">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
             </svg>
@@ -891,8 +891,7 @@ function addWorkflowStep() {
           <label class="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Inferred Intent</label>
           <input type="text"
                  class="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
-                 placeholder="e.g., Detect when new litigation document is uploaded"
-                 onchange="updateStepIntent('${stepId}', this.value)">
+                 placeholder="e.g., Detect when new litigation document is uploaded"${window.LanaDomActions.on('change', 'updateStepIntent', [String(stepId), window.LanaDomActions.VALUE])}>
         </div>
 
         <!-- Step Configuration (Dynamic based on type) -->
@@ -1318,3 +1317,16 @@ document.addEventListener('DOMContentLoaded', () => {
     skillDescInput.addEventListener('input', updateMXDiagnostics);
   }
 });
+
+// Actions named by this file's markup (js/shared/dom-actions.js).
+window.LanaDomActions.registerGlobals([
+  'createNewSkill',
+  'editMatterSkill',
+  'executeMatterSkill',
+  'importSkill',
+  'removeWorkflowStep',
+  'switchMatterTab',
+  'toggleMatterSkill',
+  'updateStepIntent',
+  'viewSkillExecutions'
+]);

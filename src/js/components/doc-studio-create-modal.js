@@ -1242,7 +1242,7 @@
       toast('error', 'This Doc Studio preview link is not one LANA can open safely. Open the document from Doc Studio instead.');
       return;
     }
-    window.open(safeUrl, '_blank', 'noopener,noreferrer');
+    window.open(safeUrl, '_blank', 'noopener');
   }
 
   // -- Public API -----------------------------------------------------------

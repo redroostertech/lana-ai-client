@@ -111,7 +111,84 @@ function toStoredServer(incoming, { engineUrl = null, storedUrl = null } = {}) {
   return rest;
 }
 
+/**
+ * The firm's service keys from hosted discovery (burst_api_key, forge_api_key). The main
+ * process fetches them itself (electron-discovery.js refreshHostedDiscovery) and keeps them;
+ * no page gets them (get-saved-server) or sets them (save-settings). docs/plans/harden-ipc.md.
+ */
+const FIRM_SECRET_FIELDS = Object.freeze(['burstApiKey', 'forgeApiKey']);
+
+// The same keys as the discovery answer names them.
+const DISCOVERY_SECRET_FIELDS = Object.freeze({ burstApiKey: 'burst_api_key', forgeApiKey: 'forge_api_key' });
+
+/** A copy of a server object, or of a discovery answer, without the firm's service keys. */
+function withoutFirmSecrets(server) {
+  if (!server || typeof server !== 'object') {return server;}
+  const copy = { ...server };
+  for (const field of FIRM_SECRET_FIELDS) {
+    delete copy[field];
+    delete copy[DISCOVERY_SECRET_FIELDS[field]];
+  }
+  return copy;
+}
+
+// Each key goes with its service's address: a key is kept only while the address is the same.
+const SECRET_URL_FIELDS = Object.freeze({ burstApiKey: ['burstUrl', 'burst_url'], forgeApiKey: ['forgeUrl', 'forge_url'] });
+
+/** An address compared as the service it names (case, a trailing slash and credentials ignored). */
+function serviceKey(value) {
+  if (value === undefined || value === null || value === '') {return '';}
+  try {
+    const url = new URL(String(value).trim());
+    return `${url.protocol}//${url.host}${url.pathname.replace(/\/+$/, '')}`;
+  } catch (_) {
+    return `invalid:${String(value)}`;
+  }
+}
+
+/**
+ * The firm's service keys in a discovery answer, as stored, with the addresses they belong
+ * to ({ orgId, burstApiKey, burstUrl, forgeApiKey, forgeUrl }), or null.
+ */
+function firmSecretsFromDiscovery(body) {
+  const orgId = body && body.server && body.server.org_id;
+  if (!orgId) {return null;}
+  const secrets = { orgId };
+  for (const field of FIRM_SECRET_FIELDS) {
+    const name = DISCOVERY_SECRET_FIELDS[field];
+    if (Object.prototype.hasOwnProperty.call(body, name)) {
+      const [urlField, urlName] = SECRET_URL_FIELDS[field];
+      secrets[field] = body[name] || null;
+      if (body[urlName]) {secrets[urlField] = body[urlName];}
+    }
+  }
+  return secrets;
+}
+
+/**
+ * A server object from a page, with the keys the page may have sent replaced by the stored
+ * ones: only for the same organization, and each key only while its service address is the
+ * one it was issued with (so a page cannot point a service elsewhere and have the key sent there).
+ */
+function keepStoredFirmSecrets(incoming, stored) {
+  if (!incoming || typeof incoming !== 'object') {return incoming;}
+  const result = withoutFirmSecrets(incoming);
+  if (stored && stored.orgId && stored.orgId === incoming.orgId) {
+    for (const field of FIRM_SECRET_FIELDS) {
+      const [urlField] = SECRET_URL_FIELDS[field];
+      if (stored[field] !== undefined && serviceKey(stored[urlField]) === serviceKey(incoming[urlField])) {
+        result[field] = stored[field];
+      }
+    }
+  }
+  return result;
+}
+
 module.exports = {
+  FIRM_SECRET_FIELDS,
+  withoutFirmSecrets,
+  keepStoredFirmSecrets,
+  firmSecretsFromDiscovery,
   resolveEngineConfig,
   resolveApiBase,
   isEngineInUse,

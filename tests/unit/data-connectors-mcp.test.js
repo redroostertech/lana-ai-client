@@ -6,6 +6,7 @@
 // only when the MCP UI is visible (flag on, system_admin or org_admin).
 
 const fs = require('fs');
+const { actionCalls } = require('./helpers/dom-action-calls');
 const path = require('path');
 
 const SRC = path.join(__dirname, '..', '..', 'src');
@@ -63,6 +64,7 @@ function loadPage({ visible = false, wizardFlag = false, servers = [SERVER], ins
     mcpListServers: jest.fn(() => (servers instanceof Error ? Promise.reject(servers) : Promise.resolve(servers)))
   };
   // eslint-disable-next-line no-new-func
+  new Function('window', read('js/shared/dom-actions.js'))(win);
   new Function('window', 'document', 'ConnectorRegistry', 'Connectors', 'api', 'Lex', read('js/data_connectors.js'))(
     win, doc, win.ConnectorRegistry, connectors, {}, win.Lex
   );
@@ -86,7 +88,7 @@ describe('MCP rows on Data Connectors', () => {
     const row = page.mapConnectorRow(raw, [], []);
     expect(row).toMatchObject({ id: SERVER.id, name: 'Research', status: 'disconnected', auth_type: 'oauth2', category: 'mcp', scope: 'org', update_slug: '', version: '0.4.1' });
     const cell = page.connectorActionsCell(row);
-    expect(cell).toContain('openMcpServerPanel(');
+    expect(actionCalls(cell)).toContain('openMcpServerPanel(');
     expect(cell).toContain('>Manage<');
     expect(cell).not.toContain('openConnectorManage');
     expect(cell).not.toContain('openConnectorUpdateModal');

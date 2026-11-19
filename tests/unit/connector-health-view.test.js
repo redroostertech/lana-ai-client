@@ -7,6 +7,7 @@
 // use mocked payloads shaped like the contract.
 
 const fs = require('fs');
+const { actionCalls } = require('./helpers/dom-action-calls');
 const path = require('path');
 const { JSDOM } = require('jsdom');
 
@@ -209,6 +210,7 @@ describe('Data Connectors page wiring', () => {
     const doc = { getElementById: () => null, querySelectorAll: () => [], addEventListener: () => {} };
     const connectors = { getHealth: getHealth || (() => Promise.resolve(HEALTH)) };
     // eslint-disable-next-line no-new-func
+    new Function('window', read('js/shared/dom-actions.js'))(win);
     new Function('window', 'document', 'ConnectorRegistry', 'Connectors', 'api', 'Lex', 'console', read('js/data_connectors.js'))(
       win, doc, win.ConnectorRegistry, connectors, {}, win.Lex, win.console
     );
@@ -247,7 +249,7 @@ describe('Data Connectors page wiring', () => {
     const row = page.mapConnectorRow(clio, [clio], []);
     expect(row.status).toBe('needs_attention');
     const html = page.connectorActionsCell(row);
-    expect(html).toContain(`openConnectorManage('${SOURCE_B}')`);
+    expect(actionCalls(html)).toContain(`openConnectorManage('${SOURCE_B}')`);
     expect(html).not.toContain('installConnector');
   });
 
@@ -281,7 +283,7 @@ describe('Data Connectors page wiring', () => {
     const adminPage = loadPage({ admin: true });
     const row = adminPage.mapConnectorRow(quickbooks, [quickbooks], []);
     expect(row.instance_slug).toBe('quickbooks');
-    expect(adminPage.connectorActionsCell(row)).toContain(`openAddInstanceModal('${SOURCE_A}', event)`);
+    expect(actionCalls(adminPage.connectorActionsCell(row))).toContain(`openAddInstanceModal('${SOURCE_A}', event)`);
     expect(adminPage.connectorActionsCell(row)).toContain('aria-label="Add another QuickBooks"');
     expect(adminPage.connectorActionsCell(adminPage.mapConnectorRow(clio, [clio], []))).not.toContain('openAddInstanceModal');
 

@@ -541,7 +541,7 @@ class MenuSystem {
     this.onItemClick = options.onItemClick || null;
 
     // Detect if we're in Electron file:// mode
-    this.isFileProtocol = window.location.protocol === 'file:';
+    this.isFileProtocol = (window.location.protocol === 'file:' || window.location.protocol === 'lana-app:');
 
     // Calculate base path for relative navigation in file:// mode
     if (this.isFileProtocol) {
@@ -735,7 +735,7 @@ class MenuSystem {
     // Handle button items with onclick handlers
     if (item.isButton && item.onClick) {
       return `
-        <button onclick="${item.onClick}()"
+        <button type="button" data-menu-action="${item.onClick}"
            class="w-full flex items-center gap-3 py-2 ${activeClass} rounded-lg transition-colors"
            data-menu-id="${item.id}">
           ${icon}
@@ -896,6 +896,21 @@ class MenuSystem {
   }
 
   /**
+   * Button items name a global function (item.onClick). One delegated listener
+   * calls it; inline onclick attributes are blocked by the page CSP.
+   */
+  _bindMenuActions() {
+    if (window.__lanaMenuActionsBound) return;
+    window.__lanaMenuActionsBound = true;
+    document.addEventListener('click', (event) => {
+      const button = event.target && event.target.closest ? event.target.closest('[data-menu-action]') : null;
+      if (!button) return;
+      const action = window[button.getAttribute('data-menu-action')];
+      if (typeof action === 'function') action();
+    });
+  }
+
+  /**
    * Inject the menu into the DOM
    */
   inject(containerSelector = this.containerSelector) {
@@ -907,6 +922,7 @@ class MenuSystem {
 
     // Scrollable content only when using separate footer; otherwise full content
     container.innerHTML = this.render();
+    this._bindMenuActions();
 
     // When using separate footer: layout nav and inject footer below nav
     if (this.footerSelector) {
@@ -983,7 +999,7 @@ class MenuSystem {
       overlay.className = 'fixed inset-0 z-[100] hidden';
       overlay.innerHTML = `
         <div class="fixed inset-0" data-dismiss="sidebarUserMenuOverlay" aria-hidden="true"></div>
-        <div class="fixed bottom-0 left-0 w-64 bg-gray-800 rounded-t-2xl shadow-2xl max-h-[85vh] overflow-hidden flex flex-col z-[101]" onclick="event.stopPropagation()">
+        <div class="fixed bottom-0 left-0 w-64 bg-gray-800 rounded-t-2xl shadow-2xl max-h-[85vh] overflow-hidden flex flex-col z-[101]" data-sidebar-user-menu-panel>
           <div class="p-4 pb-3">
             <div class="flex justify-center mb-3">
               <div class="w-10 h-1 bg-gray-600 rounded-full"></div>
@@ -1027,6 +1043,7 @@ class MenuSystem {
       document.body.appendChild(overlay);
 
       overlay.querySelector('[data-dismiss="sidebarUserMenuOverlay"]').addEventListener('click', () => overlay.classList.add('hidden'));
+      overlay.querySelector('[data-sidebar-user-menu-panel]').addEventListener('click', (event) => event.stopPropagation());
       overlay.querySelectorAll('.sidebar-user-menu-item').forEach(link => {
         link.addEventListener('click', () => overlay.classList.add('hidden'));
       });

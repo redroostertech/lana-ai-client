@@ -131,7 +131,7 @@ describe('token IPC', () => {
     const onChange = jest.fn();
     registerTokenIpc(ipc, store, onChange);
 
-    const appPage = 'file:///Applications/LANA.app/public_html/index.html';
+    const appPage = 'lana-app://app/public_html/index.html';
     expect(ipc.send(CHANNELS.set, appPage, TOKEN)).toBe(TOKEN);
     expect(ipc.send(CHANNELS.get, appPage)).toBe(TOKEN);
     expect(onChange).toHaveBeenCalledWith();
@@ -145,8 +145,11 @@ describe('token IPC', () => {
     expect(store.get()).toBeNull();
   });
 
-  test('isTrustedSender accepts only file: frames', () => {
-    expect(isTrustedSender({ senderFrame: { url: 'file:///x/index.html' } })).toBe(true);
+  test('isTrustedSender accepts only the app origin (lana-app://app)', () => {
+    expect(isTrustedSender({ senderFrame: { url: 'lana-app://app/public_html/index.html' } })).toBe(true);
+    // A stray local file or a look-alike host is not the app.
+    expect(isTrustedSender({ senderFrame: { url: 'file:///x/index.html' } })).toBe(false);
+    expect(isTrustedSender({ senderFrame: { url: 'lana-app://evil/public_html/index.html' } })).toBe(false);
     expect(isTrustedSender({ senderFrame: { url: 'http://127.0.0.1:8080/' } })).toBe(false);
     expect(isTrustedSender({})).toBe(false);
   });

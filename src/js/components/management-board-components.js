@@ -19,8 +19,7 @@ const ManagementBoardComponents = {
     const metricCount = board.metric_count || board.metricCount || 0;
 
     return `
-      <div class="bg-white rounded-lg shadow hover:shadow-lg transition-all p-6 cursor-pointer group"
-           onclick="viewBoardDetail('${board.id}')">
+      <div class="bg-white rounded-lg shadow hover:shadow-lg transition-all p-6 cursor-pointer group"${window.LanaDomActions.on('click', 'viewBoardDetail', [String(board.id)])}>
         <div class="flex justify-between items-start mb-4">
           <div class="flex-1">
             <h3 class="text-lg font-semibold text-gray-900 group-hover:text-indigo-600 transition">
@@ -116,7 +115,7 @@ const ManagementBoardComponents = {
     const draftCount = board.draft_count || board.draftCount || 0;
 
     return `
-      <tr class="hover:bg-gray-50 transition cursor-pointer" onclick="viewBoardDetail('${board.id}')">
+      <tr class="hover:bg-gray-50 transition cursor-pointer"${window.LanaDomActions.on('click', 'viewBoardDetail', [String(board.id)])}>
         <td class="px-6 py-4 whitespace-nowrap">
           <div class="text-sm font-medium text-gray-900">${this.escapeHtml(board.name)}</div>
           <div class="text-sm text-gray-500">${this.escapeHtml(board.description || '')}</div>
@@ -145,10 +144,10 @@ const ManagementBoardComponents = {
           `}
         </td>
         <td class="px-6 py-4 whitespace-nowrap text-sm">
-          <button onclick="event.stopPropagation(); editBoard('${board.id}')" class="text-indigo-600 hover:text-indigo-900 mr-3">
+          <button${window.LanaDomActions.on('click', 'editBoard', [String(board.id)], { stop: true })} class="text-indigo-600 hover:text-indigo-900 mr-3">
             <i class="fas fa-edit"></i>
           </button>
-          <button onclick="event.stopPropagation(); deleteBoard('${board.id}')" class="text-red-600 hover:text-red-900">
+          <button${window.LanaDomActions.on('click', 'deleteBoard', [String(board.id)], { stop: true })} class="text-red-600 hover:text-red-900">
             <i class="fas fa-trash"></i>
           </button>
         </td>
@@ -225,7 +224,7 @@ const ManagementBoardComponents = {
           </ol>
         </div>
 
-        <button onclick="openNewBoardModal()" class="inline-flex items-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition transform hover:scale-105">
+        <button${window.LanaDomActions.on('click', 'openNewBoardModal', [])} class="inline-flex items-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition transform hover:scale-105">
           <i class="fas fa-plus-circle text-xl mr-2"></i>
           Create Your First Board
         </button>
@@ -251,7 +250,7 @@ const ManagementBoardComponents = {
             <strong>Admin Tip:</strong> As an administrator, you can create boards that will be visible to all team members based on their assigned roles and permissions.
           </p>
         </div>
-        <button onclick="openNewBoardModal()" class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition">
+        <button${window.LanaDomActions.on('click', 'openNewBoardModal', [])} class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition">
           <i class="fas fa-plus mr-2"></i>
           Create First Board
         </button>
@@ -287,7 +286,7 @@ const ManagementBoardComponents = {
           </div>
         </div>
 
-        <button onclick="document.getElementById('tab-my-boards').click()" class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition">
+        <button type="button"${window.LanaDomActions.on('click', 'openMyBoardsTab', [])} class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition">
           <i class="fas fa-arrow-left mr-2"></i>
           Go to My Boards
         </button>
@@ -399,3 +398,16 @@ const ManagementBoardComponents = {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = ManagementBoardComponents;
 }
+
+window.LanaDomActions.register('openMyBoardsTab', function () {
+  var tab = document.getElementById('tab-my-boards');
+  if (tab) tab.click();
+});
+
+// Actions named by this file's markup (js/shared/dom-actions.js).
+window.LanaDomActions.registerGlobals([
+  'deleteBoard',
+  'editBoard',
+  'openNewBoardModal',
+  'viewBoardDetail'
+]);

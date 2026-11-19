@@ -391,7 +391,7 @@
           const href = item.disabled ? '' : safeHref(item.href);
           if (href) {
             const target = item.target ? ` target="${this.escapeHtml(item.target)}"` : '';
-            const rel = item.target === '_blank' ? ' rel="noopener noreferrer"' : '';
+            const rel = item.target === '_blank' ? ' rel="noopener"' : '';
             html += `<a ${common} href="${this.escapeHtml(href)}"${target}${rel}>`;
           } else {
             html += `<div ${common}>`;

@@ -3807,6 +3807,7 @@ Lex.Orchestrator.<span class="fn">handleSSEBlock</span>(data, container);
   <script src="js/lex/chat/lex-chat.js"></script>
   <script src="js/lex/chat/lex-chat.index.js"></script>
 
+  <script src="js/shared/dom-actions.js"></script>
   <script>
     // =====================================================================
     // Sidebar + Topbar initialization
@@ -4215,7 +4216,7 @@ Lex.Orchestrator.<span class="fn">handleSSEBlock</span>(data, container);
       function renderIconGrid(filter) {
         const names = filter ? Lex.Icons.find(filter) : Lex.Icons.list();
         grid.innerHTML = names.map(name => `
-          <div class="flex flex-col items-center gap-1 p-2 rounded-lg lex-hover-bg cursor-pointer transition-colors" title="${name}" onclick="copyIconName('${name}', this)">
+          <div class="flex flex-col items-center gap-1 p-2 rounded-lg lex-hover-bg cursor-pointer transition-colors" title="${name}"${LanaDomActions.on('click', 'copyIconName', [String(name), LanaDomActions.ELEMENT])}>
             <span class="lex-text-primary">${Lex.Icons.get(name)}</span>
             <span class="text-[10px] lex-text-tertiary truncate w-full text-center">${name}</span>
           </div>
@@ -4621,14 +4622,14 @@ Lex.Orchestrator.<span class="fn">handleSSEBlock</span>(data, container);
       wrapper.innerHTML = `
         <div class="demo-label">
           ${demo.label}
-          <span class="code-toggle" onclick="toggleCode(this)"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg> Code</span>
+          <span class="code-toggle"${LanaDomActions.on('click', 'toggleCode', [LanaDomActions.ELEMENT])}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg> Code</span>
         </div>
         <div class="ai-block-render"></div>
         <div class="code-block">
           <div class="code-label">JSON (structured output from LLM)</div>
-          <pre><button class="copy-btn" onclick="copyCode(this)">Copy</button>${escapeForPre(demo.code)}</pre>
+          <pre><button class="copy-btn"${LanaDomActions.on('click', 'copyCode', [LanaDomActions.ELEMENT])}>Copy</button>${escapeForPre(demo.code)}</pre>
           <div class="code-label" style="margin-top: 12px;">JavaScript (rendering)</div>
-          <pre><button class="copy-btn" onclick="copyCode(this)">Copy</button><span class="comment">// Render a single block</span>
+          <pre><button class="copy-btn"${LanaDomActions.on('click', 'copyCode', [LanaDomActions.ELEMENT])}>Copy</button><span class="comment">// Render a single block</span>
 Lex.BlockRenderer.<span class="fn">renderOne</span>(container, ${escapeForPre(JSON.stringify(demo.block, null, 2).substring(0, 60))}...);
 
 <span class="comment">// Or render an array of blocks</span>
@@ -4852,6 +4853,13 @@ Lex.Orchestrator.<span class="fn">handleSSEBlock</span>(data, container);</pre>
     console.log('  // Chat components:');
     console.log('  document.getElementById("demo-chat").send("Hello!")');
     console.log('  document.getElementById("demo-activity").show("Working...", "tool")');
+
+    // Actions named by this page's markup (js/shared/dom-actions.js).
+    LanaDomActions.registerGlobals([
+      'copyCode',
+      'copyIconName',
+      'toggleCode'
+    ]);
   </script>
 
   <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>

@@ -14,9 +14,10 @@ const { pathToFileURL } = require('url');
 
 const ROOT = path.resolve(__dirname, '../..');
 const { decideWindowOpen, ISOLATED_POPUP_OPTIONS } = require(path.join(ROOT, 'electron-window-open-policy.js'));
+const { appPageUrl } = require(path.join(ROOT, 'electron-app-protocol.js'));
 
 const APP_ROOT = path.join(ROOT, 'public_html');
-const appPage = (rel) => pathToFileURL(path.join(APP_ROOT, rel)).href;
+const appPage = (rel) => appPageUrl(rel);
 
 describe('decideWindowOpen', () => {
   test('http(s) goes to the system browser as the parsed href', () => {
@@ -60,11 +61,14 @@ describe('decideWindowOpen', () => {
     });
   });
 
-  test('file: outside the app pages is denied, including traversal and symlink escapes', () => {
+  test('file: (even a copy of an app page) and app URLs outside public_html are denied, including traversal', () => {
     const outside = [
       pathToFileURL(path.join(os.homedir(), 'Documents', 'x.html')).href,
       'file:///etc/passwd',
-      appPage('..') + '/electron-main.js',
+      pathToFileURL(path.join(APP_ROOT, 'dashboard.html')).href,
+      'lana-app://app/public_html/%2e%2e/electron-main.js',
+      'lana-app://app/electron-main.js',
+      'lana-app://other/public_html/dashboard.html',
       pathToFileURL(APP_ROOT).href + '/../package.json',
       pathToFileURL(APP_ROOT + '-evil/x.html').href
     ];
@@ -80,14 +84,18 @@ describe('decideWindowOpen', () => {
 describe('electron-main wiring', () => {
   const main = fs.readFileSync(path.join(ROOT, 'electron-main.js'), 'utf8');
 
-  test('both windows route window.open through the policy', () => {
-    const handlers = main.match(/setWindowOpenHandler\(\(\{ url \}\) => \{[\s\S]*?\n {2}\}\);/g) || [];
-    expect(handlers.length).toBe(2);
-    handlers.forEach((handler) => {
-      expect(handler).toMatch(/decideWindowOpen\(url, \{ appRoot: path\.join\(__dirname, 'public_html'\) \}\)/);
-      expect(handler).toMatch(/shell\.openExternal\(decision\.external\)/);
-      expect(handler).not.toMatch(/return \{ action: 'allow' \}/);
-    });
+  test('every webContents routes window.open through the policy', () => {
+    const created = main.slice(main.indexOf("app.on('web-contents-created'"));
+    const handlers = created.match(/contents\.setWindowOpenHandler\(\(\{ url: openUrl, referrer \}\) => \{[\s\S]*?\n {2}\}\);/g) || [];
+    expect(handlers.length).toBe(1);
+    expect(handlers[0]).toMatch(/decideWindowOpen\(openUrl, \{ appRoot \}\)/);
+    // Through the gated opener (electron-external-open.js), never shell.openExternal directly.
+    expect(handlers[0]).toMatch(/externalOpener\.open\(decision\.external, \{ contents, fromWindowOpen: true, openerUrl: \(referrer && referrer\.url\) \|\| '' \}\)/);
+    expect(handlers[0]).not.toMatch(/shell\.openExternal/);
+    expect(handlers[0]).not.toMatch(/return \{ action: 'allow' \}/);
+    expect(created).toMatch(/const appRoot = path\.join\(__dirname, 'public_html'\);/);
+    // No window keeps a handler of its own that could differ.
+    expect((main.match(/setWindowOpenHandler\(/g) || []).length).toBe(1);
   });
 
   test('every window.open target the app itself uses still opens', () => {

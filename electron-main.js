@@ -9,7 +9,6 @@
 
 const { app, BrowserWindow, ipcMain, dialog, Menu, session, nativeImage, Notification, shell, safeStorage, protocol, desktopCapturer, systemPreferences, nativeTheme } = require('electron');
 const path = require('path');
-const url = require('url');
 const crypto = require('crypto');
 const fs = require('fs');
 const Store = require('electron-store');
@@ -93,12 +92,19 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // Import thin client modules
-const { refreshHostedDiscovery, verifyServer, discoverByDomain } = require('./electron-discovery');
+const { refreshHostedDiscovery, verifyServer, discoverByDomain, discoveryForPage, CONTROL_PLANE_URLS } = require('./electron-discovery');
+// The app's pages are served from lana-app://app (docs/plans/harden-web.md).
+const { APP_SCHEME, APP_ORIGIN, STORAGE_MIGRATION_PATH, SCHEME_PRIVILEGES, appPageUrl, pageOf, createAppProtocolHandler } = require('./electron-app-protocol');
+const { cspOriginsFromConfig, buildContentSecurityPolicy } = require('./electron-csp');
+const { corsResponseFor } = require('./electron-cors');
+const { decideNavigation, decideFrameNavigation } = require('./electron-navigation-policy');
+const { migrateFileOriginStorage } = require('./electron-origin-migration');
+const { createChefStorage } = require('./electron-chef-storage');
 // The box Chef's certificate pin (hardware boxes): one host and port, trusted by
 // the control plane's SHA-256 only; everything else keeps default checks.
 const chefPin = require('./electron-chef-pin');
 const { decideWindowOpen } = require('./electron-window-open-policy');
-const { createAppLinkRouter, createFirmSignOut, oldSessionNotice, registerAppLinkIpc, createColdStartQueue, deepLinkFromArgv, connectLinkOrgId } = require('./electron-app-links');
+const { createAppLinkRouter, createFirmSignOut, oldSessionNotice, registerAppLinkIpc, createColdStartQueue, deepLinkFromArgv, connectLinkOrgId, createConnectOrgQueue } = require('./electron-app-links');
 const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified, saveBrainchildLink, getBrainchildLink, clearBrainchildLink, setBrainchildAutoBindDisabled, isBrainchildAutoBindDisabled, authTokenPersistence, offlineKeyPersistence, getLocalEnginePreferences, updateLocalEnginePreferences, firstLaunchPersistence, locationPersistence, appearancePersistence } = require('./electron-storage');
 chefPin.configure({ getSavedServer });
 const { createLocalEngineHost } = require('./electron-local-engine');
@@ -113,14 +119,28 @@ const offlineKeyStore = createOfflineKeyStore({ safeStorage, persistence: offlin
 const { checkForUpdates, downloadAndInstallUpdate, showOptionalUpdateDialog, showForceUpdateDialog, shouldCheckForUpdates, configureAutoUpdater, getLastUpdateCheck, getLastCheckResult } = require('./electron-updater-custom');
 const { registerSystemInfoIpc } = require('./electron-system-info');
 const { installLocationPermissionHandlers, registerLocationIpc } = require('./electron-location');
+// The app's permission policy, once the session is ready (electron-location.js); Briefs borrows it.
+let appPermissions = null;
 const { logInfo, logError, logWarn, exportLogs, getLogFilePath } = require('./electron-logger');
+
+// IPC hardening (docs/plans/harden-ipc.md): every handler is registered through ipc, which answers
+// only the top frame of an app page and checks each channel's arguments (electron-ipc-policy.js).
+// Gestures: the person's last click or key press in each window, for the channels that need one.
+const { createIpcGuard, createGestureTracker } = require('./electron-ipc-guard');
+const { IPC_POLICY } = require('./electron-ipc-policy');
+const ipcGestures = createGestureTracker();
+app.on('web-contents-created', (_event, contents) => ipcGestures.watch(contents));
+const ipc = createIpcGuard({ ipcMain, policy: IPC_POLICY, gestures: ipcGestures, warn: logWarn });
+// The client preload as one bundled file, so its windows can be sandboxed (electron-preload-path.js).
+const { clientPreloadPath } = require('./electron-preload-path');
+const CLIENT_PRELOAD = () => clientPreloadPath({ isPackaged: app.isPackaged, rootDir: __dirname });
 
 // Local AI engine (local-ai-engine plan, phase 6). When an engine is
 // configured the client's API base is the engine's loopback address and the
 // engine forwards everything it does not serve to the organization's server.
 // electron-api-base.js holds the rule; getSavedServer() below stays Chef's.
 const localEngine = createLocalEngineHost({
-  ipcMain,
+  ipcMain: ipc,
   app,
   storage: { getSavedServer, getLocalEnginePreferences, updateLocalEnginePreferences },
   getWindows: () => BrowserWindow.getAllWindows(),
@@ -239,7 +259,7 @@ const editorService = createEditorService({
   },
   log: { info: logInfo, warn: logWarn, error: (message) => logError(message) }
 });
-ipcMain.on('editor-service:base-url-sync', (event) => { event.returnValue = editorService.baseUrl(); });
+ipc.on('editor-service:base-url-sync', (event) => { event.returnValue = editorService.baseUrl(); });
 
 // What the engine is given for this computer's own servers: Pip's, the redactor's and Docling's together.
 const localServers = { pip: {}, redactor: {}, docling: {} };
@@ -283,7 +303,7 @@ const firstLaunch = createFirstLaunch({
   }
 });
 registerFirstLaunchIpc({
-  ipcMain,
+  ipcMain: ipc,
   firstLaunch,
   // Settings > Capabilities: whether each server on this computer is ready, starting or not running.
   servers: () => localServerStates({ pip, redactor, docling, env: process.env, probe: (url) => pipEndpoint(url, fetch) }),
@@ -301,18 +321,18 @@ const appearance = createAppearance({
   log: (error) => logError('[appearance] the appearance setting failed', error)
 });
 appearance.start();
-registerAppearanceIpc({ ipcMain, appearance });
+registerAppearanceIpc({ ipcMain: ipc, appearance });
 
 // LANA Briefs (Briefs integration plan): runs only while discovery lists lana-notes and
 // someone is signed in. Its model work goes to the local AI engine's runtime route.
 const { createBriefs, registerBriefsSchemes } = require('./electron-briefs');
-const { isEngineInUse } = require('./electron-api-base');
+const { isEngineInUse, withoutFirmSecrets, keepStoredFirmSecrets } = require('./electron-api-base');
 const BRIEFS_DIST = path.join(__dirname, 'briefs', 'dist');
 // Loaded only when Briefs starts. A computed path keeps the client's bundler from
 // inlining it: the host ships as its own file in briefs/dist.
 const BRIEFS_HOST_FILE = path.join(BRIEFS_DIST, 'briefs-host.cjs');
 const loadBriefsHost = () => require(BRIEFS_HOST_FILE);
-registerBriefsSchemes(protocol);
+registerBriefsSchemes(protocol, [{ scheme: APP_SCHEME, privileges: SCHEME_PRIVILEGES }]);
 const briefs = createBriefs({
   electron: { app, session, protocol, desktopCapturer, systemPreferences, shell, dialog, safeStorage, nativeTheme, BrowserWindow },
   loadHost: loadBriefsHost,
@@ -322,7 +342,16 @@ const briefs = createBriefs({
     const state = localEngine.supervisor.getState();
     return isEngineInUse(state) ? state.url : null;
   },
-  ipcMain,
+  ipcMain: ipc,
+  // Briefs' own channels answer only the app's pages (electron-ipc-guard.js).
+  isAppUrl: ipc.isAppUrl,
+  // The permission check handler gets the origin only; other permissions follow the app's
+  // one policy (electron-location.js), put back when Briefs stops.
+  isTrustedOrigin: (origin) => origin === APP_ORIGIN,
+  permissions: {
+    decide: (contents, permission, details) => Boolean(appPermissions && appPermissions.decide(contents, permission, details)),
+    restore: () => { if (appPermissions) appPermissions.restore(); }
+  },
   apiBase: () => localEngine.apiBase(),
   getServer: () => getSavedServer(),
   getToken: () => authTokenStore.get(),
@@ -339,14 +368,15 @@ const briefs = createBriefs({
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
-        preload: path.join(__dirname, 'electron-preload.js'),
+        preload: CLIENT_PRELOAD(),
         additionalArguments: [BRAND_ARG],
-        sandbox: false,
+        webSecurity: true,
+        sandbox: true,
         // Audio capture keeps running while the window is hidden.
         backgroundThrottling: false
       }
     });
-    capture.loadURL(createFileUrl(path.join(__dirname, 'public_html', 'briefs', 'capture.html')));
+    capture.loadURL(appPageUrl('briefs/capture.html'));
     return capture;
   },
   showWindow: () => {
@@ -367,7 +397,13 @@ const companionBridge = require('./electron-bridge');
 const { redactUrlForLog } = require('./electron-log-redaction');
 const { BrainchildManager, discover, validateLink, mcpBinForRoot, isAllowedVaultRoot } = require('./src/electron-brainchild-manager');
 const { ElectronScreenVoice } = require('./src/screen-voice/electron-screen-voice');
-const { isAllowedExternalUrl } = require('./src/electron-external-url');
+const { isAllowedExternalUrl, sanitizeExternalUrl } = require('./src/electron-external-url');
+// Main-process confirmation dialogs and the one gate for opening links in the browser
+// (electron-confirm.js, electron-external-open.js; docs/plans/harden-ipc.md).
+const { confirmAction } = require('./electron-confirm');
+const { createExternalOpener } = require('./electron-external-open');
+const confirmFor = (kind, details, contents) => confirmAction(dialog, (contents && BrowserWindow.fromWebContents(contents)) || null, kind, details);
+const externalOpener = createExternalOpener({ shell, isAllowed: isAllowedExternalUrl, sanitize: sanitizeExternalUrl, gestures: ipcGestures, confirm: confirmFor, log: logWarn });
 const { registerAiTopologyIpc, pipEndpoint } = require('./electron-ai-topology');
 const localModelsCatalog = require('./electron-local-models');
 const {
@@ -432,7 +468,7 @@ function requestCompanionConsentFromRenderer({ app }) {
     }
 
     const requestId = generateConsentRequestId();
-    pendingCompanionConsents.set(requestId, resolve);
+    pendingCompanionConsents.set(requestId, { resolve, app, contentsId: mainWindow.webContents.id });
 
     // If the window goes away while we wait, resolve as denied so callers
     // don't hang forever (the bridge has its own timeout too).
@@ -440,7 +476,7 @@ function requestCompanionConsentFromRenderer({ app }) {
       const pending = pendingCompanionConsents.get(requestId);
       if (pending) {
         pendingCompanionConsents.delete(requestId);
-        pending({ allow: false, alwaysAllow: false });
+        pending.resolve({ allow: false, alwaysAllow: false });
       }
     };
 
@@ -460,18 +496,24 @@ function requestCompanionConsentFromRenderer({ app }) {
   });
 }
 
-ipcMain.handle('companion-bridge:respond-consent', async (_event, payload) => {
+ipc.handle('companion-bridge:respond-consent', async (event, payload) => {
   const requestId = payload && typeof payload.requestId === 'string' ? payload.requestId : null;
   if (!requestId) return { ok: false, reason: 'missing_request_id' };
 
-  const resolve = pendingCompanionConsents.get(requestId);
-  if (!resolve) return { ok: false, reason: 'unknown_request_id' };
+  const pending = pendingCompanionConsents.get(requestId);
+  if (!pending) return { ok: false, reason: 'unknown_request_id' };
+  // Only the window that was asked may answer, and allowing needs the person's own click.
+  if (!event.sender || event.sender.id !== pending.contentsId) return { ok: false, reason: 'wrong_window' };
+  const allow = Boolean(payload && payload.allow);
+  if (allow && !ipcGestures.recent(event.sender)) return { ok: false, reason: 'needs_user_action' };
+  // "Always allow" stops future prompts: the app asks again in its own dialog.
+  const alwaysAllow = allow && Boolean(payload && payload.alwaysAllow);
+  if (alwaysAllow && !(await confirmFor('alwaysAllowCompanion', { app: pending.app }, event.sender))) {
+    return { ok: false, reason: 'not_confirmed' };
+  }
 
   pendingCompanionConsents.delete(requestId);
-  resolve({
-    allow: Boolean(payload && payload.allow),
-    alwaysAllow: Boolean(payload && payload.alwaysAllow)
-  });
+  pending.resolve({ allow, alwaysAllow });
   return { ok: true };
 });
 
@@ -584,35 +626,9 @@ function watchScreenVoiceAuthentication(window) {
 // Session tracker instance
 let sessionTracker = null;
 
-/**
- * Create a file:// URL that works on all platforms (Windows, macOS, Linux)
- * Windows requires forward slashes and a leading slash before the drive letter
- * @param {string} filePath - Absolute path to the file
- * @returns {string} Properly formatted file:// URL
- */
-function createFileUrl(filePath) {
-  let normalizedPath = filePath;
-
-  // On Windows, convert backslashes to forward slashes
-  if (process.platform === 'win32') {
-    normalizedPath = filePath.replace(/\\/g, '/');
-    // Ensure path starts with / for proper file:///C:/... format
-    if (!normalizedPath.startsWith('/')) {
-      normalizedPath = '/' + normalizedPath;
-    }
-  }
-
-  return url.format({
-    pathname: normalizedPath,
-    protocol: 'file:',
-    slashes: true
-  });
-}
-
 function openScreenVoiceSettings() {
   if (!mainWindow || mainWindow.isDestroyed()) return false;
-  const settingsUrl = createFileUrl(path.join(__dirname, 'public_html/settings-v2.html'))
-    + '?capability=screen-diction#screen-diction';
+  const settingsUrl = appPageUrl('settings-v2.html?capability=screen-diction#screen-diction');
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
   mainWindow.focus();
@@ -631,7 +647,7 @@ async function navigateScreenVoiceClient(input = {}) {
   // matters.html is retired: the matters list is workspaces.html, and one matter opens its own page.
   const route = asked === 'matters.html' ? (matterId ? 'workspace-details.html' : 'workspaces.html') : asked;
   if (!SCREEN_VOICE_CLIENT_ROUTES.has(route)) throw new Error('Unsupported LANA destination');
-  const target = new URL(createFileUrl(path.join(__dirname, 'public_html', route)));
+  const target = new URL(appPageUrl(route));
   if (matterId) {
     if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,119}$/.test(matterId)) throw new Error('Invalid matter identifier');
     if (route === 'workspace-details.html') target.searchParams.set('id', matterId);
@@ -935,7 +951,7 @@ async function navigateClientDeepLink(urlObj) {
   }
 
   route = sanitizeClientRoute(retiredMatterRoute(route, params));
-  const target = new URL(createFileUrl(path.join(__dirname, 'public_html', route)));
+  const target = new URL(appPageUrl(route));
   addSafeDeepLinkParams(target, params, DEEP_LINK_CLIENT_ROUTES[route]);
   setSafeHash(target, hash);
 
@@ -1041,34 +1057,48 @@ function registerDeepLinkProtocol() {
 
 registerDeepLinkProtocol();
 
-// OAuth state management for CSRF protection
-const pendingOAuthStates = new Map();
-const OAUTH_STATE_TTL = 10 * 60 * 1000; // 10 minutes
-
+// OAuth state management for CSRF protection (electron-oauth-state.js).
+const { createOAuthStates } = require('./electron-oauth-state');
+const oauthStates = createOAuthStates();
 function generateOAuthState() {
-  const crypto = require('crypto');
-  const state = crypto.randomBytes(32).toString('hex');
-  pendingOAuthStates.set(state, Date.now());
-  // Clean up expired states
-  for (const [key, timestamp] of pendingOAuthStates) {
-    if (Date.now() - timestamp > OAUTH_STATE_TTL) {
-      pendingOAuthStates.delete(key);
-    }
-  }
-  return state;
+  return oauthStates.generate();
 }
 
-function validateOAuthState(state) {
-  if (!state || !pendingOAuthStates.has(state)) {
-    return false;
-  }
-  const timestamp = pendingOAuthStates.get(state);
-  pendingOAuthStates.delete(state);
-  return (Date.now() - timestamp) < OAUTH_STATE_TTL;
+/**
+ * The origins the app's pages may talk to, from live configuration: the saved
+ * server (Chef, Forge, burst, embedded apps), the local AI engine, the local
+ * editor service and the control plane (electron-csp.js). Read per page load
+ * and per response, so a newly connected firm or a restarted engine counts.
+ */
+function currentCspOrigins() {
+  let engineUrl = null;
+  try {
+    const state = localEngine.supervisor.getState();
+    engineUrl = state && state.mode !== 'off' ? state.url : null;
+  } catch (_) { engineUrl = null; }
+  let editorUrl = null;
+  try { editorUrl = editorService.baseUrl() || null; } catch (_) { editorUrl = null; }
+  let savedServer = null;
+  try { savedServer = getSavedServer(); } catch (_) { savedServer = null; }
+  return cspOriginsFromConfig({ savedServer, engineUrl, editorUrl, controlPlaneUrls: CONTROL_PLANE_URLS, storageOrigins: chefStorage.origins() });
 }
 
-function isBackendManagedOAuthState(state) {
-  return /^[a-f0-9]{64}$/i.test(String(state || ''));
+// Where the saved firm's presigned storage links point: Chef serves it to
+// signed-in callers only (client-config), asked with this session's token
+// (electron-chef-storage.js). Pages loaded after the answer allow it.
+const chefStorage = createChefStorage({
+  getServer: () => getSavedServer(),
+  getToken: () => authTokenStore.get(),
+  fetch: (target, init) => fetch(target, chefPin.fetchInit(target, { ...init, signal: AbortSignal.timeout(5000) }))
+});
+
+/** An empty file:// page (the origin builds before the app protocol used), for the storage move. */
+function storageMigrationFileUrl() {
+  const file = path.join(app.getPath('userData'), 'storage-migration.html');
+  try {
+    if (!fs.existsSync(file)) fs.writeFileSync(file, '<!doctype html><title></title>');
+  } catch (_) { /* the migration reports the load failure */ }
+  return require('url').pathToFileURL(file).href;
 }
 
 /**
@@ -1089,10 +1119,12 @@ function createWindow(serverUrl = null, startPage = 'dashboard.html') {
     webPreferences: {
       nodeIntegration: false, // Disable Node.js integration for security
       contextIsolation: true, // Enable context isolation for security
-      preload: path.join(__dirname, 'electron-preload.js'), // Preload script for secure IPC
+      preload: CLIENT_PRELOAD(), // electron-preload.js, bundled (electron-preload-path.js)
       additionalArguments: [BRAND_ARG], // read by the preload: which product's look
-      sandbox: false, // Disable sandbox to allow file:// navigation
-      webSecurity: false, // Disable for file:// protocol to work with absolute paths
+      sandbox: true,
+      // The app is served from lana-app://app (electron-app-protocol.js), so
+      // nothing needs web security off.
+      webSecurity: true,
       allowRunningInsecureContent: false,
       experimentalFeatures: false,
       // Chromium's built-in PDF viewer: the file viewer's fallback PDF iframe
@@ -1151,19 +1183,7 @@ function createWindow(serverUrl = null, startPage = 'dashboard.html') {
     mainWindow = null;
   });
 
-  // Handle window open requests
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    // http(s) goes to the system browser; app pages, about:blank and blob:
-    // open isolated (no preload, web security on); javascript:, data:, other
-    // schemes and files outside public_html are denied
-    // (electron-window-open-policy.js).
-    const decision = decideWindowOpen(url, { appRoot: path.join(__dirname, 'public_html') });
-    if (decision.external) {
-      require('electron').shell.openExternal(decision.external);
-      return { action: 'deny' };
-    }
-    return decision.response;
-  });
+  // Window opens: the handler every webContents gets (web-contents-created).
 }
 
 // The first-launch setup screen comes before sign-in until the person has pressed Continue
@@ -1173,13 +1193,9 @@ function signInPageName(next = 'login') {
   return signInPage({ acceptedAt: firstLaunchPersistence.read().acceptedAt, next });
 }
 
-/** file:// URL of a page under public_html; relativeUrl may carry a ?query. */
+/** App URL of a page under public_html; relativeUrl may carry a ?query. */
 function publicPageUrl(relativeUrl) {
-  const value = String(relativeUrl || '');
-  const queryAt = value.indexOf('?');
-  const page = queryAt === -1 ? value : value.slice(0, queryAt);
-  const query = queryAt === -1 ? '' : value.slice(queryAt);
-  return createFileUrl(path.join(__dirname, 'public_html', page)) + query;
+  return appPageUrl(String(relativeUrl || ''));
 }
 
 /**
@@ -1199,10 +1215,10 @@ function createLoginWindow(next = 'login') {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'electron-preload.js'),
+      preload: CLIENT_PRELOAD(),
       additionalArguments: [BRAND_ARG],
-      sandbox: false,
-      webSecurity: false,
+      sandbox: true,
+      webSecurity: true,
       // The login page navigates this same window into the app, file viewer
       // included, so it needs the built-in PDF viewer too (see createWindow).
       plugins: true
@@ -1251,19 +1267,7 @@ function createLoginWindow(next = 'login') {
   // Create application menu
   createApplicationMenu();
 
-  // Handle window open requests
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    // http(s) goes to the system browser; app pages, about:blank and blob:
-    // open isolated (no preload, web security on); javascript:, data:, other
-    // schemes and files outside public_html are denied
-    // (electron-window-open-policy.js).
-    const decision = decideWindowOpen(url, { appRoot: path.join(__dirname, 'public_html') });
-    if (decision.external) {
-      require('electron').shell.openExternal(decision.external);
-      return { action: 'deny' };
-    }
-    return decision.response;
-  });
+  // Window opens: the handler every webContents gets (web-contents-created).
 }
 
 /**
@@ -1486,16 +1490,16 @@ function createApplicationMenu() {
  */
 
 // Renderer logging - captures errors from web pages for debug export
-ipcMain.handle('renderer-log-error', async (event, message, error) => {
+ipc.handle('renderer-log-error', async (event, message, error) => {
   logError(`[Renderer] ${message}`, error ? { message: error.message, stack: error.stack } : null);
 });
 
-ipcMain.handle('renderer-log-info', async (event, message) => {
+ipc.handle('renderer-log-info', async (event, message) => {
   logInfo(`[Renderer] ${message}`);
 });
 
 // Handle configuration requests
-ipcMain.handle('get-config', async () => {
+ipc.handle('get-config', async () => {
   return {
     appVersion: getAppVersion(),
     platform: process.platform,
@@ -1509,7 +1513,12 @@ ipcMain.handle('get-config', async () => {
 // Save the firm this app connects to (the sign-in page, and app links that
 // found their firm through discovery).
 async function applyServerConnection(settings) {
-  const stored = localEngine.toStored(settings);
+  // The page never sets the firm's service keys: they come from main's own discovery request
+  // for this firm (discovery:resolve), or the stored ones stay for the same firm.
+  const keysFrom = discoveredFirmSecrets && settings && discoveredFirmSecrets.orgId === settings.orgId
+    ? discoveredFirmSecrets
+    : getSavedServer();
+  const stored = localEngine.toStored(keepStoredFirmSecrets(settings, keysFrom));
   const success = saveServerConnection(stored);
   if (success) {
     chefPin.settle();
@@ -1520,87 +1529,54 @@ async function applyServerConnection(settings) {
   return success;
 }
 
-ipcMain.handle('save-settings', async (event, settings) => {
+ipc.handle('save-settings', async (event, settings) => {
   const success = await applyServerConnection(settings);
   return { success };
 });
 
-ipcMain.handle('load-settings', async () => {
-  return localEngine.present(getSavedServer());
-});
+// Hosted discovery for the sign-in and activation pages (js/shared/org-discovery.js). Main asks,
+// keeps the firm's service keys from the answer, and returns the answer without them.
+let discoveredFirmSecrets = null;
+ipc.handle('discovery:resolve', (event, request) => discoveryForPage(request, {
+  remember: (secrets) => { discoveredFirmSecrets = secrets; }
+}));
 
 // Get app version - use centralized version system
-ipcMain.handle('get-version', async () => {
+ipc.handle('get-version', async () => {
   return getAppVersion();
-});
-
-// Connect to server (called after hosted discovery resolves org)
-ipcMain.handle('connect-to-server', async (event, server) => {
-  logInfo(`IPC: connect-to-server requested for ${server.orgName || server.orgId}`);
-  try {
-    // Save server connection (Chef's address, never the engine's), then
-    // start or retarget the local engine at it.
-    const stored = localEngine.toStored(server);
-    saveServerConnection(stored);
-    chefPin.settle();
-    syncScreenVoiceEntitlement();
-    syncBriefs(stored);
-    await localEngine.sync().catch((error) => logError('[electron-main] Local AI engine did not start', error));
-    // The app's first calls go to the engine: wait (at most 20 s) until it is listening.
-    await localEngine.untilReady();
-
-    // Resize window for main app view
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.setSize(1400, 900);
-      mainWindow.center();
-    }
-
-    return { success: true };
-  } catch (error) {
-    logError('IPC: connect-to-server failed', error);
-    return { success: false, error: error.message };
-  }
 });
 
 // Verify server connection
 // The sign-in page found a firm through the control plane: pin its Chef (or
 // nothing, for a cloud firm) before the page probes it. The pin covers that
 // host and port only, and becomes the saved one when the firm is saved.
-ipcMain.handle('chef-pin:prepare', async (event, server) => {
+ipc.handle('chef-pin:prepare', async (event, server) => {
   const pinned = chefPin.prepare({ url: server && server.url, chefCertSha256: server && server.chefCertSha256 });
   return { success: true, pinned };
 });
 
 // Why the renderer could not trust that server's certificate, for the sign-in
 // page's message: 'mismatch' | 'untrusted' | null.
-ipcMain.handle('chef-pin:refusal', async (event, url) => ({ success: true, reason: chefPin.refusalForUrl(url) }));
-
-ipcMain.handle('verify-server', async (event, serverUrl) => {
-  logInfo(`IPC: verify-server for ${serverUrl}`);
-  try {
-    const result = await verifyServer(serverUrl);
-    return { success: result !== null, server: result };
-  } catch (error) {
-    logError('IPC: verify-server failed', error);
-    return { success: false, error: error.message };
-  }
-});
+ipc.handle('chef-pin:refusal', async (event, url) => ({ success: true, reason: chefPin.refusalForUrl(url) }));
 
 // Login token get/set/clear/migrate for the preload (synchronous channels).
-registerTokenIpc(ipcMain, authTokenStore, () => {
+registerTokenIpc(ipc, authTokenStore, () => {
   syncScreenVoiceAuthentication().catch(() => {});
   // Sign-in, sign-out or a user switch: the engine follows this app's session.
   localEngine.sessionChanged();
   // Briefs follows it too: it stops on sign-out and starts on sign-in when enabled.
   syncBriefs();
+  // Sign-out: a connect link's org id still waiting is dropped.
+  if (!authTokenStore.get()) connectOrgQueue.clear();
 });
 
 // Get saved server
-ipcMain.handle('get-saved-server', async () => {
+ipc.handle('get-saved-server', async () => {
   try {
     // url is the API base (the local engine when in use); chefUrl is the
     // organization's server.
-    const server = localEngine.present(getSavedServer());
+    // Never the firm's service keys (burstApiKey, forgeApiKey): main keeps those.
+    const server = withoutFirmSecrets(localEngine.present(getSavedServer()));
     return { success: true, server };
   } catch (error) {
     logError('IPC: get-saved-server failed', error);
@@ -1609,7 +1585,7 @@ ipcMain.handle('get-saved-server', async () => {
 });
 
 // Settings > Screen diction. Empty until the feature ships (SCREEN_DICTION_READY).
-ipcMain.handle('capabilities:list', async () => {
+ipc.handle('capabilities:list', async () => {
   try {
     return { success: true, platform: process.platform, capabilities: currentCapabilityViewModels() };
   } catch (error) {
@@ -1618,7 +1594,7 @@ ipcMain.handle('capabilities:list', async () => {
   }
 });
 
-ipcMain.handle('capabilities:set-active', async (_event, payload) => {
+ipc.handle('capabilities:set-active', async (_event, payload) => {
   try {
     const id = typeof payload?.id === 'string' ? payload.id.trim() : '';
     const active = payload?.active;
@@ -1635,7 +1611,7 @@ ipcMain.handle('capabilities:set-active', async (_event, payload) => {
   }
 });
 
-ipcMain.handle('capabilities:set-open-at-login', async (_event, payload) => {
+ipc.handle('capabilities:set-open-at-login', async (_event, payload) => {
   try {
     if (!isScreenDictionEntitled()) return { success: false, error: 'Screen diction is not available yet.' };
     if (!screenVoice || typeof payload?.openAtLogin !== 'boolean') {
@@ -1649,13 +1625,13 @@ ipcMain.handle('capabilities:set-open-at-login', async (_event, payload) => {
   }
 });
 
-ipcMain.handle('capabilities:get-voice-settings', async () => {
+ipc.handle('capabilities:get-voice-settings', async () => {
   if (!isScreenDictionEntitled()) return { success: false, error: 'Screen diction is not available yet.' };
   if (!screenVoice) return { success: false, error: 'The LANA Voice Agent is not available on this platform.' };
   return { success: true, settings: screenVoice.getSettings() };
 });
 
-ipcMain.handle('capabilities:set-voice-settings', async (_event, payload) => {
+ipc.handle('capabilities:set-voice-settings', async (_event, payload) => {
   try {
     if (!isScreenDictionEntitled()) return { success: false, error: 'Screen diction is not available yet.' };
     if (!screenVoice || !payload?.settings || typeof payload.settings !== 'object' || Array.isArray(payload.settings)) {
@@ -1669,14 +1645,14 @@ ipcMain.handle('capabilities:set-voice-settings', async (_event, payload) => {
   }
 });
 
-ipcMain.handle('capabilities:get-voice-permissions', async () => {
+ipc.handle('capabilities:get-voice-permissions', async () => {
   if (!isScreenDictionEntitled()) return { success: false, error: 'Screen diction is not available yet.' };
   if (!screenVoice) return { success: false, error: 'The LANA Voice Agent is not available on this platform.' };
   try { return { success: true, permissions: await screenVoice.permissionStatus() }; }
   catch (_) { return { success: false, error: 'Permission status is temporarily unavailable.' }; }
 });
 
-ipcMain.handle('capabilities:request-voice-permission', async (_event, payload) => {
+ipc.handle('capabilities:request-voice-permission', async (_event, payload) => {
   const type = payload?.type;
   if (!isScreenDictionEntitled()) return { success: false, error: 'Screen diction is not available yet.' };
   if (!screenVoice || !['microphone', 'accessibility'].includes(type)) {
@@ -1686,25 +1662,14 @@ ipcMain.handle('capabilities:request-voice-permission', async (_event, payload) 
   catch (_) { return { success: false, error: 'The permission request could not be opened.' }; }
 });
 
-// Clear saved server (logout)
-ipcMain.handle('clear-saved-server', async () => {
-  try {
-    clearSavedServer();
-    syncScreenVoiceEntitlement();
-    syncBriefs(null);
-    await localEngine.sync().catch((error) => logError('[electron-main] Local AI engine did not stop', error));
-    return { success: true };
-  } catch (error) {
-    logError('IPC: clear-saved-server failed', error);
-    return { success: false, error: error.message };
-  }
-});
-
 
 // Session Tracking IPC Handlers
-// Initialize session tracker with backend URL and auth token
-ipcMain.handle('session-tracker:initialize', async (event, backendUrl, authToken) => {
+// Initialize the session tracker with this app's API base and login token. Both come from the
+// main process: the page names neither, so it cannot send the token to another address.
+ipc.handle('session-tracker:initialize', async () => {
   try {
+    const backendUrl = localEngine.apiBase();
+    const authToken = authTokenStore.get();
     if (sessionTracker && backendUrl && authToken) {
       sessionTracker.initialize(backendUrl, authToken);
       logInfo('[SessionTracker] Initialized with backend URL');
@@ -1721,22 +1686,14 @@ ipcMain.handle('session-tracker:initialize', async (event, backendUrl, authToken
 
 // Check for updates
 // Open URL in system browser (used by update dialog for manual download)
-ipcMain.handle('open-external-url', async (event, url) => {
-  const { shell } = require('electron');
-  if (!isAllowedExternalUrl(url)) {
-    console.warn('[open-external-url] Refused URL with a scheme that is not allowed');
-    return false;
-  }
-  await shell.openExternal(url);
-  return true;
-});
+ipc.handle('open-external-url', async (event, url) => externalOpener.open(url, { contents: event.sender }));
 
 // ───────────────────────────────────────────────────────────────────────────
 // Brainchild MCP bridge — renderer-facing read API (thin; spawn/IPC only here)
 // ───────────────────────────────────────────────────────────────────────────
 
 // Auto-discover an install + vault from OS defaults. Pure-helper backed.
-ipcMain.handle('brainchild:discover', async () => {
+ipc.handle('brainchild:discover', async () => {
   try {
     return { success: true, ...discover() };
   } catch (error) {
@@ -1747,7 +1704,7 @@ ipcMain.handle('brainchild:discover', async () => {
 
 // Establish + persist the link, then validate. Communicate via MCP only AFTER
 // the link is persisted and verified.
-ipcMain.handle('brainchild:link', async (_event, payload) => {
+ipc.handle('brainchild:link', async (_event, payload) => {
   try {
     const link = {
       installPath: (payload && payload.installPath) || '',
@@ -1793,7 +1750,7 @@ ipcMain.handle('brainchild:link', async (_event, payload) => {
   }
 });
 
-ipcMain.handle('brainchild:status', async () => {
+ipc.handle('brainchild:status', async () => {
   try {
     return { success: true, ...brainchildManager.getStatus() };
   } catch (error) {
@@ -1802,7 +1759,7 @@ ipcMain.handle('brainchild:status', async () => {
   }
 });
 
-ipcMain.handle('brainchild:listNotes', async (_event, payload) => {
+ipc.handle('brainchild:listNotes', async (_event, payload) => {
   try {
     const args = {};
     if (payload && payload.filter) args.filter = String(payload.filter);
@@ -1814,7 +1771,7 @@ ipcMain.handle('brainchild:listNotes', async (_event, payload) => {
   }
 });
 
-ipcMain.handle('brainchild:search', async (_event, payload) => {
+ipc.handle('brainchild:search', async (_event, payload) => {
   try {
     const args = { query: (payload && payload.query) || '' };
     if (payload && payload.limit) args.limit = Number(payload.limit);
@@ -1826,7 +1783,7 @@ ipcMain.handle('brainchild:search', async (_event, payload) => {
   }
 });
 
-ipcMain.handle('brainchild:getNote', async (_event, payload) => {
+ipc.handle('brainchild:getNote', async (_event, payload) => {
   try {
     const notePath = (payload && payload.path) || '';
     if (!notePath) return { success: false, error: 'missing_path' };
@@ -1843,7 +1800,7 @@ ipcMain.handle('brainchild:getNote', async (_event, payload) => {
 // Path entry stays main-chosen (dialog) rather than renderer-passed, so the
 // renderer never supplies an arbitrary install path. Returns the resolved
 // install root for the renderer to pass back to brainchild:link.
-ipcMain.handle('brainchild:pickInstall', async () => {
+ipc.handle('brainchild:pickInstall', async (event) => {
   try {
     const result = await dialog.showOpenDialog({
       title: 'Choose your Brainchild install folder',
@@ -1861,6 +1818,8 @@ ipcMain.handle('brainchild:pickInstall', async () => {
     }
     // Trust this user-picked root for subsequent brainchild:link in this session.
     brainchildPickedInstallRoots.add(require('path').resolve(installPath));
+    // The person answered our folder dialog: the vault picker that follows counts it as their gesture.
+    ipcGestures.mark(event.sender);
     return { success: true, installPath, mcpBin };
   } catch (error) {
     logError('[electron-main] brainchild:pickInstall failed', error);
@@ -1870,7 +1829,7 @@ ipcMain.handle('brainchild:pickInstall', async () => {
 
 // Native folder picker for the Brainchild VAULT directory. Returns the chosen
 // path for the renderer to pass to brainchild:link as vaultPath.
-ipcMain.handle('brainchild:pickVault', async () => {
+ipc.handle('brainchild:pickVault', async () => {
   try {
     const result = await dialog.showOpenDialog({
       title: 'Choose your Brainchild vault folder',
@@ -1892,7 +1851,7 @@ ipcMain.handle('brainchild:pickVault', async () => {
 // Unlink: stop the MCP child, forget the persisted link, and suppress auto-bind
 // so discovery does not instantly re-bind the handshake vault. Backed by
 // clearBrainchildLink() + setBrainchildAutoBindDisabled() in electron-storage.
-ipcMain.handle('brainchild:unlink', async () => {
+ipc.handle('brainchild:unlink', async () => {
   try {
     brainchildManager.stop();
     clearBrainchildLink();
@@ -1910,7 +1869,7 @@ ipcMain.handle('brainchild:unlink', async () => {
 // "Open in Brainchild": resolve the vault-relative note path against the linked
 // vault root and show it in Finder/Explorer. The note path is constrained to the
 // linked vault (no traversal outside it) before revealing.
-ipcMain.handle('brainchild:revealNote', async (_event, payload) => {
+ipc.handle('brainchild:revealNote', async (event, payload) => {
   try {
     const link = getBrainchildLink();
     if (!link || !link.vaultPath) return { success: false, error: 'not_linked' };
@@ -1925,6 +1884,8 @@ ipcMain.handle('brainchild:revealNote', async (_event, payload) => {
       return { success: false, error: 'path_outside_vault' };
     }
     const { shell } = require('electron');
+    // The app asks before showing a file from the vault (electron-confirm.js).
+    if (!(await confirmFor('revealNote', { file: resolved }, event.sender))) return { success: false, cancelled: true };
     if (fs.existsSync(resolved)) {
       shell.showItemInFolder(resolved);
       return { success: true, revealed: resolved };
@@ -1938,108 +1899,11 @@ ipcMain.handle('brainchild:revealNote', async (_event, payload) => {
   }
 });
 
-ipcMain.handle('generate-oauth-state', async () => {
+ipc.handle('generate-oauth-state', async () => {
   return generateOAuthState();
 });
 
-/**
- * OAuth State Management - Backend-based
- * Creates state token in backend database for CSRF protection
- */
-ipcMain.handle('create-oauth-state', async (event, { provider, connectorId, matterId }) => {
-  try {
-    const savedServer = getSavedServer();
-    if (!savedServer || !savedServer.serverUrl) {
-      throw new Error('No server connection found');
-    }
-
-    const baseUrl = savedServer.serverUrl;
-    const authToken = savedServer.authToken;
-
-    if (!authToken) {
-      throw new Error('No authentication token found');
-    }
-
-    // Call backend to create state token
-    const response = await chefPin.pinnedFetch()(`${baseUrl}/api/v1/integrations/oauth/states`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`
-      },
-      body: JSON.stringify({
-        provider,
-        connector_id: connectorId,
-        matter_id: matterId
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      throw new Error(errorData.error || `HTTP ${response.status}`);
-    }
-
-    const data = await response.json();
-    logInfo(`OAuth state created for provider: ${provider}, state: ${data.state.substring(0, 8)}...`);
-
-    return { success: true, state: data.state };
-  } catch (error) {
-    logError('Failed to create OAuth state', error);
-    return { success: false, error: error.message };
-  }
-});
-
-/**
- * OAuth Code Exchange - Backend-based
- * Exchanges authorization code for tokens via backend
- */
-ipcMain.handle('exchange-oauth-code', async (event, { code, state, provider, connectorId, redirectUri, realmId }) => {
-  try {
-    const savedServer = getSavedServer();
-    if (!savedServer || !savedServer.serverUrl) {
-      throw new Error('No server connection found');
-    }
-
-    const baseUrl = savedServer.serverUrl;
-    const authToken = savedServer.authToken;
-
-    if (!authToken) {
-      throw new Error('No authentication token found');
-    }
-
-    // Call backend to exchange code for tokens
-    const response = await chefPin.pinnedFetch()(`${baseUrl}/api/v1/integrations/oauth/exchange`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`
-      },
-      body: JSON.stringify({
-        code,
-        state,
-        provider,
-        connectorId: connectorId || provider,
-        redirectUri: redirectUri || `${baseUrl}/api/v1/integrations/oauth/callback`,
-        realmId: realmId || null
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      throw new Error(errorData.error || `HTTP ${response.status}`);
-    }
-
-    const data = await response.json();
-    logInfo(`OAuth code exchanged successfully for provider: ${provider}`);
-
-    return { success: true, data };
-  } catch (error) {
-    logError('Failed to exchange OAuth code', error);
-    return { success: false, error: error.message };
-  }
-});
-
-ipcMain.handle('check-updates', async (event, serverUrl) => {
+ipc.handle('check-updates', async (event, serverUrl) => {
   try {
     // Get saved server to retrieve orgId
     const savedServer = getSavedServer();
@@ -2054,7 +1918,9 @@ ipcMain.handle('check-updates', async (event, serverUrl) => {
 });
 
 // Download and install update
-ipcMain.handle('install-update', async (event, serverUrl) => {
+ipc.handle('install-update', async (event, serverUrl) => {
+  // The app asks, not the page: it quits and restarts (electron-confirm.js).
+  if (!(await confirmFor('installUpdate', { version: (getLastCheckResult() || {}).version }, event.sender))) return { success: false, cancelled: true };
   try {
     // Get saved server to retrieve orgId
     const savedServer = getSavedServer();
@@ -2065,88 +1931,6 @@ ipcMain.handle('install-update', async (event, serverUrl) => {
   } catch (error) {
     logError('IPC: install-update failed', error);
     return { success: false, error: error.message };
-  }
-});
-
-/**
- * VPN Key Management IPC Handlers
- * Uses electron-store for secure local storage of VPN keys
- */
-const vpnStore = new Store({ name: 'vpn-keys', encryptionKey: 'lana-vpn-secure-store' });
-
-// Generate WireGuard keypair using X25519
-ipcMain.handle('vpn-generate-keypair', async () => {
-  try {
-    // Generate X25519 keypair using Node.js crypto
-    const { publicKey, privateKey } = crypto.generateKeyPairSync('x25519', {
-      publicKeyEncoding: { type: 'spki', format: 'der' },
-      privateKeyEncoding: { type: 'pkcs8', format: 'der' }
-    });
-
-    // Extract raw keys (X25519 keys are 32 bytes)
-    // SPKI format: 12 bytes header + 32 bytes key
-    // PKCS8 format: 16 bytes header + 32 bytes key
-    const rawPublicKey = publicKey.slice(-32);
-    const rawPrivateKey = privateKey.slice(-32);
-
-    return {
-      publicKey: rawPublicKey.toString('base64'),
-      privateKey: rawPrivateKey.toString('base64')
-    };
-  } catch (error) {
-    logError('VPN keypair generation failed', error);
-    throw error;
-  }
-});
-
-// Save VPN keys to secure storage
-ipcMain.handle('vpn-save-keys', async (event, keys) => {
-  try {
-    vpnStore.set('keys', keys);
-    logInfo('VPN keys saved to secure storage');
-    return { success: true };
-  } catch (error) {
-    logError('Failed to save VPN keys', error);
-    return { success: false, error: error.message };
-  }
-});
-
-// Load VPN keys from secure storage
-ipcMain.handle('vpn-load-keys', async () => {
-  try {
-    const keys = vpnStore.get('keys');
-    return keys || null;
-  } catch (error) {
-    logError('Failed to load VPN keys', error);
-    return null;
-  }
-});
-
-// Clear VPN keys from secure storage
-ipcMain.handle('vpn-clear-keys', async () => {
-  try {
-    vpnStore.delete('keys');
-    vpnStore.delete('deviceId');
-    logInfo('VPN keys cleared from secure storage');
-    return { success: true };
-  } catch (error) {
-    logError('Failed to clear VPN keys', error);
-    return { success: false, error: error.message };
-  }
-});
-
-// Get or create device ID
-ipcMain.handle('vpn-get-device-id', async () => {
-  try {
-    let deviceId = vpnStore.get('deviceId');
-    if (!deviceId) {
-      deviceId = crypto.randomUUID();
-      vpnStore.set('deviceId', deviceId);
-    }
-    return deviceId;
-  } catch (error) {
-    logError('Failed to get device ID', error);
-    return crypto.randomUUID(); // Fallback to random UUID
   }
 });
 
@@ -2164,7 +1948,7 @@ ipcMain.handle('vpn-get-device-id', async () => {
  * Note: granted_user_id is treated as semi-sensitive — never log it.
  */
 // Settings > Capabilities > AI: local model servers, the server, Forge (electron-ai-topology.js).
-registerAiTopologyIpc(ipcMain, {
+registerAiTopologyIpc(ipc, {
   env: process.env,
   savedServer: () => getSavedServer(),
   fetchImpl: chefPin.pinnedFetch(),
@@ -2175,7 +1959,7 @@ registerAiTopologyIpc(ipcMain, {
 });
 
 // Settings > General: About, Software update, Language & region (electron-system-info.js).
-registerSystemInfoIpc(ipcMain, {
+registerSystemInfoIpc(ipc, {
   app,
   displayVersion: getAppVersion,
   checkForUpdates,
@@ -2187,14 +1971,14 @@ registerSystemInfoIpc(ipcMain, {
 });
 
 // Settings > General > Location: whether the person turned it on (electron-location.js).
-registerLocationIpc(ipcMain, { persistence: locationPersistence, shell, platform: process.platform, isPackaged: app.isPackaged });
+registerLocationIpc(ipc, { persistence: locationPersistence, shell, platform: process.platform, isPackaged: app.isPackaged });
 
 const bridgeConsentsStore = new Store({
   name: 'bridge-consents',
   defaults: { consents: {} }
 });
 
-ipcMain.handle('settings:list-bridge-consents', async () => {
+ipc.handle('settings:list-bridge-consents', async () => {
   try {
     const consents = bridgeConsentsStore.get('consents', {}) || {};
     return consents;
@@ -2204,7 +1988,7 @@ ipcMain.handle('settings:list-bridge-consents', async () => {
   }
 });
 
-ipcMain.handle('settings:revoke-bridge-consent', async (_event, payload) => {
+ipc.handle('settings:revoke-bridge-consent', async (_event, payload) => {
   const app = payload && typeof payload.app === 'string' ? payload.app.trim() : '';
   if (!app) {
     return { ok: false, message: 'app name is required' };
@@ -2295,7 +2079,8 @@ const handleOAuthCallback = (urlObj) => {
   logInfo(`OAuth callback: provider=${provider}, hasCode=${!!code}, hasError=${!!error}`);
 
   // Validate state for CSRF protection
-  if (state && !validateOAuthState(state) && !isBackendManagedOAuthState(state)) {
+  // A callback without a state, or with one this app did not issue, is refused: any website can open this link.
+  if (!oauthStates.acceptsCallback(state)) {
     logError('OAuth state validation failed — possible CSRF');
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('oauth-callback', {
@@ -2343,11 +2128,21 @@ const handleConnectLink = (urlObj) => {
 
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.focus();
-    mainWindow.webContents.send('connect-link:org', { orgId });
+    // An open sign-in page fills it in; on any other page the link is not used (as before).
+    if (pageOf(mainWindow.webContents.getURL()) === 'login.html') {
+      mainWindow.webContents.send('connect-link:org', { orgId });
+    } else {
+      logInfo('[DeepLink] Connect link ignored: the sign-in page is not showing');
+    }
   } else {
+    // The sign-in window opened for this link takes the id once its page is ready
+    // (connect-link:take); no other window or later sign-in page gets it.
     createLoginWindow();
+    if (mainWindow && !mainWindow.isDestroyed()) connectOrgQueue.offer(orgId, mainWindow.webContents.id);
   }
 };
+const connectOrgQueue = createConnectOrgQueue();
+ipc.handle('connect-link:take', (event) => ({ orgId: connectOrgQueue.take(event.sender.id) }));
 
 // App links from Chef's emails (electron-app-links.js). The router decides the
 // firm and sign-in; these are the window, dialog and storage pieces it uses.
@@ -2438,7 +2233,7 @@ const appLinkRouter = createAppLinkRouter({
   openSignIn: openAppLinkSignIn,
   log: (message) => logInfo(`[AppLinks] ${message}`)
 });
-registerAppLinkIpc(ipcMain, appLinkRouter);
+registerAppLinkIpc(ipc, appLinkRouter);
 
 // Deep links that arrive before the first window has loaded (the app was
 // launched by the link) wait for it; every route goes through this.
@@ -2546,13 +2341,46 @@ app.whenReady().then(async () => {
 
   // Geolocation only for the app's own pages, and only after the person turned Location on
   // in Settings. Every other permission keeps Electron's default.
-  installLocationPermissionHandlers(session.defaultSession, {
+  appPermissions = installLocationPermissionHandlers(session.defaultSession, {
     appRoot: path.join(__dirname, 'public_html'),
     isAllowed: () => locationPersistence.read().allowed
   });
 
-  // Configure session to handle CORS for API requests
-  // This allows the file:// app to make requests to http:// backend
+  // The app's own pages, from lana-app://app/public_html/ with their CSP
+  // (electron-app-protocol.js, electron-csp.js; docs/plans/harden-web.md).
+  const appRoot = path.join(__dirname, 'public_html');
+  protocol.handle(APP_SCHEME, createAppProtocolHandler({
+    appRoot,
+    fetchFile: (fileUrl, init) => require('electron').net.fetch(fileUrl, init),
+    buildPolicy: ({ page, nonce, handlerHashes }) => buildContentSecurityPolicy({
+      page,
+      nonce,
+      handlerHashes,
+      origins: currentCspOrigins()
+    })
+  }));
+
+  // Builds before the app protocol kept renderer localStorage on file://: copy it once.
+  await migrateFileOriginStorage({
+    store: migrationStore,
+    // A WebContentsView, not a BrowserWindow: closing it must not count as the
+    // last window closing (window-all-closed quits on Windows and Linux).
+    createPage: () => {
+      const { WebContentsView } = require('electron');
+      const view = new WebContentsView({
+        webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true }
+      });
+      return {
+        loadURL: (target) => view.webContents.loadURL(target),
+        webContents: view.webContents,
+        destroy: () => view.webContents.close()
+      };
+    },
+    fileOriginUrl: storageMigrationFileUrl(),
+    appOriginUrl: `${APP_ORIGIN}${STORAGE_MIGRATION_PATH}`,
+    log: logInfo
+  });
+
   // The app's own pages calling the local editor's /v1 API get its token added here.
   session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
     let pageUrl = '';
@@ -2562,15 +2390,15 @@ app.whenReady().then(async () => {
     callback({ requestHeaders: editorService.requestHeaders({ url: details.url, pageUrl, resourceType: details.resourceType, headers: details.requestHeaders }) });
   });
 
-  const { addMissingCorsHeaders } = require('./electron-cors');
+  // CORS for the app origin, answered here for the configured origins only
+  // (electron-cors.js); every other site's headers pass through untouched.
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-    callback({
-      responseHeaders: addMissingCorsHeaders(details.responseHeaders)
-    });
+    callback(corsResponseFor(details, { appOrigin: APP_ORIGIN, allowedOrigins: currentCspOrigins().api }));
   });
 
   // Initialize session tracker
   sessionTracker = new SessionTracker({
+    ipcMain: ipc,
     heartbeatInterval: 30000, // 30 seconds
     idleThreshold: 60 // 1 minute
   });
@@ -2774,114 +2602,76 @@ app.on('before-quit', async (event) => {
   }
 });
 
-// Security: Prevent navigation to external URLs (allow local file navigation)
-// Also fix absolute paths (e.g., /index.html -> file:///path/to/app/public_html/index.html)
+// Every webContents (app windows, popups, the update dialog, the Briefs capture
+// window): main-frame navigation, window opens and webviews are guarded here.
 app.on('web-contents-created', (event, contents) => {
+  const appRoot = path.join(__dirname, 'public_html');
+
+  // App pages load; root-relative app paths and old file:// links to app pages
+  // are rewritten; http(s) and mailto open in the system browser
+  // (src/electron-external-url.js); anything else is refused
+  // (electron-navigation-policy.js).
   contents.on('will-navigate', (navigationEvent, navigationUrl) => {
-    const parsedUrl = new URL(navigationUrl);
-
-    // Allow file:// protocol navigation (local HTML files)
-    // Block external http/https navigation (but not our API calls which use fetch)
-    if (parsedUrl.protocol === 'file:') {
-      // Decode the pathname (handles %3A for : etc.)
-      let pathname = decodeURIComponent(parsedUrl.pathname);
-
-      logInfo(`[electron-main] [Navigation] Original URL: ${redactUrlForLog(navigationUrl)}`);
-      logInfo(`[electron-main] [Navigation] Decoded pathname: ${pathname}`);
-
-      // Check if this path needs to be fixed to point to public_html
-      // A path is "correct" if it already includes public_html AND doesn't have a drive letter after it
-      const hasPublicHtml = pathname.includes('public_html');
-      const hasDriveLetterAfterPublicHtml = /public_html\/[A-Za-z]:/.test(pathname);
-      const isAlreadyCorrect = hasPublicHtml && !hasDriveLetterAfterPublicHtml;
-
-      if (!isAlreadyCorrect) {
-        // Extract just the page path from the URL
-        // On macOS/Linux: /workspaces.html or /admin/users.html
-        // On Windows: /C:/workspaces.html or C:/workspaces.html -> need to extract just /workspaces.html
-        let pagePath = pathname;
-
-        // If path has public_html but also a drive letter, extract just the page name
-        if (hasDriveLetterAfterPublicHtml) {
-          const driveMatch = pathname.match(/public_html\/[A-Za-z]:(\/[^?#]*)/);
-          if (driveMatch) {
-            pagePath = driveMatch[1];
-            logInfo(`[electron-main] [Navigation] Extracted page from malformed path: ${pagePath}`);
-          }
-        } else {
-          // On Windows, file:// URLs resolve root-relative paths like /workspaces.html to /C:/workspaces.html
-          // We need to strip the drive letter to get just the page path
-          // Handle formats: /C:/path, C:/path, /C%3A/path (URL encoded)
-          const windowsDriveMatch = pathname.match(/^\/?[A-Za-z]:(\/[^?#]*)/);
-          if (windowsDriveMatch) {
-            pagePath = windowsDriveMatch[1];
-            logInfo(`[electron-main] [Navigation] Windows drive letter stripped: ${pathname} -> ${pagePath}`);
-          }
-        }
-
-        // If a file:// navigation resolved to the project root instead of
-        // public_html (for example /Users/.../lana-ai-client/admin/analytics.html),
-        // strip the project root before joining with public_html. Without this,
-        // the handler produces public_html/Users/.../lana-ai-client/... paths.
-        const projectRoot = path.resolve(__dirname);
-        const normalizedPathname = path.resolve(pathname);
-        if (normalizedPathname === projectRoot || normalizedPathname.startsWith(projectRoot + path.sep)) {
-          pagePath = normalizedPathname.substring(projectRoot.length);
-          if (pagePath.startsWith(path.sep + 'public_html' + path.sep)) {
-            pagePath = pagePath.substring(('/public_html').length);
-          } else if (pagePath.startsWith(path.sep + 'src' + path.sep)) {
-            pagePath = pagePath.substring(('/src').length);
-          }
-          if (!pagePath.startsWith(path.sep)) {
-            pagePath = path.sep + pagePath;
-          }
-          logInfo(`[electron-main] [Navigation] Project-root path stripped: ${pathname} -> ${pagePath}`);
-        }
-
-        // Ensure pagePath starts with / for proper path.join behavior
-        if (!pagePath.startsWith('/')) {
-          pagePath = '/' + pagePath;
-        }
-
-        // Remove any remaining drive letters that might have slipped through
-        pagePath = pagePath.replace(/^\/[A-Za-z]:/, '');
-        if (!pagePath.startsWith('/')) {
-          pagePath = '/' + pagePath;
-        }
-
-        // Build the correct path to public_html using the cross-platform helper
-        const publicHtmlPath = path.join(__dirname, 'public_html');
-        const fullPath = path.join(publicHtmlPath, pagePath);
-        let correctPath = createFileUrl(fullPath);
-
-        // Preserve query string and hash from original URL
-        logInfo(`[electron-main] [Navigation] parsedUrl.search: ${parsedUrl.search ? '[redacted]' : ''}`);
-        logInfo(`[electron-main] [Navigation] parsedUrl.hash: ${parsedUrl.hash ? '[redacted]' : ''}`);
-
-        if (parsedUrl.search) {
-          correctPath += parsedUrl.search;
-          logInfo(`[electron-main] [Navigation] Added search: ${redactUrlForLog(correctPath)}`);
-        }
-        if (parsedUrl.hash) {
-          correctPath += parsedUrl.hash;
-          logInfo(`[electron-main] [Navigation] Added hash: ${redactUrlForLog(correctPath)}`);
-        }
-
-        logInfo(`[electron-main] [Navigation] Final path: ${redactUrlForLog(navigationUrl)} -> ${redactUrlForLog(correctPath)}`);
-        navigationEvent.preventDefault();
-        contents.loadURL(correctPath);
-        return;
-      }
-
-      // Allow local file navigation - this is how the app navigates between pages
-      logInfo(`[electron-main] [Navigation] Path OK, allowing: ${pathname}`);
-      return;
-    }
-
-    // Block navigation to external URLs (security measure)
-    // API calls use fetch(), not navigation, so they're not affected
+    const decision = decideNavigation(navigationUrl, { appRoot });
+    if (decision.action === 'allow') return;
     navigationEvent.preventDefault();
+    if (decision.action === 'redirect') {
+      contents.loadURL(decision.url);
+    } else if (decision.action === 'external') {
+      externalOpener.open(decision.url, { contents }).catch(() => {});
+    } else {
+      logInfo(`[electron-main] [Navigation] Refused: ${redactUrlForLog(String(navigationUrl))}`);
+    }
   });
+
+  // Frames inside a page: a custom scheme (foo://, ms-settings:) is never handed to the
+  // operating system from a frame; mail and vault links go through the app's opener
+  // (electron-navigation-policy.js decideFrameNavigation, electron-external-open.js).
+  contents.on('will-frame-navigate', (details) => {
+    if (details.isMainFrame) return;
+    const decision = decideFrameNavigation(details.url);
+    if (decision.action === 'allow') return;
+    details.preventDefault();
+    // Judged by the frame that started it; with no initiator known, it is refused.
+    if (decision.action === 'external' && details.initiator) {
+      externalOpener.open(decision.url, { contents, fromFrame: details.initiator }).catch(() => {});
+    } else {
+      logInfo(`[electron-main] [Navigation] Refused a frame navigation: ${redactUrlForLog(String(details.url))}`);
+    }
+  });
+
+  // A redirect may only land on an app page (the app protocol never redirects).
+  contents.on('will-redirect', (navigationEvent, navigationUrl, isInPlace, isMainFrame) => {
+    if (isMainFrame === false) return;
+    if (decideNavigation(navigationUrl, { appRoot }).action !== 'allow') navigationEvent.preventDefault();
+  });
+
+  // http(s) goes to the system browser; app pages, about:blank and blob:
+  // open isolated (no preload, web security on); javascript:, data:, file:
+  // and other schemes are denied (electron-window-open-policy.js).
+  contents.setWindowOpenHandler(({ url: openUrl, referrer }) => {
+    const decision = decideWindowOpen(openUrl, { appRoot });
+    if (decision.external) {
+      // Any frame can call window.open: the link opens only for the app's own frames,
+      // after a click or a yes in the app's dialog, within a rate limit (electron-external-open.js).
+      externalOpener.open(decision.external, { contents, fromWindowOpen: true, openerUrl: (referrer && referrer.url) || '' }).catch(() => {});
+      return { action: 'deny' };
+    }
+    return decision.response;
+  });
+
+  // The app uses no <webview>.
+  contents.on('will-attach-webview', (attachEvent) => attachEvent.preventDefault());
+
+  // Development: CSP violations from any page show in the main log too.
+  if (process.env.NODE_ENV === 'development') {
+    contents.on('console-message', (consoleEvent, level, message) => {
+      const text = (consoleEvent && typeof consoleEvent.message === 'string') ? consoleEvent.message : String(message || '');
+      if (text.includes('Content Security Policy')) {
+        logWarn(`[csp] ${redactUrlForLog(contents.getURL())}: ${text}`);
+      }
+    });
+  }
 });
 
 // Handle uncaught exceptions

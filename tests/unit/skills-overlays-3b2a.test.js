@@ -192,6 +192,7 @@ describe('workspace-details skill builder and import modals', () => {
     window.eval(read('js/lex/lex.forms.js'));
     window.eval(read('js/lex/components/form/lex-select.js'));
     window.eval(read('js/shared/event-catalog.js'));
+    window.eval(read('js/shared/dom-actions.js'));
     window.eval(read('js/matter-skills.js'));
     return window;
   }
@@ -226,6 +227,7 @@ describe('workspace-details skill builder and import modals', () => {
 
   test('close helpers still hide a page that carries the legacy fixed-overlay markup', () => {
     const window = lexWindow('<div id="createSkillModal" class="fixed inset-0 flex"></div><div id="importSkillModal" class="fixed inset-0 flex"><button id="import-skill-btn"></button><input id="skill-file-input"><div id="skill-upload-prompt"></div><div id="skill-file-info"></div><div id="skill-preview"></div></div>');
+    window.eval(read('js/shared/dom-actions.js'));
     window.eval(read('js/matter-skills.js'));
     window.closeCreateSkillModal();
     window.closeImportSkillModal();

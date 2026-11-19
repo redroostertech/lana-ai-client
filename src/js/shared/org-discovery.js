@@ -8,12 +8,13 @@
  * act on. When discovery fails the person has nowhere else to go, so the failure
  * always says what to check, offers a retry and names the support address.
  *
- * Plain module: no DOM. fetch is passed in so tests can fake it.
+ * The request itself is made by the main process (window.electronAPI.discovery.resolve,
+ * electron-main.js discovery:resolve), so the answer's firm service keys never reach the
+ * page. Plain module: no DOM. discover is passed in so tests can fake it.
  */
 (function (global) {
   'use strict';
 
-  var DISCOVERY_URL = 'https://www.redroostertec.com/lana-ai/v1/discovery';
   var SUPPORT_EMAIL = 'support@redroostertec.com';
 
   /** Error with a kind the screen can branch on. */
@@ -36,17 +37,6 @@
     domain = domain.split(':')[0];
     domain = domain.split('/')[0];
     return domain;
-  }
-
-  function buildDiscoveryRequest(orgId, serverUrl) {
-    return {
-      url: DISCOVERY_URL,
-      init: {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ org_id: orgId, domain: extractDomain(serverUrl) })
-      }
-    };
   }
 
   /**
@@ -108,9 +98,9 @@
       port: body.discovery.port,
       isSecure: isSecure,
       vpn: body.discovery.vpn || null,
-      burstApiKey: body.burst_api_key || null,
+      // The firm's service keys (burst_api_key, forge_api_key) are not kept here: the main
+      // process fetches and holds them (electron-api-base.js FIRM_SECRET_FIELDS).
       burstUrl: body.burst_url || null,
-      forgeApiKey: body.forge_api_key || null,
       forgeUrl: body.forge_url || null,
       forgeSovereign: body.forge_sovereign || null,
       tier: body.tier || 'standard',
@@ -123,27 +113,34 @@
    * Ask hosted discovery for an organization.
    * @param {string} orgId
    * @param {string} serverUrl - the org's server name (orgid.lanaai.io or a custom one)
-   * @param {{ fetch: Function, normalizeEnabledApps?: Function }} deps
+   * @param {{ discover: Function, normalizeEnabledApps?: Function }} deps
+   *   discover(orgId, domain) -> { invalid } | { reached: false } | { reached: true, status, body }
+   *   (window.electronAPI.discovery.resolve)
    */
   async function resolveOrganization(orgId, serverUrl, deps) {
-    var doFetch = deps && deps.fetch;
-    var request = buildDiscoveryRequest(orgId, serverUrl);
-    var response;
+    var discover = deps && deps.discover;
+    var answer;
     try {
-      response = await doFetch(request.url, request.init);
+      answer = await discover(orgId, extractDomain(serverUrl));
     } catch (error) {
+      answer = { reached: false };
+    }
+    if (answer && answer.invalid) {
+      throw DiscoveryError('invalid', 'Invalid request: check the Organization ID');
+    }
+    if (!answer || !answer.reached) {
       throw DiscoveryError('offline', 'Unable to reach discovery service. Please check your internet connection.');
     }
-    var data = null;
-    try {
-      data = await response.json();
-    } catch (error) {
-      data = null;
-    }
-    if (data === null && response.ok) {
+    var data = answer.body || null;
+    if (data === null && answer.status >= 200 && answer.status < 300) {
       throw DiscoveryError('service', 'Discovery service error. Please try again later.');
     }
-    return parseDiscoveryResponse(response.status, data, deps && deps.normalizeEnabledApps);
+    return parseDiscoveryResponse(answer.status, data, deps && deps.normalizeEnabledApps);
+  }
+
+  /** The main process's discovery request (electron-preload.js), for deps.discover. */
+  function electronDiscover(orgId, domain) {
+    return global.electronAPI.discovery.resolve(orgId, domain);
   }
 
   /**
@@ -182,15 +179,14 @@
   }
 
   var api = {
-    DISCOVERY_URL: DISCOVERY_URL,
     SUPPORT_EMAIL: SUPPORT_EMAIL,
     DiscoveryError: DiscoveryError,
     generateServerUrl: generateServerUrl,
     extractDomain: extractDomain,
-    buildDiscoveryRequest: buildDiscoveryRequest,
     parseDiscoveryResponse: parseDiscoveryResponse,
     chefCertPin: chefCertPin,
     resolveOrganization: resolveOrganization,
+    electronDiscover: electronDiscover,
     describeFailure: describeFailure
   };
 

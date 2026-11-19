@@ -4,6 +4,7 @@ const path = require('path');
 const { randomUUID } = require('node:crypto');
 const Store = require('electron-store');
 const { app, BrowserWindow, clipboard, globalShortcut, ipcMain, screen, shell, systemPreferences } = require('electron');
+const { appPageUrl } = require('../../electron-app-protocol');
 const { VoiceSessionController } = require('./voice-session-controller');
 const { createDesktopAdapter } = require('./desktop-adapter');
 const { VoiceApiClient } = require('./voice-api-client');
@@ -12,6 +13,8 @@ const {
   desktopEventSchema, contextForRealtime, proposalToDecision
 } = require('./contracts');
 const { fingerprintsMatch } = require('./target-fingerprint');
+const { isAppSender, payloadBytes } = require('../../electron-ipc-guard');
+const SCREEN_VOICE_LIMITS = require('../../electron-ipc-policy').RAW_IPC_LIMITS.screenVoice;
 const { decisionRequiresConfirmation } = require('./confirmation-policy');
 const { actionText, normalizeText } = require('./action-normalizer');
 const { runHelper, startShortcutMonitor } = require('./native-helper');
@@ -162,8 +165,8 @@ class ElectronScreenVoice {
     });
     this.overlay.setAlwaysOnTop(true, 'floating');
     this.overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-    const rendererRoot = app.isPackaged ? 'public_html' : 'src';
-    this.overlay.loadFile(path.join(this.rootDir, rendererRoot, 'screen-voice', 'overlay', 'index.html'), { query: { flavor: this.brandFlavor } });
+    // The app origin, with its CSP (electron-app-protocol.js).
+    this.overlay.loadURL(appPageUrl(`screen-voice/overlay/index.html?flavor=${encodeURIComponent(this.brandFlavor || '')}`));
     this.overlay.on('focus', () => { this.sendPermissionStatus().catch(() => {}); });
     this.overlay.on('closed', () => { this.overlay = null; });
     this.positionOverlay();
@@ -211,8 +214,10 @@ class ElectronScreenVoice {
     this.send('screen-voice:state', { ...snapshot, settings: this.settings, selectedMode: this.pendingMode });
   }
 
+  // The overlay window, and in it the top frame of the overlay page (electron-ipc-guard.js).
   isOverlaySender(event) {
-    return Boolean(this.overlay && !this.overlay.isDestroyed() && event.sender.id === this.overlay.webContents.id);
+    return Boolean(this.overlay && !this.overlay.isDestroyed() && event.sender.id === this.overlay.webContents.id
+      && isAppSender(event));
   }
 
   registerIpc() {
@@ -220,6 +225,9 @@ class ElectronScreenVoice {
     this.ipcRegistered = true;
     const handle = (channel, fn) => ipcMain.handle(channel, async (event, payload) => {
       if (!this.isOverlaySender(event)) throw new Error('Unauthorized screen voice IPC sender');
+      // Size limits per channel (electron-ipc-policy.js RAW_IPC_LIMITS).
+      const limit = SCREEN_VOICE_LIMITS[channel] || SCREEN_VOICE_LIMITS.default;
+      if (payloadBytes(payload, limit) > limit) throw new Error('Refused: too_large');
       return fn(payload || {});
     });
     handle('screen-voice:get-state', async () => ({

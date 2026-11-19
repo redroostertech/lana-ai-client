@@ -204,7 +204,7 @@ describe('voice agent destinations', () => {
       URL,
       path,
       __dirname: '/app',
-      createFileUrl: (p) => 'file://' + p
+      appPageUrl: require('../../electron-app-protocol').appPageUrl
     };
     const navigate = vm.runInNewContext(
       mainBlock(main, 'const SCREEN_VOICE_CLIENT_ROUTES = new Set([', '\n]);') + '\n'
@@ -219,8 +219,8 @@ describe('voice agent destinations', () => {
     await navigate({ route: 'matters.html' });
     await navigate({ route: 'matters.html', matterId: 'M1' });
     expect(loaded).toEqual([
-      'file:///app/public_html/workspaces.html',
-      'file:///app/public_html/workspace-details.html?id=M1'
+      'lana-app://app/public_html/workspaces.html',
+      'lana-app://app/public_html/workspace-details.html?id=M1'
     ]);
   });
 

@@ -41,7 +41,7 @@
     var link = el('a', 'oss-item-link', item.source);
     link.href = item.source;
     link.target = '_blank';
-    link.rel = 'noreferrer noopener';
+    link.rel = 'noopener';
     body.appendChild(link);
     Model.textsFor(notices, item).forEach(function (text) {
       body.appendChild(el('p', 'oss-text-title', text.title));

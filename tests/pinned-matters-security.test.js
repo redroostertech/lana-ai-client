@@ -33,12 +33,15 @@ function loadMatterCardHelpers() {
   const helperSource = workspaceJs.slice(helperStart, helperEnd);
   const statusBadge = (status) => `<span>${String(status || '')}</span>`;
   const formatDate = (value) => String(value || '');
+  // Card markup names actions through js/shared/dom-actions.js (no inline handlers).
+  const pageWindow = { LanaDomActions: require('../src/js/shared/dom-actions.js') };
   return new Function(
     'selectedMatters',
     'statusBadge',
     'formatDate',
+    'window',
     `${helperSource}\nreturn { escapeHtml, renderMatterCard };`
-  )(new Set(), statusBadge, formatDate);
+  )(new Set(), statusBadge, formatDate, pageWindow);
 }
 
 function loadLexUtils(window) {
@@ -174,6 +177,17 @@ describe('Pinned Matters - Security Fixes Validation', () => {
       expect(cardHtml).toContain('&lt;script&gt;');
       expect(cardHtml).toContain('&lt;img');
       expect(cardHtml).toContain('&lt;svg');
+
+      // No inline handlers; the actions get the hostile id back as one string.
+      const host = new JSDOM('<!doctype html><body></body>').window.document.body;
+      host.innerHTML = cardHtml;
+      expect(host.querySelectorAll('script, img, svg[onload], iframe').length).toBe(0);
+      expect(host.querySelectorAll('[onclick], [onerror], [onload], [onchange]').length).toBe(0);
+      ['toggleMatterSelection', 'viewMatter', 'togglePin'].forEach((action) => {
+        const el = host.querySelector(`[data-on-click="${action}"]`);
+        expect(el).not.toBeNull();
+        expect(JSON.parse(el.getAttribute('data-args-click'))[0]).toBe(maliciousMatter.matter_id);
+      });
     });
 
     test('statusBadge() escapes status value', () => {

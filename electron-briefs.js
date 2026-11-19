@@ -43,6 +43,9 @@ const STARTED_CHANNEL = 'briefs:started';
 // (tests/unit/electron-briefs.test.js checks). Registered before the app is ready without
 // loading the host, so Briefs costs nothing at launch while it is off.
 const BRIEFS_AUDIO_SCHEME = 'lana-audio';
+const { isAppUrl } = require('./electron-app-protocol');
+const { payloadBytes } = require('./electron-ipc-guard');
+const { RAW_IPC_LIMITS } = require('./electron-ipc-policy');
 
 function appId(item) {
   if (typeof item === 'string') return item.trim();
@@ -55,13 +58,9 @@ function isBriefsEnabled(server) {
   return Boolean(server && Array.isArray(server.enabledApps) && server.enabledApps.some((item) => appId(item) === BRIEFS_APP_ID));
 }
 
-/** The client's own pages are file:// pages (as the token store trusts them). */
+/** The client's own pages are on the app origin (as the token store trusts them). */
 function isClientPage(url) {
-  try {
-    return new URL(url).protocol === 'file:';
-  } catch (_) {
-    return false;
-  }
+  return isAppUrl(url);
 }
 
 /** The claims of a session token (read, not verified: LANA checks the token), or null. */
@@ -142,6 +141,9 @@ function isLoaded(window) {
  * @param {function} deps.getToken - () => the person's LANA session token, or null
  * @param {function} deps.getWindows - () => the open BrowserWindows
  * @param {object} [deps.ipcMain] - answers the pages' "is Briefs running" question
+ * @param {function} [deps.isAppUrl] - (url) => true for the app's own pages; the Briefs host answers only these
+ * @param {function} [deps.isTrustedOrigin] - (origin) => true for the app's own origin (permission checks)
+ * @param {{ decide: Function, restore: Function }} [deps.permissions] - the app's permission policy (electron-location.js)
  * @param {function} [deps.speechModels] - async () => the Briefs speech model ids first launch says to install
  * @param {function} [deps.createCaptureWindow] - () => a hidden BrowserWindow loading briefs/capture.html with the client preload
  * @param {object} [deps.appearance] - electron-appearance.js: the one Light / Dark / System setting, kept in step with Briefs' own
@@ -273,7 +275,12 @@ function createBriefs(deps) {
         createPrintWindow: (options) => new electron.BrowserWindow(options)
       },
       directory,
-      isTrustedURL: isClientPage,
+      // A page on lana-app://app/public_html/ (electron-ipc-guard.js, electron-app-protocol.js); the host also refuses frames inside a page (trustedTopFrame).
+      isTrustedURL: deps.isAppUrl || isClientPage,
+      ...(deps.isTrustedOrigin ? { isTrustedOrigin: deps.isTrustedOrigin } : {}),
+      ...(deps.permissions ? { permissions: deps.permissions } : {}),
+      // Size limits for its bridge and capture frames (electron-ipc-policy.js RAW_IPC_LIMITS).
+      ipcLimits: { measure: payloadBytes, ...RAW_IPC_LIMITS.briefs },
       engineBase: () => deps.engineBase(),
       session: () => sessionSnapshot(deps.getToken() || null, deps.apiBase(), deps.getServer()),
       // The one model catalog: Briefs downloads its speech models from the client's pinned list.
@@ -393,9 +400,12 @@ function createBriefs(deps) {
   };
 }
 
-/** Before the app is ready: the replay audio scheme must be registered early. Loads nothing of Briefs. */
-function registerBriefsSchemes(protocol) {
-  protocol.registerSchemesAsPrivileged([{ scheme: BRIEFS_AUDIO_SCHEME, privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true } }]);
+/**
+ * Before the app is ready: the replay audio scheme must be registered early. Loads nothing of Briefs.
+ * Electron takes one registerSchemesAsPrivileged call, so the app's other schemes come in `others`.
+ */
+function registerBriefsSchemes(protocol, others = []) {
+  protocol.registerSchemesAsPrivileged([{ scheme: BRIEFS_AUDIO_SCHEME, privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true } }, ...others]);
 }
 
 module.exports = { RUNNING_CHANNEL, STARTED_CHANNEL, createBriefs, registerBriefsSchemes, isBriefsEnabled, isClientPage, personKey, personOf, sessionSnapshot, BRIEFS_APP_ID, BRIEFS_AUDIO_SCHEME };

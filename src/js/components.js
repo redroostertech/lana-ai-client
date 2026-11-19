@@ -199,13 +199,15 @@ const DemoBanner = {
         <span>
           <strong>DEMO MODE</strong> — No server connection. Showing sample data for demonstration purposes.
         </span>
-        <button onclick="DemoBanner.hide()" class="ml-2 p-1 hover:bg-white/20 rounded transition-colors" title="Dismiss">
+        <button type="button" data-demo-banner-dismiss class="ml-2 p-1 hover:bg-white/20 rounded transition-colors" title="Dismiss">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
           </svg>
         </button>
       </div>
     `;
+
+    banner.querySelector('[data-demo-banner-dismiss]').addEventListener('click', () => this.hide());
 
     // Insert at the very beginning of body
     document.body.insertBefore(banner, document.body.firstChild);
@@ -300,31 +302,31 @@ const ConversationActionsModal = {
       modal.innerHTML =
         '<h3 id="modalConversationTitle" class="text-lg font-medium text-gray-900 mb-6"></h3>' +
         '<div class="space-y-3">' +
-          '<button onclick="ConversationActionsModal.editConversation()" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-indigo-300 hover:bg-indigo-50 transition-all group">' +
+          '<button data-conversation-action="editConversation" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-indigo-300 hover:bg-indigo-50 transition-all group">' +
             '<div class="flex-shrink-0 w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-200 transition-colors">' +
               '<svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>' +
             '</div>' +
             '<div class="flex-1"><div class="font-medium text-gray-900">Rename Conversation</div><div class="text-sm text-gray-500">Change the conversation name</div></div>' +
           '</button>' +
-          '<button id="togglePinConversationBtn" onclick="ConversationActionsModal.togglePin()" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-yellow-300 hover:bg-yellow-50 transition-all group">' +
+          '<button id="togglePinConversationBtn" data-conversation-action="togglePin" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-yellow-300 hover:bg-yellow-50 transition-all group">' +
             '<div class="flex-shrink-0 w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center group-hover:bg-yellow-200 transition-colors">' +
               '<svg id="togglePinConversationIcon" class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path></svg>' +
             '</div>' +
             '<div class="flex-1"><div id="togglePinConversationLabel" class="font-medium text-gray-900">Pin Conversation</div><div id="togglePinConversationDescription" class="text-sm text-gray-500">Keep this conversation at the top of the list</div></div>' +
           '</button>' +
-          '<button id="viewMatterDetailsBtn" onclick="ConversationActionsModal.viewMatterDetails()" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-indigo-300 hover:bg-indigo-50 transition-all group hidden">' +
+          '<button id="viewMatterDetailsBtn" data-conversation-action="viewMatterDetails" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-indigo-300 hover:bg-indigo-50 transition-all group hidden">' +
             '<div class="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">' +
               '<svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>' +
             '</div>' +
             '<div class="flex-1"><div class="font-medium text-gray-900">View Matter Details</div><div class="text-sm text-gray-500">Open the associated matter</div></div>' +
           '</button>' +
-          '<button onclick="ConversationActionsModal.deleteConversation()" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-red-300 hover:bg-red-50 transition-all group">' +
+          '<button data-conversation-action="deleteConversation" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-red-300 hover:bg-red-50 transition-all group">' +
             '<div class="flex-shrink-0 w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center group-hover:bg-red-200 transition-colors">' +
               '<svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>' +
             '</div>' +
             '<div class="flex-1"><div class="font-medium text-gray-900">Archive Conversation</div><div class="text-sm text-gray-500">Hide from the list — can be restored later</div></div>' +
           '</button>' +
-          '<button onclick="ConversationActionsModal.permanentDeleteConversation()" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-red-400 hover:bg-red-50 transition-all group">' +
+          '<button data-conversation-action="permanentDeleteConversation" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-red-400 hover:bg-red-50 transition-all group">' +
             '<div class="flex-shrink-0 w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center group-hover:bg-red-200 transition-colors">' +
               '<svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>' +
             '</div>' +
@@ -334,6 +336,13 @@ const ConversationActionsModal = {
       // Escape, the header close button and the backdrop dismiss the modal
       // on their own; clear the selection the same way close() does.
       modal.addEventListener('lex-close', function () { self._clearSelection(); });
+      // One listener for the option buttons (no inline handlers: the page CSP blocks them).
+      modal.addEventListener('click', function (event) {
+        var button = event.target.closest('[data-conversation-action]');
+        if (!button || !modal.contains(button)) return;
+        var action = button.getAttribute('data-conversation-action');
+        if (typeof self[action] === 'function') self[action]();
+      });
       document.body.appendChild(modal);
       self._boundActionsModal = modal;
       return modal;

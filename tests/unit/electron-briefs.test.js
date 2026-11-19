@@ -21,7 +21,7 @@ const BOB = token({ userId: 'u-bob', organizationId: 'org-1' });
 function fakeWindow({ loaded = true } = {}) {
   const contents = new EventEmitter();
   contents.isLoading = () => !loaded;
-  contents.getURL = () => (loaded ? 'file:///app/public_html/dashboard.html' : '');
+  contents.getURL = () => (loaded ? 'lana-app://app/public_html/dashboard.html' : '');
   contents.finishLoad = () => { loaded = true; contents.emit('did-finish-load'); };
   return { webContents: contents, isDestroyed: () => false };
 }
@@ -153,8 +153,9 @@ describe('LANA Briefs in the client', () => {
     expect(isBriefsEnabled(null)).toBe(false);
   });
 
-  test('trusts only the client\'s own file:// pages', () => {
-    expect(isClientPage('file:///Applications/LANA.app/Contents/Resources/app.asar/public_html/dashboard.html')).toBe(true);
+  test('trusts only the client\'s own pages (the app origin)', () => {
+    expect(isClientPage('lana-app://app/public_html/dashboard.html')).toBe(true);
+    expect(isClientPage('file:///Applications/LANA.app/Contents/Resources/app.asar/public_html/dashboard.html')).toBe(false);
     expect(isClientPage('https://evil.test/')).toBe(false);
     expect(isClientPage('')).toBe(false);
   });
@@ -286,7 +287,7 @@ describe('LANA Briefs in the client', () => {
       busy.webContents.isLoading = () => true;
       let mainFrame = true;
       busy.webContents.isLoadingMainFrame = () => mainFrame;
-      busy.webContents.getURL = () => 'file:///app/public_html/dashboard.html';
+      busy.webContents.getURL = () => 'lana-app://app/public_html/dashboard.html';
       const { briefs, hosts } = setup({ windows: [busy] });
       const started = briefs.sync(enabled);
       await jest.advanceTimersByTimeAsync(10);

@@ -20,7 +20,7 @@
  *     that are currently shown, and both stay on the same section.
  *
  * This only toggles the panel-level `.is-active` class. Section-level
- * visibility (personalization reveal, Electron-only VPN / connected apps,
+ * visibility (personalization reveal, Electron-only connected apps,
  * conditional preferences) is still owned by settings-v2.js and
  * settings-personalization.js via the separate `sv2-hidden` class, so the
  * two mechanisms never fight.

@@ -282,7 +282,7 @@ function renderMatterLink(lanaClientUrl, matterId, matterName, options = {}) {
   const href = buildMatterDetailUrl(lanaClientUrl, matterId);
   if (!href) return escapeHtml(text);
 
-  return `<a href="${escapeAttribute(href)}" target="_blank" rel="noopener noreferrer" data-ld-matter-link="true" style="color:var(--lex-color-primary-600,#2563eb);text-decoration:none;" onclick="event.stopPropagation()">${escapeHtml(text)}</a>`;
+  return `<a href="${escapeAttribute(href)}" target="_blank" rel="noopener" data-ld-matter-link="true" style="color:var(--lex-color-primary-600,#2563eb);text-decoration:none;">${escapeHtml(text)}</a>`;
 }
 
 function renderMatterBadge(lanaClientUrl, matterId, matterName) {
@@ -1055,7 +1055,7 @@ function renderComparedDocumentsView(documents, inlineHtml) {
                 <div class="muted">${escapeHtml(document.filename || 'Unnamed document')}</div>
               </div>
               <div class="row-actions">
-                ${safeArtifactUrl(document.download_url) ? `<a href="${escapeAttribute(safeArtifactUrl(document.download_url))}" target="_blank" rel="noopener noreferrer">Download</a>` : ''}
+                ${safeArtifactUrl(document.download_url) ? `<a href="${escapeAttribute(safeArtifactUrl(document.download_url))}" target="_blank" rel="noopener">Download</a>` : ''}
               </div>
             </header>
             <div class="ld-compared-document-pane__meta muted">
@@ -1084,7 +1084,7 @@ function renderComparedDocumentsView(documents, inlineHtml) {
             <div class="muted">${escapeHtml(originalDocument?.content_type || '')}</div>
           </div>
           <div class="row-actions">
-            ${safeArtifactUrl(originalDocument?.download_url) ? `<a href="${escapeAttribute(safeArtifactUrl(originalDocument.download_url))}" target="_blank" rel="noopener noreferrer">Download</a>` : ''}
+            ${safeArtifactUrl(originalDocument?.download_url) ? `<a href="${escapeAttribute(safeArtifactUrl(originalDocument.download_url))}" target="_blank" rel="noopener">Download</a>` : ''}
           </div>
         </section>
         <section class="ld-compare-header-card">
@@ -1094,7 +1094,7 @@ function renderComparedDocumentsView(documents, inlineHtml) {
             <div class="muted">${escapeHtml(revisedDocument?.content_type || '')}</div>
           </div>
           <div class="row-actions">
-            ${safeArtifactUrl(revisedDocument?.download_url) ? `<a href="${escapeAttribute(safeArtifactUrl(revisedDocument.download_url))}" target="_blank" rel="noopener noreferrer">Download</a>` : ''}
+            ${safeArtifactUrl(revisedDocument?.download_url) ? `<a href="${escapeAttribute(safeArtifactUrl(revisedDocument.download_url))}" target="_blank" rel="noopener">Download</a>` : ''}
           </div>
         </section>
       </div>
@@ -1738,7 +1738,7 @@ function renderArtifactModal(artifact, modalView = 'default') {
           </div>
           <div class="row-actions">
             ${redlineUrl
-              ? `<a href="${escapeAttribute(redlineUrl)}" target="_blank" rel="noopener noreferrer">Open redline in new tab</a>`
+              ? `<a href="${escapeAttribute(redlineUrl)}" target="_blank" rel="noopener">Open redline in new tab</a>`
               : ''}
           </div>
         </div>
@@ -1765,7 +1765,7 @@ function renderArtifactModal(artifact, modalView = 'default') {
       ? `
         <div class="ld-artifact-modal-meta" style="margin-top:10px;">
           ${redlineUrl
-            ? `<a href="${escapeAttribute(redlineUrl)}" target="_blank" rel="noopener noreferrer">Open redline in new tab</a>`
+            ? `<a href="${escapeAttribute(redlineUrl)}" target="_blank" rel="noopener">Open redline in new tab</a>`
             : ''}
         </div>
         <iframe
@@ -1778,7 +1778,7 @@ function renderArtifactModal(artifact, modalView = 'default') {
       : isHtmlRedline
         ? `
           <div class="ld-artifact-modal-meta" style="margin-top:10px;">
-            <a href="${escapeAttribute(redlineUrl)}" target="_blank" rel="noopener noreferrer">Open redline in new tab</a>
+            <a href="${escapeAttribute(redlineUrl)}" target="_blank" rel="noopener">Open redline in new tab</a>
           </div>
           <iframe
             class="ld-artifact-modal-body"${remoteFrame({ source: 'remote', url: redlineUrl, contentType: 'text/html' })}
@@ -2314,7 +2314,7 @@ export async function handleLibraryDetailClick(context, event) {
   if (downloadEl) {
     const artifactId = downloadEl.dataset.ldArtifactDownload;
     if (artifactId) {
-      window.open(getApiUrl(`/api/v1/automation/artifacts/${encodeURIComponent(artifactId)}/download`), '_blank', 'noopener,noreferrer');
+      window.open(getApiUrl(`/api/v1/automation/artifacts/${encodeURIComponent(artifactId)}/download`), '_blank', 'noopener');
     }
     return true;
   }
@@ -2820,4 +2820,14 @@ async function reloadAutomation(context, automationId) {
   } catch (_err) {
     // best-effort
   }
+}
+
+// A matter link inside a clickable row opens the matter, not the row. Capture
+// phase, so the row never sees the click; the link still follows its href.
+// (Replaces an inline onclick, which the page CSP blocks.)
+if (typeof document !== 'undefined' && !document.__lanaLibraryMatterLinkStop) {
+  document.__lanaLibraryMatterLinkStop = true;
+  document.addEventListener('click', (event) => {
+    if (event.target && event.target.closest && event.target.closest('[data-ld-matter-link]')) event.stopPropagation();
+  }, true);
 }

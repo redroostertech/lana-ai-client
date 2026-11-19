@@ -29,6 +29,14 @@ const ConversationSearchModal = {
     this.modal = document.getElementById('conversationSearchModal');
     this.searchInput = document.getElementById('conversationSearchInput');
     this.resultsContainer = document.getElementById('conversationSearchResults');
+    // A result is chosen by one delegated listener (inline handlers are blocked by the page CSP).
+    if (this.resultsContainer) {
+      this.resultsContainer.addEventListener('click', (event) => {
+        const item = event.target.closest('[data-thread-id]');
+        if (!item || !this.resultsContainer.contains(item)) return;
+        this.selectConversation(item.getAttribute('data-thread-id'), item.getAttribute('data-matter-id') || '');
+      });
+    }
 
     // Set up event listeners
     this.setupEventListeners();
@@ -280,16 +288,13 @@ const ConversationSearchModal = {
       return '';
     }
 
-    // Escape special characters in IDs to prevent breaking onclick handler
-    const escapedThreadId = String(threadId).replace(/'/g, "\\'");
-    const escapedMatterId = String(matterId).replace(/'/g, "\\'");
 
     this._selection = this._selection || new Map();
     this._selection.set(String(threadId), { title, matterName });
 
     return `
       <div class="p-4 hover:bg-gray-50 rounded-lg cursor-pointer border border-gray-200 mb-3 transition-colors"
-           onclick="ConversationSearchModal.selectConversation('${escapedThreadId}', '${escapedMatterId}')">
+           data-thread-id="${this.escapeHtml(String(threadId))}" data-matter-id="${this.escapeHtml(String(matterId || ''))}">
         <div class="flex items-start justify-between gap-2">
           <div class="flex-1 min-w-0">
             <p class="text-sm font-medium text-gray-900">${highlightedTitle}</p>

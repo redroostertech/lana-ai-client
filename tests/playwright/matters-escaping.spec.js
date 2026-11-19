@@ -10,6 +10,13 @@
 // no rendered tags, no double-escaped entities such as &amp;quot; on screen,
 // no console errors, no handler failures, and window.__pwned never set.
 //
+// Handlers: markup built by the matters scripts names actions through
+// js/shared/dom-actions.js (data-on-click plus JSON arguments), never inline
+// on*="" attributes, which the desktop app's CSP blocks. Every check below
+// also fails on an inline handler in the rendered DOM, on an action that is
+// not registered, and on a CSP violation when the client is served with the
+// app's policy.
+//
 // Run it only against a disposable backend and organization. It creates
 // matters, comments, tasks, contacts and links, and pins and unpins a matter.
 //
@@ -119,7 +126,16 @@ async function seed(request, auth) {
 
 function watch(page) {
   const problems = [];
+  page.addInitScript(() => {
+    document.addEventListener('securitypolicyviolation', (e) => {
+      console.error(`CSP violation: ${e.effectiveDirective} ${e.blockedURI} ${e.sourceFile}:${e.lineNumber}`);
+    });
+  });
   page.on('console', (msg) => {
+    if (msg.type() === 'warning' && /\[LanaDomActions\]/.test(msg.text())) {
+      problems.push(`action not registered: ${msg.text().slice(0, 200)}`);
+      return;
+    }
     if (msg.type() !== 'error') return;
     const where = (msg.location() && msg.location().url) || '';
     if (/favicon\.ico$/.test(where)) return; // Electron never asks for one.
@@ -136,7 +152,7 @@ function watch(page) {
 }
 
 async function inspect(page, scope) {
-  return page.evaluate(({ scope, tagTexts, doubleSource }) => {
+  return page.evaluate(async ({ scope, tagTexts, doubleSource }) => {
     const root = scope ? document.querySelector(scope) : document.body;
     const text = root ? root.innerText : '';
     const injected = Array.from((root || document).querySelectorAll('b, i, u, script'))
@@ -147,7 +163,16 @@ async function inspect(page, scope) {
     const re = new RegExp(doubleSource, 'gi');
     let m;
     while ((m = re.exec(text))) dbl.push(text.slice(Math.max(0, m.index - 40), m.index + 20).replace(/\s+/g, ' '));
-    return { text, injected, imgs, doubleEscaped: dbl, pwned: window.__pwned !== undefined };
+    // Inline handlers written in the page's own HTML file are allowed (the CSP
+    // hashes them); any other on* attribute was built by script.
+    const handlerValues = (doc) => Array.from(doc.querySelectorAll('*'))
+      .flatMap((el) => Array.from(el.attributes).filter((a) => /^on[a-z]+$/i.test(a.name)).map((a) => a.value));
+    const source = new DOMParser().parseFromString(await (await fetch(location.href)).text(), 'text/html');
+    const staticHandlers = new Set(handlerValues(source));
+    const inlineHandlers = Array.from(document.querySelectorAll('body *'))
+      .filter((el) => Array.from(el.attributes).some((a) => /^on[a-z]+$/i.test(a.name) && !staticHandlers.has(a.value)))
+      .map((el) => el.outerHTML.slice(0, 120));
+    return { text, injected, imgs, inlineHandlers, doubleEscaped: dbl, pwned: window.__pwned !== undefined };
   }, { scope, tagTexts: INJECTED_TAG_TEXTS, doubleSource: DOUBLE_ESCAPED.source });
 }
 
@@ -156,6 +181,7 @@ async function expectClean(page, problems, area, { scope = null, mustShow = [] }
   expect.soft(r.pwned, `${area}: window.__pwned set`).toBe(false);
   expect.soft(r.imgs, `${area}: payload <img> rendered`).toBe(0);
   expect.soft(r.injected, `${area}: payload tags rendered as HTML`).toEqual([]);
+  expect.soft(r.inlineHandlers, `${area}: inline on* handlers in the DOM`).toEqual([]);
   expect.soft(r.doubleEscaped, `${area}: entities shown literally`).toEqual([]);
   for (const s of mustShow) expect.soft(r.text.includes(s), `${area}: shows ${JSON.stringify(s)} literally`).toBe(true);
   expect.soft(problems.splice(0), `${area}: console errors, page errors or dialogs`).toEqual([]);

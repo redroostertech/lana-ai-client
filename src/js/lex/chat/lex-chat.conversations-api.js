@@ -59,7 +59,7 @@
       const configUrl = global.LanaConfig && global.LanaConfig.API_BASE_URL;
       if (configUrl) return configUrl;
 
-      if (global.location && global.location.protocol !== 'file:' && global.location.origin !== 'null') {
+      if (global.location && (global.location.protocol !== 'file:' && global.location.protocol !== 'lana-app:') && global.location.origin !== 'null') {
         return global.location.origin;
       }
 

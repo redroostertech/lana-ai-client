@@ -210,6 +210,58 @@
     },
     {
       "type": "library",
+      "bom-ref": "lana:font-awesome-free",
+      "name": "Font Awesome Free (CSS and web fonts)",
+      "version": "6.4.0",
+      "purl": "pkg:npm/%40fortawesome/fontawesome-free@6.4.0",
+      "licenses": [
+        {
+          "expression": "OFL-1.1 AND MIT AND CC-BY-4.0"
+        }
+      ],
+      "copyright": "Copyright (c) Fonticons, Inc. (https://fontawesome.com)",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/FortAwesome/Font-Awesome"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "public_html/css/vendor/fontawesome/css/all.min.css"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "lana:drawflow",
+      "name": "Drawflow",
+      "version": "0.0.60",
+      "purl": "pkg:npm/drawflow@0.0.60",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2020 Jero Soler",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/jerosoler/Drawflow"
+        }
+      ],
+      "properties": [
+        {
+          "name": "lana:shippedAs",
+          "value": "public_html/js/vendor/drawflow.min.js"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "lana:jspdf",
       "name": "jsPDF",
       "version": "2.5.1",

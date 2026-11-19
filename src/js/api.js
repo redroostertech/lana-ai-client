@@ -19,7 +19,7 @@ function getPagePath(targetPage) {
   // For http:// protocol: /integrations/connectors.html
 
   // For file:// protocol, find the base directory (public_html or src)
-  if (window.location.protocol === 'file:') {
+  if ((window.location.protocol === 'file:' || window.location.protocol === 'lana-app:')) {
     // Check if we're in a subdirectory within public_html or src
     if (currentPath.includes('/integrations/') ||
         currentPath.includes('/admin/') ||
@@ -202,7 +202,7 @@ class ApiClient {
       // Electron (preload-exposed APIs aren't propagated to subframes by default).
       // For browsers, fall back to current origin when no other URL is set.
       const origin = window.location.origin;
-      if (!this.baseUrl && window.location.protocol !== 'file:' && origin && origin !== 'null') {
+      if (!this.baseUrl && (window.location.protocol !== 'file:' && window.location.protocol !== 'lana-app:') && origin && origin !== 'null') {
         this.baseUrl = origin;
       }
       this._ready = true;
@@ -325,7 +325,7 @@ class ApiClient {
     if (!url || url === 'null' || url === 'undefined') {
       return true;
     }
-    if (url.startsWith('file:')) {
+    if (url.startsWith('file:') || url.startsWith('lana-app:')) {
       return true;
     }
     return false;
@@ -641,7 +641,7 @@ class ApiClient {
       // In Electron with file:// protocol, this won't help, but in browser it will
       if (!window.electronAPI) {
         const origin = window.location.origin;
-        if (origin && origin !== 'null' && !origin.startsWith('file:')) {
+        if (origin && origin !== 'null' && !origin.startsWith('file:') && !origin.startsWith('lana-app:')) {
           baseUrl = origin;
         }
       }
@@ -1829,8 +1829,9 @@ class ApiClient {
     if (!window.electronAPI) return Promise.resolve();
     return Promise.resolve(this._readyPromise).then(async () => {
       try {
-        await window.electronAPI.invoke('session-tracker:initialize', this.baseUrl, this.token);
-        await window.electronAPI.invoke('session-tracker:start');
+        // The main process uses its own API base and login token (electron-main.js).
+        await window.electronAPI.sessionTracking.initialize();
+        await window.electronAPI.sessionTracking.start();
         this.log('Session tracking initialized and started');
       } catch (error) {
         console.warn('[LanaAPI] Failed to start session tracking:', error);

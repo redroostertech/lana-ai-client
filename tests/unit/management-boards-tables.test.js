@@ -26,6 +26,8 @@ function loadPage(rel) {
   new Function('window', read('js/shared/library-column-filters.js'))(win);
   // eslint-disable-next-line no-new-func
   new Function('window', read('js/admin/admin-table-kit.js'))(win);
+  // eslint-disable-next-line no-new-func
+  new Function('window', read('js/shared/dom-actions.js'))(win);
   win.Lex.Modal = { confirm: () => ({ style: { setProperty: () => {} } }), open: () => ({}) };
 
   const document = {

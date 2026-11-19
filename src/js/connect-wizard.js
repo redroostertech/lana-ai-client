@@ -55,13 +55,13 @@
   }
 
   function isElectronFlow() {
-    return Boolean(window.isElectron || window.electronAPI || window.location.protocol === 'file:');
+    return Boolean(window.isElectron || window.electronAPI || (window.location.protocol === 'file:' || window.location.protocol === 'lana-app:'));
   }
 
   function openExternal(url) {
     if (!url) return;
-    if (window.electronAPI && typeof window.electronAPI.invoke === 'function') {
-      window.electronAPI.invoke('open-external-url', url).catch(function (error) {
+    if (window.electronAPI && typeof window.electronAPI.openExternal === 'function') {
+      window.electronAPI.openExternal(url).catch(function (error) {
         console.error('[ConnectWizard] Failed to open external URL:', error && error.message);
       });
       return;

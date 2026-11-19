@@ -26,6 +26,7 @@ function boot() {
   window.eval(read('js/lex/components/form/lex-select.js'));
   window.eval(read('js/shared/event-catalog.js'));
   // Top-level let bindings stay inside the eval, so expose the step list.
+  window.eval(read('js/shared/dom-actions.js'));
   window.eval(read('js/matter-skills.js') + '\nwindow.__skillSteps = function () { return skillSteps; };');
   windows.push(window);
   return window;

@@ -106,7 +106,7 @@
       // Under file:// protocol, the resolved pathname includes the full filesystem
       // path (e.g. /Users/.../src/workspaces.html). Strip down to the page-relative
       // path so descriptor lookups work (e.g. /workspaces.html).
-      if (window.location.protocol === 'file:') {
+      if ((window.location.protocol === 'file:' || window.location.protocol === 'lana-app:')) {
         var srcIdx = pathname.indexOf('/src/');
         if (srcIdx !== -1) return pathname.substring(srcIdx + 4);
         var pubIdx = pathname.indexOf('/public_html/');
@@ -422,7 +422,7 @@
    * have already changed window.location.href.
    */
   function resolveFetchUrl(path) {
-    if (window.location.protocol === 'file:') {
+    if ((window.location.protocol === 'file:' || window.location.protocol === 'lana-app:')) {
       var relative = path.indexOf('/') === 0 ? path.substring(1) : path;
       try {
         return new URL(relative, _appBaseUrl).href;

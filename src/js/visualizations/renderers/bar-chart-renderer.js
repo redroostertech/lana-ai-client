@@ -30,6 +30,20 @@ import { ChartTheme } from '../chart-theme.js';
  * BarChartRenderer class
  * Renders horizontal or vertical bar charts using Chart.js
  */
+
+// Help popover open/close for markup built below: named actions
+// (js/shared/dom-actions.js), not inline handlers, which the page CSP blocks.
+const DomActions = typeof window !== 'undefined' ? window.LanaDomActions : null;
+if (DomActions && !DomActions.has('showChartHelp')) {
+  DomActions.register({
+    showChartHelp: (id) => { const el = document.getElementById(id); if (el) el.classList.remove('hidden'); },
+    hideChartHelp: (id) => { const el = document.getElementById(id); if (el) el.classList.add('hidden'); }
+  });
+}
+function chartHelpAction(name, helpId) {
+  return DomActions ? DomActions.on('click', name, [String(helpId)]) : '';
+}
+
 export class BarChartRenderer {
   /**
    * Create a BarChartRenderer instance
@@ -243,7 +257,7 @@ export class BarChartRenderer {
         <button
           type="button"
           class="ml-2 text-gray-400 hover:text-indigo-600 transition-colors"
-          onclick="document.getElementById('${helpId}').classList.remove('hidden')"
+          ${chartHelpAction('showChartHelp', helpId)}
           aria-label="Show help"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -287,7 +301,7 @@ export class BarChartRenderer {
             <button
               type="button"
               class="text-gray-400 hover:text-gray-600"
-              onclick="document.getElementById('${helpId}').classList.add('hidden')"
+              ${chartHelpAction('hideChartHelp', helpId)}
             >
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />

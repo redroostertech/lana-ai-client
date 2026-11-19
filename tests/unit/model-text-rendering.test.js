@@ -170,8 +170,8 @@ describe('Lex.ChatFormat.format', () => {
     expect(links).toEqual([
       ['workspace-details.html?id=1', null, null],
       ['#summary', null, null],
-      ['https://a.example/', '_blank', 'noopener noreferrer'],
-      ['mailto:a@b.example', '_blank', 'noopener noreferrer']
+      ['https://a.example/', '_blank', 'noopener'],
+      ['mailto:a@b.example', '_blank', 'noopener']
     ]);
   });
 
@@ -277,7 +277,7 @@ describe('text.block.js (AI text blocks)', () => {
     const links = Array.from(out.querySelectorAll('a')).map((a) => [a.getAttribute('href'), a.getAttribute('target'), a.getAttribute('rel')]);
     // App paths stay in the window (lex-router handles them); only http(s)
     // and mailto open a new tab.
-    expect(links).toEqual([['https://a.example/', '_blank', 'noopener noreferrer'], ['matters.html?id=1', null, null]]);
+    expect(links).toEqual([['https://a.example/', '_blank', 'noopener'], ['matters.html?id=1', null, null]]);
     expect(out.textContent).toContain('b');
   });
 

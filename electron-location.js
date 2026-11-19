@@ -3,7 +3,7 @@
 /**
  * Settings > General > Location: the main-process side of the location permission.
  *
- *   isAppPage(pageUrl, appRoot)       true only for the app's own pages (file:// under public_html)
+ *   isAppPage(pageUrl, appRoot)       true only for the app's own pages (lana-app://app/public_html/...)
  *   allowGeolocation({ pageUrl, appRoot, allowed })
  *                                     geolocation is allowed only for the app's own pages, and only
  *                                     after the person turned Location on in Settings
@@ -20,8 +20,7 @@
  * sent to a server, and no geocoding or IP lookup service is called.
  */
 
-const path = require('path');
-const { fileURLToPath } = require('url');
+const { resolveAppFile, APP_ORIGIN } = require('./electron-app-protocol');
 
 const GEOLOCATION = 'geolocation';
 
@@ -36,19 +35,9 @@ function systemSettingsUrl(platform) {
   return Object.prototype.hasOwnProperty.call(SYSTEM_SETTINGS_URLS, platform) ? SYSTEM_SETTINGS_URLS[platform] : null;
 }
 
-/** The file a file:// page URL points at is inside appRoot (no other origin, no path escape). */
+/** The page is one of the app's own (app origin, a file inside appRoot; no other origin, no path escape). */
 function isAppPage(pageUrl, appRoot) {
-  if (!appRoot) return false;
-  let filePath;
-  try {
-    const parsed = new URL(String(pageUrl || ''));
-    if (parsed.protocol !== 'file:') return false;
-    filePath = fileURLToPath(parsed);
-  } catch (_) {
-    return false;
-  }
-  const rel = path.relative(path.resolve(appRoot), path.resolve(filePath));
-  return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
+  return Boolean(appRoot) && resolveAppFile(String(pageUrl || ''), appRoot) !== null;
 }
 
 function allowGeolocation({ pageUrl, appRoot, allowed }) {
@@ -65,17 +54,40 @@ function pageUrlOf(webContents, details) {
 }
 
 /**
+ * The app's permission policy (one place): the app's own pages keep every permission
+ * except geolocation, which needs the person's Allow too; any other origin (a remote
+ * preview, an embed, a page that should not be in an app window) gets none.
+ * The permission check handler may only know the origin (lana-app://app).
+ *
  * @param {Electron.Session} session
  * @param {{ appRoot: string, isAllowed: () => boolean }} options
+ * @returns {{ decide: Function, restore: Function }} the policy, for LANA Briefs, which sets
+ *   its own handlers while it runs and calls restore() when it stops
  */
 function installLocationPermissionHandlers(session, { appRoot, isAllowed }) {
-  const decide = (webContents, details) => allowGeolocation({ pageUrl: pageUrlOf(webContents, details), appRoot, allowed: isAllowed() });
-  session.setPermissionRequestHandler((webContents, permission, callback, details) => {
-    callback(permission === GEOLOCATION ? decide(webContents, details) : true);
-  });
-  session.setPermissionCheckHandler((webContents, permission, _requestingOrigin, details) => (
-    permission === GEOLOCATION ? decide(webContents, details) : true
-  ));
+  const fromApp = (webContents, details) => {
+    const pageUrl = details && details.requestingUrl ? details.requestingUrl
+      : (details && details.requestingOrigin !== undefined ? '' : pageUrlOf(webContents, details));
+    if (pageUrl) return isAppPage(pageUrl, appRoot);
+    return Boolean(details && details.requestingOrigin === APP_ORIGIN);
+  };
+  const decide = (webContents, permission, details) => {
+    // Chromium asks for openExternal when a frame navigates to a custom scheme; the app opens
+    // such links only through its own opener (electron-external-open.js), never this way.
+    if (permission === 'openExternal') return false;
+    if (!fromApp(webContents, details)) return false;
+    return permission === GEOLOCATION ? Boolean(isAllowed()) : true;
+  };
+  const install = () => {
+    session.setPermissionRequestHandler((webContents, permission, callback, details) => {
+      callback(decide(webContents, permission, details));
+    });
+    session.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => (
+      decide(webContents, permission, { ...(details || {}), requestingOrigin })
+    ));
+  };
+  install();
+  return { decide, restore: install };
 }
 
 /**

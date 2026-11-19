@@ -491,7 +491,7 @@ class WorkflowBuilder {
             <label class="block text-sm font-medium text-gray-700 mb-1">Event Type</label>
             <div class="flex flex-wrap items-center gap-2">
               <div class="flex-1 min-w-[220px]">${workflowConfigSelect('config-event', EventTypes, config.event)}</div>
-              <button type="button" class="px-3 py-2 text-xs font-semibold rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100" onclick="openWorkflowEventBrowser()">Browse Events</button>
+              <button type="button" class="px-3 py-2 text-xs font-semibold rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"${window.LanaDomActions.on('click', 'openWorkflowEventBrowser', [])}>Browse Events</button>
             </div>
             <div id="workflow-event-description" class="mt-2">
               ${getWorkflowEventSummaryHtml(config.event || EventTypes[0].value)}
@@ -677,13 +677,13 @@ class WorkflowBuilder {
             <div class="${colors.icon}">${NodeIcons[nodeDef.icon] || NodeIcons.document}</div>
             <h3 class="font-semibold text-gray-900">${nodeDef.name}</h3>
           </div>
-          <button onclick="workflowBuilder.deleteSelectedNode()" class="text-red-500 hover:text-red-700" title="Delete node">
+          <button${window.LanaDomActions.on('click', 'workflowBuilder.deleteSelectedNode', [])} class="text-red-500 hover:text-red-700" title="Delete node">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
           </button>
         </div>
         ${formFields}
         <div class="mt-4 pt-4 border-t border-gray-200">
-          <button onclick="workflowBuilder.saveNodeConfig(${nodeId})" class="w-full px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+          <button${window.LanaDomActions.on('click', 'workflowBuilder.saveNodeConfig', [nodeId])} class="w-full px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
             Apply Changes
           </button>
         </div>
@@ -839,3 +839,10 @@ window.WorkflowNodeTypes = WorkflowNodeTypes;
 window.NodeIcons = NodeIcons;
 window.NodeColors = NodeColors;
 window.EventTypes = EventTypes;
+
+// Actions named by this file's markup (js/shared/dom-actions.js).
+window.LanaDomActions.registerGlobals([
+  'openWorkflowEventBrowser',
+  'workflowBuilder.deleteSelectedNode',
+  'workflowBuilder.saveNodeConfig'
+]);

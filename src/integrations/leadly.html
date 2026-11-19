@@ -314,6 +314,7 @@
   <script src="js/leadly-tables.js"></script>
 
   <!-- Page controller -->
+  <script src="../js/shared/dom-actions.js"></script>
   <script>
     // Load user profile and initialize permissions
     (async () => {
@@ -764,7 +765,7 @@
               Before you can sync data, you need to configure your GoHighLevel API credentials.
               Go to the Configuration tab to complete the setup.
             </p>
-            <button onclick="switchTab('configuration')" class="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors">
+            <button${LanaDomActions.on('click', 'switchTab', ['configuration'])} class="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
               </svg>
@@ -836,32 +837,27 @@
                 <div class="space-y-4 mb-4">
                   <!-- Quick Select Buttons -->
                   <div class="flex flex-wrap gap-2">
-                    <button
-                      onclick="setDateRange(7)"
+                    <button${LanaDomActions.on('click', 'setDateRange', [7])}
                       class="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-white hover:border-emerald-500 transition-colors"
                     >
                       Last 7 days
                     </button>
-                    <button
-                      onclick="setDateRange(30)"
+                    <button${LanaDomActions.on('click', 'setDateRange', [30])}
                       class="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-white hover:border-emerald-500 transition-colors"
                     >
                       Last 30 days
                     </button>
-                    <button
-                      onclick="setDateRange(90)"
+                    <button${LanaDomActions.on('click', 'setDateRange', [90])}
                       class="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-white hover:border-emerald-500 transition-colors"
                     >
                       Last 90 days
                     </button>
-                    <button
-                      onclick="setDateRange(180)"
+                    <button${LanaDomActions.on('click', 'setDateRange', [180])}
                       class="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-white hover:border-emerald-500 transition-colors"
                     >
                       Last 6 months
                     </button>
-                    <button
-                      onclick="setDateRange(365)"
+                    <button${LanaDomActions.on('click', 'setDateRange', [365])}
                       class="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-white hover:border-emerald-500 transition-colors"
                     >
                       Last year
@@ -889,8 +885,7 @@
                   </div>
                 </div>
 
-                <button
-                  onclick="runManualSync()"
+                <button${LanaDomActions.on('click', 'runManualSync', [])}
                   id="runSyncBtn"
                   class="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors"
                 >
@@ -1017,8 +1012,7 @@
 
                 <!-- Execute Button -->
                 <div class="flex items-center gap-3 pt-2">
-                  <button
-                    onclick="executeCustomApiRequest()"
+                  <button${LanaDomActions.on('click', 'executeCustomApiRequest', [])}
                     id="customApiExecuteBtn"
                     class="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
                   >
@@ -1028,8 +1022,7 @@
                     </svg>
                     Execute Request
                   </button>
-                  <button
-                    onclick="clearCustomApiRequest()"
+                  <button${LanaDomActions.on('click', 'clearCustomApiRequest', [])}
                     class="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
                   >
                     Clear
@@ -1042,8 +1035,7 @@
                 <div class="flex items-center justify-between mb-3">
                   <h4 class="font-medium text-gray-900">Response</h4>
                   <div class="flex items-center gap-2">
-                    <button
-                      onclick="importCustomApiResponse()"
+                    <button${LanaDomActions.on('click', 'importCustomApiResponse', [])}
                       id="customApiImportBtn"
                       class="hidden px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors"
                     >
@@ -1866,25 +1858,25 @@
             <div class="bg-gray-50 rounded-lg p-4">
               <h3 class="text-sm font-semibold text-gray-700 mb-3">Data Types</h3>
               <nav class="space-y-1">
-                <button onclick="loadOutputData('contacts')" id="output-nav-contacts" class="output-nav-btn w-full text-left px-4 py-3 rounded-lg bg-emerald-600 text-white font-medium">
+                <button${LanaDomActions.on('click', 'loadOutputData', ['contacts'])} id="output-nav-contacts" class="output-nav-btn w-full text-left px-4 py-3 rounded-lg bg-emerald-600 text-white font-medium">
                   <div class="flex items-center justify-between">
                     <span>Contacts</span>
                     <span id="output-count-contacts" class="text-sm">-</span>
                   </div>
                 </button>
-                <button onclick="loadOutputData('opportunities')" id="output-nav-opportunities" class="output-nav-btn w-full text-left px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors">
+                <button${LanaDomActions.on('click', 'loadOutputData', ['opportunities'])} id="output-nav-opportunities" class="output-nav-btn w-full text-left px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors">
                   <div class="flex items-center justify-between">
                     <span>Opportunities</span>
                     <span id="output-count-opportunities" class="text-sm text-gray-500">-</span>
                   </div>
                 </button>
-                <button onclick="loadOutputData('pipelines')" id="output-nav-pipelines" class="output-nav-btn w-full text-left px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors">
+                <button${LanaDomActions.on('click', 'loadOutputData', ['pipelines'])} id="output-nav-pipelines" class="output-nav-btn w-full text-left px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors">
                   <div class="flex items-center justify-between">
                     <span>Pipelines</span>
                     <span id="output-count-pipelines" class="text-sm text-gray-500">-</span>
                   </div>
                 </button>
-                <button onclick="loadOutputData('funnel')" id="output-nav-funnel" class="output-nav-btn w-full text-left px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors">
+                <button${LanaDomActions.on('click', 'loadOutputData', ['funnel'])} id="output-nav-funnel" class="output-nav-btn w-full text-left px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors">
                   <div class="flex items-center justify-between">
                     <span>Funnels</span>
                     <span id="output-count-funnel" class="text-sm text-gray-500">-</span>
@@ -2011,7 +2003,7 @@
                       <p class="text-sm font-medium text-yellow-900 mb-1">Configuration Required</p>
                       <p class="text-sm text-yellow-700">This integration needs to be configured by your system administrator before you can use it. Please contact your administrator to complete the setup.</p>
                     </div>
-                    <button onclick="switchTab('configuration')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors">
+                    <button${LanaDomActions.on('click', 'switchTab', ['configuration'])} class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors">
                       Go to Configuration
                     </button>
                   ` : `
@@ -2108,13 +2100,13 @@
             <section class="mb-8">
               <h3 class="text-lg font-semibold text-gray-900 mb-3">Getting Started</h3>
               <ol class="list-decimal list-inside space-y-2 text-gray-600">
-                <li>Go to the <a href="#" onclick="switchTab('configuration'); return false;" class="text-emerald-600 hover:text-emerald-700">Configuration tab</a> (admin access required)</li>
+                <li>Go to the <a href="#"${LanaDomActions.on('click', 'switchTab', ['configuration'], { prevent: true })} class="text-emerald-600 hover:text-emerald-700">Configuration tab</a> (admin access required)</li>
                 <li>Enter your GoHighLevel API key and Location ID</li>
                 <li>Configure sync settings to import contacts, opportunities, pipelines, and funnels</li>
                 <li>Configure your sync frequency (manual, hourly, daily, etc.)</li>
                 <li>Save your configuration and trigger an initial sync</li>
-                <li>View your synced data in the <a href="#" onclick="switchTab('output'); return false;" class="text-emerald-600 hover:text-emerald-700">Output tab</a></li>
-                <li>Monitor sync status in the <a href="#" onclick="switchTab('run'); return false;" class="text-emerald-600 hover:text-emerald-700">Run tab</a></li>
+                <li>View your synced data in the <a href="#"${LanaDomActions.on('click', 'switchTab', ['output'], { prevent: true })} class="text-emerald-600 hover:text-emerald-700">Output tab</a></li>
+                <li>Monitor sync status in the <a href="#"${LanaDomActions.on('click', 'switchTab', ['run'], { prevent: true })} class="text-emerald-600 hover:text-emerald-700">Run tab</a></li>
               </ol>
             </section>
 
@@ -2126,7 +2118,7 @@
                   <li><strong>Dashboard shows "Not Configured":</strong> Go to Configuration tab and enter your GoHighLevel credentials</li>
                   <li><strong>Sync fails with authentication error:</strong> Verify your API key is valid and has the correct permissions</li>
                   <li><strong>No data appears:</strong> Check that your Location ID is correct and trigger a manual sync</li>
-                  <li><strong>Missing entity types:</strong> Review the <a href="#" onclick="switchTab('logs'); return false;" class="text-blue-800 hover:text-blue-900 underline">Execution Logs</a> for sync errors</li>
+                  <li><strong>Missing entity types:</strong> Review the <a href="#"${LanaDomActions.on('click', 'switchTab', ['logs'], { prevent: true })} class="text-blue-800 hover:text-blue-900 underline">Execution Logs</a> for sync errors</li>
                   <li><strong>Rate limit errors:</strong> GoHighLevel has API rate limits - syncs may take longer for large datasets</li>
                 </ul>
               </div>
@@ -2137,9 +2129,9 @@
               <p class="text-gray-600 mb-3">
                 Need help with the Leadly CRM integration? Our support team is here to assist you.
               </p>
-              <button onclick="window.location.href='/help.html'" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors">
+              <a href="/help.html" class="inline-block px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors">
                 Submit Support Ticket
-              </button>
+              </a>
             </section>
           </div>
         </div>
@@ -2176,8 +2168,7 @@
               <h4 class="font-semibold text-gray-900">Connection Status</h4>
               <div class="flex items-center gap-2">
                 ${isConfigured ? `
-                  <button
-                    onclick="testGHLConnectionFromStatus()"
+                  <button${LanaDomActions.on('click', 'testGHLConnectionFromStatus', [])}
                     id="statusTestConnectionBtn"
                     class="inline-flex items-center gap-2 px-3 py-1.5 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
                     title="Test connection"
@@ -2187,8 +2178,7 @@
                     </svg>
                     Test Connection
                   </button>
-                  <button
-                    onclick="showDeleteConfigDialog()"
+                  <button${LanaDomActions.on('click', 'showDeleteConfigDialog', [])}
                     class="inline-flex items-center gap-2 text-sm text-red-600 hover:text-red-800 transition-colors"
                     title="Delete configuration"
                   >
@@ -2255,8 +2245,7 @@
           <div class="bg-white border border-gray-200 rounded-lg mb-6">
             <!-- Collapsible header -->
             <button
-              type="button"
-              onclick="toggleSetupInstructions()"
+              type="button"${LanaDomActions.on('click', 'toggleSetupInstructions', [])}
               class="w-full flex items-center justify-between p-6 text-left hover:bg-gray-50 transition-colors rounded-t-lg"
             >
               <h4 class="font-semibold text-gray-900">Setup Instructions</h4>
@@ -2379,8 +2368,7 @@
               <!-- Action Buttons -->
               <div class="flex gap-3">
                 <button
-                  type="button"
-                  onclick="testGHLConnection()"
+                  type="button"${LanaDomActions.on('click', 'testGHLConnection', [])}
                   id="testConnectionBtn"
                   class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -2722,7 +2710,7 @@
             <div class="px-6 py-4 border-b border-gray-200">
               <div class="flex items-center justify-between">
                 <h3 class="text-lg font-semibold text-gray-900">Active Jobs</h3>
-                <button onclick="refreshExecutionLogs()" id="refreshExecutionLogsBtn" class="text-sm text-emerald-600 hover:text-emerald-700 flex items-center gap-1 transition-all disabled:opacity-50">
+                <button${LanaDomActions.on('click', 'refreshExecutionLogs', [])} id="refreshExecutionLogsBtn" class="text-sm text-emerald-600 hover:text-emerald-700 flex items-center gap-1 transition-all disabled:opacity-50">
                   <svg id="refreshExecutionLogsIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                   </svg>
@@ -2742,8 +2730,7 @@
                 <span id="activeJobsInfo">Showing 0-0 of 0</span>
               </div>
               <div class="flex items-center gap-2">
-                <button
-                  onclick="changeActiveJobsPage(-1)"
+                <button${LanaDomActions.on('click', 'changeActiveJobsPage', [-1])}
                   id="activeJobsPrevBtn"
                   class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   disabled
@@ -2755,8 +2742,7 @@
                 <div id="activeJobsPageNumbers" class="flex gap-1">
                   <!-- Page number buttons will be inserted here -->
                 </div>
-                <button
-                  onclick="changeActiveJobsPage(1)"
+                <button${LanaDomActions.on('click', 'changeActiveJobsPage', [1])}
                   id="activeJobsNextBtn"
                   class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   disabled
@@ -2943,8 +2929,7 @@
                     ${job.job_type || 'Processing'} • Started ${timeAgo(job.created_at)}${timeRemaining ? ` • ${timeRemaining}` : ''}
                   </p>
                 </div>
-                ${!job._isSync ? `<button
-                  onclick="cancelJob('${job.id}', ${job._isUpload || false})"
+                ${!job._isSync ? `<button${LanaDomActions.on('click', 'cancelJob', [String(job.id), job._isUpload || false])}
                   class="text-sm text-red-600 hover:text-red-700"
                   title="Cancel job"
                 >
@@ -3851,7 +3836,7 @@
         let parentItem = '';
         if (parentPath) {
           parentItem = `
-            <div class="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors group border-b border-gray-200 mb-2" onclick="navigateToDirectory('${parentPath}')">
+            <div class="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors group border-b border-gray-200 mb-2"${LanaDomActions.on('click', 'navigateToDirectory', [String(parentPath)])}>
               <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
               </svg>
@@ -3879,7 +3864,7 @@
         }
 
         directoryList.innerHTML = parentItem + directories.map(dir => `
-          <div class="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors group" onclick="navigateToDirectory('${dir.path}')">
+          <div class="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors group"${LanaDomActions.on('click', 'navigateToDirectory', [String(dir.path)])}>
             <svg class="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
             </svg>
@@ -3927,7 +3912,7 @@
             <p class="text-sm mt-2">${errorMessage}</p>
             ${errorDetails ? `<p class="text-xs mt-1 text-gray-600">${errorDetails}</p>` : ''}
             <p class="text-xs mt-2 text-gray-500">Path: ${fullPath}</p>
-            <button onclick="loadDirectory('${basePath}', '${subPath}')" class="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg">
+            <button${LanaDomActions.on('click', 'loadDirectory', [String(basePath), String(subPath)])} class="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg">
               Retry
             </button>
           </div>
@@ -4122,6 +4107,25 @@
     // Initialize
     loadDashboard();
 
+    // Actions named by this page's markup (js/shared/dom-actions.js).
+    LanaDomActions.registerGlobals([
+      'cancelJob',
+      'changeActiveJobsPage',
+      'clearCustomApiRequest',
+      'executeCustomApiRequest',
+      'importCustomApiResponse',
+      'loadDirectory',
+      'loadOutputData',
+      'navigateToDirectory',
+      'refreshExecutionLogs',
+      'runManualSync',
+      'setDateRange',
+      'showDeleteConfigDialog',
+      'switchTab',
+      'testGHLConnection',
+      'testGHLConnectionFromStatus',
+      'toggleSetupInstructions'
+    ]);
   </script>
 
   <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>

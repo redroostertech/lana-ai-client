@@ -111,7 +111,7 @@
     } catch (_error) {
       return '';
     }
-    if (url.protocol === 'https:' || url.protocol === 'http:' || url.protocol === 'file:') return value;
+    if (url.protocol === 'https:' || url.protocol === 'http:' || url.protocol === 'file:' || url.protocol === 'lana-app:') return value;
     if (url.protocol === 'data:' && url.pathname.indexOf('image/') === 0) return value;
     return '';
   }

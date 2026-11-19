@@ -16,6 +16,7 @@ const read = (rel) => fs.readFileSync(path.join(SRC, rel), 'utf8');
 function loadWorkflowBuilder() {
   const win = {};
   // eslint-disable-next-line no-new-func
+  new Function('window', read('js/shared/dom-actions.js'))(win);
   return new Function('window', `${read('js/workflow-builder.js')}\nreturn { workflowConfigSelect, EventTypes };`)(win);
 }
 

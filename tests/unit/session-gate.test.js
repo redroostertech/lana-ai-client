@@ -115,7 +115,13 @@ describe('LanaSessionGate', () => {
 
 describe('sign in and the session services', () => {
   function electron() {
-    return { invoke: jest.fn(async () => ({ success: true })), getSavedServer: jest.fn(async () => ({ success: true, server: { url: 'https://chef.example.test' } })) };
+    // Records the session tracking calls in order (window.electronAPI.sessionTracking, electron-preload.js).
+    const calls = [];
+    const tracking = {
+      initialize: jest.fn(async (...args) => { calls.push(['initialize', ...args]); return { success: true }; }),
+      start: jest.fn(async (...args) => { calls.push(['start', ...args]); return { success: true }; })
+    };
+    return { calls, sessionTracking: tracking, getSavedServer: jest.fn(async () => ({ success: true, server: { url: 'https://chef.example.test' } })) };
   }
 
   test('required enrollment: the token is kept and refresh, activity and tracking wait', async () => {
@@ -129,14 +135,14 @@ describe('sign in and the session services', () => {
     expect(JSON.parse(context.localStorage.getItem('user')).mfaEnrollmentRequired).toBe(true);
     expect(refresh).not.toHaveBeenCalled();
     expect(activity).not.toHaveBeenCalled();
-    expect(electronAPI.invoke).not.toHaveBeenCalled();
+    expect(electronAPI.calls).toEqual([]);
 
     // Enrollment done: the flag clears and everything starts.
     await api.completeMfaEnrollment();
     expect(JSON.parse(context.localStorage.getItem('user')).mfaEnrollmentRequired).toBe(false);
     expect(refresh).toHaveBeenCalledTimes(1);
     expect(activity).toHaveBeenCalledTimes(1);
-    expect(electronAPI.invoke.mock.calls.map((c) => c[0])).toEqual(['session-tracker:initialize', 'session-tracker:start']);
+    expect(electronAPI.calls).toEqual([['initialize'], ['start']]);
     api.stopTokenRefresh();
     api.cleanupActivityListener();
   });
@@ -148,7 +154,7 @@ describe('sign in and the session services', () => {
     const refresh = jest.spyOn(api, 'startTokenRefresh');
     await api.login('p@firm.test', 'pw');
     expect(refresh).toHaveBeenCalledTimes(1);
-    expect(electronAPI.invoke.mock.calls.map((c) => c[0])).toEqual(['session-tracker:initialize', 'session-tracker:start']);
+    expect(electronAPI.calls).toEqual([['initialize'], ['start']]);
     api.stopTokenRefresh();
     api.cleanupActivityListener();
   });
@@ -159,7 +165,7 @@ describe('sign in and the session services', () => {
     await Promise.resolve(api._readyPromise);
     await new Promise((resolve) => setImmediate(resolve));
     expect(api.refreshTimer || null).toBe(null);
-    expect(electronAPI.invoke).not.toHaveBeenCalled();
+    expect(electronAPI.calls).toEqual([]);
   });
 });
 

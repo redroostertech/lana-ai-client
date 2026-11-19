@@ -58,30 +58,12 @@ class SessionTracker {
    * Setup IPC handlers for renderer communication
    */
   setupIPC() {
-    // Get current session info
-    ipcMain.handle('session-tracker:getStatus', () => {
-      return {
-        sessionId: this.currentSessionId,
-        matterId: this.currentMatterId,
-        isIdle: this.isIdle,
-        isActive: !!this.currentSessionId
-      };
-    });
-
-    // Update matter context
-    ipcMain.handle('session-tracker:updateMatter', (event, matterId) => {
-      this.currentMatterId = matterId;
-      this.store.set('matterId', matterId);
-      return { success: true };
-    });
-
-    // Manual session control
-    ipcMain.handle('session-tracker:start', async () => {
+    // The pages start tracking after sign-in (src/js/api.js); the matter, status
+    // and end are main-process only. ipcMain is the guarded one from
+    // electron-main.js (electron-ipc-guard.js), which checks the sender.
+    const ipc = this.options.ipcMain || ipcMain;
+    ipc.handle('session-tracker:start', async () => {
       return await this.startSession();
-    });
-
-    ipcMain.handle('session-tracker:end', async (event, reason = 'manual') => {
-      return await this.endSession(reason);
     });
   }
 

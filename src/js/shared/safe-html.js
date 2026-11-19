@@ -191,7 +191,7 @@
           var href = urls ? urls.safeLinkHref(String((token && token.href) || '')) : '';
           if (!href) return label;
           var title = token && token.title ? ' title="' + escapeText(token.title) + '"' : '';
-          return '<a href="' + escapeText(href) + '"' + title + ' target="_blank" rel="noopener noreferrer">' + label + '</a>';
+          return '<a href="' + escapeText(href) + '"' + title + ' target="_blank" rel="noopener">' + label + '</a>';
         },
         image: function (token) {
           return escapeText((token && (token.text || token.title)) || '');
