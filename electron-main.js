@@ -871,6 +871,19 @@ function retiredMatterRoute(route, params) {
   return 'workspace-details.html';
 }
 
+// Pages that are only a fragment of the app shell (as Lex.Nav's
+// _shellFragmentPages): a link opens them inside app.html (?page=), which starts
+// the router on them, instead of loading the bare fragment.
+const SHELL_FRAGMENT_ROUTES = Object.freeze(['model-pricing.html', 'open-source-licenses.html']);
+
+function shellFragmentUrl(route) {
+  const asked = stripLeadingSlashes(route).trim();
+  if (!SHELL_FRAGMENT_ROUTES.includes(asked)) return null;
+  const target = new URL(appPageUrl('app.html'));
+  target.searchParams.set('page', asked);
+  return target.toString();
+}
+
 function sanitizeClientRoute(route) {
   const asked = stripLeadingSlashes(route).trim();
   const value = Object.prototype.hasOwnProperty.call(RETIRED_CLIENT_ROUTES, asked) ? RETIRED_CLIENT_ROUTES[asked] : asked;
@@ -973,10 +986,16 @@ async function navigateClientDeepLink(urlObj) {
   }
 
   const linkParams = retiredPageParams(route, params);
-  route = sanitizeClientRoute(retiredMatterRoute(route, linkParams));
-  const target = new URL(appPageUrl(route));
-  addSafeDeepLinkParams(target, linkParams, DEEP_LINK_CLIENT_ROUTES[route]);
-  setSafeHash(target, hash);
+  const fragmentUrl = shellFragmentUrl(route);
+  let target;
+  if (fragmentUrl) {
+    target = new URL(fragmentUrl);
+  } else {
+    route = sanitizeClientRoute(retiredMatterRoute(route, linkParams));
+    target = new URL(appPageUrl(route));
+    addSafeDeepLinkParams(target, linkParams, DEEP_LINK_CLIENT_ROUTES[route]);
+    setSafeHash(target, hash);
+  }
 
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();

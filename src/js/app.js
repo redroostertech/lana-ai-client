@@ -85,7 +85,9 @@
           || window.name.indexOf('lana-pending-global-search:') === 0;
       }
 
+      // A lana-ai:// link to a shell fragment loads app.html?page=<fragment>.
       var startPath = (history.state && history.state.path)
+        || (window.Lex && Lex.Nav && Lex.Nav.shellStartPath ? Lex.Nav.shellStartPath(window.location.search) : null)
         || (function () {
             try {
               return sessionStorage.getItem('_lex_last_path');

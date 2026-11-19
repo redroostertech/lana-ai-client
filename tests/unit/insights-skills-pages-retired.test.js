@@ -14,8 +14,8 @@
  * Skill Builder and Import Skill modals and their scripts (matter-skills.js,
  * skill-builder.js) went with them; nothing in src/ calls the skills API.
  *
- * model-pricing.html is a fragment of the app shell: a standalone page opens it
- * through app.html, and it is no lana-ai:// destination of its own.
+ * model-pricing.html and open-source-licenses.html are fragments of the app
+ * shell: a standalone page and a lana-ai:// link both open them through app.html.
  */
 
 const fs = require('fs');
@@ -70,6 +70,7 @@ describe('the pages and their own files are gone', () => {
     'src/css/skills-marketplace.css',
     'src/matter-skills.html',
     'src/js/matter-skills.js',
+    'src/css/matter-skills.css',
     'src/js/skill-builder.js'
   ])('%s', (rel) => {
     expect(fs.existsSync(path.join(ROOT, rel))).toBe(false);
@@ -82,6 +83,12 @@ describe('the pages and their own files are gone', () => {
       if (pattern.test(fs.readFileSync(file, 'utf8'))) files.add(path.relative(ROOT, file));
     }
     expect([...files].sort()).toEqual(['electron-main.js', 'src/js/lex/lex-nav.js']);
+  });
+
+  test('the Tailwind build no longer imports the skills page styles', () => {
+    // None of its classes (.btn-primary, .modal, .toast, .stat-card, .skill-*,
+    // .execution-*, .config-*) is used by a page that loads tailwind-output.css.
+    expect(read('src/css/tailwind-input.css')).not.toContain('matter-skills.css');
   });
 
   test('nothing in src/ calls the retired skills API', () => {
@@ -282,9 +289,85 @@ describe('electron-main deep links', () => {
     expect(open('insights/predictions.html', 'type=revenue&tab=x')).toEqual({ landed: 'admin/analytics.html', forwarded: {} });
   });
 
-  test('the retired pages and model-pricing.html are no destinations of their own', () => {
+  test('the retired pages and the shell fragments are no destinations of their own', () => {
     const { DEEP_LINK_CLIENT_ROUTES, sanitizeClientRoute } = loadDeepLinkRouting();
     Object.keys(RETIRED).forEach((page) => expect(Object.keys(DEEP_LINK_CLIENT_ROUTES)).not.toContain(page));
     expect(() => sanitizeClientRoute('model-pricing.html')).toThrow('Unsupported LANA destination');
+  });
+});
+
+// lana-ai://open?route=<fragment> opens the fragment inside app.html, the way
+// Lex.Nav does from a standalone page: app.html?page=<fragment> starts the
+// router on it (Lex.Nav.shellStartPath).
+describe('lana-ai:// links to a shell fragment open it inside app.html', () => {
+  function loadNavigator() {
+    const main = read('electron-main.js');
+    const loaded = [];
+    const mainWindow = { isDestroyed: () => false, isMinimized: () => false, restore() {}, show() {}, focus() {}, loadURL: async (u) => { loaded.push(u); } };
+    const blocks = [
+      ['const DEEP_LINK_CLIENT_ROUTES = Object.freeze({', '\n});'],
+      ['const DEEP_LINK_AGENT_HASH_VIEWS = Object.freeze(new Set([', '\n]));'],
+      ['const DEEP_LINK_AUTOMATION_HASH_VIEWS = Object.freeze(new Set([', '\n]));'],
+      ['const DEEP_LINK_SETTINGS_SECTIONS = Object.freeze(new Set([', '\n]));'],
+      ['const DEEP_LINK_ALIASES = Object.freeze({', '\n});'],
+      ['function firstDeepLinkSegment(urlObj) {', '\n}'],
+      ['function rejectUnsafeFragment(value', '\n}'],
+      ['function setSafeHash(target, fragment) {', '\n}'],
+      ['function prefixedHash(prefix, value) {', '\n}'],
+      ['function stripLeadingSlashes(value) {', '\n}'],
+      ['const RETIRED_CLIENT_ROUTES = Object.freeze({', '\n});'],
+      ['function retiredPageParams(route, params) {', '\n}'],
+      ['function retiredMatterRoute(route, params) {', '\n}'],
+      ['const SHELL_FRAGMENT_ROUTES = Object.freeze(', ');'],
+      ['function shellFragmentUrl(route) {', '\n}'],
+      ['function sanitizeClientRoute(route) {', '\n}'],
+      ['function addSafeDeepLinkParams(target, sourceParams, allowedKeys) {', '\n}'],
+      ['async function navigateClientDeepLink(urlObj) {', '\n}']
+    ];
+    const code = blocks.map(([start, end]) => mainBlock(main, start, end)).join('\n') + '\nnavigateClientDeepLink;';
+    const navigate = vm.runInNewContext(code, {
+      mainWindow, createWindow() {}, URL, URLSearchParams,
+      appPageUrl: require('../../electron-app-protocol').appPageUrl
+    });
+    return { navigate, loaded };
+  }
+
+  test.each([
+    ['lana-ai://open?route=model-pricing.html', 'lana-app://app/public_html/app.html?page=model-pricing.html'],
+    ['lana-ai://open?route=/model-pricing.html&model=x', 'lana-app://app/public_html/app.html?page=model-pricing.html'],
+    ['lana-ai://open?route=open-source-licenses.html', 'lana-app://app/public_html/app.html?page=open-source-licenses.html']
+  ])('%s', async (link, landed) => {
+    const { navigate, loaded } = loadNavigator();
+    await navigate(new URL(link));
+    expect(loaded).toEqual([landed]);
+  });
+
+  test('other routes still open on their own; unknown ones are still refused', async () => {
+    const { navigate, loaded } = loadNavigator();
+    await navigate(new URL('lana-ai://open?route=admin/reporting.html&report=aging'));
+    expect(loaded).toEqual(['lana-app://app/public_html/admin/reporting.html?report=aging']);
+    await expect(navigate(new URL('lana-ai://open?route=app.html'))).rejects.toThrow('Unsupported LANA destination');
+    await expect(navigate(new URL('lana-ai://open?route=../model-pricing.html'))).rejects.toThrow('Unsupported LANA destination');
+  });
+
+  test('electron-main and Lex.Nav list the same fragments', () => {
+    const main = read('electron-main.js');
+    const listed = vm.runInNewContext(mainBlock(main, 'const SHELL_FRAGMENT_ROUTES = Object.freeze(', ');') + '\nSHELL_FRAGMENT_ROUTES;', {});
+    const nav = read('src/js/lex/lex-nav.js');
+    const block = nav.slice(nav.indexOf('var _shellFragmentPages = {'), nav.indexOf('};', nav.indexOf('var _shellFragmentPages = {')));
+    expect([...listed].sort()).toEqual([...block.matchAll(/'([\w/.-]+\.html)': true/g)].map((m) => m[1]).sort());
+  });
+
+  test('app.html starts on the fragment named by ?page=, and only on a fragment', () => {
+    const { win } = loadRenderer({ router: false });
+    expect(win.Lex.Nav.shellStartPath('?page=model-pricing.html')).toBe('/model-pricing.html');
+    expect(win.Lex.Nav.shellStartPath('?page=open-source-licenses.html')).toBe('/open-source-licenses.html');
+    expect(win.Lex.Nav.shellStartPath('?page=admin/users.html')).toBeNull();
+    expect(win.Lex.Nav.shellStartPath('?page=constructor')).toBeNull();
+    expect(win.Lex.Nav.shellStartPath('')).toBeNull();
+    const app = read('src/js/app.js');
+    const start = app.indexOf('var startPath = (history.state && history.state.path)');
+    expect(start).toBeGreaterThan(-1);
+    expect(app.slice(start, start + 300)).toContain('Lex.Nav.shellStartPath(window.location.search)');
   });
 });

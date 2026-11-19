@@ -64,7 +64,7 @@ These client routes are supported by the OS protocol handler for this phase:
 
 `insights/module-execution.html` (the old Reports page) is retired: an old link opens `admin/reporting.html`, with `?module=<key>` carried as `?report=<key>`. `insights/dashboard.html` and `insights/predictions.html` open `admin/analytics.html` (the Insights Dashboard), and `admin/management-boards.html` opens `admin/dashboard-library.html` (All dashboards). `skills.html`, `skills-marketplace.html` and `matter-skills.html` are retired: skills are automations, and old links open the Automate app (`automation/index.html`). Their other params named their own records and are dropped.
 
-`model-pricing.html` is a fragment of the app shell, not a destination of its own: in-app links open it inside `app.html`.
+`model-pricing.html` and `open-source-licenses.html` are fragments of the app shell: `lana-ai://open?route=model-pricing.html` (and in-app links) open them inside `app.html` (`app.html?page=model-pricing.html`); their params are dropped.
 
 `matters.html` is retired; the matters list is `workspaces.html`. An old link to it opens `workspaces.html`, keeping `action`, `status`, `sort_by` and `sort_order`; the page applies `status`, `sort_by` and `sort_order` only when they are values its toolbar offers. A link to one matter (`?matter_id=<id>` or `?open=<id>`, with an optional `tab`) opens that matter at `workspace-details.html?id=<id>`. This holds for `lana-ai://open?route=matters.html`, for in-app links and saved last pages, and for the voice agent's `matters.html` destination.
 

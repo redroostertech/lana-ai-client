@@ -424,6 +424,17 @@
   }
 
   /**
+   * The start path app.html opens for ?page=<fragment> (a lana-ai:// link to a
+   * shell fragment page), or null when the query names no fragment page.
+   * @param {string} search - e.g. '?page=model-pricing.html'
+   * @returns {string|null} e.g. '/model-pricing.html'
+   */
+  function shellStartPath(search) {
+    var page = new URLSearchParams(search || '').get('page');
+    return page && Object.prototype.hasOwnProperty.call(_shellFragmentPages, page) ? '/' + page : null;
+  }
+
+  /**
    * The root-relative path a retired page's link opens, or null.
    * '/matters.html?matter_id=M1' -> '/workspace-details.html?id=M1'
    * @param {string} path
@@ -675,6 +686,7 @@
     replacementFor: replacementFor,
     redirectFor:  redirectFor,
     redirectPath: redirectPath,
+    shellStartPath: shellStartPath,
 
     /**
      * Check if navigation context exists without consuming it.
