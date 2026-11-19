@@ -13,28 +13,6 @@ const crypto = require('crypto');
 const fs = require('fs');
 const Store = require('electron-store');
 
-/**
- * Resolve app icon candidates for the macOS Dock override. In development the
- * process is Electron.app, whose bundle icon is the default Electron mark; use
- * the PNG master first because nativeImage loads it more reliably than ICNS.
- */
-// The icon folders. A packaged app carries them as app-icons/ (electron-builder
-// leaves its build/ resources folder out of the app); an unpackaged run reads
-// build/ in the source tree.
-function iconDirs() {
-  const dir = BRAND_FLAVOR === 'lana-one' ? 'icons-lana-one' : 'icons';
-  return [path.join(__dirname, 'app-icons', dir), path.join(__dirname, 'build', dir)];
-}
-
-function appIconCandidates() {
-  return iconDirs().flatMap((d) => [
-    path.join(d, 'icon-1024.png'),
-    path.join(d, 'icon-512.png'),
-    path.join(d, 'icon.png'),
-    path.join(d, 'icon.icns'),
-  ]);
-}
-
 // Set app version from package.json (prevents app.getVersion() returning the Electron framework version)
 const packageJson = require('./package.json');
 app.setName(packageJson.productName || 'Lana AI');
@@ -50,38 +28,28 @@ app.setVersion(packageJson.version);
 const { resolveFlavor, readAppPackageJson } = require('./src/js/brand/lana-brand');
 const BRAND_FLAVOR = resolveFlavor({ env: process.env, packageJson: readAppPackageJson(app.getAppPath()), isPackaged: app.isPackaged });
 const BRAND_ARG = '--lana-flavor=' + BRAND_FLAVOR;
-const WINDOW_ICON = iconDirs().map((d) => path.join(d, 'icon-256.png')).find((p) => fs.existsSync(p))
-  || path.join(iconDirs()[0], 'icon-256.png');
+// The LANA icon for windows, native dialogs and the dock (electron-app-icon.js): app-icons/ in
+// a packaged app, build/ in a dev run, per brand flavor. In a dev run the process is Electron.app,
+// so without it dialogs and the dock show Electron's icon.
+const { createAppIcon } = require('./electron-app-icon');
+const appIcon = createAppIcon({ nativeImage, rootDir: __dirname, flavor: BRAND_FLAVOR });
+const WINDOW_ICON = appIcon.windowIconPath();
 
 function applyDockIcon() {
   if (process.platform !== 'darwin' || !app.dock) return false;
-  let foundCandidate = false;
   try {
-    const candidates = appIconCandidates();
-    for (const iconPath of candidates) {
-      if (!fs.existsSync(iconPath)) continue;
-      foundCandidate = true;
-
-      const img = nativeImage.createFromPath(iconPath);
-      if (img.isEmpty()) {
-        logError(`[lana-ai-client] dock icon candidate could not be loaded: ${iconPath}`);
-        continue;
-      }
-
-      app.dock.setIcon(img);
-      app.dock.show().catch(() => {});
-      logInfo(`[lana-ai-client] dock icon applied: ${iconPath}`);
-      return true;
+    const image = appIcon.image({ dock: true });
+    if (!image) {
+      logError('[lana-ai-client] dock icon set failed: no usable icon found');
+      return false;
     }
+    app.dock.setIcon(appIcon.image({ dock: true }));
+    app.dock.show().catch(() => {});
+    return true;
   } catch (err) {
-    const msg = err && err.message ? err.message : String(err);
-    logError(`[lana-ai-client] dock icon set failed: ${msg}`);
+    logError(`[lana-ai-client] dock icon set failed: ${err && err.message ? err.message : String(err)}`);
+    return false;
   }
-
-  logError(foundCandidate
-    ? '[lana-ai-client] dock icon set failed: all icon candidates were empty'
-    : '[lana-ai-client] dock icon set failed: no icon assets found');
-  return false;
 }
 
 // Chromium can emit noisy GPU-driver diagnostics to stderr on macOS dev runs
@@ -404,7 +372,9 @@ const { ElectronScreenVoice } = require('./src/screen-voice/electron-screen-voic
 const { isAllowedExternalUrl, sanitizeExternalUrl } = require('./src/electron-external-url');
 // Main-process confirmation dialogs and the one gate for opening links in the browser
 // (electron-confirm.js, electron-external-open.js; docs/plans/harden-ipc.md).
-const { confirmAction, trackedMessageBox, cancelAllPrompts } = require('./electron-confirm');
+const { confirmAction, trackedMessageBox, cancelAllPrompts, setDialogIcon } = require('./electron-confirm');
+// Every question shows the LANA icon (electron-app-icon.js), not Electron's in a dev run.
+setDialogIcon(() => appIcon.image());
 // SIGTERM (a system shutdown, a process manager): close any open question and quit normally,
 // so the engine and the other local servers stop cleanly.
 process.on('SIGTERM', () => {

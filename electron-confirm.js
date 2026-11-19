@@ -54,6 +54,20 @@ const CONFIRMATIONS = Object.freeze({
 // (showMessageBox's AbortSignal answers as Cancel) on before-quit and SIGTERM.
 const pendingPrompts = new Set();
 
+// The LANA icon for every question (electron-app-icon.js), set by electron-main.js. In a dev run
+// the default would be Electron's.
+let dialogIcon = null;
+function setDialogIcon(getter) {
+  dialogIcon = typeof getter === 'function' ? getter : null;
+}
+function currentDialogIcon() {
+  try {
+    return dialogIcon ? dialogIcon() : undefined;
+  } catch (_error) {
+    return undefined;
+  }
+}
+
 /**
  * dialog.showMessageBox, tracked: it closes as Cancel when the app quits.
  * @param {object} dialog - Electron's dialog
@@ -65,6 +79,11 @@ async function trackedMessageBox(dialog, parentWindow, options) {
   pendingPrompts.add(controller);
   try {
     const withSignal = { ...options, signal: controller.signal };
+    // The caller's own icon wins; without one, the LANA icon when there is one.
+    if (withSignal.icon === undefined) {
+      const icon = currentDialogIcon();
+      if (icon) withSignal.icon = icon;
+    }
     return parentWindow ? await dialog.showMessageBox(parentWindow, withSignal) : await dialog.showMessageBox(withSignal);
   } finally {
     pendingPrompts.delete(controller);
@@ -111,4 +130,4 @@ async function confirmAction(dialog, parentWindow, kind, details) {
   }
 }
 
-module.exports = { CONFIRMATIONS, confirmAction, trackedMessageBox, cancelAllPrompts, pendingPromptCount };
+module.exports = { CONFIRMATIONS, confirmAction, trackedMessageBox, cancelAllPrompts, pendingPromptCount, setDialogIcon };

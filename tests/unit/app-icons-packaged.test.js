@@ -25,9 +25,12 @@ test('electron-builder copies both icon sets into the app as app-icons/', () => 
 });
 
 test('the main process looks in app-icons/ first, then build/ for unpackaged runs', () => {
-  expect(main).toMatch(/'app-icons'/);
-  const fn = main.slice(main.indexOf('function iconDirs'), main.indexOf('function appIconCandidates'));
+  // The lookup lives in electron-app-icon.js (windows, dialogs and the dock share it).
+  const helper = fs.readFileSync(path.join(ROOT, 'electron-app-icon.js'), 'utf8');
+  const fn = helper.slice(helper.indexOf('function iconDirs'), helper.indexOf('function createAppIcon'));
+  expect(fn.indexOf("'app-icons'")).toBeGreaterThan(-1);
   expect(fn.indexOf("'app-icons'")).toBeLessThan(fn.indexOf("'build'"));
+  expect(main).toMatch(/createAppIcon\(\{ nativeImage, rootDir: __dirname, flavor: BRAND_FLAVOR \}\)/);
 });
 
 test('every icon the main process asks for exists in the source tree', () => {
