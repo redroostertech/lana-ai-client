@@ -7,7 +7,7 @@
  * @returns {string} - Formatted document type
  */
 function formatDocumentType(documentType) {
-  const label = window.LanaDocumentTypes ? window.LanaDocumentTypes.documentTypeLabel(documentType) : documentType;
+  const label = window.LanaDocumentTypeNames ? window.LanaDocumentTypeNames.documentTypeLabel(documentType) : documentType;
   return label || '\u2014';
 }
 

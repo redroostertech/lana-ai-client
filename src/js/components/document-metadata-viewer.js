@@ -54,8 +54,11 @@ class DocumentMetadataViewer {
     this.render();
 
     try {
-      // Fetch metadata using metadata service
+      // Fetch metadata using metadata service; document type names are
+      // backend data, fetched alongside it.
+      const typeNamesReady = window.LanaDocumentTypeNames ? window.LanaDocumentTypeNames.load() : null;
       const metadata = await window.metadataService.fetchMetadata(documentId, forceRefresh);
+      if (typeNamesReady) await typeNamesReady;
       this.metadata = metadata;
       this.isLoading = false;
 

@@ -3716,7 +3716,7 @@
   }
 
   function formatDocumentType(type) {
-    return (window.LanaDocumentTypes ? window.LanaDocumentTypes.documentTypeLabel(type) : type) || '';
+    return (window.LanaDocumentTypeNames ? window.LanaDocumentTypeNames.documentTypeLabel(type) : type) || '';
   }
 
   function officeFileMetadata(file) {
@@ -8240,7 +8240,10 @@
     if (!window.api || typeof window.api.get !== 'function') throw new Error('The API client is unavailable.');
     var path = '/api/v1/storage/files/' + encodeURIComponent(documentId);
     if (matterId) path += '?matter_id=' + encodeURIComponent(matterId);
+    // Document type names are backend data; fetch them alongside the file.
+    var typeNamesReady = window.LanaDocumentTypeNames ? window.LanaDocumentTypeNames.load(window.api) : null;
     var response = await window.api.get(path);
+    if (typeNamesReady) await typeNamesReady;
     var file = response && response.data ? response.data : response;
     if (!file || !file.id) throw new Error('The requested document was not found.');
     var displayFilename = documentDisplayFilename(file);

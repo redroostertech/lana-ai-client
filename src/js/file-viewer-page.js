@@ -1205,7 +1205,7 @@
   }
 
   function formatDocumentType(type) {
-    return window.LanaDocumentTypes ? window.LanaDocumentTypes.documentTypeLabel(type) : (type || null);
+    return window.LanaDocumentTypeNames ? window.LanaDocumentTypeNames.documentTypeLabel(type) : (type || null);
   }
 
   function isDemoMode() {
@@ -4601,10 +4601,13 @@
 
     try {
       var encodedFileId = encodeURIComponent(fileId);
+      // Document type names are backend data; fetch them alongside the file.
+      var typeNamesReady = window.LanaDocumentTypeNames ? window.LanaDocumentTypeNames.load(api) : null;
       var response = await api.get('/api/v1/storage/files/' + encodedFileId);
       if (!response || !response.id) {
         throw new Error('File not found');
       }
+      if (typeNamesReady) await typeNamesReady;
       var displayFilename = documentDisplayFilename(response);
 
       // Track file activity (non-blocking)
