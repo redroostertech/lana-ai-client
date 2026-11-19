@@ -8,9 +8,10 @@
  * Public API (window.LanaListQueryParams, or module.exports in Node):
  *   - filterValues(filter)                    -> string[] a column filter selected
  *   - mattersParams(query, context)           -> GET /api/v1/matters params
+ *   - mattersLinkState(params)                -> { status, sortBy, sortDir } a link asks for
  *   - myTasksParams(query, context)           -> GET /api/v1/tasks/my params
  *   - libraryFilesParams(query, context)      -> GET /api/v1/storage/library/files params
- *   - MATTER_STATUS_OPTIONS, MATTER_TYPE_OPTIONS, TASK_STATUS_OPTIONS,
+ *   - MATTER_STATUS_OPTIONS, MATTER_TYPE_OPTIONS, MATTER_SHARED_FILTER, TASK_STATUS_OPTIONS,
  *     TASK_PRIORITY_OPTIONS, TASK_DUE_OPTIONS, FILE_SIZE_RANGES
  *
  * Each builder returns a URLSearchParams. Date ranges use the shared
@@ -69,6 +70,10 @@
     { value: 'archived', label: 'Archived' }
   ];
 
+  // The toolbar Status select adds "Shared with me" to the matter statuses.
+  // It rides in the status filter and becomes shared_only=true.
+  var MATTER_SHARED_FILTER = 'shared';
+
   var MATTER_TYPE_OPTIONS = [
     { value: 'matter', label: 'Client matter' },
     { value: 'workspace', label: 'Workspace' }
@@ -98,12 +103,17 @@
     params.set('sort_by', MATTER_SORT_BY_COLUMN[query.sortBy] || 'created_at');
     params.set('sort_order', query.sortDir === 'asc' ? 'asc' : 'desc');
     params.set('exclude_pinned', 'true');
-    params.set('include_all', context.includeAll ? 'true' : 'false');
+    // "Shared with me" lists other people's matters shared with this user,
+    // so it never widens to the whole organization.
+    var status = filterValues(filters.status)[0];
+    var shared = status === MATTER_SHARED_FILTER;
+    params.set('include_all', context.includeAll && !shared ? 'true' : 'false');
     if (context.search) params.set('search', context.search);
 
     // Status and Type are single-choice: the API takes one value each.
-    var status = filterValues(filters.status)[0];
-    if (status) {
+    if (shared) {
+      params.set('shared_only', 'true');
+    } else if (status) {
       params.set('status', status);
       // The API hides archived rows unless asked for them.
       if (status === 'archived') params.set('include_archived', 'true');
@@ -115,9 +125,35 @@
     if (name) params.set('name', name);
     var matterId = filterValues(filters.matter_id)[0];
     if (matterId) params.set('matter_id_contains', matterId);
+    var client = filterValues(filters.client_name)[0];
+    if (client) params.set('client_name', client);
     setRange(params, filters.created_at, 'created_after', 'created_before', context.now);
     setRange(params, filters.updated_at, 'updated_after', 'updated_before', context.now);
     return params;
+  }
+
+  /**
+   * The matters list state a link asks for (?status=, ?sort_by=,
+   * ?sort_order=), keeping only values the Workspaces toolbar offers:
+   * "all", a matter status or "shared"; a sortable column; asc or desc. Anything
+   * else comes back as ''.
+   * @param {URLSearchParams|Object} params
+   * @returns {{status: string, sortBy: string, sortDir: string}}
+   */
+  function mattersLinkState(params) {
+    var get = function (key) {
+      var value = params && typeof params.get === 'function' ? params.get(key) : (params ? params[key] : null);
+      return String(value == null ? '' : value).trim().toLowerCase();
+    };
+    var status = get('status');
+    var statuses = ['all'].concat(MATTER_STATUS_OPTIONS.map(function (o) { return o.value; }), MATTER_SHARED_FILTER);
+    var sortBy = get('sort_by');
+    var sortDir = get('sort_order');
+    return {
+      status: statuses.indexOf(status) !== -1 ? status : '',
+      sortBy: Object.prototype.hasOwnProperty.call(MATTER_SORT_BY_COLUMN, sortBy) ? sortBy : '',
+      sortDir: sortDir === 'asc' || sortDir === 'desc' ? sortDir : ''
+    };
   }
 
   // ── My Tasks: GET /api/v1/tasks/my ────────────────────────────────────
@@ -259,10 +295,12 @@
   var moduleApi = {
     filterValues: filterValues,
     mattersParams: mattersParams,
+    mattersLinkState: mattersLinkState,
     myTasksParams: myTasksParams,
     libraryFilesParams: libraryFilesParams,
     MATTER_STATUS_OPTIONS: MATTER_STATUS_OPTIONS,
     MATTER_TYPE_OPTIONS: MATTER_TYPE_OPTIONS,
+    MATTER_SHARED_FILTER: MATTER_SHARED_FILTER,
     MATTER_SORT_BY_COLUMN: MATTER_SORT_BY_COLUMN,
     TASK_STATUS_OPTIONS: TASK_STATUS_OPTIONS,
     TASK_PRIORITY_OPTIONS: TASK_PRIORITY_OPTIONS,

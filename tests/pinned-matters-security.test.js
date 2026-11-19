@@ -22,15 +22,15 @@ const { JSDOM } = require('jsdom');
 const fs = require('fs');
 const path = require('path');
 
-// Load the matters.html file
-const mattersHtmlPath = path.join(__dirname, '../src/matters.html');
-const mattersHtml = fs.readFileSync(mattersHtmlPath, 'utf-8');
+// The matters list is workspaces.html; its page script is js/workspace.js.
+const mattersHtml = fs.readFileSync(path.join(__dirname, '../src/workspaces.html'), 'utf-8');
+const workspaceJs = fs.readFileSync(path.join(__dirname, '../src/js/workspace.js'), 'utf-8');
 
 function loadMatterCardHelpers() {
-  const helperStart = mattersHtml.indexOf('function escapeHtml(unsafe)');
-  const helperEnd = mattersHtml.indexOf('// Debounce utility function', helperStart);
+  const helperStart = workspaceJs.indexOf('function escapeHtml(unsafe)');
+  const helperEnd = workspaceJs.indexOf('// Debounce utility function', helperStart);
   if (helperStart < 0 || helperEnd < 0) throw new Error('Matter card helpers not found');
-  const helperSource = mattersHtml.slice(helperStart, helperEnd);
+  const helperSource = workspaceJs.slice(helperStart, helperEnd);
   const statusBadge = (status) => `<span>${String(status || '')}</span>`;
   const formatDate = (value) => String(value || '');
   return new Function(
@@ -201,7 +201,7 @@ describe('Pinned Matters - Security Fixes Validation', () => {
         { matter_id: '4', is_pinned: true, pinned_at: '2026-01-07T12:00:00Z' }
       ];
 
-      // Extract sorting logic from matters.html
+      // The pinned sort in js/workspace.js
       const sortFn = (a, b) => {
         const aTime = a.pinned_at ? new Date(a.pinned_at).getTime() : 0;
         const bTime = b.pinned_at ? new Date(b.pinned_at).getTime() : 0;
@@ -269,9 +269,14 @@ describe('Pinned Matters - Security Fixes Validation', () => {
 
   describe('BLOCKER #3: Race Condition Prevention', () => {
     test('pinningInProgress Set and cleanup guard remain in the production page', () => {
-      expect(mattersHtml).toMatch(/const pinningInProgress = new Set\(\)/);
-      expect(mattersHtml).toMatch(/if \(pinningInProgress\.has\(key\)\)/);
-      expect(mattersHtml).toMatch(/pinningInProgress\.delete\(key\)/);
+      expect(workspaceJs).toMatch(/const pinningInProgress = new Set\(\)/);
+      expect(workspaceJs).toMatch(/if \(pinningInProgress\.has\(key\)\)/);
+      expect(workspaceJs).toMatch(/pinningInProgress\.delete\(key\)/);
+    });
+
+    test('the pinned sort treats a missing pinned_at as oldest', () => {
+      expect(workspaceJs).toContain('const aTime = a.pinned_at ? new Date(a.pinned_at).getTime() : 0;');
+      expect(workspaceJs).toContain('const bTime = b.pinned_at ? new Date(b.pinned_at).getTime() : 0;');
     });
 
     test('Concurrent pin requests for same matter are blocked', async () => {

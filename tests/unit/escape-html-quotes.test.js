@@ -282,10 +282,13 @@ describe('connector-config-renderer fields', () => {
   });
 });
 
-describe('matters.html inline renderers', () => {
-  const PAGE = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'matters.html'), 'utf8');
+// The matters list (workspaces.html, js/workspace.js) and the matter page
+// (workspace-details.html, js/workspace-details.js) build HTML from matter,
+// user and activity data.
+function sourceExtractor(rel) {
+  const PAGE = fs.readFileSync(path.join(__dirname, '..', '..', 'src', rel), 'utf8');
   // Returns the source of `function name(...) { ... }` by brace matching.
-  function extract(name) {
+  return function extract(name) {
     const start = PAGE.indexOf('function ' + name + '(');
     expect(start).toBeGreaterThan(-1);
     let depth = 0;
@@ -294,46 +297,77 @@ describe('matters.html inline renderers', () => {
       else if (PAGE[i] === '}' && --depth === 0) return PAGE.slice(start, i + 1);
     }
     throw new Error('unbalanced ' + name);
-  }
-  const HOSTILE = '<img src=x onerror="window.__pwned=1">' + ATTACK;
+  };
+}
 
-  function bootWith(names, body) {
+describe('workspaces page renderers (js/workspace.js)', () => {
+  const extract = sourceExtractor(path.join('js', 'workspace.js'));
+  const HOSTILE = '<img src=x onerror="window.__pwned=1">' + ATTACK;
+  const EVIL = "m1');window.__pwned=1;//";
+
+  function load() {
     const window = boot(['time-utils.js', 'lex/lex.core.js']);
-    window.document.body.innerHTML = body;
-    window.eval('function escapeHtml(t) { if (!t) return \'\'; return window.Lex.escapeHtml(t); }\n'
-      + 'function formatFileSize(n) { return String(n); }\nfunction insertMention() {}\nfunction insertDocumentReference() {}\n'
-      + names.map(extract).join('\n'));
+    window.eval('var selectedMatters = new Set(); function statusBadge() { return \'\'; } function formatDate(v) { return String(v || \'\'); }\n'
+      + extract('escapeHtml') + '\n' + extract('jsArg') + '\n' + extract('matterOptionsMenuHtml') + '\n'
+      + extract('renderMatterCard') + '\n' + extract('renderPinnedCard')
+      + '\nwindow.renderMatterCard = renderMatterCard; window.renderPinnedCard = renderPinnedCard;');
     return window;
   }
 
-  test('mention dropdown keeps user name, id and email as data and text', () => {
-    const window = bootWith(['showMentionDropdown'], '<div id="mentionDropdown" class="hidden"><div id="mentionList"></div></div>');
-    window.showMentionDropdown([{ id: HOSTILE, name: HOSTILE, email: HOSTILE }]);
-    const item = window.document.querySelector('.mention-item');
-    expect(window.document.querySelector('#mentionList img')).toBeNull();
-    expect(window.document.querySelector('#mentionList [onfocus], #mentionList [data-pwn]')).toBeNull();
-    expect(item.dataset.userName).toBe(HOSTILE);
-    expect(item.dataset.userId).toBe(HOSTILE);
+  function runHandlers(window, host, names) {
+    const calls = [];
+    names.forEach((n) => { window[n] = (id) => calls.push(id); });
+    host.querySelectorAll('[onclick]').forEach((el) => {
+      const code = el.getAttribute('onclick');
+      if (new RegExp(names.join('|')).test(code)) new window.Function('event', code)({ stopPropagation() {} });
+    });
+    return calls;
+  }
+
+  test('matter card handlers get the matter id as one string', () => {
+    const window = load();
+    const host = window.document.createElement('div');
+    host.innerHTML = window.renderMatterCard({ matter_id: EVIL, name: HOSTILE, client_name: HOSTILE, description: HOSTILE, source: EVIL, is_pinned: '1);window.__pwned=1;//' });
+    expect(host.querySelector('img')).toBeNull();
+    expect(host.querySelector('[onfocus], [data-pwn]')).toBeNull();
+    const calls = runHandlers(window, host, ['toggleMatterSelection', 'viewMatter', 'togglePin']);
+    expect(window.__pwned).toBeUndefined();
+    expect(calls).toEqual([EVIL, EVIL, EVIL]);
   });
 
-  test('document dropdown keeps the file name as data and text', () => {
-    const window = bootWith(['showDocumentDropdown'], '<div id="documentDropdown" class="hidden"><div id="documentList"></div></div>');
-    window.showDocumentDropdown([{ id: HOSTILE, filename: HOSTILE, file_size: 1 }]);
-    const item = window.document.querySelector('.document-item');
-    expect(window.document.querySelector('#documentList img')).toBeNull();
-    expect(window.document.querySelector('#documentList [onfocus], #documentList [data-pwn]')).toBeNull();
-    expect(item.dataset.docName).toBe(HOSTILE);
-    expect(item.dataset.docId).toBe(HOSTILE);
+  test('pinned card handlers get the matter id as one string', () => {
+    const window = load();
+    const host = window.document.createElement('div');
+    host.innerHTML = window.renderPinnedCard({ matter_id: EVIL, name: HOSTILE, client_name: HOSTILE, source: EVIL, status: 'active' });
+    expect(host.querySelector('img')).toBeNull();
+    const calls = runHandlers(window, host, ['viewMatter', 'togglePin']);
+    expect(window.__pwned).toBeUndefined();
+    expect(calls).toEqual([EVIL, EVIL]);
   });
+
+  test('share pickers render user fields as text and pass the id as one string', () => {
+    const js = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'js', 'workspace.js'), 'utf8');
+    ['addUserToShare', 'removeUserFromShare', 'addWorkspaceUserToShare', 'removeWorkspaceUserFromShare'].forEach((fn) => {
+      expect(js).toContain('onclick="' + fn + '(${jsArg(u.id)})"');
+      expect(js).not.toContain(fn + "('${u.id}')");
+    });
+    expect(js).not.toMatch(/\$\{u\.(email|first_name|last_name)\}/);
+  });
+});
+
+describe('matter page renderers (js/workspace-details.js)', () => {
+  const extract = sourceExtractor(path.join('js', 'workspace-details.js'));
+  const HOSTILE = '<img src=x onerror="window.__pwned=1">' + ATTACK;
+
   test('comment content and activity descriptions render user text as text', () => {
     const window = boot(['time-utils.js', 'lex/lex.core.js']);
-    window.eval(extract('renderCommentContent') + '\n' + extract('getActivityDescription')
+    window.eval('function escapeHtml(t) { if (!t) return \'\'; return window.Lex.escapeHtml(t); }\n'
+      + extract('_commentTextToHtml') + '\n' + extract('renderCommentContent') + '\n' + extract('getActivityDescription')
       + '\nwindow.renderCommentContent = renderCommentContent; window.getActivityDescription = getActivityDescription;');
     const host = window.document.createElement('div');
     host.innerHTML = window.renderCommentContent('hi @[Ann](u1) ' + HOSTILE + '\nline two');
     expect(host.querySelector('img')).toBeNull();
-    expect(host.querySelector('span').textContent).toBe('@Ann');
-    expect(host.querySelectorAll('br')).toHaveLength(1);
+    expect(host.textContent).toContain('@Ann');
     expect(host.textContent).toContain(HOSTILE);
     [
       { user: { first_name: HOSTILE, last_name: 'x' }, display_message: HOSTILE },
@@ -344,45 +378,6 @@ describe('matters.html inline renderers', () => {
       host.innerHTML = window.getActivityDescription(activity);
       expect(host.querySelector('img')).toBeNull();
     });
-  });
-
-  test('matter card handlers get the matter id as one string', () => {
-    const window = boot(['time-utils.js', 'lex/lex.core.js']);
-    window.eval('var selectedMatters = new Set(); function statusBadge() { return \'\'; }\n'
-      + extract('escapeHtml') + '\n' + (PAGE.includes('function jsArg(') ? extract('jsArg') : '') + '\n'
-      + extract('formatDate') + '\n' + extract('renderMatterCard') + '\nwindow.renderMatterCard = renderMatterCard;');
-    const evil = "m1');window.__pwned=1;//";
-    const host = window.document.createElement('div');
-    host.innerHTML = window.renderMatterCard({ matter_id: evil, name: HOSTILE, source: evil, is_pinned: '1);window.__pwned=1;//' });
-    const calls = [];
-    ['toggleMatterSelection', 'viewMatter', 'togglePin'].forEach((n) => { window[n] = (id) => calls.push(id); });
-    host.querySelectorAll('[onclick]').forEach((el) => {
-      const code = el.getAttribute('onclick');
-      if (/toggleMatterSelection|viewMatter|togglePin/.test(code)) new window.Function('event', code)({ stopPropagation() {} });
-    });
-    expect(window.__pwned).toBeUndefined();
-    expect(calls).toEqual([evil, evil, evil]);
-  });
-
-  test('contact card keeps synced contact fields and ids inert', () => {
-    const window = boot(['time-utils.js', 'lex/lex.core.js']);
-    window.eval(extract('escapeHtml') + '\n' + extract('jsArg') + '\nvar matter = { matter_id: "m1" };\n' + extract('renderContactCard')
-      + '\nwindow.renderContactCard = renderContactCard;');
-    const evil = "x');window.__pwned=1;//" + HOSTILE;
-    const host = window.document.createElement('div');
-    host.innerHTML = window.renderContactCard({ id: evil, display_name: HOSTILE, email: HOSTILE, title: HOSTILE, company_name: HOSTILE, phone_mobile: HOSTILE, role: 'client', link_type: 'linked' });
-    expect(host.querySelector('img')).toBeNull();
-    expect(host.querySelector('[onfocus], [data-pwn]')).toBeNull();
-    const calls = [];
-    window.openContactDetail = (id) => calls.push(id);
-    window.unlinkContactFromMatter = (id) => calls.push(id);
-    host.querySelectorAll('[onclick]').forEach((el) => {
-      const code = el.getAttribute('onclick');
-      if (/openContactDetail|unlinkContactFromMatter/.test(code)) new window.Function('event', code)({ stopPropagation() {} });
-    });
-    expect(window.__pwned).toBeUndefined();
-    expect(calls.length).toBeGreaterThan(0);
-    calls.forEach((id) => expect(id).toBe(evil));
   });
 });
 

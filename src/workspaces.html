@@ -122,7 +122,7 @@
             <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Status:</label>
             <lex-select
               id="statusFilter"
-              options='[{"value":"all","label":"All"},{"value":"active","label":"Active"},{"value":"inactive","label":"Inactive"},{"value":"closed","label":"Closed"},{"value":"archived","label":"Archived"}]'
+              options='[{"value":"all","label":"All"},{"value":"active","label":"Active"},{"value":"inactive","label":"Inactive"},{"value":"closed","label":"Closed"},{"value":"archived","label":"Archived"},{"value":"shared","label":"Shared with me"}]'
               value="all"
             ></lex-select>
           </div>
@@ -158,8 +158,18 @@
         <div id="listPinnedCards" class="flex gap-4 overflow-x-auto pb-4 scrollbar-thin"></div>
       </div>
 
-      <!-- Section header — title + count, Library-style -->
-      <div class="flex items-center justify-between mb-3">
+      <!-- Grid view selection (the list view selects through the table) -->
+      <div id="gridSelectionControls" class="matters-grid-selection hidden">
+        <lex-checkbox id="selectAllMatters" label="Select all"></lex-checkbox>
+        <div id="bulkActions" class="matters-grid-selection__bulk hidden">
+          <span id="selectedCount" class="matters-grid-selection__count">0 selected</span>
+          <lex-btn id="bulkDeleteBtn" variant="danger" size="sm" leading-icon="trash-2">Delete Selected</lex-btn>
+          <lex-btn id="clearSelectionBtn" variant="ghost" size="sm">Clear</lex-btn>
+        </div>
+      </div>
+      <!-- Section header: title and count, Library-style. List view only:
+           the grid draws its own Pinned and All Workspaces headers. -->
+      <div id="mattersListHeader" class="flex items-center justify-between mb-3">
         <h2 class="text-lg font-semibold" style="color: var(--lex-text-primary)">All Workspaces</h2>
         <span id="mattersSectionCount" class="text-sm" style="color: var(--lex-text-secondary)"></span>
       </div>
@@ -182,8 +192,8 @@
           server-paging
           column-filters
           selectable
-          columns="name,matter_id,status,matter_type,created_at,updated_at"
-          labels="Name,Matter ID,Status,Type,Created,Last edited"
+          columns="name,client_name,matter_id,status,matter_type,created_at,updated_at,actions"
+          labels="Name,Client,Matter ID,Status,Type,Created,Last edited,Actions"
           sortable-columns="name,status,matter_type,created_at,updated_at"
           sort-by="created_at"
           sort-dir="desc"
@@ -511,7 +521,8 @@
        product. Hide the billable "Client Workspace" type (keep only the
        collaborative Workspace), the Client Name field, and "Share with Team
        Members" (no collaboration at launch). Edition-gated + inline !important so it
-       wins over the modal's own show/hide; the org / LANA AI build keeps all fields. -->
+       wins over the modal's own show/hide; the org / LANA AI build keeps all fields.
+       The matters list drops its Client column (and that column's filter) too. -->
   <script>
     (function () {
       if (!window.electronAPI || typeof window.electronAPI.getConfig !== 'function') return;
@@ -528,6 +539,21 @@
         // "Create matter in workspace" modal.
         var wsClientName = byId('workspaceClientName'); fullRow(wsClientName); hideEl(wsClientName);
         hideEl(byId('workspaceShareWithSection'));
+        // Matters list: no Client column. The --no-client class keeps the
+        // column widths in step (css/workspaces-list.css).
+        var table = byId('mattersListView');
+        if (table) {
+          var cols = (table.getAttribute('columns') || '').split(',');
+          var labels = (table.getAttribute('labels') || '').split(',');
+          var at = cols.indexOf('client_name');
+          if (at !== -1) {
+            cols.splice(at, 1);
+            labels.splice(at, 1);
+            table.classList.add('matters-list-table--no-client');
+            table.setAttribute('labels', labels.join(','));
+            table.setAttribute('columns', cols.join(','));
+          }
+        }
       }).catch(function () { /* inert */ });
     })();
   </script>

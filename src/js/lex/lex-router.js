@@ -72,7 +72,7 @@
 
   /**
    * Normalize any href (relative, absolute, file://) to a root-relative path
-   * like '/matters.html' or '/admin/users.html'.
+   * like '/workspaces.html' or '/admin/users.html'.
    */
   function normalizePath(href) {
     if (!href) return '/dashboard.html';
@@ -475,9 +475,9 @@
 
   function navigate(path, options) {
     options = options || {};
-    // A retired page (an old link, a saved last page) opens the page that replaced it (Lex.Nav.replacementFor).
-    var replacement = global.Lex && global.Lex.Nav && global.Lex.Nav.replacementFor ? global.Lex.Nav.replacementFor(pathKey(path)) : null;
-    if (replacement) path = '/' + replacement;
+    // A retired page (an old link, a saved last page) opens the page that replaced it (Lex.Nav.redirectPath).
+    var redirected = global.Lex && global.Lex.Nav && global.Lex.Nav.redirectPath ? global.Lex.Nav.redirectPath(path) : null;
+    if (redirected) path = redirected;
     var pushState = options.pushState !== false;
 
     if (_navigating) {
@@ -823,7 +823,7 @@
 
     /**
      * Navigate to a page programmatically.
-     * @param {string} path - root-relative path like '/matters.html'
+     * @param {string} path - root-relative path like '/workspaces.html'
      * @param {object} [options] - { force: bool, pushState: bool }
      */
     navigate: navigate,

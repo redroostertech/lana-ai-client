@@ -187,7 +187,7 @@ select.className = DROPDOWN_CLASSES.compact;
 The following 7 dropdowns have been updated to use the `.select-standard` pattern:
 
 ### lana-client
-1. **src/matters.html** (line 232) - `statusFilter` dropdown
+1. **src/workspaces.html** (line 124) - `statusFilter` dropdown
 2. **src/matters/timeline.html** (line 57) - `matterSelect` dropdown
 3. **src/admin/users.html** (line 191) - `statusFilter` dropdown
 4. **src/admin/sessions.html** (line 196) - `deviceFilter` dropdown

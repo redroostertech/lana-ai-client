@@ -1,5 +1,5 @@
 /* workspace.js — Workspaces page script (SPA lifecycle).
-   Extracted from matters.html inline scripts.
+   The matters list: grid and list views, pins, create and edit.
    Uses LexRouter.registerView() for onEnter/onLeave lifecycle.
 
    Dependencies (loaded via page descriptor before this file):
@@ -82,8 +82,12 @@
       if (sectionEl) sectionEl.textContent = label;
     }
 
-    // View mode: 'grid' or 'list'
+    // View mode: 'grid' or 'list', remembered per viewer.
+    const VIEW_STORAGE_KEY = 'lana.matters.viewMode';
     let viewMode = 'list';
+    try {
+      if (window.localStorage.getItem(VIEW_STORAGE_KEY) === 'grid') viewMode = 'grid';
+    } catch (e) { /* storage unavailable: list view */ }
 
     // Analytics: Track page view only once on initial load
     let hasTrackedPageView = false;
@@ -98,6 +102,12 @@
         .split('>').join('&gt;')
         .split('"').join('&quot;')
         .split("'").join('&#039;');
+    }
+
+    // A JS string argument inside a double-quoted onclick attribute: JSON
+    // quoting for the script, then HTML escaping for the attribute.
+    function jsArg(value) {
+      return escapeHtml(JSON.stringify(value == null ? '' : String(value)));
     }
 
     // Matter options menu (Edit / Archive or Unarchive / Delete) on grid
@@ -126,7 +136,6 @@
       const escapedClientName = escapeHtml(matter.client_name || '');
       const escapedDescription = escapeHtml(matter.description || 'No description');
       const escapedMatterNumber = escapeHtml(matter.matter_number || '');
-      const escapedSource = escapeHtml(matter.source || 'lana');  // Use 'source' not 'source_type' for pin API
 
       return `
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow relative matter-card ${selectedMatters.has(matter.matter_id) ? 'ring-2 lex-ring-focus' : ''}" data-matter-id="${escapedMatterId}">
@@ -136,10 +145,10 @@
                    class="matter-checkbox w-5 h-5 lex-text-accent border-gray-300 rounded lex-ring-focus"
                    data-matter-id="${escapedMatterId}"
                    ${selectedMatters.has(matter.matter_id) ? 'checked' : ''}
-                   onclick="event.stopPropagation(); toggleMatterSelection('${escapedMatterId}')">
+                   onclick="event.stopPropagation(); toggleMatterSelection(${jsArg(matter.matter_id)})">
           </div>
 
-          <div class="cursor-pointer pl-8" onclick="viewMatter('${escapedMatterId}')">
+          <div class="cursor-pointer pl-8" onclick="viewMatter(${jsArg(matter.matter_id)})">
             <div class="flex items-start justify-between mb-4">
               <div class="flex-1 min-w-0">
                 <span class="text-xs text-gray-400 font-mono block truncate" title="${escapedMatterId}">${escapedMatterId}</span>
@@ -149,7 +158,7 @@
               <div class="flex items-center gap-2">
                 <!-- Pin Button -->
                 <button
-                  onclick="event.stopPropagation(); togglePin('${escapedMatterId}', '${escapedSource}', ${matter.is_pinned || false})"
+                  onclick="event.stopPropagation(); togglePin(${jsArg(matter.matter_id)}, ${jsArg(matter.source || 'lana')}, ${matter.is_pinned ? 'true' : 'false'})"
                   class="pin-button ${matter.is_pinned ? 'text-yellow-500' : 'text-gray-400'} hover:text-yellow-600 transition-colors"
                   title="${matter.is_pinned ? 'Unpin matter' : 'Pin matter'}"
                   data-matter-id="${escapedMatterId}"
@@ -196,69 +205,19 @@
       `;
     }
 
-    // Helper function to render a single matter as a list/table row
-    function renderMatterListRow(matter) {
-      var escapedMatterId = escapeHtml(matter.matter_id);
-      var escapedMatterName = escapeHtml(matter.name || matter.matter_name || 'Untitled');
-      var escapedDescription = escapeHtml(matter.description || 'No description');
-      var escapedSource = escapeHtml(matter.source || 'lana');
-
-      var typeBadge = matter.matter_type === 'matter'
-        ? '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Matter</span>'
-        : '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Workspace</span>';
-
-      var pinIcon = matter.is_pinned
-        ? '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg>'
-        : '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>';
-
-      return [
-        '<tr class="matter-row cursor-pointer group" data-matter-id="' + escapedMatterId + '" style="background: transparent" onmouseover="this.style.background=\'var(--lex-bg-secondary)\'" onmouseout="this.style.background=\'transparent\'" onclick="viewMatter(\'' + escapedMatterId + '\')">',
-        '  <td class="px-4 py-3 w-10" onclick="event.stopPropagation()">',
-        '    <input type="checkbox" class="matter-checkbox w-4 h-4 lex-text-accent border-gray-300 rounded lex-ring-focus"',
-        '           data-matter-id="' + escapedMatterId + '"',
-        '           ' + (selectedMatters.has(matter.matter_id) ? 'checked' : ''),
-        '           onclick="toggleMatterSelection(\'' + escapedMatterId + '\')">',
-        '  </td>',
-        '  <td class="px-4 py-3 whitespace-nowrap">',
-        '    <div class="flex items-center gap-2">',
-        '      <button onclick="event.stopPropagation(); togglePin(\'' + escapedMatterId + '\', \'' + escapedSource + '\', ' + (matter.is_pinned || false) + ')"',
-        '              class="pin-button flex-shrink-0 ' + (matter.is_pinned ? 'text-yellow-500' : 'text-gray-300 hover:text-yellow-500') + ' transition-colors"',
-        '              data-matter-id="' + escapedMatterId + '" title="' + (matter.is_pinned ? 'Unpin' : 'Pin') + '">',
-        '        ' + pinIcon,
-        '      </button>',
-        '      <span class="text-xs font-mono" style="color: var(--lex-text-tertiary)" title="' + escapedMatterId + '">' + escapedMatterId + '</span>',
-        '    </div>',
-        '  </td>',
-        '  <td class="px-4 py-3">',
-        '    <span class="text-sm font-medium" style="color: var(--lex-text-primary)">' + escapedMatterName + '</span>',
-        '  </td>',
-        '  <td class="px-4 py-3" style="max-width: 300px;">',
-        '    <p class="text-sm line-clamp-2" style="color: var(--lex-text-secondary); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">' + escapedDescription + '</p>',
-        '  </td>',
-        '  <td class="px-4 py-3 whitespace-nowrap">' + statusBadge(matter.status || 'active') + '</td>',
-        '  <td class="px-4 py-3 whitespace-nowrap">' + typeBadge + '</td>',
-        '  <td class="px-4 py-3 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + formatDate(matter.created_at) + '</td>',
-        '  <td class="px-4 py-3 whitespace-nowrap text-sm" onclick="event.stopPropagation()">',
-        '    ' + matterOptionsMenuHtml(matter),
-        '  </td>',
-        '</tr>'
-      ].join('');
-    }
-
     // Render a pinned matter as a compact horizontal card (for list view pinned section)
     function renderPinnedCard(matter) {
       var escapedMatterId = escapeHtml(matter.matter_id);
       var escapedMatterName = escapeHtml(matter.name || matter.matter_name || 'Untitled');
       var escapedClientName = escapeHtml(matter.client_name || '');
-      var escapedSource = escapeHtml(matter.source || 'lana');
 
       var typeBadge = matter.matter_type === 'matter'
         ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Matter</span>'
         : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Workspace</span>';
 
       return [
-        '<div class="flex-shrink-0 w-56 rounded-lg border p-4 cursor-pointer hover:shadow-md transition-shadow relative group" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)" onclick="viewMatter(\'' + escapedMatterId + '\')">',
-        '  <button onclick="event.stopPropagation(); togglePin(\'' + escapedMatterId + '\', \'' + escapedSource + '\', true)"',
+        '<div class="flex-shrink-0 w-56 rounded-lg border p-4 cursor-pointer hover:shadow-md transition-shadow relative group" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)" onclick="viewMatter(' + jsArg(matter.matter_id) + ')">',
+        '  <button onclick="event.stopPropagation(); togglePin(' + jsArg(matter.matter_id) + ', ' + jsArg(matter.source || 'lana') + ', true)"',
         '          class="pin-button absolute top-2 right-2 text-yellow-500 hover:text-yellow-600 transition-colors" data-matter-id="' + escapedMatterId + '" title="Unpin">',
         '    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg>',
         '  </button>',
@@ -303,6 +262,7 @@
       return {
         matter_id: matter.matter_id,
         name: matter.name || matter.matter_name || 'Untitled',
+        client_name: matter.client_name || '',
         status: matter.status || 'active',
         matter_type: matter.matter_type || 'workspace',
         created_at: matter.created_at || '',
@@ -323,6 +283,9 @@
               '<span class="matters-list-name" title="' + escapeHtml(val) + '">' + escapeHtml(val) + '</span>' +
             '</span>';
         },
+        client_name: function (val) {
+          return val ? '<span class="matters-list-client" title="' + escapeHtml(val) + '">' + escapeHtml(val) + '</span>' : muted('');
+        },
         matter_id: function (val) {
           return '<span class="matters-list-id" title="' + escapeHtml(val) + '">' + escapeHtml(val || '—') + '</span>';
         },
@@ -333,14 +296,20 @@
         matter_type: function (val) {
           return muted(MATTER_TYPE_LABELS[val] || Lex.Utils.humanizeLabel(val || ''));
         },
+        // The date shows; the full date and time is the tooltip.
         created_at: function (val) {
-          var text = val ? Lex.Utils.formatDateTime(val) : '';
-          return '<time class="matters-list-muted" datetime="' + escapeHtml(val) + '" title="' + escapeHtml(text) + '">' + escapeHtml(text || '—') + '</time>';
+          var day = val ? Lex.Utils.formatDate(val) : '';
+          var full = val ? Lex.Utils.formatDateTime(val) : '';
+          return '<time class="matters-list-muted" datetime="' + escapeHtml(val) + '" title="' + escapeHtml(full) + '">' + escapeHtml(day || '—') + '</time>';
         },
         updated_at: function (val) {
           var full = val ? Lex.Utils.formatDateTime(val) : '';
           var ago = val ? Lex.Utils.timeAgo(val) : '';
           return '<time class="matters-list-muted" datetime="' + escapeHtml(val) + '" title="' + escapeHtml(full) + '">' + escapeHtml(ago && ago !== '-' ? ago : '—') + '</time>';
+        },
+        // Edit / Archive / Delete, the same menu as the cards.
+        actions: function (val, row) {
+          return matterOptionsMenuHtml(row._raw || row);
         }
       };
     }
@@ -352,6 +321,7 @@
       var ranges = window.LanaLibraryColumnFilters;
       var map = {
         name: { text: true, placeholder: 'Name contains...' },
+        client_name: { text: true, placeholder: 'Client contains...' },
         matter_id: { text: true, placeholder: 'Matter ID contains...' }
       };
       if (params) {
@@ -385,7 +355,14 @@
 
     // Switch between grid and list view modes
     function switchView(mode) {
-      viewMode = mode;
+      viewMode = mode === 'grid' ? 'grid' : 'list';
+      try { window.localStorage.setItem(VIEW_STORAGE_KEY, viewMode); } catch (e) { /* ignore */ }
+
+      // Selections made in one view don't carry into the other.
+      selectedMatters.clear();
+      updateSelectionUI();
+      var table = mattersTable();
+      if (table && typeof table.deselectAll === 'function') table.deselectAll();
 
       var gridBtn = document.getElementById('gridViewBtn');
       var listBtn = document.getElementById('listViewBtn');
@@ -411,6 +388,14 @@
 
       // Hide pinned section in grid view (pinned is list-only)
       var pinnedSection = document.getElementById('listPinnedSection');
+
+      // The list view selects through the table's own checkboxes.
+      var gridControls = document.getElementById('gridSelectionControls');
+      if (gridControls) gridControls.classList.toggle('hidden', viewMode !== 'grid');
+
+      // One "All Workspaces" header per view: the grid draws its own.
+      var listHeader = document.getElementById('mattersListHeader');
+      if (listHeader) listHeader.classList.toggle('hidden', viewMode === 'grid');
 
       if (viewMode === 'grid') {
         gridEl.classList.remove('hidden');
@@ -518,9 +503,7 @@
             var content = escapeHtml(evt.content || '');
             if (content.length > 80) content = content.substring(0, 80) + '...';
             var ago = formatTimeAgoLocal(evt.created_at);
-            var matterId = escapeHtml(evt.matter_id || '');
-
-            html += '<div class="flex items-start gap-3 py-3 px-1 hover:bg-gray-50 rounded cursor-pointer" onclick="viewMatter(\'' + matterId + '\')">';
+            html += '<div class="flex items-start gap-3 py-3 px-1 hover:bg-gray-50 rounded cursor-pointer" onclick="viewMatter(' + jsArg(evt.matter_id || '') + ')">';
             html += '  <div class="flex-shrink-0 w-8 h-8 rounded-full lex-bg-accent-muted flex items-center justify-center">';
             html += '    <span class="lex-text-accent text-xs font-semibold">' + actorName.charAt(0) + '</span>';
             html += '  </div>';
@@ -623,8 +606,10 @@
         var includeAll = isOrgAdmin();
         var params = queryParams.mattersParams(query, { search: searchTerm, includeAll: includeAll });
         var typeValue = queryParams.filterValues(filters.matter_type)[0] || '';
-        var pinnedFilters = { search: searchTerm, include_all: includeAll };
-        if (statusValue !== 'all') pinnedFilters.status = statusValue;
+        var sharedOnly = statusValue === queryParams.MATTER_SHARED_FILTER;
+        var pinnedFilters = { search: searchTerm, include_all: includeAll && !sharedOnly };
+        if (sharedOnly) pinnedFilters.shared_only = true;
+        else if (statusValue !== 'all') pinnedFilters.status = statusValue;
         if (statusValue === 'archived') pinnedFilters.include_archived = true;
         if (typeValue) pinnedFilters.matter_type = typeValue;
 
@@ -889,6 +874,26 @@
       return button && button.dataset.order === 'asc' ? 'asc' : 'desc';
     }
 
+    // Set the toolbar and the table's query from a link, without fetching.
+    function applyLinkState(params) {
+      var helpers = window.LanaListQueryParams;
+      var table = mattersTable();
+      if (!helpers || !table || typeof table.restoreQuery !== 'function') return;
+      var state = helpers.mattersLinkState(params);
+      if (!state.status && !state.sortBy && !state.sortDir) return;
+      var sortBy = state.sortBy || table.sortBy || 'created_at';
+      var sortDir = state.sortDir || table.sortDir || 'desc';
+      table.restoreQuery({
+        sortBy: sortBy,
+        sortDir: sortDir,
+        filters: state.status && state.status !== 'all' ? { status: { operator: 'in', value: [state.status] } } : {},
+        limit: Number(table.limit) || 20
+      });
+      var statusSelect = document.getElementById('statusFilter');
+      if (statusSelect && state.status) statusSelect.value = state.status;
+      syncToolbarSort(sortBy, sortDir);
+    }
+
     // Toolbar sort drives the table, which asks the server for page 1.
     function applySort(column, direction) {
       var table = mattersTable();
@@ -1005,6 +1010,8 @@
     var _listViewBtn = document.getElementById('listViewBtn');
     if (_gridViewBtn) _gridViewBtn.addEventListener('click', function () { switchView('grid'); });
     if (_listViewBtn) _listViewBtn.addEventListener('click', function () { switchView('list'); });
+    if (_gridViewBtn) _gridViewBtn.variant = viewMode === 'grid' ? 'primary' : 'ghost';
+    if (_listViewBtn) _listViewBtn.variant = viewMode === 'list' ? 'primary' : 'ghost';
 
     var _mattersTable = mattersTable();
     if (_mattersTable) {
@@ -1051,19 +1058,8 @@
       _mattersTable.addEventListener('bulk-action', function (e) {
         var action = e.detail && e.detail.action;
         if (action === 'delete' && e.detail.items) {
-          var ids = e.detail.items.map(function (m) { return m.matter_id; });
-          if (ids.length === 0) return;
-          Lex.Modal.confirmAsync('Delete Matters', 'Delete ' + ids.length + ' matter(s)? This cannot be undone.', {
-            confirmText: 'Delete',
-            variant: 'danger'
-          }).then(function (confirmed) {
-            if (!confirmed) return;
-            Promise.all(ids.map(function (id) { return api.deleteMatter(id); })).then(function () {
-              Lex.Toast.success(ids.length + ' matter(s) deleted');
-              _mattersTable.deselectAll();
-              loadMatters();
-            });
-          });
+          var ids = e.detail.items.map(function (m) { return m.matter_id; }).filter(Boolean);
+          confirmBulkDeleteMatters(ids, function () { _mattersTable.deselectAll(); });
         }
       });
     }
@@ -1189,13 +1185,13 @@
         if (userSearchResults) userSearchResults.innerHTML = '<div class="p-3 text-sm text-gray-500">No users found</div>';
       } else {
         if (userSearchResults) userSearchResults.innerHTML = filtered.map(u => `
-          <div class="p-2 hover:bg-gray-50 cursor-pointer flex items-center gap-2" onclick="addUserToShare('${u.id}')">
+          <div class="p-2 hover:bg-gray-50 cursor-pointer flex items-center gap-2" onclick="addUserToShare(${jsArg(u.id)})">
             <div class="w-8 h-8 lex-bg-accent-soft rounded-full flex items-center justify-center flex-shrink-0">
-              <span class="text-xs font-medium lex-text-accent">${(u.first_name?.[0] || '') + (u.last_name?.[0] || '') || u.email?.[0]?.toUpperCase() || 'U'}</span>
+              <span class="text-xs font-medium lex-text-accent">${escapeHtml((u.first_name?.[0] || '') + (u.last_name?.[0] || '') || u.email?.[0]?.toUpperCase() || 'U')}</span>
             </div>
             <div class="flex-1 min-w-0">
-              <p class="text-sm font-medium text-gray-900 truncate">${u.first_name || ''} ${u.last_name || ''}</p>
-              <p class="text-xs text-gray-500 truncate">${u.email}</p>
+              <p class="text-sm font-medium text-gray-900 truncate">${escapeHtml(u.first_name || '')} ${escapeHtml(u.last_name || '')}</p>
+              <p class="text-xs text-gray-500 truncate">${escapeHtml(u.email)}</p>
             </div>
           </div>
         `).join('');
@@ -1268,14 +1264,14 @@
         <div class="flex items-center justify-between bg-gray-50 rounded-lg p-2">
           <div class="flex items-center gap-2">
             <div class="w-8 h-8 lex-bg-accent-soft rounded-full flex items-center justify-center flex-shrink-0">
-              <span class="text-xs font-medium lex-text-accent">${(u.first_name?.[0] || '') + (u.last_name?.[0] || '') || u.email?.[0]?.toUpperCase() || 'U'}</span>
+              <span class="text-xs font-medium lex-text-accent">${escapeHtml((u.first_name?.[0] || '') + (u.last_name?.[0] || '') || u.email?.[0]?.toUpperCase() || 'U')}</span>
             </div>
             <div>
-              <p class="text-sm font-medium text-gray-900">${u.first_name || ''} ${u.last_name || ''}</p>
-              <p class="text-xs text-gray-500">${u.email}</p>
+              <p class="text-sm font-medium text-gray-900">${escapeHtml(u.first_name || '')} ${escapeHtml(u.last_name || '')}</p>
+              <p class="text-xs text-gray-500">${escapeHtml(u.email)}</p>
             </div>
           </div>
-          <button type="button" onclick="removeUserFromShare('${u.id}')" class="text-gray-400 hover:text-red-600 p-1">
+          <button type="button" onclick="removeUserFromShare(${jsArg(u.id)})" class="text-gray-400 hover:text-red-600 p-1">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
           </button>
         </div>
@@ -1338,120 +1334,6 @@
         conflictDetection.reset();
       }
     });
-
-    // Create conversation for a matter and navigate to chat
-    function getConversationIdFromCreateResponse(response) {
-      const seen = [];
-
-      function fromObject(obj) {
-        if (!obj || typeof obj !== 'object' || seen.indexOf(obj) !== -1) return '';
-        seen.push(obj);
-
-        const directId = obj.conversation_id || obj.conversationId || obj.thread_id || obj.threadId;
-        if (directId) return directId;
-
-        const nestedId = fromObject(obj.conversation) || fromObject(obj.session) || fromObject(obj.data);
-        if (nestedId) return nestedId;
-
-        return obj.id || '';
-      }
-
-      return fromObject(response);
-    }
-
-    window.createMatterConversation = async function(matterId, matterName) {
-      console.log('[matters.html.createMatterConversation] Creating conversation for matter:', { matterId, matterName });
-
-      // Find the button that triggered this action
-      const buttons = document.querySelectorAll(`button[onclick*="createMatterConversation('${matterId}'"]`);
-
-      // Disable all matching buttons and show loading state
-      buttons.forEach(button => {
-        button.disabled = true;
-        button.classList.add('opacity-50', 'cursor-not-allowed');
-
-        // Store original HTML
-        if (!button.dataset.originalHtml) {
-          button.dataset.originalHtml = button.innerHTML;
-        }
-
-        // Replace with loading spinner
-        button.innerHTML = `
-          <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          <span>Creating...</span>
-        `;
-      });
-
-      try {
-        console.log('[matters.html.createMatterConversation] Calling API to create conversation...');
-
-        const response = await api.createConversation({
-          matter_id: matterId,
-          title: matterName || matterId,
-          thread_type: 'ad_hoc',
-          context_type: 'full_chat',
-          page_scope: 'matter',
-          metadata: {
-            matter_name: matterName,
-            matter_id: matterId
-          },
-          context: {
-            matter_name: matterName,
-            matter_id: matterId
-          }
-        });
-
-        console.log('[matters.html.createMatterConversation] API response:', response);
-
-        const threadId = getConversationIdFromCreateResponse(response);
-
-        if (!threadId) {
-          throw new Error('No thread ID returned from API');
-        }
-
-        console.log('[matters.html.createMatterConversation] ✅ Conversation created successfully!', {
-          threadId,
-          matterId,
-          matterName
-        });
-
-        console.log('[matters.html.createMatterConversation] ========================================');
-        console.log('[matters.html.createMatterConversation] READY TO NAVIGATE');
-        console.log('[matters.html.createMatterConversation] ========================================');
-        console.log('[matters.html.createMatterConversation] Thread ID:', threadId);
-        console.log('[matters.html.createMatterConversation] Matter ID:', matterId);
-        console.log('[matters.html.createMatterConversation] Matter Name:', matterName);
-        console.log('[matters.html.createMatterConversation] Current window.location.href:', window.location.href);
-        console.log('[matters.html.createMatterConversation] ========================================');
-        console.log('[matters.html.createMatterConversation] WILL OPEN LANA DOCK');
-        console.log('[matters.html.createMatterConversation] ========================================');
-
-        console.log('[matters.html.createMatterConversation] Opening conversation in LANA dock');
-        NavigationHelpers.navigateToConversation(threadId, matterId);
-
-      } catch (error) {
-        console.error('[matters.html.createMatterConversation] Failed to create conversation:', error);
-
-        // Restore buttons on error
-        buttons.forEach(button => {
-          button.disabled = false;
-          button.classList.remove('opacity-50', 'cursor-not-allowed');
-          if (button.dataset.originalHtml) {
-            button.innerHTML = button.dataset.originalHtml;
-          }
-        });
-
-        // Show user-friendly error message
-        if (error.response?.data?.error?.code === 'MATTER_NOT_FOUND') {
-          Lex.Toast.error(`Matter not found. Please refresh the page and try again.`);
-        } else {
-          Lex.Toast.error(`Failed to create conversation: ${error.message || 'Unknown error'}`);
-        }
-      }
-    };
 
     // Edit matter
     window.editMatter = async function(matterId) {
@@ -1726,7 +1608,6 @@
           }
 
           Lex.Toast.success('Matter deleted');
-          closeDrawer();
           loadMatters();
         } catch (error) {
           if (window.analytics) {
@@ -1861,11 +1742,15 @@
       updateSelectionUI();
     });
 
-    // Bulk delete
+    // Bulk delete: the grid's "Delete Selected" and the list table's bulk action.
     var _bulkDelBtn = document.getElementById('bulkDeleteBtn');
-    if (_bulkDelBtn) _bulkDelBtn.addEventListener('click', async () => {
-      const count = selectedMatters.size;
-      const matterIds = Array.from(selectedMatters);
+    if (_bulkDelBtn) _bulkDelBtn.addEventListener('click', function () {
+      confirmBulkDeleteMatters(Array.from(selectedMatters));
+    });
+
+    function confirmBulkDeleteMatters(matterIds, afterDelete) {
+      const count = matterIds.length;
+      if (count === 0) return;
 
       Modal.confirm(
         'Delete Multiple Matters',
@@ -1894,7 +1779,7 @@
             // Clear selection and reload
             selectedMatters.clear();
             updateSelectionUI();
-            closeDrawer();
+            if (typeof afterDelete === 'function') afterDelete();
             loadMatters();
           } catch (error) {
             if (window.analytics) {
@@ -1908,7 +1793,7 @@
           }
         }
       );
-    });
+    }
 
 
     // Form submission
@@ -2062,13 +1947,8 @@
           // Get selected workspace from dropdown
           const selectedWorkspaceId = document.getElementById('workspaceSelector')?.value;
 
-          // Auto-link to workspace if selected from dropdown OR if created from workspace modal.
-          // createMatterForWorkspaceId is declared (with `let`) in matters.html only; on the
-          // Workspaces page this code runs without that scope, so guard with typeof to avoid
-          // a ReferenceError on the standalone-matter path (where selectedWorkspaceId is empty
-          // and the || falls through to the right side).
-          const fallbackWorkspaceId = (typeof createMatterForWorkspaceId !== 'undefined') ? createMatterForWorkspaceId : null;
-          const workspaceToLinkTo = selectedWorkspaceId || fallbackWorkspaceId;
+          // Auto-link to the workspace picked in the dropdown.
+          const workspaceToLinkTo = selectedWorkspaceId;
 
           if (workspaceToLinkTo && result.matter?.matter_id) {
             try {
@@ -2096,11 +1976,6 @@
             } catch (error) {
               console.error('[Matter Creation] Error auto-linking to workspace:', error);
               Lex.Toast.error('Failed to link to workspace');
-            } finally {
-              // Clear the workspace ID — only if the matters.html scope owns it.
-              if (typeof createMatterForWorkspaceId !== 'undefined') {
-                createMatterForWorkspaceId = null;
-              }
             }
           }
         }
@@ -2206,10 +2081,10 @@
         resultsDiv.innerHTML = '<p class="p-3 text-sm text-gray-500">No users found</p>';
       } else {
         resultsDiv.innerHTML = filtered.map(u => `
-          <button type="button" onclick="addWorkspaceUserToShare('${u.id}')"
+          <button type="button" onclick="addWorkspaceUserToShare(${jsArg(u.id)})"
             class="w-full text-left px-3 py-2 hover:bg-gray-50 transition-colors">
-            <div class="font-medium text-sm">${u.first_name} ${u.last_name}</div>
-            <div class="text-xs text-gray-500">${u.email}</div>
+            <div class="font-medium text-sm">${escapeHtml(u.first_name || '')} ${escapeHtml(u.last_name || '')}</div>
+            <div class="text-xs text-gray-500">${escapeHtml(u.email)}</div>
           </button>
         `).join('');
       }
@@ -2245,10 +2120,10 @@
         container.innerHTML = workspaceSelectedUsers.map(u => `
           <div class="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
             <div class="flex-1 min-w-0">
-              <div class="font-medium text-sm">${u.first_name} ${u.last_name}</div>
-              <div class="text-xs text-gray-500 truncate">${u.email}</div>
+              <div class="font-medium text-sm">${escapeHtml(u.first_name || '')} ${escapeHtml(u.last_name || '')}</div>
+              <div class="text-xs text-gray-500 truncate">${escapeHtml(u.email)}</div>
             </div>
-            <button type="button" onclick="removeWorkspaceUserFromShare('${u.id}')"
+            <button type="button" onclick="removeWorkspaceUserFromShare(${jsArg(u.id)})"
               class="ml-2 text-red-600 hover:text-red-800 p-1">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -2372,6 +2247,11 @@
           loadMatters();
         });
 
+        // A link may ask for a status and a sort (?status=, ?sort_by=,
+        // ?sort_order=, also carried over from links to the old Matters page).
+        // Only values the toolbar offers are used; the first load asks for them.
+        applyLinkState(new URLSearchParams(window.location.search));
+
         // Summary metrics are intentionally hidden for now.
         await loadMatters();
 
@@ -2477,195 +2357,6 @@
 
     // Conversation actions are handled by the global ConversationActionsModal
     // from components.js — no page-specific overrides needed.
-
-    // Global refresh page function (accessible from inline onclick handlers)
-    function refreshPage() {
-      console.log('[Matters] Refreshing page...');
-      window.location.reload();
-    }
-
-
-  // ── Manual Connect + Custom Fields (from second script block) ──
-
-    // Manual Connect Modal State
-    let currentManualConnectMatter = null;
-    let manualConnectSearchTimeout = null;
-
-    // Show manual connect modal
-    function showManualConnectModal(matterId) {
-      currentManualConnectMatter = matterId;
-      const modal = document.getElementById('manualConnectModal');
-      modal.open = true;
-
-      // Load available connectors for filter
-      loadAvailableConnectors();
-
-      // Set up search handlers
-      const searchInput = document.getElementById('manualConnectSearch');
-      const entityTypeSelect = document.getElementById('manualConnectEntityType');
-      const connectorSelect = document.getElementById('manualConnectConnector');
-
-      searchInput.addEventListener('lex-input', () => {
-        clearTimeout(manualConnectSearchTimeout);
-        manualConnectSearchTimeout = setTimeout(() => performManualConnectSearch(), 300);
-      });
-
-      entityTypeSelect.addEventListener('lex-change', performManualConnectSearch);
-      connectorSelect.addEventListener('lex-change', performManualConnectSearch);
-
-      // Clear previous search
-      searchInput.value = '';
-      entityTypeSelect.value = '';
-      connectorSelect.value = '';
-    }
-
-    // Close manual connect modal
-    function closeManualConnectModal() {
-      const modal = document.getElementById('manualConnectModal');
-      modal.open = false;
-      
-      currentManualConnectMatter = null;
-    }
-
-    // Load available connectors (lex-select uses options array)
-    async function loadAvailableConnectors() {
-      try {
-        const response = await api.get('/api/v1/connectors/integration-sources?status=active');
-        const connectors = response.sources || [];
-
-        const select = document.getElementById('manualConnectConnector');
-        const optionsList = [{ value: '', label: 'All Connectors' }];
-        connectors.forEach(conn => {
-          optionsList.push({ value: conn.connector_id, label: conn.connector_name || conn.connector_id });
-        });
-        select.options = optionsList;
-      } catch (error) {
-        console.error('[loadAvailableConnectors] Error:', error);
-      }
-    }
-
-    // Perform search
-    async function performManualConnectSearch() {
-      const searchInput = document.getElementById('manualConnectSearch');
-      const entityTypeSelect = document.getElementById('manualConnectEntityType');
-      const connectorSelect = document.getElementById('manualConnectConnector');
-      const resultsDiv = document.getElementById('manualConnectResults');
-
-      const search = searchInput.value.trim();
-      const entityType = entityTypeSelect.value;
-      const connectorId = connectorSelect.value;
-
-      // Show loading
-      resultsDiv.innerHTML = `
-        <div class="text-center py-8">
-          <div class="animate-spin w-8 h-8 border-4 lex-border border-t-stone-600 rounded-full mx-auto mb-4"></div>
-          <p class="text-gray-500">Searching...</p>
-        </div>
-      `;
-
-      try {
-        const response = await api.searchConnectorDataForLinking(currentManualConnectMatter, {
-          search,
-          entity_type: entityType,
-          connector_id: connectorId,
-          limit: 20
-        });
-
-        const results = response.results || [];
-
-        if (results.length === 0) {
-          resultsDiv.innerHTML = `
-            <div class="text-center py-8 text-gray-500">
-              <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M12 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-              <p class="mt-2">No results found</p>
-            </div>
-          `;
-          return;
-        }
-
-        // Render results
-        resultsDiv.innerHTML = `
-          <div class="space-y-2">
-            ${results.map(item => renderSearchResultCard(item)).join('')}
-          </div>
-        `;
-
-      } catch (error) {
-        console.error('[performManualConnectSearch] Error:', error);
-        resultsDiv.innerHTML = `
-          <div class="text-center py-8 text-red-600">
-            <svg class="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-            <p class="mt-2">Error loading results</p>
-            <p class="text-sm text-gray-500">${error.message}</p>
-          </div>
-        `;
-      }
-    }
-
-    // Render search result card
-    function renderSearchResultCard(item) {
-      const data = item.data || {};
-      const title = data.name || data.title || item.external_id;
-      const subtitle = data.description || data.status || item.entity_type;
-
-      return `
-        <div class="border border-gray-200 rounded-lg p-4 hover:lex-border-accent hover:bg-gray-50 transition-colors">
-          <div class="flex items-start justify-between">
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2 mb-1">
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                  ${item.entity_type.replace('_', ' ')}
-                </span>
-                ${item.connector_name ? `
-                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                    ${item.connector_name}
-                  </span>
-                ` : ''}
-              </div>
-              <h4 class="text-sm font-medium text-gray-900 truncate">${escapeHtml(title)}</h4>
-              <p class="text-xs text-gray-500 mt-1">${escapeHtml(subtitle)}</p>
-              <p class="text-xs text-gray-400 mt-1">ID: ${escapeHtml(item.external_id)}</p>
-            </div>
-            <button onclick="linkConnectorData('${item.id}')" class="ml-4 flex-shrink-0 inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white lex-bg-accent hover:lex-bg-accent focus:outline-none focus:ring-2 focus:ring-offset-2 lex-ring-focus">
-              <svg class="-ml-0.5 mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
-              </svg>
-              Link
-            </button>
-          </div>
-        </div>
-      `;
-    }
-
-    // Link connector data
-    async function linkConnectorData(connectorDataId) {
-      try {
-        await api.linkConnectorDataToMatter(currentManualConnectMatter, connectorDataId);
-
-        Lex.Toast.success('Data linked successfully!');
-        closeManualConnectModal();
-
-        // Reload the connected data tab
-        const matter = window.currentViewedMatter;
-        if (matter) {
-          await renderConnectedDataTab(matter);
-        }
-      } catch (error) {
-        console.error('[linkConnectorData] Error:', error);
-        Lex.Toast.error(error.message || 'Failed to link data');
-      }
-    }
-
-    // Helper: Escape HTML
-
-  // ── Expose second-block functions for onclick handlers ──────────────
-  window.showManualConnectModal = showManualConnectModal;
-  window.closeManualConnectModal = closeManualConnectModal;
-  ['showManualConnectModal','closeManualConnectModal'].forEach(_trackGlobal);
 
   // ── Lifecycle hooks ─────────────────────────────────────────────────
 

@@ -12,7 +12,7 @@ const NavigationHelpers = {
   /**
    * Resolve path to a target file from current location.
    * Handles file:// protocol depth calculation.
-   * @param {string} targetPath - Target file path (e.g., 'dashboard.html', 'matters.html')
+   * @param {string} targetPath - Target file path (e.g., 'dashboard.html', 'workspaces.html')
    * @returns {string} Resolved relative path
    */
   resolvePath(targetPath) {

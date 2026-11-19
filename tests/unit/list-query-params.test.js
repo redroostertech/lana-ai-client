@@ -69,6 +69,23 @@ describe('Workspaces query -> GET /api/v1/matters', () => {
     expect(params.get('include_archived')).toBe('true');
   });
 
+  test('the Client column filter maps to client_name', () => {
+    const params = builders.mattersParams({ filters: { client_name: { operator: 'contains', value: ' Acme ' } } });
+    expect(params.get('client_name')).toBe('Acme');
+  });
+
+  test('"Shared with me" becomes shared_only and never widens to the organization', () => {
+    const params = builders.mattersParams(
+      { filters: { status: { operator: 'in', value: [builders.MATTER_SHARED_FILTER] } } },
+      { includeAll: true }
+    );
+    expect(builders.MATTER_SHARED_FILTER).toBe('shared');
+    expect(params.get('shared_only')).toBe('true');
+    expect(params.get('include_all')).toBe('false');
+    expect(params.has('status')).toBe(false);
+    expect(params.has('include_archived')).toBe(false);
+  });
+
   test('page size is capped at the API maximum we allow', () => {
     expect(builders.mattersParams({ limit: 5000 }).get('page_size')).toBe('100');
   });
@@ -175,8 +192,8 @@ describe('page wiring follows the table standard', () => {
     expect(table).toContain('server-paging');
     expect(table).toContain('column-filters');
     expect(table).toContain('lex-table--card');
-    expect(table).toContain('columns="name,matter_id,status,matter_type,created_at,updated_at"');
-    expect(table).toContain('labels="Name,Matter ID,Status,Type,Created,Last edited"');
+    expect(table).toContain('columns="name,client_name,matter_id,status,matter_type,created_at,updated_at,actions"');
+    expect(table).toContain('labels="Name,Client,Matter ID,Status,Type,Created,Last edited,Actions"');
     expect(table).toContain('limit="20"');
     expect(table).not.toMatch(/\b(compact|searchable|filterable)\b/);
     expect(html).not.toContain('<lex-pagination id="pagination"');
@@ -186,6 +203,80 @@ describe('page wiring follows the table standard', () => {
     expect(js).toContain("queryParams.mattersParams(query");
     expect(js).toContain('table.setServerData(unpinnedMatters.map(mapMatterForTable), lastPagination)');
     expect(js).not.toContain('listEl.setData(');
+  });
+
+  test('Workspaces carries the old Matters page features: Client, row menu, Shared with me, grid bulk delete', () => {
+    const html = read('workspaces.html');
+    const js = read(path.join('js', 'workspace.js'));
+    expect(html).toContain('{"value":"shared","label":"Shared with me"}');
+    expect(js).toContain("client_name: { text: true, placeholder: 'Client contains...' }");
+    expect(js).toContain('return matterOptionsMenuHtml(row._raw || row);');
+    // Grid view: Select all and Delete Selected (the list view selects through the table).
+    expect(html).toMatch(/<div id="gridSelectionControls"[^>]*>\s*<lex-checkbox id="selectAllMatters"/);
+    expect(html).toContain('<lex-btn id="bulkDeleteBtn" variant="danger"');
+    expect(js).toContain("gridControls.classList.toggle('hidden', viewMode !== 'grid')");
+    // One bulk delete for both views, through the bulk API.
+    expect(js).toContain('confirmBulkDeleteMatters(Array.from(selectedMatters));');
+    expect(js).toContain('confirmBulkDeleteMatters(ids, function () { _mattersTable.deselectAll(); });');
+    expect(js).toContain('await api.bulkDeleteMatters(matterIds);');
+    // There is no drawer on this page.
+    expect(js).not.toMatch(/\bcloseDrawer\(/);
+    // The chosen view is remembered per viewer.
+    expect(js).toContain("const VIEW_STORAGE_KEY = 'lana.matters.viewMode';");
+  });
+
+  test('Workspaces: one All Workspaces header per view, dates fit their columns', () => {
+    const html = read('workspaces.html');
+    const js = read(path.join('js', 'workspace.js'));
+    // The list header hides in grid view, which draws its own section headers.
+    expect(html).toMatch(/<div id="mattersListHeader"[^>]*>\s*<h2[^>]*>All Workspaces<\/h2>/);
+    expect(js).toContain("listHeader.classList.toggle('hidden', viewMode === 'grid')");
+    // Created shows the date; the full date and time is the tooltip.
+    expect(js).toContain("var day = val ? Lex.Utils.formatDate(val) : '';");
+  });
+
+  test('Workspaces: dead code from the old Matters page is gone', () => {
+    const js = read(path.join('js', 'workspace.js'));
+    ['renderMatterListRow', 'createMatterConversation', 'getConversationIdFromCreateResponse',
+      'showManualConnectModal', 'closeManualConnectModal', 'performManualConnectSearch',
+      'loadAvailableConnectors', 'renderSearchResultCard', 'linkConnectorData', 'refreshPage'].forEach((name) => {
+      expect({ name, found: js.includes(name) }).toEqual({ name, found: false });
+    });
+  });
+
+  describe('LANA One hides the Client column with the Client Name field', () => {
+    const { JSDOM } = require('jsdom');
+    const html = read('workspaces.html');
+    const script = html.slice(html.lastIndexOf('<script>') + '<script>'.length, html.lastIndexOf('</script>'));
+
+    async function run(config) {
+      const dom = new JSDOM(html.replace(/<script[\s\S]*?<\/script>/g, ''), { runScripts: 'outside-only' });
+      const { window } = dom;
+      // The page content sits in a <template>; the edition check runs after it is in the DOM.
+      const tpl = window.document.getElementById('page-content');
+      window.document.body.appendChild(tpl.content.cloneNode(true));
+      window.electronAPI = { getConfig: () => config };
+      window.eval(script);
+      await new Promise((r) => setTimeout(r, 0));
+      return window.document;
+    }
+
+    test('the same isLanaOne check that hides Client Name drops the column', async () => {
+      expect(script).toContain('if (!cfg || cfg.isLanaOne !== true) return;');
+      const doc = await run({ isLanaOne: true });
+      expect(doc.getElementById('clientName').style.display).toBe('none');
+      const table = doc.getElementById('mattersListView');
+      expect(table.getAttribute('columns')).toBe('name,matter_id,status,matter_type,created_at,updated_at,actions');
+      expect(table.getAttribute('labels')).toBe('Name,Matter ID,Status,Type,Created,Last edited,Actions');
+      expect(table.classList.contains('matters-list-table--no-client')).toBe(true);
+    });
+
+    test('the team edition keeps it', async () => {
+      const doc = await run({ isLanaOne: false });
+      const table = doc.getElementById('mattersListView');
+      expect(table.getAttribute('columns')).toContain('client_name');
+      expect(table.classList.contains('matters-list-table--no-client')).toBe(false);
+    });
   });
 
   test('My Tasks: server-paged, Task filters by text, no fetch cap', () => {

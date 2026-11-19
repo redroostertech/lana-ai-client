@@ -356,7 +356,7 @@
    */
   function wireWorkspacesHero() {
     var openBtn = el('ccOpenWorkspacesBtn');
-    if (openBtn) openBtn.addEventListener('click', function () { Lex.Nav.go('matters.html'); });
+    if (openBtn) openBtn.addEventListener('click', function () { Lex.Nav.go('workspaces.html'); });
     var tourBtn = el('ccTourBtn');
     if (tourBtn) tourBtn.addEventListener('click', function () {
       if (window.LanaAppWalkthrough) window.LanaAppWalkthrough.show('workspaces');
@@ -364,7 +364,7 @@
     var loop = el('ccLoop');
     if (loop) loop.addEventListener('lex-app-loop-select', function (event) {
       var step = event.detail && event.detail.value;
-      if (step === 'open') Lex.Nav.go('matters.html');
+      if (step === 'open') Lex.Nav.go('workspaces.html');
       else if (step === 'tasks') Lex.Nav.go('my-tasks.html');
       else if (step === 'ask') {
         var dock = document.querySelector('lex-lana-dock');
@@ -375,7 +375,7 @@
       window.LanaAppWalkthrough.register('workspaces', {
         brand: 'WORKSPACES.',
         pages: window.WorkspacesWalkthrough.pages,
-        onAction: function (action) { if (action === 'open') Lex.Nav.go('matters.html'); }
+        onAction: function (action) { if (action === 'open') Lex.Nav.go('workspaces.html'); }
       });
       window.LanaAppWalkthrough.showFirstRun('workspaces');
     }

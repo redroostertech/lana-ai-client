@@ -17,7 +17,7 @@ describe('NavigationHelpers dock-first chat routing', () => {
     jest.resetModules();
     global.window = {
       location: {
-        pathname: '/src/matters.html',
+        pathname: '/src/workspaces.html',
         search: '',
         href: ''
       },

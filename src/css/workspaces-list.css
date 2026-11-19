@@ -1,7 +1,10 @@
 /* Workspaces list (lex-table #mattersListView): docs/TABLE-STANDARD.md.
-   Columns: [select], Name, Matter ID, Status, Type, Created, Last edited.
-   The name column takes the remaining width; short and date columns get
-   fixed widths so a full "10/20/2026 11:40 PM" never truncates. */
+   Columns: [select], Name, Client, Matter ID, Status, Type, Created,
+   Last edited, Actions.
+   Name takes the remaining width. The short columns get fixed widths and
+   keep their text on one line (an over-long Matter ID ends in an
+   ellipsis); headers may wrap so their filter icons never push a column
+   wider. Everything fits from 1280px up without sideways scroll. */
 .matters-list-table table {
   table-layout: fixed;
 }
@@ -10,19 +13,43 @@
   overflow: hidden;
 }
 
-#mattersListView th {
+#mattersListView th,
+#mattersListView td {
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+#mattersListView td {
   white-space: nowrap;
 }
 
-/* Below this width the table scrolls sideways instead of squeezing names. */
-#mattersListView table { min-width: 980px; }
+/* The name and client cells wrap at word breaks. */
+#mattersListView td:nth-child(2),
+#mattersListView td:nth-child(3) {
+  white-space: normal;
+}
 
-#mattersListView th:nth-child(1) { width: 44px; }
-#mattersListView th:nth-child(3) { width: 150px; }
-#mattersListView th:nth-child(4) { width: 120px; }
-#mattersListView th:nth-child(5) { width: 136px; }
-#mattersListView th:nth-child(6) { width: 176px; }
-#mattersListView th:nth-child(7) { width: 150px; }
+/* Below this width the table scrolls sideways instead of squeezing names. */
+#mattersListView table { min-width: 860px; }
+
+#mattersListView th:nth-child(1) { width: 40px; }  /* row select */
+#mattersListView th:nth-child(3) { width: 12%; }   /* Client */
+#mattersListView th:nth-child(4) { width: 92px; }  /* Matter ID */
+#mattersListView th:nth-child(5) { width: 88px; }  /* Status */
+#mattersListView th:nth-child(6) { width: 104px; } /* Type */
+#mattersListView th:nth-child(7) { width: 100px; } /* Created */
+#mattersListView th:nth-child(8) { width: 100px; } /* Last edited */
+#mattersListView th:nth-child(9) { width: 76px; }  /* Actions */
+
+/* LANA One hides the Client column (see workspaces.html), so the later
+   columns move one place left. */
+#mattersListView.matters-list-table--no-client th:nth-child(3) { width: 92px; }  /* Matter ID */
+#mattersListView.matters-list-table--no-client th:nth-child(4) { width: 88px; }  /* Status */
+#mattersListView.matters-list-table--no-client th:nth-child(5) { width: 128px; } /* Type: LANA One words it "Client workspace" */
+#mattersListView.matters-list-table--no-client th:nth-child(6) { width: 100px; } /* Created */
+#mattersListView.matters-list-table--no-client th:nth-child(7) { width: 100px; } /* Last edited */
+#mattersListView.matters-list-table--no-client th:nth-child(8) { width: 76px; }  /* Actions */
+#mattersListView.matters-list-table--no-client td:nth-child(3) { white-space: nowrap; }
 
 .matters-list-name-cell {
   align-items: flex-start;
@@ -59,5 +86,40 @@
 
 .matters-list-muted {
   color: var(--lex-text-secondary);
+  white-space: nowrap;
+}
+
+.matters-list-client {
+  color: var(--lex-text-primary);
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Grid view selection: Select all, then the count and bulk actions. */
+.matters-grid-selection {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+  min-height: 32px;
+}
+
+.matters-grid-selection.hidden,
+.matters-grid-selection__bulk.hidden {
+  display: none;
+}
+
+.matters-grid-selection__bulk {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.matters-grid-selection__count {
+  color: var(--lex-text-secondary);
+  font-size: 0.875rem;
+  font-weight: var(--lex-weight-medium, 500);
   white-space: nowrap;
 }

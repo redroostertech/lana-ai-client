@@ -577,5 +577,5 @@ class ConflictDetection {
   }
 }
 
-// Export for use in matters.html
+// Export for the create-matter modals (workspaces.html, workspace-details.html)
 window.ConflictDetection = ConflictDetection;

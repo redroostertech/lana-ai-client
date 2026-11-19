@@ -412,9 +412,6 @@ describe('menus inside clipping containers use floating', () => {
     expect(dash).toMatch(/cc-task-status-pill[\s\S]{0,300}variant="ghost" align="end" floating/);
     expect(dash).toContain('data-task-actions-menu button-label="Actions" align="end" floating');
     expect(src('js/pages/my-tasks.js')).toContain('data-task-actions-menu button-label="Actions" align="end" floating');
-    const matters = src('matters.html');
-    expect(matters).toMatch(/id="drawerOptionsMenu"[^>]*floating/);
-    expect(matters).toMatch(/class="matter-card-options"[\s\S]{0,300}floating onclick/);
   });
 
   test('the drive.css clipping workaround is gone', () => {

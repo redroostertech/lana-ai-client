@@ -39,7 +39,7 @@ Allowed actions are:
 - answer, summarize, clarify, or refuse without mutation;
 - insert text, replace an explicit selection, insert a tabular matrix, or copy;
 - open a confirmed HTTPS Google/Bing search results URL;
-- navigate to `chat.html`, `matters.html`, `workspace-details.html`, `integrations/connectors.html`, or `notifications.html`.
+- navigate to `chat.html`, `workspaces.html`, `workspace-details.html`, `integrations/connectors.html`, or `notifications.html` (the retired `matters.html` opens `workspaces.html`, or the matter's `workspace-details.html` when a matter id is given).
 
 Browser and LANA navigation always require the visible Approve action. Multi-cell changes and other risky edits follow the configured confirmation policy. Send, Submit, Delete, Purchase, Publish, arbitrary buttons, arbitrary URLs, scripts, commands, and unrestricted keystrokes are not available to the model.
 

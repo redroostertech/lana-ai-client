@@ -51,7 +51,7 @@ These client routes are supported by the OS protocol handler for this phase:
 
 | Area | Routes |
 | --- | --- |
-| Core | `dashboard.html`, `workspaces.html`, `workspace-details.html`, `workspace-data.html`, `matters.html`, `matters/timeline.html`, `my-tasks.html`, `action-queue.html`, `notifications.html`, `alerts.html`, `approvals.html`, `approval-detail.html`, `search-results.html`, `search-conversations.html`, `settings-v2.html` |
+| Core | `dashboard.html`, `workspaces.html`, `workspace-details.html`, `workspace-data.html`, `matters/timeline.html`, `my-tasks.html`, `action-queue.html`, `notifications.html`, `alerts.html`, `approvals.html`, `approval-detail.html`, `search-results.html`, `search-conversations.html`, `settings-v2.html` |
 | Documents | `file-viewer.html`, `drive.html`, `folder.html`, `doc-studio/index.html`, `deck-studio/index.html`, `document-library-templates.html` |
 | Agents | `agents/index.html` with hashes: `catalog`, `activity`, `create`, `tools/browse`, `agent/<slug>`, `run/<run-id>`, `activity/<id>` |
 | Automations | `automation/index.html` with hashes: `home`, `library`, `builder`, `runs`, `approvals`, `connectors`, `automation/<automation-id>` |
@@ -62,6 +62,8 @@ These client routes are supported by the OS protocol handler for this phase:
 | Help and misc | `article.html`, `help.html`, `faq.html`, `docs/api-documentation.html`, `model-pricing.html`, `recordings.html`, `recording-detail.html`, `brainchild/index.html` |
 
 `admin/dashboard.html` is retired. An old link to it, or a last page saved on it, opens `admin/index.html` (Administration) instead.
+
+`matters.html` is retired; the matters list is `workspaces.html`. An old link to it opens `workspaces.html`, keeping `action`, `status`, `sort_by` and `sort_order`; the page applies `status`, `sort_by` and `sort_order` only when they are values its toolbar offers. A link to one matter (`?matter_id=<id>` or `?open=<id>`, with an optional `tab`) opens that matter at `workspace-details.html?id=<id>`. This holds for `lana-ai://open?route=matters.html`, for in-app links and saved last pages, and for the voice agent's `matters.html` destination.
 
 Authentication and error pages are intentionally not part of the public object-link surface. OAuth and connect links remain separate protocol flows:
 

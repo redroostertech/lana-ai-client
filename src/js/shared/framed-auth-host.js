@@ -1,6 +1,6 @@
 /**
  * Host listener for pages that load app pages in iframes but do not load
- * auth-guard.js (index.html, matters.html, which run their own sign-in
+ * auth-guard.js (index.html, which runs its own sign-in
  * checks). A child frame that cannot reach the login token posts
  * lana-auth-required; this closes its modal and goes to login only when this
  * window has no token either. Load after shared/auth-token-bridge.js.

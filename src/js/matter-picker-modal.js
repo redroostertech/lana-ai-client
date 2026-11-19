@@ -395,8 +395,8 @@ const MatterPickerModal = {
       createBtn.click();
       return;
     }
-    // Otherwise route to the current Workspaces page and let it auto-open the
-    // create modal via ?action=create. (Was matters.html — the legacy page.)
+    // Otherwise route to the Workspaces page and let it auto-open the
+    // create modal via ?action=create.
     window.location.href = NavigationHelpers.resolvePath('workspaces.html') + '?action=create';
   },
 

@@ -163,7 +163,7 @@ const MenuConfig = {
           },
           { id: 'dashboard', label: 'Dashboard', href: '/dashboard.html', icon: 'home' },
           { id: 'lex-ui', label: 'Lex UI', href: '/lex-test.html', icon: 'lex' },
-          { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
+          { id: 'workspaces', label: 'Matters', href: '/workspaces.html', icon: 'matters' },
           { id: 'my-tasks', label: 'My Tasks', href: '/my-tasks.html', icon: 'tasks' },
         ]
       },
@@ -222,7 +222,7 @@ const MenuConfig = {
           { id: 'admin-users', label: 'Users', href: '/admin/users.html', icon: 'users' },
           { id: 'admin-roles', label: 'Roles', href: '/admin/roles.html', icon: 'roles' },
           { id: 'admin-organizations', label: 'Organizations', href: '/admin/organizations.html', icon: 'organizations' },
-          { id: 'admin-matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
+          { id: 'admin-matters', label: 'Matters', href: '/workspaces.html', icon: 'matters' },
           { id: 'admin-task-plans', label: 'Task Plans', href: '/admin/task-plans.html', icon: 'tasks', customVisibility: adminRelease32Enabled },
           { id: 'admin-run-books', label: 'Run Books', href: '/admin/run-books.html', icon: 'document', requiredRoles: ADMIN_ROLES, customVisibility: adminRelease32Enabled },
           {
@@ -281,7 +281,7 @@ const MenuConfig = {
           },
           { id: 'dashboard', label: 'Dashboard', href: '/dashboard.html', icon: 'home' },
           { id: 'lex-ui', label: 'Lex UI', href: '/lex-test.html', icon: 'lex' },
-          { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
+          { id: 'workspaces', label: 'Matters', href: '/workspaces.html', icon: 'matters' },
         ]
       },
       {
@@ -345,7 +345,7 @@ const MenuConfig = {
           },
           { id: 'dashboard', label: 'Dashboard', href: '/dashboard.html', icon: 'home' },
           { id: 'lex-ui', label: 'Lex UI', href: '/lex-test.html', icon: 'lex' },
-          { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
+          { id: 'workspaces', label: 'Matters', href: '/workspaces.html', icon: 'matters' },
         ]
       },
       {
@@ -409,7 +409,7 @@ const MenuConfig = {
           },
           { id: 'dashboard', label: 'Dashboard', href: '/dashboard.html', icon: 'home' },
           { id: 'lex-ui', label: 'Lex UI', href: '/lex-test.html', icon: 'lex' },
-          { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
+          { id: 'workspaces', label: 'Matters', href: '/workspaces.html', icon: 'matters' },
         ]
       },
       {
@@ -474,7 +474,7 @@ const MenuConfig = {
           },
           { id: 'chat-dashboard', label: 'Dashboard', href: '/dashboard.html', icon: 'home' },
           { id: 'lex-ui', label: 'Lex UI', href: '/lex-test.html', icon: 'lex' },
-          { id: 'chat-matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
+          { id: 'chat-matters', label: 'Matters', href: '/workspaces.html', icon: 'matters' },
         ]
       },
       // Section 2: Infinite scrolling – Recents, New Chat, {{conversations}} (Data Connectors + Reports scroll with this)

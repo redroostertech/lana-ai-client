@@ -621,15 +621,17 @@ function openScreenVoiceSettings() {
 }
 
 const SCREEN_VOICE_CLIENT_ROUTES = new Set([
-  'dashboard.html', 'matters.html', 'workspace-details.html', 'file-viewer.html', 'approval-detail.html', 'integrations/connectors.html', 'notifications.html'
+  'dashboard.html', 'workspaces.html', 'workspace-details.html', 'file-viewer.html', 'approval-detail.html', 'integrations/connectors.html', 'notifications.html'
 ]);
 
 async function navigateScreenVoiceClient(input = {}) {
   if (!mainWindow || mainWindow.isDestroyed()) return false;
-  const route = String(input.route || '').trim().replace(/^\/+/, '');
+  const asked = String(input.route || '').trim().replace(/^\/+/, '');
+  const matterId = String(input.matterId || '').trim();
+  // matters.html is retired: the matters list is workspaces.html, and one matter opens its own page.
+  const route = asked === 'matters.html' ? (matterId ? 'workspace-details.html' : 'workspaces.html') : asked;
   if (!SCREEN_VOICE_CLIENT_ROUTES.has(route)) throw new Error('Unsupported LANA destination');
   const target = new URL(createFileUrl(path.join(__dirname, 'public_html', route)));
-  const matterId = String(input.matterId || '').trim();
   if (matterId) {
     if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,119}$/.test(matterId)) throw new Error('Invalid matter identifier');
     if (route === 'workspace-details.html') target.searchParams.set('id', matterId);
@@ -713,7 +715,6 @@ const DEEP_LINK_CLIENT_ROUTES = Object.freeze({
   'integrations/leadly.html': ['matter_id', 'source'],
   'integrations/sync-status.html': ['connectorId', 'sourceId', 'status'],
   'matter-skills.html': ['matterSkillId', 'tab'],
-  'matters.html': ['matter_id', 'open', 'tab', 'action', 'status', 'sort_by', 'sort_order'],
   'matters/timeline.html': ['id'],
   'model-pricing.html': ['model', 'provider'],
   'my-tasks.html': ['task', 'task_id', 'status', 'assignee', 'matter_id'],
@@ -735,7 +736,7 @@ const DEEP_LINK_CLIENT_ROUTES = Object.freeze({
   'workflows/templates.html': ['id', 'template'],
   'workspace-data.html': ['id', 'matter_id', 'tab'],
   'workspace-details.html': ['id', 'matter', 'tab', 'task', 'task_id', 'upload', 'open_file', 'artifact', 'artifact_id', 'activity'],
-  'workspaces.html': ['action', 'search', 'status']
+  'workspaces.html': ['action', 'search', 'status', 'sort_by', 'sort_order']
 });
 
 const DEEP_LINK_AGENT_HASH_VIEWS = Object.freeze(new Set([
@@ -818,8 +819,19 @@ function prefixedHash(prefix, value) {
 
 // Retired pages: an old link to one opens the page that replaced it.
 const RETIRED_CLIENT_ROUTES = Object.freeze({
-  'admin/dashboard.html': 'admin/index.html'
+  'admin/dashboard.html': 'admin/index.html',
+  'matters.html': 'workspaces.html'
 });
+
+// The old Matters page's link to one matter (?matter_id= or ?open=) opens that
+// matter's page; the matter id moves to ?id= and ?tab= comes along.
+function retiredMatterRoute(route, params) {
+  if (stripLeadingSlashes(route).trim() !== 'matters.html') return route;
+  const matterId = params.get('matter_id') || params.get('open');
+  if (!matterId) return route;
+  params.set('id', matterId);
+  return 'workspace-details.html';
+}
 
 function sanitizeClientRoute(route) {
   const asked = stripLeadingSlashes(route).trim();
@@ -922,7 +934,7 @@ async function navigateClientDeepLink(urlObj) {
     if (firstSegment) params.set('connectorId', firstSegment);
   }
 
-  route = sanitizeClientRoute(route);
+  route = sanitizeClientRoute(retiredMatterRoute(route, params));
   const target = new URL(createFileUrl(path.join(__dirname, 'public_html', route)));
   addSafeDeepLinkParams(target, params, DEEP_LINK_CLIENT_ROUTES[route]);
   setSafeHash(target, hash);
@@ -2787,8 +2799,8 @@ app.on('web-contents-created', (event, contents) => {
 
       if (!isAlreadyCorrect) {
         // Extract just the page path from the URL
-        // On macOS/Linux: /matters.html or /admin/users.html
-        // On Windows: /C:/matters.html or C:/matters.html -> need to extract just /matters.html
+        // On macOS/Linux: /workspaces.html or /admin/users.html
+        // On Windows: /C:/workspaces.html or C:/workspaces.html -> need to extract just /workspaces.html
         let pagePath = pathname;
 
         // If path has public_html but also a drive letter, extract just the page name
@@ -2799,7 +2811,7 @@ app.on('web-contents-created', (event, contents) => {
             logInfo(`[electron-main] [Navigation] Extracted page from malformed path: ${pagePath}`);
           }
         } else {
-          // On Windows, file:// URLs resolve root-relative paths like /matters.html to /C:/matters.html
+          // On Windows, file:// URLs resolve root-relative paths like /workspaces.html to /C:/workspaces.html
           // We need to strip the drive letter to get just the page path
           // Handle formats: /C:/path, C:/path, /C%3A/path (URL encoded)
           const windowsDriveMatch = pathname.match(/^\/?[A-Za-z]:(\/[^?#]*)/);

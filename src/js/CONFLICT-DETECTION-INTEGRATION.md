@@ -15,7 +15,7 @@ The conflict detection module (`conflict-detection.js`) provides:
 
 ### Step 1: Include the Script
 
-Add to the `<head>` section of `matters.html` (or just before `</body>`):
+Add to the page that holds the matter form, e.g. `workspaces.html` (before the page script):
 
 ```html
 <script src="js/conflict-detection.js"></script>

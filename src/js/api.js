@@ -5,7 +5,7 @@
  * Get the correct relative path from any page
  * Handles being in subdirectories like /integrations/
  *
- * @param {string} targetPage - The target HTML file (e.g., 'login.html', 'matters.html')
+ * @param {string} targetPage - The target HTML file (e.g., 'login.html', 'workspaces.html')
  * @returns {string} The correct relative path
  */
 function getPagePath(targetPage) {

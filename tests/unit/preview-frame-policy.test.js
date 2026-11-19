@@ -314,11 +314,11 @@ describe('call sites that render untrusted content', () => {
     expect(modal).toMatch(/Policy\.sandboxFor\(\{\s*source: 'blob'/);
   });
 
-  test.each(['matters.html', 'js/workspace-details.js'])('%s retypes PDF blobs before framing them', (rel) => {
+  test.each(['js/workspace-details.js'])('%s retypes PDF blobs before framing them', (rel) => {
     expect(read(rel)).toMatch(/LanaPreviewFrame\.pdfBlob\(/);
   });
 
-  test.each(['file-viewer.html', 'workspace-details.html', 'matters.html'])('%s loads the policy', (rel) => {
+  test.each(['file-viewer.html', 'workspace-details.html'])('%s loads the policy', (rel) => {
     expect(read(rel)).toMatch(/js\/shared\/preview-frame-policy\.js/);
   });
 
@@ -361,7 +361,7 @@ describe('call sites that render untrusted content', () => {
     expect(tab.indexOf('safeDocStudioUrl(')).toBeLessThan(tab.indexOf("window.open(safeUrl, '_blank'"));
   });
 
-  test.each(['matters.html', 'js/workspace-details.js'])('%s revokes every viewer object URL and keeps none unused', (rel) => {
+  test.each(['js/workspace-details.js'])('%s revokes every viewer object URL and keeps none unused', (rel) => {
     const source = read(rel);
     const start = source.search(/async function viewOrphanedDocument\(|window\.viewOrphanedDocument = async function/);
     expect(start).toBeGreaterThan(-1);
@@ -397,14 +397,13 @@ describe('call sites that render untrusted content', () => {
       const sanitized = text.match(/LanaSafeHtml\.sanitize\(result\.value\)/g) || [];
       expect({ rel, unsanitized: sinks.length - sanitized.length }).toEqual({ rel, unsanitized: 0 });
     });
-    expect(consumers.sort()).toEqual(['js/admin/run-books.js', 'js/file-viewer-page.js', 'js/workspace-details.js', 'matters.html']);
+    expect(consumers.sort()).toEqual(['js/admin/run-books.js', 'js/file-viewer-page.js', 'js/workspace-details.js']);
   });
 
   test.each([
     ['automation/index.html', ['safe-url.js', 'preview-frame-policy.js']],
     ['file-viewer.html', ['safe-url.js', 'safe-html.js', 'preview-frame-policy.js']],
     ['workspace-details.html', ['safe-url.js', 'safe-html.js', 'preview-frame-policy.js']],
-    ['matters.html', ['safe-url.js', 'safe-html.js', 'preview-frame-policy.js']],
     ['folder.html', ['safe-url.js']]
   ])('%s loads the shared safety scripts in dependency order', (rel, scripts) => {
     const html = read(rel);
@@ -445,7 +444,6 @@ describe('call sites that render untrusted content', () => {
     'data-connectors.html#connectorDashboardFrame': 'app page integrations/connector-viewer.html',
     'file-viewer.html#viewerIframe': 'PDF blobs built with LanaPreviewFrame.pdfBlob (plus a sandboxed demo srcdoc)',
     'workspace-details.html#viewerIframe': 'PDF blobs built with LanaPreviewFrame.pdfBlob',
-    'matters.html#viewerIframe': 'PDF blobs built with LanaPreviewFrame.pdfBlob (element from page markup)',
     'workspace-details.html#docStudioDocumentViewerFrame': 'src is LanaSafeUrl.safeDocStudioUrl output',
     'js/components/doc-studio-create-modal.js#dscmViewerFrame': 'src is LanaSafeUrl.safeDocStudioUrl output',
     'js/lex/chat/lex-chat.js#lex-chat-source-viewer-frame': 'app page file-viewer.html in embedded mode'
@@ -503,11 +501,7 @@ describe('call sites that render untrusted content', () => {
       (text.match(/<iframe[^>]*\bid="[^"]+"/g) || []).forEach((tag) => markupIds.add(`${rel}#${tag.match(/id="([^"]+)"/)[1]}`));
     });
     Object.keys(TRUSTED_FRAMES).forEach((key) => {
-      if (key === 'matters.html#viewerIframe') {
-        expect(read('matters.html')).toMatch(/viewerIframe\.src = viewerObjectUrl/);
-      } else {
-        expect(keys.has(key) || markupIds.has(key)).toBe(true);
-      }
+      expect(keys.has(key) || markupIds.has(key)).toBe(true);
     });
   });
 
@@ -526,8 +520,7 @@ describe('call sites that render untrusted content', () => {
     'js/embed-host.js': ['session.embed_url'],
     'js/file-viewer-page.js': ["citedPage ? objectUrl + '#page=' + citedPage : objectUrl"],
     'js/lex/chat/lex-chat.js': ["Nav.href(nav.path, Object.assign({}, nav.params, { chrome: 'embedded' }))", "'about:blank'"],
-    'js/services/docx-template-modal.js': ['src'],
-    'matters.html': ['viewerObjectUrl']
+    'js/services/docx-template-modal.js': ['src']
   };
 
   function frameSrcAssignments() {

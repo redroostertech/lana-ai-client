@@ -320,7 +320,6 @@ Report-card tables inside generated documents and chat blocks are exempt.
 | admin/task-plans.html | js/admin/task-plans.js:291 | Task plans (`limit=50`) |
 | approvals.html | js/approvals.js:542 | Approvals inbox |
 | recordings.html | js/recordings.js:277 | Recordings |
-| matters.html | inline :1411 | Matters (copy the grid/table switch from workspaces) |
 | workflows/active.html | inline :288 | Workflows (the API call in js/workflows.js:227 is commented out) |
 | workspace-details billable drafts | js/workspace-billable-hours.js:220 | Billable drafts |
 
@@ -363,7 +362,6 @@ Kept as cards, because they're launchers or galleries:
 5. Doc Studio (including `prompt` for rename and share), voice, agents and BrainChild (which writes into `.lex-modal-body`).
 6. Automation: `template-modal` x5, library-detail modals, and the builder's 16 selects plus its publish modal.
 7. Hardest, last:
-   - matters.html: 18 selects and about 17 modals.
    - insights/module-execution.html and insights/dashboard.html: duplicated code, to convert together.
    - connector-viewer, actionstep and leadly.
    - drilldown-renderer.

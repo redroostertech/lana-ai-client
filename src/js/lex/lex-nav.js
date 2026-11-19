@@ -117,7 +117,6 @@
     'integrations/sync-status.html':          { connectorId: 'string', sourceId: 'string', status: 'string' },
     'login.html':                             { return: 'string' },
     'matter-skills.html':                     { matterSkillId: 'string', tab: 'string' },
-    'matters.html':                           { matter_id: 'string', open: 'string', tab: 'string', action: 'string', status: 'string', sort_by: 'string', sort_order: 'string' },
     'matters/timeline.html':                  { id: 'string' },
     'model-pricing.html':                     { model: 'string', provider: 'string' },
     'my-tasks.html':                          { task: 'string', task_id: 'string', status: 'string', assignee: 'string', matter_id: 'string' },
@@ -141,7 +140,7 @@
     'workflows/templates.html':               { id: 'string', template: 'string' },
     'workspace-data.html':                    { id: 'string', matter_id: 'string', tab: 'string' },
     'workspace-details.html':                 { id: 'string', matter: 'string', tab: 'string', task: 'string', task_id: 'string', upload: 'string', open_file: 'string', artifact: 'string', artifact_id: 'string', activity: 'string' },
-    'workspaces.html':                        { action: 'string', search: 'string', status: 'string', type: 'string' }
+    'workspaces.html':                        { action: 'string', search: 'string', status: 'string', type: 'string', sort_by: 'string', sort_order: 'string' }
   };
 
   // =========================================================================
@@ -149,8 +148,8 @@
   // =========================================================================
 
   /**
-   * Normalize a path to root-relative form: '/matters.html'
-   * Accepts: 'matters.html', '/matters.html', './matters.html', full URLs.
+   * Normalize a path to root-relative form: '/workspaces.html'
+   * Accepts: 'workspaces.html', '/workspaces.html', './workspaces.html', full URLs.
    * Delegates to LexRouter._normalizePath when available for protocol-aware
    * handling (file://, http://).
    * @param {string} path
@@ -220,7 +219,7 @@
 
   /**
    * Split a path into pathname and query string.
-   * '/matters.html?action=create' -> { pathname: '/matters.html', search: '?action=create' }
+   * '/workspaces.html?action=create' -> { pathname: '/workspaces.html', search: '?action=create' }
    * @param {string} path
    * @returns {{ pathname: string, search: string }}
    */
@@ -238,7 +237,7 @@
   /**
    * Extract just the filename from a root-relative path.
    * '/admin/users.html' -> 'admin/users.html'
-   * '/matters.html' -> 'matters.html'
+   * '/workspaces.html' -> 'workspaces.html'
    * @param {string} pathname
    * @returns {string}
    */
@@ -359,7 +358,8 @@
 
   // An old link or a saved last page to a retired page opens the page that replaced it.
   var _retiredPages = {
-    'admin/dashboard.html': 'admin/index.html'
+    'admin/dashboard.html': 'admin/index.html',
+    'matters.html': 'workspaces.html'
   };
 
   /**
@@ -369,6 +369,60 @@
    */
   function replacementFor(pageKey) {
     return Object.prototype.hasOwnProperty.call(_retiredPages, pageKey) ? _retiredPages[pageKey] : null;
+  }
+
+  // A link's query values (name -> value), with extra values on top.
+  function queryValues(search, extra) {
+    var out = {};
+    new URLSearchParams(search || '').forEach(function (value, key) { out[key] = value; });
+    if (extra) {
+      Object.keys(extra).forEach(function (key) {
+        var value = extra[key];
+        if (value !== null && value !== undefined && value !== '') out[key] = String(value);
+      });
+    }
+    return out;
+  }
+
+  /**
+   * Where a link to a retired page lands, or null when the page is not retired.
+   * The old Matters page (matters.html) is now workspaces.html (keeping
+   * action, status, sort_by and sort_order); its link to one matter
+   * (?matter_id= or ?open=, with ?tab=) opens that matter's page.
+   * @param {string} pageKey - e.g. 'matters.html'
+   * @param {Object} [params] - the link's query values
+   * @returns {{page: string, params: Object|null}|null} params null keeps the link's own params
+   */
+  function redirectFor(pageKey, params) {
+    var page = replacementFor(pageKey);
+    if (!page) return null;
+    if (pageKey !== 'matters.html') return { page: page, params: null };
+    var values = params || {};
+    var matterId = values.matter_id || values.open;
+    if (matterId) {
+      var details = { id: String(matterId) };
+      if (values.tab) details.tab = String(values.tab);
+      return { page: 'workspace-details.html', params: details };
+    }
+    var kept = {};
+    ['action', 'status', 'sort_by', 'sort_order'].forEach(function (key) {
+      if (values[key]) kept[key] = String(values[key]);
+    });
+    return { page: page, params: kept };
+  }
+
+  /**
+   * The root-relative path a retired page's link opens, or null.
+   * '/matters.html?matter_id=M1' -> '/workspace-details.html?id=M1'
+   * @param {string} path
+   * @returns {string|null}
+   */
+  function redirectPath(path) {
+    var parts = splitPathAndQuery(String(path || ''));
+    var redirect = redirectFor(extractPageKey(parts.pathname), queryValues(parts.search));
+    if (!redirect) return null;
+    var qs = redirect.params ? new URLSearchParams(redirect.params).toString() : '';
+    return '/' + redirect.page + (qs ? '?' + qs : '');
   }
 
   // =========================================================================
@@ -388,9 +442,9 @@
    * @returns {Promise|undefined}
    *
    * Examples:
-   *   Lex.Nav.go('matters.html')
-   *   Lex.Nav.go('matters.html', { params: { action: 'create' }, context: { action: 'create' } })
-   *   Lex.Nav.go('matters.html', { params: { matter_id: matterId } })
+   *   Lex.Nav.go('workspaces.html')
+   *   Lex.Nav.go('workspaces.html', { params: { action: 'create' }, context: { action: 'create' } })
+   *   Lex.Nav.go('workspace-details.html', { params: { id: matterId } })
    */
   function go(path, options) {
     options = options || {};
@@ -418,11 +472,12 @@
     var inlineSearch = parts.search;
 
     var pageKey = extractPageKey(pathname);
-    var replacement = replacementFor(pageKey);
-    if (replacement) {
-      pageKey = replacement;
-      pathname = '/' + replacement;
+    var redirect = redirectFor(pageKey, queryValues(inlineSearch, options.params));
+    if (redirect) {
+      pageKey = redirect.page;
+      pathname = '/' + redirect.page;
       inlineSearch = '';
+      if (redirect.params) options = Object.assign({}, options, { params: redirect.params });
     }
     if (pageKey === 'search-results.html' || pageKey === 'global-search.html') {
       var searchParams = new URLSearchParams(inlineSearch || '');
@@ -606,6 +661,8 @@
     getParams:    getParams,
     updateParams: updateParams,
     replacementFor: replacementFor,
+    redirectFor:  redirectFor,
+    redirectPath: redirectPath,
 
     /**
      * Check if navigation context exists without consuming it.

@@ -147,8 +147,8 @@ window width, so it keeps a wide layout while the component itself is squeezed.
 **Every navigation must go through `Lex.Nav.go()`.** Never use `window.location.href`.
 
 ```javascript
-Lex.Nav.go('matters.html');
-Lex.Nav.go('matters.html', { params: { matter_id: 'abc-123' } });
+Lex.Nav.go('workspaces.html');
+Lex.Nav.go('workspace-details.html', { params: { id: 'abc-123' } });
 Lex.Nav.go('dashboard.html', { replace: true });
 
 // Reading on destination page
@@ -1033,7 +1033,7 @@ The codebase has two parallel UI architectures:
 | **Menu** | `renderMenu('#mainNav')` per page | `<lex-app>` calls `setSections()` with nav structure |
 | **Auth** | Per-page `checkAuthWithRetry()` | `lex.auth.js` + router auth guard |
 
-**Rule: All new pages MUST use the V2 architecture.** V1 pages (`index.html`, `matters.html`, `storage.html`, etc.) are legacy and listed in `FULL_RELOAD_PAGES`.
+**Rule: All new pages MUST use the V2 architecture.** V1 pages (`index.html`, `storage.html`, etc.) are legacy and listed in `FULL_RELOAD_PAGES`.
 
 ### V2 Shell Hierarchy
 
@@ -1220,7 +1220,7 @@ Pages listed in `FULL_RELOAD_PAGES` bypass the SPA router entirely — clicking 
 'onboarding.html', 'demo.html', 'update-dialog.html',
 'app.html',     // The SPA entry point itself
 'index.html',   // V1 legacy dashboard
-'matters.html', 'storage.html', 'connectors.html'  // V1 legacy pages
+'storage.html', 'connectors.html'  // V1 legacy pages
 ```
 
 **Rule:** When migrating a V1 page to V2, remove it from `FULL_RELOAD_PAGES` and add a page descriptor.

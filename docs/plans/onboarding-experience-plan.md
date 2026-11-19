@@ -61,7 +61,7 @@ I checked the client and backend on 2026-10-30. Some of the strongest ideas in t
 
 | Concept the documents emphasize | In the product today? | How onboarding handles it |
 |---|---|---|
-| Matters, documents, connectors | Yes (`matters.html`, document library, `data-connectors.html`) | Teach directly |
+| Matters, documents, connectors | Yes (`workspaces.html`, document library, `data-connectors.html`) | Teach directly |
 | Answers with sources (grounded chat) | Yes (chat grounding and citations) | Teach directly |
 | Approvals and review | Yes (`approvals.html`, `approval-detail.html`) | Teach directly |
 | Exceptions to act on | Partly (`action-queue.html`, `alerts.html`) | Teach as "LANA flags what needs you" |
