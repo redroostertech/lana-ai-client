@@ -27,7 +27,8 @@ test.each(['createWindow', 'createLoginWindow'])('%s enables the built-in PDF vi
   expect(prefs).toMatch(/plugins:\s*true/);
   expect(prefs).toMatch(/nodeIntegration:\s*false/);
   expect(prefs).toMatch(/contextIsolation:\s*true/);
-  expect(prefs).toMatch(/sandbox:\s*false/);
+  // Sandboxed since the IPC hardening: the preload runs as one bundled file (electron-preload-path.js).
+  expect(prefs).toMatch(/sandbox:\s*true/);
 });
 
 test('the login page navigates its own window into the app (so it renders file-viewer.html)', () => {

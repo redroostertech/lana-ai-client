@@ -86,6 +86,12 @@ window.LanaConfig = {
   DEMO_DATA_MANIFEST: '../mock-data/demo/manifest.json',
 
   /**
+   * The help center the Help, FAQ and article pages read (no trailing slash). Its origin is
+   * allowed in those pages' CSP only (electron-discovery.js HELP_CENTER_ORIGIN, electron-csp.js).
+   */
+  HELP_CENTER_API: 'https://www.redroostertec.com/lana-ai/v1',
+
+  /**
    * Enable Multi-Factor Authentication (MFA)
    *
    * When false:

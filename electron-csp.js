@@ -25,6 +25,11 @@
 // configured origins. tests/unit/electron-csp.test.js pins this list.
 const SIGN_IN_PAGES = Object.freeze(['login.html', 'activate.html']);
 
+// The pages that read the help center (help.js, faq.js, article.js): they load standalone or
+// inside the app shell, app.html, whose URL the router keeps, so app.html is on the list too.
+// They get the help center origin in connect-src only (tests/unit/electron-csp.test.js).
+const HELP_CENTER_PAGES = Object.freeze(['help.html', 'faq.html', 'article.html', 'app.html']);
+
 /**
  * Pages whose own scripts build inline event handlers in markup strings
  * (onclick="fn('${id}')"). Their text varies, so no hash can allow them; such a
@@ -78,24 +83,27 @@ function embedOriginsOf(enabledApps) {
  * @param {Object|null} config.savedServer - electron-storage getSavedServer() (url, chefUrl, forgeUrl, burstUrl, enabledApps)
  * @param {string|null} config.engineUrl - the local AI engine's loopback URL, when it runs
  * @param {string|null} config.editorUrl - the local editor service's loopback URL, when it runs
- * @param {string[]} config.controlPlaneUrls - discovery and help endpoints
+ * @param {string[]} config.helpOrigins - the help center (help pages only, HELP_CENTER_PAGES)
  * @param {string[]} config.storageOrigins - where Chef's presigned storage links point (Chef discovery)
- * @returns {{ api: string[], editor: string[], embed: string[] }}
+ * @returns {{ api: string[], editor: string[], embed: string[], help: string[] }}
  */
-function cspOriginsFromConfig({ savedServer = null, engineUrl = null, editorUrl = null, controlPlaneUrls = [], storageOrigins = [] } = {}) {
+function cspOriginsFromConfig({ savedServer = null, engineUrl = null, editorUrl = null, helpOrigins = [], storageOrigins = [] } = {}) {
   const server = savedServer && typeof savedServer === 'object' ? savedServer : {};
   const editor = uniqueOrigins([editorUrl]);
   const api = uniqueOrigins([
     server.url, server.chefUrl, server.forgeUrl, server.burstUrl,
     engineUrl, editorUrl,
-    ...(Array.isArray(controlPlaneUrls) ? controlPlaneUrls : []),
     ...(Array.isArray(storageOrigins) ? storageOrigins : [])
   ]);
-  return { api, editor, embed: embedOriginsOf(server.enabledApps) };
+  return { api, editor, embed: embedOriginsOf(server.enabledApps), help: uniqueOrigins(Array.isArray(helpOrigins) ? helpOrigins : []) };
 }
 
 function isDebtPage(page) {
   return INLINE_HANDLER_DEBT_PAGES.includes(String(page || ''));
+}
+
+function isHelpCenterPage(page) {
+  return HELP_CENTER_PAGES.includes(String(page || ''));
 }
 
 function isSignInPage(page) {
@@ -127,6 +135,7 @@ function buildContentSecurityPolicy({ page = null, nonce = '', handlerHashes = [
   script.push(...editor);
 
   const connect = ["'self'", ...api];
+  if (isHelpCenterPage(page)) connect.push(...uniqueOrigins(origins.help).filter((o) => !connect.includes(o)));
   if (isSignInPage(page)) connect.push('https:', 'http:');
 
   const directives = [
@@ -134,7 +143,8 @@ function buildContentSecurityPolicy({ page = null, nonce = '', handlerHashes = [
     ['script-src', script],
     ['style-src', ["'self'", "'unsafe-inline'"]],
     ['img-src', ["'self'", 'data:', 'blob:', ...api]],
-    ['font-src', ["'self'", 'data:']],
+    // The LANA editor's fonts load from the editor service, like its modules.
+    ['font-src', ["'self'", 'data:', ...editor]],
     ['connect-src', connect],
     ['frame-src', ["'self'", 'blob:', ...api, ...embed]],
     ['worker-src', ["'self'", 'blob:']],
@@ -150,6 +160,7 @@ function buildContentSecurityPolicy({ page = null, nonce = '', handlerHashes = [
 
 module.exports = {
   SIGN_IN_PAGES,
+  HELP_CENTER_PAGES,
   INLINE_HANDLER_DEBT_PAGES,
   originOf,
   embedOriginsOf,

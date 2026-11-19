@@ -78,6 +78,8 @@
   </style>
 
   <link rel="stylesheet" href="css/lex-chat.css">
+  <!-- target="_blank" links open through the guarded channel (js/shared/external-links.js). -->
+  <script src="js/shared/external-links.js"></script>
 </head>
 <body>
 
@@ -113,6 +115,9 @@
         </svg>
         <h3 class="text-lg font-semibold text-gray-900 mb-2">Article not found</h3>
         <p class="text-gray-600 mb-4">The requested article could not be found.</p>
+        <button type="button" id="retryLoadArticle" class="hidden px-4 py-2 mr-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
+          Try again
+        </button>
         <a href="help.html" class="inline-block px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
           Back to Help Center
         </a>
@@ -152,31 +157,6 @@
           <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8 mb-6">
             <div id="articleContent" class="article-content prose max-w-none">
               <!-- Article content will be inserted here -->
-            </div>
-          </div>
-
-          <!-- Was this helpful? -->
-          <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8 mb-6" style="display: none;">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">Was this article helpful?</h3>
-            <div class="flex items-center gap-4">
-              <button id="helpfulYes" class="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-green-50 hover:border-green-500 hover:text-green-700 transition-colors">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"></path>
-                </svg>
-                Yes
-              </button>
-              <button id="helpfulNo" class="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-red-50 hover:border-red-500 hover:text-red-700 transition-colors">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.096c.5 0 .905-.405.905-.904 0-.715.211-1.413.608-2.008L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5"></path>
-                </svg>
-                No
-              </button>
-              <div id="feedbackMessage" class="hidden text-sm text-green-600 flex items-center gap-2">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                </svg>
-                Thank you for your feedback!
-              </div>
             </div>
           </div>
 

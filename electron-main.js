@@ -92,7 +92,7 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // Import thin client modules
-const { refreshHostedDiscovery, verifyServer, discoverByDomain, discoveryForPage, CONTROL_PLANE_URLS } = require('./electron-discovery');
+const { refreshHostedDiscovery, verifyServer, discoverByDomain, discoveryForPage, HELP_CENTER_ORIGIN } = require('./electron-discovery');
 // The app's pages are served from lana-app://app (docs/plans/harden-web.md).
 const { APP_SCHEME, APP_ORIGIN, STORAGE_MIGRATION_PATH, SCHEME_PRIVILEGES, appPageUrl, pageOf, createAppProtocolHandler } = require('./electron-app-protocol');
 const { cspOriginsFromConfig, buildContentSecurityPolicy } = require('./electron-csp');
@@ -1103,7 +1103,7 @@ function currentCspOrigins() {
   try { editorUrl = editorService.baseUrl() || null; } catch (_) { editorUrl = null; }
   let savedServer = null;
   try { savedServer = getSavedServer(); } catch (_) { savedServer = null; }
-  return cspOriginsFromConfig({ savedServer, engineUrl, editorUrl, controlPlaneUrls: CONTROL_PLANE_URLS, storageOrigins: chefStorage.origins() });
+  return cspOriginsFromConfig({ savedServer, engineUrl, editorUrl, helpOrigins: [HELP_CENTER_ORIGIN], storageOrigins: chefStorage.origins() });
 }
 
 // Where the saved firm's presigned storage links point: Chef serves it to

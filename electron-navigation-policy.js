@@ -67,11 +67,13 @@ function decideNavigation(url, { appRoot } = {}) {
 
 // Schemes a frame inside a page may load in place: the app, the web, and the
 // in-page ones previews and embeds use.
-const FRAME_SCHEMES = new Set(['lana-app:', 'http:', 'https:', 'blob:', 'about:', 'data:']);
+const FRAME_SCHEMES = new Set(['lana-app:', 'https:', 'blob:', 'about:', 'data:']);
+// Plain http loads in a frame only from this computer (the LANA editor service, the engine).
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]']);
 
 /**
- * A subframe navigation (will-frame-navigate in electron-main.js). Web content and app
- * pages load in the frame (the page CSP's frame-src still decides what may). Any other
+ * A subframe navigation (will-frame-navigate in electron-main.js). https content, loopback
+ * http and app pages load in the frame (the page CSP's frame-src still decides what may). Any other
  * scheme would make Chromium hand the URL to the operating system (foo://, ms-settings:):
  * the frame never goes there, and mail or vault links go through the app's opener
  * (electron-external-open.js) instead.
@@ -85,6 +87,11 @@ function decideFrameNavigation(url) {
     return DENY;
   }
   if (FRAME_SCHEMES.has(parsed.protocol)) return ALLOW;
+  if (parsed.protocol === 'http:') {
+    // Any other http address is not loaded in place: it goes out through the opener, which
+    // always asks for http (electron-external-open.js).
+    return LOOPBACK_HOSTS.has(parsed.hostname) ? ALLOW : { action: 'external', url: parsed.href };
+  }
   if ((parsed.protocol === 'mailto:' || parsed.protocol === 'brainchild:') && isAllowedExternalUrl(parsed.href)) {
     return { action: 'external', url: parsed.href };
   }

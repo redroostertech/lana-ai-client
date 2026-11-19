@@ -20,6 +20,8 @@
   <script src="../js/menu.js"></script>
   <script src="../js/shared/header-user-menu.js"></script>
   <script src="../js/notifications.js"></script>
+  <!-- target="_blank" links open through the guarded channel (js/shared/external-links.js). -->
+  <script src="../js/shared/external-links.js"></script>
 </head>
 <body class="bg-gray-100">
     <div class="flex h-screen">
@@ -567,7 +569,7 @@
 
         async function loadIntegrations() {
             try {
-                const res = await api.request('/api/integrations');
+                const res = await api.request('GET', '/api/integrations');
                 const integrations = res.integrations || res || [];
 
                 // Update stats
@@ -606,7 +608,7 @@
                 apiActivity = { count: count };
             }
             try {
-                const res = await api.request('/api/integrations/activity');
+                const res = await api.request('GET', '/api/integrations/activity');
                 const rows = (res.activities || []).map(T.mapActivity);
                 table.setColumnFilterOptions(T.filterOptions(rows));
                 table.setData(rows);
@@ -649,7 +651,7 @@
         async function testConnection(integrationId) {
             try {
                 Toast.info(`Testing ${integrationId} connection...`);
-                const res = await api.request(`/api/integrations/${integrationId}/test`, { method: 'POST' });
+                const res = await api.request('POST', `/api/integrations/${integrationId}/test`);
 
                 if (res.success) {
                     Toast.success(`${integrationId} connection successful!`);
@@ -685,10 +687,7 @@
             });
 
             try {
-                await api.request(`/api/integrations/${integrationId}/config`, {
-                    method: 'PUT',
-                    body: JSON.stringify(config)
-                });
+                await api.request('PUT', `/api/integrations/${integrationId}/config`, config);
                 Toast.success('Configuration saved successfully');
                 closeModal('configModal');
                 loadIntegrations();
@@ -705,10 +704,7 @@
             data.type = String(document.getElementById('addIntegrationType').value || 'rest');
 
             try {
-                await api.request('/api/integrations', {
-                    method: 'POST',
-                    body: JSON.stringify(data)
-                });
+                await api.request('POST', '/api/integrations', data);
                 Toast.success('Integration added successfully');
                 closeModal('addIntegrationModal');
                 this.reset();

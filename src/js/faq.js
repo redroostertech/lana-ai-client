@@ -7,6 +7,12 @@
 const FAQSystem = (function() {
   let faqData = null;
   let searchIndex = null;
+
+  // Help center content is remote text: escaped everywhere it goes into markup.
+  const esc = (value) => window.Lex.escapeHtml(value == null ? '' : String(value));
+  // Counts from the help center, as numbers (anything else is 0).
+  const num = (value) => (Number.isFinite(Number(value)) ? Number(value) : 0);
+
   let currentFilter = 'all';
   let currentSearchQuery = '';
   let currentlyOpenFaqId = null;
@@ -26,60 +32,30 @@ const FAQSystem = (function() {
     }
   }
 
-  /**
-   * Load FAQ content from API or mock data
-   */
-  async function loadFAQContent() {
-    const apiUrl = 'https://redroostertec.com/lana-ai/v1/faq';
-
-    try {
-      // Try to fetch from API
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${api.token}`
-        }
-      });
-
-      if (response.ok) {
-        const apiData = await response.json();
-
-        // Check if API returned empty data
-        if (!apiData.categories || apiData.categories.length === 0) {
-          console.warn('API returned empty data, using mock data');
-          faqData = await loadMockFAQData();
-        } else {
-          faqData = apiData;
-          console.log('Loaded FAQ content from API');
-        }
-      } else {
-        throw new Error('API returned error');
-      }
-    } catch (error) {
-      console.warn('Failed to load from API, using mock data:', error);
-      // Fall back to mock data
-      faqData = await loadMockFAQData();
-    }
-
-    // Build search index
-    buildSearchIndex();
+  /** The help center's address (js/config.js). */
+  function helpCenterUrl(path) {
+    return window.LanaConfig.HELP_CENTER_API + path;
   }
 
-  /**
-   * Load mock FAQ data from local file
-   */
-  async function loadMockFAQData() {
-    try {
-      const response = await fetch('mock-data/faq-data.json');
-      if (!response.ok) {
-        throw new Error('Failed to load mock data');
-      }
-      return await response.json();
-    } catch (error) {
-      console.error('Failed to load mock FAQ data:', error);
-      throw error;
-    }
+  /** GET one help center list; rejects when it cannot be reached or answers nothing. */
+  async function fetchHelpCenter(path, listKey) {
+    // The help center is public: no LANA token or cookies go to it (RedRoosterTech-Web routes/lana-ai.js).
+    const response = await fetch(helpCenterUrl(path), {
+      method: 'GET',
+      credentials: 'omit',
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!response.ok) throw new Error(`The help center answered ${response.status}`);
+    const data = await response.json();
+    if (!data || !Array.isArray(data[listKey]) || data[listKey].length === 0) throw new Error('The help center sent no content');
+    return data;
+  }
+
+  /** Load the FAQs from the help center. Offline, init shows the help center message. */
+  async function loadFAQContent() {
+    faqData = await fetchHelpCenter('/faq', 'categories');
+    // Build search index
+    buildSearchIndex();
   }
 
   /**
@@ -140,9 +116,9 @@ const FAQSystem = (function() {
               ? 'text-indigo-600 border-b-2 border-indigo-600'
               : 'text-gray-600 border-b-2 border-transparent hover:text-gray-900 hover:border-gray-300'
           }"
-          data-category="${tab.id}"
+          data-category="${esc(tab.id)}"
         >
-          ${tab.title}
+          ${esc(tab.title)}
         </button>
       `;
     }).join('');
@@ -219,8 +195,8 @@ const FAQSystem = (function() {
               ${iconMap[category.icon] || iconMap.info}
             </div>
             <div>
-              <h2 class="text-xl font-bold text-gray-900">${category.title}</h2>
-              <p class="text-sm text-gray-600">${category.description} • ${category.faqs.length} questions</p>
+              <h2 class="text-xl font-bold text-gray-900">${esc(category.title)}</h2>
+              <p class="text-sm text-gray-600">${esc(category.description)} • ${category.faqs.length} questions</p>
             </div>
           </div>
         </div>
@@ -240,10 +216,10 @@ const FAQSystem = (function() {
     const isOpen = currentlyOpenFaqId === faqId;
 
     return `
-      <div class="faq-item" data-faq-id="${faq.id}" data-category-id="${categoryId}" data-full-id="${faqId}">
+      <div class="faq-item" data-faq-id="${esc(faq.id)}" data-category-id="${esc(categoryId)}" data-full-id="${esc(faqId)}">
         <button class="faq-question w-full px-6 py-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors">
           <div class="flex-1 pr-4">
-            <h3 class="font-medium text-gray-900">${faq.question}</h3>
+            <h3 class="font-medium text-gray-900">${esc(faq.question)}</h3>
           </div>
           <svg class="w-5 h-5 text-gray-400 flex-shrink-0 faq-chevron ${isOpen ? 'open' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -259,7 +235,7 @@ const FAQSystem = (function() {
             ${faq.tags && faq.tags.length > 0 ? `
               <div class="flex flex-wrap gap-2 mb-4">
                 ${faq.tags.map(tag => `
-                  <span class="px-2 py-1 bg-gray-200 text-gray-700 rounded-full text-xs">${tag}</span>
+                  <span class="px-2 py-1 bg-gray-200 text-gray-700 rounded-full text-xs">${esc(tag)}</span>
                 `).join('')}
               </div>
             ` : ''}
@@ -270,7 +246,7 @@ const FAQSystem = (function() {
                 <button
                   class="vote-btn p-2 rounded hover:bg-green-100 transition-colors"
                   data-vote="helpful"
-                  data-faq-id="${faq.id}"
+                  data-faq-id="${esc(faq.id)}"
                   title="Yes, this was helpful"
                 >
                   <svg class="w-4 h-4 text-gray-600 hover:text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -280,7 +256,7 @@ const FAQSystem = (function() {
                 <button
                   class="vote-btn p-2 rounded hover:bg-red-100 transition-colors"
                   data-vote="not-helpful"
-                  data-faq-id="${faq.id}"
+                  data-faq-id="${esc(faq.id)}"
                   title="No, this wasn't helpful"
                 >
                   <svg class="w-4 h-4 text-gray-600 hover:text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -289,7 +265,7 @@ const FAQSystem = (function() {
                 </button>
               </div>
               <div class="text-xs text-gray-500">
-                ${faq.helpful || 0} helpful • ${faq.notHelpful || 0} not helpful
+                ${num(faq.helpful)} helpful • ${num(faq.notHelpful)} not helpful
               </div>
             </div>
 
@@ -302,10 +278,10 @@ const FAQSystem = (function() {
                     return related ? `
                       <button
                         class="block w-full text-left text-sm text-indigo-600 hover:text-indigo-800 hover:underline related-faq-link"
-                        data-faq-id="${related.id}"
-                        data-category-id="${related.categoryId}"
+                        data-faq-id="${esc(related.id)}"
+                        data-category-id="${esc(related.categoryId)}"
                       >
-                        → ${related.question}
+                        → ${esc(related.question)}
                       </button>
                     ` : '';
                   }).join('')}
@@ -369,7 +345,7 @@ const FAQSystem = (function() {
   function formatFAQAnswer(answer) {
     return answer
       .split('\n\n')
-      .map(para => `<p class="mb-3 last:mb-0">${para}</p>`)
+      .map(para => `<p class="mb-3 last:mb-0">${esc(para)}</p>`)
       .join('');
   }
 
@@ -394,20 +370,18 @@ const FAQSystem = (function() {
 
     // Send vote to API
     try {
-      const response = await fetch(`https://redroostertec.com/lana-ai/v1/faq/${faqId}/feedback`, {
+      const response = await fetch(helpCenterUrl(`/faq/${encodeURIComponent(faqId)}/feedback`), {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${api.token}`
-        },
-        body: JSON.stringify({
-          feedback: vote === 'helpful' ? 'helpful' : 'not_helpful'
-        })
+        // Public endpoint: no LANA token or cookies.
+        credentials: 'omit',
+        headers: { 'Content-Type': 'application/json' },
+        // The help center takes { helpful: true|false }.
+        body: JSON.stringify({ helpful: vote === 'helpful' })
       });
 
       if (response.ok) {
         const result = await response.json();
-        console.log('Vote submitted successfully:', result);
+        console.log('Vote submitted');
 
         // Update the count display if backend returns updated counts
         if (result.helpful !== undefined && result.not_helpful !== undefined) {
@@ -601,7 +575,7 @@ const FAQSystem = (function() {
     container.innerHTML = Object.values(byCategory).map(group => `
       <div class="bg-white rounded-lg border border-gray-200 overflow-hidden mb-6">
         <div class="bg-gradient-to-r from-indigo-50 to-purple-50 px-6 py-4 border-b border-gray-200">
-          <h2 class="text-xl font-bold text-gray-900">${group.categoryTitle}</h2>
+          <h2 class="text-xl font-bold text-gray-900">${esc(group.categoryTitle)}</h2>
           <p class="text-sm text-gray-600">${group.faqs.length} result${group.faqs.length === 1 ? '' : 's'}</p>
         </div>
         <div class="divide-y divide-gray-200">
@@ -617,6 +591,12 @@ const FAQSystem = (function() {
   function showError() {
     document.getElementById('faqLoading').classList.add('hidden');
     document.getElementById('faqError').classList.remove('hidden');
+    // Try again works even though the page never finished loading.
+    const retryBtn = document.getElementById('retryLoadFaq');
+    if (retryBtn && !retryBtn.dataset.wired) {
+      retryBtn.dataset.wired = 'true';
+      retryBtn.addEventListener('click', () => location.reload());
+    }
   }
 
   // Public API

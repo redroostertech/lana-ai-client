@@ -4,6 +4,7 @@
 
 const {
   SIGN_IN_PAGES,
+  HELP_CENTER_PAGES,
   originOf,
   embedOriginsOf,
   cspOriginsFromConfig,
@@ -36,7 +37,7 @@ const CONFIG = {
   savedServer: SAVED,
   engineUrl: 'http://127.0.0.1:47123',
   editorUrl: 'http://127.0.0.1:53117',
-  controlPlaneUrls: ['https://www.redroostertec.com/lana-ai/v1/discovery', 'https://redroostertec.com/lana-ai/v1/help']
+  helpOrigins: ['https://www.redroostertec.com/lana-ai/v1/help']
 };
 
 describe('cspOriginsFromConfig', () => {
@@ -47,19 +48,16 @@ describe('cspOriginsFromConfig', () => {
       'https://forge-api.lanaai.io',
       'https://burst.lanaai.io',
       'http://127.0.0.1:47123',
-      'http://127.0.0.1:53117',
-      'https://www.redroostertec.com',
-      'https://redroostertec.com'
+      'http://127.0.0.1:53117'
     ]);
     expect(origins.editor).toEqual(['http://127.0.0.1:53117']);
+    // The help center is not an API origin: only the help pages get it (below).
+    expect(origins.help).toEqual(['https://www.redroostertec.com']);
     expect(origins.embed).toEqual(['https://partner.example', 'https://other.example']);
   });
 
-  test('nothing configured gives only the control plane', () => {
-    expect(cspOriginsFromConfig({ controlPlaneUrls: CONFIG.controlPlaneUrls })).toEqual({
-      api: ['https://www.redroostertec.com', 'https://redroostertec.com'], editor: [], embed: []
-    });
-    expect(cspOriginsFromConfig()).toEqual({ api: [], editor: [], embed: [] });
+  test('nothing configured gives nothing', () => {
+    expect(cspOriginsFromConfig()).toEqual({ api: [], editor: [], embed: [], help: [] });
   });
 
   test('refuses wildcards, other schemes, credentials and junk', () => {
@@ -142,4 +140,30 @@ test('the pages that fetch a firm before it is saved are exactly the broad ones'
   // first-launch makes no request of its own (it talks to the main process only).
   const firstLaunchScripts = ['js/first-launch.js', 'js/first-launch.model.js', 'js/first-launch.pages.js', 'js/local-ai-fit.model.js'];
   for (const file of firstLaunchScripts) expect({ file, fetches: /\bfetch\(|XMLHttpRequest/.test(read(file)) }).toEqual({ file, fetches: false });
+});
+
+describe('the help center origin', () => {
+  const origins = { api: ['https://chef.firm.test'], editor: [], embed: [], help: ['https://www.redroostertec.com'] };
+  const connect = (page) => directives(buildContentSecurityPolicy({ page, nonce: 'Tm9uY2U0', origins }))['connect-src'];
+
+  test('only the help pages (and the app shell that can host them) may fetch it, in connect-src only', () => {
+    // help.html, faq.html and article.html load standalone or inside app.html (the router keeps
+    // the shell's URL), so app.html needs it too.
+    expect(HELP_CENTER_PAGES).toEqual(['help.html', 'faq.html', 'article.html', 'app.html']);
+    for (const page of HELP_CENTER_PAGES) expect(connect(page)).toContain('https://www.redroostertec.com');
+    for (const page of ['dashboard.html', 'login.html', 'settings-v2.html', 'admin/help.html', null]) {
+      expect(connect(page)).not.toContain('https://www.redroostertec.com');
+    }
+    const d = directives(buildContentSecurityPolicy({ page: 'help.html', nonce: 'Tm9uY2U0', origins }));
+    for (const name of ['img-src', 'frame-src', 'media-src', 'script-src']) expect(d[name]).not.toContain('https://www.redroostertec.com');
+  });
+});
+
+describe('the editor service', () => {
+  test('its fonts load wherever its scripts do (file viewer and editor)', () => {
+    const origins = { api: [], editor: ['http://127.0.0.1:53117'], embed: [], help: [] };
+    const d = directives(buildContentSecurityPolicy({ page: 'file-viewer.html', nonce: 'Tm9uY2U0', origins }));
+    expect(d['script-src']).toContain('http://127.0.0.1:53117');
+    expect(d['font-src']).toEqual(["'self'", 'data:', 'http://127.0.0.1:53117']);
+  });
 });

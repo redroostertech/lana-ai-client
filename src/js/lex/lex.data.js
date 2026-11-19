@@ -515,7 +515,7 @@
         if (api.get) {
           response = await api.get(url);
         } else if (api.request) {
-          response = await api.request(url, { method: 'GET' });
+          response = await api.request('GET', url);
         } else {
           const fetchResponse = await fetch(url);
           response = await fetchResponse.json();

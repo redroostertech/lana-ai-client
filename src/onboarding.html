@@ -18,6 +18,8 @@
   <script src="js/lex/lex.core.js"></script>
   <script src="js/lex/components/foundation/lex-modal.js"></script>
     <link rel="stylesheet" href="css/vendor/fontawesome/css/all.min.css">
+  <!-- target="_blank" links open through the guarded channel (js/shared/external-links.js). -->
+  <script src="js/shared/external-links.js"></script>
 </head>
 <body class="bg-gray-100 min-h-screen">
     <div class="min-h-screen flex flex-col items-center justify-center py-12 px-4">
@@ -274,10 +276,7 @@
                 const params = new URLSearchParams(window.location.search);
                 const token = params.get('token');
 
-                await api.request('/api/auth/verify-device', {
-                    method: 'POST',
-                    body: JSON.stringify({ code, token })
-                });
+                await api.request('POST', '/api/auth/verify-device', { code, token });
 
                 goToStep(2);
             } catch (error) {
@@ -297,10 +296,7 @@
                 const params = new URLSearchParams(window.location.search);
                 const token = params.get('token');
 
-                await api.request('/api/auth/resend-device-code', {
-                    method: 'POST',
-                    body: JSON.stringify({ token })
-                });
+                await api.request('POST', '/api/auth/resend-device-code', { token });
 
                 btn.textContent = 'Code sent!';
                 setTimeout(() => {
@@ -327,13 +323,10 @@
                 const params = new URLSearchParams(window.location.search);
                 const token = params.get('token');
 
-                await api.request('/api/auth/trust-device', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        token,
-                        trust: trustDevice,
-                        deviceName: deviceName || undefined
-                    })
+                await api.request('POST', '/api/auth/trust-device', {
+                    token,
+                    trust: trustDevice,
+                    deviceName: deviceName || undefined
                 });
 
                 goToStep(3);

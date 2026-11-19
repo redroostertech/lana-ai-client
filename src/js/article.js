@@ -8,6 +8,12 @@ const ArticleSystem = (function() {
   let helpData = null;
   let currentArticle = null;
 
+  // Help center content is remote text: escaped everywhere it goes into markup.
+  const esc = (value) => window.Lex.escapeHtml(value == null ? '' : String(value));
+
+  // The help center could not be reached (a different message from "not found").
+  let offline = false;
+
   /**
    * Initialize the article system
    */
@@ -25,69 +31,37 @@ const ArticleSystem = (function() {
 
       await loadHelpContent();
       loadAndRenderArticle(sectionId, articleId);
-      attachEventListeners();
     } catch (error) {
       console.error('Failed to initialize article system:', error);
       showError();
     }
   }
 
-  /**
-   * Load help content from API or mock data
-   */
-  async function loadHelpContent() {
-    // TEMPORARILY USING LOCAL MOCK DATA ONLY - REMOVE AFTER API IS UPDATED
-    console.log('Using local mock data for testing');
-    helpData = await loadMockHelpData();
-    return;
-
-    /* COMMENTED OUT - UNCOMMENT AFTER API IS UPDATED
-    const apiUrl = 'https://redroostertec.com/lana-ai/v1/help';
-
-    try {
-      // Try to fetch from API
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${api.token}`
-        }
-      });
-
-      if (response.ok) {
-        const apiData = await response.json();
-
-        // Check if API returned empty data
-        if (!apiData.sections || apiData.sections.length === 0) {
-          console.warn('API returned empty data, using mock data');
-          helpData = await loadMockHelpData();
-        } else {
-          helpData = apiData;
-          console.log('Loaded help content from API');
-        }
-      } else {
-        throw new Error('API returned error');
-      }
-    } catch (error) {
-      console.warn('Failed to load from API, using mock data:', error);
-      // Fall back to mock data
-      helpData = await loadMockHelpData();
-    }
-    */
+  /** The help center's address (js/config.js). */
+  function helpCenterUrl(path) {
+    return window.LanaConfig.HELP_CENTER_API + path;
   }
 
-  /**
-   * Load mock help data from local file
-   */
-  async function loadMockHelpData() {
+  /** GET one help center list; rejects when it cannot be reached or answers nothing. */
+  async function fetchHelpCenter(path, listKey) {
+    // The help center is public: no LANA token or cookies go to it (RedRoosterTech-Web routes/lana-ai.js).
+    const response = await fetch(helpCenterUrl(path), {
+      method: 'GET',
+      credentials: 'omit',
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!response.ok) throw new Error(`The help center answered ${response.status}`);
+    const data = await response.json();
+    if (!data || !Array.isArray(data[listKey]) || data[listKey].length === 0) throw new Error('The help center sent no content');
+    return data;
+  }
+
+  /** Load the help center's sections. Offline, init shows the help center message. */
+  async function loadHelpContent() {
     try {
-      const response = await fetch('mock-data/help-data.json');
-      if (!response.ok) {
-        throw new Error('Failed to load mock data');
-      }
-      return await response.json();
+      helpData = await fetchHelpCenter('/help', 'sections');
     } catch (error) {
-      console.error('Failed to load mock help data:', error);
+      offline = true;
       throw error;
     }
   }
@@ -154,7 +128,7 @@ const ArticleSystem = (function() {
     const tagsContainer = document.getElementById('articleTags');
     if (article.tags && article.tags.length > 0) {
       tagsContainer.innerHTML = article.tags.map(tag => `
-        <span class="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">${tag}</span>
+        <span class="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">${esc(tag)}</span>
       `).join('');
     }
 
@@ -184,12 +158,12 @@ const ArticleSystem = (function() {
         if (!related) return '';
 
         return `
-          <a href="article.html?section=${related.sectionId}&id=${related.id}"
+          <a href="article.html?section=${esc(encodeURIComponent(related.sectionId))}&amp;id=${esc(encodeURIComponent(related.id))}"
              class="block p-4 border border-gray-200 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-all group">
             <div class="flex items-start justify-between gap-4">
               <div class="flex-1">
-                <h4 class="font-medium text-gray-900 group-hover:text-indigo-600 mb-1">${related.title}</h4>
-                <p class="text-sm text-gray-600">${related.summary}</p>
+                <h4 class="font-medium text-gray-900 group-hover:text-indigo-600 mb-1">${esc(related.title)}</h4>
+                <p class="text-sm text-gray-600">${esc(related.summary)}</p>
               </div>
               <svg class="w-5 h-5 text-gray-400 group-hover:text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
@@ -228,7 +202,8 @@ const ArticleSystem = (function() {
    * Basic markdown to HTML conversion
    */
   function markdownToHtml(markdown) {
-    let html = markdown;
+    // Escaped first: the help center's markdown is text, and only these rules add markup.
+    let html = esc(markdown);
 
     // Code blocks (must be processed before inline code)
     html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
@@ -330,62 +305,23 @@ const ArticleSystem = (function() {
    */
   function showError() {
     document.getElementById('articleLoading').classList.add('hidden');
-    document.getElementById('articleError').classList.remove('hidden');
-  }
-
-  /**
-   * Attach event listeners
-   */
-  function attachEventListeners() {
-    // Helpful buttons
-    const helpfulYes = document.getElementById('helpfulYes');
-    const helpfulNo = document.getElementById('helpfulNo');
-    const feedbackMessage = document.getElementById('feedbackMessage');
-
-    if (helpfulYes) {
-      helpfulYes.addEventListener('click', () => {
-        recordFeedback(true);
-        helpfulYes.classList.add('bg-green-50', 'border-green-500', 'text-green-700');
-        helpfulNo.disabled = true;
-        feedbackMessage.classList.remove('hidden');
-      });
-    }
-
-    if (helpfulNo) {
-      helpfulNo.addEventListener('click', () => {
-        recordFeedback(false);
-        helpfulNo.classList.add('bg-red-50', 'border-red-500', 'text-red-700');
-        helpfulYes.disabled = true;
-        feedbackMessage.classList.remove('hidden');
-      });
-    }
-  }
-
-  /**
-   * Record feedback
-   */
-  async function recordFeedback(helpful) {
-    const urlParams = new URLSearchParams(window.location.search);
-    const articleId = urlParams.get('id');
-    const sectionId = urlParams.get('section');
-
-    console.log('Article feedback:', { articleId, sectionId, helpful });
-
-    try {
-      await fetch(`https://redroostertec.com/lana-ai/v1/help/${articleId}/feedback`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${api.token}`
-        },
-        body: JSON.stringify({
-          section_id: sectionId,
-          feedback: helpful ? 'helpful' : 'not_helpful'
-        })
-      });
-      console.log('Feedback submitted successfully');
-    } catch (error) {
-      console.error('Failed to submit feedback:', error);
+    const box = document.getElementById('articleError');
+    box.classList.remove('hidden');
+    if (offline) {
+      // Not "not found": the help center could not be reached.
+      const title = box.querySelector('h3');
+      const detail = box.querySelector('p');
+      if (title) title.textContent = 'The help center could not be reached';
+      if (detail) detail.textContent = 'Check your internet connection, then try again.';
+      // Try again, as on the Help and FAQ pages.
+      const retryBtn = document.getElementById('retryLoadArticle');
+      if (retryBtn) {
+        retryBtn.classList.remove('hidden');
+        if (!retryBtn.dataset.wired) {
+          retryBtn.dataset.wired = 'true';
+          retryBtn.addEventListener('click', () => location.reload());
+        }
+      }
     }
   }
 

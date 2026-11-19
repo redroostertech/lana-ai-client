@@ -17,10 +17,10 @@ const chefPin = require('./electron-chef-pin');
 const { withoutFirmSecrets, firmSecretsFromDiscovery } = require('./electron-api-base');
 
 const HOSTED_DISCOVERY_URL = 'https://www.redroostertec.com/lana-ai/v1/discovery';
-// The control plane endpoints the app's pages call themselves: the help center
-// (help.js, faq.js, article.js). The page CSP allows exactly these origins
-// (electron-csp.js). Discovery is not one: main asks it (discovery:resolve).
-const CONTROL_PLANE_URLS = Object.freeze(['https://redroostertec.com/lana-ai/v1/help']);
+// The help center the help, FAQ and article pages read (js/config.js HELP_CENTER_API; the
+// bare redroostertec.com redirects here). Allowed in connect-src on those pages only
+// (electron-csp.js HELP_CENTER_PAGES). Discovery, on the same host, is asked by main only.
+const HELP_CENTER_ORIGIN = 'https://www.redroostertec.com';
 
 function hasOwn(value, key) {
   return Boolean(value && Object.prototype.hasOwnProperty.call(value, key));
@@ -260,7 +260,7 @@ async function verifyServer(serverUrl, retries = 2, options = {}) {
 
 module.exports = {
   HOSTED_DISCOVERY_URL,
-  CONTROL_PLANE_URLS,
+  HELP_CENTER_ORIGIN,
   requestDiscovery,
   discoveryForPage,
   mergeHostedDiscovery,

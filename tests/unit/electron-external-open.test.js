@@ -213,3 +213,26 @@ describe('electron-main.js uses them', () => {
     expect(reveal.indexOf("confirmFor('revealNote'")).toBeLessThan(reveal.indexOf('shell.showItemInFolder'));
   });
 });
+
+describe('plain http:// always asks', () => {
+  test('even with a click and an app opener, in every open path', async () => {
+    for (const from of [{}, { fromWindowOpen: true, openerUrl: 'lana-app://app/' }, { fromFrame: { url: 'lana-app://app/public_html/drive.html' } }]) {
+      const declined = setup({ gesture: true, confirmed: false });
+      await expect(declined.opener.open('http://insecure.example/page', { contents: contentsAt(), ...from })).resolves.toBe(false);
+      expect(declined.confirm).toHaveBeenCalledWith('openExternal', { url: 'http://insecure.example/page' }, expect.anything());
+      const accepted = setup({ gesture: true, confirmed: true });
+      await expect(accepted.opener.open('http://insecure.example/page', { contents: contentsAt(), ...from })).resolves.toBe(true);
+    }
+    // https with a click still opens without a question.
+    const https = setup({ gesture: true });
+    await expect(https.opener.open('https://lanaai.io', { contents: contentsAt() })).resolves.toBe(true);
+    expect(https.confirm).not.toHaveBeenCalled();
+  });
+
+  test('will-navigate sends http to the opener (which asks), not straight to the browser', () => {
+    const { decideNavigation } = require('../../electron-navigation-policy');
+    expect(decideNavigation('http://insecure.example/x', { appRoot: '/app/public_html' })).toEqual({ action: 'external', url: 'http://insecure.example/x' });
+    const main = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'electron-main.js'), 'utf8');
+    expect(main).toMatch(/externalOpener\.open\(decision\.url, \{ contents \}\)/);
+  });
+});

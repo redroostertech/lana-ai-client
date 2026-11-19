@@ -19,6 +19,8 @@
     <script src="../js/menu.js"></script>
     <script src="../js/shared/header-user-menu.js"></script>
     <script src="../js/notifications.js"></script>
+  <!-- target="_blank" links open through the guarded channel (js/shared/external-links.js). -->
+  <script src="../js/shared/external-links.js"></script>
 </head>
 <body class="bg-gray-100">
     <div class="flex h-screen">
@@ -677,7 +679,7 @@
 
         async function loadSettings() {
             try {
-                const settings = await api.request('/api/settings');
+                const settings = await api.request('GET', '/api/settings');
 
                 // General
                 if (settings.general) {
@@ -779,7 +781,7 @@
             const lastRunEl = document.getElementById('heartbeatLastRun');
             const lastStatusEl = document.getElementById('heartbeatLastStatus');
             try {
-                const data = await api.request('/api/v1/heartbeat/runs?limit=1');
+                const data = await api.request('GET', '/api/v1/heartbeat/runs?limit=1');
                 const runs = (data && data.data) ? data.data : (Array.isArray(data) ? data : []);
                 if (!runs.length) {
                     lastRunEl.textContent = 'No heartbeat runs recorded yet.';
@@ -827,10 +829,7 @@
             resultEl.classList.add('hidden');
 
             try {
-                const result = await api.request('/api/v1/heartbeat/trigger', {
-                    method: 'POST',
-                    body: JSON.stringify({})
-                });
+                const result = await api.request('POST', '/api/v1/heartbeat/trigger', {});
 
                 const status = (result && result.status) ? result.status : 'completed';
 
@@ -896,7 +895,7 @@
          */
         async function loadHeartbeatConfig() {
             try {
-                var response = await api.request('/api/v1/heartbeat/config');
+                var response = await api.request('GET', '/api/v1/heartbeat/config');
                 var config = response && response.data ? response.data : response;
                 if (!config) {
                     document.getElementById('heartbeatConfigLoading').textContent = 'No configuration found.';
@@ -951,10 +950,7 @@
             };
 
             try {
-                await api.request('/api/v1/heartbeat/config', {
-                    method: 'PUT',
-                    body: JSON.stringify(body)
-                });
+                await api.request('PUT', '/api/v1/heartbeat/config', body);
                 var statusEl = document.getElementById('hbConfigSaveStatus');
                 statusEl.classList.remove('hidden');
                 setTimeout(function() { statusEl.classList.add('hidden'); }, 3000);
@@ -985,7 +981,7 @@
                     orderId: 'heartbeatHistorySortOrder',
                     filterId: 'heartbeatHistoryStatus',
                     countIds: ['heartbeatHistorySectionCount'],
-                    request: function (url) { return api.request(url); }
+                    request: function (url) { return api.request('GET', url); }
                 });
             }
             heartbeatHistory.reload();
@@ -1040,10 +1036,7 @@
             };
 
             try {
-                await api.request('/api/settings', {
-                    method: 'PUT',
-                    body: JSON.stringify(settings)
-                });
+                await api.request('PUT', '/api/settings', settings);
                 Toast.success('Settings saved successfully');
             } catch (error) {
                 Toast.error(error.message || 'Failed to save settings');

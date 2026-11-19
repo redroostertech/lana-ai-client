@@ -1,7 +1,7 @@
 /**
  * LANA AI Help System
  *
- * Loads and renders help content from API or mock data
+ * Loads and renders help content from the help center (js/config.js HELP_CENTER_API)
  * Handles contact support form submissions
  */
 
@@ -9,6 +9,20 @@ const HelpSystem = (function() {
   let helpData = null;
   let faqData = null;
   let searchIndex = null;
+
+  // Help center content is remote text: escaped everywhere it goes into markup.
+  const esc = (value) => window.Lex.escapeHtml(value == null ? '' : String(value));
+
+  /**
+   * A quick link's address: an https: address or a relative app path (js/shared/safe-url.js),
+   * else '' (the link is then shown as plain text).
+   */
+  function quickLinkHref(raw) {
+    const safe = window.LanaSafeUrl;
+    const href = safe ? safe.safeAppOrLinkHref(raw) : '';
+    if (!href) return '';
+    return safe.schemeOf(raw) === 'relative' || href.indexOf('https:') === 0 ? href : '';
+  }
 
   /**
    * Initialize the help system
@@ -25,44 +39,36 @@ const HelpSystem = (function() {
     }
   }
 
+  /** The help center's address (js/config.js). */
+  function helpCenterUrl(path) {
+    return window.LanaConfig.HELP_CENTER_API + path;
+  }
+
+  /** GET one help center list; rejects when it cannot be reached or answers nothing. */
+  async function fetchHelpCenter(path, listKey) {
+    // The help center is public: no LANA token or cookies go to it (RedRoosterTech-Web routes/lana-ai.js).
+    const response = await fetch(helpCenterUrl(path), {
+      method: 'GET',
+      credentials: 'omit',
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!response.ok) throw new Error(`The help center answered ${response.status}`);
+    const data = await response.json();
+    if (!data || !Array.isArray(data[listKey]) || data[listKey].length === 0) throw new Error('The help center sent no content');
+    return data;
+  }
+
   /**
-   * Load help content from API or mock data
+   * Load the help center's sections, and its FAQs for search. Offline, init shows the
+   * help center message (showError); FAQs that do not load only leave them out of search.
    */
   async function loadHelpContent() {
-    const apiUrl = 'https://redroostertec.com/lana-ai/v1/help';
+    helpData = await fetchHelpCenter('/help', 'sections');
+    // The help center names it quick_links.
+    if (!helpData.quickLinks && Array.isArray(helpData.quick_links)) helpData.quickLinks = helpData.quick_links;
 
     try {
-      // Try to fetch from API
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${api.token}`
-        }
-      });
-
-      if (response.ok) {
-        const apiData = await response.json();
-
-        // Check if API returned empty data
-        if (!apiData.sections || apiData.sections.length === 0) {
-          console.warn('API returned empty data, using mock data');
-          helpData = await loadMockHelpData();
-        } else {
-          helpData = apiData;
-          console.log('Loaded help content from API');
-        }
-      } else {
-        throw new Error('API returned error');
-      }
-    } catch (error) {
-      console.warn('Failed to load from API, using mock data:', error);
-      // Fall back to mock data
-      helpData = await loadMockHelpData();
-    }
-
-    try {
-      faqData = await loadMockFAQData();
+      faqData = await fetchHelpCenter('/faq', 'categories');
     } catch (error) {
       console.warn('Failed to load FAQ data for help search:', error);
       faqData = null;
@@ -70,30 +76,6 @@ const HelpSystem = (function() {
 
     // Build search index
     buildSearchIndex();
-  }
-
-  /**
-   * Load mock help data from local file
-   */
-  async function loadMockHelpData() {
-    try {
-      const response = await fetch('mock-data/help-data.json');
-      if (!response.ok) {
-        throw new Error('Failed to load mock data');
-      }
-      return await response.json();
-    } catch (error) {
-      console.error('Failed to load mock help data:', error);
-      throw error;
-    }
-  }
-
-  async function loadMockFAQData() {
-    const response = await fetch('mock-data/faq-data.json');
-    if (!response.ok) {
-      throw new Error('Failed to load FAQ data');
-    }
-    return await response.json();
   }
 
   function plainTextFromHtmlish(value) {
@@ -175,20 +157,25 @@ const HelpSystem = (function() {
     // Filter out hidden links
     const visibleLinks = helpData.quickLinks.filter(link => !link.hidden);
 
-    container.innerHTML = visibleLinks.map(link => `
-      <a href="${link.href}" ${link.external ? 'target="_blank" rel="noopener"' : ''} class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+    container.innerHTML = visibleLinks.map(link => {
+      const href = quickLinkHref(link.href);
+      const tag = href ? 'a' : 'div';
+      const target = href ? `href="${esc(href)}" ${link.external ? 'target="_blank" rel="noopener"' : ''}` : '';
+      return `
+      <${tag} ${target} class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
         <div class="flex items-start gap-4">
           <div class="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0 text-indigo-600">
             ${iconMap[link.icon] || iconMap.mail}
           </div>
           <div class="flex-1">
-            <h3 class="font-semibold text-gray-900 mb-1">${link.title}</h3>
-            <p class="text-sm text-gray-600">${link.description}</p>
+            <h3 class="font-semibold text-gray-900 mb-1">${esc(link.title)}</h3>
+            <p class="text-sm text-gray-600">${esc(link.description)}</p>
           </div>
-          ${link.external ? '<svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>' : ''}
+          ${href && link.external ? '<svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>' : ''}
         </div>
-      </a>
-    `).join('');
+      </${tag}>
+    `;
+    }).join('');
   }
 
   /**
@@ -212,8 +199,8 @@ const HelpSystem = (function() {
             ${iconMap[section.icon] || iconMap.rocket}
           </div>
           <div>
-            <h2 class="text-2xl font-bold text-gray-900">${section.title}</h2>
-            <p class="text-gray-600">${section.description}</p>
+            <h2 class="text-2xl font-bold text-gray-900">${esc(section.title)}</h2>
+            <p class="text-gray-600">${esc(section.description)}</p>
           </div>
         </div>
 
@@ -221,13 +208,13 @@ const HelpSystem = (function() {
           ${section.articles.map(article => `
             <button
               class="text-left bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow article-card"
-              data-article-id="${article.id}"
-              data-section-id="${section.id}"
+              data-article-id="${esc(article.id)}"
+              data-section-id="${esc(section.id)}"
             >
-              <h3 class="font-semibold text-gray-900 mb-2">${article.title}</h3>
-              <p class="text-sm text-gray-600 mb-3">${article.summary}</p>
+              <h3 class="font-semibold text-gray-900 mb-2">${esc(article.title)}</h3>
+              <p class="text-sm text-gray-600 mb-3">${esc(article.summary)}</p>
               <div class="flex items-center justify-between text-xs text-gray-500">
-                <span>${article.readTime} min read</span>
+                <span>${esc(article.readTime)} min read</span>
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                 </svg>
@@ -254,7 +241,7 @@ const HelpSystem = (function() {
   function showArticleModal(sectionId, articleId) {
     // Navigate to dedicated article page
     const articlePath = typeof getPagePath === 'function' ? getPagePath('article.html') : 'article.html';
-    window.location.href = `${articlePath}?section=${sectionId}&id=${articleId}`;
+    window.location.href = `${articlePath}?section=${encodeURIComponent(sectionId)}&id=${encodeURIComponent(articleId)}`;
   }
 
   /**
@@ -372,13 +359,13 @@ const HelpSystem = (function() {
         ${results.map(item => `
           <button
             class="text-left bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow search-result-card"
-            data-type="${item.type}"
-            data-item-id="${item.id}"
-            data-section-id="${item.sectionId}"
+            data-type="${esc(item.type)}"
+            data-item-id="${esc(item.id)}"
+            data-section-id="${esc(item.sectionId)}"
           >
-            <div class="text-xs text-indigo-600 font-medium mb-2">${item.type === 'faq' ? 'FAQ' : item.section}</div>
-            <h3 class="font-semibold text-gray-900 mb-2">${item.title}</h3>
-            <p class="text-sm text-gray-600">${item.summary}</p>
+            <div class="text-xs text-indigo-600 font-medium mb-2">${esc(item.type === 'faq' ? 'FAQ' : item.section)}</div>
+            <h3 class="font-semibold text-gray-900 mb-2">${esc(item.title)}</h3>
+            <p class="text-sm text-gray-600">${esc(item.summary)}</p>
           </button>
         `).join('')}
       </div>
@@ -436,7 +423,8 @@ const HelpSystem = (function() {
 
     // Validate that user data is populated
     if (!name || !email) {
-      console.error('User data not populated. Name:', name, 'Email:', email);
+      // No personal data in logs: say only which is missing.
+      console.error('Contact form: the signed-in user\'s name or email is missing');
       errorMsg.classList.remove('hidden');
       document.getElementById('contactErrorMessage').textContent =
         'Unable to retrieve your account information. Please refresh the page and try again.';
@@ -463,15 +451,13 @@ const HelpSystem = (function() {
       deploymentId: undefined // TODO: Get from config if available
     };
 
-    console.log('Submitting contact form with data:', formData);
 
     try {
-      const response = await fetch('https://redroostertec.com/lana-ai/v1/support/contact', {
+      const response = await fetch(helpCenterUrl('/support/contact'), {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${api.token}`
-        },
+        // Public endpoint: no LANA token or cookies.
+        credentials: 'omit',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       });
 
@@ -479,7 +465,7 @@ const HelpSystem = (function() {
 
       if (response.ok) {
         const result = await response.json();
-        console.log('Contact form success:', result);
+        console.log('Contact form sent');
 
         // Show success
         document.getElementById('ticketId').textContent = result.ticket_id || result.ticketId || 'N/A';
@@ -497,7 +483,7 @@ const HelpSystem = (function() {
         successMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
       } else {
         const errorData = await response.json().catch(() => ({}));
-        console.error('Contact form API error:', errorData);
+        console.error('Contact form: the help center answered', response.status);
         throw new Error(errorData.message || errorData.error || 'Failed to submit');
       }
     } catch (error) {
@@ -528,6 +514,12 @@ const HelpSystem = (function() {
   function showError() {
     document.getElementById('helpLoading').classList.add('hidden');
     document.getElementById('helpError').classList.remove('hidden');
+    // Try again works even though the page never finished loading.
+    const retryBtn = document.getElementById('retryLoadHelp');
+    if (retryBtn && !retryBtn.dataset.wired) {
+      retryBtn.dataset.wired = 'true';
+      retryBtn.addEventListener('click', () => location.reload());
+    }
   }
 
   // Public API

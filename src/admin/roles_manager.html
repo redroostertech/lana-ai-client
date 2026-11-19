@@ -65,6 +65,8 @@
       50% { opacity: 0.85; transform: scale(0.96); }
     }
   </style>
+  <!-- target="_blank" links open through the guarded channel (js/shared/external-links.js). -->
+  <script src="../js/shared/external-links.js"></script>
 </head>
 <body class="bg-gray-100">
 
@@ -245,7 +247,7 @@
 
         async function loadRole() {
             try {
-                const role = await api.request(`/api/rbac/roles/${roleId}`);
+                const role = await api.request('GET', `/api/rbac/roles/${roleId}`);
 
                 document.getElementById('pageTitle').textContent = `Edit Role: ${role.name}`;
                 document.getElementById('roleName').value = role.name;
@@ -352,7 +354,7 @@
 
         async function loadRoleUsers() {
             try {
-                const res = await api.request(`/api/rbac/roles/${roleId}/users`);
+                const res = await api.request('GET', `/api/rbac/roles/${roleId}/users`);
                 const users = res.users || res || [];
                 const container = document.getElementById('roleUsers');
 
@@ -398,10 +400,7 @@
                     await api.updateRole(roleId, { name, description });
 
                     // Update permissions
-                    await api.request(`/api/rbac/roles/${roleId}/permissions`, {
-                        method: 'PUT',
-                        body: JSON.stringify({ permissions: selectedPermissions })
-                    });
+                    await api.request('PUT', `/api/rbac/roles/${roleId}/permissions`, { permissions: selectedPermissions });
 
                     Toast.success('Role updated successfully');
                 } else {

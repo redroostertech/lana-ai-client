@@ -11,6 +11,7 @@
  *    for a frame navigation the frame that started it;
  *  - fewer than MAX_OPENS opens happened from that window in the last WINDOW_MS (asks
  *    that were refused or cancelled do not count);
+ *  - a plain http:// address always asks (no silent path);
  *  - the person clicked or typed in the app in the last 2 seconds, or else said yes
  *    in a main-process dialog (electron-confirm.js): one question per window at a
  *    time, and none for CANCEL_COOLDOWN_MS after a no.
@@ -76,7 +77,8 @@ function createExternalOpener({ shell, isAllowed, sanitize = (url) => url, gestu
       }
       // A window.open without a referrer could come from any frame (a third-party frame can
       // hide its origin with noreferrer), so it always asks, even right after a click.
-      const mustAsk = fromWindowOpen && !openerUrl;
+      // Plain http:// is never opened without a question, however it was asked for.
+      const mustAsk = (fromWindowOpen && !openerUrl) || /^http:/i.test(url);
       if (mustAsk || !gestures.recent(contents)) {
         // One question per window at a time, and none for a while after a no.
         if (asking.has(id) || (quietUntil.get(id) || 0) > now()) return false;

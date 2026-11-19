@@ -62,7 +62,7 @@ describe('decideFrameNavigation', () => {
   const { decideFrameNavigation } = require('../../electron-navigation-policy');
 
   test('app pages and web content stay in the frame', () => {
-    for (const url of ['lana-app://app/public_html/integrations/connector-viewer.html', 'https://partner.example/app', 'http://127.0.0.1:4710/v1/x', 'blob:lana-app://app/123', 'about:blank', 'about:srcdoc', 'data:text/html,x']) {
+    for (const url of ['lana-app://app/public_html/integrations/connector-viewer.html', 'https://partner.example/app', 'http://127.0.0.1:4710/v1/x', 'http://localhost:8080/x', 'http://[::1]:5000/', 'blob:lana-app://app/123', 'about:blank', 'about:srcdoc', 'data:text/html,x']) {
       expect({ url, decision: decideFrameNavigation(url) }).toEqual({ url, decision: { action: 'allow' } });
     }
   });
@@ -85,5 +85,19 @@ describe('decideFrameNavigation', () => {
     expect(block).not.toMatch(/details\.initiator \|\| details\.frame/);
     expect(block).toMatch(/if \(decision\.action === 'external' && details\.initiator\)/);
     expect(block).toMatch(/externalOpener\.open\(decision\.url, \{ contents, fromFrame: details\.initiator \}\)/);
+  });
+});
+
+describe('http in frames', () => {
+  const { decideFrameNavigation } = require('../../electron-navigation-policy');
+
+  test('only loopback http loads in a frame (the editor service); any other http goes out through the asking path', () => {
+    for (const url of ['http://127.0.0.1:53117/editor', 'http://localhost:3000/', 'http://[::1]:8080/x']) {
+      expect({ url, d: decideFrameNavigation(url) }).toEqual({ url, d: { action: 'allow' } });
+    }
+    for (const url of ['http://192.168.1.20:8080/', 'http://box.tail1234.ts.net:8080/x', 'http://example.com/', 'http://127.0.0.1.evil.example/']) {
+      expect({ url, d: decideFrameNavigation(url) }).toEqual({ url, d: { action: 'external', url: new URL(url).href } });
+    }
+    expect(decideFrameNavigation('https://partner.example/app')).toEqual({ action: 'allow' });
   });
 });

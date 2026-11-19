@@ -9,7 +9,7 @@
 jest.mock('electron', () => ({ app: { getPath: jest.fn(() => '/tmp') } }));
 jest.mock('../../electron-logger', () => ({ logInfo: jest.fn(), logError: jest.fn() }));
 
-const { HOSTED_DISCOVERY_URL, CONTROL_PLANE_URLS, requestDiscovery, discoveryForPage } = require('../../electron-discovery');
+const { HOSTED_DISCOVERY_URL, HELP_CENTER_ORIGIN, requestDiscovery, discoveryForPage } = require('../../electron-discovery');
 const { refusalFor } = require('../../electron-ipc-guard');
 const { IPC_POLICY } = require('../../electron-ipc-policy');
 
@@ -26,8 +26,12 @@ const ANSWER = {
 
 const answering = (status, data) => ({ post: jest.fn(async () => ({ status, data })) });
 
-test('the page CSP no longer allows the discovery origin: no page fetches it', () => {
-  expect(CONTROL_PLANE_URLS.map((u) => new URL(u).origin)).not.toContain(new URL(HOSTED_DISCOVERY_URL).origin);
+test('no page fetches discovery; the same host serves the help center, allowed on the help pages only', () => {
+  const { buildContentSecurityPolicy, HELP_CENTER_PAGES } = require('../../electron-csp');
+  expect(HELP_CENTER_ORIGIN).toBe(new URL(HOSTED_DISCOVERY_URL).origin);
+  const connect = (page) => buildContentSecurityPolicy({ page, nonce: 'Tm9uY2U0', origins: { help: [HELP_CENTER_ORIGIN] } }).split(';').find((d) => d.trim().startsWith('connect-src'));
+  for (const page of ['dashboard.html', 'workspaces.html', 'settings-v2.html']) expect(connect(page)).not.toContain(HELP_CENTER_ORIGIN);
+  for (const page of HELP_CENTER_PAGES) expect(connect(page)).toContain(HELP_CENTER_ORIGIN);
 });
 
 describe('requestDiscovery', () => {
