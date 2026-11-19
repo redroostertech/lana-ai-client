@@ -43,20 +43,69 @@
     return time().wallClockInTimeZone(instant, zone);
   }
 
+  var DEFAULT_START_MINUTES = 9 * 60;
+
+  // The work day the grid shows (calendar-layout.js), Monday to Friday.
+  function workDay() {
+    var L = global.LanaCalendarLayout;
+    return {
+      start: L && Number.isFinite(L.WORKDAY_START_MINUTES) ? L.WORKDAY_START_MINUTES : 8 * 60,
+      end: L && Number.isFinite(L.WORKDAY_END_MINUTES) ? L.WORKDAY_END_MINUTES : 18 * 60
+    };
+  }
+
+  function isWeekday(day) {
+    var weekday = new Date(day + 'T12:00:00Z').getUTCDay();
+    return weekday >= 1 && weekday <= 5;
+  }
+
   /**
-   * Values for a new event starting at `minutes` on `day` (the clicked slot,
-   * else the next half hour), one hour long, in the viewer's zone.
+   * Where a new event starts when no slot was clicked: on today during the
+   * work day, the next half hour; before it, 9 AM today; after it (or on a
+   * weekend), 9 AM the next work day. On any other selected day, 9 AM.
+   * keepDay (a day the person clicked): never moves to another day; outside
+   * the work day it is 9 AM on that day.
+   */
+  function defaultStart(selectedDay, zone, now, keepDay) {
+    var T = time();
+    var wall = wallOf(now || T.nowDate(), zone) || { day: selectedDay, minutes: 0 };
+    var day = selectedDay || wall.day;
+    if (day !== wall.day) return { day: day, minutes: DEFAULT_START_MINUTES };
+    var hours = workDay();
+    var next = Math.ceil(wall.minutes / 30) * 30;
+    var weekday = isWeekday(day);
+    if (weekday && wall.minutes >= hours.start && next < hours.end) return { day: day, minutes: next };
+    if (keepDay || (weekday && wall.minutes < hours.start)) return { day: day, minutes: DEFAULT_START_MINUTES };
+    var nextDay = T.addPlainDays(day, 1);
+    while (!isWeekday(nextDay)) nextDay = T.addPlainDays(nextDay, 1);
+    return { day: nextDay, minutes: DEFAULT_START_MINUTES };
+  }
+
+  /**
+   * Values for a new event, one hour long, in the viewer's zone: at
+   * `minutes` on `day` when a slot was clicked, else at defaultStart.
+   * explicitDay: `day` was clicked (a month date), so it is kept.
+   * `now` is for tests.
    */
   function draftForNew(input) {
     var opts = input || {};
     var zone = opts.timeZone || 'UTC';
     var T = time();
-    var day = opts.day || T.dayInTimeZone(T.nowDate(), zone);
-    var start = Number.isFinite(opts.minutes) ? opts.minutes : Math.min(23 * 60, Math.ceil(((wallOf(T.nowDate(), zone) || {}).minutes || 540) / 30) * 30);
+    var day;
+    var start;
+    if (Number.isFinite(opts.minutes)) {
+      day = opts.day || T.dayInTimeZone(opts.now || T.nowDate(), zone);
+      start = opts.minutes;
+    } else {
+      var chosen = defaultStart(opts.day, zone, opts.now, opts.explicitDay === true && !!opts.day);
+      day = chosen.day;
+      start = chosen.minutes;
+    }
     var end = Math.min(24 * 60 - 1, start + DEFAULT_MINUTES);
     return {
       id: null,
       title: '',
+      location: '',
       is_all_day: opts.allDay === true,
       start_date: day,
       start_time: hhmm(start),
@@ -86,6 +135,7 @@
     return {
       id: event.calendar_event_id || null,
       title: event.title || '',
+      location: event.location || '',
       is_all_day: event.is_all_day === true,
       start_date: start.day,
       start_time: hhmm(start.minutes),
@@ -114,7 +164,7 @@
       // stored until repeating events can be edited (stage 2 part 6).
       var keptTitle = String(v.title || '').trim();
       if (!keptTitle) return { errors: [{ name: 'title', message: 'Give the event a title.' }] };
-      return { body: { title: keptTitle, visibility: v.visibility === 'private' ? 'private' : 'public', description: String(v.description || '') } };
+      return { body: { title: keptTitle, visibility: v.visibility === 'private' ? 'private' : 'public', description: String(v.description || ''), location: String(v.location || '').trim() } };
     }
     var T = time();
     var errors = [];
@@ -153,7 +203,9 @@
         start_time: start.toISOString(),
         end_time: end.toISOString(),
         visibility: v.visibility === 'private' ? 'private' : 'public',
-        description: String(v.description || '')
+        description: String(v.description || ''),
+        // The API takes a string, not null: an empty one clears it.
+        location: String(v.location || '').trim()
       }
     };
   }
@@ -199,6 +251,37 @@
   }
 
   /**
+   * The id to read in full (GET /calendar-events/:id) for the details panel:
+   * a LANA event the viewer can read. A busy block has no details and an
+   * event from a connected app ("cd:" ids) has no detail endpoint; both use
+   * only what the agenda gave.
+   */
+  function detailId(item) {
+    if (!item || item.busy || !item.id) return null;
+    return /^cd:/.test(String(item.id)) ? null : String(item.id);
+  }
+
+  /** The location row: from the detail, never on a busy block (like the title). */
+  function detailLocation(item, detail) {
+    if (!item || item.busy || !detail) return '';
+    return String(detail.location || '').trim();
+  }
+
+  /**
+   * The links row: every link the detail lists (the server returns only the
+   * ones the viewer may read: matter, workspace, task). Before the detail
+   * arrives, or for an event with no detail, the agenda's matter. A busy
+   * block lists none.
+   */
+  function detailLinks(item, detail) {
+    if (!item || item.busy) return [];
+    if (detail && Array.isArray(detail.links)) return detail.links.map(linkText);
+    var matter = item.matter;
+    if (!matter || !(matter.name || matter.matter_id)) return [];
+    return [linkText({ target_type: 'matter', label: matter.name || matter.matter_id })];
+  }
+
+  /**
    * The warning shown for a 409 CALENDAR_CONFLICT: one line per overlapping
    * block, in the viewer's zone. A block the viewer may not read says Busy.
    */
@@ -234,6 +317,9 @@
     attendeeOptions: attendeeOptions,
     linkOptions: linkOptions,
     linkText: linkText,
+    detailId: detailId,
+    detailLocation: detailLocation,
+    detailLinks: detailLinks,
     conflictLines: conflictLines,
     isConflict: isConflict,
     conflictsOf: conflictsOf

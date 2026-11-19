@@ -14,7 +14,7 @@ const { JSDOM, VirtualConsole } = require('jsdom');
 const SRC = path.join(__dirname, '../../src');
 const read = (rel) => fs.readFileSync(path.join(SRC, rel), 'utf8');
 
-const IDS = ['calEditDrawer', 'calEventForm', 'calFieldTitle', 'calFieldAllDay', 'calFieldStartDate', 'calFieldStartTime', 'calFieldEndDate',
+const IDS = ['calEditDrawer', 'calEventForm', 'calFieldTitle', 'calFieldLocation', 'calFieldAllDay', 'calFieldStartDate', 'calFieldStartTime', 'calFieldEndDate',
   'calFieldEndTime', 'calFieldZone', 'calFieldAttendees', 'calFieldVisibility', 'calFieldDescription', 'calLinkList', 'calLinkEmpty',
   'calLinkType', 'calLinkTarget', 'calLinkAddBtn', 'calEditError', 'calDeleteBtn', 'calRecurringNote'];
 
@@ -101,10 +101,12 @@ describe('calendar event drawer', () => {
     calendar: { is_mine: true }, can_edit: true, can_delete: true, ...overrides });
 
   test('a repeating event: time fields locked, a save sends only the details, and a drag saves nothing (review C5)', async () => {
-    const { w, drawer, calls } = setup({ detail: existing({ recurrence_rule: 'FREQ=WEEKLY' }) });
+    const { w, drawer, calls } = setup({ detail: existing({ recurrence_rule: 'FREQ=WEEKLY', location: 'Room 4' }) });
     await drawer.openEdit('CAL-5');
     await settle();
     const doc = w.document;
+    expect(doc.getElementById('calFieldLocation').value).toBe('Room 4');
+    doc.getElementById('calFieldLocation').value = 'Room 7';
     expect(doc.getElementById('calFieldStartTime').disabled).toBe(true);
     expect(doc.getElementById('calRecurringNote').classList.contains('hidden')).toBe(false);
     drawer.save();
@@ -112,7 +114,7 @@ describe('calendar event drawer', () => {
     const body = calls.filter((c) => c[0] === 'update').pop()[2];
     expect(body).not.toHaveProperty('start_time');
     expect(body).not.toHaveProperty('end_time');
-    expect(body).toMatchObject({ title: 'Weekly sync' });
+    expect(body).toMatchObject({ title: 'Weekly sync', location: 'Room 7' });
     const before = calls.length;
     await drawer.move({ id: 'CAL-5', recurring: true }, '2026-11-19T14:00:00.000Z', '2026-11-19T15:00:00.000Z');
     expect(calls).toHaveLength(before);
@@ -128,4 +130,15 @@ describe('calendar event drawer', () => {
     await settle();
     expect(asOwner.w.document.getElementById('calDeleteBtn').classList.contains('hidden')).toBe(false);
   });
+
+  test('a clicked month date keeps its day after hours; the New button moves to the next work day', () => {
+    const { w, drawer } = setup();
+    w.LanaTime.nowDate = () => new Date('2026-11-21T23:30:00Z'); // Saturday 6:30 PM New York
+    const value = (id) => w.document.getElementById(id).value;
+    drawer.openNew({ day: '2026-11-21', minutes: null, explicitDay: true });
+    expect([value('calFieldStartDate'), value('calFieldStartTime')]).toEqual(['2026-11-21', '09:00']);
+    drawer.openNew({ day: '2026-11-21' });
+    expect([value('calFieldStartDate'), value('calFieldStartTime')]).toEqual(['2026-11-23', '09:00']);
+  });
 });
+

@@ -82,6 +82,14 @@ describe('lex-sidebar theme', () => {
     expect(light['--lex-sidebar-menu-hover-bg']).toBe('var(--lex-color-gray-100)');
   });
 
+  test('dark: the selected row stands apart from hover, from the sidebar tokens (calendar screenshots, 2026-11-18)', () => {
+    const css = read('css/lex-tokens.css');
+    const dark = block(css, 'lex-sidebar[data-lex-theme="dark"]');
+    expect(dark['--lex-sidebar-hover-bg']).toBe('#2D2B27');
+    expect(dark['--lex-sidebar-active-bg']).toBe('color-mix(in srgb, var(--lex-sidebar-text-active) 14%, var(--lex-sidebar-bg))');
+    expect(block(css, 'lex-sidebar[data-lex-theme="light"]')['--lex-sidebar-active-bg']).toBe('var(--lex-color-gray-300)');
+  });
+
   test('group titles and the app menu hover read the sidebar tokens, not the page status colors', () => {
     const code = read('js/lex/components/layout/lex-sidebar.js');
     const rule = (sel) => code.slice(code.indexOf(sel + ' {'), code.indexOf('}', code.indexOf(sel + ' {')));

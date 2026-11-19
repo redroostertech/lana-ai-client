@@ -67,6 +67,7 @@
 
     function setValues(values) {
       field('calFieldTitle').value = values.title;
+      field('calFieldLocation').value = values.location || '';
       field('calFieldAllDay').checked = values.is_all_day;
       field('calFieldStartDate').value = values.start_date;
       field('calFieldStartTime').value = values.start_time;
@@ -88,6 +89,7 @@
       var attendees = field('calFieldAttendees').value;
       return {
         title: field('calFieldTitle').value,
+        location: field('calFieldLocation').value,
         is_all_day: field('calFieldAllDay').checked === true,
         start_date: field('calFieldStartDate').value,
         start_time: field('calFieldStartTime').value,
@@ -186,7 +188,7 @@
       var s = slot || {};
       state.detail = null;
       state.pendingLinks = [];
-      setValues(Form.draftForNew({ day: s.day, minutes: s.minutes === null ? undefined : s.minutes, allDay: s.allDay === true, timeZone: viewerZone() }));
+      setValues(Form.draftForNew({ day: s.day, explicitDay: s.explicitDay === true, minutes: s.minutes === null ? undefined : s.minutes, allDay: s.allDay === true, timeZone: viewerZone() }));
       setTimesLocked(false);
       openDrawer('New event', false);
     }

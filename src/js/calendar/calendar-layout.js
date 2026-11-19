@@ -428,6 +428,7 @@
     monthCapacity: monthCapacity,
     initialScrollMinutes: initialScrollMinutes,
     WORKDAY_START_MINUTES: WORKDAY_START_MINUTES,
+    WORKDAY_END_MINUTES: WORKDAY_END_MINUTES,
     snapMinutes: snapMinutes,
     dragResult: dragResult,
     minutesAtOffset: minutesAtOffset,

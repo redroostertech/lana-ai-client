@@ -17,6 +17,7 @@
   'use strict';
 
   var Model = window.LanaCalendarPageModel;
+  var Form = window.LanaCalendarEventForm;
   var Layout = window.LanaCalendarLayout;
   var T = window.LanaTime;
   var Calendar = window.LanaCalendarApi.create(window.api);
@@ -30,6 +31,7 @@
     viewerId: '',
     canManage: false,
     loadSequence: 0,
+    detailSequence: 0,
     agenda: null
   };
 
@@ -187,9 +189,7 @@
     show(el('calDetailStatusRow'), !!STATUS_LABELS[item.status]);
     setText('calDetailOrganizer', item.organizer);
     show(el('calDetailOrganizerRow'), !!item.organizer);
-    var matter = item.matter;
-    setText('calDetailMatter', matter ? (matter.name || matter.matter_id || '') : '');
-    show(el('calDetailMatterRow'), !!matter);
+    renderDetailExtras(item, null);
 
     var readOnlyNote = el('calDetailReadOnly');
     var target = Model.openTargetFor(item.busy ? { busy_only: true } : { source: item.source }, {
@@ -210,6 +210,30 @@
     // A LANA event the viewer may change opens for editing.
     show(el('calEditBtn'), !item.busy && !item.readOnly && (!item.source || item.source.kind !== 'connector'));
     drawer.open = true;
+    // The agenda carries no location or links: a LANA event the viewer can
+    // read is fetched in full. Only the answer for the event still shown lands.
+    var sequence = ++state.detailSequence;
+    var id = Form.detailId(item);
+    if (!id) return;
+    Calendar.getEvent(id).then(function (detail) {
+      if (sequence === state.detailSequence && state.openItem === item) renderDetailExtras(item, detail);
+    }).catch(function () {
+      // The panel keeps what the agenda gave.
+    });
+  }
+
+  // Rows that come from the event detail (GET /calendar-events/:id).
+  function renderDetailExtras(item, detail) {
+    var location = Form.detailLocation(item, detail);
+    setText('calDetailLocation', location);
+    show(el('calDetailLocationRow'), !!location);
+    var links = Form.detailLinks(item, detail);
+    var list = el('calDetailLinks');
+    if (list) {
+      var esc = window.Lex.Utils.escapeHtml;
+      list.innerHTML = links.map(function (text) { return '<li>' + esc(text) + '</li>'; }).join('');
+    }
+    show(el('calDetailLinksRow'), links.length > 0);
   }
 
   function openSource() {
@@ -282,7 +306,8 @@
       if (editor) editor.openNew({ day: state.view === 'month' ? T.dayInTimeZone(T.nowDate(), currentZone()) : state.day });
     });
     el('calGrid').addEventListener('lex-calendar-create', function (e) {
-      if (editor && e.detail) editor.openNew({ day: e.detail.day, minutes: e.detail.minutes, allDay: e.detail.allDay });
+      // A day the person clicked is kept (the New button may move after hours).
+      if (editor && e.detail) editor.openNew({ day: e.detail.day, explicitDay: true, minutes: e.detail.minutes, allDay: e.detail.allDay });
     });
     el('calGrid').addEventListener('lex-calendar-move', function (e) {
       var d = e.detail || {};

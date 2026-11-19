@@ -88,7 +88,8 @@
             <div class="cal-detail-row"><dt>Source</dt><dd id="calDetailSource"></dd></div>
             <div id="calDetailStatusRow" class="cal-detail-row"><dt>Status</dt><dd id="calDetailStatus"></dd></div>
             <div id="calDetailOrganizerRow" class="cal-detail-row"><dt>Organizer</dt><dd id="calDetailOrganizer"></dd></div>
-            <div id="calDetailMatterRow" class="cal-detail-row"><dt>Matter</dt><dd id="calDetailMatter"></dd></div>
+            <div id="calDetailLocationRow" class="cal-detail-row hidden"><dt>Location</dt><dd id="calDetailLocation"></dd></div>
+            <div id="calDetailLinksRow" class="cal-detail-row hidden"><dt>Linked to</dt><dd><ul id="calDetailLinks" class="cal-detail-links"></ul></dd></div>
           </dl>
           <p id="calDetailReadOnly" class="cal-help hidden"></p>
           <div class="cal-detail-actions">
@@ -111,6 +112,7 @@
             <lex-input id="calFieldEndTime" name="end_time" type="time" label="End time" class="cal-time-field"></lex-input>
           </div>
           <lex-select id="calFieldZone" name="time_zone" label="Time zone" searchable></lex-select>
+          <lex-input id="calFieldLocation" name="location" label="Location" maxlength="500" placeholder="Add a room, address or meeting link"></lex-input>
           <lex-select id="calFieldAttendees" name="attendees" label="Invite people" multiple searchable clearable placeholder="Add people from your firm"></lex-select>
           <div class="cal-form-field">
             <span class="cal-form-label" id="calFieldVisibilityLabel">Who can see the details</span>

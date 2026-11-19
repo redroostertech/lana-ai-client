@@ -36,8 +36,15 @@ function buildDrawerFooterButtons(buttons, escapeHtml) {
   }).join('');
 }
 
+// Pure helper: true while the body has content below what shows (a pixel of
+// slack for fractional scroll positions).
+function hasMoreBelow(metrics) {
+  var m = metrics || {};
+  return m.clientHeight > 0 && m.scrollTop + m.clientHeight < m.scrollHeight - 1;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { buildDrawerFooterButtons: buildDrawerFooterButtons };
+  module.exports = { buildDrawerFooterButtons: buildDrawerFooterButtons, hasMoreBelow: hasMoreBelow };
 }
 
 if (typeof window !== 'undefined' && window.Lex) (function () {
@@ -81,7 +88,9 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
       .lex-drawer-backdrop {
         position: fixed;
         inset: 0;
-        background: rgba(0, 0, 0, 0.4);
+        /* Shared with lex-modal; the dark value dims more (lex-tokens.css). The fallback is
+           the light value, for pages without lex-tokens.css. */
+        background: var(--lex-modal-overlay, rgba(13, 8, 7, 0.5));
         animation: lex-drawer-fade-in var(--lex-duration-fade, 200ms) var(--lex-ease-out, ease);
       }
 
@@ -233,6 +242,13 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
         border-top: 1px solid var(--lex-border-subtle, rgba(0,0,0,0.06));
         background: var(--lex-bg-secondary);
         flex-shrink: 0;
+      }
+      /* Content continues under the footer: it casts a shadow up over the
+         body, so a control cut at its edge reads as "scroll for more". */
+      .lex-drawer-panel--more-below > .lex-drawer-footer {
+        position: relative;
+        border-top-color: var(--lex-border-strong);
+        box-shadow: 0 -10px 14px -10px var(--lex-modal-overlay);
       }
       .lex-drawer-footer:empty {
         display: none;
@@ -581,6 +597,8 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
         });
       }
 
+      this._watchScrollCue(panel);
+
       this.delegate('click', '[data-action="close"]', () => {
         this.emit('lex-close');
         this.open = false;
@@ -626,6 +644,41 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
           this._scrollLocked = false;
         }
       });
+    }
+
+    // Keep lex-drawer-panel--more-below in step with the body's scroll
+    // position and its content size while open.
+    _watchScrollCue(panel) {
+      const body = panel && panel.querySelector('.lex-drawer-body');
+      if (!body) return;
+      const sync = () => {
+        panel.classList.toggle('lex-drawer-panel--more-below',
+          hasMoreBelow({ scrollTop: body.scrollTop, clientHeight: body.clientHeight, scrollHeight: body.scrollHeight }));
+      };
+      this.listen(body, 'scroll', sync, { passive: true });
+      // The body's own size (window resize, expand) and the size of what it
+      // holds. slot-content is inline (no box to observe), so its children
+      // are watched, and a MutationObserver brings in children added later.
+      const content = body.querySelector('slot-content');
+      const resize = typeof ResizeObserver === 'function' ? new ResizeObserver(sync) : null;
+      if (resize) {
+        resize.observe(body);
+        if (content) Array.from(content.children).forEach((child) => resize.observe(child));
+        this._eventCleanups.push(() => resize.disconnect());
+      }
+      if (content && typeof MutationObserver === 'function') {
+        const mutations = new MutationObserver((records) => {
+          if (resize) {
+            records.forEach((record) => record.addedNodes.forEach((node) => {
+              if (node.nodeType === 1 && node.parentNode === content) resize.observe(node);
+            }));
+          }
+          sync();
+        });
+        mutations.observe(content, { childList: true, subtree: true, characterData: true });
+        this._eventCleanups.push(() => mutations.disconnect());
+      }
+      (typeof requestAnimationFrame === 'function' ? requestAnimationFrame : setTimeout)(sync);
     }
 
     // --- Instance API ---

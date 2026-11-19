@@ -21,7 +21,7 @@ async function mount(props) {
   });
   const w = dom.window;
   opened.push(w);
-  ['js/time-utils.js', 'js/lex/lex.core.js', 'js/calendar/calendar-layout.js', 'js/lex/components/data/lex-calendar-grid.js']
+  ['js/time-utils.js', 'js/lex/lex.core.js', 'js/lex/lex.utils.js', 'js/calendar/calendar-layout.js', 'js/lex/components/data/lex-calendar-grid.js']
     .forEach((rel) => w.eval(read(rel)));
   const grid = w.document.getElementById('g');
   Object.assign(grid, props);
@@ -174,6 +174,36 @@ describe('lex-calendar-grid', () => {
       expect(width('D')).toBeCloseTo(200 / 3);
     });
 
+    test('every event has a native tooltip with its full title and time, escaped', async () => {
+      const { grid } = await mount({ timeZone: 'UTC', days: ['2026-11-18'], items: [
+        { id: 't', title: 'Free consultation: "Harper" <family>', start: '2026-11-18T14:00:00Z', end: '2026-11-18T15:00:00Z', variant: 'mine' },
+        { id: 'a', title: 'CLE: Elder law update', is_all_day: true, start_date: '2026-11-18', end_date: '2026-11-19', variant: 'mine' }
+      ] });
+      const timed = grid.querySelector('.lex-cal-timed');
+      expect(timed.getAttribute('title')).toBe('Free consultation: "Harper" <family>, 2:00 PM to 3:00 PM');
+      expect(grid.querySelector('.lex-cal-allday-bar').getAttribute('title')).toBe('CLE: Elder law update, all day');
+      expect(timed.getAttribute('aria-label')).toMatch(/^Free consultation: "Harper" <family>, 2:00 PM to 3:00 PM/);
+    });
+
+    test('month items carry the tooltip too', async () => {
+      const { w, grid } = await mount({ timeZone: 'UTC', days: [] });
+      Object.assign(grid, { view: 'month', days: w.LanaCalendarLayout.viewDays('month', '2026-11-18'), items: [
+        { id: 'm', title: 'Weekly case review', start: '2026-11-20T15:00:00Z', end: '2026-11-20T16:00:00Z', variant: 'mine' }
+      ] });
+      await new Promise((resolve) => w.setTimeout(resolve, 0));
+      expect(grid.querySelector('.lex-cal-month-item').getAttribute('title')).toBe('Weekly case review, 3:00 PM to 4:00 PM');
+    });
+
+    test('an event of 45 minutes or more may wrap its title to two lines; a shorter one stays one line', async () => {
+      const { grid } = await mount({ timeZone: 'UTC', days: ['2026-11-18'], items: [
+        { id: 's', title: 'Quick call', start: '2026-11-18T09:00:00Z', end: '2026-11-18T09:30:00Z', variant: 'mine' },
+        { id: 'h', title: 'Estate plan review: Chen', start: '2026-11-18T11:00:00Z', end: '2026-11-18T12:00:00Z', variant: 'mine' }
+      ] });
+      const [short, hour] = grid.querySelectorAll('.lex-cal-timed');
+      expect(short.classList.contains('lex-cal-timed--wrap')).toBe(false);
+      expect(hour.classList.contains('lex-cal-timed--wrap')).toBe(true);
+    });
+
     test('the all-day chip carries no badge (the badge is in its label)', async () => {
       const { grid } = await mount({ timeZone: 'UTC', days: ['2026-11-18'], items: [
         { id: 'c', title: 'CLE: Elder law', is_all_day: true, start_date: '2026-11-18', end_date: '2026-11-19', variant: 'mine', badge: { label: 'Leadli', kind: 'connector' } }
@@ -183,5 +213,30 @@ describe('lex-calendar-grid', () => {
       expect(bar.getAttribute('aria-label')).toContain('Leadli');
     });
   });
-});
 
+  describe('grid edges (calendar screenshots, 2026-11-18)', () => {
+    const css = read('css/lex-calendar-grid.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    // Every rule whose selector list ends with `selector`, joined.
+    const rule = (selector) => {
+      const out = [];
+      for (let at = css.indexOf(selector + ' {'); at !== -1; at = css.indexOf(selector + ' {', at + 1)) {
+        out.push(css.slice(at, css.indexOf('}', at)));
+      }
+      return out.join('\n');
+    };
+
+    test('the scrollbar never covers the last column: the body keeps a gutter and the rows above match it', () => {
+      expect(rule('.lex-cal-body')).toMatch(/scrollbar-gutter:\s*stable/);
+      expect(rule('.lex-cal-head,\n.lex-cal-allday')).toMatch(/scrollbar-gutter:\s*stable/);
+      expect(rule('.lex-cal-head,\n.lex-cal-allday,\n.lex-cal-body')).toMatch(/padding-right:\s*var\(--cal-scroll-pad\)/);
+    });
+
+    test('hour labels sit inside their hour, so the top one is never cut by the all-day row', async () => {
+      expect(rule('.lex-cal-hour span')).not.toMatch(/top:\s*-/);
+      const { grid } = await mount({ timeZone: 'UTC', days: ['2026-11-18'], items: [] });
+      const labels = [...grid.querySelectorAll('.lex-cal-hour span')].map((n) => n.textContent);
+      expect(labels.slice(0, 2)).toEqual(['12 AM', '1 AM']);
+      expect(labels[8]).toBe('8 AM');
+    });
+  });
+});

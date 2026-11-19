@@ -21,7 +21,7 @@ afterEach(() => { opened.splice(0).forEach((w) => w.close()); });
 
 const settle = async (w) => { for (let i = 0; i < 10; i += 1) await new Promise((resolve) => w.setTimeout(resolve, 0)); };
 
-async function setup({ canManage = false, agendaError = null } = {}) {
+async function setup({ canManage = false, agendaError = null, editorCalls = null, heldDetails = null } = {}) {
   const page = read('calendar.html');
   const template = page.slice(page.indexOf('<template id="page-content">') + '<template id="page-content">'.length, page.indexOf('</template>'));
   const dom = new JSDOM(`<!doctype html><html><body><div id="lex-main-content">${template}</div></body></html>`, {
@@ -51,6 +51,19 @@ async function setup({ canManage = false, agendaError = null } = {}) {
       return Promise.resolve({ data: { members: [{ user_id: VIEWER, name: 'Me' }, { user_id: COWORKER, name: 'Sam' }],
         unlinked: [{ id: 'i1', name: 'Pat Intake', label: 'not linked to a LANA user' }], freebusy_visible: true, can_manage: canManage } });
     }
+    // heldDetails: detail calls wait until the test resolves them, by id.
+    if (heldDetails && url.startsWith('/api/v1/calendar-events/')) {
+      const id = url.split('/').pop();
+      return new Promise((resolve) => { heldDetails[id] = () => resolve({ data: { calendar_event_id: id, title: id, location: 'Room of ' + id, links: [] } }); });
+    }
+    if (url === '/api/v1/calendar-events/EVENT-1') {
+      return Promise.resolve({ data: { calendar_event_id: 'EVENT-1', title: 'Client call', location: 'Conference room A',
+        links: [
+          { target_type: 'matter', target_id: 'm1', label: 'Rivera Estate Plan' },
+          { target_type: 'workspace', target_id: 'w1', label: 'Rivera signing workspace' },
+          { target_type: 'task', target_id: 't1', label: 'Prepare signing packet' }
+        ] } });
+    }
     if (url === '/api/v1/calendars/policy') return Promise.resolve({ data: { freebusy_visible_to_members: true } });
     return Promise.reject(new Error('unexpected ' + url));
   };
@@ -61,8 +74,14 @@ async function setup({ canManage = false, agendaError = null } = {}) {
     'js/lex/components/foundation/lex-btn.js', 'js/lex/components/foundation/lex-banner.js', 'js/lex/components/foundation/lex-badge.js',
     'js/lex/components/foundation/lex-drawer.js', 'js/lex/components/form/lex-select.js', 'js/lex/components/form/lex-segmented.js',
     'js/lex/components/form/lex-toggle.js', 'js/calendar/calendar-layout.js', 'js/lex/components/data/lex-calendar-grid.js',
-    'js/shared/device-time-zone.js', 'js/services/calendar-api.service.js', 'js/calendar/calendar-page.model.js', 'js/calendar/calendar-page.js'
-  ].forEach((rel) => w.eval(read(rel)));
+    'js/shared/device-time-zone.js', 'js/services/calendar-api.service.js', 'js/calendar/calendar-page.model.js', 'js/calendar/calendar-event-form.model.js', 'js/calendar/calendar-page.js'
+  ].forEach((rel) => {
+    // Stand in for the event drawer before the page creates its editor.
+    if (editorCalls && rel === 'js/calendar/calendar-page.js') {
+      w.LanaCalendarEventDrawer = { create: () => ({ openNew: (slot) => editorCalls.push(slot), openEdit() {}, move() {} }) };
+    }
+    w.eval(read(rel));
+  });
   await settle(w);
   return { w, calls, doc: w.document };
 }
@@ -109,4 +128,52 @@ describe('calendar page', () => {
     await settle(w);
     expect(doc.getElementById('calNotice').textContent).toBe('Your firm shows each person only their own calendar, so coworkers cannot be added.');
   });
+
+  test('the details panel reads a LANA event in full and shows its location; a busy block shows none', async () => {
+    const { w, calls, doc } = await setup();
+    const grid = doc.getElementById('calGrid');
+    const item = (title) => grid.items.find((i) => i.title === title);
+    grid.dispatchEvent(new w.CustomEvent('lex-calendar-open', { detail: { item: item('Client call') }, bubbles: true }));
+    await settle(w);
+    expect(calls.some((c) => c[1] === '/api/v1/calendar-events/EVENT-1')).toBe(true);
+    expect(doc.getElementById('calDetailLocation').textContent).toBe('Conference room A');
+    expect(doc.getElementById('calDetailLocationRow').classList.contains('hidden')).toBe(false);
+    expect([...doc.querySelectorAll('#calDetailLinks li')].map((n) => n.textContent)).toEqual([
+      'Matter: Rivera Estate Plan', 'Workspace: Rivera signing workspace', 'Task: Prepare signing packet'
+    ]);
+
+    const before = calls.length;
+    grid.dispatchEvent(new w.CustomEvent('lex-calendar-open', { detail: { item: item('Busy') }, bubbles: true }));
+    await settle(w);
+    expect(calls.slice(before).some((c) => c[1].startsWith('/api/v1/calendar-events/'))).toBe(false);
+    expect(doc.getElementById('calDetailLocation').textContent).toBe('');
+    expect(doc.getElementById('calDetailLocationRow').classList.contains('hidden')).toBe(true);
+    expect(doc.getElementById('calDetailLinksRow').classList.contains('hidden')).toBe(true);
+  });
+
+  test('a day clicked on the grid opens New event on that day (explicitDay); the New button does not', async () => {
+    const editorCalls = [];
+    const { w, doc } = await setup({ editorCalls });
+    doc.getElementById('calGrid').dispatchEvent(new w.CustomEvent('lex-calendar-create', { detail: { day: '2026-11-21', minutes: null, allDay: false }, bubbles: true }));
+    doc.getElementById('calNewBtn').click();
+    expect(editorCalls[0]).toMatchObject({ day: '2026-11-21', explicitDay: true, minutes: null });
+    expect(editorCalls[1].explicitDay).toBeUndefined();
+  });
+
+  test('a slow detail for an event no longer shown never replaces the open one', async () => {
+    const heldDetails = {};
+    const { w, doc } = await setup({ heldDetails });
+    const grid = doc.getElementById('calGrid');
+    const base = grid.items.find((i) => i.title === 'Client call');
+    const open = (item) => grid.dispatchEvent(new w.CustomEvent('lex-calendar-open', { detail: { item }, bubbles: true }));
+    open({ ...base, id: 'EVENT-A', title: 'A' });
+    open({ ...base, id: 'EVENT-B', title: 'B' });
+    heldDetails['EVENT-B']();
+    await settle(w);
+    expect(doc.getElementById('calDetailLocation').textContent).toBe('Room of EVENT-B');
+    heldDetails['EVENT-A']();
+    await settle(w);
+    expect(doc.getElementById('calDetailLocation').textContent).toBe('Room of EVENT-B');
+  });
 });
+

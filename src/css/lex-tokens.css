@@ -449,7 +449,8 @@
   --lex-sidebar-text-muted:   #7A756D;
   --lex-sidebar-section-text: #A9A49D;
   --lex-sidebar-hover-bg:     #2D2B27;
-  --lex-sidebar-active-bg:    #2D2B27;
+  /* Selected row: lighter than hover (#2D2B27) so it reads on the dark sidebar. */
+  --lex-sidebar-active-bg:    color-mix(in srgb, var(--lex-sidebar-text-active) 14%, var(--lex-sidebar-bg));
   --lex-sidebar-border:       #2D2B27;
   --lex-sidebar-logo-height:  28px;
   --lex-sidebar-item-gap:     4px;
@@ -688,7 +689,8 @@
     --lex-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.45), 0 2px 4px -2px rgba(0, 0, 0, 0.35);
     --lex-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.45), 0 4px 6px -4px rgba(0, 0, 0, 0.35);
     --lex-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
-    --lex-modal-overlay: rgba(0, 0, 0, 0.6);
+    /* Dark pages are already near black: the backdrop needs more to read as dimmed. */
+    --lex-modal-overlay: rgba(0, 0, 0, 0.72);
     --lex-focus-ring-color: rgba(103, 201, 160, 0.35);
 
     /* Components */
@@ -1131,7 +1133,8 @@ lex-sidebar[data-lex-theme="dark"] {
   --lex-sidebar-text-muted:   #7A756D;
   --lex-sidebar-section-text: #A9A49D;
   --lex-sidebar-hover-bg:     #2D2B27;
-  --lex-sidebar-active-bg:    #2D2B27;
+  /* Selected row: lighter than hover (#2D2B27) so it reads on the dark sidebar. */
+  --lex-sidebar-active-bg:    color-mix(in srgb, var(--lex-sidebar-text-active) 14%, var(--lex-sidebar-bg));
   --lex-sidebar-border:       #2D2B27;
   --lex-sidebar-avatar-bg:    #595246;
   --lex-sidebar-avatar-text:  #FFFFFF;

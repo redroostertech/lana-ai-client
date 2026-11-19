@@ -146,7 +146,7 @@ describe('event drawer model', () => {
   test('payload: wall times in the event zone become instants', () => {
     const { body } = F.toPayload({ title: ' Consult ', start_date: '2026-11-18', start_time: '09:00', end_date: '2026-11-18', end_time: '10:15', time_zone: NY });
     expect(body).toEqual({ title: 'Consult', is_all_day: false, timezone: NY, start_time: '2026-11-18T14:00:00.000Z',
-      end_time: '2026-11-18T15:15:00.000Z', visibility: 'public', description: '' });
+      end_time: '2026-11-18T15:15:00.000Z', visibility: 'public', description: '', location: '' });
   });
 
   test('payload: an all-day event runs midnight to the midnight after its last day', () => {

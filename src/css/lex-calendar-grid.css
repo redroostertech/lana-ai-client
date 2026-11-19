@@ -10,6 +10,9 @@ lex-calendar-grid {
   container: lex-calendar-grid / inline-size;
   --cal-gutter: 56px;
   --cal-hour-height: 48px;
+  /* Room right of the last column for a scrollbar that overlays content
+     (macOS); a classic one gets its own gutter (scrollbar-gutter below). */
+  --cal-scroll-pad: 8px;
   --cal-person-0: var(--lex-chart-color-3);
   --cal-person-1: var(--lex-chart-color-2);
   --cal-person-2: var(--lex-chart-color-1);
@@ -38,6 +41,15 @@ lex-calendar-grid {
 .lex-cal-body {
   display: grid;
   grid-template-columns: var(--cal-gutter) minmax(0, 1fr);
+  padding-right: var(--cal-scroll-pad);
+}
+
+/* The rows above the scrolling body reserve the same scrollbar gutter, so
+   the day columns stay aligned where scrollbars take space (Windows). */
+.lex-cal-head,
+.lex-cal-allday {
+  overflow-y: hidden;
+  scrollbar-gutter: stable;
 }
 
 .lex-cal-head {
@@ -101,6 +113,7 @@ lex-calendar-grid {
 .lex-cal-body {
   max-height: 640px;
   overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .lex-cal-gutter {
@@ -117,8 +130,10 @@ lex-calendar-grid {
 }
 
 .lex-cal-hour span {
+  /* Inside its hour, under the line: a label is never half hidden at the
+     top of the scrolling body, under the all-day row. */
   position: absolute;
-  top: -7px;
+  top: 2px;
   right: 6px;
 }
 
@@ -206,16 +221,41 @@ lex-calendar-grid {
   transform: translate(var(--cal-drag-x, 0px), var(--cal-drag-y, 0px));
 }
 
-/* An event of 75 minutes or more lets its title use two lines before it
-   clips, so a narrow overlapping event still reads; shorter ones keep one
-   line so the time is never drawn over a cut second line. */
-.lex-cal-timed--tall .lex-cal-event-title {
+/* An event of 45 minutes or more lets its title use two lines, so a narrow
+   or overlapping event still reads (the full title is in its tooltip). The
+   column wraps: a line (time, badge) that does not fit under the title moves
+   to a second flex column, which starts past the event's right edge and is
+   clipped, so nothing is drawn half cut. */
+.lex-cal-timed--wrap {
+  flex-wrap: wrap;
+  align-content: flex-start;
+  column-gap: 6px;
+  /* One hour is 48px: title, time and badge fit with 1px top and bottom. */
+  row-gap: 0;
+  padding-top: 1px;
+  padding-bottom: 1px;
+}
+
+.lex-cal-timed--wrap > * {
   flex-shrink: 0;
+}
+
+.lex-cal-timed--wrap > .lex-cal-event-title,
+.lex-cal-timed--wrap > .lex-cal-event-time {
+  width: 100%;
+}
+
+.lex-cal-timed--wrap .lex-cal-event-title {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   white-space: normal;
   overflow-wrap: anywhere;
+}
+
+.lex-cal-timed--wrap .lex-cal-event-time {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* A short event: one line, title first, then the time; it clips at the end. */

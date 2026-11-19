@@ -88,7 +88,9 @@
       .lex-modal-backdrop {
         position: fixed;
         inset: 0;
-        background: rgba(0, 0, 0, 0.5);
+        /* Shared with lex-drawer; the dark value dims more (lex-tokens.css). The fallback is
+           the light value, for pages without lex-tokens.css. */
+        background: var(--lex-modal-overlay, rgba(13, 8, 7, 0.5));
         animation: lex-modal-fade-in var(--lex-duration-fade, 200ms) var(--lex-ease-out, ease);
       }
 
