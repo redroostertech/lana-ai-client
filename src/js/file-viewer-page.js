@@ -1189,14 +1189,19 @@
     if (response.ok) return;
 
     var detail = '';
+    var text = '';
     try {
-      var text = await response.text();
+      text = await response.text();
       if (text) {
         detail = ': ' + text.substring(0, 180);
       }
     } catch (_) {}
 
-    throw new Error(fallbackMessage + ' (' + response.status + ' ' + response.statusText + ')' + detail);
+    var error = new Error(fallbackMessage + ' (' + response.status + ' ' + response.statusText + ')' + detail);
+    error.status = response.status;
+    // The server's stable code (FILE_CONTENT_MISSING for a stored file that is gone).
+    error.code = window.LanaFileContentErrors.codeFromBody(text);
+    throw error;
   }
 
   function formatDocumentType(type) {
@@ -4535,7 +4540,8 @@
     notice.classList.remove('hidden');
   }
 
-  function showError(message) {
+  function showError(message, options) {
+    var contentMissing = !!(options && options.contentMissing);
     hideAllViewers();
     var errorDiv = document.getElementById('viewerError');
     document.getElementById('viewerErrorMsg').textContent = message;
@@ -4554,7 +4560,8 @@
     if (dlBtn) dlBtn.classList.add('hidden');
     if (docStudioBtn) docStudioBtn.classList.add('hidden');
     if (fileInfoBtn) fileInfoBtn.classList.add('hidden');
-    if (errorDownloadBtn) errorDownloadBtn.classList.toggle('hidden', !hasLoadedFile);
+    // A file whose stored content is gone cannot be downloaded either.
+    if (errorDownloadBtn) errorDownloadBtn.classList.toggle('hidden', !hasLoadedFile || contentMissing);
     if (errorDeleteBtn) errorDeleteBtn.classList.toggle('hidden', !hasLoadedFile);
     setReviewRailVisible(false);
   }
@@ -4945,7 +4952,9 @@
       }
     } catch (error) {
       console.error('[FileViewerPage] Content load error:', error);
-      showError('Failed to load preview: ' + error.message);
+      showError(window.LanaFileContentErrors.viewerMessage(error, 'Failed to load preview'), {
+        contentMissing: window.LanaFileContentErrors.isFileContentMissing(error)
+      });
     }
   }
 
@@ -5379,7 +5388,7 @@
       }
     } catch (error) {
       console.error('[FileViewerPage] Download error:', error);
-      notify(error.message || 'Failed to download file', 'error');
+      notify(window.LanaFileContentErrors.viewerMessage(error, '') || 'Failed to download file', 'error');
     }
   }
 

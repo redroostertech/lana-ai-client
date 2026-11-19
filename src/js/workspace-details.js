@@ -9353,7 +9353,7 @@
           }
           throw new Error('Session expired');
         }
-        throw new Error('Failed to download: ' + response.status);
+        throw new Error(await window.LanaFileContentErrors.failureMessage(response, 'Failed to download: ' + response.status));
       }
 
       var blob = await response.blob();

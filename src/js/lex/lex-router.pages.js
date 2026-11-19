@@ -101,6 +101,7 @@
         'js/vendor/pdf.min.js',
         'js/shared/safe-html.js',
         'js/shared/preview-frame-policy.js',
+        'js/shared/file-content-errors.js',
         'js/services/docx-template-modal.js',
         'js/services/document-create-modal.js',
         'js/workspace-switcher.js',
@@ -333,6 +334,7 @@
         'js/lex/components/form/lex-dropdown-btn.js',
         'js/lex/components/form/lex-checkbox.js',
         'js/lex/components/form/lex-textarea.js',
+        'js/shared/file-content-errors.js',
         // Page controller
         'js/folder.js'
       ],

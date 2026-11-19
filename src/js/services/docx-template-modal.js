@@ -759,7 +759,11 @@
       headers: { 'Authorization': 'Bearer ' + api.token }
     })
     .then(function (resp) {
-      if (!resp.ok) throw new Error('Failed to load file');
+      if (!resp.ok) {
+        return window.LanaFileContentErrors.failureMessage(resp, 'Failed to load file').then(function (message) {
+          throw new Error(message);
+        });
+      }
       return resp.blob();
     })
     .then(function (blob) {

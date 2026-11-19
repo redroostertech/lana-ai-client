@@ -964,7 +964,10 @@
         if (api && api.token) headers.Authorization = 'Bearer ' + api.token;
 
         var response = await fetch(url, { headers: headers });
-        if (!response.ok) throw new Error('Download failed: ' + response.status);
+        if (!response.ok) {
+          toastError(await window.LanaFileContentErrors.failureMessage(response, 'Failed to download file. Please try again.'));
+          return;
+        }
 
         var blob = await response.blob();
         var blobUrl = URL.createObjectURL(blob);

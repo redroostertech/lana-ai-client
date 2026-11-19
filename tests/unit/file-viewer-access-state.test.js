@@ -25,7 +25,8 @@ describe('File Viewer access and failed-load state', () => {
 
   test('does not expose download or delete actions without loaded file metadata', () => {
     expect(pageJs).toContain("var hasLoadedFile = Boolean(state.currentFile && state.currentFile.id);");
-    expect(pageJs).toContain("errorDownloadBtn.classList.toggle('hidden', !hasLoadedFile)");
+    // Also hidden when the stored file is gone (FILE_CONTENT_MISSING).
+    expect(pageJs).toContain("errorDownloadBtn.classList.toggle('hidden', !hasLoadedFile || contentMissing)");
     expect(pageJs).toContain("errorDeleteBtn.classList.toggle('hidden', !hasLoadedFile)");
   });
 

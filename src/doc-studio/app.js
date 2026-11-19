@@ -3317,7 +3317,7 @@ async function downloadCurrentStoredFile() {
   }
   const response = await apiFetch(`/api/v1/storage/files/${encodeURIComponent(fileId)}/download${params.toString() ? `?${params}` : ''}`);
   if (!response.ok) {
-    setStatus('File download failed.');
+    setStatus(await window.LanaFileContentErrors.failureMessage(response, 'File download failed.'));
     return;
   }
   downloadBlob(await response.blob(), currentDocumentFileName());
