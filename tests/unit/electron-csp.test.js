@@ -108,12 +108,14 @@ describe('buildContentSecurityPolicy', () => {
     }
   });
 
-  test('only the sign-in pages may connect to a server that is not configured yet', () => {
-    expect(SIGN_IN_PAGES).toEqual(['login.html', 'first-launch.html']);
+  test('only the pages that reach a firm not saved yet may connect to any server: sign-in and activation', () => {
+    // login.html: the typed or found firm, and the custom server field; activate.html: the firm an
+    // Organization ID resolves to, before it is saved. first-launch.html fetches nothing.
+    expect(SIGN_IN_PAGES).toEqual(['login.html', 'activate.html']);
     for (const page of SIGN_IN_PAGES) {
       expect(directives(buildContentSecurityPolicy({ page, nonce: 'Tm9uY2U0', origins }))['connect-src']).toEqual(["'self'", ...origins.api, 'https:', 'http:']);
     }
-    for (const page of ['dashboard.html', 'admin/login.html', 'login.html.evil', null]) {
+    for (const page of ['first-launch.html', 'dashboard.html', 'accept-invite.html', 'admin/login.html', 'login.html.evil', null]) {
       expect(directives(buildContentSecurityPolicy({ page, nonce: 'Tm9uY2U0', origins }))['connect-src']).not.toContain('https:');
     }
   });
@@ -128,4 +130,16 @@ describe('buildContentSecurityPolicy', () => {
     expect(d['connect-src']).toEqual(["'self'"]);
     expect(d['script-src']).toEqual(["'self'", "'nonce-Tm9uY2U0'"]);
   });
+});
+
+test('the pages that fetch a firm before it is saved are exactly the broad ones', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const read = (rel) => fs.readFileSync(path.join(__dirname, '..', '..', 'src', rel), 'utf8');
+  // Both resolve an Organization ID and then talk to that firm on the same page.
+  expect(read('login.html')).toMatch(/OrgDiscovery\.resolveOrganization\(/);
+  expect(read('js/pages/activate.js')).toMatch(/Discovery\.resolveOrganization\(/);
+  // first-launch makes no request of its own (it talks to the main process only).
+  const firstLaunchScripts = ['js/first-launch.js', 'js/first-launch.model.js', 'js/first-launch.pages.js', 'js/local-ai-fit.model.js'];
+  for (const file of firstLaunchScripts) expect({ file, fetches: /\bfetch\(|XMLHttpRequest/.test(read(file)) }).toEqual({ file, fetches: false });
 });

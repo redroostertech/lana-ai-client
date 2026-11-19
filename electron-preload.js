@@ -95,6 +95,14 @@ function logDetails(error) {
   };
 }
 
+/** A connect link as the sign-in page gets it: { orgId, error }, each a string or null. */
+function connectLinkView(data) {
+  return {
+    orgId: data && typeof data.orgId === 'string' ? data.orgId : null,
+    error: data && data.error === 'invalid_link' ? 'invalid_link' : null
+  };
+}
+
 contextBridge.exposeInMainWorld('electronAPI', {
   /**
    * Application configuration
@@ -219,6 +227,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getCapabilities: () => ipcRenderer.invoke('first-launch:capabilities'),
     getServers: () => ipcRenderer.invoke('first-launch:servers'),
     switchChat: (chatId) => ipcRenderer.invoke('first-launch:switch-chat', { chatId: typeof chatId === 'string' ? chatId : null }),
+    // Try again on a local server that stopped (Docling).
+    retryServer: (id) => ipcRenderer.invoke('first-launch:retry-server', { id: typeof id === 'string' ? id : '' }),
     onStatus: (callback) => {
       const handler = (_event, status) => callback(status);
       ipcRenderer.on('first-launch:status-changed', handler);
@@ -351,11 +361,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   /**
    * lana-ai://connect/<org-id>: the main process checked the id; the sign-in page fills it in.
    */
-  takeConnectOrg: () => ipcRenderer.invoke('connect-link:take').then((answer) => (answer && typeof answer.orgId === 'string' ? answer.orgId : null)),
-  onConnectOrg: (callback) => {
+  // { orgId } for a valid link, { error: 'invalid_link' } for one the app refused.
+  takeConnectLink: () => ipcRenderer.invoke('connect-link:take').then(connectLinkView),
+  onConnectLink: (callback) => {
     ipcRenderer.on('connect-link:org', (_event, data) => {
-      const orgId = data && typeof data.orgId === 'string' ? data.orgId : null;
-      if (orgId) callback(orgId);
+      const view = connectLinkView(data);
+      if (view.orgId || view.error) callback(view);
     });
   },
 

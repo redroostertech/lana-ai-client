@@ -36,7 +36,8 @@ const CHANNELS = Object.freeze({
   statusChanged: 'first-launch:status-changed',
   capabilities: 'first-launch:capabilities',
   servers: 'first-launch:servers',
-  switchChat: 'first-launch:switch-chat'
+  switchChat: 'first-launch:switch-chat',
+  retryServer: 'first-launch:retry-server'
 });
 
 function failure(error) {
@@ -46,6 +47,9 @@ function failure(error) {
 /** A kept process's state (electron-process-keeper.js) in plain words for the page. */
 function plainServerState(server) {
   if (!server || server.process === 'stopped') {return 'not_running';}
+  // Stopped on purpose (electron-process-keeper.js): failed too often, or not ready to start.
+  if (server.process === 'failed') {return 'stopped';}
+  if (server.process === 'not_ready') {return 'not_ready';}
   if (server.process === 'running' && server.healthy) {return 'ready';}
   return 'starting';
 }
@@ -86,7 +90,10 @@ async function localServerStates({ pip, redactor, docling, env = {}, probe = nul
  * @param {() => Promise<Object>} [deps.servers] - localServerStates() bound to this app's servers
  * @param {(error: Error) => void} [deps.log]
  */
-function registerFirstLaunchIpc({ ipcMain, firstLaunch, servers = async () => null, log = () => {} }) {
+// Servers Settings can start again after they stopped (Try again).
+const RETRYABLE_SERVERS = Object.freeze(['docling']);
+
+function registerFirstLaunchIpc({ ipcMain, firstLaunch, servers = async () => null, retryServer = async () => null, log = () => {} }) {
   /** Only a model this computer can run; a model marked too big is never saved. */
   async function fitsHere(chatId) {
     const current = await firstLaunch.plan();
@@ -139,6 +146,15 @@ function registerFirstLaunchIpc({ ipcMain, firstLaunch, servers = async () => nu
 
   ipcMain.handle(CHANNELS.servers, async () => {
     try { return { success: true, servers: await servers() }; } catch (error) { log(error); return failure(error); }
+  });
+
+  ipcMain.handle(CHANNELS.retryServer, async (_event, payload) => {
+    const id = payload && payload.id;
+    if (!RETRYABLE_SERVERS.includes(id)) {return { success: false, error: 'That server cannot be restarted from here.' };}
+    try {
+      await retryServer(id);
+      return { success: true, servers: await servers() };
+    } catch (error) { log(error); return failure(error); }
   });
 
   ipcMain.handle(CHANNELS.switchChat, async (_event, payload) => {

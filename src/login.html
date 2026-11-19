@@ -288,15 +288,12 @@
     const step2 = document.getElementById('step2');
     const discoveryForm = document.getElementById('discoveryForm');
     const orgIdInput = document.getElementById('orgId');
-    // lana-ai://connect/<org-id>: the main process sends the checked id (electron-main.js handleConnectLink).
-    if (window.electronAPI && typeof window.electronAPI.onConnectOrg === 'function') {
-      window.electronAPI.onConnectOrg((orgId) => {
-        if (orgIdInput) orgIdInput.value = orgId;
-      });
-      // One that came before this page showed (the app was starting, or another page was open).
-      window.electronAPI.takeConnectOrg().then((orgId) => {
-        if (orgId && orgIdInput) orgIdInput.value = orgId;
-      }).catch(() => {});
+    // lana-ai://connect/<org-id>: the main process sends the checked id, or says the link
+    // was invalid (electron-main.js handleConnectLink); never a modal.
+    if (window.electronAPI && typeof window.electronAPI.onConnectLink === 'function') {
+      window.electronAPI.onConnectLink(applyConnectLink);
+      // One that came before this page showed (the app was starting).
+      window.electronAPI.takeConnectLink().then(applyConnectLink).catch(() => {});
     }
     const serverUrlInput = document.getElementById('serverUrl');
     const devApiOverrideInput = document.getElementById('devApiOverride');
@@ -640,6 +637,20 @@
 
     function hideDiscoveryFailure() {
       discoveryError.classList.add('hidden');
+    }
+
+    /** A connect link: fill in its organization ID, or say the link was invalid. */
+    function applyConnectLink(link) {
+      if (!link) return;
+      if (link.orgId) {
+        if (orgIdInput) orgIdInput.value = link.orgId;
+        hideDiscoveryFailure();
+      } else if (link.error === 'invalid_link') {
+        discoveryErrorTitle.textContent = 'Invalid connection link.';
+        discoveryErrorDetail.textContent = 'Ask for a new link, or type your Organization ID above.';
+        discoveryErrorSupport.textContent = OrgDiscovery.describeFailure(null).support;
+        discoveryError.classList.remove('hidden');
+      }
     }
 
     discoveryRetryBtn.addEventListener('click', () => {

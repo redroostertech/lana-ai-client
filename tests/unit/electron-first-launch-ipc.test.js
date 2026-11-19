@@ -178,3 +178,22 @@ describe('the development hardware override', () => {
     expect(devHardwareReader({ env, isPackaged, read: real })).toBeNull();
   });
 });
+
+// Docling stopped (it would not start, or crashed too often): Settings shows it and can retry.
+describe('a local server that stopped', () => {
+  test('its state names why: stopped after failures, or not ready', () => {
+    expect(plainServerState({ process: 'failed', failure: 'too_many_restarts' })).toBe('stopped');
+    expect(plainServerState({ process: 'not_ready', failure: 'not_ready' })).toBe('not_ready');
+  });
+
+  test('Try again reaches the server through first-launch:retry-server, for Docling only', async () => {
+    const ipc = fakeIpc();
+    const retryServer = jest.fn(async () => ({ state: 'starting' }));
+    registerFirstLaunchIpc({ ipcMain: ipc, firstLaunch: fakeFirstLaunch(), retryServer, servers: async () => ({ docling: 'starting' }) });
+    expect(CHANNELS.retryServer).toBe('first-launch:retry-server');
+    await expect(ipc.call(CHANNELS.retryServer, { id: 'docling' })).resolves.toEqual({ success: true, servers: { docling: 'starting' } });
+    expect(retryServer).toHaveBeenCalledWith('docling');
+    await expect(ipc.call(CHANNELS.retryServer, { id: 'pip' })).resolves.toMatchObject({ success: false });
+    expect(retryServer).toHaveBeenCalledTimes(1);
+  });
+});

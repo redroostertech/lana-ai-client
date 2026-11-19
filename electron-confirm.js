@@ -50,6 +50,39 @@ const CONFIRMATIONS = Object.freeze({
   })
 });
 
+// Every open question, so quitting never waits on one: cancelAllPrompts() closes them all
+// (showMessageBox's AbortSignal answers as Cancel) on before-quit and SIGTERM.
+const pendingPrompts = new Set();
+
+/**
+ * dialog.showMessageBox, tracked: it closes as Cancel when the app quits.
+ * @param {object} dialog - Electron's dialog
+ * @param {object|undefined|null} parentWindow
+ * @param {object} options - showMessageBox options (cancelId is what an abort answers)
+ */
+async function trackedMessageBox(dialog, parentWindow, options) {
+  const controller = new AbortController();
+  pendingPrompts.add(controller);
+  try {
+    const withSignal = { ...options, signal: controller.signal };
+    return parentWindow ? await dialog.showMessageBox(parentWindow, withSignal) : await dialog.showMessageBox(withSignal);
+  } finally {
+    pendingPrompts.delete(controller);
+  }
+}
+
+/** Close every open question as Cancel. Returns how many there were. */
+function cancelAllPrompts() {
+  const count = pendingPrompts.size;
+  for (const controller of pendingPrompts) controller.abort();
+  pendingPrompts.clear();
+  return count;
+}
+
+function pendingPromptCount() {
+  return pendingPrompts.size;
+}
+
 /**
  * @param {object} dialog - Electron's dialog
  * @param {object|null} parentWindow - the BrowserWindow that asked, or null
@@ -71,11 +104,11 @@ async function confirmAction(dialog, parentWindow, kind, details) {
     detail: copy.detail
   };
   try {
-    const result = parentWindow ? await dialog.showMessageBox(parentWindow, options) : await dialog.showMessageBox(options);
+    const result = await trackedMessageBox(dialog, parentWindow, options);
     return Boolean(result && result.response === 0);
   } catch (_) {
     return false;
   }
 }
 
-module.exports = { CONFIRMATIONS, confirmAction };
+module.exports = { CONFIRMATIONS, confirmAction, trackedMessageBox, cancelAllPrompts, pendingPromptCount };

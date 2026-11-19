@@ -140,6 +140,31 @@ function loadLogin({ fetch, electronAPI = undefined, reachability = null }) {
 
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 
+describe('a connect link (lana-ai://connect/<org-id>)', () => {
+  test('an invalid link shows "Invalid connection link." in the page\'s error box, no modal', async () => {
+    const page = loadLogin({ fetch: async () => { throw new Error('no fetch'); }, electronAPI: {
+      onConnectLink: () => {},
+      takeConnectLink: async () => ({ orgId: null, error: 'invalid_link' })
+    } });
+    await flush();
+    expect(page.el('discoveryError').classList.contains('hidden')).toBe(false);
+    expect(page.el('discoveryErrorTitle').textContent).toBe('Invalid connection link.');
+    expect(page.el('discoveryErrorSupport').textContent).toContain('support@redroostertec.com');
+  });
+
+  test('a valid link fills in the organization ID, now or later', async () => {
+    let later;
+    const page = loadLogin({ fetch: async () => { throw new Error('no fetch'); }, electronAPI: {
+      onConnectLink: (callback) => { later = callback; },
+      takeConnectLink: async () => ({ orgId: 'smithlaw', error: null })
+    } });
+    await flush();
+    expect(page.el('orgId').value).toBe('smithlaw');
+    later({ orgId: 'jonesfirm', error: null });
+    expect(page.el('orgId').value).toBe('jonesfirm');
+  });
+});
+
 describe('Step 1: the organization cannot be found or reached', () => {
   test.each([
     ['not found', async () => ({ ok: false, status: 404, json: async () => ({ error: 'Organization not found or inactive' }) }), 'We could not find that organization'],

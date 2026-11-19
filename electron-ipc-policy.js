@@ -86,6 +86,8 @@ const IPC_POLICY = Object.freeze({
   'first-launch:capabilities': none,
   'first-launch:servers': none,
   'first-launch:switch-chat': invoke(obj()),
+  // Try again on a stopped local server (Settings > Capabilities; the first-launch screen).
+  'first-launch:retry-server': invoke(obj(), { pages: ['settings-v2.html', 'first-launch.html'] }),
 
   // Settings > Screen diction
   'capabilities:list': none,

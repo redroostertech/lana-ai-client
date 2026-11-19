@@ -52,6 +52,12 @@ const READ_TIMEOUT_MS = '240000';
 
 const DOCLING_DEFAULTS = Object.freeze({
   ...DEFAULTS,
+  // docling-serve runs under uvicorn, which exits with 3 when the app cannot start (its models or
+  // packages are missing): not ready, so no restarts until it is retried.
+  notReadyExitCodes: Object.freeze([3]),
+  // Any other crash loop stops after 5 restarts within 10 minutes, until Settings' Try again.
+  maxRestarts: 5,
+  restartWindowMs: 10 * 60 * 1000,
   // docling-serve imports torch and its models before /health answers.
   startTimeoutMs: 180000,
   healthIntervalStartingMs: 500
@@ -145,7 +151,17 @@ function createDocling(deps) {
     try { onAddress(next); } catch (_error) { /* listener errors are not ours */ }
   }
 
-  async function start() {
+  // One start at a time: launch and first-launch setup finishing can both ask, and the keeper
+  // exists only after the port is picked, so a second call waits for the first.
+  let starting = null;
+  function start() {
+    if (!starting) {
+      starting = startOnce().finally(() => { starting = null; });
+    }
+    return starting;
+  }
+
+  async function startOnce() {
     if (keeper) {return getState();}
     const command = currentCommand();
     if (!command) {
@@ -182,7 +198,28 @@ function createDocling(deps) {
     return { installed: Boolean(command), external: Boolean(command && command.external), server: keeper ? keeper.getState() : null };
   }
 
-  return { start, stop, getState };
+  /** Settings' Try again: start the stopped server again, or start it if it never started. */
+  async function retry() {
+    if (keeper) {
+      keeper.retry();
+      return getState();
+    }
+    return start();
+  }
+
+  return { start, stop, retry, getState };
+}
+
+/**
+ * Whether Docling may start now. The downloaded runtime, a developer's program or a running
+ * docling-serve: yes. A Python environment found on this computer (LANA_DOCLING_VENV or
+ * ~/.venv/docling) only after first-launch setup is done, since before that its models are not
+ * in place and it fails to start (2026-11-19 click-through: restarts every 60 s on a new profile).
+ */
+function shouldStartDocling(command, { setupDone }) {
+  if (!command) {return false;}
+  if (command.external || command.source === 'runtime' || command.source === 'bin') {return true;}
+  return Boolean(setupDone);
 }
 
 /** What the engine is given for Docling: its address and the reading timeouts, or nothing. */
@@ -190,4 +227,4 @@ function doclingEndpoints(url) {
   return url ? { DOCLING_API_URL: url, DOC_PARSER_TIMEOUT_DOCLING_MS: READ_TIMEOUT_MS, DOCLING_TIMEOUT_MS: READ_TIMEOUT_MS } : {};
 }
 
-module.exports = { createDocling, resolveDoclingCommand, doclingEnv, checkDocling, doclingEndpoints, DOCLING_MEMORY_BYTES, DOCLING_DEFAULTS };
+module.exports = { createDocling, shouldStartDocling, resolveDoclingCommand, doclingEnv, checkDocling, doclingEndpoints, DOCLING_MEMORY_BYTES, DOCLING_DEFAULTS };

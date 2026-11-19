@@ -8,6 +8,11 @@
  * the start timeout, waiting 1 second, then 2, 4 and so on up to 60. The restart count goes back
  * to 0 after a minute of good health. Stop sends SIGTERM, and SIGKILL after a grace period.
  *
+ * Optional limits (Docling sets them): an exit code in notReadyExitCodes means the server is not
+ * installed or not ready, so it stops as 'not_ready' with no restarts; more than maxRestarts
+ * restarts within restartWindowMs stop it as 'failed' (failure 'too_many_restarts'). Either
+ * way it stays stopped until retry().
+ *
  * Spawn and timers are injected, so it runs under Jest without Electron.
  */
 
@@ -23,7 +28,10 @@ const DEFAULTS = Object.freeze({
   healthIntervalRunningMs: 5000,
   healthTimeoutMs: 3000,
   maxHealthFailures: 3,
-  stopGraceMs: 5000
+  stopGraceMs: 5000,
+  notReadyExitCodes: Object.freeze([]),
+  maxRestarts: Infinity,
+  restartWindowMs: 10 * 60 * 1000
 });
 
 /**
@@ -44,7 +52,8 @@ const DEFAULTS = Object.freeze({
 function createKeptProcess({ name, label, spawn, timers, now, log, openLog, onChange, options }) {
   const role = name;
   const opts = { ...DEFAULTS, ...options };
-  const state = { role, process: 'stopped', port: null, url: null, pid: null, healthy: false, answeredOnce: false, restarts: 0, lastExit: null, lastHealthError: null };
+  const state = { role, process: 'stopped', port: null, url: null, pid: null, healthy: false, answeredOnce: false, restarts: 0, lastExit: null, lastHealthError: null, failure: null };
+  let restartTimes = [];
   let spec = null;
   let child = null;
   let generation = 0;
@@ -113,6 +122,14 @@ function createKeptProcess({ name, label, spawn, timers, now, log, openLog, onCh
   }
 
   function scheduleRestart(gen) {
+    restartTimes = restartTimes.filter((at) => now() - at < opts.restartWindowMs);
+    if (restartTimes.length >= opts.maxRestarts) {
+      Object.assign(state, { process: 'failed', failure: 'too_many_restarts' });
+      log.warn(`[${label}] the ${role} server failed ${restartTimes.length + 1} times in a row; stopped until it is retried`);
+      emit();
+      return;
+    }
+    restartTimes.push(now());
     state.restarts += 1;
     const delay = Math.min(opts.maxBackoffMs, opts.minBackoffMs * 2 ** (state.restarts - 1));
     state.process = 'restarting';
@@ -165,6 +182,13 @@ function createKeptProcess({ name, label, spawn, timers, now, log, openLog, onCh
       clear('stable');
       Object.assign(state, { pid: null, healthy: false, lastExit: { reason: 'exited', code, signal, at: new Date(now()).toISOString() } });
       log.warn(`[${label}] ${role} server exited (code ${code}, signal ${signal})`);
+      if (gen === generation && opts.notReadyExitCodes.includes(code)) {
+        // Not installed or not ready yet (for docling-serve, uvicorn's startup failure): no restarts.
+        Object.assign(state, { process: 'not_ready', failure: 'not_ready' });
+        log.warn(`[${label}] the ${role} server is not ready (exit code ${code}); not restarting`);
+        emit();
+        return;
+      }
       if (gen === generation) {scheduleRestart(gen);}
     });
     timer.start = timers.setTimeout(() => {
@@ -185,7 +209,20 @@ function createKeptProcess({ name, label, spawn, timers, now, log, openLog, onCh
   function start(next) {
     generation += 1;
     spec = next;
-    Object.assign(state, { port: next.port, url: `http://${LOOPBACK_HOST}:${next.port}`, restarts: 0, lastExit: null, answeredOnce: false });
+    Object.assign(state, { port: next.port, url: `http://${LOOPBACK_HOST}:${next.port}`, restarts: 0, lastExit: null, answeredOnce: false, failure: null });
+    restartTimes = [];
+    launch(generation);
+  }
+
+  /**
+   * Start again after 'failed' or 'not_ready' (Settings' Try again). Only the stopped state is
+   * cleared: the recent restarts still count, so a server that keeps failing stops again at once.
+   */
+  function retry() {
+    if (!spec || child || (state.process !== 'failed' && state.process !== 'not_ready')) {return;}
+    generation += 1;
+    clearAll();
+    state.failure = null;
     launch(generation);
   }
 
@@ -195,11 +232,11 @@ function createKeptProcess({ name, label, spawn, timers, now, log, openLog, onCh
     const target = child;
     child = null;
     await kill(target);
-    Object.assign(state, { process: 'stopped', pid: null, healthy: false, port: null, url: null, answeredOnce: false });
+    Object.assign(state, { process: 'stopped', pid: null, healthy: false, port: null, url: null, answeredOnce: false, failure: null });
     emit();
   }
 
-  return { start, stop, getState: () => ({ ...state }) };
+  return { start, stop, retry, getState: () => ({ ...state }) };
 }
 
 module.exports = { createKeptProcess, DEFAULTS };

@@ -42,6 +42,8 @@
     starting: { label: 'Starting', tone: 'blue' },
     not_running: { label: 'Not running', tone: 'yellow' },
     not_installed: { label: 'Not installed', tone: 'gray' },
+    stopped: { label: 'Stopped', tone: 'red' },
+    not_ready: { label: 'Not ready', tone: 'yellow' },
     downloading: { label: 'Downloading', tone: 'blue' },
     off: { label: 'Off', tone: 'gray' }
   };
@@ -74,6 +76,8 @@
   function serverSummary(stateKey) {
     if (stateKey === 'starting') {return 'Getting ready. This can take a minute.';}
     if (stateKey === 'not_running') {return 'Set up, but not answering. LANA keeps trying.';}
+    if (stateKey === 'stopped') {return 'It stopped after failing to start several times. Choose Try again to start it.';}
+    if (stateKey === 'not_ready') {return 'It could not start because its files are not ready. Choose Try again once setup has finished.';}
     return '';
   }
 
@@ -266,7 +270,10 @@
         : s.docling === 'not_installed' ? (failed ? 'It could not be installed. LANA tries again the next time it opens.'
           : view.acceptedAt ? 'LANA installs it with the other files.' : 'Set up local AI above to install it.')
           : serverSummary(s.docling);
-      rows.push(row('documents', 'Document reading', docling.install, s.docling, docSummary, 'On this computer'));
+      var documents = row('documents', 'Document reading', docling.install, s.docling, docSummary, 'On this computer');
+      // Stopped on purpose: Settings can start it again (first-launch:retry-server).
+      if (docling.install && (s.docling === 'stopped' || s.docling === 'not_ready')) {documents.retry = 'docling';}
+      rows.push(documents);
     }
 
     var privacyOn = s.redactor !== 'not_installed';
@@ -393,6 +400,14 @@
       }).catch(function () { /* the last known states stay */ });
     }
 
+    /** Try again on a server that stopped (Docling): main starts it, then the new states show. */
+    function retryServer(id) {
+      return api.retryServer(id).then(unwrap).then(function (result) {
+        state.servers = result.servers || state.servers;
+        draw();
+      }).catch(fail);
+    }
+
     function nameOf(chatId) {
       var choice = ((state.planView && state.planView.chatChoices) || []).find(function (c) { return c.id === chatId; });
       return choice ? choice.name : null;
@@ -493,6 +508,7 @@
       setServerAi: setServerAi,
       setUp: setUp,
       refreshServers: refreshServers,
+      retryServer: retryServer,
       onStatus: onStatus,
       openChooser: openChooser,
       closeChooser: closeChooser,

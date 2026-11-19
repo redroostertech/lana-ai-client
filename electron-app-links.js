@@ -101,13 +101,18 @@ function createConnectOrgQueue({ now = () => Date.now(), ttlMs = PENDING_TTL_MS 
   return {
     offer(orgId, contentsId) {
       const valid = normalizeOrgId(orgId);
-      pending = valid && contentsId !== undefined ? { orgId: valid, contentsId, at: now() } : null;
+      pending = valid && contentsId !== undefined ? { orgId: valid, error: null, contentsId, at: now() } : null;
     },
+    /** An invalid link: the sign-in page says so in its own error box (no modal). */
+    offerError(contentsId) {
+      pending = contentsId !== undefined ? { orgId: null, error: 'invalid_link', contentsId, at: now() } : null;
+    },
+    /** { orgId, error } for that window, once, or null. */
     take(contentsId) {
       const current = pending;
       pending = null;
-      if (!current || current.contentsId !== contentsId) return null;
-      return now() - current.at <= ttlMs ? current.orgId : null;
+      if (!current || current.contentsId !== contentsId || now() - current.at > ttlMs) return null;
+      return { orgId: current.orgId, error: current.error };
     },
     clear() {
       pending = null;

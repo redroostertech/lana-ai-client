@@ -175,6 +175,14 @@ describe('changing the chat model', () => {
     return { api, frames, c, last: () => frames[frames.length - 1] };
   }
 
+  test('Try again asks main to start the stopped server and shows the new states', async () => {
+    const { api, c, last } = await loaded();
+    api.retryServer = jest.fn(async () => ({ success: true, servers: { ...ALL_READY, docling: 'starting' } }));
+    await c.retryServer('docling');
+    expect(api.retryServer).toHaveBeenCalledWith('docling');
+    expect(last().view.rows.find((r) => r.id === 'documents').badge).toBe('Starting');
+  });
+
   test('the chooser opens on the current model and cannot switch to it', async () => {
     const { c, last } = await loaded();
     c.openChooser();
@@ -387,5 +395,19 @@ describe('the setup offer in Settings', () => {
     await c.load();
     c.setServerAi({ relay: { enabled: true }, chat: { state: 'not_set' } });
     expect(fact(frames[frames.length - 1].view.computerFacts, 'Chat runs')).toBe('Not set up on this computer yet. Uses the cloud for now.');
+  });
+});
+
+describe('document reading that stopped', () => {
+  test('stopped or not ready says so and offers Try again', () => {
+    const stopped = M.buildCapabilitiesView({ planView: planView(24), servers: { ...ALL_READY, docling: 'stopped' } });
+    const row = stopped.rows.find((r) => r.id === 'documents');
+    expect(row.badge).toBe('Stopped');
+    expect(row.summary).toMatch(/Try again/);
+    expect(row.retry).toBe('docling');
+    const notReady = M.buildCapabilitiesView({ planView: planView(24), servers: { ...ALL_READY, docling: 'not_ready' } });
+    expect(notReady.rows.find((r) => r.id === 'documents')).toMatchObject({ badge: 'Not ready', retry: 'docling' });
+    const ready = M.buildCapabilitiesView({ planView: planView(24), servers: ALL_READY });
+    expect(ready.rows.find((r) => r.id === 'documents').retry).toBeUndefined();
   });
 });

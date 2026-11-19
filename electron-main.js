@@ -209,7 +209,7 @@ const redactor = createRedactor({
 // offers uploaded files to it first, and reads them itself when it is not running. Worked out
 // again on every start, so the runtime first-launch setup installs (electron-docling-install.js)
 // starts as soon as it is in place.
-const { createDocling, resolveDoclingCommand, doclingEndpoints, DOCLING_MEMORY_BYTES } = require('./electron-docling');
+const { createDocling, shouldStartDocling, resolveDoclingCommand, doclingEndpoints, DOCLING_MEMORY_BYTES } = require('./electron-docling');
 const doclingInstall = require('./electron-docling-install');
 const resolveDocling = () => resolveDoclingCommand({
   env: process.env,
@@ -300,6 +300,8 @@ const firstLaunch = createFirstLaunch({
     logInfo('[first-launch] every local model file is in place; starting Pip');
     pip.apply(result, localModelsCatalog.modelsDir(process.env, app.getPath('userData')))
       .catch((error) => logError('[electron-main] Pip did not start', error));
+    // Setup is done: a Docling found on this computer may start now (electron-docling.js).
+    void docling.start().catch((error) => logError('[electron-main] Docling did not start', error));
   }
 });
 registerFirstLaunchIpc({
@@ -307,6 +309,8 @@ registerFirstLaunchIpc({
   firstLaunch,
   // Settings > Capabilities: whether each server on this computer is ready, starting or not running.
   servers: () => localServerStates({ pip, redactor, docling, env: process.env, probe: (url) => pipEndpoint(url, fetch) }),
+  // Settings' Try again on a server that stopped (electron-process-keeper.js limits).
+  retryServer: (id) => (id === 'docling' ? docling.retry() : null),
   log: (error) => logError('[first-launch] the setup screen call failed', error)
 });
 
@@ -400,7 +404,13 @@ const { ElectronScreenVoice } = require('./src/screen-voice/electron-screen-voic
 const { isAllowedExternalUrl, sanitizeExternalUrl } = require('./src/electron-external-url');
 // Main-process confirmation dialogs and the one gate for opening links in the browser
 // (electron-confirm.js, electron-external-open.js; docs/plans/harden-ipc.md).
-const { confirmAction } = require('./electron-confirm');
+const { confirmAction, trackedMessageBox, cancelAllPrompts } = require('./electron-confirm');
+// SIGTERM (a system shutdown, a process manager): close any open question and quit normally,
+// so the engine and the other local servers stop cleanly.
+process.on('SIGTERM', () => {
+  cancelAllPrompts();
+  app.quit();
+});
 const { createExternalOpener } = require('./electron-external-open');
 const confirmFor = (kind, details, contents) => confirmAction(dialog, (contents && BrowserWindow.fromWebContents(contents)) || null, kind, details);
 const externalOpener = createExternalOpener({ shell, isAllowed: isAllowedExternalUrl, sanitize: sanitizeExternalUrl, gestures: ipcGestures, confirm: confirmFor, log: logWarn });
@@ -1295,7 +1305,8 @@ async function checkAndHandleUpdates(serverUrl, options = {}) {
     if (!updateInfo.updateAvailable) {
       logInfo('No updates available');
       if (options.notifyUpToDate) {
-        dialog.showMessageBox(mainWindow || undefined, {
+        // Tracked so quitting closes it (electron-confirm.js).
+        trackedMessageBox(dialog, mainWindow || undefined, {
           type: 'info',
           title: 'Check for Updates',
           message: 'You’re up to date',
@@ -1406,7 +1417,7 @@ function createApplicationMenu() {
         {
           label: 'About',
           click: () => {
-            dialog.showMessageBox({
+            trackedMessageBox(dialog, undefined, {
               type: 'info',
               title: BRAND_FLAVOR === 'lana-one' ? 'About LANA One' : 'About Lana AI',
               message: BRAND_FLAVOR === 'lana-one' ? 'LANA One' : 'Lana AI Desktop Client',
@@ -1436,7 +1447,7 @@ function createApplicationMenu() {
               const logPath = exportLogs();
               const { shell } = require('electron');
 
-              const result = await dialog.showMessageBox(mainWindow, {
+              const result = await trackedMessageBox(dialog, mainWindow, {
                 type: 'info',
                 title: 'Debug Logs Exported',
                 message: 'Debug logs have been exported',
@@ -2057,8 +2068,8 @@ const handleDeepLink = async (deepLinkUrl) => {
         break;
     }
   } catch (error) {
+    // Logged only: a modal here (inside open-url / second-instance) froze the main process.
     logError('Failed to handle deep link', error);
-    dialog.showErrorBox('Error', 'Failed to process the link.');
   }
 };
 
@@ -2117,32 +2128,32 @@ const handleOAuthCallback = (urlObj) => {
  */
 const handleConnectLink = (urlObj) => {
   // Any website can open this link: only an id matching the org id pattern is used, and it
-  // reaches the sign-in page as data over IPC (login.html onConnectOrg), never as script.
+  // reaches the sign-in page as data over IPC (login.html onConnectLink / takeConnectLink), never as script.
+  // An invalid link is reported on the sign-in page, never in a modal: a sync dialog here
+  // (inside open-url / second-instance) froze the main process until it was killed.
   const orgId = connectLinkOrgId(urlObj);
-
-  if (!orgId) {
-    logError('No valid org ID in connect deep link');
-    dialog.showErrorBox('Connection Error', 'Invalid connection link.');
-    return;
-  }
+  if (!orgId) logError('No valid org ID in connect deep link');
 
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.focus();
-    // An open sign-in page fills it in; on any other page the link is not used (as before).
+    // An open sign-in page fills it in (or shows the error); on any other page the link is not used.
     if (pageOf(mainWindow.webContents.getURL()) === 'login.html') {
-      mainWindow.webContents.send('connect-link:org', { orgId });
+      if (orgId) mainWindow.webContents.send('connect-link:org', { orgId });
+      else mainWindow.webContents.send('connect-link:org', { error: 'invalid_link' });
     } else {
       logInfo('[DeepLink] Connect link ignored: the sign-in page is not showing');
     }
   } else {
-    // The sign-in window opened for this link takes the id once its page is ready
+    // The sign-in window opened for this link takes it once its page is ready
     // (connect-link:take); no other window or later sign-in page gets it.
     createLoginWindow();
-    if (mainWindow && !mainWindow.isDestroyed()) connectOrgQueue.offer(orgId, mainWindow.webContents.id);
+    const contentsId = mainWindow && !mainWindow.isDestroyed() ? mainWindow.webContents.id : undefined;
+    if (orgId) connectOrgQueue.offer(orgId, contentsId);
+    else connectOrgQueue.offerError(contentsId);
   }
 };
 const connectOrgQueue = createConnectOrgQueue();
-ipc.handle('connect-link:take', (event) => ({ orgId: connectOrgQueue.take(event.sender.id) }));
+ipc.handle('connect-link:take', (event) => connectOrgQueue.take(event.sender.id) || { orgId: null, error: null });
 
 // App links from Chef's emails (electron-app-links.js). The router decides the
 // firm and sign-in; these are the window, dialog and storage pieces it uses.
@@ -2173,7 +2184,8 @@ async function openAppLinkSignIn() {
 
 async function appLinkMessage(options) {
   const parent = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
-  return dialog.showMessageBox(parent, { type: 'info', noLink: true, ...options });
+  // Tracked so quitting closes it (electron-confirm.js).
+  return trackedMessageBox(dialog, parent, { type: 'info', noLink: true, ...options });
 }
 
 // Switching firms from a link ends the session on the old firm's Chef too,
@@ -2291,7 +2303,10 @@ app.whenReady().then(async () => {
 
   // Model downloads cut off last time pick up again in the background.
   void redactor.start().catch((error) => logError('[electron-main] The redactor did not start', error));
-  void docling.start().catch((error) => logError('[electron-main] Docling did not start', error));
+  // Docling waits for first-launch setup unless it is set up another way (electron-docling.js).
+  if (shouldStartDocling(resolveDocling(), { setupDone: Boolean(firstLaunchPersistence.read().completedAt) })) {
+    void docling.start().catch((error) => logError('[electron-main] Docling did not start', error));
+  }
   void editorService.start().catch((error) => logError('[electron-main] The LANA document editor did not start', error));
   void firstLaunch.resume();
 
@@ -2551,26 +2566,27 @@ app.on('window-all-closed', () => {
   }
 });
 
-// Handle application quit
-let localEngineQuitPrepared = false;
+// Handle application quit. The local servers stop once (electron-quit-gate.js); a second Cmd-Q
+// or SIGTERM during the engine's job handoff waits for that same shutdown.
+const { createQuitGate } = require('./electron-quit-gate');
+const quitGate = createQuitGate({
+  // Briefs first drains its calls and closes its store, then the local AI engine hands its
+  // running background jobs off to the organization's cloud (up to 12 s) and stops.
+  cleanup: () => briefs.stop()
+    .catch((error) => logError('[electron-main] Failed to stop LANA Briefs', error))
+    .then(() => localEngine.prepareQuit())
+    .catch((error) => logError('[electron-main] Failed to stop the local AI engine', error))
+    // Pip last: the engine may still be handing a job off through it.
+    .then(() => firstLaunch.pause())
+    .then(() => Promise.all([pip.stop(), redactor.stop(), docling.stop(), editorService.stop()]))
+    .catch((error) => logError('[electron-main] Failed to stop Pip', error)),
+  quit: () => app.quit(),
+  log: (message, error) => logError(message, error)
+});
 app.on('before-quit', async (event) => {
-  // The local AI engine first hands its running background jobs off to the
-  // organization's cloud (up to 12 s), then stops; the quit then continues.
-  if (!localEngineQuitPrepared) {
-    event.preventDefault();
-    localEngineQuitPrepared = true;
-    // Briefs first drains its calls and closes its store, then the engine stops.
-    briefs.stop()
-      .catch((error) => logError('[electron-main] Failed to stop LANA Briefs', error))
-      .then(() => localEngine.prepareQuit())
-      .catch((error) => logError('[electron-main] Failed to stop the local AI engine', error))
-      // Pip last: the engine may still be handing a job off through it.
-      .then(() => firstLaunch.pause())
-      .then(() => Promise.all([pip.stop(), redactor.stop(), docling.stop(), editorService.stop()]))
-      .catch((error) => logError('[electron-main] Failed to stop Pip', error))
-      .finally(() => app.quit());
-    return;
-  }
+  // A question still open (electron-confirm.js) is answered as Cancel, so it never holds the quit.
+  cancelAllPrompts();
+  if (!quitGate.beforeQuit(event)) return;
 
   // Cleanup operations before quitting
   console.log('[electron-main] Application is quitting...');

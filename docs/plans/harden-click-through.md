@@ -39,7 +39,8 @@ page and what you clicked.
 6. Sign in with email and password, and with MFA if your account has it.
 7. App links from email: accept an invite, activate an account (also from the
    "Activate here" link), finish MFA setup, open a shared link. Each lands on
-   the right page.
+   the right page. On a computer that never signed in to that firm, activate
+   by typing the Organization ID: it works.
 8. After signing in, restart the app: Settings > Capabilities > AI still shows
    Forge (the firm keys are now kept by the app only).
 9. Connect links (`lana-ai://connect/<your-org-id>`, typed in the browser's
@@ -49,7 +50,9 @@ page and what you clicked.
    - with LANA open on another page: nothing changes (the link is not used);
      sign out and the sign-in page does not show that ID;
    - a bad link such as `lana-ai://connect/x'y` shows "Invalid connection
-     link." and nothing else happens.
+     link." in the sign-in page's red box (no pop-up window), with LANA open
+     on the sign-in page and with LANA quit; LANA keeps running normally
+     afterwards (it used to freeze and be killed).
 
 ## 3. Daily use
 
@@ -126,6 +129,10 @@ shows at a time.
    There is no VPN card any more (expected).
 2. Appearance: Light, Dark and System change every page at once.
 3. Capabilities: the local AI plan, servers, and switching the chat model.
+   On a new profile, Document reading does not start (or restart) before
+   setup finishes. If it cannot start, it shows Stopped or Not ready with a
+   Try again button, and the log no longer shows Docling restarting every
+   minute.
 4. Local AI: restart the engine, turn it on or off, background jobs; the
    status banner follows.
 5. Screen diction: the toggle, voice settings and the permission buttons.
@@ -147,3 +154,6 @@ shows at a time.
    on the new version.
 4. After the update restarts the app: still signed in, pages load, and the
    Section 1 checks hold.
+5. Quitting with a question open: while "Open this link in your browser?" (or
+   the install, Always allow or Show-in-folder question) is showing, Cmd-Q
+   quits LANA; the question closes as Cancel.

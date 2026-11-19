@@ -107,11 +107,26 @@
     setButton(button, true, state.busy);
   }
 
+  /** Try again, for a server that stopped (settings-capabilities.model.js row.retry). */
+  function retryActions(id) {
+    var actions = document.createElement('div');
+    actions.className = 'sv2-ai-item-actions';
+    var button = document.createElement('lex-btn');
+    button.setAttribute('variant', 'secondary');
+    button.setAttribute('size', 'sm');
+    button.setAttribute('label', 'Try again');
+    button.addEventListener('click', function () { controller.retryServer(id); });
+    actions.appendChild(button);
+    return actions;
+  }
+
   function renderRows(rows) {
     var box = el('sv2-ai-local-rows');
     if (!box || !window.LanaAiRow) {return;}
     box.innerHTML = '';
-    rows.forEach(function (row) { box.appendChild(window.LanaAiRow.create(row)); });
+    rows.forEach(function (row) {
+      box.appendChild(window.LanaAiRow.create(row, row.retry ? { actions: retryActions(row.retry) } : undefined));
+    });
     show(el('sv2-ai-local'), true);
   }
 

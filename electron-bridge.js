@@ -53,6 +53,7 @@ const https = require('node:https');
 const Store = require('electron-store');
 const { dialog, BrowserWindow } = require('electron');
 const { logInfo, logError } = require('./electron-logger');
+const { trackedMessageBox } = require('./electron-confirm');
 
 const BRIDGE_HOST = '127.0.0.1';
 const BRIDGE_PORT = 7890;
@@ -280,11 +281,8 @@ async function promptForConsentViaNativeDialog(appName, parentWindow) {
 
   let result;
   try {
-    if (parentWindow) {
-      result = await dialog.showMessageBox(parentWindow, dialogOptions);
-    } else {
-      result = await dialog.showMessageBox(dialogOptions);
-    }
+    // Tracked so quitting closes it as a denial (electron-confirm.js).
+    result = await trackedMessageBox(dialog, parentWindow || undefined, dialogOptions);
   } catch (error) {
     logError('[electron-bridge] Native consent dialog failed', error);
     return { allow: false, alwaysAllow: false };

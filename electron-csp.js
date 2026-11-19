@@ -12,9 +12,18 @@
  * Pure: no Electron imports.
  */
 
-// The person finds or types the firm's server on these pages, so its origin is
-// not known when the page loads. They render no firm data.
-const SIGN_IN_PAGES = Object.freeze(['login.html', 'first-launch.html']);
+// The pages that talk to a firm before it is saved here, so its origin cannot be in
+// the policy the page loads with (a page's CSP is fixed at load):
+//  - login.html: Connect resolves the Organization ID (discovery runs in the main
+//    process), then the page checks that server's /api/health/discovery and signs in to
+//    it; "Use a custom server" lets the person type any address. Both happen on the
+//    page that loaded before the firm was known.
+//  - activate.html: an Organization ID typed on the page resolves to a firm, and the
+//    activation is posted to it before it is saved.
+// They get connect-src https: http: (and no other broad source); they render no firm data.
+// Every other page, first-launch.html included (it fetches nothing), gets only the
+// configured origins. tests/unit/electron-csp.test.js pins this list.
+const SIGN_IN_PAGES = Object.freeze(['login.html', 'activate.html']);
 
 /**
  * Pages whose own scripts build inline event handlers in markup strings

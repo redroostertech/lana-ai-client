@@ -60,7 +60,10 @@ describe('the bundled client preload under a sandbox', () => {
   test('needs nothing but electron, and exposes the same API', () => {
     bundleDevPreload(ROOT, outfile);
     const { exposed, calls, refused } = runSandboxed(outfile, ['electron', '--lana-flavor=lana-one']);
-    expect(refused).toEqual([]);
+    // Without briefs/dist built (npm run build:briefs), the Briefs bridge is left out, as in
+    // the source preload: its require fails inside a try and the client runs without Briefs.
+    const briefsBuilt = fs.existsSync(path.join(ROOT, 'briefs', 'dist', 'briefs-preload.cjs'));
+    expect(refused).toEqual(briefsBuilt ? [] : ['./briefs/dist/briefs-preload.cjs']);
     expect(exposed.lanaBrand).toMatchObject({ flavor: 'lana-one' });
     expect(Object.keys(exposed.lanaAuthToken).sort()).toEqual(['clear', 'get', 'set']);
     expect(typeof exposed.electronAPI.getSavedServer).toBe('function');
