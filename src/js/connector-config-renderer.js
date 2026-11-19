@@ -75,14 +75,14 @@ function renderField(field, currentValue) {
   const requiredLabel = field.required ? '<span class="text-red-500">*</span>' : '';
 
   let fieldHTML = `
-    <div class="field-container" data-field="${field.field_name}">
+    <div class="field-container" data-field="${escapeAttribute(field.field_name)}">
       <label class="block text-sm font-medium text-gray-700 mb-2">
-        ${field.label} ${requiredLabel}
+        ${escapeAttribute(field.label)} ${requiredLabel}
       </label>
   `;
 
   if (field.description) {
-    fieldHTML += `<p class="text-sm text-gray-500 mb-2">${field.description}</p>`;
+    fieldHTML += `<p class="text-sm text-gray-500 mb-2">${escapeAttribute(field.description)}</p>`;
   }
 
   switch (field.type) {
@@ -126,7 +126,7 @@ function renderField(field, currentValue) {
       break;
 
     default:
-      fieldHTML += `<div class="text-red-500">Unknown field type: ${field.type}</div>`;
+      fieldHTML += `<div class="text-red-500">Unknown field type: ${escapeAttribute(field.type)}</div>`;
   }
 
   fieldHTML += '</div>';
@@ -141,9 +141,9 @@ function renderDirectoryBrowser(field, value) {
     <div class="flex space-x-2">
       <input
         type="text"
-        id="${field.field_name}"
-        name="${field.field_name}"
-        value="${value}"
+        id="${escapeAttribute(field.field_name)}"
+        name="${escapeAttribute(field.field_name)}"
+        value="${escapeAttribute(value)}"
         placeholder="Select or enter a directory path"
         class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         ${field.required ? 'required' : ''}
@@ -151,8 +151,8 @@ function renderDirectoryBrowser(field, value) {
       <button
         type="button"
         class="browse-btn px-4 py-2 bg-gray-100 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-200"
-        data-field="${field.field_name}"
-        data-config='${JSON.stringify(field.browser_config || {})}'
+        data-field="${escapeAttribute(field.field_name)}"
+        data-config="${escapeAttribute(JSON.stringify(field.browser_config || {}))}"
       >
         <svg class="w-5 h-5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
@@ -171,7 +171,7 @@ function renderOAuth(field, value) {
 
   return `
     <div class="oauth-container">
-      <input type="hidden" id="${field.field_name}" name="${field.field_name}" value="${value}" />
+      <input type="hidden" id="${escapeAttribute(field.field_name)}" name="${escapeAttribute(field.field_name)}" value="${escapeAttribute(value)}" />
 
       ${isConnected ? `
         <div class="flex items-center space-x-2 p-3 bg-green-50 border border-green-200 rounded-md">
@@ -182,7 +182,7 @@ function renderOAuth(field, value) {
           <button
             type="button"
             class="disconnect-oauth-btn ml-auto text-sm text-red-600 hover:text-red-700"
-            data-field="${field.field_name}"
+            data-field="${escapeAttribute(field.field_name)}"
           >
             Disconnect
           </button>
@@ -191,14 +191,14 @@ function renderOAuth(field, value) {
         <button
           type="button"
           class="connect-oauth-btn w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          data-field="${field.field_name}"
-          data-provider="${field.oauth_config?.provider || 'generic'}"
+          data-field="${escapeAttribute(field.field_name)}"
+          data-provider="${escapeAttribute(field.oauth_config?.provider || 'generic')}"
         >
           <svg class="w-5 h-5 inline-block mr-2" fill="currentColor" viewBox="0 0 20 20">
             <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"></path>
             <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"></path>
           </svg>
-          Connect ${field.label}
+          Connect ${escapeAttribute(field.label)}
         </button>
       `}
     </div>
@@ -213,11 +213,11 @@ function renderTextInput(field, value, required) {
 
   return `
     <input
-      type="${inputType}"
-      id="${field.field_name}"
-      name="${field.field_name}"
-      value="${value}"
-      placeholder="${field.placeholder || ''}"
+      type="${escapeAttribute(inputType)}"
+      id="${escapeAttribute(field.field_name)}"
+      name="${escapeAttribute(field.field_name)}"
+      value="${escapeAttribute(value)}"
+      placeholder="${escapeAttribute(field.placeholder || '')}"
       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
       ${required}
     />
@@ -232,17 +232,17 @@ function renderPasswordInput(field, value, required) {
     <div class="relative">
       <input
         type="password"
-        id="${field.field_name}"
-        name="${field.field_name}"
-        value="${value}"
-        placeholder="${field.placeholder || '••••••••'}"
+        id="${escapeAttribute(field.field_name)}"
+        name="${escapeAttribute(field.field_name)}"
+        value="${escapeAttribute(value)}"
+        placeholder="${escapeAttribute(field.placeholder || '••••••••')}"
         class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         ${required}
       />
       <button
         type="button"
         class="toggle-password absolute right-2 top-2 text-gray-400 hover:text-gray-600"
-        data-field="${field.field_name}"
+        data-field="${escapeAttribute(field.field_name)}"
       >
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
@@ -257,17 +257,17 @@ function renderPasswordInput(field, value, required) {
  * Render number input field
  */
 function renderNumberInput(field, value, required) {
-  const min = field.validation?.min !== undefined ? `min="${field.validation.min}"` : '';
-  const max = field.validation?.max !== undefined ? `max="${field.validation.max}"` : '';
-  const step = field.validation?.step !== undefined ? `step="${field.validation.step}"` : '';
+  const min = field.validation?.min !== undefined ? `min="${escapeAttribute(field.validation.min)}"` : '';
+  const max = field.validation?.max !== undefined ? `max="${escapeAttribute(field.validation.max)}"` : '';
+  const step = field.validation?.step !== undefined ? `step="${escapeAttribute(field.validation.step)}"` : '';
 
   return `
     <input
       type="number"
-      id="${field.field_name}"
-      name="${field.field_name}"
-      value="${value}"
-      placeholder="${field.placeholder || ''}"
+      id="${escapeAttribute(field.field_name)}"
+      name="${escapeAttribute(field.field_name)}"
+      value="${escapeAttribute(value)}"
+      placeholder="${escapeAttribute(field.placeholder || '')}"
       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
       ${required}
       ${min}
@@ -294,8 +294,8 @@ function renderSelect(field, value, required) {
 
   return `
     <lex-select
-      id="${field.field_name}"
-      name="${field.field_name}"
+      id="${escapeAttribute(field.field_name)}"
+      name="${escapeAttribute(field.field_name)}"
       placeholder="${escapeAttribute(placeholder)}"
       options="${escapeAttribute(JSON.stringify(options))}"
       value="${escapeAttribute(selectedValue)}"
@@ -305,14 +305,10 @@ function renderSelect(field, value, required) {
 }
 
 /**
- * Escape a value for a double-quoted HTML attribute
+ * Escape a value for HTML text or a quoted attribute (shared Lex helper)
  */
 function escapeAttribute(value) {
-  return String(value == null ? '' : value)
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+  return window.Lex.escapeHtml(value);
 }
 
 /**
@@ -332,12 +328,12 @@ function renderMultiSelect(field, value) {
       <label class="flex items-center space-x-2">
         <input
           type="checkbox"
-          name="${field.field_name}[]"
-          value="${optionValue}"
+          name="${escapeAttribute(field.field_name)}[]"
+          value="${escapeAttribute(optionValue)}"
           ${checked}
           class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
         />
-        <span class="text-sm text-gray-700">${optionLabel}</span>
+        <span class="text-sm text-gray-700">${escapeAttribute(optionLabel)}</span>
       </label>
     `;
   }
@@ -356,12 +352,12 @@ function renderCheckbox(field, value) {
     <label class="flex items-center space-x-2">
       <input
         type="checkbox"
-        id="${field.field_name}"
-        name="${field.field_name}"
+        id="${escapeAttribute(field.field_name)}"
+        name="${escapeAttribute(field.field_name)}"
         ${checked}
         class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
       />
-      <span class="text-sm text-gray-700">${field.checkbox_label || 'Enable'}</span>
+      <span class="text-sm text-gray-700">${escapeAttribute(field.checkbox_label || 'Enable')}</span>
     </label>
   `;
 }
@@ -374,8 +370,8 @@ function renderFilePicker(field, value) {
     <div class="file-picker-container">
       <input
         type="file"
-        id="${field.field_name}"
-        name="${field.field_name}"
+        id="${escapeAttribute(field.field_name)}"
+        name="${escapeAttribute(field.field_name)}"
         class="block w-full text-sm text-gray-500
           file:mr-4 file:py-2 file:px-4
           file:rounded-md file:border-0
@@ -383,9 +379,9 @@ function renderFilePicker(field, value) {
           file:bg-blue-50 file:text-blue-700
           hover:file:bg-blue-100"
         ${field.multiple ? 'multiple' : ''}
-        ${field.accept ? `accept="${field.accept}"` : ''}
+        ${field.accept ? `accept="${escapeAttribute(field.accept)}"` : ''}
       />
-      ${value ? `<p class="text-xs text-gray-500 mt-1">Current: ${value}</p>` : ''}
+      ${value ? `<p class="text-xs text-gray-500 mt-1">Current: ${escapeAttribute(value)}</p>` : ''}
     </div>
   `;
 }

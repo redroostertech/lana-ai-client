@@ -373,9 +373,7 @@
   }
 
   function _escapeHtml(text) {
-    var div = document.createElement('div');
-    div.textContent = text || '';
-    return div.innerHTML;
+    return window.Lex.escapeHtml(text || '');
   }
 
   // For a single-quoted attribute holding JSON.

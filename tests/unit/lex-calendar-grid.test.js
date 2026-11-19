@@ -64,6 +64,19 @@ describe('lex-calendar-grid', () => {
     expect(grid.querySelector('.lex-cal-event-title').textContent).toBe('<img src=x onerror=alert(1)>');
   });
 
+  test('a title with quotes stays inside the title and aria-label attributes', async () => {
+    const title = `x" onmouseover="alert(1)" data-pwn="1 it's`;
+    const { grid } = await mount({
+      timeZone: 'UTC', days: ['2026-11-18'],
+      items: [{ id: 'q', title, start: '2026-11-18T10:00:00Z', end: '2026-11-18T11:00:00Z', variant: 'mine' }]
+    });
+    const el = grid.querySelector('[title][aria-label]');
+    expect(el.getAttribute('title').startsWith(title)).toBe(true);
+    expect(el.getAttribute('aria-label').startsWith(title)).toBe(true);
+    expect(grid.querySelector('[onmouseover]')).toBeNull();
+    expect(grid.querySelector('[data-pwn]')).toBeNull();
+  });
+
   test('a daylight saving day says how long it is', async () => {
     const { grid } = await mount({ timeZone: 'America/New_York', days: ['2026-11-01'], items: [] });
     expect(grid.querySelector('.lex-cal-day-note').textContent).toBe('25 hour day');

@@ -209,9 +209,7 @@ class RawDataViewer {
    */
   escapeHtml(text) {
     if (typeof text !== 'string') return text;
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    return window.Lex.escapeHtml(text);
   }
 
   /**

@@ -272,9 +272,7 @@
 
     _esc(str) {
       if (!str) return '';
-      const d = document.createElement('div');
-      d.textContent = str;
-      return d.innerHTML;
+      return this.escapeHtml(str);
     }
   }
 

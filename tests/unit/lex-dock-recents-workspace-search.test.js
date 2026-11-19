@@ -98,11 +98,15 @@ describe('dock chat search', () => {
 
 describe('conversation search modal', () => {
   function loadModal(extra = {}) {
+    // lex.core.js provides Lex.escapeHtml on every page; mirror its mapping.
+    const escapeHtml = (v) => (v == null ? '' : String(v))
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
     const context = {
       console,
-      document: { createElement: () => { let t = ''; return { set textContent(v) { t = String(v); }, get innerHTML() { return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); } }; } },
       LanaTime: { timeAgo: () => '5m' },
-      ...extra
+      ...extra,
+      Lex: { escapeHtml, ...(extra.Lex || {}) }
     };
     context.window = context;
     vm.runInNewContext(read('src/js/conversation-search-modal.js') + '\nthis.M = ConversationSearchModal;', context);

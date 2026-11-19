@@ -89,15 +89,9 @@
       return parts.filter(Boolean).join(', ');
     }
 
-    // An attribute value: quotes escaped too (LexElement.escapeHtml leaves
-    // them, so a title with a quote could end the attribute).
-    _attr(text) {
-      return window.Lex.Utils.escapeHtml(text);
-    }
-
     // Native tooltip: the full title and time, for titles cut short.
     _tooltip(item, when) {
-      return this._attr([item.title, when].filter(Boolean).join(', '));
+      return this.escapeHtml([item.title, when].filter(Boolean).join(', '));
     }
 
     _badge(item) {
@@ -123,7 +117,7 @@
             const when = item.is_all_day ? 'all day' : this._timeRange(item);
             const startLabel = item.is_all_day || entry.continuesBefore ? '' : new Intl.DateTimeFormat('en-US', { timeZone: this.timeZone, hour: 'numeric', minute: '2-digit' }).format(new Date(item.start));
             return `<button type="button" class="${this._eventClasses(item, ['lex-cal-month-item', item.is_all_day || entry.continuesBefore || entry.continuesAfter ? 'lex-cal-month-item--bar' : ''])}" data-cal-key="${key}"
-                title="${this._tooltip(item, when)}" aria-label="${this._attr(this._eventLabel(item, when))}">
+                title="${this._tooltip(item, when)}" aria-label="${this.escapeHtml(this._eventLabel(item, when))}">
               ${startLabel ? `<span class="lex-cal-event-time">${this.escapeHtml(startLabel)}</span>` : ''}
               <span class="lex-cal-event-title">${this.escapeHtml(item.title)}</span>
             </button>`;
@@ -174,7 +168,7 @@
         const item = bar.event;
         return `<button type="button" class="${this._eventClasses(item, ['lex-cal-allday-bar'])}" data-cal-key="${key}"
             data-col="${bar.firstColumn}" data-span="${bar.span}" data-lane="${bar.lane}"
-            title="${this._tooltip(item, 'all day')}" aria-label="${this._attr(this._eventLabel(item, 'all day'))}">
+            title="${this._tooltip(item, 'all day')}" aria-label="${this.escapeHtml(this._eventLabel(item, 'all day'))}">
           ${bar.continuesBefore ? '<span class="lex-cal-continues" aria-hidden="true">&lsaquo;</span>' : ''}
           <span class="lex-cal-event-title">${this.escapeHtml(item.title)}</span>
           ${bar.continuesAfter ? '<span class="lex-cal-continues" aria-hidden="true">&rsaquo;</span>' : ''}
@@ -197,7 +191,7 @@
           return `<button type="button" class="${this._eventClasses(item, ['lex-cal-timed', short ? 'lex-cal-timed--short' : 'lex-cal-timed--wrap'])}" data-cal-key="${key}"
               data-top="${seg.top}" data-bottom="${seg.bottom}" data-column="${seg.column}" data-columns="${seg.columns}" data-span="${seg.span || 1}"
               data-day-index="${dayIndex}"${draggable ? ' data-draggable="true"' : ''}
-              title="${this._tooltip(item, when)}" aria-label="${this._attr(this._eventLabel(item, when))}">
+              title="${this._tooltip(item, when)}" aria-label="${this.escapeHtml(this._eventLabel(item, when))}">
             <span class="lex-cal-event-title">${this.escapeHtml(item.title)}</span>
             <span class="lex-cal-event-time">${this.escapeHtml(when)}</span>${short ? '' : this._badge(item)}
             ${draggable && !seg.continuesAfter ? '<span class="lex-cal-resize" data-cal-resize aria-hidden="true"></span>' : ''}

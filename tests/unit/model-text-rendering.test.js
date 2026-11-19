@@ -255,7 +255,9 @@ describe('Lex.ChatFormat.format', () => {
 describe('text.block.js (AI text blocks)', () => {
   let renderer;
   const window = load('js/lex/blocks/text.block.js', (w) => {
-    w.Lex = { SchemaRegistry: { register: (_name, _schema, fn) => { renderer = fn; } } };
+    // lex.core provides the shared Lex.escapeHtml every block uses.
+    ['js/time-utils.js', 'js/lex/lex.core.js'].forEach((rel) => w.eval(fs.readFileSync(path.join(SRC, rel), 'utf8')));
+    w.Lex.SchemaRegistry = { register: (_name, _schema, fn) => { renderer = fn; } };
   });
   const renderBlock = (content) => {
     const out = window.document.getElementById('out');

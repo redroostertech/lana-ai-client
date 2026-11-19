@@ -14,6 +14,22 @@
 
   const LEX_VERSION = '1.0.0';
 
+  // Escapes & < > " ' with the same mapping as Lex.Utils.escapeHtml, so the
+  // result is safe in element text and inside quoted attribute values. It is
+  // defined here (not delegated) so lex.core never depends on load order.
+  const LEX_HTML_ESCAPE_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+
+  function lexEscapeHtml(text) {
+    if (text === null || text === undefined) return '';
+    const str = String(text);
+    let out = '';
+    for (let i = 0; i < str.length; i++) {
+      const ch = str.charAt(i);
+      out += LEX_HTML_ESCAPE_MAP[ch] || ch;
+    }
+    return out;
+  }
+
   function lexMillisecondsSince(startMs) {
     return global.LanaTime.millisecondsSince(startMs);
   }
@@ -371,12 +387,9 @@
       return event;
     }
 
-    // Safe HTML escaping
+    // Safe HTML escaping for text and quoted attribute values
     escapeHtml(text) {
-      if (text === null || text === undefined) return '';
-      const div = document.createElement('div');
-      div.textContent = String(text);
-      return div.innerHTML;
+      return lexEscapeHtml(text);
     }
 
     // Bind an event listener with automatic cleanup on re-render/disconnect
@@ -594,6 +607,8 @@
 
   global.Lex = global.Lex || {};
   global.Lex.LexElement = LexElement;
+  // Shared escape helper for code that is not a Lex component.
+  global.Lex.escapeHtml = lexEscapeHtml;
   global.Lex.defineLex = defineLex;
   // Open overlays (lex-modal, lex-drawer) in opening order, so Escape closes
   // only the topmost one.

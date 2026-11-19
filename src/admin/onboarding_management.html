@@ -472,7 +472,7 @@
         function renderSteps() {
             const container = document.getElementById('stepsContainer');
             container.innerHTML = onboardingSteps.map((step, index) => `
-                <div class="flex items-center p-4 bg-gray-50 rounded-lg border border-gray-200" data-id="${step.id}">
+                <div class="flex items-center p-4 bg-gray-50 rounded-lg border border-gray-200" data-id="${Lex.escapeHtml(step.id)}">
                     <div class="cursor-move text-gray-400 mr-3">
                         <i class="fas fa-grip-vertical"></i>
                     </div>
@@ -480,8 +480,8 @@
                         ${index + 1}
                     </div>
                     <div class="flex-1">
-                        <input type="text" value="${step.name}" class="font-medium text-gray-900 bg-transparent border-none focus:outline-none focus:ring-0 w-full" onchange="updateStepName(${step.id}, this.value)">
-                        <input type="text" value="${step.description}" class="text-sm text-gray-500 bg-transparent border-none focus:outline-none focus:ring-0 w-full" onchange="updateStepDescription(${step.id}, this.value)">
+                        <input type="text" value="${Lex.escapeHtml(step.name)}" class="font-medium text-gray-900 bg-transparent border-none focus:outline-none focus:ring-0 w-full" onchange="updateStepName(${step.id}, this.value)">
+                        <input type="text" value="${Lex.escapeHtml(step.description)}" class="text-sm text-gray-500 bg-transparent border-none focus:outline-none focus:ring-0 w-full" onchange="updateStepDescription(${step.id}, this.value)">
                     </div>
                     <div class="flex items-center space-x-4">
                         <label class="flex items-center">

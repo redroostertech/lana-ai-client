@@ -65,9 +65,7 @@
   }
 
   function esc(value) {
-    var div = document.createElement('div');
-    div.textContent = value == null ? '' : String(value);
-    return div.innerHTML;
+    return window.Lex.escapeHtml(value == null ? '' : String(value));
   }
 
   function humanizeValue(value) {

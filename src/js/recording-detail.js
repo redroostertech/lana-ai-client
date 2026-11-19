@@ -1629,9 +1629,7 @@
   }
 
   function escapeHtml(value) {
-    var div = document.createElement('div');
-    div.textContent = value == null ? '' : String(value);
-    return div.innerHTML;
+    return window.Lex.escapeHtml(value == null ? '' : String(value));
   }
 
   // Cleanup polling and any in-flight media blob URL on page unload to

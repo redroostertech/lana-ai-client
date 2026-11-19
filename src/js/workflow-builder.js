@@ -240,7 +240,7 @@ function getWorkflowEventSummaryHtml(eventType) {
   const label = EventTypes.find((entry) => entry.value === eventType)?.label || eventType;
   return `
     <div class="rounded-xl border border-gray-200 bg-blue-50 p-3">
-      <p class="text-xs text-blue-800"><strong>Description:</strong> ${label}</p>
+      <p class="text-xs text-blue-800"><strong>Description:</strong> ${workflowEscapeAttr(label)}</p>
     </div>
   `;
 }
@@ -472,7 +472,7 @@ class WorkflowBuilder {
           <div class="space-y-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Schedule (Cron Expression)</label>
-              <input type="text" id="config-cron" value="${config.cron || '0 9 * * *'}"
+              <input type="text" id="config-cron" value="${workflowEscapeAttr(config.cron || '0 9 * * *')}"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 placeholder="0 9 * * * (9 AM daily)">
               <p class="mt-1 text-xs text-gray-500">Examples: 0 9 * * * (daily at 9AM), 0 */6 * * * (every 6 hours)</p>
@@ -509,7 +509,7 @@ class WorkflowBuilder {
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Days</label>
-              <input type="number" id="config-value" value="${config.value || 7}" min="0"
+              <input type="number" id="config-value" value="${workflowEscapeAttr(config.value || 7)}" min="0"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
             </div>
           </div>
@@ -522,7 +522,7 @@ class WorkflowBuilder {
           <div class="space-y-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Field</label>
-              <input type="text" id="config-field" value="${config.field || ''}"
+              <input type="text" id="config-field" value="${workflowEscapeAttr(config.field || '')}"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
                 placeholder="e.g., status, stage, source">
             </div>
@@ -532,7 +532,7 @@ class WorkflowBuilder {
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Value</label>
-              <input type="text" id="config-value" value="${config.value || ''}"
+              <input type="text" id="config-value" value="${workflowEscapeAttr(config.value || '')}"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
             </div>
           </div>
@@ -544,12 +544,12 @@ class WorkflowBuilder {
           <div class="space-y-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">To</label>
-              <input type="text" id="config-to" value="${config.to || '{{contact.email}}'}"
+              <input type="text" id="config-to" value="${workflowEscapeAttr(config.to || '{{contact.email}}')}"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Subject</label>
-              <input type="text" id="config-subject" value="${config.subject || ''}"
+              <input type="text" id="config-subject" value="${workflowEscapeAttr(config.subject || '')}"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
             </div>
             <div>
@@ -565,13 +565,13 @@ class WorkflowBuilder {
           <div class="space-y-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">To</label>
-              <input type="text" id="config-to" value="${config.to || '{{contact.phone}}'}"
+              <input type="text" id="config-to" value="${workflowEscapeAttr(config.to || '{{contact.phone}}')}"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Message</label>
               <textarea id="config-message" rows="3"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">${config.message || ''}</textarea>
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">${workflowEscapeAttr(config.message || '')}</textarea>
             </div>
           </div>
         `;
@@ -582,7 +582,7 @@ class WorkflowBuilder {
           <div class="space-y-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Task Title</label>
-              <input type="text" id="config-title" value="${config.title || ''}"
+              <input type="text" id="config-title" value="${workflowEscapeAttr(config.title || '')}"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
                 placeholder="Follow up with {{contact.name}}">
             </div>
@@ -592,7 +592,7 @@ class WorkflowBuilder {
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Due In (Days)</label>
-              <input type="number" id="config-dueIn" value="${config.dueIn || 1}" min="0"
+              <input type="number" id="config-dueIn" value="${workflowEscapeAttr(config.dueIn || 1)}" min="0"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
             </div>
             <div>
@@ -613,7 +613,7 @@ class WorkflowBuilder {
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Message</label>
               <textarea id="config-message" rows="3"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">${config.message || ''}</textarea>
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">${workflowEscapeAttr(config.message || '')}</textarea>
             </div>
           </div>
         `;
@@ -629,7 +629,7 @@ class WorkflowBuilder {
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Reason</label>
               <textarea id="config-reason" rows="2"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">${config.reason || ''}</textarea>
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">${workflowEscapeAttr(config.reason || '')}</textarea>
             </div>
           </div>
         `;
@@ -644,7 +644,7 @@ class WorkflowBuilder {
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Save Path</label>
-              <input type="text" id="config-savePath" value="${config.savePath || '/documents/'}"
+              <input type="text" id="config-savePath" value="${workflowEscapeAttr(config.savePath || '/documents/')}"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
             </div>
           </div>

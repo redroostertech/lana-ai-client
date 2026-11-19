@@ -382,37 +382,26 @@ const ContactSearchModal = {
   highlightText(text, query) {
     if (!query || !text) return this.escapeHtml(text || '');
 
-    const escaped = this.escapeHtml(text);
-    const escapedQuery = this.escapeHtml(query);
-    const lowerEscaped = escaped.toLowerCase();
-    const lowerQuery = escapedQuery.toLowerCase();
+    // Match against the raw text, then escape each slice, so a query never
+    // lands inside an entity such as &quot;.
+    const raw = String(text);
+    const needle = String(query).toLowerCase();
+    const lowerRaw = raw.toLowerCase();
 
     // Find all occurrences without regex
-    const parts = [];
+    let html = '';
     let lastIndex = 0;
-    let searchFrom = 0;
 
-    while (searchFrom < lowerEscaped.length) {
-      const idx = lowerEscaped.indexOf(lowerQuery, searchFrom);
+    while (lastIndex <= lowerRaw.length) {
+      const idx = lowerRaw.indexOf(needle, lastIndex);
       if (idx === -1) break;
-
-      // Add text before match
-      if (idx > lastIndex) {
-        parts.push(escaped.substring(lastIndex, idx));
-      }
-      // Add highlighted match (preserving original case)
-      parts.push('<mark class="bg-yellow-200 font-medium">' + escaped.substring(idx, idx + escapedQuery.length) + '</mark>');
-
-      lastIndex = idx + escapedQuery.length;
-      searchFrom = lastIndex;
+      // Text before the match, then the highlighted match (original case)
+      html += this.escapeHtml(raw.substring(lastIndex, idx));
+      html += '<mark class="bg-yellow-200 font-medium">' + this.escapeHtml(raw.substring(idx, idx + needle.length)) + '</mark>';
+      lastIndex = idx + needle.length;
     }
 
-    // Add remaining text
-    if (lastIndex < escaped.length) {
-      parts.push(escaped.substring(lastIndex));
-    }
-
-    return parts.length > 0 ? parts.join('') : escaped;
+    return html + this.escapeHtml(raw.substring(lastIndex));
   },
 
   /**
@@ -484,9 +473,7 @@ const ContactSearchModal = {
    * @returns {string} Escaped HTML
    */
   escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    return window.Lex.escapeHtml(text);
   },
 
   /**
@@ -495,11 +482,7 @@ const ContactSearchModal = {
    * @returns {string} Escaped attribute value
    */
   escapeAttr(text) {
-    const div = document.createElement('div');
-    div.textContent = String(text);
-    const escaped = div.innerHTML;
-    // Also escape quotes for attribute context
-    return escaped.split('"').join('&quot;').split("'").join('&#39;');
+    return window.Lex.escapeHtml(String(text));
   }
 };
 

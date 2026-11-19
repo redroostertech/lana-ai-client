@@ -121,8 +121,9 @@
     var name = org.name || 'Organization';
     var slug = org.slug ? ('@' + org.slug) : '';
 
-    banner.heading  = escHtml(name);
-    banner.subtitle = escHtml(slug);
+    // lex-banner escapes heading and subtitle itself; pass plain text.
+    banner.heading  = name;
+    banner.subtitle = slug;
 
     // Inject status badge into the action slot
     var actionsSlot = el('orgBannerActions');

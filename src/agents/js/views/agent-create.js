@@ -49,7 +49,7 @@
 
   var escHtml = (typeof window !== 'undefined' && window.Lex && window.Lex.Utils && window.Lex.Utils.escapeHtml)
     ? window.Lex.Utils.escapeHtml
-    : function (s) { var d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; };
+    : function (s) { return window.Lex.escapeHtml(s); };
 
   var TEMPLATE = ''
     + '<main class="agent-create-page-container">'

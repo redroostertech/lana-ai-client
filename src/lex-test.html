@@ -4644,7 +4644,7 @@ Lex.Orchestrator.<span class="fn">handleSSEBlock</span>(data, container);</pre>
     });
 
     function escapeForPre(text) {
-      return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return Lex.escapeHtml(text);
     }
 
     // --- Display generated system prompt ---

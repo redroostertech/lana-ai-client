@@ -347,12 +347,21 @@ const ConversationSearchModal = {
   highlightText(text, query) {
     if (!query) return this.escapeHtml(text);
 
-    const escapedText = this.escapeHtml(text);
-    const escapedQuery = this.escapeHtml(query);
-    const pattern = escapedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(`(${pattern})`, 'gi');
-
-    return escapedText.replace(regex, '<mark class="bg-yellow-200 font-medium">$1</mark>');
+    // Match against the raw text, then escape each slice, so a query never
+    // lands inside an entity such as &quot;.
+    const raw = String(text == null ? '' : text);
+    const needle = String(query).toLowerCase();
+    const lowerRaw = raw.toLowerCase();
+    let html = '';
+    let lastIndex = 0;
+    let idx = lowerRaw.indexOf(needle);
+    while (idx !== -1) {
+      html += this.escapeHtml(raw.substring(lastIndex, idx));
+      html += '<mark class="bg-yellow-200 font-medium">' + this.escapeHtml(raw.substring(idx, idx + needle.length)) + '</mark>';
+      lastIndex = idx + needle.length;
+      idx = lowerRaw.indexOf(needle, lastIndex);
+    }
+    return html + this.escapeHtml(raw.substring(lastIndex));
   },
 
   /**
@@ -402,9 +411,7 @@ const ConversationSearchModal = {
    * Escape HTML
    */
   escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    return window.Lex.escapeHtml(text);
   }
 };
 

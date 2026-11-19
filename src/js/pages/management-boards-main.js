@@ -792,9 +792,7 @@ function formatUserName(firstName, lastName, email) {
  * Escape HTML to prevent XSS
  */
 function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
+  return window.Lex.escapeHtml(text);
 }
 
 /**

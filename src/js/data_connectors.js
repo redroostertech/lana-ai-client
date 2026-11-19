@@ -1107,15 +1107,15 @@
 
     var logoEl = document.getElementById('detailsLogo');
     if (nc.logo_url) {
-      logoEl.innerHTML = '<img src="' + nc.logo_url + '" alt="' + nc.name + '" class="w-12 h-12 object-contain">';
+      logoEl.innerHTML = '<img src="' + escapeHtml(nc.logo_url) + '" alt="' + escapeHtml(nc.name) + '" class="w-12 h-12 object-contain">';
     } else {
-      logoEl.innerHTML = '<span class="text-2xl font-bold" style="color:var(--lex-text-disabled)">' + nc.name.charAt(0) + '</span>';
+      logoEl.innerHTML = '<span class="text-2xl font-bold" style="color:var(--lex-text-disabled)">' + escapeHtml(nc.name.charAt(0)) + '</span>';
     }
 
     var contentParts = [];
 
-    contentParts.push('<div><h4 class="font-semibold mb-2" style="color:var(--lex-text-primary)">Description</h4><p style="color:var(--lex-text-secondary)">' + nc.description + '</p></div>');
-    contentParts.push('<div><h4 class="font-semibold mb-2" style="color:var(--lex-text-primary)">Category</h4><span class="inline-flex items-center px-3 py-1 rounded-full text-sm" style="background:var(--lex-status-neutral-bg);color:var(--lex-status-neutral-text)">' + formatText(nc.category) + '</span></div>');
+    contentParts.push('<div><h4 class="font-semibold mb-2" style="color:var(--lex-text-primary)">Description</h4><p style="color:var(--lex-text-secondary)">' + escapeHtml(nc.description) + '</p></div>');
+    contentParts.push('<div><h4 class="font-semibold mb-2" style="color:var(--lex-text-primary)">Category</h4><span class="inline-flex items-center px-3 py-1 rounded-full text-sm" style="background:var(--lex-status-neutral-bg);color:var(--lex-status-neutral-text)">' + escapeHtml(formatText(nc.category)) + '</span></div>');
 
     var authTypeLabel = nc.auth_type === 'oauth2' ? 'OAuth 2.0' :
                         nc.auth_type === 'api_key' ? 'API Key' :
@@ -1125,13 +1125,13 @@
       : nc.auth_type === 'api_key'
         ? 'background:var(--lex-bg-accent-muted);color:var(--lex-text-accent)'
         : 'background:var(--lex-status-neutral-bg);color:var(--lex-status-neutral-text)';
-    contentParts.push('<div><h4 class="font-semibold mb-2" style="color:var(--lex-text-primary)">Authentication</h4><span class="inline-flex items-center px-3 py-1 rounded-full text-sm" style="' + authStyle + '">' + authTypeLabel + '</span></div>');
+    contentParts.push('<div><h4 class="font-semibold mb-2" style="color:var(--lex-text-primary)">Authentication</h4><span class="inline-flex items-center px-3 py-1 rounded-full text-sm" style="' + authStyle + '">' + escapeHtml(authTypeLabel) + '</span></div>');
     contentParts.push('<div><h4 class="font-semibold mb-2" style="color:var(--lex-text-primary)">Scope</h4>' + renderScopeBadge(nc) + '</div>');
 
     if (nc.capabilities && nc.capabilities.length > 0) {
       contentParts.push('<div><h4 class="font-semibold mb-2" style="color:var(--lex-text-primary)">Capabilities</h4><div class="flex flex-wrap gap-2">' +
         nc.capabilities.map(function (cap) {
-          return '<span class="inline-flex items-center px-2 py-1 rounded text-sm" style="background:var(--lex-bg-accent-muted);color:var(--lex-text-accent)">' + formatText(cap) + '</span>';
+          return '<span class="inline-flex items-center px-2 py-1 rounded text-sm" style="background:var(--lex-bg-accent-muted);color:var(--lex-text-accent)">' + escapeHtml(formatText(cap)) + '</span>';
         }).join('') +
       '</div></div>');
     }
@@ -1139,7 +1139,7 @@
     if (nc.tags && nc.tags.length > 0) {
       contentParts.push('<div><h4 class="font-semibold mb-2" style="color:var(--lex-text-primary)">Tags</h4><div class="flex flex-wrap gap-2">' +
         nc.tags.map(function (tag) {
-          return '<span class="inline-flex items-center px-2 py-1 rounded text-sm" style="background:var(--lex-status-neutral-bg);color:var(--lex-status-neutral-text)">' + tag + '</span>';
+          return '<span class="inline-flex items-center px-2 py-1 rounded text-sm" style="background:var(--lex-status-neutral-bg);color:var(--lex-status-neutral-text)">' + escapeHtml(tag) + '</span>';
         }).join('') +
       '</div></div>');
     }
@@ -1199,11 +1199,11 @@
         modalIcon.className = 'w-20 h-20 mx-auto mb-4 rounded-2xl flex items-center justify-center p-3';
         modalIcon.style.background = 'var(--lex-card-bg)';
         modalIcon.style.border = '2px solid var(--lex-border-default)';
-        modalIcon.innerHTML = '<img src="' + logoUrl + '" alt="' + connectorName + '" class="w-full h-full object-contain">';
+        modalIcon.innerHTML = '<img src="' + escapeHtml(logoUrl) + '" alt="' + escapeHtml(connectorName) + '" class="w-full h-full object-contain">';
       } else {
         modalIcon.className = 'w-20 h-20 mx-auto mb-4 rounded-2xl flex items-center justify-center';
         modalIcon.style.background = 'var(--lex-bg-accent)';
-        modalIcon.innerHTML = '<span class="text-3xl font-bold" style="color:var(--lex-text-on-accent)">' + connectorName.charAt(0).toUpperCase() + '</span>';
+        modalIcon.innerHTML = '<span class="text-3xl font-bold" style="color:var(--lex-text-on-accent)">' + escapeHtml(connectorName.charAt(0).toUpperCase()) + '</span>';
       }
     }
 
@@ -1817,7 +1817,7 @@
       // Backend returns { success: true, data: { source_name, ... } }
       var row = (result && result.data) || result || {};
       var name = row.source_name || row.connector_name || 'Account';
-      Lex.Toast.success(Lex.Utils.escapeHtml(name) + ' set as the default account.');
+      Lex.Toast.success(name + ' set as the default account.');
       // Reload the list so the UI reflects the new default
       loadConnectorAccounts();
     }).catch(function (error) {

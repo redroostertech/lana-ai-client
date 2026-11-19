@@ -20,7 +20,7 @@
 
   var escHtml = (window.Lex && Lex.Utils && Lex.Utils.escapeHtml)
     ? Lex.Utils.escapeHtml
-    : function (s) { var d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; };
+    : function (s) { return window.Lex.escapeHtml(s); };
 
   var formatDate = (window.Lex && Lex.Utils && Lex.Utils.formatDate)
     ? Lex.Utils.formatDate

@@ -241,16 +241,12 @@
   }
 
   /**
-   * Escape HTML special characters in text content.
-   * Uses split/join — no regex.
+   * Escape HTML special characters in text content (shared Lex helper).
    * @param {string} text
    * @returns {string}
    */
   function escapeHtmlContent(text) {
-    return raw(text)
-      .split('&').join('&amp;')
-      .split('<').join('&lt;')
-      .split('>').join('&gt;');
+    return window.Lex.escapeHtml(raw(text));
   }
 
   /**
