@@ -447,7 +447,7 @@ describe('shared detail page parts', () => {
     expect(css).not.toMatch(/\.dash-period-card|\.dash-dashboard-switcher|\.dashboard-detail-banner/);
     expect(read('js/admin/dashboard-detail.js')).not.toMatch(/dash-dashboard-switcher|dashboard-detail-banner--no-actions/);
     const shared = read(SHARED_CSS);
-    ['.detail-title-switcher', '.detail-banner--no-actions .lex-banner-overflow', '.detail-period-card', '.detail-period-card__fields']
+    ['.detail-banner--no-actions .lex-banner-overflow', '.detail-period-card', '.detail-period-card__fields']
       .forEach(rule => expect(shared).toContain(rule));
     expect(shared).not.toMatch(/#[0-9a-f]{3,6}\b/i);
   });
@@ -461,7 +461,7 @@ describe('shared detail page parts', () => {
     const picked = [];
     w.TitleSwitcher.render({ id: 'reportSwitcher', placeholder: 'Search reports...', value: 'b',
       options: [{ value: 'a', label: 'A <x>' }, { value: 'b', label: 'B' }], onPick: (value) => picked.push(value) });
-    const select = w.document.querySelector('lex-topbar .detail-title-switcher lex-select#reportSwitcher');
+    const select = w.document.querySelector('lex-topbar .title-switcher lex-select#reportSwitcher');
     expect(select).not.toBeNull();
     expect(w.document.querySelector('lex-topbar .lex-topbar-heading')).toBeNull();
     expect(select.options).toEqual([{ value: 'a', label: 'A <x>' }, { value: 'b', label: 'B' }]);
@@ -472,7 +472,7 @@ describe('shared detail page parts', () => {
     expect(picked).toEqual(['a']);
     // A second render reuses the switcher.
     w.TitleSwitcher.render({ id: 'reportSwitcher', placeholder: 'x', value: 'a', options: [{ value: 'a', label: 'A' }], onPick() {} });
-    expect(w.document.querySelectorAll('lex-topbar .detail-title-switcher')).toHaveLength(1);
+    expect(w.document.querySelectorAll('lex-topbar .title-switcher')).toHaveLength(1);
   });
 });
 

@@ -220,7 +220,7 @@ describe('the Reports pages wiring', () => {
     const pages = read('js/lex/lex-router.pages.js');
     const listRoute = pages.slice(pages.indexOf("'admin/reports-list.html': {"), pages.indexOf("'admin/report.html': {"));
     expect(listRoute).toContain("'css/admin/report-about.css'");
-    expect(drawerCss).toMatch(/\.report-about__card\s*\{[^}]*var\(--lex-bg-card\)/);
+    expect(drawerCss).toMatch(/\.report-about__card\s*\{[^}]*var\(--lex-bg-card, var\(--lex-bg-primary\)\)/);
     expect(drawerCss).toMatch(/::marker\s*\{[^}]*var\(--lex-/);
     expect(drawerCss).not.toMatch(/#[0-9a-f]{3,6}\b/i);
   });

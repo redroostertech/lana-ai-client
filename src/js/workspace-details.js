@@ -11541,8 +11541,8 @@
     // 0. Put the plain topbar heading back — the lex-app shell (and its
     // topbar) persists across SPA routes, so the switcher must not leak
     // onto other pages.
-    if (window.WorkspaceSwitcher) {
-      window.WorkspaceSwitcher.restore();
+    if (window.TitleSwitcher) {
+      window.TitleSwitcher.restore();
     }
 
     // 1. Close any open lex-modals and lex-drawers (in-page and hoisted)

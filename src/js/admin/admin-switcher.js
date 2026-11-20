@@ -1,4 +1,5 @@
-/* Admin flow topbar switcher. */
+/* Admin flow topbar switcher: the admin pages, through the shared
+   TitleSwitcher (js/shared/title-switcher.js). */
 
 (function () {
   'use strict';
@@ -122,31 +123,15 @@
 
   function render() {
     if (!shouldRender()) return false;
-
-    var heading = document.querySelector('lex-topbar .lex-topbar-heading');
-    var wrapper = document.querySelector('lex-topbar .admin-flow-switcher');
-    if (!wrapper && !heading) return false;
-
-    if (!wrapper) {
-      wrapper = document.createElement('div');
-      wrapper.className = 'admin-flow-switcher';
-      heading.replaceWith(wrapper);
-    }
-
-    if (!window.customElements || !customElements.get('lex-select')) return false;
-
-    wrapper.innerHTML = '<lex-select id="adminFlowSwitcher" name="adminFlowSwitcher" placeholder="Search admin pages..." searchable></lex-select>';
-    var select = wrapper.querySelector('lex-select');
-    if (!select) return true;
-
-    select.options = ADMIN_PAGES.filter(canViewPage);
-    select.value = currentAdminPath();
-    select.addEventListener('lex-change', function (event) {
-      var value = event.detail && event.detail.value;
-      navigate(value);
+    if (!window.TitleSwitcher || !window.customElements || !customElements.get('lex-select')) return false;
+    // The shared header title switcher (js/shared/title-switcher.js, css/title-switcher.css).
+    return !!window.TitleSwitcher.render({
+      id: 'adminFlowSwitcher',
+      placeholder: 'Search admin pages...',
+      options: ADMIN_PAGES.filter(canViewPage),
+      value: currentAdminPath(),
+      onPick: navigate
     });
-
-    return true;
   }
 
   function init() {

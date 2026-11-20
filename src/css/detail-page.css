@@ -1,45 +1,8 @@
 /* Detail pages (one dashboard, admin/dashboard-detail.html; one report,
-   admin/report.html) share their header: the item switcher in the shell
-   title (TitleSwitcher, js/shared/title-switcher.js), a light lex-banner
+   admin/report.html) share their header parts: the header title switcher
+   has its own sheet; here are a light lex-banner
    whose overflow menu can be suppressed, and the period card. Colors come
    from Lex tokens, so light and dark follow the theme. */
-
-/* Shell title switcher: a searchable lex-select in place of the title. */
-.detail-title-switcher {
-  display: block;
-  max-width: min(28rem, 100%);
-  height: 2.75rem;
-}
-
-.detail-title-switcher lex-select {
-  display: block;
-  width: 100%;
-  min-width: 13rem;
-  max-width: 28rem;
-}
-
-.detail-title-switcher .lex-field,
-.detail-title-switcher .lex-field-label {
-  margin: 0;
-}
-
-.detail-title-switcher .lex-field-label,
-.detail-title-switcher .lex-field-help,
-.detail-title-switcher .lex-field-error {
-  display: none;
-}
-
-.detail-title-switcher .lex-select-trigger {
-  height: 2.75rem;
-  min-height: 2.75rem;
-  font-size: var(--lex-h5-size, 1.125rem);
-  font-weight: var(--lex-weight-semibold, 600);
-  background: var(--lex-bg-card, var(--lex-bg-primary));
-}
-
-.detail-title-switcher .lex-select-wrap {
-  margin: 0;
-}
 
 /* Banner: a page with no item actions to offer hides the kebab menu. */
 .detail-banner--no-actions .lex-banner-overflow {

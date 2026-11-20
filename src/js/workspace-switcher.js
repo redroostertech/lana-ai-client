@@ -1,12 +1,8 @@
-/* Workspace switcher — replaces the static "Matter Details" topbar heading on
-   workspace-details.html with a searchable lex-select listing workspaces and
-   matters (Pinned / Recent groups), so users can jump between workspaces.
-   Modeled on js/admin/admin-switcher.js and the data-driven variant in
-   js/admin/dashboard-detail.js (renderDashboardSwitcher).
-
-   Because workspace-details is an SPA route inside the persistent lex-app
-   shell (unlike the standalone admin pages), the page must call
-   WorkspaceSwitcher.restore() on leave to put the <h1> heading back. */
+/* Workspace switcher: the matter page's header title becomes a searchable
+   list of workspaces and matters (Pinned / Recent groups), so users can jump
+   between them. Drawn by the shared TitleSwitcher (js/shared/title-switcher.js,
+   css/title-switcher.css), which also puts the plain title back when the app
+   moves to another page. */
 (function () {
   'use strict';
 
@@ -72,28 +68,21 @@
     }
   }
 
-  function mount() {
-    var topbar = document.querySelector('lex-topbar');
-    if (!topbar) return null;
-
-    var existing = topbar.querySelector('#workspaceSwitcher');
-    if (existing) return existing;
-
-    var heading = topbar.querySelector('.lex-topbar-heading');
-    if (!heading) return null;
-
-    var wrapper = document.createElement('div');
-    wrapper.className = 'workspace-switcher';
-    wrapper.innerHTML = '<lex-select id="workspaceSwitcher" name="workspaceSwitcher" placeholder="Search workspaces..." searchable></lex-select>';
-    heading.replaceWith(wrapper);
-    return wrapper.querySelector('#workspaceSwitcher');
+  function openMatter(id) {
+    if (window.Lex && window.Lex.Nav && typeof window.Lex.Nav.go === 'function') {
+      window.Lex.Nav.go('workspace-details.html', {
+        params: { id: id, tab: 'summary' },
+        context: { matterId: id, tab: 'summary' }
+      });
+    } else {
+      window.location.href = 'workspace-details.html?id=' + encodeURIComponent(id) + '&tab=summary';
+    }
   }
 
   async function render(currentId) {
-    if (!window.customElements || !customElements.get('lex-select')) return;
-
-    var select = mount();
-    if (!select) {
+    var ready = window.TitleSwitcher && window.customElements && customElements.get('lex-select') &&
+      document.querySelector('lex-topbar .lex-topbar-heading, lex-topbar .title-switcher');
+    if (!ready) {
       // lex-app / lex-topbar upgrade asynchronously on first paint
       if (_attempts++ < 30) setTimeout(function () { render(currentId); }, 50);
       return;
@@ -110,40 +99,14 @@
       options = [toOption(current, 'Current')].concat(options);
     }
 
-    select.options = options;
-    if (currentId) select.value = currentId;
-
-    if (!select._wsSwitcherBound) {
-      select.addEventListener('lex-change', function (e) {
-        var id = e.detail && e.detail.value;
-        if (!id) return;
-        var cur = window.currentMatterData && window.currentMatterData.matter;
-        if (cur && cur.matter_id === id) return;
-        if (window.Lex && window.Lex.Nav && typeof window.Lex.Nav.go === 'function') {
-          window.Lex.Nav.go('workspace-details.html', {
-            params: { id: id, tab: 'summary' },
-            context: { matterId: id, tab: 'summary' }
-          });
-        } else {
-          window.location.href = 'workspace-details.html?id=' + encodeURIComponent(id) + '&tab=summary';
-        }
-      });
-      select._wsSwitcherBound = true;
-    }
+    window.TitleSwitcher.render({
+      id: 'workspaceSwitcher',
+      placeholder: 'Search workspaces...',
+      options: options,
+      value: currentId || '',
+      onPick: openMatter
+    });
   }
 
-  // Put the plain <h1> heading back so other SPA pages sharing the lex-app
-  // shell keep their normal topbar title.
-  function restore() {
-    var topbar = document.querySelector('lex-topbar');
-    if (!topbar) return;
-    var wrapper = topbar.querySelector('.workspace-switcher');
-    if (!wrapper) return;
-    var h1 = document.createElement('h1');
-    h1.className = 'lex-topbar-heading';
-    h1.textContent = topbar.heading || '';
-    wrapper.replaceWith(h1);
-  }
-
-  window.WorkspaceSwitcher = { render: render, restore: restore };
+  window.WorkspaceSwitcher = { render: render };
 })();

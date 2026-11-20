@@ -100,6 +100,7 @@
         'js/shared/file-content-errors.js',
         'js/services/docx-template-modal.js',
         'js/services/document-create-modal.js',
+        'js/shared/title-switcher.js',
         'js/workspace-switcher.js',
         'js/workspace-billable-hours.js',
         'js/shared/library-column-filters.js',
@@ -117,7 +118,7 @@
         'css/matter-object-types.css',
         'css/matter-runnables.css',
         'css/workspace-summary.css',
-        'css/workspace-switcher.css',
+        'css/title-switcher.css',
         'css/lana-ask-btn.css'
       ]
     },
@@ -517,6 +518,7 @@
       ],
       stylesheets: [
         'insights/raw-data-viewer.css',
+        'css/title-switcher.css',
         'css/detail-page.css',
         'css/admin/report.css'
       ]
@@ -569,6 +571,7 @@
       ],
       stylesheets: [
         'css/admin/insights-dashboard.css',
+        'css/title-switcher.css',
         'css/detail-page.css'
       ]
     },
