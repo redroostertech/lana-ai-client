@@ -40,7 +40,7 @@
     "preelectron": "node scripts/fetch-lana-editor.js --optional && npm run build:tiptap && npm run css:dev && node scripts/build-screen-voice-helper.js && node scripts/build-briefs.js && node scripts/build-briefs-ble-helper.js --optional",
     "electron": "electron electron-main.js --disable-gpu-driver-bug-workarounds",
     "preelectron:dev": "node scripts/fetch-lana-editor.js --optional && npm run build:tiptap && npm run css:dev && node scripts/build-screen-voice-helper.js && node scripts/build-briefs.js && node scripts/build-briefs-ble-helper.js --optional",
-    "electron:dev": "NODE_ENV=development npx electron electron-main.js --disable-gpu-driver-bug-workarounds",
+    "electron:dev": "node scripts/electron-dev.js electron-main.js --disable-gpu-driver-bug-workarounds",
     "electron:dev:watch": "node --watch-path=electron-main.js --watch-path=electron-preload.js --watch-path=electron-storage.js --watch-path=electron-discovery.js --watch-path=electron-logger.js --watch-path=electron-updater-custom.js --watch-path=js --watch-path=public_html --watch-path=src/js/tiptap-bundle.js --watch-path=src/css scripts/electron-dev-watch.js",
     "electron:rebuild": "electron-rebuild -f -w bcrypt",
     "postinstall": "node scripts/postinstall-electron.js",

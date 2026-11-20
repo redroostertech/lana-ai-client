@@ -17,7 +17,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const esbuild = require('esbuild');
-const electronPath = require('electron');
+const { devElectronPathForRoot } = require('./dev-electron-bundle');
 const { baseConfig, OUTFILES } = require('./build-tiptap');
 
 const ROOT = path.join(__dirname, '..');
@@ -85,7 +85,7 @@ async function main() {
   process.chdir(ROOT);
   await buildTiptap();
   await buildCss();
-  const code = await run(electronPath, ['electron-main.js', '--disable-gpu-driver-bug-workarounds'], {
+  const code = await run(devElectronPathForRoot(ROOT), ['electron-main.js', '--disable-gpu-driver-bug-workarounds'], {
     env: { ...process.env, NODE_ENV: 'development' },
   });
   process.exit(code);

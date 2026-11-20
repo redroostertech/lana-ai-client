@@ -17,7 +17,7 @@ Use Node 24.21.0 (npm 11), the exact version in `engines`. Electron 44 no longer
 
 npm 11 gates dependency install scripts behind `allowScripts`. The `allowScripts` block in `package.json` records an explicit, version-pinned denial for each of them, so installs print no install-script warnings: bcrypt, esbuild, fsevents, @parcel/watcher and unrs-resolver load their prebuilt binaries (bundled or from platform packages) without their scripts, and electron-winstaller's script only serves the Squirrel.Windows target, which this app does not build. When one of those packages changes version, npm lists it again under `npm install-scripts ls`; review it and update the pinned entry.
 
-`electron:dev` runs `NODE_ENV=development npx electron electron-main.js`. Its `preelectron:dev` hook first builds the TipTap bundle, Tailwind CSS, and the screen-voice helper, so no separate build step is needed.
+`electron:dev` runs `node scripts/electron-dev.js electron-main.js`, which starts Electron in development mode from a copy of Electron named for the product (so the dock says LANA AI, not Electron). Its `preelectron:dev` hook first builds the TipTap bundle, Tailwind CSS, and the screen-voice helper, so no separate build step is needed.
 
 Run unit tests:
 
