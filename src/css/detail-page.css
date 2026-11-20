@@ -34,7 +34,7 @@
   min-height: 2.75rem;
   font-size: var(--lex-h5-size, 1.125rem);
   font-weight: var(--lex-weight-semibold, 600);
-  background: var(--lex-bg-card);
+  background: var(--lex-bg-card, var(--lex-bg-primary));
 }
 
 .detail-title-switcher .lex-select-wrap {
@@ -56,7 +56,7 @@
   border: 1px solid var(--lex-border-subtle);
   border-radius: var(--lex-radius-md);
   padding: 1rem;
-  background: var(--lex-bg-card);
+  background: var(--lex-bg-card, var(--lex-bg-primary));
 }
 
 .detail-period-card__label {

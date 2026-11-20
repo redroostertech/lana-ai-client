@@ -10,7 +10,7 @@
 }
 
 .report-about__card {
-  background: var(--lex-bg-card);
+  background: var(--lex-bg-card, var(--lex-bg-primary));
   border: 1px solid var(--lex-border-subtle);
   border-radius: var(--lex-radius-lg);
   padding: var(--lex-space-md);
