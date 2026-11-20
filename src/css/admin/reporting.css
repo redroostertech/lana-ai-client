@@ -169,57 +169,40 @@
   display: none;
 }
 
-/* "What it shows": the summary opens the report's side panel. */
-.reporting-list__about {
+/* "What it shows": the summary cut short, then "show more", which opens the
+   report's side panel (styled in report-about.css). */
+.reporting-list__sr {
+  border: 0;
+  clip: rect(0 0 0 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+.reporting-list__more {
   background: none;
   border: 0;
   color: var(--lex-text-link);
   cursor: pointer;
   font: inherit;
   padding: 0;
-  text-align: left;
   text-decoration: underline;
   text-underline-offset: 2px;
+  white-space: nowrap;
 }
 
-.reporting-list__about:hover {
+.reporting-list__more:hover {
   color: var(--lex-text-link-hover);
 }
 
-.reporting-list__about:focus-visible {
+.reporting-list__more:focus-visible {
   border-radius: 2px;
-  outline: 2px solid var(--lex-text-link);
+  outline: 2px solid var(--lex-border-focus);
   outline-offset: 2px;
-}
-
-/* Report side panel */
-.reporting-about {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
-.reporting-about__heading {
-  color: var(--lex-text-primary);
-  font-size: 0.9375rem;
-  font-weight: 600;
-  margin: 0 0 0.375rem;
-}
-
-.reporting-about__text,
-.reporting-about__list {
-  color: var(--lex-text-primary);
-  font-size: 0.9375rem;
-  line-height: 1.6;
-  margin: 0;
-}
-
-.reporting-about__list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-  list-style: disc;
-  padding-left: 1.25rem;
 }
 
 /* Picked report header (controls card) */
@@ -349,6 +332,11 @@
 
 .reporting-presets {
   margin-bottom: 1rem;
+}
+
+/* A report that shows today's numbers has no period to pick. */
+[data-period-control][hidden] {
+  display: none;
 }
 
 .reporting-presets__label {

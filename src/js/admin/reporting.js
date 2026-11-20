@@ -156,8 +156,11 @@
   // refetches the profile first (api.ensureFirmTimezone).
   async function selectPeriodPreset(preset) {
     await api.ensureFirmTimezone();
-    var days = LanaTime.reportPresetDays(preset, window.Lex.Utils.getFirmTimezone());
+    applyPeriodDays(LanaTime.reportPresetDays(preset, window.Lex.Utils.getFirmTimezone()), preset);
+  }
 
+  // Put plain days (inclusive end) in the period fields.
+  function applyPeriodDays(days, preset) {
     var periodStartEl = document.getElementById('periodStart');
     var periodEndEl = document.getElementById('periodEnd');
     if (periodStartEl) periodStartEl.value = days.start;
@@ -188,25 +191,10 @@
     var durationMs = endDate - startDate;
     var durationDays = Math.ceil(durationMs / LanaTime.MS_PER_DAY);
 
-    var allOptions = [
-      { value: 'daily',     label: 'Daily' },
-      { value: 'weekly',    label: 'Weekly' },
-      { value: 'monthly',   label: 'Monthly' },
-      { value: 'quarterly', label: 'Quarterly' },
-      { value: 'yearly',    label: 'Yearly' }
-    ];
-
-    if (preset === 'lastYear' || (durationDays >= 365 && durationDays <= 366)) {
-      periodTypeEl.options = [{ value: 'monthly', label: 'Monthly' }];
-      periodTypeEl.value = 'monthly';
-    } else {
-      periodTypeEl.options = allOptions;
-      if (['daily', 'weekly', 'monthly', 'quarterly', 'yearly'].indexOf(currentValue) !== -1) {
-        periodTypeEl.value = currentValue;
-      } else {
-        periodTypeEl.value = 'monthly';
-      }
-    }
+    var labels = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly', quarterly: 'Quarterly', yearly: 'Yearly' };
+    var choice = ReportsList.compareByFor(durationDays, preset, currentValue);
+    periodTypeEl.options = choice.options.map(function (value) { return { value: value, label: labels[value] }; });
+    periodTypeEl.value = choice.value;
   }
 
   function initPeriodControls() {
@@ -1223,8 +1211,8 @@
         var row = event.detail && event.detail.row;
         if (row) openReport(row);
       });
-      // The summary button opens the report's side panel. lex-table leaves
-      // clicks on buttons to them, so this never opens the report itself.
+      // Show more opens the report's side panel. lex-table leaves clicks on
+      // buttons to them, so this never opens the report itself.
       table.addEventListener('click', function (event) {
         var button = event.target.closest('[data-report-about]');
         if (button) openReportAbout(button.getAttribute('data-report-about'));
@@ -1245,47 +1233,153 @@
     if (count) count.textContent = entries.length + (entries.length === 1 ? ' report' : ' reports');
   }
 
-  // Side panel: what the report is, how it is put together, its goal and how
-  // to use it. The text is the report's declared about, from its detail.
+  // Side panel: run controls, then what the report is, what you see, how it
+  // is put together, the data it uses, its goal, how to use it and what is
+  // good to know. The text is the report's declared about, from its detail;
+  // a saved report has none but can still run from here.
   var reportAboutRequest = 0;
+  var drawerPreset = 'thisWeek';
 
-  async function openReportAbout(key) {
+  function drawerIcon(name) {
+    return window.Lex && Lex.Icons ? Lex.Icons.get({ name: name, size: 'small' }) : '';
+  }
+
+  async function openReportAbout(id) {
     var drawer = document.getElementById('reportAboutDrawer');
-    if (!drawer || !key) return;
-    var entry = findReportEntry('module:' + key);
+    var entry = id && findReportEntry(id);
+    if (!drawer || !entry) return;
+    bindDrawerRun(drawer);
     var request = ++reportAboutRequest;
-    drawer.heading = entry ? entry.name : 'About this report';
-    drawer.contentRoot.innerHTML = '<p class="reporting-list__muted">Loading\u2026</p>';
+    drawer.dataset.reportId = id;
+    drawer.heading = entry.name;
+    drawer.contentRoot.innerHTML = ReportsList.runControlsHtml(drawerPreset, escapeHtml, drawerIcon, entry.usesPeriod !== false)
+      + '<div data-report-about-body>'
+      + (entry.kind === 'report' ? '<p class="reporting-list__muted">Loading\u2026</p>' : '') + '</div>';
     drawer.open = true;
+    if (entry.kind !== 'report') return;
+    var body = drawer.contentRoot.querySelector('[data-report-about-body]');
     try {
-      var detail = await api.get('/api/v1/modules/' + encodeURIComponent(key));
+      var detail = await api.get('/api/v1/modules/' + encodeURIComponent(entry.key));
       if (request !== reportAboutRequest) return;
-      drawer.contentRoot.innerHTML = ReportsList.aboutHtml(detail && detail.about, escapeHtml);
+      body.innerHTML = ReportsList.aboutHtml(detail && detail.about, escapeHtml, drawerIcon);
     } catch (error) {
       if (request !== reportAboutRequest) return;
       console.error('[Reporting] Failed to load report details:', error);
-      drawer.contentRoot.innerHTML = '<p class="reporting-list__muted">The details could not load. Please try again.</p>';
+      body.innerHTML = '<p class="reporting-list__muted">The details could not load. Please try again.</p>';
     }
+  }
+
+  function bindDrawerRun(drawer) {
+    if (drawer.dataset.runBound) return;
+    drawer.dataset.runBound = 'true';
+    drawer.addEventListener('lex-change', function (event) {
+      var select = event.target.closest('[data-run-period]');
+      if (select) pickDrawerPreset(drawer, select.value);
+    });
+    drawer.addEventListener('click', function (event) {
+      if (event.target.closest('[data-run-report]')) runFromDrawer(drawer);
+    });
+  }
+
+  function pickDrawerPreset(drawer, preset) {
+    drawerPreset = preset;
+    var custom = drawer.querySelector('[data-run-custom]');
+    if (custom) custom.hidden = preset !== 'custom';
+    showDrawerProblem(drawer, null);
+  }
+
+  function showDrawerProblem(drawer, message) {
+    var problem = drawer.querySelector('[data-run-problem]');
+    if (!problem) return;
+    problem.textContent = message || '';
+    problem.hidden = !message;
+  }
+
+  // Run picks the period, closes the panel, opens the report (an in-page
+  // view, so Back returns to the list) and runs it with the page's own
+  // period and run code. Preset days come from LanaTime.reportPresetDays.
+  async function runFromDrawer(drawer) {
+    var entry = findReportEntry(drawer.dataset.reportId);
+    if (!entry) return;
+    var custom = null;
+    if (entry.usesPeriod !== false && drawerPreset === 'custom') {
+      var start = (drawer.querySelector('[data-run-start]') || {}).value || '';
+      var end = (drawer.querySelector('[data-run-end]') || {}).value || '';
+      var problem = ReportsList.customPeriodProblem(start, end);
+      if (problem) {
+        showDrawerProblem(drawer, problem);
+        return;
+      }
+      custom = { start: start, end: end };
+    }
+    drawer.open = false;
+    openReport(entry);
+    // A report that shows today's numbers runs with the period fields as
+    // they are; the backend does not read them.
+    if (custom) {
+      applyPeriodDays(custom, null);
+    } else if (entry.usesPeriod !== false) {
+      await selectPeriodPreset(drawerPreset);
+    }
+    executeModule();
   }
 
   function findReportEntry(id) {
     return ReportsList.buildReportEntries(allModules, importedReports).find(function (entry) { return entry.id === id; });
   }
 
-  // A link such as a dashboard tile opens one report directly (?report=<key>).
+  // Opening a report is an in-page view (Lex.Nav.pushView), so the shell Back
+  // and the back gesture return to the list before leaving the page. The
+  // entry's recorded view wins; a link such as a dashboard tile opens one
+  // report directly (?report=<key>) on a fresh entry.
   function openReportFromUrl() {
-    var key = new URLSearchParams(window.location.search).get('report');
+    var view = window.Lex && Lex.Nav ? Lex.Nav.getView() : undefined;
+    if (typeof view === 'string') {
+      var recorded = findReportEntry(view);
+      if (recorded) openReport(recorded, { fromHistory: true });
+      return;
+    }
+    if (view === null) return;
+    var params = window.Lex && Lex.Nav ? Lex.Nav.getParams() : new URLSearchParams(window.location.search);
+    var key = params.get('report');
     if (!key) return;
     var entry = findReportEntry('module:' + key);
-    if (entry) openReport(entry, { keepUrl: true });
+    if (entry) openReport(entry);
   }
 
-  function setReportUrl(key) {
-    if (!window.history || typeof window.history.replaceState !== 'function') return;
-    var url = new URL(window.location.href);
-    if (key) url.searchParams.set('report', key);
-    else url.searchParams.delete('report');
-    window.history.replaceState(window.history.state, '', url.toString());
+  // Follow Back and Forward between the list and a report while the page is
+  // shown; stop when the router leaves it (it binds again on the next visit).
+  var stopReportViews = null;
+
+  function bindReportViews() {
+    if (stopReportViews || !(window.Lex && Lex.Nav)) return;
+    stopReportViews = Lex.Nav.onViewChange('admin/reporting.html', function (view) {
+      if (!document.getElementById('reportsListSection')) return;
+      var entry = view && findReportEntry(view);
+      if (entry) openReport(entry, { fromHistory: true });
+      else showReportsList();
+    });
+    if (typeof LexRouter !== 'undefined' && typeof LexRouter.registerView === 'function') {
+      LexRouter.registerView({
+        onLeave: function () {
+          if (stopReportViews) stopReportViews();
+          stopReportViews = null;
+        }
+      });
+    }
+  }
+
+  // Back to the list: step back off the report's entry, like the shell Back.
+  function closeReportView() {
+    if (window.Lex && Lex.Nav) Lex.Nav.closeView(showReportsList);
+    else showReportsList();
+  }
+
+  // The list keeps its search; its scroll is put back when it shows again.
+  var listScrollTop = 0;
+
+  function contentScroller() {
+    return document.getElementById('lex-main-content') || document.scrollingElement;
   }
 
   function openReport(entry, opts) {
@@ -1306,9 +1400,17 @@
     hideInfo();
     hideError();
 
-    document.getElementById('reportsListSection').hidden = true;
+    // A report that shows today's numbers has no period to pick.
+    document.querySelectorAll('[data-period-control]').forEach(function (el) {
+      el.hidden = entry.usesPeriod === false;
+    });
+
+    var listSection = document.getElementById('reportsListSection');
+    var scroller = contentScroller();
+    if (!listSection.hidden && scroller) listScrollTop = scroller.scrollTop;
+    listSection.hidden = true;
     document.getElementById('reportingLayout').hidden = false;
-    if (entry.kind !== 'saved' && !(opts && opts.keepUrl)) setReportUrl(entry.key);
+    if (!(opts && opts.fromHistory) && window.Lex && Lex.Nav) Lex.Nav.pushView(entry.id);
   }
 
   function showReportsList() {
@@ -1316,7 +1418,8 @@
     selectedImportedReportId = null;
     document.getElementById('reportingLayout').hidden = true;
     document.getElementById('reportsListSection').hidden = false;
-    setReportUrl(null);
+    var scroller = contentScroller();
+    if (scroller) scroller.scrollTop = listScrollTop;
     // Reload so a report just run shows its new last run time.
     loadModules();
   }
@@ -1344,7 +1447,7 @@
     var backBtn = document.getElementById('backToReportsBtn');
     if (backBtn && !backBtn.dataset.bound) {
       backBtn.dataset.bound = 'true';
-      backBtn.addEventListener('click', showReportsList);
+      backBtn.addEventListener('click', closeReportView);
     }
 
     var deleteBtn = document.getElementById('deleteImportedReportBtn');
@@ -2728,7 +2831,7 @@
       await api.delete('/api/v1/reporting/reports/' + reportId);
       showInfo('Report "' + reportName + '" deleted.');
       if (selectedImportedReportId === reportId) {
-        showReportsList();
+        closeReportView();
       }
       await loadImportedReports();
     } catch (error) {
@@ -3638,6 +3741,7 @@
     loadModules();
     loadImportedReports();
     initReportSelect();
+    bindReportViews();
     initPeriodControls();
     initImportControls();
     initCustomizePanel();

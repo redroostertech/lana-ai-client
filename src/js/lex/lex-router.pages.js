@@ -502,7 +502,8 @@
       ],
       stylesheets: [
         'insights/raw-data-viewer.css',
-        'css/admin/reporting.css'
+        'css/admin/reporting.css',
+        'css/admin/report-about.css'
       ]
     },
 

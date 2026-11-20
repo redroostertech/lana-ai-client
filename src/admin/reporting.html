@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="../css/lex-chat.css">
   <link rel="stylesheet" href="../css/admin/admin-tables.css">
   <link rel="stylesheet" href="../css/admin/reporting.css">
+  <link rel="stylesheet" href="../css/admin/report-about.css">
   <script src="../js/tailwind-loader.js"></script>
 
   <style>
@@ -118,7 +119,7 @@
             </div>
 
             <!-- Period Presets -->
-            <div class="reporting-presets">
+            <div class="reporting-presets" data-period-control>
               <p class="lex-label lex-text-secondary reporting-presets__label">Quick Select Period</p>
               <div id="periodPresets" class="reporting-presets__list">
                 <lex-btn data-preset="last7days" variant="secondary" size="sm">Last 7 Days</lex-btn>
@@ -132,7 +133,7 @@
             </div>
 
             <!-- Date Range Row -->
-            <div class="reporting-period-fields">
+            <div class="reporting-period-fields" data-period-control>
               <lex-input id="periodStart" label="Start Date" type="date" name="periodStart"></lex-input>
               <lex-input id="periodEnd" label="End Date" type="date" name="periodEnd"></lex-input>
               <lex-select

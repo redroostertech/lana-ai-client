@@ -12,6 +12,10 @@
      Lex.Nav.peek()                   — read context without clearing
      Lex.Nav.getParams()              — current URL query params
      Lex.Nav.updateParams(params)     — update URL params without navigation
+     Lex.Nav.pushView(view)           - open an in-page view as a history entry
+     Lex.Nav.getView()                - view on the current entry (null = page base)
+     Lex.Nav.onViewChange(page, fn)   - Back/Forward landed on a view of page; returns unsubscribe
+     Lex.Nav.closeView(fallback)      - step back off an open view, else fallback()
      Lex.Nav.hasContext                — boolean getter
 
    Rules:
@@ -656,6 +660,76 @@
     global.history.replaceState(newState, '');
   }
 
+  // -------------------------------------------------------------------------
+  // In-page views: a detail opened inside a page (one report on the Reports
+  // list) gets its own history entry, so the shell Back and the platform back
+  // gesture close it before leaving the page. The entry keeps the page's
+  // route path, so the router sees no page change and does not reload.
+  // -------------------------------------------------------------------------
+
+  function copyState(extra) {
+    var current = global.history.state || {};
+    var next = {};
+    Object.keys(current).forEach(function (key) { next[key] = current[key]; });
+    Object.keys(extra).forEach(function (key) { next[key] = extra[key]; });
+    return next;
+  }
+
+  /**
+   * Open an in-page view as a new history entry. The entry it leaves is
+   * marked as the page's base view (null) so Back returns to it.
+   * @param {string} view - page-owned view id
+   */
+  function pushView(view) {
+    var current = global.history.state || {};
+    if (current.view === undefined) global.history.replaceState(copyState({ view: null }), '');
+    global.history.pushState(copyState({ view: view }), '');
+  }
+
+  /**
+   * The view recorded on the current entry: a view id, null for the page's
+   * base view, or undefined when the entry records none (a fresh page load).
+   */
+  function getView() {
+    var state = global.history.state;
+    return state && state.view !== undefined ? state.view : undefined;
+  }
+
+  function pageKeyOf(path) {
+    var normalized = normalizePath(path);
+    return normalized ? extractPageKey(splitPathAndQuery(normalized).pathname) : '';
+  }
+
+  /**
+   * Call handler(view) when Back or Forward lands on an entry of `page` that
+   * records a view (null is the page's base view). Entries of other pages
+   * are ignored. Returns a function that stops listening; a page calls it
+   * when it is left (LexRouter.registerView onLeave).
+   * @param {string} page - the owning route, e.g. 'admin/reporting.html'
+   * @param {Function} handler
+   * @returns {Function} unsubscribe
+   */
+  function onViewChange(page, handler) {
+    var owner = pageKeyOf(page);
+    function listener(event) {
+      var state = event.state;
+      if (!state || state.view === undefined || pageKeyOf(state.path) !== owner) return;
+      handler(state.view);
+    }
+    global.addEventListener('popstate', listener);
+    return function () { global.removeEventListener('popstate', listener); };
+  }
+
+  /**
+   * Close the open in-page view: step back off its entry (the view listener
+   * then shows the base view), or call fallback() when no view is open.
+   * @param {Function} fallback
+   */
+  function closeView(fallback) {
+    if (typeof getView() === 'string') global.history.back();
+    else if (typeof fallback === 'function') fallback();
+  }
+
   /**
    * A page URL relative to the current document, with params, without
    * navigating. For hosting an app page inside the current one (for example
@@ -683,6 +757,10 @@
     peek:         peek,
     getParams:    getParams,
     updateParams: updateParams,
+    pushView:     pushView,
+    getView:      getView,
+    onViewChange: onViewChange,
+    closeView:    closeView,
     replacementFor: replacementFor,
     redirectFor:  redirectFor,
     redirectPath: redirectPath,

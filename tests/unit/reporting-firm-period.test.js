@@ -53,7 +53,7 @@ function page({ post = jest.fn().mockResolvedValue(RESULT), get = jest.fn().mock
     return realPreset(preset, zone, new Date('2026-11-01T05:00:00.000Z'));
   };
   vm.runInNewContext(source, { window, document, console: { log() {}, error() {}, warn() {} }, Intl, URLSearchParams,
-    setTimeout: jest.fn(), clearTimeout: jest.fn(), LanaTime: timeWin.LanaTime, Lex: window.Lex,
+    setTimeout: jest.fn(), clearTimeout: jest.fn(), LanaTime: timeWin.LanaTime, ReportsList: window.ReportsList, Lex: window.Lex,
     DrilldownRenderer: window.DrilldownRenderer, api: { post, get, user: {}, ensureFirmTimezone } });
   return { exports: window.testExports, nodes, post, presetCalls, opened, tables: window.ReportingTables, ensureFirmTimezone };
 }

@@ -1,0 +1,93 @@
+/* Report side panel (#reportAboutDrawer): run controls, then the report's
+   about parts, each its own card with an icon and a heading. Colors come from
+   Lex tokens, so light and dark follow the theme. */
+
+.report-about {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-md);
+  margin-top: var(--lex-space-md);
+}
+
+.report-about__card {
+  background: var(--lex-bg-card);
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: var(--lex-radius-lg);
+  padding: var(--lex-space-md);
+}
+
+.report-about__head {
+  align-items: center;
+  display: flex;
+  gap: var(--lex-space-sm);
+  margin-bottom: var(--lex-space-sm);
+}
+
+.report-about__icon {
+  align-items: center;
+  background: var(--lex-bg-accent-soft);
+  border-radius: var(--lex-radius-md);
+  color: var(--lex-text-accent);
+  display: inline-flex;
+  flex-shrink: 0;
+  height: 1.75rem;
+  justify-content: center;
+  width: 1.75rem;
+}
+
+.report-about__icon svg {
+  height: 1rem;
+  width: 1rem;
+}
+
+.report-about__heading {
+  color: var(--lex-text-primary);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.report-about__text,
+.report-about__list {
+  color: var(--lex-text-secondary);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.report-about__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-space-xs);
+  list-style: disc;
+  padding-left: 1.25rem;
+}
+
+.report-about__list li::marker {
+  color: var(--lex-text-accent);
+}
+
+/* Run this report */
+.report-run__custom {
+  display: grid;
+  gap: var(--lex-space-sm);
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  margin-top: var(--lex-space-sm);
+}
+
+.report-run__custom[hidden],
+.report-run__problem[hidden] {
+  display: none;
+}
+
+.report-run__problem {
+  color: var(--lex-status-danger);
+  font-size: 0.875rem;
+  margin: var(--lex-space-sm) 0 0;
+}
+
+.report-run__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--lex-space-md);
+}

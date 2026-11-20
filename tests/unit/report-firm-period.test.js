@@ -56,7 +56,14 @@ describe('preset days in a zone', () => {
     ['lastMonth', { start: '2026-09-01', end: '2026-09-30' }],
     ['thisQuarter', { start: '2026-10-01', end: '2026-10-31' }],
     ['thisYear', { start: '2026-01-01', end: '2026-10-31' }],
-    ['lastYear', { start: '2025-01-01', end: '2025-12-31' }]
+    ['lastYear', { start: '2025-01-01', end: '2025-12-31' }],
+    // Quick periods from the report side panel. Saturday, Oct 31 in Los
+    // Angeles; weeks start on Monday, as the backend's weekly periods do.
+    ['today', { start: '2026-10-31', end: '2026-10-31' }],
+    ['yesterday', { start: '2026-10-30', end: '2026-10-30' }],
+    ['todayAndYesterday', { start: '2026-10-30', end: '2026-10-31' }],
+    ['thisWeek', { start: '2026-10-26', end: '2026-10-31' }],
+    ['lastWeek', { start: '2026-10-19', end: '2026-10-25' }]
   ])('%s for a Los Angeles firm', (preset, expected) => {
     expect(load(user).LanaTime.reportPresetDays(preset, 'America/Los_Angeles', now)).toEqual(expected);
   });
@@ -65,6 +72,12 @@ describe('preset days in a zone', () => {
     const { LanaTime } = load(user);
     expect(LanaTime.reportPresetDays('thisMonth', 'America/New_York', now)).toEqual({ start: '2026-11-01', end: '2026-11-01' });
     expect(LanaTime.reportPresetDays('lastMonth', 'America/New_York', now)).toEqual({ start: '2026-10-01', end: '2026-10-31' });
+  });
+
+  test('on a Sunday this week still started on Monday', () => {
+    const { LanaTime } = load(user);
+    expect(LanaTime.reportPresetDays('thisWeek', 'America/New_York', now)).toEqual({ start: '2026-10-26', end: '2026-11-01' });
+    expect(LanaTime.reportPresetDays('lastWeek', 'America/New_York', now)).toEqual({ start: '2026-10-19', end: '2026-10-25' });
   });
 
   test('last month from March 31 is all of February', () => {

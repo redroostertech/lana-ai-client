@@ -623,8 +623,11 @@
           history.pushState({ path: path }, descriptor.title);
         } else {
           // Even without pushState (startup, back nav), ensure
-          // history.state.path is current so getParams() works.
-          history.replaceState({ path: path }, '');
+          // history.state.path is current so getParams() works. Back onto
+          // an entry for this path keeps the in-page view it recorded
+          // (Lex.Nav.pushView) so the page can reopen it.
+          var entry = history.state && history.state.path === path ? history.state : null;
+          history.replaceState(entry && entry.view !== undefined ? { path: path, view: entry.view } : { path: path }, '');
         }
         // Persist path to sessionStorage so refresh restores the current page
         // when history.state is cleared (e.g. some browsers/devices).

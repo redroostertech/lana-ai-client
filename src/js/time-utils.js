@@ -385,7 +385,14 @@
     var y = Number(today.slice(0, 4));
     var m = Number(today.slice(5, 7)) - 1;
     var d = Number(today.slice(8, 10));
+    // Weeks start on Monday, as the backend's weekly periods do.
+    var monday = plainDay(y, m, d - ((plainDayOfWeek(today) + 6) % 7));
     switch (preset) {
+      case 'today': return { start: today, end: today };
+      case 'yesterday': return { start: plainDay(y, m, d - 1), end: plainDay(y, m, d - 1) };
+      case 'todayAndYesterday': return { start: plainDay(y, m, d - 1), end: today };
+      case 'thisWeek': return { start: monday, end: today };
+      case 'lastWeek': return { start: addPlainDays(monday, -7), end: addPlainDays(monday, -1) };
       case 'last30days': return { start: plainDay(y, m, d - 29), end: today };
       case 'thisMonth': return { start: plainDay(y, m, 1), end: today };
       case 'lastMonth': return { start: plainDay(y, m - 1, 1), end: plainDay(y, m, 0) };
