@@ -1197,8 +1197,8 @@
         return '<div class="reporting-list__name">' + escapeHtml(value)
           + (row.saved ? ' <lex-badge label="Saved copy" color="gray"></lex-badge>' : '') + '</div>';
       },
-      purpose: function (value) {
-        return value ? escapeHtml(value) : '<span class="reporting-list__muted">No description</span>';
+      purpose: function (_value, row) {
+        return ReportsList.purposeCell(row, escapeHtml);
       },
       audience: function (value) {
         return value ? escapeHtml(value) : '<span class="reporting-list__muted">Anyone</span>';
@@ -1223,6 +1223,12 @@
         var row = event.detail && event.detail.row;
         if (row) openReport(row);
       });
+      // The summary button opens the report's side panel. lex-table leaves
+      // clicks on buttons to them, so this never opens the report itself.
+      table.addEventListener('click', function (event) {
+        var button = event.target.closest('[data-report-about]');
+        if (button) openReportAbout(button.getAttribute('data-report-about'));
+      });
       var search = document.getElementById('reportsListSearch');
       if (search) {
         var runSearch = function (event) {
@@ -1237,6 +1243,29 @@
     table.setData(entries);
     var count = document.getElementById('reportsListCount');
     if (count) count.textContent = entries.length + (entries.length === 1 ? ' report' : ' reports');
+  }
+
+  // Side panel: what the report is, how it is put together, its goal and how
+  // to use it. The text is the report's declared about, from its detail.
+  var reportAboutRequest = 0;
+
+  async function openReportAbout(key) {
+    var drawer = document.getElementById('reportAboutDrawer');
+    if (!drawer || !key) return;
+    var entry = findReportEntry('module:' + key);
+    var request = ++reportAboutRequest;
+    drawer.heading = entry ? entry.name : 'About this report';
+    drawer.contentRoot.innerHTML = '<p class="reporting-list__muted">Loading\u2026</p>';
+    drawer.open = true;
+    try {
+      var detail = await api.get('/api/v1/modules/' + encodeURIComponent(key));
+      if (request !== reportAboutRequest) return;
+      drawer.contentRoot.innerHTML = ReportsList.aboutHtml(detail && detail.about, escapeHtml);
+    } catch (error) {
+      if (request !== reportAboutRequest) return;
+      console.error('[Reporting] Failed to load report details:', error);
+      drawer.contentRoot.innerHTML = '<p class="reporting-list__muted">The details could not load. Please try again.</p>';
+    }
   }
 
   function findReportEntry(id) {

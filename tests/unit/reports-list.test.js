@@ -72,3 +72,88 @@ test('a seeded template that references a module is listed once, as that module;
     { report_id: 'r3', name: 'Custom Thing', module_key: null, last_run_at: null }]);
   expect(entries.map(e => e.id)).toEqual(['module:document-count', 'module:matter-aging-analysis', 'saved:r4', 'saved:r3']);
 });
+
+// "What it shows" is the report's one-line summary from the backend, cut to 50
+// characters, and a button that opens the report's side panel. The panel text
+// (what, how it is built, goal, how to use) is server data, escaped here.
+describe('report summary and side panel', () => {
+  const { previewText, purposeCell, aboutHtml } = win.ReportsList;
+  const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  const long = 'See how cases are spread across your team and how many get done.';
+
+  test('a summary longer than 50 characters is cut to 50 with an ellipsis', () => {
+    const shown = previewText(long);
+    expect(Array.from(shown).length).toBeLessThanOrEqual(50);
+    expect(shown.endsWith('…')).toBe(true);
+    expect(long.startsWith(shown.slice(0, -1))).toBe(true);
+    expect(previewText('See how many documents you have.')).toBe('See how many documents you have.');
+    expect(previewText('')).toBe('');
+  });
+
+  test('the cut counts characters as people see them, so an emoji is never split in half', () => {
+    const emoji = '\u{1F4CA}'.repeat(60);
+    const shown = previewText(emoji);
+    expect(Array.from(shown)).toHaveLength(50);
+    expect(shown.endsWith('\u{1F4CA}\u2026')).toBe(true);
+    expect(previewText('\u{1F4CA}'.repeat(50))).toBe('\u{1F4CA}'.repeat(50));
+  });
+
+  test('a report summary is a button that opens its panel, keeping the full text for hover and screen readers', () => {
+    const html = purposeCell({ kind: 'report', key: 'case-workload', name: 'Case Workload', purpose: long }, esc);
+    expect(html).toMatch(/^<button type="button" class="reporting-list__about"/);
+    expect(html).toContain('data-report-about="case-workload"');
+    expect(html).toContain('title="' + long + '"');
+    expect(html).toContain('aria-label="About Case Workload: ' + long + '"');
+    expect(html).toContain('>' + previewText(long) + '</button>');
+    expect(html).not.toMatch(/\son[a-z]+=|style=/i);
+  });
+
+  test('server text is escaped', () => {
+    const html = purposeCell({ kind: 'report', key: 'k"><x', name: '<b>', purpose: '<img src=x onerror=alert(1)>' }, esc);
+    expect(html).not.toContain('<img');
+    expect(html).not.toContain('<b>');
+    expect(html).toContain('data-report-about="k&quot;&gt;&lt;x"');
+  });
+
+  test('a saved report keeps a plain summary; none says so', () => {
+    const saved = purposeCell({ kind: 'saved', key: 'r1', name: 'Mine', purpose: long }, esc);
+    expect(saved).not.toContain('<button');
+    expect(saved).toContain('title="' + long + '"');
+    expect(purposeCell({ kind: 'report', key: 'x', name: 'X', purpose: '' }, esc)).toContain('No description');
+  });
+
+  test('the panel shows the four parts in order, as paragraphs or lists, escaped', () => {
+    const html = aboutHtml({ what: 'What <it> is.', howBuilt: ['Reads data.', 'Counts it.'], goal: 'The goal.', howToUse: 'Run it.' }, esc);
+    const order = ['What it is', 'How it is put together', 'Goal', 'How to use it'].map(h => html.indexOf('>' + h + '<'));
+    order.forEach(i => expect(i).toBeGreaterThan(-1));
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(html).toContain('<p class="reporting-about__text">What &lt;it&gt; is.</p>');
+    expect(html).toContain('<li>Reads data.</li><li>Counts it.</li>');
+    expect(html).not.toMatch(/style=|[–—]/);
+  });
+
+  test('a report without details says so instead of a blank panel', () => {
+    expect(aboutHtml(null, esc)).toContain('reporting-list__muted');
+  });
+});
+
+describe('the Reports page wiring', () => {
+  const html = fs.readFileSync(path.join(__dirname, '../../src/admin/reporting.html'), 'utf8');
+  const js = fs.readFileSync(path.join(__dirname, '../../src/js/admin/reporting.js'), 'utf8');
+  const css = fs.readFileSync(path.join(__dirname, '../../src/css/admin/reporting.css'), 'utf8');
+
+  test('New report is hidden for now, but its feature code stays', () => {
+    expect(html).toMatch(/<lex-btn id="newReportBtn"[^>]*\shidden[\s>]/);
+    expect(css).toMatch(/#newReportBtn\[hidden\]\s*\{\s*display:\s*none;/);
+    expect(js).toContain("newReportBtn.addEventListener('click', openNewReport)");
+  });
+
+  test('the summary button opens a Lex drawer filled from the report detail endpoint', () => {
+    expect(html).toMatch(/<lex-drawer id="reportAboutDrawer"[^>]*side="right"/);
+    expect(js).toContain('ReportsList.purposeCell');
+    expect(js).toMatch(/closest\('\[data-report-about\]'\)/);
+    expect(js).toMatch(/api\.get\('\/api\/v1\/modules\/' \+ encodeURIComponent\(/);
+    expect(js).toContain('ReportsList.aboutHtml');
+  });
+});

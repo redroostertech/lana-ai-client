@@ -56,7 +56,8 @@
         lana
         lana-context-type="full_chat"
       >
-        <lex-btn id="newReportBtn" variant="primary" size="sm">New report</lex-btn>
+        <!-- New report is hidden for now; its code stays. -->
+        <lex-btn id="newReportBtn" variant="primary" size="sm" hidden>New report</lex-btn>
         <lex-btn id="importReportBtn" variant="secondary" size="sm">
           <span class="reporting-btn-content">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -215,6 +216,9 @@
       <lex-modal id="drilldownModal" heading="Details" size="xl" hide-actions>
         <div id="drilldownContent"></div>
       </lex-modal>
+
+      <!-- Report details: filled from GET /api/v1/modules/:moduleKey (about) -->
+      <lex-drawer id="reportAboutDrawer" heading="About this report" side="right" width="md"></lex-drawer>
 
       <!-- Module Customization Panel -->
       <lex-drawer id="customizePanel" heading="Customize Module" side="right" width="480px">
