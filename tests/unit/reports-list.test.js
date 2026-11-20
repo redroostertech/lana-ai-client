@@ -237,8 +237,8 @@ describe('the Reports pages wiring', () => {
     const model = read('js/admin/reports-list.model.js');
     expect(js + listJs + model + css + listCss).not.toMatch(/usesPeriod|data-period-control/);
     expect(html).not.toMatch(/data-period-control/);
-    expect(html).toMatch(/<div class="reporting-presets">/);
-    expect(html).toMatch(/<div class="reporting-period-fields">/);
+    expect(html).toMatch(/<div class="detail-period-card__presets">/);
+    expect(html).toMatch(/<div class="detail-period-card__fields">/);
     expect(js).toContain('ReportsList.compareByFor(');
   });
 

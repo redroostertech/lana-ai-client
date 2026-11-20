@@ -420,37 +420,18 @@
   }
 
   function renderDashboardSwitcher() {
-    var wrapper = document.querySelector('lex-topbar .dash-dashboard-switcher');
-    var heading = document.querySelector('lex-topbar .lex-topbar-heading');
-    if ((!wrapper && !heading) || !dashboardSwitcherItems.length) return;
-
-    if (!wrapper) {
-      wrapper = document.createElement('div');
-      wrapper.className = 'dash-dashboard-switcher';
-      heading.replaceWith(wrapper);
-    }
-
-    var selected = currentDashboardId || '';
-    var options = [{ value: '', label: 'Dashboard' }].concat(dashboardSwitcherItems.map(function (dashboard) {
-      return {
-        value: dashboard.id,
-        label: dashboard.name || 'Dashboard',
-        description: dashboard.description || '',
-      };
-    }));
-
-    wrapper.innerHTML = '<lex-select id="dashboardLibrarySwitcher" name="dashboardLibrarySwitcher" placeholder="Search dashboards..." searchable></lex-select>';
-    var select = wrapper.querySelector('lex-select');
-    if (select) {
-      select.options = options;
-      select.value = selected;
-      select.addEventListener('lex-change', function (event) {
-        var value = event.detail && event.detail.value;
-        if (value && value !== currentDashboardId) {
-          Lex.Nav.go('admin/dashboard-detail.html?id=' + encodeURIComponent(value));
-        }
-      });
-    }
+    if (!dashboardSwitcherItems.length) return;
+    window.TitleSwitcher.render({
+      id: 'dashboardLibrarySwitcher',
+      placeholder: 'Search dashboards...',
+      value: currentDashboardId || '',
+      options: [{ value: '', label: 'Dashboard' }].concat(dashboardSwitcherItems.map(function (dashboard) {
+        return { value: dashboard.id, label: dashboard.name || 'Dashboard', description: dashboard.description || '' };
+      })),
+      onPick: function (value) {
+        Lex.Nav.go('admin/dashboard-detail.html?id=' + encodeURIComponent(value));
+      }
+    });
   }
 
   async function loadDashboardSwitcher() {
@@ -851,7 +832,7 @@
     var myToken = dashboardLoadToken;
     var config = VIEW_CONFIG[type];
     var banner = el('dashboardDetailBanner');
-    if (banner) banner.classList.add('dashboard-detail-banner--no-actions');
+    if (banner) banner.classList.add('detail-banner--no-actions');
     currentDashboardId = null;
     currentDashboardName = '';
     currentDashboardMetricKeys = null;
@@ -910,7 +891,7 @@
       currentDashboardName = dashboard && dashboard.name ? dashboard.name : '';
       loadDashboardSwitcher();
       var banner = el('dashboardDetailBanner');
-      if (banner) banner.classList.remove('dashboard-detail-banner--no-actions');
+      if (banner) banner.classList.remove('detail-banner--no-actions');
       var layout = dashboard && dashboard.layout ? dashboard.layout : {};
       var type = VIEW_CONFIG[layout.dashboard_type] ? layout.dashboard_type : 'owner';
       var metricKeys = Array.isArray(layout.metric_keys) ? layout.metric_keys : [];

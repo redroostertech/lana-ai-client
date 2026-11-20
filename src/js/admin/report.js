@@ -31,12 +31,12 @@
   // Drilldowns read these, not the date inputs, so a drilldown lists the
   // rows its tile counted even after the inputs change.
   var runPeriodDays = null;
-  var currentModuleData = null;
+  // What Export PDF and Export CSV export: the last run's metrics
+  // ({ metrics }) or a saved report's rows ({ head, rows }); null until a
+  // run produced data (setExportData).
+  var exportData = null;
   var chartInstances = {};
   var drilldownRenderer = null;
-  var trendsChart = null;
-  var statusChart = null;
-  var timeSeriesChart = null;
 
   // ==========================================================================
   // Helpers
@@ -451,6 +451,7 @@
     if (executeBtn) executeBtn.loading = true;
     hideError();
     showInfo('Running your report...');
+    setExportData(null);
 
     // Hide previous results while loading
     var resultsEl = document.getElementById('moduleResults');
@@ -505,6 +506,7 @@
 
       // Render visualizations based on backend response (section-driven)
       renderVisualizations(data);
+      setExportData(Array.isArray(data.metrics) && data.metrics.length ? { metrics: data.metrics } : null);
 
       // Hide placeholder, show results area
       var placeholder = document.getElementById('reportingPlaceholder');
@@ -1197,12 +1199,18 @@
     if (entry.kind === 'saved') selectImportedReport(entry.key);
     else selectModule(entry.key);
 
-    var nameEl = document.getElementById('selectedReportName');
-    var purposeEl = document.getElementById('selectedReportPurpose');
+    // The banner and breadcrumb escape what they render.
+    var banner = document.getElementById('reportBanner');
+    var breadcrumb = document.getElementById('reportBreadcrumb');
     var savedBadge = document.getElementById('selectedReportSavedBadge');
-    if (nameEl) nameEl.textContent = entry.name;
-    if (purposeEl) purposeEl.textContent = entry.purpose || '';
+    if (banner) {
+      banner.heading = entry.name;
+      banner.subtitle = entry.purpose || '';
+    }
+    if (breadcrumb) breadcrumb.items = [{ label: 'Reports', href: ReportsList.LIST_PAGE }, { label: entry.name }];
     if (savedBadge) savedBadge.hidden = !entry.saved;
+    renderReportSwitcher(entry);
+    setExportData(null);
 
     var results = document.getElementById('moduleResults');
     var placeholder = document.getElementById('reportingPlaceholder');
@@ -1212,7 +1220,25 @@
     hideError();
   }
 
-  // All reports and the shell Back open the list page.
+  // The shell title switches to another shown report (as the dashboard
+  // detail page switches dashboards).
+  function renderReportSwitcher(current) {
+    var entries = ReportsList.buildReportEntries(allModules, importedReports);
+    window.TitleSwitcher.render({
+      id: 'reportSwitcher',
+      placeholder: 'Search reports...',
+      value: current.id,
+      options: entries.map(function (entry) {
+        return { value: entry.id, label: entry.name, description: entry.purpose || '' };
+      }),
+      onPick: function (id) {
+        var picked = findReportEntry(id);
+        if (picked) Lex.Nav.go(ReportsList.reportHref(picked));
+      }
+    });
+  }
+
+  // The banner's All reports and the shell Back open the list page.
   function goToList() {
     Lex.Nav.go(ReportsList.LIST_PAGE);
   }
@@ -1249,32 +1275,24 @@
     syncDeleteReportButton();
   }
 
-  // Imported (non-template) reports can be deleted; the button sits next to
-  // the dropdown and only shows while one of them is selected.
-  function syncDeleteReportButton() {
-    var btn = document.getElementById('deleteImportedReportBtn');
-    if (!btn) return;
-    var report = selectedImportedReportId && importedReports.find(function (r) {
+  // A firm's own saved report (not a template) can be deleted: the banner's
+  // menu shows Delete report while one is open (a class on the banner host,
+  // which keeps it when the banner re-renders its action copies).
+  function selectedSavedReport() {
+    return selectedImportedReportId && importedReports.find(function (r) {
       return r.report_id === selectedImportedReportId;
     });
-    btn.hidden = !report || !!report.is_template;
   }
 
-  function initReportSelect() {
-    var backBtn = document.getElementById('backToReportsBtn');
-    if (backBtn && !backBtn.dataset.bound) {
-      backBtn.dataset.bound = 'true';
-      backBtn.addEventListener('click', goToList);
-    }
+  function syncDeleteReportButton() {
+    var banner = document.getElementById('reportBanner');
+    var report = selectedSavedReport();
+    if (banner) banner.classList.toggle('report-banner--deletable', !!report && !report.is_template);
+  }
 
-    var deleteBtn = document.getElementById('deleteImportedReportBtn');
-    if (deleteBtn && !deleteBtn.dataset.bound) {
-      deleteBtn.dataset.bound = 'true';
-      deleteBtn.addEventListener('click', function () {
-        var report = importedReports.find(function (r) { return r.report_id === selectedImportedReportId; });
-        if (report) deleteImportedReport(report.report_id, report.name);
-      });
-    }
+  function deleteSelectedReport() {
+    var report = selectedSavedReport();
+    if (report && !report.is_template) deleteImportedReport(report.report_id, report.name);
   }
 
   // ==========================================================================
@@ -2404,104 +2422,6 @@
   }
 
   // ==========================================================================
-  // Legacy Charts (renderCharts / renderTimeSeriesChart)
-  // ==========================================================================
-
-  function renderCharts(metrics) {
-    currentModuleData = metrics;
-    if (trendsChart) trendsChart.destroy();
-    if (statusChart) statusChart.destroy();
-
-    var trendsCtx = document.getElementById('metricTrendsChart');
-    if (trendsCtx) {
-      trendsCtx = trendsCtx.getContext('2d');
-      var metricNames = metrics.map(function (m) { return m.name; });
-      var currentValues = metrics.map(function (m) { return parseFloat(m.current) || 0; });
-      var priorValues = metrics.map(function (m) { return parseFloat(m.prior) || 0; });
-
-      trendsChart = new Chart(trendsCtx, {
-        type: 'bar',
-        data: {
-          labels: metricNames,
-          datasets: [
-            { label: 'Current Period', data: currentValues, backgroundColor: '#818cf8', borderColor: '#6366f1', borderWidth: 1 },
-            { label: 'Prior Period', data: priorValues, backgroundColor: '#e5e7eb', borderColor: '#d1d5db', borderWidth: 1 }
-          ]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 15 } } },
-          scales: { y: { beginAtZero: true } }
-        }
-      });
-    }
-
-    var statusCtx = document.getElementById('statusDistributionChart');
-    if (statusCtx) {
-      statusCtx = statusCtx.getContext('2d');
-      var statusCounts = {
-        green: metrics.filter(function (m) { return m.status === 'green'; }).length,
-        yellow: metrics.filter(function (m) { return m.status === 'yellow'; }).length,
-        red: metrics.filter(function (m) { return m.status === 'red'; }).length,
-        gray: metrics.filter(function (m) { return m.status === 'gray'; }).length
-      };
-      statusChart = new Chart(statusCtx, {
-        type: 'doughnut',
-        data: {
-          labels: ['On Target (Green)', 'Warning (Yellow)', 'Critical (Red)', 'No Target (Gray)'],
-          datasets: [{ data: [statusCounts.green, statusCounts.yellow, statusCounts.red, statusCounts.gray], backgroundColor: ['#22c55e', '#eab308', '#ef4444', '#9ca3af'], borderWidth: 0 }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 10 } } } }
-      });
-    }
-  }
-
-  function renderTimeSeriesChart(timeSeries, metrics) {
-    var section = document.getElementById('timeSeriesSection');
-    if (section) section.classList.remove('hidden');
-    if (timeSeriesChart) timeSeriesChart.destroy();
-
-    var canvas = document.getElementById('timeSeriesChart');
-    if (!canvas) return;
-    var ctx = canvas.getContext('2d');
-
-    var labels = timeSeries.map(function (ts) {
-      return new Date(ts.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: getOrganizationTimezone() });
-    });
-
-    var colorPalette = [
-      { bg: 'rgba(99, 102, 241, 0.2)', border: '#6366f1' },
-      { bg: 'rgba(16, 185, 129, 0.2)', border: '#10b981' },
-      { bg: 'rgba(245, 158, 11, 0.2)', border: '#f59e0b' },
-      { bg: 'rgba(239, 68, 68, 0.2)', border: '#ef4444' },
-      { bg: 'rgba(139, 92, 246, 0.2)', border: '#8b5cf6' }
-    ];
-
-    var datasets = metrics.map(function (metric, index) {
-      var color = colorPalette[index % colorPalette.length];
-      var dataPoints = timeSeries.map(function (ts) {
-        var found = null;
-        for (var j = 0; j < ts.metrics.length; j++) {
-          if (ts.metrics[j].key === metric.key) { found = ts.metrics[j]; break; }
-        }
-        return found ? parseFloat(found.value) || 0 : 0;
-      });
-      return { label: metric.name, data: dataPoints, fill: true, backgroundColor: color.bg, borderColor: color.border, borderWidth: 2, tension: 0.4, pointRadius: 4, pointHoverRadius: 6 };
-    });
-
-    timeSeriesChart = new Chart(ctx, {
-      type: 'line',
-      data: { labels: labels, datasets: datasets },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 15 } } },
-        scales: { y: { beginAtZero: true }, x: { ticks: { maxRotation: 45, minRotation: 45 } } }
-      }
-    });
-  }
-
-  // ==========================================================================
   // Export Functions
   // ==========================================================================
 
@@ -2530,9 +2450,37 @@
     });
   }
 
+  // Keep the export data and turn the banner's Export PDF and Export CSV
+  // items on only while there is something to export. They start disabled
+  // in the page; the banner shows copies of them, so the rendered items are
+  // the ones to change.
+  function setExportData(data) {
+    exportData = data;
+    var banner = document.getElementById('reportBanner');
+    if (!banner) return;
+    Array.prototype.forEach.call(banner.querySelectorAll('[data-reporting-action^="export-"]'), function (item) {
+      item.disabled = !data;
+    });
+  }
+
+  // The export as a header row and body rows. A report's metrics come out as
+  // Metric, Current, Prior, Target, Change (Change % on CSV only), Status; a
+  // saved report's rows keep their own columns.
+  function exportTable(withChangePercent) {
+    if (exportData.metrics) {
+      return {
+        head: withChangePercent
+          ? ['Metric', 'Current', 'Prior', 'Target', 'Change', 'Change %', 'Status']
+          : ['Metric', 'Current', 'Prior', 'Target', 'Change', 'Status'],
+        body: buildExportRows(exportData.metrics, withChangePercent)
+      };
+    }
+    return { head: exportData.head, body: exportData.rows };
+  }
+
   function exportToPDF() {
-    if (!currentModuleData) {
-      Lex.Modal.alert('Nothing to export', 'Run a module first, then export its results.');
+    if (!exportData) {
+      Lex.Modal.alert('Nothing to export', 'Run the report first, then export its results.');
       return;
     }
 
@@ -2552,12 +2500,12 @@
     doc.text('Compare By: ' + (resultPeriodTypeEl ? resultPeriodTypeEl.textContent : ''), 14, 49);
     doc.text('Current Period: ' + (resultCurrentPeriodEl ? resultCurrentPeriodEl.textContent : ''), 14, 56);
 
-    var tableData = buildExportRows(currentModuleData, false);
+    var table = exportTable(false);
 
     doc.autoTable({
       startY: 65,
-      head: [['Metric', 'Current', 'Prior', 'Target', 'Change', 'Status']],
-      body: tableData,
+      head: [table.head],
+      body: table.body,
       theme: 'grid',
       headStyles: { fillColor: [99, 102, 241] },
       styles: { fontSize: 9 }
@@ -2569,16 +2517,14 @@
   }
 
   function exportToCSV() {
-    if (!currentModuleData) {
-      Lex.Modal.alert('Nothing to export', 'Run a module first, then export its results.');
+    if (!exportData) {
+      Lex.Modal.alert('Nothing to export', 'Run the report first, then export its results.');
       return;
     }
 
-    var headers = ['Metric', 'Current', 'Prior', 'Target', 'Change', 'Change %', 'Status'];
-    var rows = buildExportRows(currentModuleData, true);
-
-    var csvContent = headers.join(',') + '\n';
-    rows.forEach(function (row) {
+    var table = exportTable(true);
+    var csvContent = '';
+    [table.head].concat(table.body).forEach(function (row) {
       csvContent += row.map(function (cell) {
         var cellStr = String(cell);
         if (cellStr.indexOf(',') !== -1 || cellStr.indexOf('"') !== -1) {
@@ -2646,6 +2592,7 @@
     var report = importedReports.find(function (r) { return r.report_id === selectedImportedReportId; });
     var reportName = report ? report.name : 'Imported Report';
     showInfo('Running your report...');
+    setExportData(null);
 
     // Hide previous results
     var resultsEl = document.getElementById('moduleResults');
@@ -2714,6 +2661,12 @@
           var declaredCols = window.ReportBuilder.declaredTableColumns(result);
           var resultCols = declaredCols ? tables.breakdownColumns({ columns: declaredCols }, rows) : tables.resultColumns(rows);
           var resultRows = rows.map(function (row, idx) { return tables.mapResultRow(row, resultCols, idx); });
+          setExportData({
+            head: resultCols.map(function (c) { return c.header; }),
+            rows: rows.map(function (row) {
+              return resultCols.map(function (c) { return exportCell(null, row[c.field]); });
+            })
+          });
           var card = document.createElement('div');
           card.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6';
           vizContainer.innerHTML = '';
@@ -3180,6 +3133,10 @@
   // carry data-reporting-action; this one document listener runs them, so
   // buttons inside drawers and modals work wherever Lex mounts them.
   var PAGE_ACTIONS = {
+    'all-reports': function () { goToList(); },
+    'export-pdf': function () { exportToPDF(); },
+    'export-csv': function () { exportToCSV(); },
+    'delete-report': function () { deleteSelectedReport(); },
     'show-module-info': function () { showModuleInfo(); },
     'close-module-info': function () { closeModuleInfo(); },
     'close-data-sources': function () { closeDataSourcesModal(); },
@@ -3223,7 +3180,6 @@
   function init() {
     initPageActions();
     initTileActions();
-    initReportSelect();
     bindShellBack();
     initPeriodControls();
     initCustomizePanel();

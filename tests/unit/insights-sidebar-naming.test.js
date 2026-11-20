@@ -56,8 +56,8 @@ test('the Insights home is titled Dashboard and names the two the same way', () 
   const html = read('admin/analytics.html');
   expect(html).not.toContain('Firm Reporting');
   expect(html).toContain('page-title="Dashboard"');
-  expect(read('admin/reports-list.html')).toContain(`crumbs='[{"label":"Dashboard","href":"admin/analytics.html"},{"label":"Reports"}]'`);
-  expect(read('admin/report.html')).toContain(`crumbs='[{"label":"Dashboard","href":"admin/analytics.html"},{"label":"Reports","href":"admin/reports-list.html"},{"label":"Report"}]'`);
+  expect(read('admin/reports-list.html')).toContain(`items='[{"label":"Dashboard","href":"admin/analytics.html"},{"label":"Reports"}]'`);
+  expect(read('admin/report.html')).toContain(`items='[{"label":"Reports","href":"admin/reports-list.html"},{"label":"Report"}]'`);
 });
 
 test('dashboard detail and builder breadcrumbs read Dashboard / All dashboards', () => {

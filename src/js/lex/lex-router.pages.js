@@ -512,10 +512,12 @@
         'js/shared/dashboard-tiles.js',
         'js/admin/report-builder.js',
         'js/admin/reports-list.model.js',
+        'js/shared/title-switcher.js',
         'js/admin/report.js'
       ],
       stylesheets: [
         'insights/raw-data-viewer.css',
+        'css/detail-page.css',
         'css/admin/report.css'
       ]
     },
@@ -562,10 +564,12 @@
         'js/dashboard/metric-goal-comparison.js',
         'js/shared/data-state.js',
         'js/shared/dashboard-tiles.js',
+        'js/shared/title-switcher.js',
         'js/admin/dashboard-detail.js'
       ],
       stylesheets: [
-        'css/admin/insights-dashboard.css'
+        'css/admin/insights-dashboard.css',
+        'css/detail-page.css'
       ]
     },
 

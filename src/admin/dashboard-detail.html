@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="../css/components.css">
   <link rel="stylesheet" href="../css/tailwind-output.css">
   <link rel="stylesheet" href="../css/admin/insights-dashboard.css">
+  <link rel="stylesheet" href="../css/detail-page.css">
   <script src="../js/tailwind-loader.js"></script>
   <link rel="stylesheet" href="../css/lex-chat.css">
   <!-- target="_blank" links open through the guarded channel (js/shared/external-links.js). -->
@@ -30,7 +31,7 @@
     <main>
       <lex-banner
         id="dashboardDetailBanner"
-        class="dashboard-detail-banner dashboard-detail-banner--no-actions"
+        class="detail-banner detail-banner--no-actions"
         variant="light"
         heading="Dashboard"
         subtitle="Role-aware metric cards backed by the report module metric catalog"
@@ -53,10 +54,10 @@
 
       <section class="dash-detail-content">
         <div id="dashboardViewContext" class="dash-view-context"></div>
-        <section class="dash-period-card" aria-labelledby="dashboardPeriodHeading">
-          <div class="dash-period-card__presets">
-            <p class="dash-period-card__label" id="dashboardPeriodHeading">Quick Select Period</p>
-            <div id="dashboardPeriodPresets" class="dash-period-card__buttons">
+        <section class="detail-period-card" aria-labelledby="dashboardPeriodHeading">
+          <div class="detail-period-card__presets">
+            <p class="detail-period-card__label" id="dashboardPeriodHeading">Quick Select Period</p>
+            <div id="dashboardPeriodPresets" class="detail-period-card__buttons">
               <lex-btn data-dashboard-preset="last7days" variant="secondary" size="sm">Last 7 Days</lex-btn>
               <lex-btn data-dashboard-preset="last30days" variant="secondary" size="sm">Last 30 Days</lex-btn>
               <lex-btn data-dashboard-preset="thisMonth" variant="secondary" size="sm">This Month</lex-btn>
@@ -67,7 +68,7 @@
             </div>
           </div>
 
-          <div class="dash-period-card__fields">
+          <div class="detail-period-card__fields">
             <lex-input id="dashboardPeriodStart" label="Start Date" type="date" name="dashboardPeriodStart"></lex-input>
             <lex-input id="dashboardPeriodEnd" label="End Date" type="date" name="dashboardPeriodEnd"></lex-input>
             <lex-select
@@ -162,6 +163,7 @@
   <script src="../js/shared/acquisition-source-presentation.js"></script>
   <script src="../js/shared/data-state.js"></script>
   <script src="../js/shared/dashboard-tiles.js"></script>
+  <script src="../js/shared/title-switcher.js"></script>
   <script src="../js/admin/dashboard-detail.js"></script>
   <script src="../js/auth-guard.js"></script>
   <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>

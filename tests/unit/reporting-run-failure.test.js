@@ -12,7 +12,7 @@ const vm = require('vm');
 const { withReportSharedScripts } = require('./helpers/report-shared-scripts');
 
 function node() {
-  return { value: '', hidden: false, innerHTML: '', textContent: '', style: {}, loading: false };
+  return { value: '', hidden: false, innerHTML: '', textContent: '', style: {}, loading: false, querySelectorAll: () => [] };
 }
 
 function page(post) {

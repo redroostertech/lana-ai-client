@@ -162,9 +162,11 @@
     syncSelect(target);
 
     if (opts && opts.updateHash && ('#' + target) !== window.location.hash) {
-      // replaceState keeps the section switch out of the browser history stack.
+      // replaceState keeps the section switch out of the browser history
+      // stack; it keeps the entry's state (the app router's route lives in
+      // history.state.path, and Back needs it).
       if (window.history && window.history.replaceState) {
-        window.history.replaceState(null, '', '#' + target);
+        window.history.replaceState(window.history.state, '', '#' + target);
       } else {
         window.location.hash = target;
       }

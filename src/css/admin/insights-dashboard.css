@@ -713,14 +713,6 @@
   color: #b91c1c;
 }
 
-/* Dashboard-detail banner: Edit/Delete are slotted into lex-banner's
-   overflow menu, but they only apply when a saved dashboard is loaded.
-   In default-view mode (no currentDashboardId) we suppress the kebab so
-   the banner reads as actions-free. */
-.dashboard-detail-banner--no-actions .lex-banner-overflow {
-  display: none;
-}
-
 .dash-builder {
   display: grid;
   grid-template-columns: minmax(12rem, 14rem) minmax(0, 1fr);
@@ -990,71 +982,6 @@
 
 .dash-summary-grid {
   margin-bottom: 1rem;
-}
-
-.dash-period-card {
-  display: grid;
-  gap: 1rem;
-  margin-bottom: 1rem;
-  border: 1px solid var(--lex-border-subtle, #e5e7eb);
-  border-radius: 8px;
-  padding: 1rem;
-  background: var(--lex-bg-card, #fff);
-}
-
-.dash-period-card__label {
-  margin: 0 0 0.5rem;
-  color: var(--lex-text-secondary, #6b7280);
-  font-size: 0.875rem;
-  font-weight: 700;
-}
-
-.dash-period-card__buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.dash-period-card__fields {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1rem;
-}
-
-.dash-dashboard-switcher {
-  display: block;
-  max-width: min(28rem, 100%);
-  height: 2.75rem;
-}
-
-.dash-dashboard-switcher lex-select {
-  display: block;
-  width: 100%;
-  min-width: 13rem;
-  max-width: 28rem;
-}
-
-.dash-dashboard-switcher .lex-field,
-.dash-dashboard-switcher .lex-field-label {
-  margin: 0;
-}
-
-.dash-dashboard-switcher .lex-field-label,
-.dash-dashboard-switcher .lex-field-help,
-.dash-dashboard-switcher .lex-field-error {
-  display: none;
-}
-
-.dash-dashboard-switcher .lex-select-trigger {
-  height: 2.75rem;
-  min-height: 2.75rem;
-  font-size: var(--lex-h5-size, 1.125rem);
-  font-weight: var(--lex-weight-semibold, 600);
-  background: var(--lex-bg-card, #fff);
-}
-
-.dash-dashboard-switcher .lex-select-wrap {
-  margin: 0;
 }
 
 .dash-card-grid {
@@ -1804,14 +1731,6 @@
     height: 2.5rem;
   }
 
-  .dash-period-card__fields {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .dash-period-card__fields > :last-child {
-    grid-column: 1 / -1;
-  }
-
   .dash-view-context {
     flex-direction: column;
     align-items: flex-start;
@@ -1824,10 +1743,6 @@
 
 @container dash-detail (max-width: 479px) {
   .dash-browser__rail {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .dash-period-card__fields {
     grid-template-columns: minmax(0, 1fr);
   }
 }
@@ -1870,10 +1785,6 @@
 
   .dash-browser__rail {
     position: static;
-  }
-
-  .dash-period-card__fields {
-    grid-template-columns: 1fr;
   }
 
   .metric-detail-definition {

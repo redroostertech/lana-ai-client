@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="../css/drilldown-renderer.css">
   <link rel="stylesheet" href="../css/lex-chat.css">
   <link rel="stylesheet" href="../css/admin/admin-tables.css">
+  <link rel="stylesheet" href="../css/detail-page.css">
   <link rel="stylesheet" href="../css/admin/report.css">
   <script src="../js/tailwind-loader.js"></script>
 
@@ -36,36 +37,55 @@
 
     <main>
 
-      <lex-spacer size="md"></lex-spacer>
+      <!-- Laid out like the dashboard detail page: the report's name and
+           summary (report.js sets them; the banner escapes them), All reports,
+           and a menu of report actions. The banner shows copies of its
+           children, so the actions run through data-reporting-action. -->
+      <lex-banner
+        id="reportBanner"
+        class="detail-banner"
+        variant="light"
+        heading="Report"
+        max-actions="1"
+        lana
+        lana-context-type="full_chat"
+      >
+        <lex-btn data-reporting-action="all-reports" variant="secondary" size="sm">All reports</lex-btn>
+        <button type="button" role="menuitem" data-reporting-action="export-pdf" disabled>
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          Export PDF
+        </button>
+        <button type="button" role="menuitem" data-reporting-action="export-csv" disabled>
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          Export CSV
+        </button>
+        <button type="button" role="menuitem" data-reporting-action="delete-report" data-variant="danger">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a2 2 0 012-2h2a2 2 0 012 2v3"/></svg>
+          Delete report
+        </button>
+      </lex-banner>
 
-      <!-- Breadcrumb back to the list and the analytics hub -->
-      <lex-breadcrumb
-        crumbs='[{"label":"Dashboard","href":"admin/analytics.html"},{"label":"Reports","href":"admin/reports-list.html"},{"label":"Report"}]'
-      ></lex-breadcrumb>
+      <!-- Reports / this report (report.js sets its name). -->
+      <lex-breadcrumb id="reportBreadcrumb" items='[{"label":"Reports","href":"admin/reports-list.html"},{"label":"Report"}]'></lex-breadcrumb>
 
-      <!-- The report's controls card; results stack below -->
+      <!-- The period card; the report body (results) stacks below -->
       <div id="reportingLayout" class="reporting-layout">
 
         <!-- ── Main Content Column ────────────────────────────────── -->
         <div id="reportingMainColumn" class="reporting-main-column">
 
-          <!-- Controls Card -->
-          <lex-card id="controlsCard">
-            <!-- The picked report: its name and purpose, a way back to the list -->
+          <!-- Period card (shared with the dashboard detail page): the period
+               to run, then Run Report -->
+          <section id="controlsCard" class="detail-period-card" aria-labelledby="reportPeriodHeading">
+            <!-- A saved copy says so. -->
             <div class="reporting-selected">
-              <lex-btn id="backToReportsBtn" class="reporting-selected__back" variant="ghost" size="sm">All reports</lex-btn>
-              <div class="reporting-selected__text">
-                <h2 id="selectedReportName" class="reporting-selected__name"></h2>
-                <p id="selectedReportPurpose" class="reporting-selected__purpose"></p>
-              </div>
               <lex-badge id="selectedReportSavedBadge" class="reporting-selected__badge" label="Saved copy" color="gray" hidden></lex-badge>
-              <lex-btn id="deleteImportedReportBtn" class="reporting-module-picker__delete" variant="ghost" size="sm" hidden>Delete report</lex-btn>
             </div>
 
             <!-- Period Presets -->
-            <div class="reporting-presets">
-              <p class="lex-label lex-text-secondary reporting-presets__label">Quick Select Period</p>
-              <div id="periodPresets" class="reporting-presets__list">
+            <div class="detail-period-card__presets">
+              <p class="detail-period-card__label" id="reportPeriodHeading">Quick Select Period</p>
+              <div id="periodPresets" class="detail-period-card__buttons">
                 <lex-btn data-preset="last7days" variant="secondary" size="sm">Last 7 Days</lex-btn>
                 <lex-btn data-preset="last30days" variant="secondary" size="sm">Last 30 Days</lex-btn>
                 <lex-btn data-preset="thisMonth" variant="secondary" size="sm">This Month</lex-btn>
@@ -77,7 +97,7 @@
             </div>
 
             <!-- Date Range Row -->
-            <div class="reporting-period-fields">
+            <div class="detail-period-card__fields">
               <lex-input id="periodStart" label="Start Date" type="date" name="periodStart"></lex-input>
               <lex-input id="periodEnd" label="End Date" type="date" name="periodEnd"></lex-input>
               <lex-select
@@ -114,7 +134,7 @@
               <p id="executionErrorText" class="lex-body-sm reporting-execution-error__text"></p>
             </div>
             <div id="executionState" class="reporting-run-state" hidden></div>
-          </lex-card>
+          </section>
 
           <!-- Results Placeholder (shown when no report has run) -->
           <lex-empty
@@ -436,6 +456,7 @@
   <script src="../js/shared/dashboard-tiles.js"></script>
   <script src="../js/admin/report-builder.js"></script>
   <script src="../js/admin/reports-list.model.js"></script>
+  <script src="../js/shared/title-switcher.js"></script>
   <script src="../js/admin/report.js"></script>
 
   <!-- ES module bridge for visualization renderers -->
