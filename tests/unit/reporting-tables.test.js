@@ -178,16 +178,16 @@ describe('imported report results', () => {
 });
 
 describe('page contract', () => {
-  const html = read('admin/reporting.html');
-  const js = read('js/admin/reporting.js');
+  const html = read('admin/report.html');
+  const js = read('js/admin/report.js');
 
   test('no hand-built tables, native selects or browser dialogs remain outside the kept summary tables', () => {
     expect(html).not.toMatch(/<select\b/);
     expect(js).not.toMatch(/<select\b/);
     expect(js).not.toMatch(/(^|[^.\w])(alert|confirm|prompt)\(/m);
     expect(js).not.toMatch(/window\.(alert|confirm|prompt)\(/);
-    // Kept plain: top-N tag/journey/campaign/landing breakdowns (4) in reporting.js,
-    // the missing-entities list in reporting.html.
+    // Kept plain: top-N tag/journey/campaign/landing breakdowns (4) in report.js,
+    // the missing-entities list in report.html.
     expect((js.match(/<table\b/g) || []).length).toBe(4);
     expect((html.match(/<table\b/g) || []).length).toBe(1);
   });
@@ -198,6 +198,6 @@ describe('page contract', () => {
     expect(html).not.toContain('customizeOverlay');
     ['lex-table.js', 'admin-table-kit.js', 'library-column-filters.js', 'reporting-tables.js', 'admin-tables.css']
       .forEach((file) => expect(html).toContain(file));
-    expect(html.indexOf('reporting-tables.js')).toBeLessThan(html.indexOf('admin/reporting.js'));
+    expect(html.indexOf('reporting-tables.js')).toBeLessThan(html.indexOf('admin/report.js'));
   });
 });

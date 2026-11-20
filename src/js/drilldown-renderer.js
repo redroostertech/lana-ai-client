@@ -6,7 +6,7 @@
  * @description Data-driven component that fetches and renders drilldown data based on metric configuration
  */
 
-// Marked library is loaded globally via script tag (see admin/reporting.html)
+// Marked library is loaded globally via script tag (see admin/report.html)
 // The UMD build creates a global 'marked' object
 // Configure marked if available
 if (typeof marked !== 'undefined' && marked) {

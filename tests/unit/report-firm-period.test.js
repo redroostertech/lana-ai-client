@@ -85,3 +85,14 @@ describe('preset days in a zone', () => {
     expect(LanaTime.reportPresetDays('lastMonth', 'UTC', new Date('2026-03-31T12:00:00Z'))).toEqual({ start: '2026-02-01', end: '2026-02-28' });
   });
 });
+
+describe('plain days', () => {
+  test('isPlainDay accepts only real calendar days', () => {
+    const { LanaTime } = load(user);
+    expect(LanaTime.isPlainDay('2026-02-28')).toBe(true);
+    expect(LanaTime.isPlainDay('2028-02-29')).toBe(true);
+    ['2026-02-29', '2026-02-31', '2026-13-01', '2026-00-10', '2026-1-01', '', null, '2026-02-28T00:00:00Z']
+      .forEach(value => expect([value, LanaTime.isPlainDay(value)]).toEqual([value, false]));
+  });
+});
+

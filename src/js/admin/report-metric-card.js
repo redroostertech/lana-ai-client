@@ -1,5 +1,5 @@
 /* Report tile: renders one scalar metric result for the Reports page
-   (moved out of reporting.js so it renders in tests). A result whose
+   (moved out of the report page script so it renders in tests). A result whose
    data_state is not ok shows the shared DataState block instead of numbers.
    Formatting and the empty token come from here and DataState. */
 
@@ -39,7 +39,7 @@
       '<div class="flex items-center gap-3">' + (drilldownBtn || '') + (ctx.footerEnd || '') + '</div></div>';
   }
 
-  // The page's delegated listener (reporting.js) opens the drilldown from these.
+  // The page's delegated listener (report.js) opens the drilldown from these.
   function drilldownData(kind, metric) {
     return 'data-metric-drilldown="' + kind + '" data-metric-key="' + esc(metric.key) + '" data-metric-name="' + esc(metric.name) + '"';
   }

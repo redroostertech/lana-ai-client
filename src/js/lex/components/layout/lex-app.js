@@ -976,8 +976,10 @@
         path.indexOf('admin/dashboard-builder.html') !== -1 ||
         path.indexOf('/admin/metric_detail.html') !== -1 ||
         path.indexOf('admin/metric_detail.html') !== -1 ||
-        path.indexOf('/admin/reporting.html') !== -1 ||
-        path.indexOf('admin/reporting.html') !== -1 ||
+        path.indexOf('/admin/reports-list.html') !== -1 ||
+        path.indexOf('admin/reports-list.html') !== -1 ||
+        path.indexOf('/admin/report.html') !== -1 ||
+        path.indexOf('admin/report.html') !== -1 ||
         path.indexOf('/admin/billable-hours.html') !== -1 ||
         path.indexOf('admin/billable-hours.html') !== -1 ||
         path.indexOf('/admin/data-visualization.html') !== -1 ||
@@ -1017,7 +1019,7 @@
         ? [
             // Reports run an analysis for a period; All dashboards lists the saved views.
             { id: 'insights-dashboard', home: true, href: 'admin/analytics.html' }, // Dashboard, grid icon (Lex.SidebarNav.HOME)
-            { id: 'insights-reports', label: 'Reports', icon: 'bar-chart-2', href: 'admin/reporting.html' },
+            { id: 'insights-reports', label: 'Reports', icon: 'bar-chart-2', href: 'admin/reports-list.html' },
             { id: 'insights-dashboards', label: 'All dashboards', icon: 'book-open', href: 'admin/dashboard-library.html' },
             { id: 'billable-hours', label: 'Billable Hours', icon: 'clock', href: 'admin/billable-hours.html' }
           ]

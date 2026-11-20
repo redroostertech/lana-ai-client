@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reports - LANA AI</title>
+
+  <!-- CSS in head -->
+  <script src="../js/lex/lex.theme.js"></script>
+  <link rel="stylesheet" href="../css/lex-tokens.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/tailwind-output.css">
+  <link rel="stylesheet" href="../css/lex-chat.css">
+  <link rel="stylesheet" href="../css/admin/admin-tables.css">
+  <link rel="stylesheet" href="../css/admin/reports-list.css">
+  <link rel="stylesheet" href="../css/admin/report-about.css">
+  <script src="../js/tailwind-loader.js"></script>
+
+  <!-- target="_blank" links open through the guarded channel (js/shared/external-links.js). -->
+  <script src="../js/shared/external-links.js"></script>
+</head>
+<body>
+
+  <lex-loader theme="light"></lex-loader>
+
+  <lex-app
+    logo-src="../img/logo-light.png"
+    logo-alt="LANA AI"
+    logo-href="../dashboard.html"
+    active-nav-id="insights-reports"
+    page-title="Reports"
+  ></lex-app>
+
+  <template id="page-content">
+
+    <main>
+
+      <!-- Page Header -->
+      <lex-banner
+        id="reportingBanner"
+        variant="light"
+        corners
+        heading="Reports"
+        subtitle="Pick a report, choose a period, and run it."
+        lana
+        lana-context-type="full_chat"
+      >
+        <!-- New report is hidden for now; its code stays. -->
+        <lex-btn id="newReportBtn" variant="primary" size="sm" hidden>New report</lex-btn>
+        <lex-btn id="importReportBtn" variant="secondary" size="sm" leading-icon="upload">Import Report</lex-btn>
+      </lex-banner>
+
+      <lex-spacer size="md"></lex-spacer>
+
+      <!-- Breadcrumb back to analytics hub -->
+      <lex-breadcrumb
+        crumbs='[{"label":"Dashboard","href":"admin/analytics.html"},{"label":"Reports"}]'
+      ></lex-breadcrumb>
+
+      <!-- The list. Each row comes from the report catalog (purpose,
+           audience, last run); picking one opens its report page. -->
+      <section id="reportsListSection" class="reporting-list" aria-labelledby="reportsListHeading">
+        <div class="reporting-list__toolbar" role="search" aria-label="Search reports">
+          <h2 id="reportsListHeading" class="reporting-list__heading">All reports</h2>
+          <lex-input id="reportsListSearch" class="reporting-list__search" placeholder="Search reports..." clearable="true" leading-icon="search"></lex-input>
+          <span id="reportsListCount" class="reporting-list__count" aria-live="polite"></span>
+        </div>
+        <lex-table
+          id="reportsListTable"
+          class="lex-table--card"
+          columns="name,purpose,audience,last_run_at"
+          labels="Report,What it shows,For,Last run"
+          sortable-columns="name,audience,last_run_at"
+          sort-by="name"
+          sort-dir="asc"
+          limit="20"
+          id-key="row_id"
+          empty-text="No reports yet"
+          aria-label="Reports"
+        ></lex-table>
+      </section>
+
+      <!-- Report details: filled from GET /api/v1/modules/:moduleKey (about) -->
+      <lex-drawer id="reportAboutDrawer" heading="About this report" side="right" width="md">
+        <div id="reportRunFooter" class="report-run" data-slot="footer"></div>
+      </lex-drawer>
+
+      <!-- Import Report Modal -->
+      <div id="importReportModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-6 w-full max-w-lg">
+          <div class="bg-white rounded-lg shadow-xl">
+            <div class="flex items-start justify-between p-5 border-b border-gray-200">
+              <h3 class="text-xl font-semibold text-gray-900">Import Report</h3>
+              <button type="button" data-reporting-action="close-import" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+              </button>
+            </div>
+            <div class="p-5">
+              <p class="text-sm text-gray-600 mb-4">Upload a report definition file (JSON or ZIP). ZIP files should contain a <code class="bg-gray-100 px-1 py-0.5 rounded text-xs">report.json</code> at the root and optionally a <code class="bg-gray-100 px-1 py-0.5 rounded text-xs">ui/</code> folder.</p>
+              <div id="importDropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-indigo-400 transition-colors cursor-pointer">
+                <svg class="mx-auto h-10 w-10 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                </svg>
+                <p class="text-sm font-medium text-gray-700">Drop file here or click to browse</p>
+                <p class="text-xs text-gray-500 mt-1">JSON or ZIP, max 50 MB</p>
+                <input type="file" id="importFileInput" accept=".json,.zip,application/json,application/zip" class="hidden">
+              </div>
+              <div id="importFileInfo" class="hidden mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    <span id="importFileName" class="text-sm font-medium text-gray-900"></span>
+                  </div>
+                  <button id="importFileClear" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                  </button>
+                </div>
+                <p id="importFileSize" class="text-xs text-gray-500 mt-1"></p>
+              </div>
+              <div id="importError" class="hidden mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p id="importErrorText" class="text-sm text-red-700"></p>
+              </div>
+              <div id="importSuccess" class="hidden mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p id="importSuccessText" class="text-sm text-green-700"></p>
+              </div>
+            </div>
+            <div class="flex justify-end gap-3 p-5 border-t border-gray-200">
+              <button type="button" data-reporting-action="close-import" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
+              <button id="importSubmitBtn" disabled class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">Import</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+  </template>
+
+  <noscript>
+    <div class="reports-list-noscript">
+      Please enable JavaScript to use LANA AI.
+    </div>
+  </noscript>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       Scripts at end of body
+       ════════════════════════════════════════════════════════════════ -->
+
+  <!-- Universal shell scripts -->
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/time-utils.js"></script>
+  <script src="../js/shared/request-retry.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/version.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/navigation-helpers.js"></script>
+  <script src="../js/conversation-search-modal.js"></script>
+  <script src="../js/contact-search-modal.js"></script>
+  <script src="../js/notifications.js"></script>
+
+  <!-- Lex UI core -->
+  <script src="../js/lex/lex.core.js"></script>
+  <script src="../js/lex/lex.icons.js"></script>
+  <script src="../js/lex/lex.data.js"></script>
+  <script src="../js/lex/lex.forms.js"></script>
+  <script src="../js/lex/lex.state.js"></script>
+  <script src="../js/lex/lex.utils.js"></script>
+  <script src="../js/lex/lex.auth.js"></script>
+  <script src="../js/lex/lex-nav.js"></script>
+
+  <!-- Lex UI layout -->
+  <script src="../js/lex/components/foundation/lex-loader.js"></script>
+  <script src="../js/lex/components/foundation/lex-toast.js"></script>
+  <script src="../js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="../js/lex/components/foundation/lex-btn.js"></script>
+  <script src="../js/lex/components/foundation/lex-empty.js"></script>
+  <script src="../js/lex/components/foundation/lex-spacer.js"></script>
+  <script src="../js/lex/components/form/lex-segmented.js"></script>
+  <script src="../js/lex/components/layout/lex-sidebar.js"></script>
+  <script src="../js/lex/components/layout/lex-topbar.js"></script>
+  <script src="../js/lex/components/layout/lex-conversation-item.js"></script>
+  <script src="../js/lex/components/layout/lex-notification-panel.js"></script>
+  <script src="../js/lex/components/layout/lex-app.js"></script>
+
+  <!-- Page-specific Lex components — loaded before lex-page-init.js -->
+  <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
+  <script src="../js/lex/components/foundation/lex-banner.js"></script>
+  <script src="../js/lex/components/foundation/lex-card.js"></script>
+  <script src="../js/lex/components/foundation/lex-drawer.js"></script>
+  <script src="../js/lex/components/foundation/lex-modal.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/data/lex-table.js"></script>
+  <script src="../js/lex/components/form/lex-input.js"></script>
+  <script src="../js/lex/components/form/lex-select.js"></script>
+
+  <!-- Mermaid diagram rendering (before chat format) -->
+  <script src="../js/vendor/mermaid.min.js"></script>
+
+  <!-- Chat components for the global LANA dock -->
+  <script src="../js/shared/safe-url.js"></script>
+  <script src="../js/shared/safe-html.js"></script>
+  <script src="../js/lex/chat/lex-chat.format.js"></script>
+  <script src="../js/lex/chat/lex-chat.conversations-api.js"></script>
+  <script src="../js/lex/chat/lex-chat.source.js"></script>
+  <script src="../js/lex/chat/lex-chat.message.js"></script>
+  <script src="../js/lex/chat/lex-chat-progress-events.js"></script>
+  <script src="../js/lex/chat/lex-chat.activity.js"></script>
+  <script src="../js/lex/chat/lex-chat.documents.js"></script>
+  <script src="../js/lex/chat/lex-chat.composer-mentions.js"></script>
+  <script src="../js/services/slash-commands.service.js"></script>
+  <script src="../js/lex/chat/lex-chat.composer-slash.js"></script>
+  <script src="../js/lex/chat/lex-chat.composer.js"></script>
+  <script src="../js/lex/chat/lex-chat.thread.js"></script>
+  <script src="../js/lex/chat/lex-chat.threads.js"></script>
+  <script src="../js/lex/chat/lex-chat.js"></script>
+  <script src="../js/lex/chat/lex-dynamic-card.renderer.js"></script>
+  <script src="../js/lex/chat/lex-agentic-plan-card.js"></script>
+  <script src="../js/lex/chat/lex-chat.index.js"></script>
+  <script src="../js/lex/components/chat/lex-lana-panel.js"></script>
+
+  <!-- Inject page content + hoist modals -->
+  <script src="../js/lex/lex-page-init.js"></script>
+
+  <!-- Page controller (MUST be last before auth-guard) -->
+  <script src="../js/admin/report-builder.js"></script>
+  <script src="../js/admin/reports-list.model.js"></script>
+  <script src="../js/admin/reports-list.js"></script>
+
+  <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>
+  <!-- LANA dock (IDE-style docked chat panel) -->
+  <script src="../js/lex/components/layout/lex-lana-dock.js"></script>
+
+  <!-- Auth guard + loader dismiss (MUST be last) -->
+  <script src="../js/auth-guard.js"></script>
+
+</body>
+</html>

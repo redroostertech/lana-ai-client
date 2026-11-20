@@ -688,8 +688,8 @@ describe('call sites that render untrusted content', () => {
   // marked output is model or backend text: it goes through LanaSafeHtml.
   test.each([
     ['js/workspace-details.js', /el\.innerHTML = window\.LanaSafeHtml \? window\.LanaSafeHtml\.renderMarkdown\(fullText\) : /],
-    ['js/admin/reporting.js', /return window\.LanaSafeHtml \? window\.LanaSafeHtml\.renderMarkdown\(text, \{ inline: true, breaks: true \}\)/],
-    ['js/admin/reporting.js', /return window\.LanaSafeHtml \? window\.LanaSafeHtml\.renderMarkdown\(text, \{ unwrapParagraph: true, breaks: true \}\)/],
+    ['js/admin/report.js', /return window\.LanaSafeHtml \? window\.LanaSafeHtml\.renderMarkdown\(text, \{ inline: true, breaks: true \}\)/],
+    ['js/admin/report.js', /return window\.LanaSafeHtml \? window\.LanaSafeHtml\.renderMarkdown\(text, \{ unwrapParagraph: true, breaks: true \}\)/],
     ['js/components/document-metadata-viewer.js', /return window\.LanaSafeHtml \? window\.LanaSafeHtml\.renderMarkdown\(text\) : this\.escapeHtml\(text\);/],
     ['js/lex/lex.markdown.js', /return window\.LanaSafeHtml \? window\.LanaSafeHtml\.renderMarkdown\(src\) : /],
     ['js/lex/lex.markdown.js', /return window\.LanaSafeHtml \? window\.LanaSafeHtml\.renderMarkdown\(src, \{ inline: true \}\) : /]
@@ -709,7 +709,7 @@ describe('call sites that render untrusted content', () => {
   });
 
   test('every page that loads a markdown or chat renderer also loads safe-url.js then safe-html.js', () => {
-    const users = ['lex-chat.format.js', 'lex.markdown.js', 'document-metadata-viewer.js', 'admin/reporting.js', 'js/reporting.js', 'renderMarkdownBlock', 'workspace-artifacts-view.js', 'drilldown-renderer.js'];
+    const users = ['lex-chat.format.js', 'lex.markdown.js', 'document-metadata-viewer.js', 'admin/report.js', 'js/reporting.js', 'renderMarkdownBlock', 'workspace-artifacts-view.js', 'drilldown-renderer.js'];
     const bad = sources()
       .filter(({ rel, text }) => rel.endsWith('.html') && users.some((name) => text.includes(name)))
       .filter(({ text }) => {
@@ -756,8 +756,8 @@ describe('call sites that render untrusted content', () => {
     expect(policy).toMatch(/apiToken: api && api\.token/);
   });
   test.each([
-    ['js/admin/reporting.js', /renderMarkdown\(text, \{ inline: true, breaks: true \}\)/],
-    ['js/admin/reporting.js', /renderMarkdown\(text, \{ unwrapParagraph: true, breaks: true \}\)/],
+    ['js/admin/report.js', /renderMarkdown\(text, \{ inline: true, breaks: true \}\)/],
+    ['js/admin/report.js', /renderMarkdown\(text, \{ unwrapParagraph: true, breaks: true \}\)/],
     ['js/drilldown-renderer.js', /renderMarkdown\(text, \{ inline: true, breaks: true \}\)/],
     ['js/drilldown-renderer.js', /renderMarkdown\(text, \{ unwrapParagraph: true, breaks: true \}\)/]
   ])('%s keeps the single-newline breaks it had (marked.use breaks on its page)', (rel, pattern) => {

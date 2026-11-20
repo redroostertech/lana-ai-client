@@ -67,12 +67,20 @@
   color: var(--lex-text-accent);
 }
 
-/* Run this report */
+/* Run controls in the drawer footer: custom dates (for Custom) above the
+   period dropdown and Run. */
+.report-run {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--lex-space-sm);
+  min-width: 0;
+}
+
 .report-run__custom {
   display: grid;
   gap: var(--lex-space-sm);
   grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-  margin-top: var(--lex-space-sm);
 }
 
 .report-run__custom[hidden],
@@ -83,11 +91,16 @@
 .report-run__problem {
   color: var(--lex-status-danger);
   font-size: 0.875rem;
-  margin: var(--lex-space-sm) 0 0;
+  margin: 0;
 }
 
-.report-run__actions {
+.report-run__row {
+  align-items: flex-end;
   display: flex;
-  justify-content: flex-end;
-  margin-top: var(--lex-space-md);
+  gap: var(--lex-space-sm);
+}
+
+.report-run__row lex-select {
+  flex: 1;
+  min-width: 0;
 }

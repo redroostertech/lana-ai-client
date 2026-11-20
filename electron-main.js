@@ -662,7 +662,8 @@ const DEEP_LINK_CLIENT_ROUTES = Object.freeze({
   'admin/organizations.html': ['id', 'q'],
   'admin/plugins.html': ['id', 'plugin'],
   'admin/relevance-labeling.html': ['id'],
-  'admin/reporting.html': ['id', 'report'],
+  'admin/report.html': ['report', 'saved', 'period', 'start', 'end'],
+  'admin/reports-list.html': [],
   'admin/roles.html': ['id'],
   'admin/roles_manager.html': ['id'],
   'admin/search-analytics.html': ['q'],
@@ -810,7 +811,8 @@ const RETIRED_CLIENT_ROUTES = Object.freeze({
   'admin/dashboard.html': 'admin/index.html',
   'admin/management-boards.html': 'admin/dashboard-library.html',
   'insights/dashboard.html': 'admin/analytics.html',
-  'insights/module-execution.html': 'admin/reporting.html',
+  'admin/reporting.html': 'admin/reports-list.html',
+  'insights/module-execution.html': 'admin/reports-list.html',
   'insights/predictions.html': 'admin/analytics.html',
   'matter-skills.html': 'automation/index.html',
   'matters.html': 'workspaces.html',
@@ -819,7 +821,7 @@ const RETIRED_CLIENT_ROUTES = Object.freeze({
 });
 
 // What a retired page's link keeps (as Lex.Nav.redirectFor): the old Reports
-// page's ?module= opens that report (?report=); the other old Insights (Dashboard, Predictions),
+// pages' report (?module= or ?report=) carries as ?report=; the other old Insights (Dashboard, Predictions),
 // Management Boards and Skills pages' params named their own records, so the
 // replacement opens on its home or list. Other routes keep their params.
 function retiredPageParams(route, params) {
@@ -828,13 +830,20 @@ function retiredPageParams(route, params) {
   if (!Object.prototype.hasOwnProperty.call(RETIRED_CLIENT_ROUTES, asked)) return params;
   const kept = new URLSearchParams();
   if (asked === 'insights/module-execution.html' && params.get('module')) kept.set('report', params.get('module'));
+  if (asked === 'admin/reporting.html' && params.get('report')) kept.set('report', params.get('report'));
   return kept;
 }
 
-// The old Matters page's link to one matter (?matter_id= or ?open=) opens that
-// matter's page; the matter id moves to ?id= and ?tab= comes along.
-function retiredMatterRoute(route, params) {
-  if (stripLeadingSlashes(route).trim() !== 'matters.html') return route;
+// A retired page's link to one record opens that record's page: the old
+// Matters page's matter (?matter_id= or ?open=) opens workspace-details.html
+// (the id moves to ?id=, ?tab= comes along); the old Reports pages' report
+// (?report=, from retiredPageParams) opens admin/report.html.
+function retiredRecordRoute(route, params) {
+  const asked = stripLeadingSlashes(route).trim();
+  if ((asked === 'admin/reporting.html' || asked === 'insights/module-execution.html') && params.get('report')) {
+    return 'admin/report.html';
+  }
+  if (asked !== 'matters.html') return route;
   const matterId = params.get('matter_id') || params.get('open');
   if (!matterId) return route;
   params.set('id', matterId);
@@ -961,7 +970,7 @@ async function navigateClientDeepLink(urlObj) {
   if (fragmentUrl) {
     target = new URL(fragmentUrl);
   } else {
-    route = sanitizeClientRoute(retiredMatterRoute(route, linkParams));
+    route = sanitizeClientRoute(retiredRecordRoute(route, linkParams));
     target = new URL(appPageUrl(route));
     addSafeDeepLinkParams(target, linkParams, DEEP_LINK_CLIENT_ROUTES[route]);
     setSafeHash(target, hash);

@@ -49,7 +49,7 @@ function page(file, names) {
 }
 test('actual dashboard and reporting cards preserve all exact signed currencies and qualified equal labels', () => {
   for (const html of [page('js/admin/dashboard-detail.js', 'renderMetricCard').renderMetricCard(metric()),
-    page('js/admin/reporting.js', 'createMetricCard').createMetricCard(metric())]) {
+    page('js/admin/report.js', 'createMetricCard').createMetricCard(metric())]) {
     expect(html).toContain('-9007199254740993.0123456789'); expect(html).toContain('12.00000000000000000002');
     expect(html).toContain('EUR'); expect(html).toContain('USD'); expect(html).toContain('&lt;Referral&gt;');
     expect(html).not.toContain('<Referral>'); expect(html).not.toContain('[object Object]');
@@ -125,7 +125,7 @@ test('mixed visualization preserves ordinary sibling settings and never combines
   } finally { global.document = saved; }
 });
 test('mounted standalone and routed pages load the helper before consumers', () => {
-  for (const file of ['admin/dashboard-detail.html', 'admin/reporting.html', 'admin/metric-catalog.html']) {
+  for (const file of ['admin/dashboard-detail.html', 'admin/report.html', 'admin/metric-catalog.html']) {
     const source = fs.readFileSync(path.join(sourceRoot, file), 'utf8');
     expect(source).toContain('js/shared/acquisition-source-presentation.js');
   }

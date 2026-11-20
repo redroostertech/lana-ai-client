@@ -30,8 +30,11 @@ For backend documentation (module engine, module configs, API), see: `LANA-AI/do
 
 | File | Purpose |
 |------|---------|
-| `src/admin/reporting.html` | Page template (Lex UI components) |
-| `src/js/admin/reporting.js` | Page controller (~117 KB IIFE) |
+| `src/admin/reports-list.html` | List page: the reports, search, about drawer, Import Report |
+| `src/js/admin/reports-list.js` | List page controller (IIFE) |
+| `src/admin/report.html` | Report page (`?report=<key>` or `?saved=<id>`): date form, Run Report, results |
+| `src/js/admin/report.js` | Report page controller (IIFE) |
+| `src/js/admin/reports-list.model.js` | Helpers both pages share (`ReportsList`): entries, escaping, run periods, the report page URL |
 | `src/js/visualizations/renderers/` | 7 ES6 Chart.js renderer files (4 imported, 3 available but not wired up) |
 | `src/js/drilldown-renderer.js` | Paginated drilldown table modal |
 | `src/js/vendor/chart.js` | Chart.js library |

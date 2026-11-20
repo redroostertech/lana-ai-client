@@ -7,7 +7,7 @@
  * (admin/management-boards.html) and the Skills pages (skills.html,
  * skills-marketplace.html, matter-skills.html) are retired. An old link, a
  * saved last page or a lana-ai:// link opens the page that replaced each:
- * Reports (admin/reporting.html, ?module= becomes ?report=), the Insights
+ * Reports (admin/reports-list.html; ?module= opens that report, admin/report.html?report=), the Insights
  * Dashboard (admin/analytics.html, also for Predictions), All dashboards
  * (admin/dashboard-library.html) and the Automate app (automation/index.html;
  * skills became automations and /api/v1/skills is gone). The workspace pages'
@@ -27,7 +27,8 @@ const SRC = path.join(ROOT, 'src');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 
 const RETIRED = {
-  'insights/module-execution.html': 'admin/reporting.html',
+  'insights/module-execution.html': 'admin/reports-list.html',
+  'admin/reporting.html': 'admin/reports-list.html',
   'insights/dashboard.html': 'admin/analytics.html',
   'insights/predictions.html': 'admin/analytics.html',
   'admin/management-boards.html': 'admin/dashboard-library.html',
@@ -113,7 +114,7 @@ describe('the pages and their own files are gone', () => {
     const pages = read('src/js/lex/lex-router.pages.js');
     Object.keys(RETIRED).forEach((page) => expect(pages).not.toContain(`'${page}': {`));
     const app = read('src/js/lex/components/layout/lex-app.js');
-    expect(app).toContain("{ id: 'insights-reports', label: 'Reports', icon: 'bar-chart-2', href: 'admin/reporting.html' }");
+    expect(app).toContain("{ id: 'insights-reports', label: 'Reports', icon: 'bar-chart-2', href: 'admin/reports-list.html' }");
     expect(app).toContain("{ id: 'insights-dashboards', label: 'All dashboards', icon: 'book-open', href: 'admin/dashboard-library.html' }");
   });
 });
@@ -151,8 +152,10 @@ function loadRenderer({ page = 'app.html', router = true } = {}) {
 
 describe('the renderer opens the replacement page', () => {
   test.each([
-    ['/insights/module-execution.html', 'admin/reporting.html'],
-    ['/insights/module-execution.html?module=growth_intake&id=7&matter_id=M1', 'admin/reporting.html?report=growth_intake'],
+    ['/insights/module-execution.html', 'admin/reports-list.html'],
+    ['/insights/module-execution.html?module=growth_intake&id=7&matter_id=M1', 'admin/report.html?report=growth_intake'],
+    ['/admin/reporting.html', 'admin/reports-list.html'],
+    ['/admin/reporting.html?report=aging&id=7', 'admin/report.html?report=aging'],
     ['/insights/dashboard.html?matter_id=M1&module=x&tab=y', 'admin/analytics.html'],
     ['/admin/management-boards.html?id=B1&board=team', 'admin/dashboard-library.html'],
     ['/skills.html?id=M1&category=x', 'automation/index.html'],
@@ -167,7 +170,7 @@ describe('the renderer opens the replacement page', () => {
   test('Lex.Nav.go keeps the report key and drops the rest', async () => {
     const { win } = loadRenderer();
     await win.Lex.Nav.go('insights/module-execution.html', { params: { module: 'aging', matter_id: 'M1' } });
-    expect(win.location.href).toBe('admin/reporting.html?report=aging');
+    expect(win.location.href).toBe('admin/report.html?report=aging');
   });
 
   test('Lex.Nav.go on a standalone page (no router)', () => {
@@ -179,7 +182,7 @@ describe('the renderer opens the replacement page', () => {
   test('report keys are passed as data, not markup', () => {
     const { win } = loadRenderer();
     expect(win.Lex.Nav.redirectPath('/insights/module-execution.html?module=' + encodeURIComponent('a&b=<x>')))
-      .toBe('/admin/reporting.html?report=a%26b%3D%3Cx%3E');
+      .toBe('/admin/report.html?report=a%26b%3D%3Cx%3E');
   });
 
   test('the earlier retired pages and other pages are unchanged', async () => {
@@ -188,7 +191,8 @@ describe('the renderer opens the replacement page', () => {
     expect(win.Lex.Nav.redirectPath('/matters.html?matter_id=M1')).toBe('/workspace-details.html?id=M1');
     expect(win.Lex.Nav.redirectPath('/insights/predictions.html?type=revenue&matter_id=M1')).toBe('/admin/analytics.html');
     expect(win.Lex.Nav.redirectPath('/admin/analytics.html')).toBeNull();
-    expect(win.Lex.Nav.redirectPath('/admin/reporting.html?report=x')).toBeNull();
+    expect(win.Lex.Nav.redirectPath('/admin/report.html?report=x')).toBeNull();
+    expect(win.Lex.Nav.redirectPath('/admin/reports-list.html')).toBeNull();
   });
 
   test('the retired pages are gone from the deep-link registry', () => {
@@ -242,17 +246,17 @@ function loadDeepLinkRouting() {
     mainBlock(main, 'function stripLeadingSlashes(value) {', '\n}'),
     mainBlock(main, 'const RETIRED_CLIENT_ROUTES = Object.freeze({', '\n});'),
     mainBlock(main, 'function retiredPageParams(route, params) {', '\n}'),
-    mainBlock(main, 'function retiredMatterRoute(route, params) {', '\n}'),
+    mainBlock(main, 'function retiredRecordRoute(route, params) {', '\n}'),
     mainBlock(main, 'function sanitizeClientRoute(route) {', '\n}'),
-    '({ sanitizeClientRoute, retiredMatterRoute, retiredPageParams, DEEP_LINK_CLIENT_ROUTES });'
+    '({ sanitizeClientRoute, retiredRecordRoute, retiredPageParams, DEEP_LINK_CLIENT_ROUTES });'
   ].join('\n');
   return vm.runInNewContext(code, { URLSearchParams });
 }
 
 function open(route, query) {
-  const { sanitizeClientRoute, retiredMatterRoute, retiredPageParams, DEEP_LINK_CLIENT_ROUTES } = loadDeepLinkRouting();
+  const { sanitizeClientRoute, retiredRecordRoute, retiredPageParams, DEEP_LINK_CLIENT_ROUTES } = loadDeepLinkRouting();
   const params = retiredPageParams(route, new URLSearchParams(query || ''));
-  const landed = sanitizeClientRoute(retiredMatterRoute(route, params));
+  const landed = sanitizeClientRoute(retiredRecordRoute(route, params));
   const forwarded = {};
   DEEP_LINK_CLIENT_ROUTES[landed].forEach((key) => { if (params.get(key)) forwarded[key] = params.get(key); });
   return { landed, forwarded };
@@ -266,7 +270,10 @@ describe('electron-main deep links', () => {
 
   test('the old Reports page keeps the report and drops its other params', () => {
     expect(open('insights/module-execution.html', 'module=aging&id=7&matter_id=M1'))
-      .toEqual({ landed: 'admin/reporting.html', forwarded: { report: 'aging' } });
+      .toEqual({ landed: 'admin/report.html', forwarded: { report: 'aging' } });
+    expect(open('admin/reporting.html', 'report=aging&id=x'))
+      .toEqual({ landed: 'admin/report.html', forwarded: { report: 'aging' } });
+    expect(open('admin/reporting.html', 'id=x')).toEqual({ landed: 'admin/reports-list.html', forwarded: {} });
   });
 
   test('a board id is not forwarded as a dashboard id', () => {
@@ -277,8 +284,8 @@ describe('electron-main deep links', () => {
   test('matters.html and other routes keep their params', () => {
     expect(open('matters.html', 'matter_id=M1&tab=files'))
       .toEqual({ landed: 'workspace-details.html', forwarded: { id: 'M1', tab: 'files' } });
-    expect(open('admin/reporting.html', 'report=aging&id=x'))
-      .toEqual({ landed: 'admin/reporting.html', forwarded: { id: 'x', report: 'aging' } });
+    expect(open('admin/report.html', 'report=aging&period=lastWeek&x=1'))
+      .toEqual({ landed: 'admin/report.html', forwarded: { report: 'aging', period: 'lastWeek' } });
   });
 
   test('lana-ai://insights views open the replacements', () => {
@@ -317,7 +324,7 @@ describe('lana-ai:// links to a shell fragment open it inside app.html', () => {
       ['function stripLeadingSlashes(value) {', '\n}'],
       ['const RETIRED_CLIENT_ROUTES = Object.freeze({', '\n});'],
       ['function retiredPageParams(route, params) {', '\n}'],
-      ['function retiredMatterRoute(route, params) {', '\n}'],
+      ['function retiredRecordRoute(route, params) {', '\n}'],
       ['const SHELL_FRAGMENT_ROUTES = Object.freeze(', ');'],
       ['function shellFragmentUrl(route) {', '\n}'],
       ['function sanitizeClientRoute(route) {', '\n}'],
@@ -345,7 +352,7 @@ describe('lana-ai:// links to a shell fragment open it inside app.html', () => {
   test('other routes still open on their own; unknown ones are still refused', async () => {
     const { navigate, loaded } = loadNavigator();
     await navigate(new URL('lana-ai://open?route=admin/reporting.html&report=aging'));
-    expect(loaded).toEqual(['lana-app://app/public_html/admin/reporting.html?report=aging']);
+    expect(loaded).toEqual(['lana-app://app/public_html/admin/report.html?report=aging']);
     await expect(navigate(new URL('lana-ai://open?route=app.html'))).rejects.toThrow('Unsupported LANA destination');
     await expect(navigate(new URL('lana-ai://open?route=../model-pricing.html'))).rejects.toThrow('Unsupported LANA destination');
   });

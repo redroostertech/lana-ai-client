@@ -1,0 +1,126 @@
+/* Reports list page (admin/reports-list.html): the list of reports, its
+   search and "show more", and the New report modal. The about drawer has its
+   own stylesheet (report-about.css). Colors come from Lex tokens. */
+
+/* The list */
+.reporting-list {
+  margin-top: 1rem;
+}
+
+.reporting-list[hidden],
+.reporting-layout[hidden] {
+  display: none;
+}
+
+.reporting-list__toolbar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.reporting-list__heading {
+  color: var(--lex-text-primary);
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.reporting-list__search {
+  flex: 1 1 16rem;
+  max-width: 28rem;
+}
+
+.reporting-list__count {
+  color: var(--lex-text-secondary);
+  font-size: 0.875rem;
+  margin-left: auto;
+}
+
+.reporting-list__name {
+  align-items: center;
+  color: var(--lex-text-primary);
+  display: flex;
+  font-weight: 500;
+  gap: 0.5rem;
+}
+
+.reporting-list__muted {
+  color: var(--lex-text-secondary);
+}
+
+/* Hidden for now; lex-btn sets its own display. */
+#newReportBtn[hidden] {
+  display: none;
+}
+
+/* "What it shows": the summary cut short, then "show more", which opens the
+   report's side panel (styled in report-about.css). */
+.reporting-list__sr {
+  border: 0;
+  clip: rect(0 0 0 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+.reporting-list__more {
+  background: none;
+  border: 0;
+  color: var(--lex-text-link);
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+}
+
+.reporting-list__more:hover {
+  color: var(--lex-text-link-hover);
+}
+
+.reporting-list__more:focus-visible {
+  border-radius: 2px;
+  outline: 2px solid var(--lex-border-focus);
+  outline-offset: 2px;
+}
+
+/* New report: from the metric catalog, or build your own. */
+.reporting-new-report,
+.reporting-new-report__section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.reporting-new-report__section[hidden],
+.reporting-new-report__error[hidden] {
+  display: none;
+}
+
+.reporting-new-report__text {
+  color: var(--lex-text-secondary);
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.reporting-new-report__error {
+  color: var(--lex-danger);
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+/* Shown only without JavaScript. */
+.reports-list-noscript {
+  align-items: center;
+  color: var(--lex-text-secondary);
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+}

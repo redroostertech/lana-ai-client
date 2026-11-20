@@ -286,6 +286,12 @@
     return plainDay(y, m, d + Number(days || 0));
   }
 
+  // True for a real calendar day written 'YYYY-MM-DD' (2026-02-31 is not).
+  function isPlainDay(value) {
+    var text = String(value == null ? '' : value);
+    return /^\d{4}-\d{2}-\d{2}$/.test(text) && addPlainDays(text, 0) === text;
+  }
+
   // Day of the week of a 'YYYY-MM-DD' value: 0 Sunday to 6 Saturday, or NaN.
   function plainDayOfWeek(dayValue) {
     var text = String(dayValue || '');
@@ -482,6 +488,7 @@
     utcDayEnd: utcDayEnd,
     dayInTimeZone: dayInTimeZone,
     addPlainDays: addPlainDays,
+    isPlainDay: isPlainDay,
     plainDayOfWeek: plainDayOfWeek,
     wallClockInTimeZone: wallClockInTimeZone,
     timeZoneOffsetMs: timeZoneOffsetMs,

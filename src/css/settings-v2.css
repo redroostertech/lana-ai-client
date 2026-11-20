@@ -37,8 +37,8 @@
 }
 
 /* The visual treatment below mirrors the Lana Insights "Report Modules"
-   side menu (#moduleMenu in src/admin/reporting.html, items rendered in
-   src/js/admin/reporting.js): a compact 240px rail of text-forward items
+   side menu (#moduleMenu in the old src/admin/reporting.html, items rendered
+   in its script): a compact 240px rail of text-forward items
    with radius-md corners, an accent-soft active fill in the brand-600
    text colour, and no left indicator bar. All values come from lex tokens. */
 

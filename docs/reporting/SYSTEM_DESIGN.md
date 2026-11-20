@@ -7,10 +7,12 @@
 ## Architecture
 
 ```
-src/admin/reporting.html              -- Page template (Lex UI components)
+src/admin/reports-list.html           -- List page (the reports, about drawer, Import Report)
+  +-- src/js/admin/reports-list.js    -- List page controller (IIFE)
+
+src/admin/report.html                 -- Report page, ?report=<key> or ?saved=<id> (Lex UI components)
   |
-  +-- src/js/admin/reporting.js       -- Page controller (~117 KB IIFE)
-  |     +-- Module sidebar logic
+  +-- src/js/admin/report.js          -- Report page controller (IIFE)
   |     +-- Period preset/selection
   |     +-- Report execution
   |     +-- Metric card rendering
@@ -86,13 +88,12 @@ Two-column grid layout using Lex UI components:
 
 ---
 
-## Controller: `reporting.js`
+## Controller: `report.js`
 
 Self-contained IIFE (~117 KB). Key internal state:
 
 ```javascript
 var allModules = [];              // All available modules from API
-var moduleCategories = {};        // Modules grouped by category
 var selectedModuleKey = null;     // Currently selected module
 var currentModuleData = null;     // Last execution results
 var currentModuleConfig = null;   // Current module config
@@ -188,7 +189,7 @@ Status colors determined by `getStatusColor()`:
 
 ## Visualization Renderers
 
-7 renderer files exist in `src/js/visualizations/renderers/`, but only **4 are imported** in `reporting.html`:
+7 renderer files exist in `src/js/visualizations/renderers/`, but only **4 are imported** in `report.html`:
 
 ```html
 <script type="module">
@@ -265,7 +266,7 @@ Modal-based paginated table for metric detail data.
 
 ## Migration: V1 to V2
 
-| Aspect | V1 (`insights/module-execution.html`) | V2 (`admin/reporting.html`) |
+| Aspect | V1 (`insights/module-execution.html`) | V2 (`admin/reports-list.html`, `admin/report.html`) |
 |--------|----------------------------------------|------------------------------|
 | Size | ~356 KB / ~7,900 lines | ~27 KB HTML + ~117 KB JS |
 | UI Framework | Custom/Tailwind | Lex UI components |

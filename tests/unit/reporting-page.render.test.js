@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Runs the real Reports page script (reporting.js, init() removed) after its
+ * Runs the real report page script (report.js, init() removed) after its
  * shared scripts, and renders its tiles and helpers.
  */
 
@@ -11,7 +11,7 @@ const vm = require('vm');
 const { withReportSharedScripts } = require('./helpers/report-shared-scripts');
 
 function page() {
-  let source = fs.readFileSync(path.join(__dirname, '../../src/js/admin/reporting.js'), 'utf8');
+  let source = fs.readFileSync(path.join(__dirname, '../../src/js/admin/report.js'), 'utf8');
   const end = source.lastIndexOf('  init();');
   source = source.slice(0, end)
     + '  window.testExports = { formatCurrency, formatNumber, formatPercentage, renderMetricCardBody };'
@@ -44,7 +44,7 @@ test('a tile with no current or prior value shows the empty token, never N/A', (
 describe('tile buttons run through one delegated listener', () => {
   function setup({ goalAdmin = true } = {}) {
     const ids = { periodStart: { value: '2026-11-10' }, periodEnd: { value: '2026-11-16' } };
-    let source = fs.readFileSync(path.join(__dirname, '../../src/js/admin/reporting.js'), 'utf8');
+    let source = fs.readFileSync(path.join(__dirname, '../../src/js/admin/report.js'), 'utf8');
     const end = source.lastIndexOf('  init();');
     source = source.slice(0, end) + '  selectedModuleKey = "m"; runPeriodDays = { periodStart: "2026-11-01", periodEnd: "2026-11-15" };  window.testExports = { renderMetricCardBody, onTileClick };' + source.slice(end + '  init();'.length);
     const window = withReportSharedScripts({ addEventListener() {}, location: { href: '' } });

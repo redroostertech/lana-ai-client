@@ -11,7 +11,7 @@ const vm = require('vm');
 const { withReportSharedScripts } = require('./helpers/report-shared-scripts');
 
 function page(confirmed) {
-  let source = fs.readFileSync(path.join(__dirname, '../../src/js/admin/reporting.js'), 'utf8');
+  let source = fs.readFileSync(path.join(__dirname, '../../src/js/admin/report.js'), 'utf8');
   const end = source.lastIndexOf('  init();');
   source = source.slice(0, end) + '  window.testExports = { deleteCustomization };' + source.slice(end + '  init();'.length);
   const window = withReportSharedScripts({ addEventListener() {} });

@@ -2035,8 +2035,10 @@
         path.indexOf('admin/dashboard-detail.html') !== -1 ||
         path.indexOf('/admin/dashboard-builder.html') !== -1 ||
         path.indexOf('admin/dashboard-builder.html') !== -1 ||
-        path.indexOf('/admin/reporting.html') !== -1 ||
-        path.indexOf('admin/reporting.html') !== -1 ||
+        path.indexOf('/admin/reports-list.html') !== -1 ||
+        path.indexOf('admin/reports-list.html') !== -1 ||
+        path.indexOf('/admin/report.html') !== -1 ||
+        path.indexOf('admin/report.html') !== -1 ||
         path.indexOf('/admin/billable-hours.html') !== -1 ||
         path.indexOf('admin/billable-hours.html') !== -1 ||
         path.indexOf('/admin/data-visualization.html') !== -1 ||

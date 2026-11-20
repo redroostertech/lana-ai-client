@@ -8,9 +8,9 @@ Guide for changing the reporting page layout, metric card rendering, period pres
 
 ## Changing Metric Card Layout
 
-Metric cards are rendered dynamically in `reporting.js` by the `renderMetricCards()` function. To change the card structure:
+Metric cards are rendered dynamically in `report.js` by the `renderMetricCards()` function. To change the card structure:
 
-1. Open `src/js/admin/reporting.js`
+1. Open `src/js/admin/report.js`
 2. Find the `renderMetricCards()` function
 3. Modify the HTML template string inside
 
@@ -64,7 +64,7 @@ function getStatusColor(current, target, inverseLogic) {
 
 ### Modifying Existing Presets
 
-In `reporting.js`, find `selectPeriodPreset()` and update the date calculations:
+In `report.js`, find `selectPeriodPreset()` and update the date calculations:
 
 ```javascript
 case 'thisMonth':
@@ -75,7 +75,7 @@ case 'thisMonth':
 
 ### Adding/Removing Preset Buttons
 
-In `reporting.html`, modify the `#periodPresets` div:
+In `report.html`, modify the `#periodPresets` div:
 
 ```html
 <div id="periodPresets" style="display:flex;flex-wrap:wrap;gap:0.5rem;">
@@ -88,7 +88,7 @@ In `reporting.html`, modify the `#periodPresets` div:
 
 ## Changing the Results Header
 
-The results header shows module name, period info, execution time, and data sources. Modify in the results rendering section of `reporting.js`.
+The results header shows module name, period info, execution time, and data sources. Modify in the results rendering section of `report.js`.
 
 ### Key Elements
 

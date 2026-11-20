@@ -1,10 +1,16 @@
-/* Lex UI — Admin Reporting Page Controller
-   V2 page controller for admin/reporting.html.
-   Module sidebar, period controls, and report execution shell.
+/* Report page (admin/report.html?report=<key> or ?saved=<id>): the report
+   header, the date form (Quick Select Period, Start, End, Compare By), Run
+   Report, results and drilldowns. A period in the URL (?period=, or ?start=
+   and ?end=) runs the report at once. The list of reports is its own page
+   (admin/reports-list.html); helpers both pages share live in
+   reports-list.model.js (ReportsList).
 */
 
 (function () {
   'use strict';
+
+  // Shared with the other Reports page (reports-list.model.js).
+  var ReportsList = window.ReportsList;
 
   // ==========================================================================
   // State
@@ -14,7 +20,6 @@
   var EMPTY = window.DataState.EMPTY_VALUE;
 
   var allModules = [];
-  var moduleCategories = {};
   var selectedModuleKey = null;
 
   // Visualization state
@@ -197,7 +202,13 @@
     periodTypeEl.value = choice.value;
   }
 
+  // Once per mount (init runs twice on a first visit, the page then the
+  // router): the presets, the date fields and Run Report come together.
   function initPeriodControls() {
+    var controls = document.getElementById('controlsCard');
+    if (!controls || controls.dataset.bound) return;
+    controls.dataset.bound = 'true';
+
     // Period preset buttons
     var presetsContainer = document.getElementById('periodPresets');
     if (presetsContainer) {
@@ -240,8 +251,7 @@
       });
     }
 
-    // Default: Last 7 days
-    selectPeriodPreset('last7days');
+    // The period is set when the report loads (loadReport).
   }
 
   // ==========================================================================
@@ -842,14 +852,7 @@
   // up description/helpText without round-tripping through DOM attributes.
   var _metricInfoRegistry = Object.create(null);
 
-  function escapeHtml(s) {
-    return String(s == null ? '' : s)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
+  var escapeHtml = ReportsList.escapeHtml;
 
   // Admin-only edit-goal icon: deep-links to the Metric Catalog goal editor.
   function editGoalButtonHTML(metric) {
@@ -1148,241 +1151,49 @@
   }
 
   // ==========================================================================
-  // Module Loading
+  // The report: which one (?report=<key> or ?saved=<id>) and the period to
+  // run (?period=<preset>, or ?start= and ?end=) come from the page URL.
+  // With a period, the page runs the report at once.
   // ==========================================================================
 
-  async function loadModules() {
+  // init() runs twice on a first visit (the script itself, then the router,
+  // which by then has the route's params); only the latest load goes on.
+  var loadRequest = 0;
+
+  async function loadReport() {
+    var request = ++loadRequest;
+    var params = window.Lex && Lex.Nav ? Lex.Nav.getParams() : new URLSearchParams(window.location.search);
+    var asked = ReportsList.reportRequest(params);
+    var catalog;
     try {
-      var response = await api.get('/api/v1/modules');
-
-      allModules = response.modules || [];
-
-      if (response.categories && Array.isArray(response.categories)) {
-        response.categories.forEach(function (cat) {
-          moduleCategories[cat.key] = cat.name;
-        });
-      }
-
-      renderReportsList();
-      openReportFromUrl();
-
+      catalog = await ReportsList.loadCatalog(api);
     } catch (error) {
-      console.error('[Reporting] Failed to load modules:', error);
-      showError('Reports could not load. Please refresh the page.');
+      if (request !== loadRequest) return;
+      console.error('[Report] Failed to load reports:', error);
+      showError('This report could not load. Please refresh the page.');
+      return;
     }
-  }
-
-  // ==========================================================================
-  // Reports list (first view). Rows come from the report catalog and saved
-  // reports (ReportsList); picking one opens its period and compare controls.
-  // ==========================================================================
-
-  var reportsListBound = false;
-
-  function reportsListRenderers() {
-    return {
-      name: function (value, row) {
-        return '<div class="reporting-list__name">' + escapeHtml(value)
-          + (row.saved ? ' <lex-badge label="Saved copy" color="gray"></lex-badge>' : '') + '</div>';
-      },
-      purpose: function (_value, row) {
-        return ReportsList.purposeCell(row, escapeHtml);
-      },
-      audience: function (value) {
-        return value ? escapeHtml(value) : '<span class="reporting-list__muted">Anyone</span>';
-      },
-      last_run_at: function (value) {
-        var text = value ? LanaTime.timeAgo(value, { style: 'words' }) : '';
-        return text
-          ? '<time datetime="' + escapeHtml(value) + '">' + escapeHtml(text) + '</time>'
-          : '<span class="reporting-list__muted">Not run yet</span>';
-      }
-    };
-  }
-
-  function renderReportsList() {
-    var table = document.getElementById('reportsListTable');
-    if (!table || typeof table.setData !== 'function') return;
-    if (!reportsListBound) {
-      reportsListBound = true;
-      table.setCellRenderers(reportsListRenderers());
-      table._getSearchColumns = function () { return ['name', 'purpose', 'audience']; };
-      table.addEventListener('row-click', function (event) {
-        var row = event.detail && event.detail.row;
-        if (row) openReport(row);
-      });
-      // Show more opens the report's side panel. lex-table leaves clicks on
-      // buttons to them, so this never opens the report itself.
-      table.addEventListener('click', function (event) {
-        var button = event.target.closest('[data-report-about]');
-        if (button) openReportAbout(button.getAttribute('data-report-about'));
-      });
-      var search = document.getElementById('reportsListSearch');
-      if (search) {
-        var runSearch = function (event) {
-          var value = event && event.detail && event.detail.value !== undefined ? event.detail.value : search.value;
-          if (table.dataSource) table.dataSource.setSearch(String(value || '').trim());
-        };
-        search.addEventListener('lex-input', runSearch);
-        search.addEventListener('lex-change', runSearch);
-      }
+    if (request !== loadRequest) return;
+    allModules = catalog.modules;
+    importedReports = catalog.saved;
+    var entry = asked.id && findReportEntry(asked.id);
+    if (!entry) {
+      showError('This report could not be found. Pick one from All reports.');
+      return;
     }
-    var entries = ReportsList.buildReportEntries(allModules, importedReports);
-    table.setData(entries);
-    var count = document.getElementById('reportsListCount');
-    if (count) count.textContent = entries.length + (entries.length === 1 ? ' report' : ' reports');
-  }
-
-  // Side panel: run controls, then what the report is, what you see, how it
-  // is put together, the data it uses, its goal, how to use it and what is
-  // good to know. The text is the report's declared about, from its detail;
-  // a saved report has none but can still run from here.
-  var reportAboutRequest = 0;
-  var drawerPreset = 'thisWeek';
-
-  function drawerIcon(name) {
-    return window.Lex && Lex.Icons ? Lex.Icons.get({ name: name, size: 'small' }) : '';
-  }
-
-  async function openReportAbout(id) {
-    var drawer = document.getElementById('reportAboutDrawer');
-    var entry = id && findReportEntry(id);
-    if (!drawer || !entry) return;
-    bindDrawerRun(drawer);
-    var request = ++reportAboutRequest;
-    drawer.dataset.reportId = id;
-    drawer.heading = entry.name;
-    drawer.contentRoot.innerHTML = ReportsList.runControlsHtml(drawerPreset, escapeHtml, drawerIcon, entry.usesPeriod !== false)
-      + '<div data-report-about-body>'
-      + (entry.kind === 'report' ? '<p class="reporting-list__muted">Loading\u2026</p>' : '') + '</div>';
-    drawer.open = true;
-    if (entry.kind !== 'report') return;
-    var body = drawer.contentRoot.querySelector('[data-report-about-body]');
-    try {
-      var detail = await api.get('/api/v1/modules/' + encodeURIComponent(entry.key));
-      if (request !== reportAboutRequest) return;
-      body.innerHTML = ReportsList.aboutHtml(detail && detail.about, escapeHtml, drawerIcon);
-    } catch (error) {
-      if (request !== reportAboutRequest) return;
-      console.error('[Reporting] Failed to load report details:', error);
-      body.innerHTML = '<p class="reporting-list__muted">The details could not load. Please try again.</p>';
-    }
-  }
-
-  function bindDrawerRun(drawer) {
-    if (drawer.dataset.runBound) return;
-    drawer.dataset.runBound = 'true';
-    drawer.addEventListener('lex-change', function (event) {
-      var select = event.target.closest('[data-run-period]');
-      if (select) pickDrawerPreset(drawer, select.value);
-    });
-    drawer.addEventListener('click', function (event) {
-      if (event.target.closest('[data-run-report]')) runFromDrawer(drawer);
-    });
-  }
-
-  function pickDrawerPreset(drawer, preset) {
-    drawerPreset = preset;
-    var custom = drawer.querySelector('[data-run-custom]');
-    if (custom) custom.hidden = preset !== 'custom';
-    showDrawerProblem(drawer, null);
-  }
-
-  function showDrawerProblem(drawer, message) {
-    var problem = drawer.querySelector('[data-run-problem]');
-    if (!problem) return;
-    problem.textContent = message || '';
-    problem.hidden = !message;
-  }
-
-  // Run picks the period, closes the panel, opens the report (an in-page
-  // view, so Back returns to the list) and runs it with the page's own
-  // period and run code. Preset days come from LanaTime.reportPresetDays.
-  async function runFromDrawer(drawer) {
-    var entry = findReportEntry(drawer.dataset.reportId);
-    if (!entry) return;
-    var custom = null;
-    if (entry.usesPeriod !== false && drawerPreset === 'custom') {
-      var start = (drawer.querySelector('[data-run-start]') || {}).value || '';
-      var end = (drawer.querySelector('[data-run-end]') || {}).value || '';
-      var problem = ReportsList.customPeriodProblem(start, end);
-      if (problem) {
-        showDrawerProblem(drawer, problem);
-        return;
-      }
-      custom = { start: start, end: end };
-    }
-    drawer.open = false;
     openReport(entry);
-    // A report that shows today's numbers runs with the period fields as
-    // they are; the backend does not read them.
-    if (custom) {
-      applyPeriodDays(custom, null);
-    } else if (entry.usesPeriod !== false) {
-      await selectPeriodPreset(drawerPreset);
-    }
-    executeModule();
+    if (asked.period && asked.period.preset) await selectPeriodPreset(asked.period.preset);
+    else if (asked.period) applyPeriodDays(asked.period, null);
+    else await selectPeriodPreset('last7days');
+    if (request !== loadRequest) return;
+    if (asked.period) executeModule();
   }
 
   function findReportEntry(id) {
-    return ReportsList.buildReportEntries(allModules, importedReports).find(function (entry) { return entry.id === id; });
+    return ReportsList.findEntry(allModules, importedReports, id);
   }
 
-  // Opening a report is an in-page view (Lex.Nav.pushView), so the shell Back
-  // and the back gesture return to the list before leaving the page. The
-  // entry's recorded view wins; a link such as a dashboard tile opens one
-  // report directly (?report=<key>) on a fresh entry.
-  function openReportFromUrl() {
-    var view = window.Lex && Lex.Nav ? Lex.Nav.getView() : undefined;
-    if (typeof view === 'string') {
-      var recorded = findReportEntry(view);
-      if (recorded) openReport(recorded, { fromHistory: true });
-      return;
-    }
-    if (view === null) return;
-    var params = window.Lex && Lex.Nav ? Lex.Nav.getParams() : new URLSearchParams(window.location.search);
-    var key = params.get('report');
-    if (!key) return;
-    var entry = findReportEntry('module:' + key);
-    if (entry) openReport(entry);
-  }
-
-  // Follow Back and Forward between the list and a report while the page is
-  // shown; stop when the router leaves it (it binds again on the next visit).
-  var stopReportViews = null;
-
-  function bindReportViews() {
-    if (stopReportViews || !(window.Lex && Lex.Nav)) return;
-    stopReportViews = Lex.Nav.onViewChange('admin/reporting.html', function (view) {
-      if (!document.getElementById('reportsListSection')) return;
-      var entry = view && findReportEntry(view);
-      if (entry) openReport(entry, { fromHistory: true });
-      else showReportsList();
-    });
-    if (typeof LexRouter !== 'undefined' && typeof LexRouter.registerView === 'function') {
-      LexRouter.registerView({
-        onLeave: function () {
-          if (stopReportViews) stopReportViews();
-          stopReportViews = null;
-        }
-      });
-    }
-  }
-
-  // Back to the list: step back off the report's entry, like the shell Back.
-  function closeReportView() {
-    if (window.Lex && Lex.Nav) Lex.Nav.closeView(showReportsList);
-    else showReportsList();
-  }
-
-  // The list keeps its search; its scroll is put back when it shows again.
-  var listScrollTop = 0;
-
-  function contentScroller() {
-    return document.getElementById('lex-main-content') || document.scrollingElement;
-  }
-
-  function openReport(entry, opts) {
+  function openReport(entry) {
     if (entry.kind === 'saved') selectImportedReport(entry.key);
     else selectModule(entry.key);
 
@@ -1399,29 +1210,35 @@
     if (placeholder) placeholder.style.display = '';
     hideInfo();
     hideError();
-
-    // A report that shows today's numbers has no period to pick.
-    document.querySelectorAll('[data-period-control]').forEach(function (el) {
-      el.hidden = entry.usesPeriod === false;
-    });
-
-    var listSection = document.getElementById('reportsListSection');
-    var scroller = contentScroller();
-    if (!listSection.hidden && scroller) listScrollTop = scroller.scrollTop;
-    listSection.hidden = true;
-    document.getElementById('reportingLayout').hidden = false;
-    if (!(opts && opts.fromHistory) && window.Lex && Lex.Nav) Lex.Nav.pushView(entry.id);
   }
 
-  function showReportsList() {
-    selectedModuleKey = null;
-    selectedImportedReportId = null;
-    document.getElementById('reportingLayout').hidden = true;
-    document.getElementById('reportsListSection').hidden = false;
-    var scroller = contentScroller();
-    if (scroller) scroller.scrollTop = listScrollTop;
-    // Reload so a report just run shows its new last run time.
-    loadModules();
+  // All reports and the shell Back open the list page.
+  function goToList() {
+    Lex.Nav.go(ReportsList.LIST_PAGE);
+  }
+
+  function onShellBack(event) {
+    if (typeof event.preventDefault === 'function') event.preventDefault();
+    if (typeof event.stopPropagation === 'function') event.stopPropagation();
+    if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+    goToList();
+  }
+
+  // While this page shows, the shell Back goes to the list; the listener is
+  // removed when the router leaves the page.
+  var shellBackBound = false;
+  function bindShellBack() {
+    if (shellBackBound) return;
+    shellBackBound = true;
+    document.addEventListener('topbar-back-click', onShellBack, true);
+    if (typeof LexRouter !== 'undefined' && typeof LexRouter.registerView === 'function') {
+      LexRouter.registerView({
+        onLeave: function () {
+          document.removeEventListener('topbar-back-click', onShellBack, true);
+          shellBackBound = false;
+        }
+      });
+    }
   }
 
   function selectModule(moduleKey) {
@@ -1447,7 +1264,7 @@
     var backBtn = document.getElementById('backToReportsBtn');
     if (backBtn && !backBtn.dataset.bound) {
       backBtn.dataset.bound = 'true';
-      backBtn.addEventListener('click', closeReportView);
+      backBtn.addEventListener('click', goToList);
     }
 
     var deleteBtn = document.getElementById('deleteImportedReportBtn');
@@ -2786,29 +2603,11 @@
   }
 
   // ==========================================================================
-  // Report Import & Management (V2)
+  // Saved reports (V2): run and delete
   // ==========================================================================
 
   var importedReports = [];
   var selectedImportedReportId = null;
-  var pendingImportFile = null;
-
-  async function loadImportedReports() {
-    try {
-      var response = await api.get('/api/v1/reporting/reports', {
-        limit: 100,
-        offset: 0,
-        sort: 'name',
-        order: 'asc',
-        is_active: true
-      });
-
-      importedReports = (response.data || response.reports || []);
-    } catch (error) {
-      console.error('[Reporting] Failed to load imported reports:', error);
-    }
-    renderReportsList();
-  }
 
   function selectImportedReport(reportId) {
     selectedImportedReportId = reportId;
@@ -2829,11 +2628,8 @@
   async function performDeleteImportedReport(reportId, reportName) {
     try {
       await api.delete('/api/v1/reporting/reports/' + reportId);
-      showInfo('Report "' + reportName + '" deleted.');
-      if (selectedImportedReportId === reportId) {
-        closeReportView();
-      }
-      await loadImportedReports();
+      Lex.Toast.success('Report "' + reportName + '" deleted.');
+      goToList();
     } catch (error) {
       console.error('[Reporting] Failed to delete report:', error);
       showError(error.message || 'Failed to delete report.');
@@ -2949,319 +2745,6 @@
       showRunFailure(error);
     } finally {
       if (executeBtn) executeBtn.loading = false;
-    }
-  }
-
-  // ==========================================================================
-  // New report: from the metric catalog, or build your own
-  // ==========================================================================
-
-  // Two paths. From the metric catalog: a catalog metric's value, or the rows
-  // behind it (only metrics the catalog marks has_rows). Build your own: a
-  // custom report definition, imported as before. The backend refuses any
-  // key that is not in the catalog.
-  var NEW_REPORT_PATHS = [
-    { value: 'catalog', label: 'From the metric catalog' },
-    { value: 'custom', label: 'Build your own' }
-  ];
-  function newReportShowOptions() {
-    return [
-      { value: window.ReportBuilder.KINDS.value, label: 'Its value' },
-      { value: window.ReportBuilder.KINDS.rows, label: 'The rows behind it' }
-    ];
-  }
-
-  function newReportContent() {
-    return '<div class="reporting-new-report">'
-      + '<lex-segmented id="newReportPath" name="newReportPath"></lex-segmented>'
-      + '<div id="newReportCatalog" class="reporting-new-report__section">'
-      + '<p class="reporting-new-report__text">Pick a metric from the metric catalog. The report shows its value for the period you run it for, or the rows behind that number.</p>'
-      + '<lex-segmented id="newReportShow" name="newReportShow"></lex-segmented>'
-      + '<lex-select id="newReportMetric" name="newReportMetric" label="Metric" searchable placeholder="Loading metrics..."></lex-select>'
-      + '<lex-input id="newReportName" name="newReportName" label="Report name"></lex-input>'
-      + '<p id="newReportError" class="reporting-new-report__error" role="alert" hidden></p>'
-      + '</div>'
-      + '<div id="newReportCustom" class="reporting-new-report__section" hidden>'
-      + '<p class="reporting-new-report__text">Make your own report from your firm\'s tables. Write a report definition file (JSON, or a ZIP with report.json) and import it.</p>'
-      + '</div>'
-      + '</div>';
-  }
-
-  async function openNewReport() {
-    var modal = Lex.Modal.open({ heading: 'New report', size: 'md', content: newReportContent() });
-    modal.hideActions = false;
-    modal.confirmText = 'Save report';
-    modal.cancelText = 'Cancel';
-
-    var root = modal.contentRoot || modal;
-    var pathEl = root.querySelector('#newReportPath');
-    var showEl = root.querySelector('#newReportShow');
-    var metricEl = root.querySelector('#newReportMetric');
-    var nameEl = root.querySelector('#newReportName');
-    var errorEl = root.querySelector('#newReportError');
-    var catalogEl = root.querySelector('#newReportCatalog');
-    var customEl = root.querySelector('#newReportCustom');
-    var catalogMetrics = [];
-    var path = 'catalog';
-    var kind = window.ReportBuilder.KINDS.value;
-
-    function showError(message) {
-      errorEl.textContent = message || '';
-      errorEl.hidden = !message;
-    }
-    function refreshMetricOptions() {
-      var options = window.ReportBuilder.catalogMetricOptions(catalogMetrics, kind);
-      var current = metricEl.value;
-      metricEl.options = options;
-      metricEl.placeholder = options.length ? 'Pick a metric' : 'No metrics to pick';
-      if (!options.some(function (o) { return o.value === current; })) metricEl.value = '';
-    }
-
-    pathEl.options = NEW_REPORT_PATHS;
-    pathEl.value = path;
-    showEl.options = newReportShowOptions();
-    showEl.value = kind;
-    pathEl.addEventListener('lex-change', function (event) {
-      path = event.detail.value;
-      catalogEl.hidden = path !== 'catalog';
-      customEl.hidden = path !== 'custom';
-      modal.confirmText = path === 'custom' ? 'Import a definition' : 'Save report';
-      showError('');
-    });
-    showEl.addEventListener('lex-change', function (event) {
-      kind = event.detail.value;
-      refreshMetricOptions();
-    });
-    metricEl.addEventListener('lex-change', function (event) {
-      var picked = catalogMetrics.find(function (m) { return m.key === event.detail.value; });
-      if (picked && !nameEl.value) nameEl.value = picked.display_name || picked.title || picked.name || picked.key;
-    });
-
-    modal.addEventListener('lex-confirm', function () {
-      modal.keepOpen();
-      if (path === 'custom') {
-        modal.removeAfterClose();
-        openImportModal();
-        return;
-      }
-      var built = window.ReportBuilder.catalogReportDefinition({ kind: kind, metricKey: metricEl.value, name: nameEl.value });
-      if (built.problem) { showError(built.problem); return; }
-      showError('');
-      saveCatalogReport(built.body).then(function (saved) {
-        if (saved) modal.removeAfterClose();
-      }).catch(function (error) {
-        showError(error.message || 'The report could not be saved. Please try again.');
-      });
-    });
-
-    try {
-      var response = await api.getMetricCatalog({ limit: 1000 });
-      catalogMetrics = (response && response.data) || [];
-      refreshMetricOptions();
-    } catch (error) {
-      showError('The metric catalog could not load. Please try again.');
-    }
-  }
-
-  async function saveCatalogReport(body) {
-    var result = await api.post('/api/v1/reporting/reports', body);
-    var report = result && (result.data || result);
-    await loadImportedReports();
-    if (report && report.report_id) {
-      var entry = findReportEntry('saved:' + report.report_id);
-      if (entry) {
-        openReport(entry);
-        executeImportedReport();
-      }
-    }
-    Lex.Toast.success('Report saved.');
-    return true;
-  }
-
-  // Import modal
-  function openImportModal() {
-    pendingImportFile = null;
-    var modal = document.getElementById('importReportModal');
-    if (modal) modal.classList.remove('hidden');
-
-    // Reset state
-    var fileInput = document.getElementById('importFileInput');
-    if (fileInput) fileInput.value = '';
-    var fileInfo = document.getElementById('importFileInfo');
-    if (fileInfo) fileInfo.classList.add('hidden');
-    var submitBtn = document.getElementById('importSubmitBtn');
-    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Import'; }
-    var errEl = document.getElementById('importError');
-    if (errEl) errEl.classList.add('hidden');
-    var successEl = document.getElementById('importSuccess');
-    if (successEl) successEl.classList.add('hidden');
-  }
-
-  function closeImportModal() {
-    var modal = document.getElementById('importReportModal');
-    if (modal) modal.classList.add('hidden');
-    pendingImportFile = null;
-  }
-
-  function handleImportFileSelect(file) {
-    if (!file) return;
-
-    var validTypes = ['application/json', 'text/json', 'application/zip', 'application/x-zip-compressed'];
-    var validExtensions = ['.json', '.zip'];
-    var fileName = file.name.toLowerCase();
-    var hasValidExt = validExtensions.some(function (ext) { return fileName.endsWith(ext); });
-
-    if (validTypes.indexOf(file.type) === -1 && !hasValidExt) {
-      var errEl = document.getElementById('importError');
-      var errText = document.getElementById('importErrorText');
-      if (errText) errText.textContent = 'Invalid file type. Please upload a JSON or ZIP file.';
-      if (errEl) errEl.classList.remove('hidden');
-      return;
-    }
-
-    if (file.size > 50 * 1024 * 1024) {
-      var errEl2 = document.getElementById('importError');
-      var errText2 = document.getElementById('importErrorText');
-      if (errText2) errText2.textContent = 'File too large. Maximum size is 50 MB.';
-      if (errEl2) errEl2.classList.remove('hidden');
-      return;
-    }
-
-    pendingImportFile = file;
-
-    // Show file info
-    var fileInfo = document.getElementById('importFileInfo');
-    if (fileInfo) fileInfo.classList.remove('hidden');
-    var fileNameEl = document.getElementById('importFileName');
-    if (fileNameEl) fileNameEl.textContent = file.name;
-    var fileSizeEl = document.getElementById('importFileSize');
-    if (fileSizeEl) {
-      var sizeKB = (file.size / 1024).toFixed(1);
-      fileSizeEl.textContent = sizeKB > 1024 ? (file.size / 1024 / 1024).toFixed(1) + ' MB' : sizeKB + ' KB';
-    }
-
-    // Enable submit
-    var submitBtn = document.getElementById('importSubmitBtn');
-    if (submitBtn) submitBtn.disabled = false;
-
-    // Hide errors
-    var errEl3 = document.getElementById('importError');
-    if (errEl3) errEl3.classList.add('hidden');
-    var successEl = document.getElementById('importSuccess');
-    if (successEl) successEl.classList.add('hidden');
-  }
-
-  function clearImportFile() {
-    pendingImportFile = null;
-    var fileInput = document.getElementById('importFileInput');
-    if (fileInput) fileInput.value = '';
-    var fileInfo = document.getElementById('importFileInfo');
-    if (fileInfo) fileInfo.classList.add('hidden');
-    var submitBtn = document.getElementById('importSubmitBtn');
-    if (submitBtn) submitBtn.disabled = true;
-  }
-
-  async function submitImport() {
-    if (!pendingImportFile) return;
-
-    var submitBtn = document.getElementById('importSubmitBtn');
-    var errEl = document.getElementById('importError');
-    var errText = document.getElementById('importErrorText');
-    var successEl = document.getElementById('importSuccess');
-    var successText = document.getElementById('importSuccessText');
-
-    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Importing...'; }
-    if (errEl) errEl.classList.add('hidden');
-    if (successEl) successEl.classList.add('hidden');
-
-    try {
-      var formData = new FormData();
-      formData.append('report_file', pendingImportFile);
-
-      var result = await api.post('/api/v1/reporting/import', formData);
-
-      var reportName = (result.data && result.data.name) || pendingImportFile.name;
-      var isUpdate = result.metadata && result.metadata.is_update;
-
-      if (successText) successText.textContent = (isUpdate ? 'Updated' : 'Imported') + ' report: ' + reportName;
-      if (successEl) successEl.classList.remove('hidden');
-
-      // Refresh the imported reports list
-      await loadImportedReports();
-
-      // Auto-select the imported report
-      if (result.data && result.data.report_id) {
-        selectImportedReport(result.data.report_id);
-      }
-
-      // Reset file input after success
-      pendingImportFile = null;
-      var fileInput = document.getElementById('importFileInput');
-      if (fileInput) fileInput.value = '';
-      var fileInfo = document.getElementById('importFileInfo');
-      if (fileInfo) fileInfo.classList.add('hidden');
-      if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Import'; }
-
-    } catch (error) {
-      console.error('[Reporting] Import failed:', error);
-      if (errText) errText.textContent = error.message || 'Import failed. Please check the file format and try again.';
-      if (errEl) errEl.classList.remove('hidden');
-      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Import'; }
-    }
-  }
-
-  function initImportControls() {
-    var newReportBtn = document.getElementById('newReportBtn');
-    if (newReportBtn) {
-      newReportBtn.addEventListener('click', openNewReport);
-    }
-
-    var importBtn = document.getElementById('importReportBtn');
-    if (importBtn) {
-      importBtn.addEventListener('click', openImportModal);
-    }
-
-    var dropZone = document.getElementById('importDropZone');
-    var fileInput = document.getElementById('importFileInput');
-
-    if (dropZone && fileInput) {
-      dropZone.addEventListener('click', function () { fileInput.click(); });
-
-      fileInput.addEventListener('change', function () {
-        if (fileInput.files && fileInput.files[0]) {
-          handleImportFileSelect(fileInput.files[0]);
-        }
-      });
-
-      dropZone.addEventListener('dragover', function (e) {
-        e.preventDefault();
-        dropZone.style.borderColor = 'var(--lex-border-accent, #6366f1)';
-        dropZone.style.background = 'var(--lex-bg-accent-soft, #eef2ff)';
-      });
-
-      dropZone.addEventListener('dragleave', function () {
-        dropZone.style.borderColor = '';
-        dropZone.style.background = '';
-      });
-
-      dropZone.addEventListener('drop', function (e) {
-        e.preventDefault();
-        dropZone.style.borderColor = '';
-        dropZone.style.background = '';
-        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-          handleImportFileSelect(e.dataTransfer.files[0]);
-        }
-      });
-    }
-
-    var clearBtn = document.getElementById('importFileClear');
-    if (clearBtn) {
-      clearBtn.addEventListener('click', clearImportFile);
-    }
-
-    var submitBtn = document.getElementById('importSubmitBtn');
-    if (submitBtn) {
-      submitBtn.addEventListener('click', submitImport);
     }
   }
 
@@ -3559,7 +3042,13 @@
     }
   }
 
+  // Once per mount (init runs twice on a first visit, the page then the
+  // router); the panel's controls come with it.
   function initCustomizePanel() {
+    var panel = document.getElementById('customizePanel');
+    if (!panel || panel.dataset.bound) return;
+    panel.dataset.bound = 'true';
+
     var customizeBtn = document.getElementById('customizeBtn');
     if (customizeBtn) customizeBtn.addEventListener('click', openCustomizePanel);
 
@@ -3594,10 +3083,9 @@
     });
   }
 
-  // Show the customize button when a module is selected.
+  // Customize is hidden for now (report.html); its code stays. A selected
+  // module still refreshes the customization badge.
   function showCustomizeButton() {
-    var btn = document.getElementById('customizeBtn');
-    if (btn) btn.hidden = false;
     updateCustomizationBadge();
   }
 
@@ -3613,8 +3101,6 @@
     showMetricDrilldown: showMetricDrilldown,
     closeDataSourcesModal: closeDataSourcesModal,
     closeMissingEntitiesModal: closeMissingEntitiesModal,
-    closeImportModal: closeImportModal,
-    openImportModal: openImportModal,
     deleteImportedReport: deleteImportedReport,
     openCustomizePanel: openCustomizePanel,
     closeCustomizePanel: closeCustomizePanel,
@@ -3698,7 +3184,6 @@
     'close-module-info': function () { closeModuleInfo(); },
     'close-data-sources': function () { closeDataSourcesModal(); },
     'close-missing-entities': function () { closeMissingEntitiesModal(); },
-    'close-import': function () { closeImportModal(); },
     'show-help': function (el) {
       var panel = document.getElementById(el.getAttribute('data-help-modal'));
       if (panel) panel.classList.remove('hidden');
@@ -3738,29 +3223,28 @@
   function init() {
     initPageActions();
     initTileActions();
-    loadModules();
-    loadImportedReports();
     initReportSelect();
-    bindReportViews();
+    bindShellBack();
     initPeriodControls();
-    initImportControls();
     initCustomizePanel();
-    // Data sources button
+    // Data sources and missing entities buttons (once per mount: init runs
+    // twice on a first visit, the page then the router).
     var dataSourcesBtn = document.getElementById('dataSourcesBtn');
-    if (dataSourcesBtn) {
+    if (dataSourcesBtn && !dataSourcesBtn.dataset.bound) {
+      dataSourcesBtn.dataset.bound = 'true';
       dataSourcesBtn.addEventListener('click', openDataSourcesModal);
     }
 
-    // Missing entities button
     var missingEntitiesBtn = document.getElementById('missingEntitiesBtn');
-    if (missingEntitiesBtn) {
+    if (missingEntitiesBtn && !missingEntitiesBtn.dataset.bound) {
+      missingEntitiesBtn.dataset.bound = 'true';
       missingEntitiesBtn.addEventListener('click', openMissingEntitiesModal);
     }
-
+    loadReport();
   }
 
   if (typeof LexRouter !== 'undefined') {
-    LexRouter.registerPageInit('admin/reporting.html', init);
+    LexRouter.registerPageInit('admin/report.html', init);
   }
   init();
 

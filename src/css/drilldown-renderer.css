@@ -6,7 +6,7 @@
  * (eg AR aging buckets) and toggle a single-card filter when clickable.
  *
  * Loaded by:
- *   src/admin/reporting.html
+ *   src/admin/report.html
  *
  * Companion JS:
  *   src/js/drilldown-renderer.js -> renderBreakdownCards()

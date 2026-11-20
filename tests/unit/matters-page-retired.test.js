@@ -145,9 +145,9 @@ function loadDeepLinkRouting() {
     mainBlock(main, 'const DEEP_LINK_CLIENT_ROUTES = Object.freeze({', '\n});'),
     mainBlock(main, 'function stripLeadingSlashes(value) {', '\n}'),
     mainBlock(main, 'const RETIRED_CLIENT_ROUTES = Object.freeze({', '\n});'),
-    mainBlock(main, 'function retiredMatterRoute(route, params) {', '\n}'),
+    mainBlock(main, 'function retiredRecordRoute(route, params) {', '\n}'),
     mainBlock(main, 'function sanitizeClientRoute(route) {', '\n}'),
-    '({ sanitizeClientRoute, retiredMatterRoute, DEEP_LINK_CLIENT_ROUTES });'
+    '({ sanitizeClientRoute, retiredRecordRoute, DEEP_LINK_CLIENT_ROUTES });'
   ].join('\n');
   return vm.runInNewContext(code, {});
 }
@@ -161,9 +161,9 @@ describe('electron-main deep links', () => {
     ['matter_id=M1&tab=files', { id: 'M1', tab: 'files' }],
     ['open=M2', { id: 'M2' }]
   ])('matters.html?%s opens the matter page', (query, expected) => {
-    const { sanitizeClientRoute, retiredMatterRoute, DEEP_LINK_CLIENT_ROUTES } = loadDeepLinkRouting();
+    const { sanitizeClientRoute, retiredRecordRoute, DEEP_LINK_CLIENT_ROUTES } = loadDeepLinkRouting();
     const params = new URLSearchParams(query);
-    const route = sanitizeClientRoute(retiredMatterRoute('matters.html', params));
+    const route = sanitizeClientRoute(retiredRecordRoute('matters.html', params));
     expect(route).toBe('workspace-details.html');
     const forwarded = {};
     DEEP_LINK_CLIENT_ROUTES[route].forEach((key) => { if (params.get(key)) forwarded[key] = params.get(key); });
@@ -171,9 +171,9 @@ describe('electron-main deep links', () => {
   });
 
   test('matters.html?status=&sort_by=&sort_order= keeps them on workspaces.html', () => {
-    const { sanitizeClientRoute, retiredMatterRoute, DEEP_LINK_CLIENT_ROUTES } = loadDeepLinkRouting();
+    const { sanitizeClientRoute, retiredRecordRoute, DEEP_LINK_CLIENT_ROUTES } = loadDeepLinkRouting();
     const params = new URLSearchParams('status=archived&sort_by=name&sort_order=asc&matter=zz');
-    const route = sanitizeClientRoute(retiredMatterRoute('matters.html', params));
+    const route = sanitizeClientRoute(retiredRecordRoute('matters.html', params));
     expect(route).toBe('workspaces.html');
     const forwarded = {};
     DEEP_LINK_CLIENT_ROUTES[route].forEach((key) => { if (params.get(key)) forwarded[key] = params.get(key); });
@@ -181,10 +181,10 @@ describe('electron-main deep links', () => {
   });
 
   test('matters.html is no longer an allowed destination of its own', () => {
-    const { DEEP_LINK_CLIENT_ROUTES, retiredMatterRoute } = loadDeepLinkRouting();
+    const { DEEP_LINK_CLIENT_ROUTES, retiredRecordRoute } = loadDeepLinkRouting();
     expect(Object.keys(DEEP_LINK_CLIENT_ROUTES)).not.toContain('matters.html');
     expect(DEEP_LINK_CLIENT_ROUTES['workspaces.html']).toEqual(['action', 'search', 'status', 'sort_by', 'sort_order']);
-    expect(retiredMatterRoute('workspaces.html', new URLSearchParams('matter_id=M1'))).toBe('workspaces.html');
+    expect(retiredRecordRoute('workspaces.html', new URLSearchParams('matter_id=M1'))).toBe('workspaces.html');
   });
 });
 

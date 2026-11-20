@@ -9,9 +9,9 @@ const fs = require('fs');
 const path = require('path');
 
 const SRC = path.join(__dirname, '..', '..', 'src');
-const FILES = ['js/admin/reporting.js', 'js/admin/report-metric-card.js', 'js/admin/reports-list.js', 'js/admin/dashboard-detail.js',
+const FILES = ['js/admin/report.js', 'js/admin/report-metric-card.js', 'js/admin/reports-list.js', 'js/admin/dashboard-detail.js',
   'js/admin/dashboard-library.js', 'js/admin/dashboard-builder.js', 'js/shared/data-state.js',
-  'js/admin/metric-detail.js', 'admin/reporting.html', 'admin/dashboard-library.html', 'admin/dashboard-detail.html',
+  'js/admin/metric-detail.js', 'admin/report.html', 'admin/dashboard-library.html', 'admin/dashboard-detail.html',
   'admin/dashboard-builder.html', 'admin/metric_detail.html'];
 
 // A dash typed as is, as a JS escape (\u2013 or \u2014) or as an HTML entity.

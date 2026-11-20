@@ -1,9 +1,9 @@
 'use strict';
 
 /**
- * The Reports page has no inline onclick handlers: buttons carry
- * data-reporting-action and one delegated listener runs them. Runs the real
- * page script (init() removed).
+ * The Reports pages (the list and one report) have no inline onclick
+ * handlers: buttons carry data-reporting-action and one delegated listener
+ * per page runs them. Runs the real page scripts (init() removed).
  */
 
 const fs = require('fs');
@@ -12,8 +12,10 @@ const vm = require('vm');
 const { withReportSharedScripts } = require('./helpers/report-shared-scripts');
 
 const SRC = path.join(__dirname, '../../src');
-const js = fs.readFileSync(path.join(SRC, 'js/admin/reporting.js'), 'utf8');
-const html = fs.readFileSync(path.join(SRC, 'admin/reporting.html'), 'utf8');
+const js = fs.readFileSync(path.join(SRC, 'js/admin/report.js'), 'utf8');
+const html = fs.readFileSync(path.join(SRC, 'admin/report.html'), 'utf8');
+const listJs = fs.readFileSync(path.join(SRC, 'js/admin/reports-list.js'), 'utf8');
+const listHtml = fs.readFileSync(path.join(SRC, 'admin/reports-list.html'), 'utf8');
 
 function el(attrs) {
   const classes = new Set(['hidden']);
@@ -25,10 +27,10 @@ function el(attrs) {
   };
 }
 
-function page(apiImpl) {
-  let source = js;
+function page(apiImpl, script) {
+  let source = script || js;
   const end = source.lastIndexOf('  init();');
-  source = source.slice(0, end) + '  window.testExports = { onPageAction, renderHelpTextModal };' + source.slice(end + '  init();'.length);
+  source = source.slice(0, end) + '  window.testExports = { onPageAction, renderHelpTextModal: typeof renderHelpTextModal === \'function\' ? renderHelpTextModal : null };' + source.slice(end + '  init();'.length);
   const window = withReportSharedScripts({ addEventListener() {} });
   window.ReportingGoalComparisonMapper = require('../../src/js/shared/reporting-goal-comparison-mapper.js');
   const nodes = {};
@@ -41,30 +43,27 @@ function page(apiImpl) {
 
 const click = (target) => ({ target: { closest: (sel) => (sel === '[data-reporting-action]' ? target : null) } });
 
-test('no inline onclick in reporting.html or reporting.js', () => {
-  expect(html).not.toMatch(/onclick=/i);
-  expect(js).not.toMatch(/onclick=/i);
+test('no inline onclick on either Reports page', () => {
+  [html, js, listHtml, listJs].forEach(text => expect(text).not.toMatch(/onclick=/i));
 });
 
 test.each([
-  ['close-module-info', 'moduleInfoModal'],
-  ['close-data-sources', 'dataSourcesModal'],
-  ['close-missing-entities', 'missingEntitiesModal'],
-  ['close-import', 'importReportModal']
-])('%s hides %s', (action, id) => {
-  const p = page();
+  ['close-module-info', 'moduleInfoModal', js],
+  ['close-data-sources', 'dataSourcesModal', js],
+  ['close-missing-entities', 'missingEntitiesModal', js],
+  ['close-import', 'importReportModal', listJs]
+])('%s hides %s', (action, id, script) => {
+  const p = page(null, script);
   p.nodes[id] = el({});
   p.nodes[id].classList.remove('hidden');
   p.exports.onPageAction(click(el({ 'data-reporting-action': action })));
   expect(p.nodes[id].classList.contains('hidden')).toBe(true);
 });
 
-test('every data-reporting-action in reporting.html is handled', () => {
-  const actions = [...new Set([...html.matchAll(/data-reporting-action="([^"]+)"/g)].map((m) => m[1]))];
+test.each([['report.html', html, js], ['reports-list.html', listHtml, listJs]])('every data-reporting-action in %s is handled by its script', (_name, pageHtml, pageJs) => {
+  const actions = [...new Set([...pageHtml.matchAll(/data-reporting-action="([^"]+)"/g)].map((m) => m[1]))];
   expect(actions.length).toBeGreaterThan(0);
-  const p = page();
-  for (const a of actions) expect(js).toContain("'" + a + "'");
-  expect(p).toBeTruthy();
+  for (const a of actions) expect(pageJs).toContain("'" + a + "'");
 });
 
 test('the chart help button opens and closes its help panel', () => {

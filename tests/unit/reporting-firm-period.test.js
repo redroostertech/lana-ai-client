@@ -24,7 +24,7 @@ const RESULT = {
 
 function page({ post = jest.fn().mockResolvedValue(RESULT), get = jest.fn().mockResolvedValue({ data: [] }), storedZone = 'America/Los_Angeles' } = {}) {
   const zone = { firm: storedZone };
-  let source = fs.readFileSync(path.join(__dirname, '../../src/js/admin/reporting.js'), 'utf8');
+  let source = fs.readFileSync(path.join(__dirname, '../../src/js/admin/report.js'), 'utf8');
   const end = source.lastIndexOf('  init();');
   source = source.slice(0, end)
     + '  window.testExports = { executeModule, selectPeriodPreset, showLeadSourceDrilldown, openGenericDrilldown,'

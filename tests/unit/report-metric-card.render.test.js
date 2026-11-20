@@ -94,7 +94,7 @@ describe('result header labels', () => {
 });
 
 test('a saved report run in a failed state renders the shared state block', () => {
-  const source = fs.readFileSync(path.join(SRC, 'js/admin/reporting.js'), 'utf8');
+  const source = fs.readFileSync(path.join(SRC, 'js/admin/report.js'), 'utf8');
   const imported = source.slice(source.indexOf('async function executeImportedReport'));
   expect(imported).toMatch(/if \(window\.DataState\.isProblem\(result\)\)/);
 });
@@ -130,8 +130,8 @@ test('a Goal(s) cell with no goal says "No goal set", muted like the other empty
   expect(goal).toContain('<span class="text-gray-400">No goal set</span>');
 });
 
-describe('tile styles live in reporting.css, not inline', () => {
-  const css = fs.readFileSync(path.join(SRC, 'css/admin/reporting.css'), 'utf8');
+describe('tile styles live in report.css, not inline', () => {
+  const css = fs.readFileSync(path.join(SRC, 'css/admin/report.css'), 'utf8');
   const tiles = [
     win.ReportMetricCard.render({ key: 'c', name: 'Count', current: 3, prior: 2, data_state: 'ok' }, ctx),
     win.ReportMetricCard.render({ key: 'o', name: 'Owed', data_state: 'no_data_source', data_state_reason: 'r' }, ctx)
@@ -139,7 +139,7 @@ describe('tile styles live in reporting.css, not inline', () => {
   test.each(tiles.map((h, i) => [i, h]))('tile %i has no inline style', (i, html) => {
     expect(html).not.toMatch(/style="/);
   });
-  test('every report-tile class the tile uses is defined in reporting.css', () => {
+  test('every report-tile class the tile uses is defined in report.css', () => {
     const used = new Set(tiles.join('').match(/report-tile[a-z_-]*/g));
     expect(used.size).toBeGreaterThan(0);
     for (const cls of used) expect(css).toContain('.' + cls);

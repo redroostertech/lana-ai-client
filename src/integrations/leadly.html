@@ -627,7 +627,7 @@
 
     // ---- Analytics Tab ----
     // Analytics reports (Data Quality, Marketing Attribution, Funnel) are rendered
-    // by the generic reporting system at admin/reporting.html via module definitions.
+    // by the generic reporting system (admin/report.html) via module definitions.
     // This tab provides quick-glance summaries and links to the full reports.
 
     async function loadAnalyticsTab() {
@@ -638,7 +638,7 @@
           <!-- Report Module Links -->
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <!-- Data Quality -->
-            <a href="../admin/reporting.html?module=data-quality-analysis" class="block bg-white rounded-lg border border-gray-200 p-6 hover:border-amber-300 hover:shadow-md transition-all group">
+            <a href="../admin/reports-list.html" class="block bg-white rounded-lg border border-gray-200 p-6 hover:border-amber-300 hover:shadow-md transition-all group">
               <div class="flex items-center gap-3 mb-3">
                 <div class="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
                   <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -653,7 +653,7 @@
             </a>
 
             <!-- Marketing Attribution -->
-            <a href="../admin/reporting.html?module=marketing-attribution-analysis" class="block bg-white rounded-lg border border-gray-200 p-6 hover:border-teal-300 hover:shadow-md transition-all group">
+            <a href="../admin/reports-list.html" class="block bg-white rounded-lg border border-gray-200 p-6 hover:border-teal-300 hover:shadow-md transition-all group">
               <div class="flex items-center gap-3 mb-3">
                 <div class="w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center">
                   <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
@@ -668,7 +668,7 @@
             </a>
 
             <!-- Funnel Analysis -->
-            <a href="../admin/reporting.html?module=funnel-analysis-attribution" class="block bg-white rounded-lg border border-gray-200 p-6 hover:border-blue-300 hover:shadow-md transition-all group">
+            <a href="../admin/report.html?report=funnel-analysis-attribution" class="block bg-white rounded-lg border border-gray-200 p-6 hover:border-blue-300 hover:shadow-md transition-all group">
               <div class="flex items-center gap-3 mb-3">
                 <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
                   <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>

@@ -53,7 +53,7 @@ function page(file, names) {
 test('actual dashboard and reporting cards keep all currency rows and exact signed strings', () => {
   const m = metric();
   const outputs = [page('js/admin/dashboard-detail.js', 'renderMetricCard').renderMetricCard(m),
-    page('js/admin/reporting.js', 'createMetricCard').createMetricCard(m)];
+    page('js/admin/report.js', 'createMetricCard').createMetricCard(m)];
   for (const html of outputs) {
     for (const row of m.value) expect(html).toContain(row.currency);
     expect(html).toContain('-9007199254740993.0123456789'); expect(html).toContain('Current stock');
@@ -107,7 +107,7 @@ test('both actual preview cards use the typed distribution and keep legacy detai
   } finally { global.CurrentPipelinePresentation = saved; }
 });
 test('standalone and routed page mounts load the typed helper before its consumers', () => {
-  for (const file of ['admin/dashboard-detail.html', 'admin/reporting.html', 'admin/metric-catalog.html']) {
+  for (const file of ['admin/dashboard-detail.html', 'admin/report.html', 'admin/metric-catalog.html']) {
     const text = fs.readFileSync(path.join(sourceRoot, file), 'utf8');
     expect(text).toContain('js/shared/current-pipeline-presentation.js');
   }

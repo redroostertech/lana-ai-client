@@ -36,7 +36,7 @@ function page(file, names) {
     Intl, URLSearchParams, setTimeout: jest.fn(), clearTimeout: jest.fn(), LanaTime: { nowMs: () => 0 } });
   return window.testExports;
 }
-test.each([['dashboard-detail.js', 'renderMetricCard'], ['reporting.js', 'createMetricCard']])('%s displays actual intake denominators and null rate, not a generic scalar/share', (file, fn) => {
+test.each([['dashboard-detail.js', 'renderMetricCard'], ['report.js', 'createMetricCard']])('%s displays actual intake denominators and null rate, not a generic scalar/share', (file, fn) => {
   const html = page(file, fn)[fn](metric());
   expect(html).toContain('Closed (won + lost)');
   expect(html).toContain('66.67%'); expect(html).toContain('Unavailable');

@@ -3,7 +3,7 @@
  *
  * Pure, side-effect-free string renderers for the Metric Catalog Playground.
  * They mirror the live dashboard card (dashboard-detail.js renderMetricCard)
- * and the reporting card (reporting.js createMetricCard) so an admin can preview
+ * and the reporting card (report.js createMetricCard) so an admin can preview
  * how a single metric would read on a dashboard and in a report, plus the goal
  * rules and a drilldown of the underlying rows.
  *
@@ -192,7 +192,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Report preview card (mirrors reporting.js createMetricCard visual: a
+  // Report preview card (mirrors report.js createMetricCard visual: a
   // status-color background, Current value, change indicator, Prior/Target +
   // attainment grid). Input metric: { name, current, format, goal, comparison }.
   // Omits the override/drilldown/info action buttons (the Playground has its

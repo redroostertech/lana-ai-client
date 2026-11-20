@@ -10,7 +10,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const source = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'js', 'admin', 'reporting.js'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'js', 'admin', 'report.js'), 'utf8');
 
 test('the report run sends Compare By and no comparison mode of its own', () => {
   expect(source).toMatch(/compareBy: periodType/);

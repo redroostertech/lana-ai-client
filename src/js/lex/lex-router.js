@@ -600,6 +600,28 @@
         });
       })
       .then(function () {
+        // Step 7c: Push to history BEFORE the page's scripts run, so both the
+        // page's own init() on its first load and the registered init (Step
+        // 8d) read this route's params (Lex.Nav.getParams reads
+        // history.state.path). The content is already swapped in; a page
+        // that cannot be fetched never gets here and leaves history as is.
+        // NEVER pass the URL (3rd argument) — keep the browser URL at
+        // app.html so CMD+SHIFT+R (hard refresh) reloads the SPA shell
+        // instead of the page fragment. The route is stored in state.path
+        // and read back by app.js on reload.
+        if (pushState) {
+          history.pushState({ path: path }, descriptor.title);
+        } else {
+          // Even without pushState (startup, back nav), ensure
+          // history.state.path is current so getParams() works.
+          history.replaceState({ path: path }, '');
+        }
+        // Persist path to sessionStorage so refresh restores the current page
+        // when history.state is cleared (e.g. some browsers/devices).
+        try {
+          sessionStorage.setItem('_lex_last_path', path);
+        } catch (e) { /* ignore */ }
+
         // Step 8: Load page-specific scripts (sequential)
         return loadPageScripts(descriptor.scripts, path);
       })
@@ -612,28 +634,6 @@
             activeNav: descriptor.activeNav
           });
         }
-
-        // Step 8c: Push to history BEFORE page init so Lex.Nav.getParams()
-        // can read the route's query params from history.state.path.
-        // NEVER pass the URL (3rd argument) — keep the browser URL at
-        // app.html so CMD+SHIFT+R (hard refresh) reloads the SPA shell
-        // instead of the page fragment. The route is stored in state.path
-        // and read back by app.js on reload.
-        if (pushState) {
-          history.pushState({ path: path }, descriptor.title);
-        } else {
-          // Even without pushState (startup, back nav), ensure
-          // history.state.path is current so getParams() works. Back onto
-          // an entry for this path keeps the in-page view it recorded
-          // (Lex.Nav.pushView) so the page can reopen it.
-          var entry = history.state && history.state.path === path ? history.state : null;
-          history.replaceState(entry && entry.view !== undefined ? { path: path, view: entry.view } : { path: path }, '');
-        }
-        // Persist path to sessionStorage so refresh restores the current page
-        // when history.state is cleared (e.g. some browsers/devices).
-        try {
-          sessionStorage.setItem('_lex_last_path', path);
-        } catch (e) { /* ignore */ }
 
         // Step 8d: Call registered page init (supports SPA re-navigation).
         // On first load the IIFE registers init via registerPageInit();

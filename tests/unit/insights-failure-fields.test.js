@@ -11,7 +11,7 @@ const fs = require('fs');
 const path = require('path');
 
 const SRC = path.join(__dirname, '..', '..', 'src');
-const FILES = ['js/admin/reporting.js', 'js/admin/report-metric-card.js', 'js/admin/reports-list.js',
+const FILES = ['js/admin/report.js', 'js/admin/report-metric-card.js', 'js/admin/reports-list.js',
   'js/admin/dashboard-detail.js', 'js/admin/dashboard-library.js', 'js/shared/dashboard-tiles.js'];
 
 // Caught exceptions (error / err / e) may still read .message. The data

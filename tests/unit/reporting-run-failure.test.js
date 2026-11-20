@@ -16,7 +16,7 @@ function node() {
 }
 
 function page(post) {
-  let source = fs.readFileSync(path.join(__dirname, '../../src/js/admin/reporting.js'), 'utf8');
+  let source = fs.readFileSync(path.join(__dirname, '../../src/js/admin/report.js'), 'utf8');
   const end = source.lastIndexOf('  init();');
   source = source.slice(0, end)
     + '  window.testExports = { executeModule, setModule: function (k) { selectedModuleKey = k; selectedImportedReportId = null; },'

@@ -1010,7 +1010,7 @@
 
     content.addEventListener('click', function (event) {
       if (event.target.closest('#openReportingBtn')) {
-        Lex.Nav.go('admin/reporting.html');
+        Lex.Nav.go('admin/reports-list.html');
       }
 
       if (event.target.closest('#editDashboardBtn') && currentDashboardId) {

@@ -26,12 +26,13 @@ test('the Insights sidebar reads Dashboard, Reports, All dashboards and Billable
   const labels = [...items.matchAll(/label: '([^']+)'/g)].map(m => m[1]);
   expect(labels).toEqual(['Reports', 'All dashboards', 'Billable Hours']);
   expect(items).toContain("{ id: 'insights-dashboard', home: true, href: 'admin/analytics.html' }");
-  expect(items).toContain("{ id: 'insights-reports', label: 'Reports', icon: 'bar-chart-2', href: 'admin/reporting.html' }");
+  expect(items).toContain("{ id: 'insights-reports', label: 'Reports', icon: 'bar-chart-2', href: 'admin/reports-list.html' }");
   expect(items).toContain("{ id: 'insights-dashboards', label: 'All dashboards', icon: 'book-open', href: 'admin/dashboard-library.html' }");
 });
 
 test.each([
-  ['admin/reporting.html', 'insights-reports', 'Reports'],
+  ['admin/reports-list.html', 'insights-reports', 'Reports'],
+  ['admin/report.html', 'insights-reports', 'Report'],
   ['admin/dashboard-library.html', 'insights-dashboards', 'All dashboards'],
 ])('%s is titled %s', (file, nav, title) => {
   const html = read(file);
@@ -44,7 +45,8 @@ test.each([
 test('the SPA router uses the same names', () => {
   const pages = read('js/lex/lex-router.pages.js');
   const entry = (file) => pages.slice(pages.indexOf("'" + file + "': {"), pages.indexOf('},', pages.indexOf("'" + file + "': {")));
-  expect(entry('admin/reporting.html')).toMatch(/title: 'Reports',\s+activeNav: 'insights-reports'/);
+  expect(entry('admin/reports-list.html')).toMatch(/title: 'Reports',\s+activeNav: 'insights-reports'/);
+  expect(entry('admin/report.html')).toMatch(/title: 'Report',\s+activeNav: 'insights-reports'/);
   expect(entry('admin/dashboard-library.html')).toMatch(/title: 'All dashboards',\s+activeNav: 'insights-dashboards'/);
   expect(entry('admin/dashboard-builder.html')).toMatch(/activeNav: 'insights-dashboards'/);
   expect(entry('admin/dashboard-detail.html')).toMatch(/activeNav: 'insights-dashboards'/);
@@ -54,7 +56,8 @@ test('the Insights home is titled Dashboard and names the two the same way', () 
   const html = read('admin/analytics.html');
   expect(html).not.toContain('Firm Reporting');
   expect(html).toContain('page-title="Dashboard"');
-  expect(read('admin/reporting.html')).toContain(`crumbs='[{"label":"Dashboard","href":"admin/analytics.html"},{"label":"Reports"}]'`);
+  expect(read('admin/reports-list.html')).toContain(`crumbs='[{"label":"Dashboard","href":"admin/analytics.html"},{"label":"Reports"}]'`);
+  expect(read('admin/report.html')).toContain(`crumbs='[{"label":"Dashboard","href":"admin/analytics.html"},{"label":"Reports","href":"admin/reports-list.html"},{"label":"Report"}]'`);
 });
 
 test('dashboard detail and builder breadcrumbs read Dashboard / All dashboards', () => {

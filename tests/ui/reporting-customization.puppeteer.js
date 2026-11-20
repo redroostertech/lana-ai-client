@@ -108,7 +108,7 @@ async function run() {
 
     // ── Step 2: Navigate to Reporting Page ────────────────────────
     console.log('\nStep 2: Navigate to Reporting Page');
-    await page.goto(BASE_URL + '/admin/reporting.html', { waitUntil: 'networkidle2', timeout: 15000 });
+    await page.goto(BASE_URL + '/admin/report.html?report=document-count', { waitUntil: 'networkidle2', timeout: 15000 });
 
     const pageLoaded = await waitForSelector(page, '#reportingLayout', 8000);
     assert(pageLoaded, 'Reporting page loads with layout');

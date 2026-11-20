@@ -1,6 +1,6 @@
 /* Workspace Analytics — Page controller for admin/workspace-analytics.html.
    Standalone page for per-matter workspace analytics. Extracted from the
-   Workspace Analytics tab in reporting.js.
+   Workspace Analytics tab in the old Reports page script.
 
    Pattern: IIFE + direct init() call.
 */

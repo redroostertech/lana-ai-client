@@ -1,6 +1,6 @@
 /**
  * reporting-tables.js
- * The record tables of Firm Reporting (admin/reporting.html), built on
+ * The record tables of a report (admin/report.html), built on
  * lex-table per docs/TABLE-STANDARD.md: the lead-source drilldown, the
  * "table" visualization of a module, and the results of an imported report.
  *

@@ -25,7 +25,7 @@ typeof Chart
 // Should output: "function"
 ```
 
-If `undefined`, Chart.js failed to load. Check that `src/js/vendor/chart.js` exists and the script tag is in `reporting.html`.
+If `undefined`, Chart.js failed to load. Check that `src/js/vendor/chart.js` exists and the script tag is in `report.html`.
 
 ### Check 2: Renderer Is Available
 
@@ -36,7 +36,7 @@ typeof window.TimeSeriesRenderer
 
 If `undefined`, the ES6 module import failed. Check:
 - The renderer file exists in `src/js/visualizations/renderers/`
-- The import in `reporting.html` has the correct path
+- The import in `report.html` has the correct path
 - No syntax errors in the renderer file
 
 ### Check 3: Canvas Element Exists
@@ -211,7 +211,7 @@ window._reporting.closeDataSourcesModal()  // Close data sources modal
 window._reporting.closeMissingEntitiesModal() // Close missing entities modal
 ```
 
-To inspect state, set breakpoints inside `reporting.js` or add temporary `console.log` statements within the IIFE.
+To inspect state, set breakpoints inside `report.js` or add temporary `console.log` statements within the IIFE.
 
 ---
 

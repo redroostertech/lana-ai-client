@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Reports - LANA AI</title>
+  <title>Report - LANA AI</title>
 
   <!-- CSS in head -->
   <script src="../js/lex/lex.theme.js"></script>
@@ -14,19 +14,8 @@
   <link rel="stylesheet" href="../css/drilldown-renderer.css">
   <link rel="stylesheet" href="../css/lex-chat.css">
   <link rel="stylesheet" href="../css/admin/admin-tables.css">
-  <link rel="stylesheet" href="../css/admin/reporting.css">
-  <link rel="stylesheet" href="../css/admin/report-about.css">
+  <link rel="stylesheet" href="../css/admin/report.css">
   <script src="../js/tailwind-loader.js"></script>
-
-  <style>
-    .lana-topbar-divider {
-      width: 1px;
-      height: 20px;
-      background: var(--lex-chat-border, #e5e7eb);
-      margin: 0 4px;
-      flex-shrink: 0;
-    }
-  </style>
 
   <!-- target="_blank" links open through the guarded channel (js/shared/external-links.js). -->
   <script src="../js/shared/external-links.js"></script>
@@ -40,67 +29,22 @@
     logo-alt="LANA AI"
     logo-href="../dashboard.html"
     active-nav-id="insights-reports"
-    page-title="Reports"
+    page-title="Report"
   ></lex-app>
 
   <template id="page-content">
 
     <main>
 
-      <!-- Page Header -->
-      <lex-banner
-        id="reportingBanner"
-        variant="light"
-        corners
-        heading="Reports"
-        subtitle="Pick a report, choose a period, and run it."
-        lana
-        lana-context-type="full_chat"
-      >
-        <!-- New report is hidden for now; its code stays. -->
-        <lex-btn id="newReportBtn" variant="primary" size="sm" hidden>New report</lex-btn>
-        <lex-btn id="importReportBtn" variant="secondary" size="sm">
-          <span class="reporting-btn-content">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
-            </svg>
-            Import Report
-          </span>
-        </lex-btn>
-      </lex-banner>
-
       <lex-spacer size="md"></lex-spacer>
 
-      <!-- Breadcrumb back to analytics hub -->
+      <!-- Breadcrumb back to the list and the analytics hub -->
       <lex-breadcrumb
-        crumbs='[{"label":"Dashboard","href":"admin/analytics.html"},{"label":"Reports"}]'
+        crumbs='[{"label":"Dashboard","href":"admin/analytics.html"},{"label":"Reports","href":"admin/reports-list.html"},{"label":"Report"}]'
       ></lex-breadcrumb>
 
-      <!-- Reports open on a list. Each row comes from the report catalog
-           (purpose, audience, last run); picking one opens its controls. -->
-      <section id="reportsListSection" class="reporting-list" aria-labelledby="reportsListHeading">
-        <div class="reporting-list__toolbar" role="search" aria-label="Search reports">
-          <h2 id="reportsListHeading" class="reporting-list__heading">All reports</h2>
-          <lex-input id="reportsListSearch" class="reporting-list__search" placeholder="Search reports..." clearable="true" leading-icon="search"></lex-input>
-          <span id="reportsListCount" class="reporting-list__count" aria-live="polite"></span>
-        </div>
-        <lex-table
-          id="reportsListTable"
-          class="lex-table--card"
-          columns="name,purpose,audience,last_run_at"
-          labels="Report,What it shows,For,Last run"
-          sortable-columns="name,audience,last_run_at"
-          sort-by="name"
-          sort-dir="asc"
-          limit="20"
-          id-key="row_id"
-          empty-text="No reports yet"
-          aria-label="Reports"
-        ></lex-table>
-      </section>
-
-      <!-- Report picker sits in the controls card; results stack below -->
-      <div id="reportingLayout" class="reporting-layout" hidden>
+      <!-- The report's controls card; results stack below -->
+      <div id="reportingLayout" class="reporting-layout">
 
         <!-- ── Main Content Column ────────────────────────────────── -->
         <div id="reportingMainColumn" class="reporting-main-column">
@@ -119,7 +63,7 @@
             </div>
 
             <!-- Period Presets -->
-            <div class="reporting-presets" data-period-control>
+            <div class="reporting-presets">
               <p class="lex-label lex-text-secondary reporting-presets__label">Quick Select Period</p>
               <div id="periodPresets" class="reporting-presets__list">
                 <lex-btn data-preset="last7days" variant="secondary" size="sm">Last 7 Days</lex-btn>
@@ -133,7 +77,7 @@
             </div>
 
             <!-- Date Range Row -->
-            <div class="reporting-period-fields" data-period-control>
+            <div class="reporting-period-fields">
               <lex-input id="periodStart" label="Start Date" type="date" name="periodStart"></lex-input>
               <lex-input id="periodEnd" label="End Date" type="date" name="periodEnd"></lex-input>
               <lex-select
@@ -148,6 +92,7 @@
             <!-- Execute + Customize Buttons -->
             <div class="reporting-run-actions">
               <lex-btn id="executeBtn" variant="primary">Run Report</lex-btn>
+              <!-- Customize is hidden for now; its code stays. -->
               <lex-btn id="customizeBtn" class="reporting-customize-btn" variant="secondary" size="sm" hidden>
                 <span class="reporting-btn-content">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -217,9 +162,6 @@
       <lex-modal id="drilldownModal" heading="Details" size="xl" hide-actions>
         <div id="drilldownContent"></div>
       </lex-modal>
-
-      <!-- Report details: filled from GET /api/v1/modules/:moduleKey (about) -->
-      <lex-drawer id="reportAboutDrawer" heading="About this report" side="right" width="md"></lex-drawer>
 
       <!-- Module Customization Panel -->
       <lex-drawer id="customizePanel" heading="Customize Module" side="right" width="480px">
@@ -347,53 +289,6 @@
             </div>
             <div class="flex justify-end p-5 border-t border-gray-200">
               <button type="button" data-reporting-action="close-missing-entities" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Close</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Import Report Modal -->
-      <div id="importReportModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 overflow-y-auto h-full w-full z-50">
-        <div class="relative top-20 mx-auto p-6 w-full max-w-lg">
-          <div class="bg-white rounded-lg shadow-xl">
-            <div class="flex items-start justify-between p-5 border-b border-gray-200">
-              <h3 class="text-xl font-semibold text-gray-900">Import Report</h3>
-              <button type="button" data-reporting-action="close-import" class="text-gray-400 hover:text-gray-600">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-              </button>
-            </div>
-            <div class="p-5">
-              <p class="text-sm text-gray-600 mb-4">Upload a report definition file (JSON or ZIP). ZIP files should contain a <code class="bg-gray-100 px-1 py-0.5 rounded text-xs">report.json</code> at the root and optionally a <code class="bg-gray-100 px-1 py-0.5 rounded text-xs">ui/</code> folder.</p>
-              <div id="importDropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-indigo-400 transition-colors cursor-pointer">
-                <svg class="mx-auto h-10 w-10 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-                </svg>
-                <p class="text-sm font-medium text-gray-700">Drop file here or click to browse</p>
-                <p class="text-xs text-gray-500 mt-1">JSON or ZIP, max 50 MB</p>
-                <input type="file" id="importFileInput" accept=".json,.zip,application/json,application/zip" class="hidden">
-              </div>
-              <div id="importFileInfo" class="hidden mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-2">
-                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                    <span id="importFileName" class="text-sm font-medium text-gray-900"></span>
-                  </div>
-                  <button id="importFileClear" class="text-gray-400 hover:text-gray-600">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                  </button>
-                </div>
-                <p id="importFileSize" class="text-xs text-gray-500 mt-1"></p>
-              </div>
-              <div id="importError" class="hidden mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p id="importErrorText" class="text-sm text-red-700"></p>
-              </div>
-              <div id="importSuccess" class="hidden mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                <p id="importSuccessText" class="text-sm text-green-700"></p>
-              </div>
-            </div>
-            <div class="flex justify-end gap-3 p-5 border-t border-gray-200">
-              <button type="button" data-reporting-action="close-import" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
-              <button id="importSubmitBtn" disabled class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">Import</button>
             </div>
           </div>
         </div>
@@ -540,8 +435,8 @@
   <script src="../js/admin/report-metric-card.js"></script>
   <script src="../js/shared/dashboard-tiles.js"></script>
   <script src="../js/admin/report-builder.js"></script>
-  <script src="../js/admin/reports-list.js"></script>
-  <script src="../js/admin/reporting.js"></script>
+  <script src="../js/admin/reports-list.model.js"></script>
+  <script src="../js/admin/report.js"></script>
 
   <!-- ES module bridge for visualization renderers -->
   <script type="module">

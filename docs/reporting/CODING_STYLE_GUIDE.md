@@ -8,7 +8,7 @@ Patterns, conventions, and rules for the reporting frontend code.
 
 ## Controller Pattern
 
-The reporting page uses a single IIFE controller (`reporting.js`) that manages all state and DOM interactions. This is consistent with other LANA AI admin pages.
+Each Reports page has one IIFE controller: `reports-list.js` for the list page and `report.js` for one report. Helpers both use live in `reports-list.model.js` (`ReportsList`). This is consistent with other LANA AI admin pages.
 
 ### State Management
 
@@ -25,7 +25,7 @@ Do NOT use global variables outside the IIFE. Expose only what's needed via `win
 
 ### DOM Access
 
-Use `document.getElementById()` for element access. DOM IDs are defined in `reporting.html` and should not be changed without updating the controller.
+Use `document.getElementById()` for element access. DOM IDs are defined in `report.html` and should not be changed without updating the controller.
 
 ### Event Handling
 
@@ -159,7 +159,7 @@ chartInstances[canvasId] = renderer;
 
 ## ES6 Module Bridge
 
-Visualization renderers are ES6 modules but the controller is an IIFE (not a module). The bridge in `reporting.html` handles this:
+Visualization renderers are ES6 modules but the controller is an IIFE (not a module). The bridge in `report.html` handles this:
 
 ```html
 <script type="module">
@@ -170,7 +170,7 @@ Visualization renderers are ES6 modules but the controller is an IIFE (not a mod
 
 When adding a new renderer:
 1. Create the ES6 class in `src/js/visualizations/renderers/`
-2. Add the import + window assignment in `reporting.html`
+2. Add the import + window assignment in `report.html`
 3. Use `window.YourRenderer` in the controller
 
 ---

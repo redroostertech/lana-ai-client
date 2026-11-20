@@ -664,7 +664,7 @@
 
   // ISO conversion: start clamps to 00:00:00.000, end clamps to 23:59:59.999
   // so the window includes the full end day. Anchored to UTC ('Z') to match
-  // the UTC-day period semantics used by reporting.js and the insights pages.
+  // the UTC-day period semantics used by report.js and the insights pages.
   function playgroundISO(value, endOfDay) {
     if (!value) return '';
     var hasTime = String(value).indexOf('T') !== -1;

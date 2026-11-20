@@ -11,7 +11,7 @@ const fs = require('fs');
 const path = require('path');
 
 const win = {};
-new Function('window', fs.readFileSync(path.join(__dirname, '../../src/js/admin/reports-list.js'), 'utf8'))(win);
+new Function('window', fs.readFileSync(path.join(__dirname, '../../src/js/admin/reports-list.model.js'), 'utf8'))(win);
 const { buildReportEntries } = win.ReportsList;
 
 const modules = [
@@ -41,27 +41,29 @@ test('a report with no declared purpose shows none rather than a guess', () => {
   expect(entry.audience).toBe('');
 });
 
-test('the list page names no report key', () => {
-  const page = fs.readFileSync(path.join(__dirname, '../../src/js/admin/reports-list.js'), 'utf8')
-    + fs.readFileSync(path.join(__dirname, '../../src/js/admin/reporting.js'), 'utf8');
+test('the Reports pages name no report key', () => {
+  const page = ['reports-list.js', 'reports-list.model.js', 'report.js']
+    .map(file => fs.readFileSync(path.join(__dirname, '../../src/js/admin', file), 'utf8')).join('\n');
   modules.forEach(m => expect(page).not.toContain("'" + m.moduleKey + "'"));
 });
 
-describe('the Reports page opens on the list', () => {
-  const html = fs.readFileSync(path.join(__dirname, '../../src/admin/reporting.html'), 'utf8');
-  const js = fs.readFileSync(path.join(__dirname, '../../src/js/admin/reporting.js'), 'utf8');
+describe('Reports opens on the list page; one report is its own page', () => {
+  const list = fs.readFileSync(path.join(__dirname, '../../src/admin/reports-list.html'), 'utf8');
+  const detail = fs.readFileSync(path.join(__dirname, '../../src/admin/report.html'), 'utf8');
+  const model = fs.readFileSync(path.join(__dirname, '../../src/js/admin/reports-list.model.js'), 'utf8');
 
-  test('the list comes before the controls, which start hidden', () => {
-    expect(html.indexOf('id="reportsListSection"')).toBeGreaterThan(-1);
-    expect(html.indexOf('id="reportsListSection"')).toBeLessThan(html.indexOf('id="reportingLayout"'));
-    expect(html).toMatch(/id="reportingLayout" class="reporting-layout" hidden/);
-    expect(html).toContain('columns="name,purpose,audience,last_run_at"');
-    expect(html).not.toContain('reportModuleSelect');
+  test('the list page has the list; the report page has the controls, shown', () => {
+    expect(list).toContain('id="reportsListSection"');
+    expect(list).toContain('columns="name,purpose,audience,last_run_at"');
+    expect(detail).not.toContain('id="reportsListSection"');
+    expect(detail).toMatch(/id="reportingLayout" class="reporting-layout">/);
+    expect(list + detail).not.toContain('reportModuleSelect');
   });
 
   test('no report is picked until someone picks one (or a link names it)', () => {
+    const js = fs.readFileSync(path.join(__dirname, '../../src/js/admin/report.js'), 'utf8');
     expect(js).not.toMatch(/Auto-select first available module/);
-    expect(js).toMatch(/get\('report'\)/);
+    expect(model).toMatch(/params\.get\('report'\)/);
   });
 });
 
@@ -78,7 +80,7 @@ test('a seeded template that references a module is listed once, as that module;
 // The panel text (what, what you see, how it is built, data used, goal, how to
 // use, good to know) is server data, escaped here.
 describe('report summary and side panel', () => {
-  const { previewText, purposeCell, aboutHtml, runControlsHtml, customPeriodProblem, RUN_PRESETS, compareByFor } = win.ReportsList;
+  const { previewText, purposeCell, aboutHtml, runFooterHtml, customPeriodProblem, RUN_PRESETS, compareByFor } = win.ReportsList;
   const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   const long = 'See how cases are spread across your team and how many get done.';
@@ -156,28 +158,19 @@ describe('report summary and side panel', () => {
     expect(aboutHtml(null, esc, icon)).toContain('reporting-list__muted');
   });
 
-  test('the run controls offer the quick periods in one Lex select and a custom range, no inline handlers', () => {
+  test('the drawer footer holds the period dropdown and Run, with the custom dates above them; no card', () => {
     expect(RUN_PRESETS.map(p => p.label)).toEqual(['Today', 'Today and yesterday', 'Yesterday', 'This week', 'Last week', 'Last month', 'Custom']);
-    expect(RUN_PRESETS.map(p => p.key)).toContain('todayAndYesterday');
-    const html = runControlsHtml('thisWeek', esc, icon);
+    const html = runFooterHtml('thisWeek', esc);
     const select = html.match(/<lex-select data-run-period label="Period" name="runPeriod" value="thisWeek" options="([^"]*)"><\/lex-select>/);
     expect(select).not.toBeNull();
-    const options = JSON.parse(select[1].replace(/&quot;/g, '"'));
-    expect(options).toEqual(RUN_PRESETS.map(p => ({ value: p.key, label: p.label })));
+    expect(JSON.parse(select[1].replace(/&quot;/g, '"'))).toEqual(RUN_PRESETS.map(p => ({ value: p.key, label: p.label })));
+    expect(html).toMatch(/<div class="report-run__row">\s*<lex-select data-run-period[\s\S]*<lex-btn data-run-report variant="primary">Run report<\/lex-btn><\/div>$/);
+    expect(html.indexOf('data-run-custom')).toBeLessThan(html.indexOf('report-run__row'));
     expect(html).toMatch(/<div class="report-run__custom" data-run-custom hidden>/);
     expect(html).toContain('<lex-input data-run-start type="date" label="Start date"');
     expect(html).toContain('<lex-input data-run-end type="date" label="End date"');
-    expect(html).toMatch(/<lex-btn data-run-report variant="primary">Run report<\/lex-btn>/);
-    expect(runControlsHtml('custom', esc, icon)).toMatch(/<div class="report-run__custom" data-run-custom>/);
-    expect(html).not.toMatch(/style=|\son[a-z]+=/i);
-  });
-
-  test('a report that ignores the period gets just a Run button, no period choices', () => {
-    const html = runControlsHtml('thisWeek', esc, icon, false);
-    expect(html).not.toContain('<lex-select');
-    expect(html).not.toContain('data-run-custom');
-    expect(html).toMatch(/<lex-btn data-run-report variant="primary">Run<\/lex-btn>/);
-    expect(runControlsHtml('thisWeek', esc, icon, true)).toContain('<lex-select data-run-period');
+    expect(runFooterHtml('custom', esc)).toMatch(/<div class="report-run__custom" data-run-custom>/);
+    expect(html).not.toMatch(/report-about__card|Run this report|style=|\son[a-z]+=/i);
   });
 
   test('one or two days compare by day; a year compares by month; otherwise the choice stays', () => {
@@ -191,11 +184,6 @@ describe('report summary and side panel', () => {
     expect(compareByFor(30, 'last30days', 'bogus')).toEqual({ options: all, value: 'monthly' });
   });
 
-  test('list entries carry whether the period changes the report; saved reports assume it does', () => {
-    const entries = buildReportEntries([{ moduleKey: 'a', name: 'A', usesPeriod: false }, { moduleKey: 'b', name: 'B' }], [{ report_id: 'r', name: 'R' }]);
-    expect(entries.map(e => e.usesPeriod)).toEqual([false, true, true]);
-  });
-
   test('a custom range needs both days, start first', () => {
     expect(customPeriodProblem('', '2026-11-02')).toBe('Pick a start date and an end date.');
     expect(customPeriodProblem('2026-11-03', '2026-11-02')).toBe('The start date must be on or before the end date.');
@@ -203,52 +191,67 @@ describe('report summary and side panel', () => {
   });
 });
 
-describe('the Reports page wiring', () => {
-  const html = fs.readFileSync(path.join(__dirname, '../../src/admin/reporting.html'), 'utf8');
-  const js = fs.readFileSync(path.join(__dirname, '../../src/js/admin/reporting.js'), 'utf8');
-  const css = fs.readFileSync(path.join(__dirname, '../../src/css/admin/reporting.css'), 'utf8');
+describe('the Reports pages wiring', () => {
+  const read = rel => fs.readFileSync(path.join(__dirname, '../../src', rel), 'utf8');
+  const listHtml = read('admin/reports-list.html');
+  const listJs = read('js/admin/reports-list.js');
+  const listCss = read('css/admin/reports-list.css');
+  const html = read('admin/report.html');
+  const js = read('js/admin/report.js');
+  const css = read('css/admin/report.css');
 
   test('New report is hidden for now, but its feature code stays', () => {
-    expect(html).toMatch(/<lex-btn id="newReportBtn"[^>]*\shidden[\s>]/);
-    expect(css).toMatch(/#newReportBtn\[hidden\]\s*\{\s*display:\s*none;/);
-    expect(js).toContain("newReportBtn.addEventListener('click', openNewReport)");
+    expect(listHtml).toMatch(/<lex-btn id="newReportBtn"[^>]*\shidden[\s>]/);
+    expect(listCss).toMatch(/#newReportBtn\[hidden\]\s*\{\s*display:\s*none;/);
+    expect(listJs).toContain("newReportBtn.addEventListener('click', openNewReport)");
   });
 
   test('the summary button opens a Lex drawer filled from the report detail endpoint', () => {
-    expect(html).toMatch(/<lex-drawer id="reportAboutDrawer"[^>]*side="right"/);
-    expect(js).toContain('ReportsList.purposeCell');
-    expect(js).toMatch(/closest\('\[data-report-about\]'\)/);
-    expect(js).toMatch(/api\.get\('\/api\/v1\/modules\/' \+ encodeURIComponent\(/);
-    expect(js).toContain('ReportsList.aboutHtml');
+    expect(listHtml).toMatch(/<lex-drawer id="reportAboutDrawer"[^>]*side="right"/);
+    expect(listJs).toContain('ReportsList.purposeCell');
+    expect(listJs).toMatch(/closest\('\[data-report-about\]'\)/);
+    expect(listJs).toMatch(/api\.get\('\/api\/v1\/modules\/' \+ encodeURIComponent\(/);
+    expect(listJs).toContain('ReportsList.aboutHtml');
   });
 
-  test('the drawer has its own stylesheet, on the page and in the shell route', () => {
-    const drawerCss = fs.readFileSync(path.join(__dirname, '../../src/css/admin/report-about.css'), 'utf8');
-    expect(html).toContain('<link rel="stylesheet" href="../css/admin/report-about.css">');
-    expect(fs.readFileSync(path.join(__dirname, '../../src/js/lex/lex-router.pages.js'), 'utf8')).toContain("'css/admin/report-about.css'");
+  test('the drawer has its own stylesheet, on the list page and in its shell route', () => {
+    const drawerCss = read('css/admin/report-about.css');
+    expect(listHtml).toContain('<link rel="stylesheet" href="../css/admin/report-about.css">');
+    const pages = read('js/lex/lex-router.pages.js');
+    const listRoute = pages.slice(pages.indexOf("'admin/reports-list.html': {"), pages.indexOf("'admin/report.html': {"));
+    expect(listRoute).toContain("'css/admin/report-about.css'");
     expect(drawerCss).toMatch(/\.report-about__card\s*\{[^}]*var\(--lex-bg-card\)/);
     expect(drawerCss).toMatch(/::marker\s*\{[^}]*var\(--lex-/);
     expect(drawerCss).not.toMatch(/#[0-9a-f]{3,6}\b/i);
   });
 
-  test('a report that ignores the period hides the page period controls', () => {
-    expect(html.match(/data-period-control/g)).toHaveLength(2);
-    expect(css).toMatch(/\[data-period-control\]\[hidden\]\s*\{\s*display:\s*none;/);
-    const open = js.slice(js.indexOf('function openReport(entry, opts)'), js.indexOf('function showReportsList'));
-    expect(open).toMatch(/querySelectorAll\('\[data-period-control\]'\)/);
-    expect(open).toContain('entry.usesPeriod === false');
-    expect(js).toMatch(/ReportsList\.runControlsHtml\(drawerPreset, escapeHtml, drawerIcon, entry\.usesPeriod !== false\)/);
+  test('the run controls live in the drawer footer slot, not in a body card', () => {
+    expect(listHtml).toMatch(/<lex-drawer id="reportAboutDrawer"[^>]*>\s*<div id="reportRunFooter" class="report-run" data-slot="footer"><\/div>\s*<\/lex-drawer>/);
+    expect(listJs).toContain('ReportsList.runFooterHtml(drawerPreset, escapeHtml)');
+    expect(listJs + js).not.toContain('runControlsHtml');
+  });
+
+  // usesPeriod stays backend data; the client gates nothing on it, and every
+  // report keeps the full date form (Quick Select Period, dates, Compare By).
+  test('no client code gates on usesPeriod, and the date form is never hidden', () => {
+    const model = read('js/admin/reports-list.model.js');
+    expect(js + listJs + model + css + listCss).not.toMatch(/usesPeriod|data-period-control/);
+    expect(html).not.toMatch(/data-period-control/);
+    expect(html).toMatch(/<div class="reporting-presets">/);
+    expect(html).toMatch(/<div class="reporting-period-fields">/);
     expect(js).toContain('ReportsList.compareByFor(');
   });
 
-  test('Run in the drawer reuses the page period and run code, then opens the report as an in-page view', () => {
-    const run = js.slice(js.indexOf('async function runFromDrawer'), js.indexOf('async function runFromDrawer') + 1600);
+  test('Run in the drawer opens the report page with the period; the report page runs it with its own period and run code', () => {
+    const run = listJs.slice(listJs.indexOf('function runFromDrawer'), listJs.indexOf('\n  }\n', listJs.indexOf('function runFromDrawer')));
     expect(run).toContain('ReportsList.customPeriodProblem(');
     expect(run).toContain('drawer.open = false');
-    expect(run).toContain('openReport(entry)');
-    expect(run).toContain('await selectPeriodPreset(');
-    expect(run).toContain('applyPeriodDays(');
-    expect(run).toContain('executeModule()');
-    expect(run).not.toMatch(/new Date\(|setDate\(|getDay\(/);
+    expect(run).toContain('Lex.Nav.go(ReportsList.reportHref(entry, period))');
+    const load = js.slice(js.indexOf('async function loadReport'), js.indexOf('\n  }\n', js.indexOf('async function loadReport')));
+    expect(load).toContain('ReportsList.reportRequest(');
+    expect(load).toContain('await selectPeriodPreset(');
+    expect(load).toContain('applyPeriodDays(');
+    expect(load).toContain('executeModule()');
+    expect(run + load).not.toMatch(/new Date\(|setDate\(|getDay\(/);
   });
 });

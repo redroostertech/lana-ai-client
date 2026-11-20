@@ -82,7 +82,7 @@ export class YourChartRenderer {
 
 ### Step 2: Add the ES6 Import Bridge
 
-In `src/admin/reporting.html`, add your import to the module script block:
+In `src/admin/report.html`, add your import to the module script block:
 
 ```html
 <script type="module">
@@ -95,7 +95,7 @@ In `src/admin/reporting.html`, add your import to the module script block:
 
 ### Step 3: Handle in Controller
 
-In `src/js/admin/reporting.js`, add a case for your visualization type in the rendering logic:
+In `src/js/admin/report.js`, add a case for your visualization type in the rendering logic:
 
 ```javascript
 // In renderVisualizations() or equivalent
@@ -118,7 +118,7 @@ if (viz.type === 'your_chart_type') {
 
 ### Step 1: Add HTML Template
 
-In `reporting.html`, inside `<template id="page-content">`, add your modal:
+In `report.html`, inside `<template id="page-content">`, add your modal:
 
 ```html
 <div id="yourModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 overflow-y-auto h-full w-full z-50">
@@ -145,7 +145,7 @@ In `reporting.html`, inside `<template id="page-content">`, add your modal:
 
 ### Step 2: Add Controller Methods
 
-In `reporting.js`, add open/close functions and expose via `window._reporting`:
+In `report.js`, add open/close functions and expose via `window._reporting`:
 
 ```javascript
 function showYourModal(data) {
@@ -169,7 +169,7 @@ window._reporting.closeYourModal = closeYourModal;
 
 ### Step 1: Add Button to HTML
 
-In `reporting.html`, inside `#periodPresets`:
+In `report.html`, inside `#periodPresets`:
 
 ```html
 <lex-btn data-preset="last90days" variant="secondary" size="sm">Last 90 Days</lex-btn>
@@ -177,7 +177,7 @@ In `reporting.html`, inside `#periodPresets`:
 
 ### Step 2: Add Case to Controller
 
-In `reporting.js`, in the `selectPeriodPreset()` function:
+In `report.js`, in the `selectPeriodPreset()` function:
 
 ```javascript
 case 'last90days':

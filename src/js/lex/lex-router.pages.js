@@ -479,8 +479,22 @@
       ]
     },
 
-    'admin/reporting.html': {
+    'admin/reports-list.html': {
       title: 'Reports',
+      activeNav: 'insights-reports',
+      scripts: [
+        'js/admin/report-builder.js',
+        'js/admin/reports-list.model.js',
+        'js/admin/reports-list.js'
+      ],
+      stylesheets: [
+        'css/admin/reports-list.css',
+        'css/admin/report-about.css'
+      ]
+    },
+
+    'admin/report.html': {
+      title: 'Report',
       activeNav: 'insights-reports',
       scripts: [
         'js/shared/current-pipeline-presentation.js',
@@ -497,13 +511,12 @@
         'js/admin/report-metric-card.js',
         'js/shared/dashboard-tiles.js',
         'js/admin/report-builder.js',
-        'js/admin/reports-list.js',
-        'js/admin/reporting.js'
+        'js/admin/reports-list.model.js',
+        'js/admin/report.js'
       ],
       stylesheets: [
         'insights/raw-data-viewer.css',
-        'css/admin/reporting.css',
-        'css/admin/report-about.css'
+        'css/admin/report.css'
       ]
     },
 

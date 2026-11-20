@@ -36,7 +36,7 @@ describe('pages label periods with the shared UTC-day helper', () => {
   test('reporting labels current and prior periods from the result days', () => {
     // Rendered in report-metric-card.render.test.js (headerLabels).
     expect(read('report-metric-card.js')).toMatch(/LanaTime\.formatUtcDayRange\(period\.startDate \|\| period\.start, period\.endDate \|\| period\.end\)/);
-    expect(read('reporting.js')).toContain('window.ReportMetricCard.headerLabels(data)');
+    expect(read('report.js')).toContain('window.ReportMetricCard.headerLabels(data)');
   });
 
   test('dashboard period captions use the shared helper', () => {

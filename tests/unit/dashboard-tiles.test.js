@@ -42,23 +42,23 @@ describe('pages use the shared tile model', () => {
   const read = (rel) => fs.readFileSync(path.join(__dirname, '../../src', rel), 'utf8');
 
   test('report result tiles offer Add to dashboard from the backend catalog key', () => {
-    const js = read('js/admin/reporting.js');
+    const js = read('js/admin/report.js');
     // The tile footer itself is render-tested in report-metric-card.render.test.js.
     expect(js).toMatch(/footerEnd: metric\.catalogKey/);
     expect(js).toContain('DashboardTiles.addTileToDashboard(api, dashboardId, metricKey)');
-    expect(read('admin/reporting.html')).toContain('js/shared/dashboard-tiles.js');
+    expect(read('admin/report.html')).toContain('js/shared/dashboard-tiles.js');
   });
 
   test('a dashboard reads its own tiles by key and opens a report only from report_link', () => {
     const js = read('js/admin/dashboard-detail.js');
     expect(js).toContain('DashboardTiles.cardRequestKeys(layout)');
-    expect(js).not.toContain("|| 'admin/reporting.html'");
+    expect(js).not.toContain("|| 'admin/report.html'");
     expect(read('admin/dashboard-detail.html')).toContain('js/shared/dashboard-tiles.js');
     expect(read('js/api.js')).toContain("queryParts.push('metric_keys=' + encodeURIComponent(params.metric_keys))");
     expect(read('js/api.js')).toContain("'/api/v1/business-intelligence/dashboards/' + encodeURIComponent(id) + '/tiles', { metric_key: metricKey }");
   });
 
   test('the Add to dashboard picker lists only dashboards the user can write', () => {
-    expect(read('js/admin/reporting.js')).toMatch(/api\.listBIDashboards\(\{ limit: 100, offset: 0, sort: 'name', order: 'asc', writable: 'true' \}\)/);
+    expect(read('js/admin/report.js')).toMatch(/api\.listBIDashboards\(\{ limit: 100, offset: 0, sort: 'name', order: 'asc', writable: 'true' \}\)/);
   });
 });
