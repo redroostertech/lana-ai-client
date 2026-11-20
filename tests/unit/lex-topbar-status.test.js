@@ -72,3 +72,30 @@ describe('lex-topbar status icon', () => {
     expect(status()).toBeNull();
   });
 });
+
+// Refresh is an icon button like the bell and the gear: no word on it, the name is for hover and
+// screen readers, and clicking it still asks the page to refresh.
+describe('lex-topbar refresh', () => {
+  test('is an icon button, labelled Refresh, beside the other header icons', () => {
+    const button = document.querySelector('lex-topbar [data-action="refresh"]');
+    expect(button.tagName).toBe('BUTTON');
+    expect(button.classList.contains('lex-topbar-action')).toBe(true);
+    expect(button.getAttribute('aria-label')).toBe('Refresh');
+    expect(button.getAttribute('title')).toBe('Refresh');
+    expect(button.textContent.trim()).toBe('');
+    expect(button.querySelector('svg')).not.toBeNull();
+  });
+
+  test('a click still asks the page to refresh', () => {
+    const bar = document.querySelector('lex-topbar');
+    let clicks = 0;
+    bar.addEventListener('topbar-refresh-click', () => { clicks += 1; });
+    document.querySelector('lex-topbar [data-action="refresh"]').click();
+    expect(clicks).toBe(1);
+  });
+
+  test('the old labelled button and its narrow-header rules are gone', () => {
+    const src = fs.readFileSync(path.join(SRC, 'js/lex/components/layout/lex-topbar.js'), 'utf8');
+    expect(src).not.toMatch(/lex-topbar-refresh|>Refresh<\/lex-btn>/);
+  });
+});

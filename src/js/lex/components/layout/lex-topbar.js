@@ -409,8 +409,7 @@
 
       /* ── Compact mode ───────────────────────────────────── */
       /* Sized from the topbar itself, not the window, so open side panels
-         count. Back keeps only its arrow; Refresh keeps only its icon (the
-         label stays readable by screen readers). */
+         count. Back keeps only its arrow. */
 
       lex-topbar {
         container: lex-topbar / inline-size;
@@ -423,19 +422,6 @@
 
         .lex-topbar-back-label {
           display: none;
-        }
-
-        .lex-topbar-refresh .lex-btn-inner {
-          padding: 0.375rem !important;
-        }
-
-        .lex-topbar-refresh slot-content {
-          position: absolute;
-          width: 1px;
-          height: 1px;
-          overflow: hidden;
-          clip: rect(0 0 0 0);
-          white-space: nowrap;
         }
       }
     `;
@@ -627,8 +613,10 @@
 
       html += this._statusHtml();
 
-      // Refresh button (always present)
-      html += `<lex-btn data-action="refresh" class="lex-topbar-refresh" variant="primary" leading-icon="refresh-cw" size="sm" title="Refresh">Refresh</lex-btn>`;
+      // Refresh: an icon button like the bell and the gear (always present)
+      html += `<button type="button" class="lex-topbar-action" data-action="refresh" title="Refresh" aria-label="Refresh">
+          ${icon('refresh-cw', 'normal')}
+        </button>`;
 
       if (this.showNotifications) {
         const count = this.notificationCount;
