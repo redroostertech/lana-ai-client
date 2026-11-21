@@ -726,6 +726,7 @@
     var CONCURRENT_UPLOADS = 3;
     var folderId = folderState.currentFolderId || null;
     var successCount = 0;
+    var uploaded = [];
 
     Lex.Toast.info('Uploading ' + fileArray.length + ' document' + (fileArray.length === 1 ? '' : 's') + '...');
 
@@ -734,7 +735,8 @@
 
       for (var i = 0; i < fileArray.length; i += CONCURRENT_UPLOADS) {
         var batch = fileArray.slice(i, i + CONCURRENT_UPLOADS);
-        var batchPromises = batch.map(function (file) {
+        var batchPromises = batch.map(function (file, idx) {
+          var index = i + idx;
           var uploadOptions = {
             folder_id: folderId || undefined
           };
@@ -743,6 +745,7 @@
           }
           return api.uploadDocument(file, matterId, uploadOptions).then(function (result) {
             successCount++;
+            uploaded[index] = result;
             return result;
           }).catch(function (error) {
             console.error('[Folder] Failed to upload file:', file.name, error);
@@ -771,6 +774,13 @@
           }
         }
 
+        // The new file opens beside its live processing steps; a duplicate of
+        // a stored file made nothing new to open.
+        var opened = uploaded.filter(function (result) { return result && result.file_id && !result.skipped; })[0];
+        if (opened) {
+          _navToFileViewer(opened.file_id);
+          return;
+        }
         await loadFolderContents({ silent: true });
       }
     } catch (error) {

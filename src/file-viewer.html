@@ -13,6 +13,8 @@
   <link rel="stylesheet" href="css/tailwind-output.css">
   <link rel="stylesheet" href="css/companion-bridge-consent.css">
   <link rel="stylesheet" href="css/file-viewer.css">
+  <link rel="stylesheet" href="css/lex-run-status.css">
+  <link rel="stylesheet" href="css/file-viewer-ingestion.css">
   <link rel="stylesheet" href="css/redline-review-panel.css">
   <link rel="stylesheet" href="css/docx-template-modal.css">
   <script src="js/tailwind-loader.js"></script>
@@ -176,6 +178,25 @@
         </div>
       </div>
       </div>
+
+      <!-- Right: live processing panel, while LANA is still working on this file
+           (js/file-viewer-ingestion.js) -->
+      <aside id="ingestionPanel" class="hidden file-viewer-ingestion" aria-label="File processing" aria-live="polite">
+        <div class="file-viewer-ingestion__head">
+          <div>
+            <p class="file-viewer-ingestion__eyebrow">LANA</p>
+            <h2 id="ingestionHeadline" class="file-viewer-ingestion__title">LANA is working on your file</h2>
+          </div>
+          <lex-btn id="ingestionClose" variant="ghost" size="sm" leading-icon="x" icon aria-label="Close" title="Close"></lex-btn>
+        </div>
+        <lex-progress-bar id="ingestionProgressBar" value="0" size="sm"></lex-progress-bar>
+        <lex-run-trace id="ingestionTrace" live empty="Waiting to start"></lex-run-trace>
+        <p id="ingestionNote" class="file-viewer-ingestion__note">You can close this. LANA keeps working, and this file shows its progress here until it is ready.</p>
+        <div class="file-viewer-ingestion__actions">
+          <lex-ask-lana-btn id="ingestionAskLana" class="hidden" panel="fileViewerLana" size="sm" label="Ask LANA about this file"></lex-ask-lana-btn>
+          <lex-btn id="ingestionRetry" class="hidden" variant="primary" size="sm">Try again</lex-btn>
+        </div>
+      </aside>
 
       <!-- Right: DOCX review rail -->
       <aside id="reviewRail" class="hidden file-viewer-review-rail" aria-label="Document review">
@@ -592,6 +613,11 @@
   <script src="js/file-viewer-citation-focus.js"></script>
 
   <!-- Page controller (MUST be last before auth-guard) -->
+  <script src="js/shared/run-status.js"></script>
+  <script src="js/lex/components/foundation/lex-progress-bar.js"></script>
+  <script src="js/lex/components/foundation/lex-run-trace.js"></script>
+  <script src="js/shared/ingestion-progress.model.js"></script>
+  <script src="js/file-viewer-ingestion.js"></script>
   <script src="js/file-viewer-page.js"></script>
 
   <!-- PAC bridge consent handler (Lex modal for token requests) -->

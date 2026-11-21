@@ -4597,6 +4597,7 @@
     // identity (for example, after selecting a released version). If the new
     // metadata request fails, error actions must not download/delete stale data.
     state.currentFile = null;
+    if (window.FileViewerIngestion) window.FileViewerIngestion.stop();
     showLoading();
 
     try {
@@ -4707,6 +4708,15 @@
       updateDocStudioButton(response);
       var fileInfoBtn = document.getElementById('viewerFileInfoBtn');
       if (fileInfoBtn) fileInfoBtn.classList.remove('hidden');
+
+      // A file LANA is still working on shows its live processing steps
+      // beside it; a ready file opens plain. Started before the content, so a
+      // preview that fails (likely when processing failed) still leaves the
+      // person Try again; and only for the file still on screen, so a newer
+      // load (another file or version) is never handed this one's panel.
+      if (window.FileViewerIngestion && state.currentFile === response) {
+        window.FileViewerIngestion.start(response, { matterId: conversationMatterId || null });
+      }
 
       // Load content + metadata
       await loadFormatCapabilities(response);

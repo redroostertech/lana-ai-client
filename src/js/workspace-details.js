@@ -2835,6 +2835,7 @@
     if (uploadProgress) uploadProgress.classList.remove('hidden');
 
     var successCount = 0;
+    var uploaded = [];
 
     for (var i = 0; i < fileArray.length; i += CONCURRENT_UPLOADS) {
       var batch = fileArray.slice(i, i + CONCURRENT_UPLOADS);
@@ -2843,6 +2844,7 @@
         if (uploadText) uploadText.textContent = 'Uploading ' + (fileIndex + 1) + '/' + fileArray.length + ': ' + file.name;
         return api.uploadDocument(file, matterId).then(function (result) {
           successCount++;
+          uploaded[fileIndex] = result;
           return result;
         }).catch(function (error) {
           Lex.Toast.error('Failed to upload ' + file.name + ': ' + error.message);
@@ -2862,6 +2864,14 @@
 
     if (successCount > 0) {
       Lex.Toast.success('Uploaded ' + successCount + ' document(s) - processing started');
+      // The new file opens beside its live processing steps (the rest stay in
+      // the list, each showing its steps when opened). A duplicate of a stored
+      // file made nothing new, so there is nothing to open.
+      var opened = uploaded.filter(function (result) { return result && result.file_id && !result.skipped; })[0];
+      if (opened) {
+        _navToFileViewer(opened.file_id);
+        return;
+      }
       await refreshDrawerDocuments(matterId);
     }
   }

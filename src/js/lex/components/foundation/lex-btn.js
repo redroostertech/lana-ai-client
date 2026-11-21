@@ -357,7 +357,12 @@
         const slotText = slotContent ? slotContent.textContent.trim() : '';
         const isIconOnly = this.icon || slotText === '';
 
-        if (isIconOnly) {
+        // A label the page gave the button ("Close") names it; the icon name
+        // is only the fallback.
+        const ownLabel = this.getAttribute('aria-label');
+        if (isIconOnly && ownLabel) {
+          btn.setAttribute('aria-label', ownLabel);
+        } else if (isIconOnly) {
           // Prefer leadingIcon name, then trailingIcon name.
           const iconName = this.leadingIcon || this.trailingIcon;
           if (iconName) {

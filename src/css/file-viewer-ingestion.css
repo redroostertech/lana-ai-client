@@ -1,0 +1,96 @@
+/* File viewer: the live processing panel (js/file-viewer-ingestion.js).
+   Sits beside the file like the review rail. The step rows are lex-run-trace
+   (css/lex-run-status.css). Theme tokens only, so dark mode follows. */
+
+.file-viewer-ingestion {
+  /* Shrinks before the file does; next to the review rail on a mid-size
+     window both rails still leave the file most of the width. */
+  width: 340px;
+  min-width: 260px;
+  max-width: 30vw;
+  flex: 0 1 340px;
+  padding: 20px 18px;
+  background: var(--lex-bg-primary);
+  border-left: 1px solid var(--lex-border-primary);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  animation: file-viewer-ingestion-in 240ms ease-out;
+}
+
+.file-viewer-ingestion.hidden {
+  display: none;
+}
+
+.file-viewer-ingestion__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.file-viewer-ingestion__eyebrow {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lex-text-accent);
+}
+
+.file-viewer-ingestion__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--lex-text-primary);
+}
+
+.file-viewer-ingestion__note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--lex-text-tertiary);
+}
+
+.file-viewer-ingestion__note.hidden,
+.file-viewer-ingestion__actions .hidden {
+  display: none;
+}
+
+.file-viewer-ingestion__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.file-viewer-ingestion--ready .file-viewer-ingestion__title {
+  color: var(--lex-status-success-text);
+}
+
+.file-viewer-ingestion--failed .file-viewer-ingestion__title {
+  color: var(--lex-status-danger-text);
+}
+
+@keyframes file-viewer-ingestion-in {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .file-viewer-ingestion {
+    animation: none;
+  }
+}
+
+/* Narrow windows: the panel goes under the file, as the review rail does. */
+@media (max-width: 900px) {
+  .file-viewer-ingestion {
+    width: auto;
+    max-width: none;
+    flex: 0 0 auto;
+    border-left: 0;
+    border-top: 1px solid var(--lex-border-primary);
+  }
+}
