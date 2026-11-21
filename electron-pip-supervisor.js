@@ -3,7 +3,7 @@
 /**
  * Pip on this computer (docs/plans/first-launch-local-ai-plan.md, phase C). Main process.
  *
- * Pip is LANA's AI server (`lqe` from LANA.cpp v3.0.0). Once the first-launch downloads are in
+ * Pip is LANA's AI server (`lqe` from LANA.cpp v3.1.0). Once the first-launch downloads are in
  * place, this module runs up to two Pip servers from the plan:
  *
  *   chat       the chosen chat model, its image reading file when the plan has one, the

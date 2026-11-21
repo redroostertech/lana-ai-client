@@ -34,9 +34,9 @@ const CATALOG = Object.freeze([
     modelVersion: 'f16',
     // The Pip build that serves it: the one this app ships (pip/pip-pin.json). It
     // must be in LANA-AI deploy/railway/embed/embed-pin.json pip.verified_builds
-    // (396ca2c1d643 passed the embedding match check on 2026-11-12, generation 1),
+    // (8ee218c47371, Pip 3.1.0, passed the embedding match check on 2026-11-21, generation 1),
     // so its vectors count as the firm's identity and nothing is re-embedded.
-    runtime: Object.freeze({ name: 'pip', version: '3.0.0', build: '396ca2c1d643' }),
+    runtime: Object.freeze({ name: 'pip', version: '3.1.0', build: '8ee218c47371' }),
     filename: 'nomic-embed-text-v1.5.f16.gguf',
     url: `${R2_LLM}/nomic-embed-text-v1.5.f16.gguf`,
     sizeBytes: 274290560,
