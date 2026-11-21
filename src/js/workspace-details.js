@@ -2867,9 +2867,12 @@
       // The new file opens beside its live processing steps (the rest stay in
       // the list, each showing its steps when opened). A duplicate of a stored
       // file made nothing new, so there is nothing to open.
-      var opened = uploaded.filter(function (result) { return result && result.file_id && !result.skipped; })[0];
-      if (opened) {
-        _navToFileViewer(opened.file_id);
+      var created = uploaded.filter(function (result) { return result && result.file_id && !result.skipped; });
+      if (created.length) {
+        // Uploaded together: the viewer shows a strip to move between them.
+        _navToFileViewer(created[0].file_id, created.map(function (result) {
+          return { id: result.file_id, name: result.filename || '' };
+        }));
         return;
       }
       await refreshDrawerDocuments(matterId);
@@ -9579,13 +9582,15 @@
    * Navigate to the dedicated file viewer page with referrer context.
    * @param {string} fileId
    */
-  function _navToFileViewer(fileId) {
+  function _navToFileViewer(fileId, uploads) {
     var params = Lex.Nav.getParams();
     var matterId = params.get('id') || '';
     var referrer = 'workspace-details.html?id=' + encodeURIComponent(matterId);
+    var context = { referrer: referrer };
+    if (uploads && uploads.length > 1) context.uploads = uploads;
     Lex.Nav.go('file-viewer.html', {
       params: { id: fileId },
-      context: { referrer: referrer }
+      context: context
     });
   }
 

@@ -95,6 +95,11 @@
       id: 'search',
       label: 'Making it searchable',
       done: ['embeddings_complete', 'embeddings_deferred'],
+      running: function (live) {
+        var total = live && count(live.chunk_count);
+        var done = live && count(live.embedded_count);
+        return total ? Math.min(done || 0, total) + ' of ' + plural(total, 'section', 'sections') : '';
+      },
       detail: function (s) {
         if (s.embeddings_deferred) return 'Search finishes in the background';
         var n = s.embeddings_complete && count(s.embeddings_complete.embedding_count);
@@ -157,11 +162,39 @@
         current = true;
         item.status = failed ? 'failed' : 'running';
         if (failed) item.message = 'This step did not finish';
+        else if (row.running) item.message = row.running(progress && progress.live) || '';
       }
       return item;
     });
     if (finished) rows.push({ id: 'ready', label: 'Ready', status: 'completed', message: 'Ask LANA about this file' });
     return rows;
+  }
+
+  /**
+   * The page map: one tile per page once LANA knows how many pages there are
+   * (after splitting into sections). A page is `ready` when every section on
+   * it, and on the pages before it, is searchable; `read` before that.
+   * Null for a file without pages (a spreadsheet, plain text).
+   */
+  function pageMap(progress) {
+    var steps = stepsByStage(progress);
+    var chunked = steps.chunking_complete;
+    var pageCount = chunked && count(chunked.page_count);
+    if (!pageCount) return null;
+    var ready;
+    if (progress.status === 'completed' || steps.embeddings_complete) ready = pageCount;
+    else if (steps.embeddings_deferred) ready = 0;
+    else ready = Math.min(pageCount, count(progress.live && progress.live.pages_ready) || 0);
+    var pages = [];
+    for (var page = 1; page <= pageCount; page += 1) pages.push({ page: page, state: page <= ready ? 'ready' : 'read' });
+    return {
+      pageCount: pageCount,
+      ready: ready,
+      pages: pages,
+      caption: steps.embeddings_deferred && progress.status !== 'completed'
+        ? plural(pageCount, 'page', 'pages') + ' read; search finishes in the background'
+        : ready + ' of ' + plural(pageCount, 'page', 'pages') + ' searchable'
+    };
   }
 
   /** One line for the panel heading. */
@@ -200,6 +233,7 @@
     shouldShow: shouldShow,
     traceSteps: traceSteps,
     headline: headline,
+    pageMap: pageMap,
     parseEvents: parseEvents,
     isTerminal: isTerminal
   };

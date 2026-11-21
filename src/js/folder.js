@@ -776,9 +776,12 @@
 
         // The new file opens beside its live processing steps; a duplicate of
         // a stored file made nothing new to open.
-        var opened = uploaded.filter(function (result) { return result && result.file_id && !result.skipped; })[0];
-        if (opened) {
-          _navToFileViewer(opened.file_id);
+        var created = uploaded.filter(function (result) { return result && result.file_id && !result.skipped; });
+        if (created.length) {
+          // Uploaded together: the viewer shows a strip to move between them.
+          _navToFileViewer(created[0].file_id, created.map(function (result) {
+            return { id: result.file_id, name: result.filename || '' };
+          }));
           return;
         }
         await loadFolderContents({ silent: true });
@@ -1240,7 +1243,7 @@
    * can navigate back to this exact folder.
    * @param {string} fileId
    */
-  function _navToFileViewer(fileId) {
+  function _navToFileViewer(fileId, uploads) {
     var referrerParts = ['folder.html?matter_id=' + encodeURIComponent(folderState.currentMatterId || '')];
     if (folderState.currentMatterName) {
       referrerParts.push('&matter_name=' + encodeURIComponent(folderState.currentMatterName));
@@ -1248,9 +1251,11 @@
     if (folderState.currentFolderId) {
       referrerParts.push('&folder_id=' + encodeURIComponent(folderState.currentFolderId));
     }
+    var context = { referrer: referrerParts.join('') };
+    if (uploads && uploads.length > 1) context.uploads = uploads;
     Lex.Nav.go('file-viewer.html', {
       params: { id: fileId },
-      context: { referrer: referrerParts.join('') }
+      context: context
     });
   }
 

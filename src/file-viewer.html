@@ -189,8 +189,13 @@
           </div>
           <lex-btn id="ingestionClose" variant="ghost" size="sm" leading-icon="x" icon aria-label="Close" title="Close"></lex-btn>
         </div>
+        <div id="ingestionUploads" class="hidden file-viewer-ingestion__uploads" aria-label="Files uploaded together"></div>
         <lex-progress-bar id="ingestionProgressBar" value="0" size="sm"></lex-progress-bar>
         <lex-run-trace id="ingestionTrace" live empty="Waiting to start"></lex-run-trace>
+        <section id="ingestionPages" class="hidden file-viewer-ingestion__pages" aria-label="Pages">
+          <div id="ingestionPageGrid" class="file-viewer-ingestion__page-grid"></div>
+          <p id="ingestionPagesCaption" class="file-viewer-ingestion__pages-caption"></p>
+        </section>
         <p id="ingestionNote" class="file-viewer-ingestion__note">You can close this. LANA keeps working, and this file shows its progress here until it is ready.</p>
         <div class="file-viewer-ingestion__actions">
           <lex-ask-lana-btn id="ingestionAskLana" class="hidden" panel="fileViewerLana" size="sm" label="Ask LANA about this file"></lex-ask-lana-btn>
@@ -618,6 +623,7 @@
   <script src="js/lex/components/foundation/lex-run-trace.js"></script>
   <script src="js/shared/ingestion-progress.model.js"></script>
   <script src="js/file-viewer-ingestion.js"></script>
+  <script src="js/file-viewer-ingestion-page.js"></script>
   <script src="js/file-viewer-page.js"></script>
 
   <!-- PAC bridge consent handler (Lex modal for token requests) -->

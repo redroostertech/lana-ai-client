@@ -519,6 +519,8 @@ describe('call sites that render untrusted content', () => {
     'js/data_connectors.js': ['url', "'about:blank'"],
     'js/embed-host.js': ['session.embed_url'],
     'js/file-viewer-page.js': ["citedPage ? objectUrl + '#page=' + citedPage : objectUrl"],
+    // The live panel's page tiles reopen the viewer's own PDF-typed blob URL at a page.
+    'js/file-viewer-ingestion-page.js': ["'about:blank'", 'target'],
     'js/lex/chat/lex-chat.js': ["Nav.href(nav.path, Object.assign({}, nav.params, { chrome: 'embedded' }))", "'about:blank'"],
     'js/services/docx-template-modal.js': ['src']
   };

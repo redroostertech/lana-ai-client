@@ -94,6 +94,46 @@ describe('the rows', () => {
   });
 });
 
+describe('the live counter and the page map', () => {
+  const chunked = [
+    { stage: 'extracting_text', at: at(0) },
+    { stage: 'extraction_complete', at: at(2) },
+    { stage: 'details_found', at: at(3) },
+    { stage: 'safety_checked', at: at(4), disposition: 'clean' },
+    { stage: 'chunking_complete', at: at(5), chunk_count: 48, page_count: 12 }
+  ];
+
+  test('while sections are made searchable the row counts them, "31 of 48 sections"', () => {
+    const rows = Model.traceSteps(job('processing', chunked, { live: { embedded_count: 31, chunk_count: 48, pages_ready: 8 } }));
+    expect(rows.find((r) => r.id === 'search')).toEqual(expect.objectContaining({ status: 'running', message: '31 of 48 sections' }));
+  });
+
+  test('no counter yet: the running row has no detail (control: done rows keep theirs)', () => {
+    const rows = Model.traceSteps(job('processing', chunked));
+    expect(rows.find((r) => r.id === 'search').message).toBe('');
+    expect(rows.find((r) => r.id === 'sections').message).toBe('48 sections');
+  });
+
+  test('one tile per page; the pages ready fill in from the start', () => {
+    const map = Model.pageMap(job('processing', chunked, { live: { pages_ready: 3 } }));
+    expect(map.pageCount).toBe(12);
+    expect(map.pages.filter((p) => p.state === 'ready').map((p) => p.page)).toEqual([1, 2, 3]);
+    expect(map.caption).toBe('3 of 12 pages searchable');
+  });
+
+  test('finished, every page is ready; search made elsewhere says so; no pages known, no map', () => {
+    expect(Model.pageMap(job('completed', chunked)).ready).toBe(12);
+    expect(Model.pageMap(job('processing', [...chunked, { stage: 'embeddings_deferred', at: at(6) }])).caption)
+      .toBe('12 pages read; search finishes in the background');
+    expect(Model.pageMap(job('processing', [{ stage: 'extracting_text', at: at(0) }]))).toBeNull();
+    expect(Model.pageMap(job('processing', [{ stage: 'chunking_complete', at: at(1), chunk_count: 4 }]))).toBeNull();
+  });
+
+  test('a pages_ready past the page count is held to it', () => {
+    expect(Model.pageMap(job('processing', chunked, { live: { pages_ready: 99 } })).ready).toBe(12);
+  });
+});
+
 describe('reading the stream', () => {
   test('whole frames become events; a half frame waits for the rest; heartbeats are skipped', () => {
     const first = Model.parseEvents('data: {"type":"connected"}\n\n:heartbeat\n\ndata: {"type":"progr');
@@ -108,7 +148,7 @@ describe('wiring', () => {
   test('the viewer loads the panel, its rows and styles, before the page script', () => {
     const html = read('file-viewer.html');
     const order = ['js/shared/run-status.js', 'js/lex/components/foundation/lex-run-trace.js',
-      'js/shared/ingestion-progress.model.js', 'js/file-viewer-ingestion.js', 'js/file-viewer-page.js']
+      'js/shared/ingestion-progress.model.js', 'js/file-viewer-ingestion.js', 'js/file-viewer-ingestion-page.js', 'js/file-viewer-page.js']
       .map((src) => html.indexOf(`<script src="${src}"></script>`));
     expect(order.every((i) => i > -1)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
@@ -117,6 +157,15 @@ describe('wiring', () => {
     const panel = html.slice(html.indexOf('<aside id="ingestionPanel"'), html.indexOf('</aside>', html.indexOf('<aside id="ingestionPanel"')));
     expect(panel).toContain('<lex-run-trace id="ingestionTrace"');
     expect(panel).not.toMatch(/style=|onclick=/);
+  });
+
+  test('the viewer answers the panel: lights PDF pages, goes to a page, opens another upload, and reads the set from navigation', () => {
+    const src = read('js/file-viewer-page.js');
+    expect(src).toContain("document.addEventListener('lana-ingestion-pages', ingestionPage.onPages);");
+    expect(src).toContain("document.addEventListener('lana-viewer-go-to-page', ingestionPage.onGoToPage);");
+    expect(src).toContain("document.addEventListener('lana-viewer-open-upload', ingestionPage.onOpenUpload);");
+    expect(src).toContain('state.uploads = window.FileViewerIngestionPage.uploadSetFrom(ctx && ctx.uploads);');
+    expect(src).toMatch(/FileViewerIngestion\.start\(response, \{ matterId: conversationMatterId \|\| null, uploads: state\.uploads \}\)/);
   });
 
   test('every file the viewer opens goes through the panel: stopped first, started before the content loads, only for the file still on screen', () => {
@@ -135,6 +184,8 @@ describe('wiring', () => {
     const src = read(file);
     // The first file the person chose, not the first upload to finish.
     expect(src).toMatch(/uploaded\[fileIndex\] = result|uploaded\[index\] = result/);
-    expect(src).toMatch(/result\.file_id && !result\.skipped[\s\S]{0,120}_navToFileViewer\(opened\.file_id\)/);
+    expect(src).toMatch(/result\.file_id && !result\.skipped[\s\S]{0,160}_navToFileViewer\(created\[0\]\.file_id, created\.map/);
+    // The set travels with the navigation, so the viewer can show the strip.
+    expect(src).toMatch(/if \(uploads && uploads\.length > 1\) context\.uploads = uploads;/);
   });
 });

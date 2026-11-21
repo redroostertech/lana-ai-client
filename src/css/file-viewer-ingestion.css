@@ -73,6 +73,136 @@
   color: var(--lex-status-danger-text);
 }
 
+/* Files uploaded together: one chip each, with its own progress. */
+.file-viewer-ingestion__uploads {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.file-viewer-ingestion__uploads.hidden,
+.file-viewer-ingestion__pages.hidden {
+  display: none;
+}
+
+.file-viewer-ingestion__upload {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 120px;
+  padding: 8px 10px;
+  border: 1px solid var(--lex-border-primary);
+  border-radius: var(--lex-radius-md, 8px);
+  background: var(--lex-bg-secondary);
+  color: var(--lex-text-secondary);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.file-viewer-ingestion__upload:hover,
+.file-viewer-ingestion__upload:focus-visible {
+  border-color: var(--lex-border-accent);
+  color: var(--lex-text-primary);
+}
+
+.file-viewer-ingestion__upload--active {
+  border-color: var(--lex-border-accent);
+  background: var(--lex-bg-primary);
+  color: var(--lex-text-primary);
+  cursor: default;
+}
+
+.file-viewer-ingestion__upload-bar {
+  width: 100%;
+  height: 3px;
+  border: 0;
+  border-radius: 2px;
+  appearance: none;
+  background: var(--lex-bg-tertiary);
+  overflow: hidden;
+}
+
+.file-viewer-ingestion__upload-bar::-webkit-progress-bar {
+  background: var(--lex-bg-tertiary);
+}
+
+.file-viewer-ingestion__upload-bar::-webkit-progress-value {
+  background: var(--lex-bg-accent);
+}
+
+.file-viewer-ingestion__upload[data-status="completed"] .file-viewer-ingestion__upload-bar::-webkit-progress-value {
+  background: var(--lex-status-success);
+}
+
+.file-viewer-ingestion__upload[data-status="failed"] .file-viewer-ingestion__upload-bar::-webkit-progress-value {
+  background: var(--lex-status-danger);
+}
+
+.file-viewer-ingestion__upload-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* The page map: a tile per page that fills in as the page becomes searchable. */
+.file-viewer-ingestion__pages {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.file-viewer-ingestion__page-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18px, 1fr));
+  gap: 4px;
+}
+
+.file-viewer-ingestion__page {
+  aspect-ratio: 3 / 4;
+  min-height: 22px;
+  padding: 0;
+  border: 1px solid var(--lex-border-primary);
+  border-radius: 3px;
+  background: var(--lex-bg-tertiary);
+  cursor: pointer;
+  transition: background-color 400ms ease, border-color 400ms ease, transform 400ms ease;
+}
+
+.file-viewer-ingestion__page:hover,
+.file-viewer-ingestion__page:focus-visible {
+  border-color: var(--lex-border-accent);
+}
+
+.file-viewer-ingestion__page--ready {
+  background: var(--lex-status-success);
+  border-color: var(--lex-status-success);
+  transform: scale(1.04);
+}
+
+.file-viewer-ingestion__pages-caption {
+  margin: 0;
+  font-size: 12px;
+  color: var(--lex-text-tertiary);
+}
+
+/* In the document itself (LANA's PDF view): pages still being made
+   searchable are dimmed; each one brightens as it becomes searchable. */
+#viewerEditor .le-pdf-page[data-lana-ingest] {
+  transition: opacity 500ms ease, box-shadow 500ms ease;
+}
+
+#viewerEditor .le-pdf-page[data-lana-ingest="waiting"] {
+  opacity: 0.55;
+}
+
+#viewerEditor .le-pdf-page[data-lana-ingest="ready"] {
+  opacity: 1;
+  box-shadow: 0 0 0 2px var(--lex-status-success);
+}
+
 @keyframes file-viewer-ingestion-in {
   from { opacity: 0; transform: translateX(12px); }
   to { opacity: 1; transform: none; }
@@ -81,6 +211,11 @@
 @media (prefers-reduced-motion: reduce) {
   .file-viewer-ingestion {
     animation: none;
+  }
+  .file-viewer-ingestion__page,
+  #viewerEditor .le-pdf-page[data-lana-ingest] {
+    transition: none;
+    transform: none;
   }
 }
 

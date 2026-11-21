@@ -30,6 +30,10 @@
     citationPage: 1,
     currentFile: null,
     referrerPage: null,
+    // Files uploaded together ([{ id, name }]), for the live panel's strip.
+    uploads: [],
+    // The plain PDF view's blob URL, so a page tile can open it at a page.
+    pdfObjectUrl: null,
     matterReturnRoute: '',
     metadataMode: 'view',
     metadataChanged: false,
@@ -4597,6 +4601,7 @@
     // identity (for example, after selecting a released version). If the new
     // metadata request fails, error actions must not download/delete stale data.
     state.currentFile = null;
+    state.pdfObjectUrl = null;
     if (window.FileViewerIngestion) window.FileViewerIngestion.stop();
     showLoading();
 
@@ -4715,7 +4720,7 @@
       // person Try again; and only for the file still on screen, so a newer
       // load (another file or version) is never handed this one's panel.
       if (window.FileViewerIngestion && state.currentFile === response) {
-        window.FileViewerIngestion.start(response, { matterId: conversationMatterId || null });
+        window.FileViewerIngestion.start(response, { matterId: conversationMatterId || null, uploads: state.uploads });
       }
 
       // Load content + metadata
@@ -4817,6 +4822,29 @@
     var located = false;
     try { located = typeof editor.locateAnnotation === 'function' && editor.locateAnnotation(CITATION_ANNOTATION_ID); } catch (_) { located = false; }
     return located;
+  }
+
+  // ── Live processing panel hooks (js/file-viewer-ingestion-page.js) ────
+
+  function createIngestionPageHooks() {
+    if (!window.FileViewerIngestionPage) return null;
+    return window.FileViewerIngestionPage.create({
+      host: function () { return document.getElementById('viewerEditor'); },
+      isEditorPdf: function () {
+        var editor = state.editorInstance;
+        return Boolean(editor && typeof editor.documentMode === 'function' && editor.documentMode() === 'pdf');
+      },
+      jumpToPage: function (page) { jumpToEditorPage(state.editorInstance, '.le-pdf-page', page); },
+      iframe: function () { return document.getElementById('viewerIframe'); },
+      pdfUrl: function () { return state.pdfObjectUrl; },
+      uploads: function () { return state.uploads; },
+      navigate: function (id) {
+        Lex.Nav.go('file-viewer.html', {
+          params: { id: id },
+          context: { referrer: state.referrerPage || fallbackBackReferrer(), uploads: state.uploads }
+        });
+      }
+    });
   }
 
   function jumpToEditorPage(editor, selector, page) {
@@ -5024,6 +5052,7 @@
     // (left unsandboxed so Chromium's PDF viewer can render it).
     var blob = window.LanaPreviewFrame.pdfBlob(arrayBuffer);
     var objectUrl = URL.createObjectURL(blob);
+    state.pdfObjectUrl = objectUrl;
     var iframe = document.getElementById('viewerIframe');
     iframe.removeAttribute('srcdoc');
     iframe.removeAttribute('sandbox');
@@ -6119,6 +6148,13 @@
     }
     if (!state.referrerPage && ctx && ctx.fileViewerReferrer) {
       state.referrerPage = normalizeBackReferrer(ctx.fileViewerReferrer);
+    }
+    var ingestionPage = createIngestionPageHooks();
+    if (ingestionPage) {
+      state.uploads = window.FileViewerIngestionPage.uploadSetFrom(ctx && ctx.uploads);
+      document.addEventListener('lana-ingestion-pages', ingestionPage.onPages);
+      document.addEventListener('lana-viewer-go-to-page', ingestionPage.onGoToPage);
+      document.addEventListener('lana-viewer-open-upload', ingestionPage.onOpenUpload);
     }
 
     // Validate file ID
