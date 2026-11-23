@@ -70,7 +70,12 @@ function chatConfig({ modelPath, mmprojPath = null, port, contextTokens, paralle
   return config;
 }
 
-/** The embedding server's settings: the same ones the server's own Pip uses for nomic. */
+/**
+ * The embedding server's settings: the same ones the server's own Pip uses for
+ * nomic. Two slots: Pip keeps one free for live questions (batch_reserve 1), so
+ * with one slot it never admits batch work such as indexing a document; ctx is
+ * split across the slots, so it is 2048 per slot.
+ */
 function embeddingConfig({ modelPath, port, hardware = {} }) {
   return {
     model: modelPath,
@@ -78,9 +83,9 @@ function embeddingConfig({ modelPath, port, hardware = {} }) {
     alias: 'nomic-embed-text',
     host: LOOPBACK_HOST,
     port,
-    ctx: 2048,
+    ctx: 4096,
     ubatch: 2048,
-    parallel: 1,
+    parallel: 2,
     threads: Math.min(4, threadsFor(hardware.cores)),
     queue_timeout: 20,
     embed_prefix_policy: 'none',
