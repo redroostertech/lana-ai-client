@@ -7,7 +7,7 @@ This document outlines the complete process for building, notarizing, and releas
 ## Prerequisites
 
 1. **Apple Developer Account** with valid signing certificate
-2. **GitHub CLI** (`gh`) installed and authenticated
+2. **Write access** to the Cloudflare R2 bucket `lana-releases` (releases.lanaai.io)
 3. **Environment variables** configured (see below)
 
 ---
@@ -172,16 +172,9 @@ rm -rf ~/Library/Caches/electron/electron-*-win32-*
 rm -rf dist/win-unpacked
 ```
 
-### GitHub upload fails (file too large)
+### Where releases are published
 
-Don't commit binaries to git. Use `gh release upload` or the `--publish` flag:
-```bash
-# Automatic (recommended)
-./scripts/build-client.sh --platform mac --publish
-
-# Manual
-gh release upload v3.0.0 dist/macos-arm64/LanaAI--genesis--3.0.0-arm64.dmg
-```
+Releases are not GitHub releases. Installers and update feeds go to releases.lanaai.io (Cloudflare R2 bucket `lana-releases`); see `docs/RELEASE-RUNBOOK.md` section 4. Never commit binaries to git.
 
 ---
 
@@ -203,7 +196,7 @@ gh release upload v3.0.0 dist/macos-arm64/LanaAI--genesis--3.0.0-arm64.dmg
 - [ ] Environment variables set (APPLE_TEAM_ID, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD)
 - [ ] Build completed with `--publish` flag
 - [ ] App is properly signed and notarized
-- [ ] GitHub release created with versioned artifacts
-- [ ] Release URL displayed in build output
+- [ ] `dist/r2` uploaded to `lana-releases`, update feeds last
+- [ ] Every `client/latest/` link answers 200
 - [ ] Server update policy updated
 - [ ] Tested OTA update from previous version

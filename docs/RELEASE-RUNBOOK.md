@@ -66,28 +66,34 @@ npm run generate-version
 
 Commit `package.json`, `src/version.js`, and `public_html/js/version.js` together.
 
-Release versions must be clean semver (`X.Y.Z`, no suffix). Prerelease suffixes on the `package.json` version (for example `4.1.0-pre.b11fab0`) interact badly with the GitHub `latest` update channel used by electron-updater: strip them before a release build.
+Release versions must be clean semver (`X.Y.Z`, no suffix). Prerelease suffixes on the `package.json` version (for example `4.1.0-pre.b11fab0`) interact badly with the update feeds electron-updater reads: strip them before a release build.
 
 ## 4. Build and publish the release
 
-Build with `scripts/build-client.sh`. It backs up and rewrites `public_html/js/config.js` for the chosen mode (auto-discovery is the default and correct for releases), cleans `dist/`, builds CSS, bundles Electron files, runs electron-builder with `electron-builder.client.json`, and organizes output into platform folders.
+Where things live (2026-11-23): code on GitHub only; everything hosted on Cloudflare R2. Installers and update feeds: bucket `lana-releases`, served at https://releases.lanaai.io/client/. Build parts (Pip, engine, redactor per system): the private bucket `lana-build-parts`, reached with 7-day read-only links. Azure is only for build machines (VMs for Windows and Linux pieces), never storage.
 
-Required environment (script prompts interactively if unset):
+Release order: the server code is final first (the engine piece is built from it); then Pip, the engine and the redactor are built for every system (macos-arm64, macos-x64, windows-x64, linux-x64) on matching computers and uploaded to `lana-build-parts`; only then are all installers built, together, on the central Mac. The LANA Release Desk checklist tracks each release.
+
+Required environment on the central Mac (the script prompts if unset):
 
 | Variable | Purpose |
 |---|---|
 | `APPLE_TEAM_ID` | macOS code signing team (developer.apple.com) |
 | `APPLE_ID` | Apple ID email for notarization |
 | `APPLE_APP_SPECIFIC_PASSWORD` | App-specific password (appleid.apple.com) |
+| `LANA_CLIENT_PARTS_URLS` | the parts links file (one `<target>/<part> <url>` per line) |
 
-`gh` CLI must be installed and authenticated (`gh auth login`) for `--publish`.
-
-Full release build and publish, all platforms:
+Build one system at a time. Each `build-client.sh` run fetches and checks the parts again while `LANA_CLIENT_PARTS_URLS` is set; `dist/` is only emptied with `--clean`, so the four runs collect in one `dist/`:
 
 ```bash
-cd <worktree-or-checkout>
+cd <clean clone at development-new>
+npm ci
 export APPLE_TEAM_ID=... APPLE_ID=... APPLE_APP_SPECIFIC_PASSWORD=...
-./scripts/build-client.sh --auto-discovery --platform all --publish
+export LANA_CLIENT_PARTS_URLS=/path/to/client-parts-urls.txt
+./scripts/build-client.sh --auto-discovery --platform mac --arch arm64 --skip-install
+./scripts/build-client.sh --auto-discovery --platform mac --arch x64 --skip-install
+./scripts/build-client.sh --auto-discovery --platform windows --skip-install
+./scripts/build-client.sh --auto-discovery --platform linux --skip-install --publish
 ```
 
 Useful flags: `--platform <mac|windows|linux|all>`, `--arch <x64|arm64|all>`, `--skip-install`, `--clean`, `--dev`, `--demo`, `--ip [ip:port]`, `--publish`, `--help`.
@@ -95,41 +101,27 @@ Useful flags: `--platform <mac|windows|linux|all>`, `--arch <x64|arm64|all>`, `-
 Platform outputs in `dist/` (artifact name pattern `LanaAI--genesis--<version>`):
 
 - macOS: `dist/macos-arm64/` and `dist/macos-x64/`, each with `.dmg` and `.zip` (signed and notarized)
-- Windows: `dist/windows/` with NSIS `-setup.exe` (x64) and `.zip`
-- Linux: `dist/linux/` with `.AppImage` and `.deb` (the script also uploads `.rpm` files if present, but the current `electron-builder.client.json` Linux targets are AppImage and deb only)
+- Windows: `dist/windows/` with NSIS `-setup.exe` (x64) and `.zip` (not code signed yet)
+- Linux: `dist/linux/` with `.AppImage` and `.deb`
 
-`--publish` behavior (verified in `scripts/build-client.sh`):
+`--publish` uploads nothing. It runs `node scripts/stage-client-release.js --dist dist --version <version>`, which lays the build out in `dist/r2/` in the bucket's exact shape and prints the object list:
 
-1. Creates git tag `v<version>` if missing and pushes it to origin.
-2. Generates release notes from git history since the previous tag (feat/fix/other sections).
-3. Creates a DRAFT GitHub release via `gh release create v<version> --draft`.
-4. Uploads all platform artifacts plus `dist/latest*.yml` update manifests. The `latest*.yml` files are required by electron-updater; a release without them cannot be auto-updated to.
-5. Publishes the release (`gh release edit v<version> --draft=false`).
+- `client/<version>/`: every installer, zip and `.blockmap`
+- `client/latest/`: stable-name copies for the download page and emails (`LANA-mac-arm64.dmg`, `LANA-mac-x64.dmg`, `LANA-windows-x64-setup.exe`, `LANA-linux-x86_64.AppImage`, `LANA-linux-amd64.deb`)
+- `client/latest.yml`, `client/latest-mac.yml`, `client/latest-linux.yml`: the update feeds installed apps read (electron-updater generic provider, `https://releases.lanaai.io/client/`). Mac builds made one arch at a time are merged into one `latest-mac.yml`.
 
-Binaries land at https://github.com/redroostertech/lana-ai-client/releases.
+Upload `dist/r2/` to bucket `lana-releases` keeping those paths, with the `latest*.yml` feeds last so no app is pointed at a file that is not there yet. Then `curl -sI` each `client/latest/` link and expect 200.
 
-electron-builder config: `electron-builder.client.json`, publish block `{"provider": "github", "owner": "redroostertech", "repo": "lana-ai-client", "releaseType": "release"}`.
+electron-builder config: `electron-builder.client.json`, publish block `{"provider": "generic", "url": "https://releases.lanaai.io/client/"}`.
 
 ## 5. Promote the release
 
-Open the admin portal page:
+Open item (2026-11-23): the portal's Client releases page (`https://redroostertec.com/admin/updates/client`) and its Promote step were built to read GitHub releases. Releases now live on releases.lanaai.io, so check what that page lists before promoting, and do not promote a release to a firm whose server is older than the engine the app carries (the engine refuses a Chef below its data API minimum).
 
-```
-https://redroostertec.com/admin/updates/client
-```
-
-The Client releases table lists GitHub releases, newest first, with a Recommended badge on the newest full release. Click Promote on the release row:
-
-- Org: leave blank for global.
-- Channel select: prereleases default to `beta`.
-- Force checkbox: optional, makes the update mandatory for clients.
-
-Promote server-side-fetches the release by tag from GitHub and upserts in Mongo:
+Promote, where it applies, upserts:
 
 - One `ClientUpdatePolicy` row keyed on `{org_id, update_channel}`.
 - One `ClientDownload` row per installer asset, keyed `{version, platform, arch}`.
-
-The Convergence panel on the same page flags any policy pointing at a version that is not on GitHub. Resolve flags before considering the release live.
 
 ## 6. Verify
 
@@ -145,7 +137,7 @@ Method: POST. Auth: none required (clients may send `Authorization: Bearer <toke
 
 Expect `status: "update_available"` with `latest_version` set to the promoted version, the platform-specific `download_url`, and `release_notes`. Other response fields the client consumes: `force_update`, `update_channel`, `checksum_sha256`. Repeat with `"platform":"win32","arch":"x64"` and `"platform":"linux"` to verify each installer URL.
 
-Known limitation: `checksum_sha256` is currently always `null`. The GitHub API does not expose asset hashes, so promote cannot fill it. Download integrity relies on signed and notarized installers plus HTTPS. To close this, publish a `SHASUMS256` asset from `build-client.sh` and parse it during promote.
+Known limitation: `checksum_sha256` is currently always `null`. Nothing records the installers' hashes where the portal can read them. Download integrity relies on signed and notarized installers plus HTTPS. To close this, have `stage-client-release.js` write a `SHASUMS256` file into `client/<version>/` and have the portal read it.
 
 ## 7. What customers see
 

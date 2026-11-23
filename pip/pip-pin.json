@@ -40,17 +40,17 @@
     "macos-arm64": {
       "sha256": "c0ae256fa3b293e67fc087773b43d8532da0709aed3bb163ff9ca642535daaf6",
       "bytes": 5882672,
-      "source": "LANA.cpp CI run 44937653949 (head 8ee218c47371), job macos-shipping (-DLQE_DISTRIBUTION=ON -DLQE_BUILD_TESTS=ON -DLQE_METAL=ON, the macos-arm64 cmake contract above), artifact lqe-darwin-arm64 (GitHub digest sha256:132d2ad3...; the artifact expires 2026-12-05, save it to the LANA Azure parts store at macos-arm64/lqe-8ee218c47371/lqe-darwin-arm64 before then). arm64 only, minos 13.3, links only /usr/lib and /System. CI builds are reproducible; a local build embeds its checkout path and gets a different sha256. Placed as build/pip/lqe; electron-builder signs it (mac.binaries)."
+      "source": "LANA.cpp CI run 44937653949 (head 8ee218c47371), job macos-shipping (-DLQE_DISTRIBUTION=ON -DLQE_BUILD_TESTS=ON -DLQE_METAL=ON, the macos-arm64 cmake contract above), artifact lqe-darwin-arm64 (GitHub digest sha256:132d2ad3...; kept in the private Cloudflare parts bucket lana-build-parts at macos-arm64/lqe-8ee218c47371/lqe-darwin-arm64 (uploaded 2026-11-23; the GitHub artifact expires 2026-12-05)). arm64 only, minos 13.3, links only /usr/lib and /System. CI builds are reproducible; a local build embeds its checkout path and gets a different sha256. Placed as build/pip/lqe; electron-builder signs it (mac.binaries)."
     },
     "windows-x64": {
       "sha256": "9a9ac904dff8f8e88ec11a234cbfc67f8a379f98cfb01498159d0558c4ca7495",
       "bytes": 79095296,
-      "source": "LANA.cpp CI run 44937653949 (head 8ee218c47371), job windows-shipping, artifact lqe-win32-x64 (GitHub digest sha256:5ea574f4...), exe lqe-win32-x64.exe, built reproducible; the artifact expires 2026-12-05, save it to the LANA Azure parts store at windows-x64/lqe-8ee218c47371/lqe-win32-x64.exe before then. Placed as build/pip/lqe.exe."
+      "source": "LANA.cpp CI run 44937653949 (head 8ee218c47371), job windows-shipping, artifact lqe-win32-x64 (GitHub digest sha256:5ea574f4...), exe lqe-win32-x64.exe, built reproducible; kept in the private Cloudflare parts bucket lana-build-parts at windows-x64/lqe-8ee218c47371/lqe-win32-x64.exe (uploaded 2026-11-23; the GitHub artifact expires 2026-12-05). Placed as build/pip/lqe.exe."
     },
     "linux-x64": {
       "sha256": "17289dfddebc86a3b5ce2c416c28873e643a01edd66b6e3ff8afbb282991b6e0",
       "bytes": 79988968,
-      "source": "LANA.cpp CI run 44937653949 (head 8ee218c47371), job linux-shipping, artifact lqe-linux-x64 (GitHub digest sha256:b0256cbb...); the artifact expires 2026-12-05, save it to the LANA Azure parts store at linux-x64/lqe-8ee218c47371/lqe-linux-x64 before then. Placed as build/pip/lqe. Imports libvulkan.so.1 (fallback in pip/vulkan-fallback)."
+      "source": "LANA.cpp CI run 44937653949 (head 8ee218c47371), job linux-shipping, artifact lqe-linux-x64 (GitHub digest sha256:b0256cbb...); kept in the private Cloudflare parts bucket lana-build-parts at linux-x64/lqe-8ee218c47371/lqe-linux-x64 (uploaded 2026-11-23; the GitHub artifact expires 2026-12-05). Placed as build/pip/lqe. Imports libvulkan.so.1 (fallback in pip/vulkan-fallback)."
     }
   },
   "vulkanLoader": {
