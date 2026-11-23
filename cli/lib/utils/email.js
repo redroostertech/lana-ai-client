@@ -82,13 +82,13 @@ async function writeReleaseEmail({ repoRoot, tag, artifacts, preRelease = false 
   }
 
   const subject = preRelease
-    ? `Lana AI Client ${tag} — pre-release for testing`
-    : `Lana AI Client ${tag} is available`;
+    ? `LANA AI ${tag}: pre-release for testing`
+    : `LANA AI ${tag} is available`;
 
   const lead = preRelease
-    ? `This is a pre-release build of Lana AI Client (${tag}) for testing. ` +
+    ? `This is a pre-release build of LANA AI (${tag}) for testing. ` +
       `Please install one of the builds below and report any issues.`
-    : `Lana AI Client ${tag} has been released and is ready for download.`;
+    : `LANA AI ${tag} has been released and is ready for download.`;
 
   const lines = [
     `To: ${to}`,

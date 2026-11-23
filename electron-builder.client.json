@@ -1,6 +1,6 @@
 {
   "appId": "com.redroostertech.lana-ai-client",
-  "productName": "Lana AI Client",
+  "productName": "LANA AI",
   "copyright": "Copyright © 2026 RedRooster Technologies Inc.",
   "directories": {
     "output": "dist",
@@ -226,7 +226,7 @@
     "allowToChangeInstallationDirectory": true,
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
-    "shortcutName": "Lana AI Client",
+    "shortcutName": "LANA AI",
     "artifactName": "LanaAI--genesis--${version}-setup.${ext}"
   },
   "dmg": {
@@ -247,6 +247,6 @@
       "width": 540,
       "height": 400
     },
-    "title": "Lana AI Client ${version}"
+    "title": "LANA AI ${version}"
   }
 }

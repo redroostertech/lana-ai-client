@@ -242,7 +242,7 @@ function renderReleaseEmailHtml({
     <div style="background: ${C.bgAlt}; border: 1px solid ${C.border}; border-radius: 8px; padding: 20px 24px; margin: 24px 0;">
       ${sectionLabel('Installing')}
       <p style="color: ${C.body}; font-size: 14px; line-height: 1.8; margin: 0;">
-        <strong style="color: ${C.text};">On Mac</strong>, open the .dmg and drag Lana AI into Applications. Replace the old copy when it asks.<br>
+        <strong style="color: ${C.text};">On Mac</strong>, open the .dmg and drag LANA AI into Applications. If you still have Lana AI Client there, move it to the Trash.<br>
         <strong style="color: ${C.text};">On Windows</strong>, run the installer and follow the prompts.
       </p>
     </div>
