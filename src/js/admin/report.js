@@ -2476,6 +2476,12 @@
     return { head: exportData.head, body: exportData.rows };
   }
 
+  // The report on screen, for the export's heading and file name.
+  function exportReportName() {
+    var moduleTitleEl = document.getElementById('moduleTitle');
+    return (moduleTitleEl && moduleTitleEl.textContent.trim()) || 'Report';
+  }
+
   function exportToPDF() {
     if (!exportData) {
       Lex.Modal.alert('Nothing to export', 'Run the report first, then export its results.');
@@ -2486,22 +2492,21 @@
     if (!jsPDFLib) { Lex.Modal.alert('Export unavailable', 'The PDF library did not load. Reload the page and try again.'); return; }
     var doc = new jsPDFLib.jsPDF();
 
+    var reportName = exportReportName();
     doc.setFontSize(20);
-    doc.text('Report', 14, 20);
+    doc.text(reportName, 14, 20);
 
     doc.setFontSize(12);
-    var moduleTitleEl = document.getElementById('moduleTitle');
     var resultPeriodTypeEl = document.getElementById('resultPeriodType');
     var resultCurrentPeriodEl = document.getElementById('resultCurrentPeriod');
 
-    doc.text('Report: ' + (moduleTitleEl ? moduleTitleEl.textContent : ''), 14, 35);
-    doc.text('Compare By: ' + (resultPeriodTypeEl ? resultPeriodTypeEl.textContent : ''), 14, 49);
-    doc.text('Current Period: ' + (resultCurrentPeriodEl ? resultCurrentPeriodEl.textContent : ''), 14, 56);
+    doc.text('Compare By: ' + (resultPeriodTypeEl ? resultPeriodTypeEl.textContent : ''), 14, 34);
+    doc.text('Current Period: ' + (resultCurrentPeriodEl ? resultCurrentPeriodEl.textContent : ''), 14, 41);
 
     var table = exportTable(false);
 
     doc.autoTable({
-      startY: 65,
+      startY: 50,
       head: [table.head],
       body: table.body,
       theme: 'grid',
@@ -2509,7 +2514,7 @@
       styles: { fontSize: 9 }
     });
 
-    var fileName = 'module-report-' + LanaTime.formatUtcDateOnly() + '.pdf';
+    var fileName = window.ReportMetricCard.exportFileName(reportName, LanaTime.formatUtcDateOnly(), 'pdf');
     doc.save(fileName);
     showInfo('Report exported to ' + fileName);
   }
@@ -2535,7 +2540,7 @@
     var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     var link = document.createElement('a');
     var url = URL.createObjectURL(blob);
-    var fileName = 'module-report-' + LanaTime.formatUtcDateOnly() + '.csv';
+    var fileName = window.ReportMetricCard.exportFileName(exportReportName(), LanaTime.formatUtcDateOnly(), 'csv');
 
     link.setAttribute('href', url);
     link.setAttribute('download', fileName);

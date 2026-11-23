@@ -26,3 +26,14 @@ test('review: only a real count-per-group list gets group wording; other cells k
   expect(card.exportValue('3 groups', [{ label: 'red', count: 1 }])).toBe('3 groups');
   expect(card.exportValue(null, [{ label: 'red', count: 1 }])).toBe('Red: 1 (total 1)');
 });
+
+describe('the exported file is named after the report (Michael, 2026-11-23)', () => {
+  test.each([
+    ['Expense Summary', 'pdf', 'Expense Summary 2026-11-23.pdf'],
+    ['Opportunity Aging', 'csv', 'Opportunity Aging 2026-11-23.csv'],
+    ['Fees: Paid / Owed?', 'pdf', 'Fees Paid Owed 2026-11-23.pdf'],
+    ['', 'csv', 'Report 2026-11-23.csv']
+  ])('%s as %s', (name, ext, expected) => {
+    expect(card.exportFileName(name, '2026-11-23', ext)).toBe(expected);
+  });
+});

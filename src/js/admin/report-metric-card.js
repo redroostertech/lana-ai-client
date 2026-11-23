@@ -254,5 +254,12 @@
     return value;
   }
 
-  global.ReportMetricCard = { render: render, headerLabels: headerLabels, formatNumber: formatNumber, formatPercentage: formatPercentage, exportValue: exportValue };
+  // The exported file's name: the report's name and the day, for example
+  // "Expense Summary 2026-11-23.pdf". Characters a file name cannot hold are dropped.
+  function exportFileName(reportName, day, ext) {
+    var name = String(reportName || '').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim() || 'Report';
+    return name + ' ' + day + '.' + ext;
+  }
+
+  global.ReportMetricCard = { render: render, headerLabels: headerLabels, formatNumber: formatNumber, formatPercentage: formatPercentage, exportValue: exportValue, exportFileName: exportFileName };
 })(window);
