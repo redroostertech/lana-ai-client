@@ -2428,9 +2428,7 @@
   // A cell value: the formatted text when there is one, else the raw value.
   // Only a missing value is blank; a real 0 stays 0.
   function exportCell(formatted, raw) {
-    if (formatted !== null && formatted !== undefined && formatted !== '') return formatted;
-    if (raw === null || raw === undefined || raw === '') return EMPTY;
-    return raw;
+    return window.ReportMetricCard.exportValue(formatted, raw);
   }
 
   // Rows for the CSV (with Change %) and PDF (without) exports.

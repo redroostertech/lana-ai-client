@@ -214,5 +214,45 @@
     };
   }
 
-  global.ReportMetricCard = { render: render, headerLabels: headerLabels, formatNumber: formatNumber, formatPercentage: formatPercentage };
+  // What an export (Export PDF, Export CSV) writes for one value: the formatted
+  // text when there is one, else the raw value, worded. A distribution (a list
+  // of {label, count} groups, such as Aging Status) reads as
+  // "Red: 2, Yellow: 5, Green: 11 (total 18)"; a list of plain values as
+  // "a, b"; a single object as "key: value, key: value".
+  function isGroup(item) {
+    return Boolean(item) && typeof item === 'object' && (item.label !== undefined || item.name !== undefined)
+      && (item.count !== undefined || item.value !== undefined);
+  }
+
+  function distributionText(groups) {
+    var total = 0;
+    var parts = groups.map(function (g) {
+      var label = String(g.label !== undefined ? g.label : g.name);
+      var count = Number(g.count !== undefined ? g.count : g.value) || 0;
+      total += count;
+      return (label.charAt(0).toUpperCase() + label.slice(1)) + ': ' + formatNumber(count, 0);
+    });
+    return parts.join(', ') + ' (total ' + formatNumber(total, 0) + ')';
+  }
+
+  function plainText(value) {
+    if (Array.isArray(value)) return value.map(plainText).join(', ');
+    if (value && typeof value === 'object') {
+      return Object.keys(value).map(function (key) { return key + ': ' + plainText(value[key]); }).join(', ');
+    }
+    return value === null || value === undefined ? '' : String(value);
+  }
+
+  function exportValue(formatted, raw) {
+    var value = formatted !== null && formatted !== undefined && formatted !== '' ? formatted : raw;
+    if (value === null || value === undefined || value === '') return EMPTY;
+    if (Array.isArray(value)) {
+      if (!value.length) return EMPTY;
+      return value.every(isGroup) ? distributionText(value) : plainText(value);
+    }
+    if (typeof value === 'object') return plainText(value) || EMPTY;
+    return value;
+  }
+
+  global.ReportMetricCard = { render: render, headerLabels: headerLabels, formatNumber: formatNumber, formatPercentage: formatPercentage, exportValue: exportValue };
 })(window);
