@@ -439,8 +439,15 @@
         justify-content: flex-start;
       }
 
-      .lex-banner-overflow-menu button:hover {
+      .lex-banner-overflow-menu button:hover:not(:disabled) {
         background: var(--lex-bg-hover);
+      }
+
+      /* A turned-off item looks turned off: a disabled button gets no click,
+         so a normal-looking one seems broken (Export before a report runs). */
+      .lex-banner-overflow-menu button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
       }
 
       .lex-banner-overflow-menu button > svg {
