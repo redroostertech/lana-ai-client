@@ -131,10 +131,10 @@ describe('settings from the plan', () => {
     expect(chatConfig({ modelPath: '/m/c.gguf', port: 1, contextTokens: 8192, parallel: 2, hardware: { platform: 'win32', accelerator: { backend: 'cuda' } } }).gpu_layers).toBe(99);
   });
 
-  // Two slots of 2048 (2026-11-23): with one slot Pip's batch reserve admits no batch request.
+  // Two slots of 2048 each (2026-11-23; Pip's ctx is per slot): with one slot Pip's batch reserve admits no batch request.
   test('embedding keeps the settings the server uses for nomic, with two slots', () => {
     expect(embeddingConfig({ modelPath: '/m/e.gguf', port: 8082, hardware: { cores: 12 } })).toEqual({
-      model: '/m/e.gguf', role: 'embed', alias: 'nomic-embed-text', host: '127.0.0.1', port: 8082, ctx: 4096, ubatch: 2048, parallel: 2,
+      model: '/m/e.gguf', role: 'embed', alias: 'nomic-embed-text', host: '127.0.0.1', port: 8082, ctx: 2048, ubatch: 2048, parallel: 2,
       threads: 4, queue_timeout: 20, embed_prefix_policy: 'none', embed_empty_input: 'refuse', embed_max_batch: 256
     });
   });
