@@ -75,8 +75,15 @@ function chatConfig({ modelPath, mmprojPath = null, port, contextTokens, paralle
  * nomic. Two slots: Pip keeps one free for live questions (batch_reserve 1), so
  * with one slot it never admits batch work such as indexing a document. Pip's
  * ctx is per slot (unlike llama.cpp's --ctx-size), so each slot holds 2048.
+ * On the graphics chip when the computer has one (Metal, CUDA or Vulkan, the
+ * same reading as chat, electron-pip-levers.js engineBackend), else the
+ * processor; Pip itself falls back to the processor when it finds no device
+ * ("no GPU backend available; running on CPU"). The vectors match the
+ * reference either way (the verified builds pass the match check on the CPU,
+ * Metal and Vulkan).
  */
 function embeddingConfig({ modelPath, port, hardware = {} }) {
+  const gpu = levers.engineBackend(hardware) !== 'cpu';
   return {
     model: modelPath,
     role: 'embed',
@@ -90,7 +97,8 @@ function embeddingConfig({ modelPath, port, hardware = {} }) {
     queue_timeout: 20,
     embed_prefix_policy: 'none',
     embed_empty_input: 'refuse',
-    embed_max_batch: 256
+    embed_max_batch: 256,
+    gpu_layers: gpu ? 99 : 0
   };
 }
 

@@ -135,8 +135,20 @@ describe('settings from the plan', () => {
   test('embedding keeps the settings the server uses for nomic, with two slots', () => {
     expect(embeddingConfig({ modelPath: '/m/e.gguf', port: 8082, hardware: { cores: 12 } })).toEqual({
       model: '/m/e.gguf', role: 'embed', alias: 'nomic-embed-text', host: '127.0.0.1', port: 8082, ctx: 2048, ubatch: 2048, parallel: 2,
-      threads: 4, queue_timeout: 20, embed_prefix_policy: 'none', embed_empty_input: 'refuse', embed_max_batch: 256
+      threads: 4, queue_timeout: 20, embed_prefix_policy: 'none', embed_empty_input: 'refuse', embed_max_batch: 256,
+      gpu_layers: 0
     });
+  });
+
+  // GPU when the computer has one, as chat reads it; the processor otherwise (Michael, 2026-11-23).
+  test.each([
+    ['a Mac (Metal)', { platform: 'darwin', accelerator: { backend: 'metal' } }, 99],
+    ['Windows with NVIDIA (CUDA)', { platform: 'win32', accelerator: { backend: 'cuda' } }, 99],
+    ['Windows with AMD or Intel (Vulkan)', { platform: 'win32', accelerator: { backend: 'vulkan' } }, 99],
+    ['a computer with no graphics chip', { platform: 'win32', accelerator: { backend: 'cpu' } }, 0],
+    ['an unknown computer', {}, 0]
+  ])('embedding on %s: gpu_layers %i', (_label, hardware, layers) => {
+    expect(embeddingConfig({ modelPath: '/m/e.gguf', port: 8082, hardware }).gpu_layers).toBe(layers);
   });
 
   test('threads leave two for the computer, between 1 and 10', () => {
