@@ -39,19 +39,19 @@
     <main>
 
       <!-- Laid out like the dashboard detail page: the report's name and
-           summary (report.js sets them; the banner escapes them), All reports,
-           and a menu of report actions. The banner shows copies of its
+           summary (report.js sets them; the banner escapes them) and a menu of
+           report actions. The shell Back goes to the list, so there is no
+           All reports button. The banner shows copies of its
            children, so the actions run through data-reporting-action. -->
       <lex-banner
         id="reportBanner"
         class="detail-banner"
         variant="light"
         heading="Report"
-        max-actions="1"
+        max-actions="0"
         lana
         lana-context-type="full_chat"
       >
-        <lex-btn data-reporting-action="all-reports" variant="secondary" size="sm">All reports</lex-btn>
         <button type="button" role="menuitem" data-reporting-action="export-pdf" disabled>
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
           Export PDF

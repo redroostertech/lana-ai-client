@@ -381,21 +381,22 @@ describe('the report page header (as the dashboard detail page)', () => {
   const html = read('admin/report.html');
   const js = read('js/admin/report.js');
 
-  test('there is no All reports button beside the name; the banner carries it as its action', () => {
+  test('no All reports button anywhere (the shell Back goes to the list); the banner menu holds the report actions', () => {
     expect(html).not.toContain('backToReportsBtn');
     expect(js).not.toContain('backToReportsBtn');
     const banner = html.slice(html.indexOf('<lex-banner'), html.indexOf('</lex-banner>'));
     expect(banner).toMatch(/id="reportBanner"/);
     expect(banner).toMatch(/class="detail-banner"/);
     expect(banner).toMatch(/variant="light"/);
-    expect(banner).toMatch(/max-actions="1"/);
+    expect(banner).toMatch(/max-actions="0"/);
     expect(banner).toMatch(/\slana[\s>]/);
-    expect(banner).toMatch(/^[\s\S]*?<lex-btn data-reporting-action="all-reports" variant="secondary" size="sm">All reports<\/lex-btn>/);
+    expect(html).not.toMatch(/data-reporting-action="all-reports"/);
+    expect(js).not.toContain("'all-reports'");
     ['export-pdf', 'export-csv', 'delete-report'].forEach(action =>
       expect(banner).toMatch(new RegExp('<button type="button" role="menuitem" data-reporting-action="' + action + '"')));
     expect(banner).toMatch(/data-reporting-action="delete-report" data-variant="danger"/);
     expect(read('css/admin/report.css')).toMatch(/#reportBanner:not\(\.report-banner--deletable\) \[data-reporting-action="delete-report"\]\s*\{\s*display:\s*none;/);
-    ['all-reports', 'export-pdf', 'export-csv', 'delete-report'].forEach(action => expect(js).toContain("'" + action + "'"));
+    ['export-pdf', 'export-csv', 'delete-report'].forEach(action => expect(js).toContain("'" + action + "'"));
   });
 
   test('the order is banner, breadcrumb (Reports / name), the period card, then the report body', () => {

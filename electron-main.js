@@ -87,6 +87,7 @@ const offlineKeyStore = createOfflineKeyStore({ safeStorage, persistence: offlin
 const { checkForUpdates, downloadAndInstallUpdate, showOptionalUpdateDialog, showForceUpdateDialog, shouldCheckForUpdates, configureAutoUpdater, getLastUpdateCheck, getLastCheckResult } = require('./electron-updater-custom');
 const { registerSystemInfoIpc } = require('./electron-system-info');
 const { installLocationPermissionHandlers, registerLocationIpc } = require('./electron-location');
+const { installDownloadHandler } = require('./electron-downloads');
 // The app's permission policy, once the session is ready (electron-location.js); Briefs borrows it.
 let appPermissions = null;
 const { logInfo, logError, logWarn, exportLogs, getLogFilePath } = require('./electron-logger');
@@ -2370,6 +2371,13 @@ app.whenReady().then(async () => {
   appPermissions = installLocationPermissionHandlers(session.defaultSession, {
     appRoot: path.join(__dirname, 'public_html'),
     isAllowed: () => locationPersistence.read().allowed
+  });
+  // Exports and other files a page saves open a Save window in Downloads (electron-downloads.js).
+  installDownloadHandler(session.defaultSession, {
+    dialog,
+    BrowserWindow,
+    downloadsDir: () => app.getPath('downloads'),
+    appRoot: path.join(__dirname, 'public_html')
   });
 
   // The app's own pages, from lana-app://app/public_html/ with their CSP

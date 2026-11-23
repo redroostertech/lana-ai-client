@@ -1238,7 +1238,7 @@
     });
   }
 
-  // The banner's All reports and the shell Back open the list page.
+  // The shell Back opens the list page.
   function goToList() {
     Lex.Nav.go(ReportsList.LIST_PAGE);
   }
@@ -3133,7 +3133,6 @@
   // carry data-reporting-action; this one document listener runs them, so
   // buttons inside drawers and modals work wherever Lex mounts them.
   var PAGE_ACTIONS = {
-    'all-reports': function () { goToList(); },
     'export-pdf': function () { exportToPDF(); },
     'export-csv': function () { exportToCSV(); },
     'delete-report': function () { deleteSelectedReport(); },
