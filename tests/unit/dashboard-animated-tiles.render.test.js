@@ -282,11 +282,12 @@ describe('when the saved dashboard cannot be read', () => {
   });
 });
 
-test('sparklines ask for history only (raw_limit 0), with the page dates', async () => {
+// The server accepts raw_limit from 1 (0 is a 400), so sparklines ask for one row.
+test('sparklines ask for history and the fewest source rows (raw_limit 1), with the page dates', async () => {
   const getMetricDetail = jest.fn().mockResolvedValue({ data: { snapshots: [] } });
   const p = page({ getMetricDetail });
   await p.exports.fetchSparkline({ metricKey: 'a.b', cacheKey: 'a.b|x' });
-  expect(getMetricDetail).toHaveBeenCalledWith('a.b', { periodStart: '2026-01-01', periodEnd: '2026-01-31', compareBy: 'monthly', rawLimit: 0 });
+  expect(getMetricDetail).toHaveBeenCalledWith('a.b', { periodStart: '2026-01-01', periodEnd: '2026-01-31', compareBy: 'monthly', rawLimit: 1 });
 });
 
 describe('declared cards (layout.cards from the trim spec)', () => {

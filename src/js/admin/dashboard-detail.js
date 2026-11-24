@@ -1348,9 +1348,10 @@
     if (cached) return cached.promise;
     var period = currentPeriod;
     var entry = { done: false, line: null };
-    // History only: raw_limit=0 skips the source rows the sparkline never shows.
+    // The sparkline needs only the history: ask for the fewest source rows
+    // the server allows (raw_limit starts at 1; 0 is rejected).
     entry.promise = api.getMetricDetail(job.metricKey, {
-      periodStart: period.start, periodEnd: period.end, compareBy: period.compareBy, rawLimit: 0,
+      periodStart: period.start, periodEnd: period.end, compareBy: period.compareBy, rawLimit: 1,
     }).then(function (response) {
       var payload = response && response.data ? response.data : response;
       entry.line = window.MetricCardView.sparkline(payload && payload.snapshots, 100, 24);
