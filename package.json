@@ -24,6 +24,7 @@
     "start": "node --max-old-space-size=2048 src/index.js",
     "start:prod": "node --max-old-space-size=16384 src/index.js",
     "dev": "node --watch --max-old-space-size=2048 src/index.js",
+    "release": "node scripts/release.js",
     "test": "jest",
     "test:unit": "jest tests/unit",
     "test:integration": "jest tests/integration",

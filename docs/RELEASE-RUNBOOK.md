@@ -68,13 +68,49 @@ Commit `package.json`, `src/version.js`, and `public_html/js/version.js` togethe
 
 Release versions must be clean semver (`X.Y.Z`, no suffix). Prerelease suffixes on the `package.json` version (for example `4.1.0-pre.b11fab0`) interact badly with the update feeds electron-updater reads: strip them before a release build.
 
-## 4. Build and publish the release
+## 4. The release command
+
+One command runs the release, phase by phase, on two machines. It reuses the build scripts below; it does not replace them.
+
+```bash
+npm run release -- <mode> --version 4.2.0 [options]
+```
+
+| Mode | Machine | What it does |
+|---|---|---|
+| `status` | either | Shows what is done: the 12 pieces in R2, the pins, the branch tips, what was uploaded. Changes nothing. |
+| `parts` | parts Mac (Apple chip) | Preflight, then builds the missing pieces for all four systems at once, then makes the pins branch (pin entries plus the version) and stops for review, then the production gate. |
+| `server` | parts Mac | Classifier check, the four Railway images, the signed server update, the portal stamp, the control plane image settings. |
+| `installers` | installer build machine | Preflight, a fresh 7-day links file, then all four installers in one session. |
+| `publish` | installer build machine | Uploads the installers with the update feeds last, then checks every link. |
+| `firms` | parts Mac | Lists what to check for each firm before promoting. |
+
+Options: `--phase <name>` runs one phase; `--target <system>` limits the pieces to one system (`macos-arm64`, `macos-x64`, `windows-x64`, `linux-x64`); `--dry-run` reads and plans but builds, uploads and pushes nothing; `--work-dir <dir>` puts the release folder (sources, builds, archives, state) on a bigger disk. The parts Mac also needs `--server-repo <LANA-AI checkout>`.
+
+**Stop and ask.** The command never asks a question in the middle of a run, because an agent runs it. At a step that needs Michael's yes it stops with exit code 10 and says what it waits for. After the yes, run the same command again with `--yes <step>`. The steps are `azure-vms` (one yes covers every VM in that run), `production`, `server-release`, `railway-images`, `upload-installers`, `firm-update` and `promote`. Exit 0 means done and exit 1 means failed.
+
+**Rerun.** A rerun picks up where the last one stopped. Each phase checks what is already done: a piece already in R2 is not built again, and pin entries already on production are not written again. The state file is `~/.lana-release/<version>/state.json` (or under `--work-dir`). It holds no secrets or links.
+
+**Secrets.** Each machine reads the R2 keys from Heroku itself (`heroku login` first). They go only to the `aws` program's environment and are never printed. If the `heroku` command does not start on a Mac (a Homebrew Node problem), set `LANA_HEROKU_BIN` to the Heroku CLI's script and the command runs it with its own Node. The links file is private (mode 600), lives in the release folder, and is never printed or passed to another agent.
+
+**The order.**
+
+1. On the parts Mac: `npm run release -- parts --version 4.2.0 --server-repo ../LANA-AI --work-dir /Volumes/<big disk>/lana-release`. It builds what is missing, uploads it, makes branch `release/4.2.0-pins`, and stops.
+2. Review that branch and merge it to `development`.
+3. Run the same command with `--phase gate --yes production`. Client production moves to development, and the command prints the handoff for the installer agent: the commit, the version and the commands. The handoff holds nothing secret.
+4. On the parts Mac: `npm run release -- server --version 4.2.0 --server-version <server version> --server-repo ../LANA-AI ...`. It stops at each yes.
+5. On the installer build machine, in a clean clone at that production commit, run `npm ci`, then `npm run release -- installers --version 4.2.0`, then `npm run release -- publish --version 4.2.0`. Publish stops for `--yes upload-installers`.
+6. On the parts Mac: `npm run release -- firms --version 4.2.0`. Update each firm's server (Norton first), then promote.
+
+Every run ends with a short summary: what was built, what was uploaded, which Release Desk boxes to tick, and what is waiting on Michael.
+
+## 4.1 Build and publish by hand
 
 Where things live (2026-11-23): code on GitHub only; everything hosted on Cloudflare R2. Installers and update feeds: bucket `lana-releases`, served at https://releases.lanaai.io/client/. Build parts (Pip, engine, redactor per system): the private bucket `lana-build-parts`, reached with 7-day read-only links. Azure is only for build machines (VMs for Windows and Linux pieces), never storage.
 
-Release order: the server code is final first (the engine piece is built from it); then Pip, the engine and the redactor are built for every system (macos-arm64, macos-x64, windows-x64, linux-x64) on matching computers and uploaded to `lana-build-parts`; only then are all installers built, together, on the central Mac. The LANA Release Desk checklist tracks each release.
+Release order: the server code is final first (the engine piece is built from it); then Pip, the engine and the redactor are built for every system (macos-arm64, macos-x64, windows-x64, linux-x64) on matching computers and uploaded to `lana-build-parts`; only then are all installers built, together, on the installer build machine. The LANA Release Desk checklist tracks each release.
 
-Required environment on the central Mac (the script prompts if unset):
+Required environment on the installer build machine (the script prompts if unset):
 
 | Variable | Purpose |
 |---|---|
@@ -86,7 +122,7 @@ Required environment on the central Mac (the script prompts if unset):
 Build one system at a time. Each `build-client.sh` run fetches and checks the parts again while `LANA_CLIENT_PARTS_URLS` is set; `dist/` is only emptied with `--clean`, so the four runs collect in one `dist/`:
 
 ```bash
-cd <clean clone at development-new>
+cd <clean clone at production>
 npm ci
 export APPLE_TEAM_ID=... APPLE_ID=... APPLE_APP_SPECIFIC_PASSWORD=...
 export LANA_CLIENT_PARTS_URLS=/path/to/client-parts-urls.txt
