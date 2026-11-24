@@ -51,6 +51,11 @@
       "sha256": "17289dfddebc86a3b5ce2c416c28873e643a01edd66b6e3ff8afbb282991b6e0",
       "bytes": 79988968,
       "source": "LANA.cpp CI run 44937653949 (head 8ee218c47371), job linux-shipping, artifact lqe-linux-x64 (GitHub digest sha256:b0256cbb...); kept in the private Cloudflare parts bucket lana-build-parts at linux-x64/lqe-8ee218c47371/lqe-linux-x64 (uploaded 2026-11-23; the GitHub artifact expires 2026-12-05). Placed as build/pip/lqe. Imports libvulkan.so.1 (fallback in pip/vulkan-fallback)."
+    },
+    "macos-x64": {
+      "sha256": "6fb5d799af2cffde4e085e60b5b2bffec4cdd7633f07438340b0c4a2b4fdfc7f",
+      "bytes": 5812648,
+      "source": "Local build on the Apple-chip build Mac under Rosetta 2 (arch -x86_64), scripts/build-pip.sh with the macos-x64 cmake contract above, AppleClang 21.0.0, SDK 26.5; ctest 29/29; verify-pip-macos-x64.js passed (x86_64 only, minos 13.3, links only /usr/lib and /System: libSystem, libc++, Accelerate). Kept in the private Cloudflare parts bucket lana-build-parts at macos-x64/lqe-8ee218c47371/lqe-darwin-x64 (uploaded 2026-11-23). A local build embeds its checkout path, so a rebuild elsewhere gets a different sha256. Placed as build/pip/lqe; electron-builder signs it (mac.binaries)."
     }
   },
   "vulkanLoader": {

@@ -1,13 +1,25 @@
 {
-  "_comment": "The LANA engine folder the client packages at <resources>/engine (electron-local-engine.js), built by scripts/build-engine.js from this LANA-AI commit with the backend's scripts/release/build-engine-bundle.js on a matching computer, its node_modules installed with npm ci. treeSha256 is sha256 over one line per file (path, bytes, sha256), engine-manifest.json left out. Change the commit only together with a rebuild of every platform's entry. 0d9a94aae (2026-11-23): local first per request (a busy or failed local Pip goes to the box's Forge or Forge; Retry after a stop runs remote; data API 1.38). macos-arm64 built on the Apple-chip build Mac; macos-x64 and windows-x64 must be rebuilt on their own computers before those installers can be built.",
+  "_comment": "The LANA engine folder the client packages at <resources>/engine (electron-local-engine.js), built by scripts/build-engine.js from this LANA-AI commit with the backend's scripts/release/build-engine-bundle.js on a matching computer, its node_modules installed with npm ci. treeSha256 is sha256 over one line per file (path, bytes, sha256), engine-manifest.json left out. Change the commit only together with a rebuild of every platform's entry. 0d9a94aae (2026-11-23): local first per request (a busy or failed local Pip goes to the box's Forge or Forge; Retry after a stop runs remote; data API 1.38). Release 4.2.0 (2026-11-23): macos-arm64 and macos-x64 built on the Apple-chip build Mac (macos-x64 under Rosetta 2 with the darwin-x64 Electron), windows-x64 on a Windows Server 2022 Azure VM, linux-x64 on an Ubuntu 22.04 (glibc 2.35) Azure VM; each loaded in the client's Electron for its system. Archives: lana-build-parts <target>/engine-0d9a94aaec65.tar.gz.",
   "repo": "redroostertech/LANA-AI",
-  "branch": "lana-runtime-merge",
+  "branch": "production",
   "version": "3.0.0",
   "commit": "0d9a94aaec6535833b9540b4a63b522d7a1f8cc6",
   "builds": {
     "macos-arm64": {
       "files": 4986,
       "treeSha256": "a07f0233c4ca848db18deaf9d4ac236af62e210a216929eb8c3aff617e77cc11"
+    },
+    "macos-x64": {
+      "files": 4986,
+      "treeSha256": "c5609011d56cce17bdc5325be911e9590c48c4618d690b1f44393b204e61ed7e"
+    },
+    "windows-x64": {
+      "files": 4986,
+      "treeSha256": "ae5ceb87399f86823b834d5834b01c853474020fce6ae79c1b30775da4c43376"
+    },
+    "linux-x64": {
+      "files": 4987,
+      "treeSha256": "001fbd27625c90a1f415352e6280513e9f339f7b81bed9c779be76c5cb65857c"
     }
   }
 }

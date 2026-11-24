@@ -15,7 +15,7 @@
       "type": "application",
       "bom-ref": "lana:lana-ai-client",
       "name": "LANA AI client",
-      "version": "4.1.0",
+      "version": "4.2.0",
       "description": "LANA AI desktop client (Electron) for macOS, Windows and Linux.",
       "supplier": {
         "name": "RedRooster Technologies Inc."

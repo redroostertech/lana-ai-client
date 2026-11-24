@@ -11,8 +11,14 @@ const path = require('path');
 const pins = require('../../scripts/local-ai-pins');
 const pin = require('../../engine/engine-pin.json');
 
-test('the engine is pinned to the local-first LANA-AI commit, by its full id', () => {
+test('the engine is pinned to the local-first LANA-AI commit, by its full id, on production', () => {
   expect(pin.commit).toBe('0d9a94aaec6535833b9540b4a63b522d7a1f8cc6');
+  expect(pin.branch).toBe('production');
+});
+
+test('release 4.2.0: Pip has a build for every system', () => {
+  const pip = require('../../pip/pip-pin.json');
+  expect(Object.keys(pip.builds).sort()).toEqual(['linux-x64', 'macos-arm64', 'macos-x64', 'windows-x64']);
 });
 
 describe('packaging against the pin', () => {
@@ -26,9 +32,13 @@ describe('packaging against the pin', () => {
   afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
   const manifest = (over) => fs.writeFileSync(path.join(pins.engineDir(root), pins.ENGINE_MANIFEST), JSON.stringify({ commit: pin.commit, dirty: false, native: [], ...over }));
 
-  test.each([['darwin', 'x64', 'macos-x64'], ['win32', 'x64', 'windows-x64']])('%s %s: not rebuilt yet, so it stops and says to build it there', (platform, arch, key) => {
+  test('release 4.2.0: every system has an engine built from that commit', () => {
+    expect(Object.keys(pin.builds).sort()).toEqual(['linux-x64', 'macos-arm64', 'macos-x64', 'windows-x64']);
+  });
+
+  test.each([['darwin', 'x64'], ['win32', 'x64'], ['linux', 'x64']])('%s %s: an engine folder that is not the pinned build is refused', (platform, arch) => {
     manifest({ platform, arch });
-    expect(pins.checkEngine({ root, platformName: platform, archName: arch, pin }).join(' ')).toContain(`has no build for ${key}`);
+    expect(pins.checkEngine({ root, platformName: platform, archName: arch, pin }).join(' ')).toContain('does not match the pin');
   });
 
   test('control: an engine folder from an older commit is refused for Apple chip too', () => {
