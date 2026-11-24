@@ -10,10 +10,11 @@ import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { TableCell } from '@tiptap/extension-table-cell';
+import { NOTE_LINK_OPTIONS } from './shared/note-link-options.js';
 
 // Export to global scope for use in HTML
 window.TiptapEditor = Editor;
-window.TiptapStarterKit = StarterKit;
+window.TiptapStarterKit = StarterKit.configure({ link: NOTE_LINK_OPTIONS });
 window.TiptapPlaceholder = Placeholder;
 window.TiptapTypography = Typography;
 window.TiptapLink = Link;
