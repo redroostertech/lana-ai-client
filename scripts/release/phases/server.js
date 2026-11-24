@@ -59,6 +59,14 @@ async function server(ctx, options = {}) {
   if (head !== commit) {throw new Error(`Server: ${repo} is at ${head.slice(0, 9)}; server production is ${commit.slice(0, 9)}. Check out production there.`);}
   if (!(await ctx.git.clean(repo))) {throw new Error(`Server: ${repo} has local changes.`);}
   const release = path.join(repo, 'scripts', 'release', 'release.sh');
+  const redactorCommit = needOption(options.railwayRedactorCommit, '--railway-redactor-commit', 'the lana-redactor commit with the dual-stack bind (REDACTOR_BIND_HOST=all)');
+  const out = path.join(ctx.dir, 'railway-images', commit.slice(0, 12));
+  const envFile = path.join(out, 'railway-images.env');
+  // A dry run reads only: it runs nothing and writes nothing.
+  if (ctx.dryRun) {
+    ctx.log(`  [dry run] would check the classifier pins (release.sh --pins-only), build the four Railway images from ${commit.slice(0, 9)} (lana-redactor ${redactorCommit.slice(0, 12)}) on an Azure Linux VM, push them, publish server ${serverVersion} with release.sh, and set the control plane`);
+    return {};
+  }
   const logFile = path.join(ctx.dir, 'logs', 'server.log');
   fs.mkdirSync(path.dirname(logFile), { recursive: true });
 
@@ -71,13 +79,6 @@ async function server(ctx, options = {}) {
   ctx.desk('server.classifiers');
 
   // 2. Railway images.
-  const redactorCommit = needOption(options.railwayRedactorCommit, '--railway-redactor-commit', 'the lana-redactor commit with the dual-stack bind (REDACTOR_BIND_HOST=all)');
-  const out = path.join(ctx.dir, 'railway-images', commit.slice(0, 12));
-  const envFile = path.join(out, 'railway-images.env');
-  if (ctx.dryRun) {
-    ctx.log(`  [dry run] would build the four Railway images from ${commit.slice(0, 9)} (lana-redactor ${redactorCommit.slice(0, 12)}) on an Azure Linux VM, push them, publish server ${serverVersion} with release.sh, and set the control plane`);
-    return {};
-  }
   if (!fs.existsSync(envFile)) {
     requireYes(ctx, 'azure-vms', 'one Linux VM for the Railway images');
     const built = await ctx.run('bash', [path.join(repo, 'scripts', 'release', 'azure-verify.sh'), 'railway-images',
@@ -99,11 +100,20 @@ async function server(ctx, options = {}) {
   // 3. Signed on-prem update and the portal stamp.
   requireYes(ctx, 'server-release', `server ${serverVersion} from ${commit.slice(0, 9)}`);
   const signingKey = needOption(options.signingKeyFile, '--signing-key-file', 'the release signing key file');
+  // release.sh stopped earlier for an attestation, which is finished by hand. Never run it again from the top.
+  if (ctx.state.serverStaged && !ctx.state.serverReleased) {
+    if (!options.serverPublished) {
+      ctx.report.waiting.push(`Server ${ctx.state.serverStaged.version} is staged and waiting for its attestation. Finish it with release.sh --verify-only and --publish-only (scripts/release/README.md), then run the server phase again with --server-published.`);
+      throw new Error(`Server: release ${ctx.state.serverStaged.version} is waiting for its attestation; it is not run again.`);
+    }
+    ctx.state.serverReleased = { ...ctx.state.serverStaged, finishedByHand: true, at: new Date().toISOString() };
+  }
   if (!ctx.state.serverReleased) {
     const token = await heroku(ctx, ['config:get', 'RELEASE_PUBLISH_TOKEN', '-a', HEROKU_APP], 'read the publish token');
     const env = { ...ctx.env, RELEASE_PUBLISH_TOKEN: token, RELEASE_SIGNING_KEY_FILE: signingKey, RELEASE_SIGNING_KEY_ID: options.signingKeyId || 'lana-release-prod', LANA_RELEASE_RAILWAY_IMAGES: path.join(out, 'images.json') };
     const published = await ctx.run('bash', [release, serverVersion, 'stable'], { cwd: repo, env, logFile });
     if (published.code === 3) {
+      ctx.state.serverStaged = { version: serverVersion, commit, at: new Date().toISOString() };
       ctx.report.waiting.push('release.sh staged the candidate and needs a tested attestation (exit 3). Test it, then rerun release.sh with --verify-only and --publish-only as its README says.');
       throw new Error('Server: release.sh is waiting for an attestation.');
     }

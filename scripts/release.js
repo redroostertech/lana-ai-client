@@ -25,6 +25,7 @@
  *   --server-version <v>  the server release number (server mode)
  *   --railway-redactor-commit <sha>, --registry-password-file <file>,
  *   --signing-key-file <file>, --signing-key-id <id>   (server mode)
+ *   --server-published    the staged server release was finished by hand (attestation)
  *
  * Exit codes: 0 done, 1 failed, 10 waiting on Michael's yes or review.
  *   --work-dir <dir>      where the release folder lives (default ~/.lana-release;
@@ -65,6 +66,7 @@ function parseArgs(argv) {
   while (args.length) {
     const flag = args.shift();
     if (flag === '--dry-run') {options.dryRun = true;}
+    else if (flag === '--server-published') {options.serverPublished = true;}
     else if (flag === '--target') {options.targets.push(args.shift());}
     else if (flag === '--yes') {options.yesValues.push(args.shift());}
     else if (VALUE_FLAGS[flag]) {options[VALUE_FLAGS[flag]] = args.shift();}

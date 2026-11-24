@@ -26,7 +26,10 @@ function planPieces(statuses) {
 async function pieces(ctx, deps = {}) {
   const build = { mac: deps.buildMac || builders.buildMac, azure: deps.buildAzure || builders.buildAzure };
   const r2 = await ctx.r2();
-  const pins = await ctx.pinsAt('origin/production');
+  // Every system builds from this one client production commit.
+  await ctx.git.fetch(ctx.clientRoot, ['production']);
+  ctx.clientCommit = await ctx.git.git(['-C', ctx.clientRoot, 'rev-parse', 'origin/production'], 'read client production');
+  const pins = await ctx.pinsAt(ctx.clientCommit);
   const listing = await r2.list(PARTS_BUCKET, '');
   const statuses = allPieces({ listing, pins, targets: ctx.targets });
 

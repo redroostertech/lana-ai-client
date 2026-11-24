@@ -53,6 +53,8 @@ function run(command, args = [], options = {}) {
 function scrub(text) {
   return String(text || '')
     .replace(/https?:\/\/\S+/g, '<link>')
+    // A SAS token or presigned query printed without its link.
+    .replace(/\b(sig|se|sp|sv|sr|st|skoid|sktid|skt|ske|sks|skv|X-Amz-[A-Za-z-]+)=[^\s&]+/gi, '$1=<hidden>')
     .replace(/\b[A-Za-z0-9+/=_-]{32,}\b/g, '<hidden>')
     .trim()
     .slice(-400);

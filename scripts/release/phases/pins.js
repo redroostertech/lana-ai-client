@@ -21,7 +21,8 @@ const { treeDigest, platformKey } = require('../../local-ai-pins');
 const { platformNameOf, archNameOf } = require('../../client-parts');
 const { sha256File } = require('../builders');
 
-const VERSION_FILES = ['package.json', 'src/version.js', 'public_html/js/version.js'];
+// public_html is a tracked symbolic link to src: git stages the real path only.
+const VERSION_FILES = ['package.json', 'src/version.js', 'src/js/version.js'];
 const PIN_PATHS = { pip: 'pip/pip-pin.json', engine: 'engine/engine-pin.json' };
 
 function branchName(version) {
@@ -84,10 +85,30 @@ function applyEntries(pinText, part, entries) {
   return `${JSON.stringify(pin, null, 2)}\n`;
 }
 
+/** True when development already carries every pin entry, the version and the engine branch. */
+async function developmentReady(ctx, listing) {
+  await ctx.git.fetch(ctx.clientRoot, ['development']);
+  const devPins = await ctx.pinsAt('origin/development');
+  const devVersion = await ctx.packageVersionAt('origin/development');
+  return devVersion === ctx.version && devPins.engine.branch === 'production'
+    && allPieces({ listing, pins: devPins, targets: TARGETS }).every((p) => p.state === 'ready');
+}
+
 async function pins(ctx) {
   const prodPins = await ctx.pinsAt('origin/production');
   const r2 = await ctx.r2();
   const listing = await r2.list(PARTS_BUCKET, '');
+  // A rerun after review: the branch is merged, so the next step is the gate.
+  if (await developmentReady(ctx, listing)) {
+    ctx.log(`  development already has every pin entry and version ${ctx.version}. Next is the production gate.`);
+    ctx.desk('gate.version');
+    return {};
+  }
+  // A rerun before review: the branch is already pushed. Commit nothing more.
+  if (ctx.state.pinsBranch) {
+    ctx.report.waiting.push(`Review branch ${ctx.state.pinsBranch} (pin entries and version ${ctx.version}), then merge it to development. Then run this command again.`);
+    return { stop: true };
+  }
   const { found, missing } = await missingEntries(ctx, prodPins, listing);
   if (missing.length) {throw new Error(`Pins: these pieces are not in the bucket yet, so they have no entry: ${missing.join(', ')}. Run the pieces phase first.`);}
   const version = await ctx.packageVersionAt('origin/production');
@@ -129,7 +150,7 @@ async function pins(ctx) {
   await git(['commit', '--quiet', '-m', message], 'commit the pin entries');
   await git(['push', '--quiet', '-u', 'origin', branch], `push ${branch}`);
   ctx.state.pinsBranch = branch;
-  ctx.report.waiting.push(`Review branch ${branch} (pin entries and version ${ctx.version}), then merge it to development. Then run: npm run release -- parts --version ${ctx.version} --phase gate`);
+  ctx.report.waiting.push(`Review branch ${branch} (pin entries and version ${ctx.version}), then merge it to development. Then run this command again: it goes on to the production gate.`);
   ctx.desk('gate.version');
   return { branch, stop: true };
 }

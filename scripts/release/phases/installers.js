@@ -28,13 +28,19 @@ const BUILDS = Object.freeze([
   { target: 'linux-x64', args: ['--platform', 'linux'] }
 ]);
 
-// What each system's build must leave in dist/, by file name ending.
-const EXPECTED = Object.freeze({
-  'macos-arm64': ['-arm64.dmg', '-arm64.dmg.blockmap', '-arm64.zip', '-arm64.zip.blockmap'],
-  'macos-x64': ['-x64.dmg', '-x64.dmg.blockmap', '-x64.zip', '-x64.zip.blockmap'],
-  'windows-x64': ['-setup.exe', '-setup.exe.blockmap', '.zip'],
-  'linux-x64': ['.AppImage', '.deb']
-});
+// What each system's build must leave in dist/, by exact name (electron-builder.client.json artifactName).
+function EXPECTED_NAMES(version) {
+  const base = `LanaAI--genesis--${version}`;
+  return {
+    'macos-arm64': [`${base}-arm64.dmg`, `${base}-arm64.dmg.blockmap`, `${base}-arm64.zip`, `${base}-arm64.zip.blockmap`],
+    'macos-x64': [`${base}-x64.dmg`, `${base}-x64.dmg.blockmap`, `${base}-x64.zip`, `${base}-x64.zip.blockmap`],
+    'windows-x64': [`${base}-setup.exe`, `${base}-setup.exe.blockmap`, `${base}.zip`],
+    'linux-x64': [`${base}.AppImage`, `${base}.deb`]
+  };
+}
+
+// Where electron-builder leaves each Mac app (build-client.sh moves only the dmg and zip files).
+const MAC_APP_DIRS = Object.freeze({ 'macos-arm64': ['mac-arm64'], 'macos-x64': ['mac', 'mac-x64'] });
 
 function walk(dir, depth = 4, out = []) {
   if (!fs.existsSync(dir) || depth < 0) {return out;}
@@ -105,15 +111,16 @@ function checkResources(target, resources, deps = {}) {
 async function checkBuilds(ctx, dist) {
   const files = walk(dist);
   const problems = [];
+  const names = new Set(files.map((file) => path.basename(file)));
+  const expected = EXPECTED_NAMES(ctx.version);
   for (const target of TARGETS) {
-    for (const ending of EXPECTED[target]) {
-      if (!files.some((file) => file.endsWith(ending) && path.basename(file).includes(ctx.version))) {problems.push(`${target}: no ${ending} for ${ctx.version} in dist`);}
+    for (const name of expected[target]) {
+      if (!names.has(name)) {problems.push(`${target}: no ${name} in dist`);}
     }
   }
   for (const target of ['macos-arm64', 'macos-x64']) {
-    // Each Mac build has its own folder (dist/macos-arm64, dist/macos-x64), and the app inside it.
-    const app = walk(path.join(dist, target)).find((file) => file.endsWith('.app'));
-    if (!app) {problems.push(`${target}: no .app in dist/${target}`);continue;}
+    const app = MAC_APP_DIRS[target].map((dir) => walk(path.join(dist, dir), 1).find((file) => file.endsWith('.app'))).find(Boolean);
+    if (!app) {problems.push(`${target}: no .app in dist/${MAC_APP_DIRS[target].join(' or dist/')}`);continue;}
     // eslint-disable-next-line no-await-in-loop
     problems.push(...await checkMacApp(ctx, target, app));
   }
@@ -161,4 +168,4 @@ async function installers(ctx) {
   return {};
 }
 
-module.exports = { installers, makeLinksFile, checkBuilds, checkResources, checkMacApp, BUILDS, EXPECTED };
+module.exports = { installers, makeLinksFile, checkBuilds, checkResources, checkMacApp, BUILDS, EXPECTED_NAMES, MAC_APP_DIRS };

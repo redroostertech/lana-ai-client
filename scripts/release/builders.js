@@ -47,12 +47,31 @@ function parseNewEntry(part, output) {
 }
 
 /**
+ * The printed entry, only when it is a new build: the pin has no entry for
+ * this very system. build-engine.js prints "(This build: ...)" for any
+ * mismatch too, and a mismatch against a reviewed entry is a failure, never a
+ * new entry. Null otherwise.
+ */
+function acceptNewEntry({ part, output, target, pin }) {
+  const parsed = parseNewEntry(part, output);
+  if (!parsed || parsed.target !== target) {return null;}
+  if ((pin.builds || {})[target]) {return null;}
+  return parsed;
+}
+
+/** The engine build's Node: the one on the build's PATH (the portable x64 Node under Rosetta). */
+function engineCommand() {
+  return 'node';
+}
+
+/**
  * A source at exactly one commit, with no remote and no history: git
  * rev-parse HEAD is the real commit, so the build scripts' commit and clean
  * checks run unchanged.
  */
-async function prepareSource(ctx, repoKey, commit) {
-  const dir = path.join(ctx.dir, 'src', `${repoKey}-${commit.slice(0, 12)}`);
+async function prepareSource(ctx, repoKey, commit, owner = 'shared') {
+  // Each system has its own folders: the two Mac builds run at once, one under Rosetta.
+  const dir = path.join(ctx.dir, 'src', owner, `${repoKey}-${commit.slice(0, 12)}`);
   if (fs.existsSync(path.join(dir, '.git'))) {
     const head = (await ctx.run('git', ['-C', dir, 'rev-parse', 'HEAD'])).stdout.trim();
     if (head === commit) {return dir;}
@@ -67,13 +86,18 @@ async function prepareSource(ctx, repoKey, commit) {
   return dir;
 }
 
-/** A client checkout for one system, at client production. */
+/**
+ * A client checkout for one system, at the client production commit this run
+ * read (ctx.clientCommit). One made by an earlier run is moved to it.
+ */
 async function clientCheckout(ctx, target) {
   const dir = path.join(ctx.dir, 'client', target);
-  if (!fs.existsSync(dir)) {
-    const result = await ctx.run('git', ['-C', ctx.clientRoot, 'worktree', 'add', '--detach', dir, 'origin/production']);
-    if (result.code !== 0) {throw new Error(`Could not make the ${target} client checkout (${scrub(result.stderr)}).`);}
-  }
+  const commit = ctx.clientCommit || 'origin/production';
+  const args = fs.existsSync(dir)
+    ? ['-C', dir, 'checkout', '--quiet', '--detach', commit]
+    : ['-C', ctx.clientRoot, 'worktree', 'add', '--detach', dir, commit];
+  const result = await ctx.run('git', args);
+  if (result.code !== 0) {throw new Error(`Could not put the ${target} client checkout at ${String(commit).slice(0, 9)} (${scrub(result.stderr)}).`);}
   return dir;
 }
 
@@ -210,9 +234,9 @@ async function buildMac(ctx, target, parts, pins) {
     const checks = [];
     let newEntry = null;
     if (part === 'pip') {
-      const source = await prepareSource(ctx, 'pip', pins.pip.commit);
+      const source = await prepareSource(ctx, 'pip', pins.pip.commit, target);
       const result = await step('bash', ['scripts/build-pip.sh'], root, { LANA_PIP_SRC: source });
-      newEntry = result.code === 0 ? null : parseNewEntry('pip', result.stderr);
+      newEntry = result.code === 0 ? null : acceptNewEntry({ part: 'pip', output: result.stderr, target, pin: pins.pip });
       if (result.code !== 0 && !newEntry) {throw new Error(`${target}: build-pip.sh failed (exit ${result.code}; see logs/${target}.log).`);}
       const model = await embedModel(ctx);
       const lqe = path.join(root, 'build', 'pip', 'lqe');
@@ -223,10 +247,10 @@ async function buildMac(ctx, target, parts, pins) {
       const verified = (model.pin.pip.verified_builds || []).some((b) => b.build === pins.pip.build);
       if (!verified) {ctx.report.waiting.push(`Add Pip build ${pins.pip.build} to LANA-AI deploy/railway/embed/embed-pin.json verified_builds (its match check passed on ${target}).`);}
     } else if (part === 'engine') {
-      const source = await prepareSource(ctx, 'server', pins.engine.commit);
+      const source = await prepareSource(ctx, 'server', pins.engine.commit, target);
       await must(step('npm', ['ci', '--no-audit', '--no-fund'], source), 'npm ci in LANA-AI');
-      const result = await step(process.execPath, ['scripts/build-engine.js'], root, { LANA_ENGINE_SRC: source });
-      newEntry = result.code === 0 ? null : parseNewEntry('engine', result.stderr);
+      const result = await step(engineCommand(), ['scripts/build-engine.js'], root, { LANA_ENGINE_SRC: source });
+      newEntry = result.code === 0 ? null : acceptNewEntry({ part: 'engine', output: result.stderr, target, pin: pins.engine });
       if (result.code !== 0 && !newEntry) {throw new Error(`${target}: build-engine.js failed (exit ${result.code}; see logs/${target}.log).`);}
       if (newEntry) {
         // build-engine.js stops before its load check when the pin has no entry: run it here.
@@ -236,7 +260,7 @@ async function buildMac(ctx, target, parts, pins) {
         checks.push(...checkEngine({ root, platformName: 'darwin', archName: target.split('-')[1], pin: withEntry }));
       }
     } else {
-      const source = await prepareSource(ctx, 'redactor', pins.redactor.commit);
+      const source = await prepareSource(ctx, 'redactor', pins.redactor.commit, target);
       const python = await redactorPython(ctx, target, source, step);
       await must(step('bash', ['scripts/build-redactor.sh'], root, { LANA_REDACTOR_SRC: source, LANA_REDACTOR_PYTHON: python }), 'build-redactor.sh');
       checks.push(...await redactorSmoke({ binary: path.join(root, 'build', 'redactor', 'lana-redactor', 'lana-redactor') }));
@@ -260,7 +284,8 @@ async function buildMac(ctx, target, parts, pins) {
 async function buildAzure(ctx, target, parts, pins) {
   const out = path.join(ctx.dir, 'azure', target);
   fs.mkdirSync(out, { recursive: true });
-  const clientCommit = (await ctx.git.tip(REPOS.client, 'production'));
+  // The same client commit the Mac systems build from.
+  const clientCommit = ctx.clientCommit || (await ctx.git.tip(REPOS.client, 'production'));
   const logFile = path.join(ctx.dir, 'logs', `${target}.log`);
   fs.mkdirSync(path.dirname(logFile), { recursive: true });
   const result = await ctx.run('bash', [
@@ -291,5 +316,5 @@ async function buildAzure(ctx, target, parts, pins) {
 }
 
 module.exports = {
-  NODE_X64, parseNewEntry, prepareSource, clientCheckout, intelToolchain, builtId, packAndUpload, embedModel, buildMac, buildAzure, sha256File
+  NODE_X64, parseNewEntry, acceptNewEntry, engineCommand, prepareSource, clientCheckout, intelToolchain, builtId, packAndUpload, embedModel, buildMac, buildAzure, sha256File
 };
