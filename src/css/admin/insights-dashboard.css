@@ -4085,3 +4085,8 @@ button.dash-lines__label:hover,
 #metricRawDataUnavailable {
   margin-top: 0.75rem;
 }
+
+/* The records toolbar is a flex row; keep it gone while hidden. */
+#metricRawDataToolbar[hidden] {
+  display: none;
+}
