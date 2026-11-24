@@ -15,7 +15,8 @@ const Store = require('electron-store');
 
 // Set app version from package.json (prevents app.getVersion() returning the Electron framework version)
 const packageJson = require('./package.json');
-app.setName(packageJson.productName || 'Lana AI');
+const { resolveAppName } = require('./electron-app-name');
+app.setName(resolveAppName(packageJson));
 app.setVersion(packageJson.version);
 
 // Which product this is: the LANA client ("lana") or LANA One ("lana-one").
