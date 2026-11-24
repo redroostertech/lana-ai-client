@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LANA AI Release Checklist</title>
+<!--
+  Source for docs/release-checklist.pdf. Edit this file, then rebuild the PDF from the repo root:
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless --no-pdf-header-footer \
+    --print-to-pdf=docs/release-checklist.pdf docs/release-checklist.html
+  The live, shared version of this checklist is the LANA Release Desk; keep the two in step.
+-->
+<style>
+  @page { size: Letter; margin: 0.6in 0.65in; }
+  body { font-family: "Helvetica Neue", Arial, sans-serif; color: #18201c; font-size: 10.5pt; line-height: 1.4; margin: 0; }
+  h1 { font-size: 20pt; margin: 0 0 2pt; }
+  .sub { color: #5d6b63; margin: 0 0 10pt; }
+  .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 4pt 18pt; margin: 0 0 12pt; padding: 8pt 10pt; border: 1px solid #c9d2cc; border-radius: 6pt; }
+  .fields div { border-bottom: 1px solid #c9d2cc; padding: 6pt 0 2pt; font-size: 9.5pt; color: #5d6b63; }
+  h2 { font-size: 12.5pt; margin: 14pt 0 2pt; padding-bottom: 3pt; border-bottom: 2px solid #23795a; break-after: avoid; }
+  .intro { color: #5d6b63; margin: 3pt 0 6pt; font-size: 9.5pt; }
+  ol { list-style: none; margin: 0; padding: 0; counter-reset: none; }
+  li { display: grid; grid-template-columns: 14pt 22pt 1fr; gap: 0 4pt; padding: 4pt 0; border-bottom: 1px solid #e3e8e5; break-inside: avoid; }
+  .box { width: 10pt; height: 10pt; border: 1.2px solid #18201c; border-radius: 2pt; margin-top: 2pt; }
+  .n { font-weight: 600; color: #23795a; }
+  .t { font-weight: 600; }
+  .h { display: block; font-weight: 400; color: #5d6b63; font-size: 9pt; }
+  table { width: 100%; border-collapse: collapse; margin: 4pt 0 2pt; font-size: 9.5pt; break-inside: avoid; }
+  th, td { border: 1px solid #c9d2cc; padding: 4pt 6pt; text-align: left; vertical-align: top; }
+  th { background: #f1f4f2; font-weight: 600; }
+  td .box { display: inline-block; vertical-align: -1pt; margin: 0 4pt 0 0; }
+  .where { color: #5d6b63; font-size: 8.5pt; }
+  .legend { font-size: 9pt; color: #5d6b63; margin: 4pt 0 0; }
+  .legend b { color: #18201c; }
+  .rules { font-size: 9pt; margin: 6pt 0 0; padding-left: 14pt; }
+  .rules li { display: list-item; border: 0; padding: 1pt 0; }
+</style>
+</head>
+<body>
+<h1>LANA AI Release Checklist</h1>
+<p class="sub">For each desktop app release. Walk it top to bottom; each phase finishes before the next one starts.</p>
+
+<div class="fields">
+  <div>Desktop app version:</div><div>Release date:</div>
+  <div>Client (lana-ai-client production):</div><div>Engine (LANA-AI production):</div>
+  <div>Pip (LANA.cpp tag and build):</div><div>Redactor (lana-redactor commit):</div>
+  <div>Document editor (lana-editor commit):</div><div>Done by:</div>
+</div>
+
+<p class="legend"><b>Pip</b>: the on-device AI server (LANA.cpp). <b>Engine</b>: a small copy of the LANA server inside the app (LANA-AI). <b>Redactor</b>: hides private details before text leaves the computer (lana-redactor).</p>
+
+<h2>Phase 1. Settle the code</h2>
+<p class="intro">Nothing gets built until the code it comes from is final.</p>
+<ol>
+  <li><span class="box"></span><span class="n">1</span><span><span class="t">Server code final for this release</span><span class="h">LANA-AI production. The engine is built from it.</span></span></li>
+  <li><span class="box"></span><span class="n">2</span><span><span class="t">Write down what this release is built from</span><span class="h">Fill in the fields at the top. A changed pin later means that piece is built again for every system.</span></span></li>
+</ol>
+
+<h2>Phase 2. Build the pieces for every system</h2>
+<p class="intro">Each piece is built on its own kind of computer, uploaded to the private Cloudflare parts bucket (lana-build-parts), and its fingerprint added to the app's pin file.</p>
+<ol>
+  <li><span class="box"></span><span class="n">3</span><span><span class="t">Build Pip, the engine and the redactor for all four systems (12 pieces)</span></span></li>
+</ol>
+<table>
+  <tr><th>System</th><th>Pip</th><th>Engine</th><th>Redactor</th></tr>
+  <tr><td>Mac, Apple chip</td><td><span class="box"></span>Built <span class="where">parts Mac</span></td><td><span class="box"></span>Built <span class="where">parts Mac</span></td><td><span class="box"></span>Built <span class="where">parts Mac</span></td></tr>
+  <tr><td>Mac, Intel</td><td><span class="box"></span>Built <span class="where">parts Mac, Rosetta</span></td><td><span class="box"></span>Built <span class="where">parts Mac, Rosetta</span></td><td><span class="box"></span>Built <span class="where">parts Mac, Rosetta</span></td></tr>
+  <tr><td>Windows</td><td><span class="box"></span>Built <span class="where">LANA.cpp builds</span></td><td><span class="box"></span>Built <span class="where">Azure Windows VM</span></td><td><span class="box"></span>Built <span class="where">Azure Windows VM</span></td></tr>
+  <tr><td>Linux</td><td><span class="box"></span>Built <span class="where">LANA.cpp builds</span></td><td><span class="box"></span>Built <span class="where">Azure Linux VM (Ubuntu 22.04)</span></td><td><span class="box"></span>Built <span class="where">Azure Linux VM (Ubuntu 22.04)</span></td></tr>
+</table>
+<ol>
+  <li><span class="box"></span><span class="n">4</span><span><span class="t">Pin entries and version in the client app</span><span class="h">One reviewed change on development: pip-pin.json and engine-pin.json entries for every system, and the version (node scripts/generate-version.js X.Y.Z, then node scripts/licenses/generate.js).</span></span></li>
+  <li><span class="box"></span><span class="n">5</span><span><span class="t">Every Azure build VM deleted</span><span class="h">Each build's own resource group (lana-build-...) shows deleted.</span></span></li>
+</ol>
+
+<h2>Phase 3. Test</h2>
+<p class="intro">Prove the code before anyone gets it.</p>
+<ol>
+  <li><span class="box"></span><span class="n">6</span><span><span class="t">Chat end-to-end tests run on the engine commit</span><span class="h">chat-core and chat-agentic in LANA-AI; review results.json.</span></span></li>
+  <li><span class="box"></span><span class="n">7</span><span><span class="t">App unit tests pass on the release commit</span><span class="h">npm run test:unit in lana-ai-client.</span></span></li>
+  <li><span class="box"></span><span class="n">8</span><span><span class="t">Release commits moved to production</span><span class="h">Needs Michael's yes. The installer machine builds from client production.</span></span></li>
+</ol>
+
+<h2>Phase 4. Release the server</h2>
+<p class="intro">Firms' servers go before the app reaches them: an app whose engine is newer than the firm's server stops working for that firm.</p>
+<ol>
+  <li><span class="box"></span><span class="n">9</span><span><span class="t">Classifiers checked</span><span class="h">release.sh step 0 (PINS) decides. Publish any missing archive to models.lanaai.io first.</span></span></li>
+  <li><span class="box"></span><span class="n">10</span><span><span class="t">Signed server update for boxes (on-prem)</span><span class="h">scripts/release/release.sh: signed, staged, verified, published to releases.lanaai.io/server/updates/.</span></span></li>
+  <li><span class="box"></span><span class="n">11</span><span><span class="t">Cloud images built and pushed</span><span class="h">The four Railway images (lana-chef, lana-embed, lana-redactor, lana-minio): deploy/railway/build-images.sh on an Azure Linux VM, push-images.sh to LANA's registry (stored on R2, never GitHub), then the control plane image variables and update policy set to the new digests.</span></span></li>
+  <li><span class="box"></span><span class="n">12</span><span><span class="t">Release recorded in the portal</span></span></li>
+  <li><span class="box"></span><span class="n">13</span><span><span class="t">Each firm's server updated, Norton first</span><span class="h">To the engine commit or newer, before that firm's team gets the new app.</span></span></li>
+</ol>
+
+<h2>Phase 5. Build the app installers (installer build machine)</h2>
+<p class="intro">All four, together, in one session. Never one system early.</p>
+<ol>
+  <li><span class="box"></span><span class="n">14</span><span><span class="t">Every system shows READY</span><span class="h">All 12 boxes in step 3 ticked.</span></span></li>
+  <li><span class="box"></span><span class="n">15</span><span><span class="t">Fresh parts links file made</span><span class="h">Read-only links to lana-build-parts; they expire after 7 days, so make it right before building.</span></span></li>
+  <li><span class="box"></span><span class="n">16</span><span><span class="t">All installers built</span><span class="h">scripts/build-client.sh from client production: npm ci, no --clean, --publish on the last build.</span></span></li>
+  <li><span class="box"></span><span class="n">17</span><span><span class="t">The build packed its own parts</span><span class="h">Document editor, Briefs speech package for each system, and the Mac helpers (screen voice, Briefs Bluetooth wake).</span></span></li>
+  <li><span class="box"></span><span class="n">18</span><span><span class="t">Mac, Apple chip: .dmg and .zip</span></span></li>
+  <li><span class="box"></span><span class="n">19</span><span><span class="t">Mac, Intel: .dmg and .zip</span></span></li>
+  <li><span class="box"></span><span class="n">20</span><span><span class="t">Windows: -setup.exe and .zip</span><span class="h">Not code signed yet; SmartScreen warns on first run.</span></span></li>
+  <li><span class="box"></span><span class="n">21</span><span><span class="t">Linux: .AppImage and .deb</span><span class="h">x86_64 only.</span></span></li>
+  <li><span class="box"></span><span class="n">22</span><span><span class="t">Blockmap files beside each installer</span></span></li>
+  <li><span class="box"></span><span class="n">23</span><span><span class="t">Mac installers signed and notarized</span><span class="h">spctl says Notarized Developer ID; codesign --verify passes; the app is named LANA AI.</span></span></li>
+  <li><span class="box"></span><span class="n">24</span><span><span class="t">Data folder name unchanged</span><span class="h">app.asar package.json still says productName "Lana AI", so people keep their data.</span></span></li>
+</ol>
+
+<h2>Phase 6. Publish</h2>
+<ol>
+  <li><span class="box"></span><span class="n">25</span><span><span class="t">Installers uploaded to releases.lanaai.io</span><span class="h">client/X.Y.Z/ and client/latest/.</span></span></li>
+  <li><span class="box"></span><span class="n">26</span><span><span class="t">Update feeds uploaded last</span><span class="h">latest-mac.yml (merges both Mac builds), latest.yml, latest-linux.yml.</span></span></li>
+  <li><span class="box"></span><span class="n">27</span><span><span class="t">Every download link opens</span><span class="h">curl -sI on each link answers 200.</span></span></li>
+  <li><span class="box"></span><span class="n">28</span><span><span class="t">Released to firms</span><span class="h">Only firms whose server was updated in step 13.</span></span></li>
+</ol>
+
+<h2>Rules that always apply</h2>
+<ul class="rules">
+  <li>Work lands on development in every repo; a release moves development to production with Michael's yes.</li>
+  <li>Everything is hosted on Cloudflare R2. Azure is only for build VMs, deleted when each build ends.</li>
+  <li>A new backend commit needs new engine builds only when the app should carry it; then all four systems are rebuilt.</li>
+  <li>Never print secrets, signed links or passwords. Never put a GitHub token on a build VM.</li>
+</ul>
+</body>
+</html>
