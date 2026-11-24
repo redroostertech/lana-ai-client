@@ -122,6 +122,15 @@ describe('listValueFormat: the unit for list numbers comes from the card format'
   test('currency_breakdown means dollars', () => {
     expect(View.listValueFormat(card('gross_revenue_by_service_offering'))).toBe('currency');
   });
+  test('the server row_format wins over the card format', () => {
+    expect(View.listValueFormat({ format: 'table', row_format: 'currency' })).toBe('currency');
+    expect(View.listValueFormat({ format: 'currency_breakdown', row_format: 'integer' })).toBe('number');
+    expect(View.listValueFormat({ format: 'table', row_format: 'percentage' })).toBe('percent');
+  });
+  test('an unknown or missing row_format falls back to the card format', () => {
+    expect(View.listValueFormat({ format: 'currency_breakdown', row_format: 'stars' })).toBe('currency');
+    expect(View.listValueFormat({ format: 'currency_breakdown', row_format: null })).toBe('currency');
+  });
   test('table means plain numbers', () => {
     expect(View.listValueFormat(card('new_cases_opened_by_service_offering'))).toBe('number');
     expect(View.listValueFormat(card('actual_vs_needed_service_offerings'))).toBe('number');

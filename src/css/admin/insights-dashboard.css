@@ -976,7 +976,7 @@
 }
 
 #dashboardDetailBreadcrumb {
-  margin: 0.75rem 0 1rem;
+  margin: 0 0 0.75rem;
   display: block;
 }
 
@@ -2045,11 +2045,25 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  margin-bottom: 1.25rem;
+  margin-bottom: 0.75rem;
 }
 
-.dash-header__crumbs .lex-breadcrumb {
+/* Breadcrumb directly under the header, above the tab row. */
+.dash-crumbs .lex-breadcrumb {
   font-size: 0.75rem;
+}
+
+.dash-fallback-note {
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px dashed var(--lex-border-subtle);
+  border-radius: 10px;
+  font-size: 0.8125rem;
+  color: var(--lex-text-secondary);
+}
+
+.dash-fallback-note[hidden] {
+  display: none;
 }
 
 .dash-header__main {

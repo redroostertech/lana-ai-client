@@ -92,6 +92,14 @@ describe('greeting', () => {
     expect(Layout.greeting(at(13), { firstName: ' Ben ' }, 'x')).toBe('Good afternoon, Ben');
     expect(Layout.greeting(at(19), { first_name: 'Cy' }, 'x')).toBe('Good evening, Cy');
   });
+  test('a system or service account is not greeted by name', () => {
+    expect(Layout.greeting(at(9), { first_name: 'System' }, 'Owner Performance')).toBe('Owner Performance');
+    expect(Layout.greeting(at(9), { firstName: 'system' }, 'Owner Performance')).toBe('Owner Performance');
+    expect(Layout.greeting(at(9), { first_name: 'Ana', is_system: true }, 'T')).toBe('T');
+    expect(Layout.greeting(at(9), { first_name: 'Ana', is_service_account: true }, 'T')).toBe('T');
+    expect(Layout.greeting(at(9), { first_name: 'Ana', account_type: 'service' }, 'T')).toBe('T');
+    expect(Layout.greeting(at(9), { first_name: 'Ana', account_type: 'person' }, 'T')).toBe('Good morning, Ana');
+  });
   test('without a first name it falls back to the dashboard title', () => {
     expect(Layout.greeting(at(9), null, 'Owner Performance')).toBe('Owner Performance');
     expect(Layout.greeting(at(9), { first_name: '  ' }, 'Owner Performance')).toBe('Owner Performance');

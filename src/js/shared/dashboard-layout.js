@@ -102,9 +102,21 @@
     return 'evening';
   }
 
+  // A system or service account (a first name of "System", or a flag on the
+  // user) is not a person to greet.
+  var SERVICE_TYPES = { system: true, service: true };
+
+  function isServiceAccount(user, first) {
+    if (first.toLowerCase() === 'system') return true;
+    if (user.is_system || user.isSystem || user.is_service_account || user.isServiceAccount) return true;
+    var type = String(user.account_type || user.accountType || user.user_type || '').toLowerCase();
+    return !!SERVICE_TYPES[type];
+  }
+
   // "Good morning, Ana" from the signed-in user, or the dashboard title.
   function greeting(now, user, fallback) {
     var first = user ? String(user.first_name || user.firstName || '').trim() : '';
+    if (first && isServiceAccount(user, first)) first = '';
     if (!first) return fallback || 'Dashboard';
     return 'Good ' + partOfDay(now) + ', ' + first;
   }

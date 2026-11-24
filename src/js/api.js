@@ -3926,6 +3926,8 @@ class ApiClient {
     if (params.compareBy) queryParts.push('compareBy=' + encodeURIComponent(params.compareBy));
     if (params.compareToPrevious !== undefined) queryParts.push('compareToPrevious=' + encodeURIComponent(String(params.compareToPrevious)));
     if (params.compareMode) queryParts.push('compareMode=' + encodeURIComponent(params.compareMode));
+    // rawLimit 0 skips the source rows (a sparkline needs only the history).
+    if (params.rawLimit !== undefined && params.rawLimit !== null) queryParts.push('raw_limit=' + encodeURIComponent(String(params.rawLimit)));
     if (queryParts.length > 0) url += '?' + queryParts.join('&');
     // options may carry { signal } so callers (e.g. the Metric Catalog "Run All"
     // batch runner) can cancel the in-flight request on a per-metric timeout.

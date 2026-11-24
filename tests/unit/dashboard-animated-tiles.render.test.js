@@ -35,7 +35,7 @@ function page(api = {}, user = null) {
   let source = fs.readFileSync(path.join(__dirname, '../../src/js/admin/dashboard-detail.js'), 'utf8');
   const end = source.lastIndexOf('  init();');
   source = source.slice(0, end)
-    + '  window.testExports = { renderMetricCard, loadMetrics, readPeriodControls, setBanner, cardLoads: function () { return cardLoads; } };'
+    + '  window.testExports = { renderMetricCard, loadMetrics, loadDashboardById, readPeriodControls, setBanner, fetchSparkline, cardLoads: function () { return cardLoads; } };'
     + source.slice(end + '  init();'.length);
   const nodes = {};
   const document = { addEventListener() {}, getElementById: (id) => (nodes[id] = nodes[id] || node()), querySelector: () => null, querySelectorAll: () => [] };
@@ -242,5 +242,50 @@ describe('bento layout and header', () => {
     expect(html).toContain('mini-delta mini-delta--up');
     expect(text(html)).toContain('+7.8% vs previous period');
   });
+});
+
+describe('when the saved dashboard cannot be read', () => {
+  function sharedPage(api) {
+    const p = page(Object.assign({ listBIDashboards: jest.fn().mockResolvedValue({ data: [] }) }, api));
+    return p;
+  }
+
+  test('a 403 on the dashboard still draws the standard cards in the bento, cards as direct grid children', async () => {
+    const forbidden = Object.assign(new Error('Permission required: dashboard:read'), { status: 403 });
+    const getDashboardMetricCards = jest.fn().mockResolvedValue({ data: cards });
+    const p = sharedPage({ getBIDashboard: jest.fn().mockRejectedValue(forbidden), getDashboardMetricCards });
+    await p.exports.loadDashboardById('abc');
+    const html = p.nodes.dashboardMetricGrid.innerHTML;
+    expect(getDashboardMetricCards).toHaveBeenCalledTimes(1);
+    expect(html).not.toContain('dash-metric-section');
+    // Every top-level element in the grid is a card.
+    const topLevel = html.split('<article ').length - 1;
+    expect(topLevel).toBe(cards.length);
+    expect(html).toContain('dash-metric-card--hero');
+    expect(text(p.nodes.dashboardFallbackNote.innerHTML)).toContain('This saved dashboard could not be opened');
+    expect(p.nodes.dashboardFallbackNote.hidden).toBe(false);
+  });
+
+  test('when the cards fail too, the calm error shows and no empty state', async () => {
+    const down = Object.assign(new Error('The server cannot reach its database'), { status: 503 });
+    const p = sharedPage({ getBIDashboard: jest.fn().mockRejectedValue(down), getDashboardMetricCards: jest.fn().mockRejectedValue(down) });
+    await p.exports.loadDashboardById('abc');
+    expect(p.nodes.dashboardMetricGrid.innerHTML).toContain('dash-load-error');
+    expect(p.nodes.dashboardMetricEmpty.hidden).toBe(true);
+  });
+
+  test('a readable dashboard hides the note', async () => {
+    const p = sharedPage({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'Mine', layout: { dashboard_type: 'owner', metric_keys: [] } } }),
+      getDashboardMetricCards: jest.fn().mockResolvedValue({ data: cards }) });
+    await p.exports.loadDashboardById('abc');
+    expect(p.nodes.dashboardFallbackNote.hidden).toBe(true);
+  });
+});
+
+test('sparklines ask for history only (raw_limit 0), with the page dates', async () => {
+  const getMetricDetail = jest.fn().mockResolvedValue({ data: { snapshots: [] } });
+  const p = page({ getMetricDetail });
+  await p.exports.fetchSparkline({ metricKey: 'a.b', cacheKey: 'a.b|x' });
+  expect(getMetricDetail).toHaveBeenCalledWith('a.b', { periodStart: '2026-01-01', periodEnd: '2026-01-31', compareBy: 'monthly', rawLimit: 0 });
 });
 

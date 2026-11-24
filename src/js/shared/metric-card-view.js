@@ -145,12 +145,16 @@
     };
   }
 
-  // The unit of a list card's numbers, keyed by the card format until the
-  // server sends a unit per list: currency_breakdown is dollars, table (and
-  // the *_count fields) are plain numbers.
+  // The unit of a list card's numbers: the server's row_format (currency |
+  // integer | percentage) when it sends one, else the card format:
+  // currency_breakdown is dollars, table (and the *_count fields) are plain
+  // numbers. Returns 'currency' | 'number' | 'percent'.
+  var ROW_FORMATS = { currency: 'currency', integer: 'number', percentage: 'percent' };
   var LIST_VALUE_FORMATS = { currency_breakdown: 'currency', table: 'number' };
 
   function listValueFormat(card) {
+    var rowFormat = card && typeof card.row_format === 'string' ? ROW_FORMATS[card.row_format.toLowerCase()] : null;
+    if (rowFormat) return rowFormat;
     var format = card && card.format;
     if (format && typeof format === 'object') format = format.type || format.style;
     return LIST_VALUE_FORMATS[String(format || '').toLowerCase()] || 'number';

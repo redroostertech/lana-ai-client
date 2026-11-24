@@ -753,10 +753,11 @@
         + window.DataState.render(EMPTY_LIST_STATE, { calm: true }) + periodLine(metric) + '</article>';
     }
     // The unit comes from the card format (currency_breakdown is dollars).
+    // The unit: the server's row_format, else the card format.
     var unit = window.MetricCardView.listValueFormat(metric);
-    var formatBar = unit === 'currency'
-      ? function (n) { return n === null ? window.DataState.EMPTY_VALUE : formatMetricCardValue({ value: n, format: 'currency' }); }
-      : plainNumber;
+    var formatBar = unit === 'number' ? plainNumber : function (n) {
+      return n === null ? window.DataState.EMPTY_VALUE : formatMetricCardValue({ value: n, format: unit === 'percent' ? 'percentage' : unit });
+    };
     // More than 12 rows read better as horizontal bars (8 shown, the rest counted).
     if (bars.hiddenCount > 0) bars = window.MetricCardView.listBars(metric.value, 8);
     var action = bars.neededPending ? window.DataState.goalAction(metric) : null;
@@ -1110,8 +1111,9 @@
     if (cached) return cached.promise;
     var period = currentPeriod;
     var entry = { done: false, line: null };
+    // History only: raw_limit=0 skips the source rows the sparkline never shows.
     entry.promise = api.getMetricDetail(job.metricKey, {
-      periodStart: period.start, periodEnd: period.end, compareBy: period.compareBy,
+      periodStart: period.start, periodEnd: period.end, compareBy: period.compareBy, rawLimit: 0,
     }).then(function (response) {
       var payload = response && response.data ? response.data : response;
       entry.line = window.MetricCardView.sparkline(payload && payload.snapshots, 100, 24);
@@ -1133,6 +1135,15 @@
       if (job.slot.isConnected !== false) paintSparkline(job.slot, line);
       pumpSparklines();
     });
+  }
+
+  function setFallbackNote(show) {
+    var note = el('dashboardFallbackNote');
+    if (!note) return;
+    note.innerHTML = show
+      ? 'This saved dashboard could not be opened right now, so these are the standard cards for its type. Change the dates to try again.'
+      : '';
+    note.hidden = !show;
   }
 
   async function loadMetrics(type) {
@@ -1189,8 +1200,23 @@
     lastSearchInputValue = '';
     renderMetrics([], null, currentDashboardType);
 
+    var dashboardResponse;
     try {
-      var dashboardResponse = await api.getBIDashboard(id);
+      dashboardResponse = await api.getBIDashboard(id);
+    } catch (definitionErr) {
+      if (!cardLoads.isLatest(myLoad)) return;
+      // The saved dashboard could not be read (a permission check or a
+      // server blip): show the standard cards for its type in the same bento,
+      // say so, and try the saved dashboard again on the next date change.
+      console.warn('[DashboardDetail] Could not read the saved dashboard:', definitionErr && definitionErr.message);
+      setFallbackNote(true);
+      await loadMetrics(currentDashboardType || 'owner');
+      currentDashboardId = id;
+      return;
+    }
+    setFallbackNote(false);
+
+    try {
       if (!cardLoads.isLatest(myLoad)) return;
       var dashboard = dashboardResponse && dashboardResponse.data ? dashboardResponse.data : dashboardResponse;
       currentDashboardName = dashboard && dashboard.name ? dashboard.name : '';

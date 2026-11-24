@@ -32,10 +32,9 @@
 
   <template id="page-content">
     <main>
-      <!-- One header: breadcrumb, greeting, the dashboard's title and actions,
-           the Insights mark, and the date-range control. -->
+      <!-- One header: greeting, the dashboard's title and actions, the
+           Insights mark and the date-range control. The breadcrumb sits under it. -->
       <header class="dash-header">
-        <lex-breadcrumb id="dashboardDetailBreadcrumb" class="dash-header__crumbs"></lex-breadcrumb>
         <div class="dash-header__main">
           <!-- Insights brand animation: plays once on load, first frame under Reduce Motion. -->
           <lex-brand-mark id="dashboardHeaderMark" class="dash-header__mark" animation="chart" size="48" once></lex-brand-mark>
@@ -103,6 +102,9 @@
           </div>
         </div>
       </header>
+
+      <lex-breadcrumb id="dashboardDetailBreadcrumb" class="dash-crumbs"></lex-breadcrumb>
+      <p id="dashboardFallbackNote" class="dash-fallback-note" role="status" hidden></p>
 
       <section class="dash-detail-content">
         <div class="dash-tabs-row">
