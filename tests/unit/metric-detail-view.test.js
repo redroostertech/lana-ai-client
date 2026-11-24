@@ -153,3 +153,45 @@ describe('cell formatting the worklist and the records table share', () => {
     expect(V.worklistColumns(table.columns, 4).map((c) => c.key)).toEqual(['matter_name', 'due_date', 'expected_amount', 'product']);
   });
 });
+
+describe('row_columns from the server', () => {
+  const rows = [
+    { matter_ref: 'm-1', matter_name: 'Estate', product: 'uncategorized', due_date: '2023-07-18T04:00:00Z', expected_amount: '2750', item_kind: 'invoice' },
+    { matter_ref: 'm-2', matter_name: 'Trust', product: 'trust_based_plan', due_date: '2023-08-01T04:00:00Z', expected_amount: '1250', item_kind: 'payment_plan' },
+  ];
+  const rowColumns = [
+    { field: 'item_kind', header: 'Kind', labels: { invoice: 'Bill', payment_plan: 'Payment plan step' } },
+    { field: 'due_date', header: 'Due', format: 'date' },
+    { field: 'expected_amount', header: 'Amount due', format: 'currency', align: 'right' },
+    { field: 'product', header: 'Service' },
+  ];
+
+  test('only those columns, in that order, with their headers, formats and alignment', () => {
+    const table = V.recordsTable(rows, rowColumns);
+    expect(table.columns.map((c) => [c.key, c.label, c.type, c.align])).toEqual([
+      ['item_kind', 'Kind', 'enum', 'left'], ['due_date', 'Due', 'date', 'left'], ['expected_amount', 'Amount due', 'money', 'right'], ['product', 'Service', 'enum', 'left'],
+    ]);
+    expect(table.rows[0].cells.map((c) => c.text)).toEqual(['Bill', 'Jul 18, 2023', '$2,750', 'Not mapped']);
+    expect(table.rows[1].cells.map((c) => c.text)).toEqual(['Payment plan step', 'Aug 1, 2023', '$1,250', 'Trust based plan']);
+  });
+
+  test('a value with no label falls back to the humanised value', () => {
+    const table = V.recordsTable([{ item_kind: 'credit_note' }], [{ field: 'item_kind', header: 'Kind', labels: { invoice: 'Bill' } }]);
+    expect(table.rows[0].cells[0].text).toBe('Credit note');
+  });
+
+  test('null or empty row_columns keeps the inference', () => {
+    expect(V.recordsTable(rows, null).columns.map((c) => c.key)).toEqual(V.recordsTable(rows).columns.map((c) => c.key));
+    expect(V.recordsTable(rows, []).columns.length).toBeGreaterThan(0);
+  });
+
+  test('formatCell applies labels first', () => {
+    expect(V.formatCell('invoice', { key: 'item_kind', type: 'enum', labels: { invoice: 'Bill' } })).toBe('Bill');
+    expect(V.formatCell('', { key: 'x', type: 'text' })).toBe(null);
+  });
+});
+
+test('worklistColumns keeps every column the server chose, in its order', () => {
+  const cols = V.recordsTable([{ a: 1, b: 2, c: 3, d: 4, e: 5 }], ['e', 'd', 'c', 'b', 'a'].map((f) => ({ field: f, header: f.toUpperCase() }))).columns;
+  expect(V.worklistColumns(cols, 4).map((c) => c.key)).toEqual(['e', 'd', 'c', 'b', 'a']);
+});

@@ -126,7 +126,7 @@
     var renderers = {};
     columns.forEach(function (col) {
       renderers[col.key] = function (value, row) {
-        var text = view().cellText(value, col.type, col.key);
+        var text = view().formatCell(value, col);
         if (text === null) return MUTED_DASH;
         if (col.align === 'right') return '<span class="metric-detail-num">' + escapeHtml(text) + '</span>';
         if (col.key === 'matter_name' && row && row._href) {
@@ -178,11 +178,13 @@
     toolbars.snapshots.updateCount();
   }
 
-  function renderRawData(sourceRows) {
+  // rowColumns: the server's row_columns (headers, formats, labels), which
+  // win over the inferred columns when present.
+  function renderRawData(sourceRows, rowColumns) {
     var table = el('metricRawDataTable');
     if (!table || typeof table.setData !== 'function') return;
     var shared = tables();
-    var model = view().recordsTable(sourceRows);
+    var model = view().recordsTable(sourceRows, rowColumns);
     if (model.columns.length) {
       table.setAttribute('columns', model.columns.map(function (c) { return c.key; }).join(','));
       table.setAttribute('labels', model.columns.map(function (c) { return c.label; }).join(','));
@@ -514,7 +516,7 @@
       renderDataUsed(payload.lineage, window.MetricCardView ? window.MetricCardView.isPointInTime(payload) || window.MetricCardView.isPointInTime(current) : false,
         view().summary(payload).value || '', metric.calculation || current.calculation || '');
       renderHistory(snapshots);
-      renderRawData(payload.raw_data && payload.raw_data.rows ? payload.raw_data.rows : []);
+      renderRawData(payload.raw_data && payload.raw_data.rows ? payload.raw_data.rows : [], payload.row_columns);
       renderRawDataTotal(payload.raw_data);
     } catch (err) {
       console.error('[MetricDetail] Failed to load metric detail:', err);

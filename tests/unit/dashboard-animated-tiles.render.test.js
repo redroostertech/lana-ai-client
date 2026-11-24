@@ -678,3 +678,26 @@ test('worklist cells use the shared formatter: money right-aligned, codes as wor
   expect(html).not.toContain('m-1');
   expect(html).not.toContain('uncategorized');
 });
+
+describe('server row_columns and caveats on worklists', () => {
+  const rows = [{ matter_ref: 'm-1', item_kind: 'invoice', due_date: '2023-07-18T04:00:00Z', expected_amount: '2750', product: 'uncategorized' }];
+  const rowColumns = [{ field: 'item_kind', header: 'Kind', labels: { invoice: 'Bill' } }, { field: 'due_date', header: 'Due', format: 'date' },
+    { field: 'expected_amount', header: 'Amount due', format: 'currency', align: 'right' }];
+
+  test('the worklist shows exactly the server columns, headers, labels and alignment', () => {
+    const html = page().exports.worklistHtml(rows, rowColumns);
+    expect(text(html)).toContain('Kind Due Amount due Bill Jul 18, 2023 $2,750');
+    expect(html).toContain('<td class="dash-worklist__num">$2,750</td>');
+    expect(html).not.toContain('Not mapped');
+  });
+
+  test('a worklist card shows its lineage caveat as a short muted note', async () => {
+    const declared = require(path.join(__dirname, '../fixtures/dashboard/declared-layouts.json'));
+    const cards = declared.cards_synthetic.map((c) => (c.metric_key.endsWith('overdue_expected_cash')
+      ? Object.assign({}, c, { lineage: { sources: [{ label: 'Bills' }], formula: { kind: 'sum', plain: 'x' }, caveats: ['Bills come from your practice system as of its last sync.'] } }) : c));
+    const layout = { cards: [{ id: 'w', kind: 'worklist', metric_key: 'finance.overdue_expected_cash' }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: cards }) });
+    await p.exports.loadDashboardById('d1');
+    expect(p.nodes.dashboardMetricGrid.innerHTML).toContain('<p class="dash-card__note">Bills come from your practice system as of its last sync.</p>');
+  });
+});

@@ -981,12 +981,17 @@
   function renderDeclaredWorklist(resolved, layoutItem, visual) {
     var def = resolved.def;
     var entry = resolved.metrics[0];
+    // The first lineage caveat, as a short muted note (for example how
+    // fresh the bills are).
+    var caveats = entry.metric && entry.metric.lineage && Array.isArray(entry.metric.lineage.caveats) ? entry.metric.lineage.caveats : [];
+    var caveatNote = caveats.length ? '<p class="dash-card__note">' + escapeHtml(caveats[0]) + '</p>' : '';
     var fallbackHtml = visual !== 'worklist' && def.options.fallback && def.options.fallback !== 'worklist'
       ? seriesChartHtml(resolved, def.options.fallback) : '';
     return '<article class="' + cardClass(accentClass(def, 'dash-metric-card--worklist'), layoutItem) + '">'
       + declaredTop(def, entry.key, entry.metric, true, def.title || metricTitle(entry.metric, entry.key))
       + valueBlock(entry.metric)
       + rowsSlot(entry.key, visual || 'worklist', def, fallbackHtml)
+      + caveatNote
       + cardFooter(entry.metric, entry.key, 'View all')
       + '</article>';
   }
@@ -1333,10 +1338,12 @@
   // The worklist uses the same cell formatting as the records table on the
   // metric's page (js/shared/metric-detail-view.js): no ids, words for
   // codes, dates as days, amounts as money (right-aligned).
-  function worklistHtml(rows) {
+  // rowColumns: the server's row_columns for these rows (headers, formats,
+  // labels), which win over the inferred columns when present.
+  function worklistHtml(rows, rowColumns) {
     if (!rows.length) return '<p class="dash-worklist__empty">No records right now.</p>';
     var view = window.MetricDetailView;
-    var table = view.recordsTable(rows);
+    var table = view.recordsTable(rows, rowColumns);
     var columns = view.worklistColumns(table.columns, 4);
     var head = '<tr>' + columns.map(function (col) {
       return '<th scope="col"' + (col.align === 'right' ? ' class="dash-worklist__num"' : '') + '>' + escapeHtml(col.label) + '</th>';
@@ -1344,7 +1351,7 @@
     var body = table.rows.slice(0, 5).map(function (row, index) {
       return '<tr>' + columns.map(function (col) {
         var source = rows[index][col.key];
-        var text = view.cellText(source, col.type, col.key);
+        var text = view.formatCell(source, col);
         if (text === null) return '<td class="dash-worklist__muted">-</td>';
         var dot = col.key === 'status' ? '<span class="dash-dot dash-dot--' + escapeHtml(String(source).toLowerCase()) + '" aria-hidden="true"></span>' : '';
         return '<td' + (col.align === 'right' ? ' class="dash-worklist__num"' : '') + '>' + dot + escapeHtml(text) + '</td>';
@@ -1364,7 +1371,7 @@
     return new Date(base + offset * 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
   }
 
-  function drawRows(slot, rows) {
+  function drawRows(slot, rows, rowColumns) {
     slot.classList.remove('mini-spark-slot--loading');
     var key = slot.getAttribute('data-worklist-key');
     var visual = slot.getAttribute('data-rows-visual') || 'worklist';
@@ -1379,7 +1386,7 @@
       slot.innerHTML = template.innerHTML;
     } else if (rows) {
       var sort = choice.sort || slot.getAttribute('data-rows-sort');
-      slot.innerHTML = worklistHtml(window.CardVisuals.sortRows(rows, sort));
+      slot.innerHTML = worklistHtml(window.CardVisuals.sortRows(rows, sort), rowColumns);
     } else {
       slot.innerHTML = '';
     }
@@ -1399,10 +1406,15 @@
         }).then(function (response) {
           var payload = response && response.data ? response.data : response;
           var rows = payload && payload.raw_data && Array.isArray(payload.raw_data.rows) ? payload.raw_data.rows : [];
-          return rows.slice(0, limit);
+          return { rows: rows.slice(0, limit), columns: payload && Array.isArray(payload.row_columns) ? payload.row_columns : null };
         }).catch(function () { return null; });
       }
-      worklistCache[cacheKey].then(function (rows) { drawRows(slot, rows); });
+      worklistCache[cacheKey].then(function (result) {
+        // The card's own row_columns answer first; metric detail's otherwise.
+        var metric = declaredIndex ? window.DashboardCards.metricFor(declaredIndex, key) : null;
+        var columns = metric && Array.isArray(metric.row_columns) ? metric.row_columns : (result && result.columns);
+        drawRows(slot, result ? result.rows : null, columns);
+      });
     });
   }
 

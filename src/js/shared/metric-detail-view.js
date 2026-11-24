@@ -142,8 +142,10 @@
     return String(value);
   }
 
-  // Up to n columns for a short list: names, then dates, then amounts, then the rest.
+  // Up to n columns for a short list: names, then dates, then amounts, then
+  // the rest. Columns the server chose are kept as they are, all of them.
   function worklistColumns(columns, n) {
+    if (columns && columns.length && columns[0].fromServer) return columns;
     function rank(col) {
       var k = col.key.toLowerCase();
       if (k === 'name' || k.slice(-5) === '_name') return 0;
@@ -163,12 +165,41 @@
     return null;
   }
 
-  /** { columns: [{ key, label, type }], rows: [{ cells: [{ key, text, href }] }] } */
-  function recordsTable(rows) {
+  // A value through the column's labels (from the server), else formatted.
+  function formatCell(value, col) {
+    if (isEmpty(value)) return null;
+    if (col.labels && Object.prototype.hasOwnProperty.call(col.labels, String(value))) return String(col.labels[String(value)]);
+    return cellText(value, col.type, col.key);
+  }
+
+  // The server's row_columns ([{ field, header, format?, align?, labels? }]):
+  // only those columns, in that order, with their headers and formats.
+  var SERVER_FORMATS = { currency: 'money', date: 'date' };
+
+  function serverColumns(rowColumns, list) {
+    return rowColumns.filter(function (c) { return c && c.field; }).map(function (c) {
+      var type = SERVER_FORMATS[c.format] || typeOf(c.field, list);
+      return {
+        key: String(c.field),
+        label: c.header ? String(c.header) : labelFor(String(c.field)),
+        type: type,
+        align: c.align === 'right' || c.align === 'left' ? c.align : (type === 'money' || type === 'number' ? 'right' : 'left'),
+        labels: c.labels && typeof c.labels === 'object' ? c.labels : null,
+        fromServer: true,
+      };
+    });
+  }
+
+  /**
+   * { columns: [{ key, label, type, align, labels? }], rows: [{ cells: [{ key, text, href }] }] }
+   * rowColumns (the server's row_columns) wins when present; else the
+   * columns are worked out from the field names and values.
+   */
+  function recordsTable(rows, rowColumns) {
     var list = (Array.isArray(rows) ? rows : []).filter(function (row) { return row && typeof row === 'object'; });
     var keys = [];
     list.forEach(function (row) { Object.keys(row).forEach(function (key) { if (keys.indexOf(key) === -1) keys.push(key); }); });
-    var columns = keys.filter(function (key) {
+    var columns = Array.isArray(rowColumns) && rowColumns.length ? serverColumns(rowColumns, list) : keys.filter(function (key) {
       return !isInternal(key, list) && list.some(function (row) { return !isEmpty(row[key]); });
     }).map(function (key) {
       var type = typeOf(key, list);
@@ -181,7 +212,7 @@
         return {
           id: 'row-' + index,
           cells: columns.map(function (col) {
-            return { key: col.key, text: cellText(row[col.key], col.type, col.key), href: col.key === 'matter_name' ? href : null };
+            return { key: col.key, text: formatCell(row[col.key], col), href: col.key === 'matter_name' ? href : null };
           }),
         };
       }),
@@ -273,6 +304,7 @@
   return {
     dayRangeText: dayRangeText,
     cellText: cellText,
+    formatCell: formatCell,
     worklistColumns: worklistColumns,
     recordsRow: recordsRow,
     recordsTable: recordsTable,

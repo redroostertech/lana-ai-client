@@ -188,3 +188,14 @@ test('the server count_scope sits once in a tooltip on the total, not repeated a
   expect(html).not.toContain('in your dates');
   expect(html).toContain('Count of');
 });
+
+test('the records table follows the server row_columns: columns, headers and labels', async () => {
+  const p = await page('?metric_key=matters_opened', { ...payload,
+    raw_data: { rows: [{ matter_ref: 'm-1', item_kind: 'invoice', expected_amount: '2750', product: 'x' }] },
+    row_columns: [{ field: 'item_kind', header: 'Kind', labels: { invoice: 'Bill' } }, { field: 'expected_amount', header: 'Amount due', format: 'currency', align: 'right' }] });
+  const table = p.nodes.metricRawDataTable;
+  expect(table.attrs.columns).toBe('item_kind,expected_amount');
+  expect(table.attrs.labels).toBe('Kind,Amount due');
+  expect(table.renderers.item_kind('invoice', {})).toContain('Bill');
+  expect(table.renderers.expected_amount('2750', {})).toBe('<span class="metric-detail-num">$2,750</span>');
+});
