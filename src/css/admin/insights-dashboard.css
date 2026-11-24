@@ -2682,7 +2682,7 @@ button.dash-lines__label:hover,
 }
 
 .dash-worklist__table th {
-  padding: 0 0.5rem 0.375rem 0;
+  padding: 0 1rem 0.375rem 0;
   font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -2692,7 +2692,7 @@ button.dash-lines__label:hover,
 }
 
 .dash-worklist__table td {
-  padding: 0.4375rem 0.5rem 0.4375rem 0;
+  padding: 0.4375rem 1rem 0.4375rem 0;
   border-top: 1px solid var(--lex-border-subtle);
   color: var(--lex-text-primary);
   white-space: nowrap;
@@ -4004,6 +4004,24 @@ button.dash-lines__label:hover,
 
 .metric-detail-num {
   display: block;
+}
+
+/* Record tables: every column keeps at least a 16px gap (set on the cells
+   above, and by lex-table's own cell padding). A left-aligned column that
+   follows a right-aligned number gets extra room, so "$2,750" and
+   "Confirmed" do not read as one value. */
+.dash-worklist__table th:last-child,
+.dash-worklist__table td:last-child {
+  padding-right: 0;
+}
+
+.dash-worklist__table .dash-worklist__num + th:not(.dash-worklist__num),
+.dash-worklist__table .dash-worklist__num + td:not(.dash-worklist__num) {
+  padding-left: 1rem;
+}
+
+#metricRawDataTable td:has(.metric-detail-num) + td:not(:has(.metric-detail-num)) {
+  padding-left: 2rem;
 }
 
 /* Calm states hug their content (no tall dashed box); the card's spare
