@@ -1,7 +1,9 @@
 /* "Finish your setup" banner: shown on the dashboard pages and Settings when
    some of the firm's case or appointment types are not mapped yet
    (GET /api/v1/mappings/summary), with a link to Settings > Mappings.
-   Hidden when everything is mapped or the API is not available (404).
+   Hidden when everything is mapped, when the feature is off (404, or 422
+   NOT_CONFIGURED), or when the summary fails (logged once). The summary is
+   asked for once per page and shared with Settings > Mappings.
    Words come from js/settings-mappings.model.js. */
 
 (function (global) {
@@ -16,16 +18,32 @@
       .split('"').join('&quot;').split("'").join('&#39;');
   }
 
+  // Statuses the API layer should not log for this request; real errors
+  // are logged once here instead.
+  var QUIET = [400, 401, 403, 404, 422, 500, 501, 502, 503, 504];
+  var pending = null;
+  var logged = false;
+
+  // { available, summary }: one request per page, shared and never retried.
+  function summary() {
+    if (!pending) {
+      pending = global.api.getMappingSummary({ quietStatuses: QUIET }).then(function (response) {
+        return { available: true, summary: response && response.data !== undefined ? response.data : response };
+      }, function (err) {
+        if (!global.SettingsMappingsModel.featureOff(err) && !logged) {
+          logged = true;
+          console.warn('[Mappings] Could not load the mappings summary:', err && (err.status || err.message));
+        }
+        return { available: false, summary: null };
+      });
+    }
+    return pending;
+  }
+
   async function draw(node) {
     if (!node) return;
-    var text = null;
-    try {
-      var response = await global.api.getMappingSummary();
-      var summary = response && response.data !== undefined ? response.data : response;
-      text = global.SettingsMappingsModel.bannerText(summary);
-    } catch (err) {
-      text = null; // Not available yet, or a blip: say nothing.
-    }
+    var result = await summary();
+    var text = result.available ? global.SettingsMappingsModel.bannerText(result.summary) : null;
     node.hidden = !text;
     node.innerHTML = text
       ? '<div class="lana-setup-banner" role="status"><span class="lana-setup-banner__text">' + escapeHtml(text) + '</span>'
@@ -49,9 +67,15 @@
     await draw(node);
   }
 
+  // After a save: ask again (only if the feature answered before).
   function refresh() {
-    mounted.forEach(function (id) { draw(document.getElementById(id)); });
+    if (!pending) return;
+    pending.then(function (result) {
+      if (!result.available) return;
+      pending = null;
+      mounted.forEach(function (id) { draw(document.getElementById(id)); });
+    });
   }
 
-  global.LanaSetupBanner = { mount: mount, refresh: refresh };
+  global.LanaSetupBanner = { mount: mount, refresh: refresh, summary: summary };
 })(window);

@@ -130,7 +130,21 @@
     return n === 1 ? '1 matter is not mapped to a service yet' : count(n) + ' matters are not mapped to a service yet';
   }
 
+  // The mappings feature is switched off on this server: an older server
+  // answers 404 (or 501); a server with the feature flag off answers 422
+  // with error code NOT_CONFIGURED. Anything else is a real error.
+  function featureOff(err) {
+    if (!err) return false;
+    var status = err.status || (err.response && err.response.status);
+    if (status === 404 || status === 501) return true;
+    if (status !== 422) return false;
+    var data = err.data || {};
+    var code = err.code || data.code || (data.error && data.error.code) || '';
+    return code === 'NOT_CONFIGURED';
+  }
+
   return {
+    featureOff: featureOff,
     pickerOptions: pickerOptions,
     visibleRows: visibleRows,
     rowKey: rowKey,

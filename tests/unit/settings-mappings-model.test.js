@@ -80,3 +80,22 @@ describe('messages', () => {
     expect(M.coverageCaveat(null)).toBe(null);
   });
 });
+
+describe('featureOff: is the mappings feature switched off on this server?', () => {
+  const M = require(path.join(__dirname, '../../src/js/settings-mappings.model.js'));
+  const err = (status, data, code) => Object.assign(new Error('x'), { status, data, code: code === undefined ? null : code });
+
+  test('404 (an older server) is off', () => {
+    expect(M.featureOff(err(404))).toBe(true);
+  });
+  test('422 with code NOT_CONFIGURED is off, whether the code is on the error or in its body', () => {
+    expect(M.featureOff(err(422, { error: { code: 'NOT_CONFIGURED' } }, 'NOT_CONFIGURED'))).toBe(true);
+    expect(M.featureOff(err(422, { error: { code: 'NOT_CONFIGURED' } }, null))).toBe(true);
+    expect(M.featureOff(err(422, { code: 'NOT_CONFIGURED' }, null))).toBe(true);
+  });
+  test('422 with another code, and 500, are real errors', () => {
+    expect(M.featureOff(err(422, { error: { code: 'VALIDATION_ERROR' } }, 'VALIDATION_ERROR'))).toBe(false);
+    expect(M.featureOff(err(500, { error: { code: 'INTERNAL' } }, 'INTERNAL'))).toBe(false);
+    expect(M.featureOff(null)).toBe(false);
+  });
+});

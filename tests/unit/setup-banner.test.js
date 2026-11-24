@@ -39,3 +39,36 @@ test('the API is not there yet (404): hidden, no error', async () => {
   await window.LanaSetupBanner.mount('lanaSetupBanner');
   expect(node.hidden).toBe(true);
 });
+
+describe('feature off or failing: hidden, quiet, one request', () => {
+  const failing = (status, code) => Promise.reject(Object.assign(new Error('x'), { status, code, data: { error: { code } } }));
+  let warn;
+  let error;
+  beforeEach(() => { warn = jest.spyOn(console, 'warn').mockImplementation(() => {}); error = jest.spyOn(console, 'error').mockImplementation(() => {}); });
+  afterEach(() => { warn.mockRestore(); error.mockRestore(); });
+
+  test.each([[404, null], [422, 'NOT_CONFIGURED']])('%s %s is the feature off: hidden and silent', async (status, code) => {
+    const { window, node } = load(failing(status, code));
+    expect((await window.LanaSetupBanner.summary()).available).toBe(false);
+    await window.LanaSetupBanner.mount('lanaSetupBanner');
+    expect(node.hidden).toBe(true);
+    expect(warn).not.toHaveBeenCalled();
+    expect(error).not.toHaveBeenCalled();
+  });
+
+  test.each([[422, 'VALIDATION_ERROR'], [500, 'INTERNAL']])('%s %s: hidden, logged once, no retry', async (status, code) => {
+    const { window, node } = load(failing(status, code));
+    await window.LanaSetupBanner.mount('lanaSetupBanner');
+    await window.LanaSetupBanner.mount('lanaSetupBanner');
+    await window.LanaSetupBanner.summary();
+    expect(node.hidden).toBe(true);
+    expect(warn.mock.calls.length + error.mock.calls.length).toBe(1);
+    expect(window.api.getMappingSummary).toHaveBeenCalledTimes(1);
+  });
+
+  test('the summary request asks the API layer to stay quiet for these statuses', async () => {
+    const { window } = load(Promise.resolve({ data: sample.summary }));
+    await window.LanaSetupBanner.summary();
+    expect(window.api.getMappingSummary.mock.calls[0][0].quietStatuses).toEqual(expect.arrayContaining([404, 422, 500]));
+  });
+});

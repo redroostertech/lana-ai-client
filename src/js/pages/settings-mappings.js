@@ -40,12 +40,6 @@
     return response && response.data !== undefined ? response.data : response;
   }
 
-  // The API is not there yet (or the feature is off for this firm).
-  function isOff(err) {
-    var status = err && (err.status || (err.response && err.response.status));
-    return status === 404 || status === 501;
-  }
-
   function canEdit() {
     return !!(window.Lex && Lex.Auth && typeof Lex.Auth.isAdmin === 'function' && Lex.Auth.isAdmin());
   }
@@ -141,7 +135,7 @@
     } catch (err) {
       state.rows[vocabulary] = [];
       state.loaded[vocabulary] = true;
-      setMessage(isOff(err) ? 'Mappings are not available yet.' : 'Could not load the mappings. Try again in a moment.');
+      setMessage(model().featureOff(err) ? 'Mappings are not available yet.' : 'Could not load the mappings. Try again in a moment.');
     }
     render();
   }
@@ -229,13 +223,12 @@
 
   // Show the section only when the API answers; load it the first time.
   async function start() {
-    if (!el('sv2-panel-mappings') || !window.api || typeof api.getMappingSummary !== 'function') return;
+    if (!el('sv2-panel-mappings') || !window.api || typeof api.getMappingSummary !== 'function' || !window.LanaSetupBanner) return;
     state.canEdit = canEdit();
-    try {
-      await api.getMappingSummary();
-    } catch (err) {
-      return; // Not available: the nav item and panel stay hidden.
-    }
+    // One shared summary request (setup-banner.js): feature off or failing
+    // leaves the nav item and panel hidden, with no retry.
+    var result = await window.LanaSetupBanner.summary();
+    if (!result.available) return;
     ['sv2-tab-mappings', 'sv2-panel-mappings'].forEach(function (id) {
       var node = el(id);
       if (node && node.classList) node.classList.remove('sv2-hidden');

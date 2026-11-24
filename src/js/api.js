@@ -3919,8 +3919,9 @@ class ApiClient {
 
   // ── Mappings (Settings > Mappings): source values to governed keys ──
   // GET /api/v1/mappings/summary -> per vocabulary { mapped_records, unmapped_records, unmapped_values }
-  async getMappingSummary() {
-    return this.get('/api/v1/mappings/summary');
+  // options.quietStatuses: statuses the caller handles itself (setup-banner.js).
+  async getMappingSummary(options) {
+    return this.get('/api/v1/mappings/summary', options || {});
   }
 
   // GET /api/v1/vocabularies/:vocabulary -> [{ key, label, parent, description }]

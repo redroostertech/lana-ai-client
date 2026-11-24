@@ -97,3 +97,18 @@ test('the API is not there yet (404): the section and the banner stay hidden', a
   expect(doc.getElementById('lanaSetupBanner').hidden).toBe(true);
   expect(api.getMappings).not.toHaveBeenCalled();
 });
+
+describe('the mappings API is deployed with its flag off', () => {
+  const failing = (status, code) => Promise.reject(Object.assign(new Error('x'), { status, code, data: { error: { code } } }));
+  test.each([[404, null], [422, 'NOT_CONFIGURED'], [422, 'VALIDATION_ERROR'], [500, 'INTERNAL']])('%s %s: nav item, section and banner hidden; one summary request', async (status, code) => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const { doc, api } = await boot({ summary: failing(status, code) });
+    expect(doc.getElementById('sv2-tab-mappings').classList.contains('sv2-hidden')).toBe(true);
+    expect(doc.getElementById('sv2-panel-mappings').classList.contains('sv2-hidden')).toBe(true);
+    expect(doc.getElementById('lanaSetupBanner').hidden).toBe(true);
+    expect(api.getMappings).not.toHaveBeenCalled();
+    expect(api.getMappingSummary).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledTimes(code === 'NOT_CONFIGURED' || status === 404 ? 0 : 1);
+    warn.mockRestore();
+  });
+});
