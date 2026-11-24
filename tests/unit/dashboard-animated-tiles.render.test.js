@@ -727,3 +727,39 @@ describe('caveat note from metric detail when the card has none', () => {
     expect(b.inserted).toEqual([]);
   });
 });
+
+describe('the server sends no_goal for cards that need a goal', () => {
+  const declared = require(path.join(__dirname, '../fixtures/dashboard/declared-layouts.json'));
+  const noGoal = (c, keepInput) => Object.assign({}, c, { data_state: 'no_goal', data_state_reason: 'No goal set. An admin can set one in the Metric Catalog.' },
+    keepInput ? {} : { goal_input: undefined });
+
+  test('no_goal without goal_input still waits for a goal and links to the Metric Catalog, never $0', () => {
+    const html = page().exports.renderMetricCard(noGoal(card('payroll_gap_month'), false));
+    expect(text(html)).toContain('Waiting for a goal');
+    expect(text(html)).toContain('No goal set. An admin can set one in the Metric Catalog.');
+    expect(html).toContain('admin/metric-catalog.html?editGoal=legal_firm.finance.payroll_gap_month');
+    expect(html).not.toContain('$0');
+    expect(text(html)).not.toContain('Not enough data');
+  });
+
+  test('no_goal with goal_input keeps the goal_input message and link', () => {
+    const html = page().exports.renderMetricCard(noGoal(card('payroll_gap_month'), true));
+    expect(text(html)).toContain('Set the Cash This Month goal in the Metric Catalog.');
+    expect(html).toContain('editGoal=core.financial-performance.cash_this_month');
+  });
+
+  test.each([true, false])('composite cards show the muted chip for no_goal slots (goal_input kept: %s)', async (keepInput) => {
+    const cardsNoGoal = declared.cards_synthetic.map((c) => (/payroll_gap_month|annual_revenue_target/.test(c.metric_key) ? noGoal(c, keepInput) : c));
+    const layout = declared.layouts['Owner Overview'];
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'Owner Overview', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: cardsNoGoal }),
+      getMetricDetail: jest.fn().mockResolvedValue({ data: { snapshots: [] } }) });
+    await p.exports.loadDashboardById('d1');
+    const articles = p.nodes.dashboardMetricGrid.innerHTML.split('<article ').slice(1);
+    const payroll = articles.find((a) => a.includes('Cash This Month'));
+    expect(text(payroll)).toContain('Payroll Gap This Month Waiting for a goal');
+    expect(payroll).toContain('mini-ring');
+    const target = articles.find((a) => a.includes('>Target Revenue<'));
+    expect(text(target)).toContain('Annual Revenue Target Waiting for a goal');
+    expect(text(payroll + target)).not.toContain('No goal set Waiting');
+  });
+});
