@@ -160,6 +160,32 @@
     return columnsHtml(model, format);
   }
 
+  // ── Group (one bar per metric) and funnel ─────────────────────
+  // rows: DashboardCards.groupRows(card, index). opts: { funnel, format(row),
+  // href(key), waitingLabel(row) }. Every label opens that metric's records.
+  function groupHtml(rows, opts) {
+    if (!rows || !rows.length) return '';
+    var o = opts || {};
+    var funnel = !!o.funnel;
+    var items = rows.map(function (row, i) {
+      var step = funnel && row.conversionPct !== null && row.conversionPct !== undefined
+        ? '<li class="mini-group__step" aria-hidden="false">' + escapeHtml(row.conversionPct + '% of the step before') + '</li>'
+        : '';
+      var value = row.waiting
+        ? '<span class="mini-group__waiting">' + escapeHtml(o.waitingLabel ? o.waitingLabel(row) : 'Waiting') + '</span>'
+        : '<span class="mini-group__value">' + escapeHtml(o.format ? o.format(row) : String(row.value)) + '</span>';
+      var x = funnel ? round1((100 - row.pct) / 2) : 0;
+      var bar = row.waiting ? ''
+        : '<svg class="mini-group__track" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true" focusable="false">'
+          + '<rect class="mini-group__fill" x="' + x + '" y="0" width="' + row.pct + '" height="8"></rect></svg>';
+      return step + '<li class="mini-group__row' + (row.waiting ? ' mini-group__row--waiting' : '') + '">'
+        + '<div class="mini-group__head">'
+        + '<button type="button" class="mini-group__label" data-metric-detail-link="' + escapeHtml(o.href ? o.href(row.key) : '') + '" title="See the records">' + escapeHtml(row.label) + '</button>'
+        + value + '</div>' + bar + '</li>';
+    }).join('');
+    return '<ul class="mini-group' + (funnel ? ' mini-group--funnel' : '') + '">' + items + '</ul>';
+  }
+
   // ── Delta chip ────────────────────────────────────────────────
   // arrow: MetricCardView.comparisonArrow(card.comparison)
   function deltaChip(arrow, words) {
@@ -252,6 +278,7 @@
     sparklineSvg: sparklineSvg,
     barsHtml: barsHtml,
     breakdownHtml: breakdownHtml,
+    groupHtml: groupHtml,
     deltaChip: deltaChip,
     ringHtml: ringHtml,
     countUp: countUp,

@@ -288,6 +288,10 @@
   // (js/shared/load-state.js). Replaces a bare counter so "No metrics" only
   // shows after a finished request returned nothing.
   var cardLoads = window.LoadState.createLoadTracker();
+  // The saved dashboard's declared cards (layout.cards), or null.
+  var currentDeclaredCards = null;
+  // The variant in view per declared card id (breakdown toggles).
+  var variantPicks = {};
   // The text each tile showed last, so new dates count from the old number.
   var previousValues = {};
 
@@ -752,7 +756,16 @@
       return '<article class="' + cardClass('dash-metric-card--waiting', item) + '">' + cardTop(metric, cardId, false)
         + window.DataState.render(EMPTY_LIST_STATE, { calm: true }) + periodLine(metric) + '</article>';
     }
-    // The unit comes from the card format (currency_breakdown is dollars).
+    return '<article class="' + cardClass('dash-metric-card--list', item) + '">' + cardTop(metric, cardId, true)
+      + listChartHtml(metric)
+      + periodLine(metric)
+      + '</article>';
+  }
+
+  // A list metric's chart (columns, or bars past 12 rows) and its notes.
+  function listChartHtml(metric) {
+    var bars = window.MetricCardView.listBars(metric.value, 12);
+    if (bars.empty) return window.DataState.render(EMPTY_LIST_STATE, { calm: true });
     // The unit: the server's row_format, else the card format.
     var unit = window.MetricCardView.listValueFormat(metric);
     var formatBar = unit === 'number' ? plainNumber : function (n) {
@@ -766,11 +779,223 @@
         + (action ? ' <button type="button" class="lex-data-state__action" data-data-state-action="' + escapeHtml(action.href) + '">' + escapeHtml(action.label) + '</button>' : '')
         + '</p>'
       : '';
-    return '<article class="' + cardClass('dash-metric-card--list', item) + '">' + cardTop(metric, cardId, true)
-      + '<div class="dash-metric-card__chart">' + window.MiniCharts.breakdownHtml(bars, formatBar) + pendingNote + '</div>'
-      + periodLine(metric)
+    return '<div class="dash-metric-card__chart">' + window.MiniCharts.breakdownHtml(bars, formatBar) + pendingNote + '</div>';
+  }
+
+  // ── Declared cards (layout.cards; js/shared/dashboard-cards.js) ──────
+  // A metric the response did not include reads as waiting, like the rest.
+  var MISSING_METRIC = {
+    data_state: 'insufficient_data',
+    data_state_reason: 'This number did not come back for these dates.',
+  };
+  var declaredIndex = null;
+
+  function metricTitle(metric, key) {
+    return (metric && (metric.title || metric.name)) || humanize(String(key || '').split('.').pop());
+  }
+
+  function declaredTop(def, key, metric, withRecords, title) {
+    if (metric) metricInfoById[key] = metric;
+    var shown = Object.assign({}, metric || { metric_key: key }, { title: title || def.title || metricTitle(metric, key) });
+    return cardTop(shown, key, withRecords);
+  }
+
+  function waitingChip(metric) {
+    var view = window.DataState.view(metric || MISSING_METRIC, { calm: true }) || { title: 'Waiting', reason: '' };
+    return '<span class="dash-chip-waiting" title="' + escapeHtml(view.reason) + '">' + escapeHtml(view.title) + '</span>';
+  }
+
+  // One detail line: a label (a link to that metric's records when it is
+  // a metric) and its value. valueHtml is already escaped.
+  function detailLine(label, valueHtml, key) {
+    var labelHtml = key
+      ? '<button type="button" class="dash-lines__label" data-metric-detail-link="' + escapeHtml(recordsHref(key)) + '" title="See the records">' + escapeHtml(label) + '</button>'
+      : '<span class="dash-lines__label">' + escapeHtml(label) + '</span>';
+    return '<li class="dash-lines__item">' + labelHtml + '<span class="dash-lines__value">' + valueHtml + '</span></li>';
+  }
+
+  function valueBlock(metric) {
+    return '<div class="dash-metric-card__result">'
+      + '<div class="dash-metric-card__value">' + escapeHtml(formatMetricCardValue(metric)) + '</div>'
+      + deltaHtml(metric) + periodLine(metric) + '</div>';
+  }
+
+  function renderDeclaredGoal(resolved, layoutItem) {
+    var def = resolved.def;
+    var first = resolved.metrics[0];
+    var metric = first.metric;
+    var goal = window.DashboardCards.goalFor(metric);
+    var main;
+    if (first.waiting) {
+      main = window.DataState.render(metric || MISSING_METRIC, { calm: true });
+    } else if (goal && goal.progress && goal.progress.available) {
+      var progress = goal.progress;
+      var target = progress.target !== null ? formatMetricCardValue({ value: progress.target, format: metric.format }) : '';
+      main = '<div class="dash-metric-card__result dash-metric-card__result--goal">'
+        + window.MiniCharts.ringHtml(progress, { value: formatMetricCardValue(metric), target: target })
+        + (progress.met ? '<lex-brand-mark class="dash-metric-card__goal-met" animation="success" size="32" label="Goal met"></lex-brand-mark>' : '')
+        + '</div>' + deltaHtml(metric);
+    } else {
+      main = valueBlock(metric) + (goal && goal.progress && !goal.progress.available
+        ? '<p class="dash-metric-card__goal-note">' + escapeHtml(goal.progress.note) + '</p>' : '');
+    }
+    var lines = (goal ? goal.details : []).map(function (detail) {
+      return detailLine(detail.label, escapeHtml(formatMetricCardValue({ value: detail.value, format: metric.format })), null);
+    }).concat(resolved.metrics.slice(1).map(function (entry) {
+      return detailLine(metricTitle(entry.metric, entry.key),
+        entry.waiting ? waitingChip(entry.metric) : escapeHtml(formatMetricCardValue(entry.metric)), entry.key);
+    }));
+    return '<article class="' + cardClass('dash-metric-card--goal', layoutItem) + '">'
+      + declaredTop(def, first.key, metric, !first.waiting)
+      + main
+      + (lines.length ? '<ul class="dash-lines">' + lines.join('') + '</ul>' : '')
       + '</article>';
   }
+
+  function renderDeclaredBreakdown(resolved, layoutItem) {
+    var def = resolved.def;
+    var active = window.DashboardCards.activeVariant(def, variantPicks[def.id]);
+    var metric = window.DashboardCards.metricFor(declaredIndex, active.key);
+    var toggle = def.variants.length
+      ? '<div class="dash-variants" role="group" aria-label="Range">' + def.variants.map(function (variant, i) {
+        var on = i === active.index;
+        return '<button type="button" class="dash-variants__btn' + (on ? ' is-active' : '') + '" aria-pressed="' + (on ? 'true' : 'false')
+          + '" data-dashboard-variant="' + escapeHtml(def.id + '|' + i) + '">' + escapeHtml(variant.label) + '</button>';
+      }).join('') + '</div>'
+      : '';
+    var body;
+    if (window.DashboardCards.isWaiting(metric)) body = window.DataState.render(metric || MISSING_METRIC, { calm: true });
+    else if (Array.isArray(metric.value)) body = listChartHtml(metric);
+    else body = valueBlock(metric);
+    return '<article class="' + cardClass('dash-metric-card--list', layoutItem) + '">'
+      + declaredTop(def, active.key, metric, !!metric)
+      + toggle + body + (metric && Array.isArray(metric.value) ? periodLine(metric) : '')
+      + '</article>';
+  }
+
+  function renderDeclaredGroup(resolved, layoutItem) {
+    var def = resolved.def;
+    var rows = window.DashboardCards.groupRows(def, declaredIndex);
+    var firstOk = resolved.metrics.filter(function (entry) { return !entry.waiting; })[0];
+    var chart = window.MiniCharts.groupHtml(rows, {
+      funnel: def.chart === 'funnel',
+      format: function (row) { return formatMetricCardValue(row.metric); },
+      href: recordsHref,
+      waitingLabel: function (row) {
+        var view = window.DataState.view(row.metric || MISSING_METRIC, { calm: true });
+        return view ? view.title : 'Waiting';
+      },
+    });
+    return '<article class="' + cardClass('dash-metric-card--group', layoutItem) + '">'
+      + declaredTop(def, def.keys[0], resolved.metrics[0].metric, false, def.title || metricTitle(resolved.metrics[0].metric, def.keys[0]))
+      + '<div class="dash-metric-card__chart">' + chart + '</div>'
+      + (firstOk ? periodLine(firstOk.metric) : '')
+      + '</article>';
+  }
+
+  function renderDeclaredPair(resolved, layoutItem) {
+    var def = resolved.def;
+    var halves = resolved.metrics.map(function (entry) {
+      var value = entry.waiting ? waitingChip(entry.metric)
+        : '<span class="dash-pair__value">' + escapeHtml(formatMetricCardValue(entry.metric)) + '</span>' + deltaHtml(entry.metric);
+      return '<div class="dash-pair__half">'
+        + '<button type="button" class="dash-pair__label" data-metric-detail-link="' + escapeHtml(recordsHref(entry.key)) + '" title="See the records">'
+        + escapeHtml(metricTitle(entry.metric, entry.key)) + '</button>' + value + '</div>';
+    }).join('');
+    var title = def.title || resolved.metrics.map(function (entry) { return metricTitle(entry.metric, entry.key); }).join(' and ');
+    var firstOk = resolved.metrics.filter(function (entry) { return !entry.waiting; })[0];
+    return '<article class="' + cardClass('dash-metric-card--pair', layoutItem) + '">'
+      + declaredTop(def, def.keys[0], resolved.metrics[0].metric, false, title)
+      + '<div class="dash-pair">' + halves + '</div>'
+      + (firstOk ? periodLine(firstOk.metric) : '')
+      + '</article>';
+  }
+
+  function renderDeclaredWorklist(resolved, layoutItem) {
+    var def = resolved.def;
+    var entry = resolved.metrics[0];
+    return '<article class="' + cardClass('dash-metric-card--worklist', layoutItem) + '">'
+      + declaredTop(def, entry.key, entry.metric, true)
+      + valueBlock(entry.metric)
+      + '<div class="dash-worklist mini-spark-slot--loading" data-worklist-key="' + escapeHtml(entry.key) + '"></div>'
+      + '<button type="button" class="dash-metric-card__link dash-worklist__all" data-metric-detail-link="' + escapeHtml(recordsHref(entry.key)) + '">View all</button>'
+      + '</article>';
+  }
+
+  function renderDeclaredCard(item) {
+    var resolved = item.resolved;
+    var layoutItem = { role: item.role, span: item.span };
+    switch (resolved.def.kind) {
+      case 'goal': return renderDeclaredGoal(resolved, layoutItem);
+      case 'breakdown': return renderDeclaredBreakdown(resolved, layoutItem);
+      case 'group': return renderDeclaredGroup(resolved, layoutItem);
+      case 'pair': return renderDeclaredPair(resolved, layoutItem);
+      case 'worklist': return renderDeclaredWorklist(resolved, layoutItem);
+      default: return renderMetricCard(resolved.metrics[0].metric, layoutItem);
+    }
+  }
+
+  // A declared card whose metrics are all waiting: one calm card in the
+  // strip, showing the goal prompt when one of them has it.
+  function renderDeclaredWaitingCard(resolved) {
+    var pick = resolved.metrics.filter(function (entry) { return entry.metric && entry.metric.goal_input; })[0] || resolved.metrics[0];
+    return '<article class="dash-metric-card dash-metric-card--waiting">'
+      + declaredTop(resolved.def, pick.key, pick.metric, false, resolved.def.title || metricTitle(pick.metric, pick.key))
+      + window.DataState.render(pick.metric || MISSING_METRIC, { calm: true }) + '</article>';
+  }
+
+  // Waiting cards collect in one strip at the bottom that opens on click.
+  function renderWaitingStrip(cardsHtml) {
+    if (!cardsHtml.length) return '';
+    var count = cardsHtml.length === 1 ? '1 card is waiting for setup' : cardsHtml.length + ' cards are waiting for setup';
+    return '<details class="dash-waiting-strip">'
+      + '<summary class="dash-waiting-strip__summary"><lex-brand-mark animation="idle" size="24"></lex-brand-mark>'
+      + '<span class="dash-waiting-strip__count">' + escapeHtml(count) + '</span>'
+      + '<span class="dash-waiting-strip__hint">Show</span></summary>'
+      + '<div class="dash-waiting-strip__cards">' + cardsHtml.join('') + '</div></details>';
+  }
+
+  // ── Worklists: the first rows behind a snapshot number ─────────────
+  var worklistCache = {};
+
+  function worklistHtml(rows) {
+    if (!rows.length) return '<p class="dash-worklist__empty">No records right now.</p>';
+    var columns = window.DashboardCards.worklistColumns(rows);
+    var head = '<tr>' + columns.map(function (col) { return '<th scope="col">' + escapeHtml(humanize(col)) + '</th>'; }).join('') + '</tr>';
+    var body = rows.slice(0, 5).map(function (row) {
+      return '<tr>' + columns.map(function (col) {
+        var value = row[col];
+        if (value === null || value === undefined || value === '') return '<td class="dash-worklist__muted">' + escapeHtml(window.DataState.EMPTY_VALUE) + '</td>';
+        var text = window.DashboardCards.isDateColumn(col) && window.Lex && Lex.Utils && Lex.Utils.formatDate ? Lex.Utils.formatDate(value)
+          : (typeof value === 'number' ? value.toLocaleString('en-US', { maximumFractionDigits: 2 }) : String(value));
+        var dot = col === 'status' ? '<span class="dash-dot dash-dot--' + escapeHtml(String(value).toLowerCase()) + '" aria-hidden="true"></span>' : '';
+        return '<td>' + dot + escapeHtml(text) + '</td>';
+      }).join('') + '</tr>';
+    }).join('');
+    return '<table class="dash-worklist__table"><thead>' + head + '</thead><tbody>' + body + '</tbody></table>';
+  }
+
+  function queueWorklists(grid) {
+    if (!grid.querySelectorAll || !window.api || typeof api.getMetricDetail !== 'function') return;
+    Array.prototype.forEach.call(grid.querySelectorAll('[data-worklist-key]'), function (slot) {
+      var key = slot.getAttribute('data-worklist-key');
+      var cacheKey = [key, currentPeriod.start, currentPeriod.end].join('|');
+      if (!worklistCache[cacheKey]) {
+        worklistCache[cacheKey] = api.getMetricDetail(key, {
+          periodStart: currentPeriod.start, periodEnd: currentPeriod.end, compareBy: currentPeriod.compareBy, rawLimit: 5,
+        }).then(function (response) {
+          var payload = response && response.data ? response.data : response;
+          var rows = payload && payload.raw_data && Array.isArray(payload.raw_data.rows) ? payload.raw_data.rows : [];
+          return rows.slice(0, 5);
+        }).catch(function () { return null; });
+      }
+      worklistCache[cacheKey].then(function (rows) {
+        slot.classList.remove('mini-spark-slot--loading');
+        slot.innerHTML = rows ? worklistHtml(rows) : '';
+      });
+    });
+  }
+
 
   function renderGoalCard(metric, cardId, progress, value, item) {
     var target = formatMetricCardValue({ value: progress.target, format: metric.format });
@@ -1033,11 +1258,22 @@
 
     if (empty) empty.hidden = true;
     tileIndex = 0;
-    // Bento grid: hero band, wide charts, then supporting cards
-    // (js/shared/dashboard-layout.js owns the order and sizes).
-    grid.innerHTML = window.DashboardLayout.buildLayout(filteredMetrics).map(function (item) {
-      return renderMetricCard(item.card, item);
-    }).join('');
+    var unfiltered = activeTypeFilter === 'all' && !getActiveSearchQuery();
+    declaredIndex = window.DashboardCards.indexMetrics(allDashboardMetrics);
+    if (currentDeclaredCards && unfiltered) {
+      // The saved dashboard's own cards, in its order (dashboard-cards.js).
+      var plan = window.DashboardCards.planDeclared(window.DashboardCards.resolveCards(currentDeclaredCards, declaredIndex));
+      grid.innerHTML = plan.items.map(renderDeclaredCard).join('')
+        + renderWaitingStrip(plan.waiting.map(renderDeclaredWaitingCard));
+    } else {
+      // Bento grid: hero band, wide charts, then supporting cards
+      // (js/shared/dashboard-layout.js owns the order and sizes); waiting
+      // cards collect in one strip at the bottom.
+      var split = window.DashboardCards.splitWaiting(filteredMetrics);
+      grid.innerHTML = window.DashboardLayout.buildLayout(split.shown).map(function (item) {
+        return renderMetricCard(item.card, item);
+      }).join('') + renderWaitingStrip(split.waiting.map(function (metric) { return renderMetricCard(metric); }));
+    }
     if (animateNextRender && grid.querySelectorAll) {
       Array.prototype.forEach.call(grid.querySelectorAll('[data-count-up]'), function (node) {
         window.MiniCharts.countUp(node, node.getAttribute('data-count-up'), { from: node.getAttribute('data-count-from') });
@@ -1045,6 +1281,7 @@
     }
     animateNextRender = false;
     queueSparklines(grid);
+    queueWorklists(grid);
   }
 
   // ── Sparklines ───────────────────────────────────────────────
@@ -1148,6 +1385,7 @@
 
   async function loadMetrics(type) {
     var myLoad = cardLoads.begin();
+    currentDeclaredCards = null;
     var config = VIEW_CONFIG[type];
     var banner = el('dashboardDetailBanner');
     if (banner) banner.classList.add('detail-banner--no-actions');
@@ -1225,8 +1463,12 @@
       if (banner) banner.classList.remove('detail-banner--no-actions');
       var layout = dashboard && dashboard.layout ? dashboard.layout : {};
       var type = VIEW_CONFIG[layout.dashboard_type] ? layout.dashboard_type : 'owner';
-      var metricKeys = Array.isArray(layout.metric_keys) ? layout.metric_keys : [];
-      currentDashboardMetricKeys = new Set(metricKeys);
+      // Declared cards (layout.cards) when the saved dashboard has them,
+      // otherwise its metric_keys as before.
+      var declared = window.DashboardCards.normalizeLayout(layout);
+      currentDeclaredCards = declared.mode === 'cards' ? declared.cards : null;
+      var metricKeys = window.DashboardCards.requestKeys(layout);
+      currentDashboardMetricKeys = new Set(metricKeys.concat(metricKeys.map(function (key) { return key.split('.').pop(); })));
       currentDashboardType = type;
       setBannerForDashboard(dashboard);
       setActiveDashboardBreadcrumb(dashboard);
@@ -1342,6 +1584,14 @@
       var reportBtn = event.target.closest('[data-report-link]');
       if (reportBtn) {
         Lex.Nav.go(reportBtn.getAttribute('data-report-link'));
+      }
+
+      var variantBtn = event.target.closest('[data-dashboard-variant]');
+      if (variantBtn) {
+        var pick = variantBtn.getAttribute('data-dashboard-variant').split('|');
+        variantPicks[pick[0]] = Number(pick[1]);
+        renderMetrics(allDashboardMetrics, currentSummary, currentDashboardType);
+        return;
       }
 
       var stateAction = event.target.closest('[data-data-state-action]');

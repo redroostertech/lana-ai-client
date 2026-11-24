@@ -43,7 +43,8 @@
   // Dashboards ask for it (options.calm) so a tile reads as waiting, never as
   // a failure or a $0. Reports keep the plain titles above.
   var CALM_TITLES = {
-    insufficient_data: 'Waiting for setup'
+    insufficient_data: 'Waiting for setup',
+    no_data_source: 'Connect a data source'
   };
   var GOAL_TITLE = 'Waiting for a goal';
   var CATALOG_PAGE = 'admin/metric-catalog.html';

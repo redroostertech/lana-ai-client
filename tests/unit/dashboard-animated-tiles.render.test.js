@@ -35,7 +35,7 @@ function page(api = {}, user = null) {
   let source = fs.readFileSync(path.join(__dirname, '../../src/js/admin/dashboard-detail.js'), 'utf8');
   const end = source.lastIndexOf('  init();');
   source = source.slice(0, end)
-    + '  window.testExports = { renderMetricCard, loadMetrics, loadDashboardById, readPeriodControls, setBanner, fetchSparkline, cardLoads: function () { return cardLoads; } };'
+    + '  window.testExports = { renderMetricCard, loadMetrics, loadDashboardById, readPeriodControls, setBanner, fetchSparkline, renderMetrics, variantPicks, allMetrics: function () { return allDashboardMetrics; }, cardLoads: function () { return cardLoads; } };'
     + source.slice(end + '  init();'.length);
   const nodes = {};
   const document = { addEventListener() {}, getElementById: (id) => (nodes[id] = nodes[id] || node()), querySelector: () => null, querySelectorAll: () => [] };
@@ -46,7 +46,7 @@ function page(api = {}, user = null) {
   window.api = { user };
   vm.runInNewContext(source, { window, document, console: { log() {}, error() {}, warn() {} }, Intl, URLSearchParams,
     setTimeout: jest.fn(), clearTimeout: jest.fn(), LanaTime, Lex, api: Object.assign({ listBIDashboards: jest.fn().mockResolvedValue({ data: [] }) }, api),
-    DashboardTiles: { cardRequestKeys: () => null } });
+    DashboardTiles: window.DashboardTiles });
   window.testExports.readPeriodControls();
   return { exports: window.testExports, nodes };
 }
@@ -287,5 +287,104 @@ test('sparklines ask for history only (raw_limit 0), with the page dates', async
   const p = page({ getMetricDetail });
   await p.exports.fetchSparkline({ metricKey: 'a.b', cacheKey: 'a.b|x' });
   expect(getMetricDetail).toHaveBeenCalledWith('a.b', { periodStart: '2026-01-01', periodEnd: '2026-01-31', compareBy: 'monthly', rawLimit: 0 });
+});
+
+describe('declared cards (layout.cards from the trim spec)', () => {
+  const declared = require(path.join(__dirname, '../fixtures/dashboard/declared-layouts.json'));
+
+  async function open(name) {
+    const layout = declared.layouts[name];
+    const getDashboardMetricCards = jest.fn().mockResolvedValue({ data: declared.cards_synthetic });
+    const getMetricDetail = jest.fn().mockResolvedValue({ data: { snapshots: [], raw_data: { rows: declared.worklist_rows_synthetic } } });
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name, layout } }), getDashboardMetricCards, getMetricDetail });
+    await p.exports.loadDashboardById('d1');
+    return { p, html: p.nodes.dashboardMetricGrid.innerHTML, getDashboardMetricCards };
+  }
+  const articlesOf = (html) => html.split('<article ').slice(1);
+  const linkKeys = (html) => html.split('data-metric-detail-link="').slice(1).map((part) => new URLSearchParams(part.split('"')[0].split('&amp;').join('&').split('?')[1]).get('metric_key'));
+
+  test('Owner Overview: the request sends the full key union; cards follow the declared order', async () => {
+    const { html, getDashboardMetricCards } = await open('Owner Overview');
+    const keys = getDashboardMetricCards.mock.calls[0][0].metric_keys.split(',');
+    expect(keys).toContain('legal_firm.finance.expected_cash_by_month');
+    expect(keys.every((k) => k.startsWith('legal_firm.'))).toBe(true);
+    const articles = articlesOf(html.split('dash-waiting-strip')[0]);
+    expect(articles[0]).toContain('dash-metric-card--hero');
+    expect(articles[0]).toContain('Gross Revenue');
+    expect(articles.map((a) => (a.split('dash-metric-card__title">')[1] || '').split('<')[0])).toEqual([
+      'Gross Revenue', 'Gross Revenue by Service Offering', 'Actual vs Target Revenue', 'Cash This Month', 'Cash Coming In',
+      'Overdue Expected Cash', 'New vs Closed Cases', 'Actual vs Needed Service Offerings', 'Total Active Cases',
+    ]);
+  });
+
+  test('goal cards: ring from card.goal or from metadata; later metrics as lines, a waiting one as a chip', async () => {
+    const { html } = await open('Owner Overview');
+    const payroll = articlesOf(html).find((a) => a.includes('Cash This Month'));
+    expect(payroll).toContain('mini-ring');
+    expect(text(payroll)).toContain('Payroll Gap This Month Waiting for a goal');
+    expect(text(payroll)).toContain('Payroll Clients Needed 4');
+    expect(linkKeys(payroll)).toEqual(expect.arrayContaining(['legal_firm.finance.payroll_leads_needed', 'legal_firm.finance.payroll_gap_month']));
+    // No card.goal here: the ring comes from metadata.attainmentPercent.
+    const target = articlesOf(html).find((a) => a.includes('Actual vs Target Revenue'));
+    expect(target).toContain('mini-ring--neutral');
+    expect(text(target)).toContain('of $150,000');
+    expect(text(target)).toContain('Gap to target $31,750');
+    expect(text(target)).toContain('Annual Revenue Target Waiting for a goal');
+  });
+
+  test('an all-waiting composite goes to the strip; the strip counts it', async () => {
+    const { html } = await open('Owner Overview');
+    const strip = html.slice(html.indexOf('dash-waiting-strip'));
+    expect(text(html)).toContain('1 card is waiting for setup');
+    expect(strip).toContain('Owner Benefit Actual');
+  });
+
+  test('breakdown variants: a toggle, and a pick swaps the list without a refetch', async () => {
+    const { p, html, getDashboardMetricCards } = await open('Owner Overview');
+    const cash = articlesOf(html).find((a) => a.includes('Cash Coming In'));
+    expect(cash).toContain('data-dashboard-variant="cash_coming_in|0"');
+    expect(cash).toContain('aria-pressed="true" data-dashboard-variant="cash_coming_in|0"');
+    expect(cash).toContain('Week of Jan 5');
+    p.exports.variantPicks.cash_coming_in = 1;
+    p.exports.renderMetrics(p.exports.allMetrics(), null, 'owner');
+    const after = articlesOf(p.nodes.dashboardMetricGrid.innerHTML).find((a) => a.includes('Cash Coming In'));
+    expect(after).toContain('Feb 2026');
+    expect(after).not.toContain('Week of Jan 5');
+    expect(getDashboardMetricCards).toHaveBeenCalledTimes(1);
+  });
+
+  test('group bars: each bar opens its own metric; worklist has a View all and a rows slot', async () => {
+    const { html } = await open('Owner Overview');
+    const cases = articlesOf(html).find((a) => a.includes('New vs Closed Cases'));
+    expect(linkKeys(cases)).toEqual(['legal_firm.case_volume.new_cases_opened_total', 'legal_firm.case_volume.closed_cases_total']);
+    expect(cases).not.toContain('dash-metric-card__icon-btn');
+    const overdue = articlesOf(html).find((a) => a.includes('Overdue Expected Cash'));
+    expect(overdue).toContain('data-worklist-key="legal_firm.finance.overdue_expected_cash"');
+    expect(text(overdue)).toContain('View all');
+  });
+
+  test('Sales & Marketing: funnel with conversions, a waiting source in its slot, and the pair', async () => {
+    const { html } = await open('Sales & Marketing');
+    const funnel = articlesOf(html).find((a) => a.includes('Intake Funnel'));
+    expect(funnel).toContain('mini-group--funnel');
+    expect(text(funnel)).toContain('60% of the step before');
+    expect(text(funnel)).toContain('38.9% of the step before');
+    const leads = articlesOf(html).find((a) => a.includes('Leads by Source'));
+    expect(text(leads)).toContain('Review Site Leads Connect a data source');
+    const pair = articlesOf(html).find((a) => a.includes('dash-metric-card--pair'));
+    expect(text(pair)).toContain('Marketing Spend $6,400');
+    expect(text(pair)).toContain('Client Acquisition Cost $305');
+    expect(linkKeys(pair)).toEqual(['legal_firm.marketing.marketing_spend', 'legal_firm.marketing.client_acquisition_cost']);
+    expect(text(html)).toContain('2 cards are waiting for setup');
+  });
+
+  test('a tab or search shows the plain bento of matching metrics', async () => {
+    const { p } = await open('Sales & Marketing');
+    p.nodes.dashboardMetricSearch.value = 'spend';
+    p.exports.renderMetrics(p.exports.allMetrics(), null, 'department');
+    const html = p.nodes.dashboardMetricGrid.innerHTML;
+    expect(articlesOf(html)).toHaveLength(1);
+    expect(html).toContain('Marketing Spend');
+  });
 });
 

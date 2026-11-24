@@ -1,0 +1,1225 @@
+{
+ "_note": "Layouts copied from the approved dashboard trim spec (Owner Overview, Sales & Marketing). Keys omit the legal_firm. prefix, as in the spec. cards_synthetic: made-up values for those keys (a few real ones from the Jan 2026 sample), some waiting on purpose.",
+ "layouts": {
+  "Owner Overview": {
+   "dashboard_type": "owner",
+   "metric_keys": [
+    "finance.gross_revenue_total",
+    "finance.gross_revenue_by_service_offering",
+    "finance.actual_vs_target_revenue",
+    "finance.revenue_gap_to_target",
+    "finance.annual_revenue_target",
+    "finance.cash_this_month",
+    "finance.payroll_gap_month",
+    "finance.payroll_clients_needed",
+    "finance.payroll_leads_needed",
+    "finance.owner_benefit_actual",
+    "finance.owner_benefit_gap",
+    "finance.total_owner_benefit_goal",
+    "finance.expected_cash_by_week",
+    "finance.expected_cash_by_month",
+    "finance.overdue_expected_cash",
+    "case_volume.new_cases_opened_total",
+    "case_volume.closed_cases_total",
+    "case_volume.actual_vs_needed_service_offerings",
+    "case_volume.active_cases_total"
+   ],
+   "cards": [
+    {
+     "id": "revenue",
+     "kind": "headline",
+     "metric_key": "finance.gross_revenue_total",
+     "note": "detail shows net_revenue and prior period"
+    },
+    {
+     "id": "revenue_by_service",
+     "kind": "breakdown",
+     "metric_key": "finance.gross_revenue_by_service_offering"
+    },
+    {
+     "id": "revenue_target",
+     "kind": "goal",
+     "metric_keys": [
+      "finance.actual_vs_target_revenue",
+      "finance.revenue_gap_to_target",
+      "finance.annual_revenue_target"
+     ]
+    },
+    {
+     "id": "payroll",
+     "kind": "goal",
+     "metric_keys": [
+      "finance.cash_this_month",
+      "finance.payroll_gap_month",
+      "finance.payroll_clients_needed",
+      "finance.payroll_leads_needed"
+     ]
+    },
+    {
+     "id": "owner_benefit",
+     "kind": "goal",
+     "metric_keys": [
+      "finance.owner_benefit_actual",
+      "finance.owner_benefit_gap",
+      "finance.total_owner_benefit_goal"
+     ]
+    },
+    {
+     "id": "cash_coming_in",
+     "kind": "breakdown",
+     "title": "Cash Coming In",
+     "metric_key": "finance.expected_cash_by_week",
+     "variants": [
+      {
+       "label": "Next 8 weeks",
+       "metric_key": "finance.expected_cash_by_week"
+      },
+      {
+       "label": "Next 6 months",
+       "metric_key": "finance.expected_cash_by_month"
+      }
+     ]
+    },
+    {
+     "id": "overdue_cash",
+     "kind": "worklist",
+     "metric_key": "finance.overdue_expected_cash"
+    },
+    {
+     "id": "cases_by_service",
+     "kind": "group",
+     "title": "New vs Closed Cases",
+     "chart": "bars",
+     "metric_keys": [
+      "case_volume.new_cases_opened_total",
+      "case_volume.closed_cases_total"
+     ],
+     "note": "breakdowns new_cases_opened_by_service_offering and closed_cases_by_service_offering in detail"
+    },
+    {
+     "id": "actual_vs_needed",
+     "kind": "breakdown",
+     "metric_key": "case_volume.actual_vs_needed_service_offerings"
+    },
+    {
+     "id": "active_cases",
+     "kind": "number",
+     "metric_key": "case_volume.active_cases_total"
+    }
+   ]
+  },
+  "Sales & Marketing": {
+   "dashboard_type": "department",
+   "metric_keys": [
+    "sales_intake.firm_conversion_rate",
+    "sales_intake.pnc_count",
+    "sales_intake.truth_talks_scheduled",
+    "sales_intake.truth_talk_show_count",
+    "sales_intake.pnc_converted_count",
+    "sales_intake.truth_talk_show_rate",
+    "sales_intake.monthly_target_attainment",
+    "sales_intake.target_miss_recovery_needed",
+    "sales_intake.new_clients_by_service_offering",
+    "sales_intake.weekly_new_clients_by_service_offering",
+    "sales_intake.quarterly_new_clients_by_service_offering",
+    "sales_intake.yearly_new_clients_by_service_offering",
+    "sales_intake.team_member_conversion_rate",
+    "marketing.new_clients_by_source",
+    "marketing.website_lead_count",
+    "marketing.referral_lead_count",
+    "marketing.review_site_lead_count",
+    "marketing.source_conversion_rate",
+    "marketing.marketing_spend",
+    "marketing.client_acquisition_cost"
+   ],
+   "cards": [
+    {
+     "id": "conversion",
+     "kind": "headline",
+     "metric_key": "sales_intake.firm_conversion_rate"
+    },
+    {
+     "id": "funnel",
+     "kind": "group",
+     "title": "Intake Funnel",
+     "chart": "funnel",
+     "metric_keys": [
+      "sales_intake.pnc_count",
+      "sales_intake.truth_talks_scheduled",
+      "sales_intake.truth_talk_show_count",
+      "sales_intake.pnc_converted_count"
+     ]
+    },
+    {
+     "id": "show_rate",
+     "kind": "number",
+     "metric_key": "sales_intake.truth_talk_show_rate"
+    },
+    {
+     "id": "target",
+     "kind": "goal",
+     "metric_keys": [
+      "sales_intake.monthly_target_attainment",
+      "sales_intake.target_miss_recovery_needed"
+     ]
+    },
+    {
+     "id": "new_clients_by_service",
+     "kind": "breakdown",
+     "metric_key": "sales_intake.new_clients_by_service_offering",
+     "variants": [
+      {
+       "label": "Week",
+       "metric_key": "sales_intake.weekly_new_clients_by_service_offering"
+      },
+      {
+       "label": "Period",
+       "metric_key": "sales_intake.new_clients_by_service_offering"
+      },
+      {
+       "label": "Quarter",
+       "metric_key": "sales_intake.quarterly_new_clients_by_service_offering"
+      },
+      {
+       "label": "Year",
+       "metric_key": "sales_intake.yearly_new_clients_by_service_offering"
+      }
+     ]
+    },
+    {
+     "id": "team_conversion",
+     "kind": "breakdown",
+     "metric_key": "sales_intake.team_member_conversion_rate"
+    },
+    {
+     "id": "new_clients_by_source",
+     "kind": "breakdown",
+     "metric_key": "marketing.new_clients_by_source"
+    },
+    {
+     "id": "leads_by_source",
+     "kind": "group",
+     "title": "Leads by Source",
+     "chart": "bars",
+     "metric_keys": [
+      "marketing.website_lead_count",
+      "marketing.referral_lead_count",
+      "marketing.review_site_lead_count"
+     ]
+    },
+    {
+     "id": "source_conversion",
+     "kind": "breakdown",
+     "metric_key": "marketing.source_conversion_rate"
+    },
+    {
+     "id": "spend_vs_cac",
+     "kind": "pair",
+     "metric_keys": [
+      "marketing.marketing_spend",
+      "marketing.client_acquisition_cost"
+     ]
+    }
+   ]
+  }
+ },
+ "cards_synthetic": [
+  {
+   "metric_key": "legal_firm.finance.gross_revenue_total",
+   "title": "Gross Revenue",
+   "value": 118250,
+   "format": "currency",
+   "formatted_value": "$118,250",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "flow",
+   "goal": null,
+   "comparison": {
+    "previous_value": 103200,
+    "absolute_change": 15050,
+    "percent_change": 14.58,
+    "direction": "up"
+   },
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.finance",
+    "label": "Finance"
+   }
+  },
+  {
+   "metric_key": "legal_firm.finance.gross_revenue_by_service_offering",
+   "title": "Gross Revenue by Service Offering",
+   "value": [
+    {
+     "service_key": "estate_planning",
+     "service_label": "Estate Planning",
+     "value": 84250
+    },
+    {
+     "service_key": "probate",
+     "service_label": "Probate",
+     "value": 31000.5
+    },
+    {
+     "service_key": "guardianship",
+     "service_label": "Guardianship",
+     "value": 3000
+    }
+   ],
+   "format": "currency_breakdown",
+   "formatted_value": "3 rows",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "flow",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.finance",
+    "label": "Finance"
+   }
+  },
+  {
+   "metric_key": "legal_firm.finance.actual_vs_target_revenue",
+   "title": "Actual vs Target Revenue",
+   "value": 118250,
+   "format": "currency",
+   "formatted_value": "$118,250",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "flow",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.finance",
+    "label": "Finance"
+   },
+   "metadata": {
+    "target": 150000,
+    "attainmentPercent": 78.83,
+    "revenueGap": 31750
+   }
+  },
+  {
+   "metric_key": "legal_firm.finance.revenue_gap_to_target",
+   "title": "Revenue Gap to Target",
+   "value": 31750,
+   "format": "currency",
+   "formatted_value": "$31,750",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "flow",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.finance",
+    "label": "Finance"
+   }
+  },
+  {
+   "metric_key": "legal_firm.finance.annual_revenue_target",
+   "title": "Annual Revenue Target",
+   "domain": "finance",
+   "section": {
+    "key": "legal_firm.finance",
+    "label": "Finance",
+    "domain": "finance",
+    "order": 1000
+   },
+   "status": "active",
+   "executable": true,
+   "value": null,
+   "formatted_value": null,
+   "format": "currency",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "snapshot",
+   "goal": null,
+   "comparison": null,
+   "target": null,
+   "report_link": null,
+   "goal_input": {
+    "metric_key": "legal_firm.finance.annual_revenue_target",
+    "name": "Annual Revenue Target",
+    "message": "Set the Annual Revenue Target goal in the Metric Catalog.",
+    "other_periods": []
+   },
+   "data_state": "insufficient_data",
+   "data_state_reason": "There is not enough data in this period to show this number."
+  },
+  {
+   "metric_key": "legal_firm.finance.cash_this_month",
+   "title": "Cash This Month",
+   "value": 32100,
+   "format": "currency",
+   "formatted_value": "$32,100",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "snapshot",
+   "goal": {
+    "target_value_resolved": 50000,
+    "attainment_pct": 64.2,
+    "delta_to_target": -17900,
+    "status": "yellow",
+    "pacing": {
+     "elapsed_fraction": 0.77,
+     "expected_to_date": 38500,
+     "pace_status": "behind"
+    },
+    "target_type": "static"
+   },
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.finance",
+    "label": "Finance"
+   }
+  },
+  {
+   "metric_key": "legal_firm.finance.payroll_gap_month",
+   "title": "Payroll Gap This Month",
+   "domain": "finance",
+   "section": {
+    "key": "legal_firm.finance",
+    "label": "Finance",
+    "domain": "finance",
+    "order": 1000
+   },
+   "status": "active",
+   "executable": true,
+   "value": null,
+   "formatted_value": null,
+   "format": "currency",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "snapshot",
+   "goal": null,
+   "comparison": null,
+   "target": null,
+   "report_link": null,
+   "goal_input": {
+    "metric_key": "core.financial-performance.cash_this_month",
+    "name": "Cash This Month",
+    "message": "Set the Cash This Month goal in the Metric Catalog.",
+    "other_periods": []
+   },
+   "data_state": "insufficient_data",
+   "data_state_reason": "There is not enough data in this period to show this number."
+  },
+  {
+   "metric_key": "legal_firm.finance.payroll_clients_needed",
+   "title": "Payroll Clients Needed",
+   "value": 4,
+   "format": "integer",
+   "formatted_value": "4",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "snapshot",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.finance",
+    "label": "Finance"
+   }
+  },
+  {
+   "metric_key": "legal_firm.finance.payroll_leads_needed",
+   "title": "Payroll Leads Needed",
+   "value": 19,
+   "format": "integer",
+   "formatted_value": "19",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "snapshot",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.finance",
+    "label": "Finance"
+   }
+  },
+  {
+   "metric_key": "legal_firm.finance.owner_benefit_actual",
+   "title": "Owner Benefit Actual",
+   "value": null,
+   "format": "currency",
+   "formatted_value": null,
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "flow",
+   "goal": null,
+   "comparison": null,
+   "data_state": "insufficient_data",
+   "data_state_reason": "There is not enough data in this period to show this number.",
+   "section": {
+    "key": "legal_firm.finance",
+    "label": "Finance"
+   }
+  },
+  {
+   "metric_key": "legal_firm.finance.owner_benefit_gap",
+   "title": "Owner Benefit Gap",
+   "value": null,
+   "format": "currency",
+   "formatted_value": null,
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "flow",
+   "goal": null,
+   "comparison": null,
+   "data_state": "insufficient_data",
+   "data_state_reason": "There is not enough data in this period to show this number.",
+   "section": {
+    "key": "legal_firm.finance",
+    "label": "Finance"
+   }
+  },
+  {
+   "metric_key": "legal_firm.finance.total_owner_benefit_goal",
+   "title": "Total Owner Benefit Goal",
+   "value": null,
+   "format": "currency",
+   "formatted_value": null,
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "flow",
+   "goal": null,
+   "comparison": null,
+   "data_state": "insufficient_data",
+   "data_state_reason": "There is not enough data in this period to show this number.",
+   "section": {
+    "key": "legal_firm.finance",
+    "label": "Finance"
+   }
+  },
+  {
+   "metric_key": "legal_firm.finance.expected_cash_by_week",
+   "title": "Cash Coming In by Week (8 Weeks)",
+   "value": [
+    {
+     "label": "Week of Jan 5",
+     "value": 12000
+    },
+    {
+     "label": "Week of Jan 12",
+     "value": 8000
+    },
+    {
+     "label": "Week of Jan 19",
+     "value": 15500
+    },
+    {
+     "label": "Week of Jan 26",
+     "value": 4300
+    }
+   ],
+   "format": "currency_breakdown",
+   "formatted_value": "4 rows",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "snapshot",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.finance",
+    "label": "Finance"
+   }
+  },
+  {
+   "metric_key": "legal_firm.finance.expected_cash_by_month",
+   "title": "Cash Coming In by Month (6 Months)",
+   "value": [
+    {
+     "label": "Jan 2026",
+     "value": 39800
+    },
+    {
+     "label": "Feb 2026",
+     "value": 51200
+    },
+    {
+     "label": "Mar 2026",
+     "value": 27400
+    }
+   ],
+   "format": "currency_breakdown",
+   "formatted_value": "3 rows",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "snapshot",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.finance",
+    "label": "Finance"
+   }
+  },
+  {
+   "metric_key": "legal_firm.finance.overdue_expected_cash",
+   "title": "Overdue Expected Cash",
+   "description": "Expected cash whose due date has passed and is still unpaid.",
+   "domain": "finance",
+   "section": {
+    "key": "legal_firm.finance",
+    "label": "Finance",
+    "domain": "finance",
+    "order": 1000
+   },
+   "status": "active",
+   "executable": true,
+   "value": 549419.5,
+   "formatted_value": "$549,420",
+   "format": "currency",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "snapshot",
+   "goal": null,
+   "comparison": null,
+   "target": null,
+   "report_link": null,
+   "data_state": "ok",
+   "data_state_reason": null
+  },
+  {
+   "metric_key": "legal_firm.case_volume.new_cases_opened_total",
+   "title": "Total New Cases Opened",
+   "value": 36,
+   "format": "integer",
+   "formatted_value": "36",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "flow",
+   "goal": null,
+   "comparison": {
+    "previous_value": 241,
+    "absolute_change": -205,
+    "percent_change": -85.06,
+    "direction": "down"
+   },
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.case_volume",
+    "label": "Case Volume"
+   }
+  },
+  {
+   "metric_key": "legal_firm.case_volume.closed_cases_total",
+   "title": "Total Closed Cases",
+   "value": 8,
+   "format": "integer",
+   "formatted_value": "8",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "flow",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.case_volume",
+    "label": "Case Volume"
+   }
+  },
+  {
+   "domain": "finance",
+   "status": "active",
+   "executable": true,
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "target": null,
+   "report_link": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "metric_key": "legal_firm.service_revenue.actual_vs_needed_service_offerings",
+   "title": "Actual vs Needed Service Offerings",
+   "section": {
+    "key": "legal_firm.service_revenue",
+    "label": "Service Revenue",
+    "domain": "finance",
+    "order": 1000
+   },
+   "format": "table",
+   "formatted_value": "4 rows",
+   "period_scope": "flow",
+   "value": [
+    {
+     "service_key": "estate_planning",
+     "service_label": "Estate Planning",
+     "actual_count": 21,
+     "needed_count": null,
+     "variance": null,
+     "average_case_value": null
+    },
+    {
+     "service_key": "guardianship",
+     "service_label": "Guardianship",
+     "actual_count": 0,
+     "needed_count": null,
+     "variance": null,
+     "average_case_value": null
+    },
+    {
+     "service_key": "probate",
+     "service_label": "Probate",
+     "actual_count": 0,
+     "needed_count": null,
+     "variance": null,
+     "average_case_value": null
+    },
+    {
+     "service_key": "medicaid",
+     "service_label": "Medicaid",
+     "actual_count": 0,
+     "needed_count": null,
+     "variance": null,
+     "average_case_value": null
+    }
+   ]
+  },
+  {
+   "metric_key": "legal_firm.case_volume.active_cases_total",
+   "title": "Total Active Cases",
+   "domain": "legal_operations",
+   "primaryAudience": "owner",
+   "dashboard_type": "owner",
+   "section": {
+    "key": "legal_firm.case_volume",
+    "label": "Case Volume",
+    "domain": "legal_operations",
+    "order": 2000
+   },
+   "group": {
+    "key": "legal_firm.case_volume",
+    "label": "Case Volume"
+   },
+   "audience": {
+    "key": "owner",
+    "label": "Owner",
+    "dashboard_type": "owner"
+   },
+   "sort_order": 2000,
+   "order": 2000,
+   "domain_group": {
+    "key": "legal_operations",
+    "label": "Legal Operations",
+    "order": 1
+   },
+   "status": "active",
+   "executable": true,
+   "value": 916,
+   "formatted_value": "916",
+   "format": "integer",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "snapshot",
+   "goal": null,
+   "comparison": null,
+   "target": null,
+   "report_link": null,
+   "report_drilldown": {
+    "metric_key": "legal_firm.case_volume.active_cases_total",
+    "dashboard_type": "owner",
+    "section_key": "legal_firm.case_volume",
+    "domain": "legal_operations"
+   },
+   "data_state": "ok",
+   "data_state_reason": null
+  },
+  {
+   "metric_key": "legal_firm.sales_intake.firm_conversion_rate",
+   "title": "Firm Conversion Rate",
+   "value": 38.5,
+   "format": "percentage",
+   "formatted_value": "38.5%",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "flow",
+   "goal": null,
+   "comparison": {
+    "previous_value": 33.1,
+    "absolute_change": 5.4,
+    "percent_change": 16.3,
+    "direction": "up"
+   },
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.sales_intake",
+    "label": "Sales Intake"
+   }
+  },
+  {
+   "metric_key": "legal_firm.sales_intake.pnc_count",
+   "title": "Potential New Clients",
+   "value": 120,
+   "format": "integer",
+   "formatted_value": "120",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "flow",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.sales_intake",
+    "label": "Sales Intake"
+   }
+  },
+  {
+   "metric_key": "legal_firm.sales_intake.truth_talks_scheduled",
+   "title": "Truth Talks Scheduled",
+   "value": 72,
+   "format": "integer",
+   "formatted_value": "72",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "flow",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.sales_intake",
+    "label": "Sales Intake"
+   }
+  },
+  {
+   "metric_key": "legal_firm.sales_intake.truth_talk_show_count",
+   "title": "Truth Talks Shown",
+   "value": 54,
+   "format": "integer",
+   "formatted_value": "54",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "flow",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.sales_intake",
+    "label": "Sales Intake"
+   }
+  },
+  {
+   "metric_key": "legal_firm.sales_intake.pnc_converted_count",
+   "title": "New Clients",
+   "value": 21,
+   "format": "integer",
+   "formatted_value": "21",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "flow",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.sales_intake",
+    "label": "Sales Intake"
+   }
+  },
+  {
+   "metric_key": "legal_firm.sales_intake.truth_talk_show_rate",
+   "title": "Truth Talk Show Rate",
+   "value": 75,
+   "format": "percentage",
+   "formatted_value": "75%",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "flow",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.sales_intake",
+    "label": "Sales Intake"
+   }
+  },
+  {
+   "metric_key": "legal_firm.sales_intake.monthly_target_attainment",
+   "title": "Monthly Target Attainment",
+   "value": null,
+   "format": "currency",
+   "formatted_value": null,
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "flow",
+   "goal": null,
+   "comparison": null,
+   "data_state": "insufficient_data",
+   "data_state_reason": "There is not enough data in this period to show this number.",
+   "section": {
+    "key": "legal_firm.sales_intake",
+    "label": "Sales Intake"
+   },
+   "goal_input": {
+    "metric_key": "legal_firm.sales_intake.monthly_new_client_target",
+    "name": "Monthly New Client Target",
+    "message": "Set the Monthly New Client Target goal in the Metric Catalog."
+   }
+  },
+  {
+   "metric_key": "legal_firm.sales_intake.target_miss_recovery_needed",
+   "title": "Target Miss Recovery Needed",
+   "value": null,
+   "format": "currency",
+   "formatted_value": null,
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "flow",
+   "goal": null,
+   "comparison": null,
+   "data_state": "insufficient_data",
+   "data_state_reason": "There is not enough data in this period to show this number.",
+   "section": {
+    "key": "legal_firm.sales_intake",
+    "label": "Sales Intake"
+   }
+  },
+  {
+   "metric_key": "legal_firm.sales_intake.weekly_new_clients_by_service_offering",
+   "title": "Weekly New Clients by Service",
+   "value": [
+    {
+     "service_key": "estate_planning",
+     "service_label": "Estate Planning",
+     "value": 5
+    },
+    {
+     "service_key": "probate",
+     "service_label": "Probate",
+     "value": 1
+    }
+   ],
+   "format": "table",
+   "formatted_value": "2 rows",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "flow",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.sales_intake",
+    "label": "Sales Intake"
+   }
+  },
+  {
+   "metric_key": "legal_firm.sales_intake.new_clients_by_service_offering",
+   "title": "New Clients by Service",
+   "value": [
+    {
+     "service_key": "estate_planning",
+     "service_label": "Estate Planning",
+     "value": 14
+    },
+    {
+     "service_key": "probate",
+     "service_label": "Probate",
+     "value": 4
+    },
+    {
+     "service_key": "guardianship",
+     "service_label": "Guardianship",
+     "value": 2
+    },
+    {
+     "service_key": "medicaid",
+     "service_label": "Medicaid",
+     "value": 1
+    }
+   ],
+   "format": "table",
+   "formatted_value": "4 rows",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "flow",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.sales_intake",
+    "label": "Sales Intake"
+   }
+  },
+  {
+   "metric_key": "legal_firm.sales_intake.quarterly_new_clients_by_service_offering",
+   "title": "Quarterly New Clients by Service",
+   "value": [
+    {
+     "service_key": "estate_planning",
+     "service_label": "Estate Planning",
+     "value": 40
+    },
+    {
+     "service_key": "probate",
+     "service_label": "Probate",
+     "value": 11
+    },
+    {
+     "service_key": "guardianship",
+     "service_label": "Guardianship",
+     "value": 6
+    },
+    {
+     "service_key": "medicaid",
+     "service_label": "Medicaid",
+     "value": 3
+    }
+   ],
+   "format": "table",
+   "formatted_value": "4 rows",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "flow",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.sales_intake",
+    "label": "Sales Intake"
+   }
+  },
+  {
+   "metric_key": "legal_firm.sales_intake.yearly_new_clients_by_service_offering",
+   "title": "Yearly New Clients by Service",
+   "value": [
+    {
+     "service_key": "estate_planning",
+     "service_label": "Estate Planning",
+     "value": 152
+    },
+    {
+     "service_key": "probate",
+     "service_label": "Probate",
+     "value": 47
+    },
+    {
+     "service_key": "guardianship",
+     "service_label": "Guardianship",
+     "value": 20
+    },
+    {
+     "service_key": "medicaid",
+     "service_label": "Medicaid",
+     "value": 12
+    }
+   ],
+   "format": "table",
+   "formatted_value": "4 rows",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "flow",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.sales_intake",
+    "label": "Sales Intake"
+   }
+  },
+  {
+   "metric_key": "legal_firm.sales_intake.team_member_conversion_rate",
+   "title": "Team Member Conversion Rate",
+   "value": [
+    {
+     "label": "Team member A",
+     "value": 42
+    },
+    {
+     "label": "Team member B",
+     "value": 35
+    }
+   ],
+   "format": "table",
+   "formatted_value": "2 rows",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "flow",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.sales_intake",
+    "label": "Sales Intake"
+   },
+   "row_format": "percentage"
+  },
+  {
+   "metric_key": "legal_firm.marketing.new_clients_by_source",
+   "title": "New Clients by Source",
+   "value": [
+    {
+     "label": "Website",
+     "value": 9
+    },
+    {
+     "label": "Referral",
+     "value": 8
+    },
+    {
+     "label": "Review sites",
+     "value": 4
+    }
+   ],
+   "format": "table",
+   "formatted_value": "3 rows",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "flow",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.marketing",
+    "label": "Marketing"
+   }
+  },
+  {
+   "metric_key": "legal_firm.marketing.website_lead_count",
+   "title": "Website Leads",
+   "value": 64,
+   "format": "integer",
+   "formatted_value": "64",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "flow",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.marketing",
+    "label": "Marketing"
+   }
+  },
+  {
+   "metric_key": "legal_firm.marketing.referral_lead_count",
+   "title": "Referral Leads",
+   "value": 38,
+   "format": "integer",
+   "formatted_value": "38",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "flow",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.marketing",
+    "label": "Marketing"
+   }
+  },
+  {
+   "metric_key": "legal_firm.marketing.review_site_lead_count",
+   "title": "Review Site Leads",
+   "value": null,
+   "format": "currency",
+   "formatted_value": null,
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "flow",
+   "goal": null,
+   "comparison": null,
+   "data_state": "no_data_source",
+   "data_state_reason": "Connect the app that holds this data to see this number.",
+   "section": {
+    "key": "legal_firm.marketing",
+    "label": "Marketing"
+   }
+  },
+  {
+   "metric_key": "legal_firm.marketing.source_conversion_rate",
+   "title": "Source Conversion Rate",
+   "value": null,
+   "format": "currency",
+   "formatted_value": null,
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "flow",
+   "goal": null,
+   "comparison": null,
+   "data_state": "insufficient_data",
+   "data_state_reason": "There is not enough data in this period to show this number.",
+   "section": {
+    "key": "legal_firm.marketing",
+    "label": "Marketing"
+   }
+  },
+  {
+   "metric_key": "legal_firm.marketing.marketing_spend",
+   "title": "Marketing Spend",
+   "value": 6400,
+   "format": "currency",
+   "formatted_value": "$6,400",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "flow",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.marketing",
+    "label": "Marketing"
+   }
+  },
+  {
+   "metric_key": "legal_firm.marketing.client_acquisition_cost",
+   "title": "Client Acquisition Cost",
+   "value": 305,
+   "format": "currency",
+   "formatted_value": "$305",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "period_scope": "flow",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.marketing",
+    "label": "Marketing"
+   }
+  }
+ ],
+ "worklist_rows_synthetic": [
+  {
+   "matter_key": "[matter id]",
+   "matter_name": "[matter 0]",
+   "client_name": "",
+   "status": "active",
+   "due_date": "2026-01-05",
+   "amount": 1000
+  },
+  {
+   "matter_key": "[matter id]",
+   "matter_name": "[matter 1]",
+   "client_name": "",
+   "status": "overdue",
+   "due_date": "2026-01-06",
+   "amount": 1250
+  },
+  {
+   "matter_key": "[matter id]",
+   "matter_name": "[matter 2]",
+   "client_name": "",
+   "status": "active",
+   "due_date": "2026-01-07",
+   "amount": 1500
+  },
+  {
+   "matter_key": "[matter id]",
+   "matter_name": "[matter 3]",
+   "client_name": "",
+   "status": "pending",
+   "due_date": "2026-01-08",
+   "amount": 1750
+  },
+  {
+   "matter_key": "[matter id]",
+   "matter_name": "[matter 4]",
+   "client_name": "",
+   "status": "active",
+   "due_date": "2026-01-09",
+   "amount": 2000
+  },
+  {
+   "matter_key": "[matter id]",
+   "matter_name": "[matter 5]",
+   "client_name": "",
+   "status": "active",
+   "due_date": "2026-01-10",
+   "amount": 2250
+  }
+ ]
+}

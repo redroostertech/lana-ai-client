@@ -18,9 +18,11 @@
   }
 
   // The metric_keys query value for a dashboard's own tiles, or null when the
-  // dashboard has none (it then shows its type's standard cards).
+  // dashboard has none (it then shows its type's standard cards). When the
+  // page has dashboard-cards.js, declared cards (layout.cards) add their keys.
   function cardRequestKeys(layout) {
-    var keys = layout && Array.isArray(layout.metric_keys) ? layout.metric_keys.filter(Boolean) : [];
+    var keys = global.DashboardCards ? global.DashboardCards.requestKeys(layout)
+      : (layout && Array.isArray(layout.metric_keys) ? layout.metric_keys.filter(Boolean) : []);
     return keys.length ? keys.join(',') : null;
   }
 

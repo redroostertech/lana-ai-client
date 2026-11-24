@@ -66,3 +66,13 @@ test('the plain render is unchanged for Reports', () => {
   const html = load().render({ data_state: 'insufficient_data', data_state_reason: 'r' });
   expect(html).toBe('<div class="lex-data-state lex-data-state--insufficient-data" role="status"><p class="lex-data-state__title">Not enough data</p><p class="lex-data-state__reason">r</p></div>');
 });
+
+test('no data source is its own calm state: connect a data source, with the reason', () => {
+  const item = { data_state: 'no_data_source', data_state_reason: 'Connect the app that holds this data to see this number.' };
+  expect(load().view(item, { calm: true })).toEqual({ state: 'no_data_source', title: 'Connect a data source',
+    reason: 'Connect the app that holds this data to see this number.', waiting: true, action: null });
+  const html = load().render(item, { calm: true });
+  expect(text(html)).toContain('Connect a data source');
+  expect(html).toContain('lex-data-state--waiting');
+  expect(load().view(item).title).toBe('No data source');
+});

@@ -2516,3 +2516,261 @@
     animation: none;
   }
 }
+
+/* ══ Declared cards (layout.cards) ══════════════════════════════════════ */
+.dash-bento__item--wide {
+  grid-column: span 2;
+}
+
+@container dash-detail (max-width: 559px) {
+  .dash-bento__item--wide {
+    grid-column: span 1;
+  }
+}
+
+/* Detail lines under a goal: label (opens that metric's records) and value. */
+.dash-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin: 0;
+  padding: 0.625rem 0 0;
+  border-top: 1px solid var(--lex-border-subtle);
+  list-style: none;
+}
+
+.dash-lines__item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.dash-lines__label {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--lex-text-secondary);
+  font: inherit;
+  text-align: left;
+}
+
+button.dash-lines__label {
+  cursor: pointer;
+}
+
+button.dash-lines__label:hover,
+.mini-group__label:hover,
+.dash-pair__label:hover {
+  color: var(--lex-text-primary);
+  text-decoration: underline;
+}
+
+.dash-lines__value {
+  flex: 0 0 auto;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--lex-text-primary);
+}
+
+/* A metric that is waiting, inside a card that still shows the others. */
+.dash-chip-waiting,
+.mini-group__waiting {
+  display: inline-flex;
+  align-items: center;
+  border: 1px dashed var(--lex-border-subtle);
+  border-radius: 999px;
+  padding: 0.0625rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--lex-text-tertiary);
+  white-space: nowrap;
+}
+
+/* Breakdown variants: a small segmented toggle. */
+.dash-variants {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 0.125rem;
+  padding: 0.1875rem;
+  border-radius: 999px;
+  background: var(--lex-bg-tertiary);
+}
+
+.dash-variants__btn {
+  padding: 0.25rem 0.625rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--lex-text-secondary);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 200ms var(--lex-ease-out, ease-out), color 200ms var(--lex-ease-out, ease-out);
+}
+
+.dash-variants__btn.is-active {
+  background: var(--lex-bg-card, var(--lex-bg-primary));
+  color: var(--lex-text-primary);
+  box-shadow: var(--lex-shadow-sm);
+}
+
+/* Pair: two numbers side by side. */
+.dash-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.dash-pair__half {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.375rem;
+  min-width: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  background: var(--lex-bg-secondary);
+}
+
+.dash-pair__label {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--lex-text-secondary);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dash-pair__value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--lex-text-primary);
+}
+
+/* Worklist: the first rows behind a snapshot number. */
+.dash-worklist {
+  min-height: 3rem;
+  overflow-x: auto;
+}
+
+.dash-worklist__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.dash-worklist__table th {
+  padding: 0 0.5rem 0.375rem 0;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--lex-text-tertiary);
+}
+
+.dash-worklist__table td {
+  padding: 0.4375rem 0.5rem 0.4375rem 0;
+  border-top: 1px solid var(--lex-border-subtle);
+  color: var(--lex-text-primary);
+  white-space: nowrap;
+}
+
+.dash-worklist__muted {
+  color: var(--lex-text-tertiary);
+}
+
+.dash-worklist__empty {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--lex-text-tertiary);
+}
+
+.dash-worklist__all {
+  align-self: flex-start;
+}
+
+.dash-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-right: 0.375rem;
+  border-radius: 999px;
+  background: var(--lex-text-tertiary);
+}
+
+.dash-dot--active,
+.dash-dot--open,
+.dash-dot--paid {
+  background: var(--lex-status-success);
+}
+
+.dash-dot--overdue,
+.dash-dot--late {
+  background: var(--lex-status-danger);
+}
+
+.dash-dot--pending {
+  background: var(--lex-status-warning);
+}
+
+/* Waiting cards collect in one strip that spans the grid. */
+.dash-waiting-strip {
+  grid-column: 1 / -1;
+  border: 1px dashed var(--lex-border-subtle);
+  border-radius: 18px;
+  background: transparent;
+}
+
+.dash-waiting-strip__summary {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.875rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--lex-text-secondary);
+  cursor: pointer;
+  list-style: none;
+}
+
+.dash-waiting-strip__summary::-webkit-details-marker {
+  display: none;
+}
+
+.dash-waiting-strip__hint {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+}
+
+.dash-waiting-strip[open] .dash-waiting-strip__hint {
+  visibility: hidden;
+}
+
+.dash-waiting-strip__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: 1rem;
+  padding: 0 1.25rem 1.25rem;
+}
+
+.dash-waiting-strip__cards .dash-metric-card {
+  border-radius: 14px;
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-variants__btn {
+    transition: none;
+  }
+}

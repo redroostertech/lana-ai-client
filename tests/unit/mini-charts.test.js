@@ -196,3 +196,40 @@ test('the sparkline area fades with its own gradient', () => {
   expect(a).toContain('fill="url(#' + id + ')"');
   expect(b).not.toContain('id="' + id + '"');
 });
+
+describe('groupHtml: one bar per metric, each opening its own records', () => {
+  const rows = [
+    { key: 'k.a', label: 'Potential New Clients', value: 120, waiting: false, pct: 100, conversionPct: null },
+    { key: 'k.b', label: 'Truth Talks Scheduled', value: 72, waiting: false, pct: 60, conversionPct: 60 },
+    { key: 'k.c', label: 'Review <Site>', value: null, waiting: true, pct: 0, conversionPct: null },
+  ];
+  const opts = (extra) => Object.assign({ format: (r) => String(r.value), href: (key) => 'detail?' + key, waitingLabel: () => 'Waiting' }, extra);
+
+  test('bars: a label button per metric with its own drilldown, escaped', () => {
+    const html = Charts.groupHtml(rows, opts());
+    expect(html).toContain('data-metric-detail-link="detail?k.a"');
+    expect(html).toContain('data-metric-detail-link="detail?k.c"');
+    expect(html).toContain('Review &lt;Site&gt;');
+    expect(html).toContain('<rect class="mini-group__fill" x="0" y="0" width="60" height="8"');
+    expect(html).not.toContain('style=');
+  });
+
+  test('a waiting metric keeps its slot with a waiting chip and no bar', () => {
+    const html = Charts.groupHtml(rows, opts());
+    const third = html.split('<li class="mini-group__row')[3];
+    expect(third).toContain('mini-group__waiting');
+    expect(third).toContain('Waiting');
+    expect(third).not.toContain('mini-group__fill');
+  });
+
+  test('funnel: centred steps with the step-to-step conversion between them', () => {
+    const html = Charts.groupHtml(rows, opts({ funnel: true }));
+    expect(html).toContain('mini-group--funnel');
+    expect(html).toContain('<rect class="mini-group__fill" x="20" y="0" width="60" height="8"');
+    expect(html).toContain('60% of the step before');
+  });
+
+  test('no rows, nothing drawn', () => {
+    expect(Charts.groupHtml([], opts())).toBe('');
+  });
+});
