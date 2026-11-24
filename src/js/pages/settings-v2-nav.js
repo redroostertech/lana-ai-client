@@ -42,6 +42,7 @@
     { id: 'phone',          icon: 'smartphone' },
     { id: 'plugins',        icon: 'plug' },
     { id: 'billing',        icon: 'sparkles' },
+    { id: 'mappings',       icon: 'shuffle' },
     { id: 'usage',          icon: 'bar-chart-2' },
     { id: 'data-controls',  icon: 'shield' }
   ];

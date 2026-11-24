@@ -581,6 +581,8 @@
         'js/shared/card-visuals.js',
         'js/shared/lineage-view.js',
         'js/shared/insights-breadcrumbs.js',
+        'js/settings-mappings.model.js',
+        'js/shared/setup-banner.js',
         'js/shared/title-switcher.js',
         'js/admin/dashboard-detail.js'
       ],
@@ -589,7 +591,8 @@
         'css/title-switcher.css',
         'css/detail-page.css',
         'css/lex-motion.css',
-        'css/mini-charts.css'
+        'css/mini-charts.css',
+        'css/setup-banner.css'
       ]
     },
 

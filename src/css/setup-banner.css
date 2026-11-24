@@ -1,0 +1,30 @@
+/* "Finish your setup" banner (js/shared/setup-banner.js), on Settings and the dashboards. */
+.lana-setup-banner-slot[hidden] {
+  display: none;
+}
+
+.lana-setup-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--lex-border-subtle);
+  border-left: 3px solid var(--lex-status-warning);
+  border-radius: 12px;
+  background: var(--lex-status-warning-bg);
+  font-size: 0.875rem;
+  color: var(--lex-text-primary);
+}
+
+.lana-setup-banner__link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--lex-text-accent);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}

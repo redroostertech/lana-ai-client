@@ -3976,3 +3976,21 @@ button.dash-lines__label:hover,
   border-radius: 0 12px 12px 0;
   background: var(--lex-bg-secondary);
 }
+
+/* A card whose records are not all mapped yet (Settings > Mappings). */
+.dash-card__caveat {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--lex-text-tertiary);
+}
+
+.dash-card__caveat-link {
+  color: var(--lex-text-accent);
+  font-weight: 600;
+}
+
+.dash-metric-card--hero .dash-card__caveat,
+.dash-metric-card--hero .dash-card__caveat-link {
+  color: inherit;
+}

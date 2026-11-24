@@ -44,7 +44,7 @@ describe('listBars detects lists from the value shape', () => {
   test('a table card becomes bars labelled from service_label', () => {
     const model = View.listBars(card('new_cases_opened_by_service_offering').value);
     expect(model).toMatchObject({ empty: false, paired: false, max: 21 });
-    expect(model.rows).toEqual([{ label: 'Estate Planning', value: 21, second: null, pct: 100, secondPct: null }]);
+    expect(model.rows).toEqual([{ label: 'Estate Planning', value: 21, second: null, pct: 100, secondPct: null, muted: false }]);
   });
 
   test('labels fall back to label, name, then a readable key', () => {
@@ -228,4 +228,10 @@ test('list rows are labelled from the first *_name field before label or name', 
   const model = View.listBars([{ attorney_id: 'a1', attorney_name: 'Avery Stone', value: 4 }, { attorney_id: 'a2', attorney_name: 'Blake Ross', value: 2 }]);
   expect(model.rows.map((r) => r.label)).toEqual(['Avery Stone', 'Blake Ross']);
   expect(View.listBars([{ service_label: 'Probate', client_name: 'X', value: 1 }]).rows[0].label).toBe('Probate');
+});
+
+test('a "Not mapped" row in a breakdown is marked muted and labelled plainly', () => {
+  const model = View.listBars([{ service_key: 'estate_planning', service_label: 'Estate Planning', value: 21 }, { service_key: 'not_mapped', service_label: 'not_mapped', value: 42 }]);
+  expect(model.rows.map((r) => [r.label, r.muted])).toEqual([['Estate Planning', false], ['Not mapped', true]]);
+  expect(View.listBars([{ label: 'X', value: 1, not_mapped: true }]).rows[0].muted).toBe(true);
 });

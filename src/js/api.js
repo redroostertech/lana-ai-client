@@ -3917,6 +3917,32 @@ class ApiClient {
     return this.post('/api/v1/modules/metric-snapshots/capture', data);
   }
 
+  // ── Mappings (Settings > Mappings): source values to governed keys ──
+  // GET /api/v1/mappings/summary -> per vocabulary { mapped_records, unmapped_records, unmapped_values }
+  async getMappingSummary() {
+    return this.get('/api/v1/mappings/summary');
+  }
+
+  // GET /api/v1/vocabularies/:vocabulary -> [{ key, label, parent, description }]
+  async getVocabulary(vocabulary) {
+    return this.get('/api/v1/vocabularies/' + encodeURIComponent(vocabulary));
+  }
+
+  // GET /api/v1/mappings/:vocabulary?status=unmapped|mapped|all
+  async getMappings(vocabulary, status = 'all') {
+    return this.get('/api/v1/mappings/' + encodeURIComponent(vocabulary) + '?status=' + encodeURIComponent(status));
+  }
+
+  // PUT /api/v1/mappings/:vocabulary { items: [{ connector, source_value, canonical_key }] } -> { saved, records_to_update }
+  async saveMappings(vocabulary, items) {
+    return this.request('PUT', '/api/v1/mappings/' + encodeURIComponent(vocabulary), { items: items });
+  }
+
+  // DELETE /api/v1/mappings/:vocabulary/:id
+  async deleteMapping(vocabulary, id) {
+    return this.request('DELETE', '/api/v1/mappings/' + encodeURIComponent(vocabulary) + '/' + encodeURIComponent(id));
+  }
+
   async getMetricDetail(metricKey, params = {}, options = {}) {
     let url = '/api/v1/modules/metric-detail/' + encodeURIComponent(metricKey);
     const queryParts = [];

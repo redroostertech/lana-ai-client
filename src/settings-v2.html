@@ -17,6 +17,8 @@
   <link rel="stylesheet" href="css/lex-motion.css">
   <link rel="stylesheet" href="css/briefs-phones.css">
   <link rel="stylesheet" href="css/settings-briefs.css">
+  <link rel="stylesheet" href="css/settings-mappings.css">
+  <link rel="stylesheet" href="css/setup-banner.css">
   <link rel="stylesheet" href="css/settings-general.css">
   <link rel="stylesheet" href="css/settings-sessions.css">
   <link rel="stylesheet" href="css/settings-capabilities.css">
@@ -54,6 +56,9 @@
        heading="Settings"
        subtitle="Manage your profile, preferences, and account"
      ></lex-banner>
+
+     <!-- "Finish your setup" when case or appointment types are not mapped yet (setup-banner.js). -->
+     <div id="lanaSetupBanner" class="lana-setup-banner-slot" hidden></div>
 
      <div class="sv2-layout">
 
@@ -116,6 +121,12 @@
           data-section="billing" aria-controls="sv2-panel-billing" aria-selected="false" tabindex="-1">
           <span class="sv2-nav-icon" data-icon="sparkles" aria-hidden="true"></span>
           <span class="sv2-nav-label">Plan &amp; billing</span>
+        </button>
+        <!-- Mappings: shown by settings-mappings.js when the mappings API answers. -->
+        <button type="button" class="sv2-nav-item sv2-hidden" role="tab" id="sv2-tab-mappings"
+          data-section="mappings" aria-controls="sv2-panel-mappings" aria-selected="false" tabindex="-1">
+          <span class="sv2-nav-icon" data-icon="shuffle" aria-hidden="true"></span>
+          <span class="sv2-nav-label">Mappings</span>
         </button>
         <button type="button" class="sv2-nav-item" role="tab" id="sv2-tab-usage"
           data-section="usage" aria-controls="sv2-panel-usage" aria-selected="false" tabindex="-1">
@@ -480,6 +491,28 @@
           </lex-card>
         </section>
       </div><!-- /sv2-panel-phone -->
+
+      <!-- ╔══════════════════════ MAPPINGS PANEL ═════════════════════╗
+           The firm's case and appointment types mapped to LANA's types.
+           Rendered by settings-mappings.js (rules in settings-mappings.model.js). -->
+      <div class="sv2-panel sv2-hidden" id="sv2-panel-mappings" role="tabpanel"
+        aria-labelledby="sv2-tab-mappings" data-section="mappings">
+        <section id="sv2-section-mappings" class="sv2-mappings">
+          <lex-card heading="Mappings" subtitle="Tell LANA what each of your case and appointment types means, so every report counts them the same way">
+            <lex-tabs id="sv2-mappings-tabs" active="matter_service"></lex-tabs>
+            <div class="sv2-map-toolbar">
+              <lex-segmented id="sv2-mappings-status" name="mappings_status" size="sm" aria-label="Show"></lex-segmented>
+              <div class="sv2-map-actions">
+                <lex-btn id="sv2-mappings-accept" variant="secondary" size="sm" label="Accept all suggestions"></lex-btn>
+                <lex-btn id="sv2-mappings-save" variant="primary" size="sm" label="Save" disabled></lex-btn>
+              </div>
+            </div>
+            <p id="sv2-mappings-readonly" class="sv2-map-note" hidden>Only admins can change mappings. You can see how each type is mapped.</p>
+            <p id="sv2-mappings-message" class="sv2-map-note" role="status" aria-live="polite"></p>
+            <ul id="sv2-mappings-list" class="sv2-map-list" aria-label="Mappings"></ul>
+          </lex-card>
+        </section>
+      </div><!-- /sv2-panel-mappings -->
 
       <!-- ╔══════════════════════ PLUGINS PANEL ══════════════════════╗ -->
       <div class="sv2-panel sv2-hidden" id="sv2-panel-plugins" role="tabpanel"
@@ -1009,6 +1042,10 @@
   <script src="js/briefs/briefs-phones-ui.js"></script>
   <script src="js/briefs/briefs-settings.js"></script>
   <script src="js/pages/settings-briefs.js"></script>
+  <script src="js/lex/components/foundation/lex-tabs.js"></script>
+  <script src="js/settings-mappings.model.js"></script>
+  <script src="js/shared/setup-banner.js"></script>
+  <script src="js/pages/settings-mappings.js"></script>
   <script src="js/pages/settings-v2-nav.js"></script>
 
   <!-- PAC bridge consent handler (Lex modal for token requests) -->

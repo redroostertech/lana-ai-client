@@ -814,13 +814,19 @@
     };
     // More than 12 rows read better as horizontal bars (8 shown, the rest counted).
     if (bars.hiddenCount > 0) bars = window.MetricCardView.listBars(metric.value, 8);
+    // Each column opens the records; a "Not mapped" column opens Mappings.
+    var listKey = metric.metric_key || metric.key;
+    bars.rows.forEach(function (row) {
+      row.key = listKey;
+      if (row.muted) row.linkHref = MAPPINGS_PAGE;
+    });
     var action = bars.neededPending ? window.DataState.goalAction(metric) : null;
     var pendingNote = bars.neededPending
       ? '<p class="dash-metric-card__list-note">Needed counts appear once a goal is set.'
         + (action ? ' <button type="button" class="lex-data-state__action" data-data-state-action="' + escapeHtml(action.href) + '">' + escapeHtml(action.label) + '</button>' : '')
         + '</p>'
       : '';
-    return '<div class="dash-metric-card__chart">' + window.MiniCharts.breakdownHtml(bars, formatBar) + pendingNote + '</div>';
+    return '<div class="dash-metric-card__chart">' + window.MiniCharts.breakdownHtml(bars, formatBar, { href: recordsHref }) + pendingNote + '</div>';
   }
 
   // ── Declared cards (layout.cards; js/shared/dashboard-cards.js) ──────
@@ -1230,12 +1236,30 @@
   // "How this card works" panel.
   var cardInfoByKey = {};
 
+  // Settings > Mappings, where a firm maps its case and appointment types.
+  var MAPPINGS_PAGE = 'settings-v2.html#mappings';
+
+  // "42 matters are not mapped to a service yet" with a link, from the
+  // first metric on the card that reports mapping_coverage.
+  function coverageHtml(metrics) {
+    var model = window.SettingsMappingsModel;
+    if (!model) return '';
+    for (var i = 0; i < metrics.length; i += 1) {
+      var text = metrics[i] ? model.coverageCaveat(metrics[i].mapping_coverage) : null;
+      if (text) {
+        return '<p class="dash-card__caveat">' + escapeHtml(text) + '. <a href="#" class="dash-card__caveat-link" data-metric-detail-link="'
+          + escapeHtml(MAPPINGS_PAGE) + '">Map them</a></p>';
+      }
+    }
+    return '';
+  }
+
   function renderDeclaredCard(item) {
     item.resolved.def.keys.concat(item.resolved.def.options.metric_keys_override || []).forEach(function (key) {
       if (!cardInfoByKey[key]) cardInfoByKey[key] = item.resolved;
     });
     var note = item.resolved.def.options && item.resolved.def.options.note;
-    var html = renderDeclaredVisual(item);
+    var html = appendToCard(renderDeclaredVisual(item), coverageHtml(item.resolved.metrics.map(function (entry) { return entry.metric; })));
     // The card's note: one muted line above the footer.
     return note ? appendToCard(html, '<p class="dash-card__note">' + escapeHtml(note) + '</p>') : html;
   }
@@ -1741,7 +1765,7 @@
       // cards collect in one strip at the bottom.
       var split = window.DashboardCards.splitWaiting(filteredMetrics);
       grid.innerHTML = withSpans(window.DashboardLayout.buildLayout(split.shown)).map(function (item) {
-        return renderMetricCard(item.card, item);
+        return appendToCard(renderMetricCard(item.card, item), coverageHtml([item.card]));
       }).join('') + renderWaitingStrip(split.waiting.map(function (metric) { return renderMetricCard(metric); }));
     }
     if (animateNextRender && grid.querySelectorAll) {
@@ -2075,6 +2099,8 @@
     }
 
     var initialPeriod = initPeriodControls();
+    // "Finish your setup" when some case or appointment types are not mapped.
+    if (window.LanaSetupBanner) window.LanaSetupBanner.mount('lanaSetupBanner');
 
     content.addEventListener('click', function (event) {
 

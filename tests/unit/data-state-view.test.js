@@ -76,3 +76,13 @@ test('no data source is its own calm state: connect a data source, with the reas
   expect(html).toContain('lex-data-state--waiting');
   expect(load().view(item).title).toBe('No data source');
 });
+
+test('not_mapped is a calm waiting state that links to Mappings', () => {
+  const item = { data_state: 'not_mapped', data_state_reason: '' };
+  expect(load().isProblem(item)).toBe(true);
+  expect(load().view(item, { calm: true })).toEqual({ state: 'not_mapped', title: 'Waiting for mappings',
+    reason: 'Map your case types to see this number.', waiting: true, action: { label: 'Open Mappings', href: 'settings-v2.html#mappings' } });
+  const html = load().render(item, { calm: true });
+  expect(html).toContain('data-data-state-action="settings-v2.html#mappings"');
+  expect(load().view(item).title).toBe('Not mapped yet');
+});

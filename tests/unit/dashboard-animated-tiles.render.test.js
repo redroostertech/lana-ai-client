@@ -638,3 +638,28 @@ describe('breadcrumbs and the way back', () => {
     expect([qs.get('from'), qs.get('dashboardId')]).toEqual(['dashboard', 'd1']);
   });
 });
+
+describe('mappings on dashboard cards', () => {
+  const declared = require(path.join(__dirname, '../fixtures/dashboard/declared-layouts.json'));
+  test('mapping_coverage adds a caveat with a link; a Not mapped bar links to Mappings; not_mapped is a calm state', async () => {
+    const cards = declared.cards_synthetic.map((c) => {
+      if (c.metric_key.endsWith('closed_cases_by_service_offering')) {
+        return Object.assign({}, c, { mapping_coverage: { mapped: 8, not_mapped: 42 },
+          value: c.value.concat([{ service_key: 'not_mapped', service_label: 'Not mapped', value: 42 }]) });
+      }
+      if (c.metric_key.endsWith('active_cases_total')) return Object.assign({}, c, { value: null, data_state: 'not_mapped', data_state_reason: '' });
+      return c;
+    });
+    const layout = { cards: [{ id: 'b', kind: 'breakdown', metric_key: 'case_volume.closed_cases_by_service_offering' },
+      { id: 'n', kind: 'number', metric_key: 'case_volume.active_cases_total' }, { id: 'x', kind: 'number', metric_key: 'case_volume.new_cases_opened_total' }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: cards }) });
+    await p.exports.loadDashboardById('d1');
+    const html = p.nodes.dashboardMetricGrid.innerHTML;
+    expect(text(html)).toContain('42 matters are not mapped to a service yet');
+    expect(html).toContain('class="dash-card__caveat"');
+    expect(html).toContain('mini-cols__group--muted');
+    expect(html).toContain('data-metric-detail-link="settings-v2.html#mappings"');
+    expect(text(html)).toContain('1 card is waiting for setup');
+    expect(text(html)).toContain('Map your case types to see this number.');
+  });
+});

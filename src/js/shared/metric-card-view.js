@@ -126,11 +126,14 @@
     var cap = limit > 0 ? limit : 8;
     var actualVsNeeded = value.some(isActualVsNeeded);
     var parsed = value.map(function (row, index) {
+      // Records whose source value is not mapped yet (Settings > Mappings).
+      var muted = !!(row && typeof row === 'object' && (row.not_mapped === true || row.service_key === 'not_mapped' || row.key === 'not_mapped'));
       var isObject = row && typeof row === 'object';
       return {
-        label: rowLabel(row, index),
+        label: muted ? 'Not mapped' : rowLabel(row, index),
         value: isObject ? toNumber(row[actualVsNeeded ? ACTUAL_KEY : VALUE_KEY]) : toNumber(row),
         second: isObject && actualVsNeeded ? toNumber(row[NEEDED_KEY]) : null,
+        muted: muted,
       };
     });
     var paired = parsed.some(function (row) { return row.second !== null; });
@@ -146,6 +149,7 @@
         second: row.second,
         pct: pctOf(row.value, max),
         secondPct: row.second === null ? null : pctOf(row.second, max),
+        muted: row.muted,
       };
     });
     return {

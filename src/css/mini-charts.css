@@ -860,3 +860,16 @@
     transition: none;
   }
 }
+
+/* "Not mapped" (records whose type is not mapped yet): muted, dashed. */
+.mini-cols__group--muted .mini-cols__bar {
+  fill: var(--lex-bg-tertiary);
+  stroke: var(--lex-text-tertiary);
+  stroke-dasharray: 3 2;
+  stroke-width: 1;
+}
+
+.mini-cols__group--muted .mini-cols__label,
+.mini-cols__group--muted .mini-cols__value {
+  fill: var(--lex-text-tertiary);
+}

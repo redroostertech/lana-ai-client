@@ -116,6 +116,8 @@
 
   function columnsHtml(model, format, opts) {
     var linkFor = function (row) {
+      // A "Not mapped" column opens its own page (Settings > Mappings).
+      if (row.linkHref) return ' data-metric-detail-link="' + escapeHtml(row.linkHref) + '"';
       return opts && typeof opts.href === 'function' && row.key ? ' data-metric-detail-link="' + escapeHtml(opts.href(row.key)) + '"' : '';
     };
     var n = model.rows.length;
@@ -141,7 +143,7 @@
         bars = column('mini-cols__bar', center - width / 2, width, row.pct);
       }
       var valueY = round1(PLOT_BOTTOM - (top / 100) * PLOT_H - 4);
-      return '<g class="mini-cols__group"' + linkFor(row) + '><title>' + escapeHtml(row.label + ': ' + valueText) + '</title>'
+      return '<g class="mini-cols__group' + (row.muted ? ' mini-cols__group--muted' : '') + '"' + linkFor(row) + '><title>' + escapeHtml(row.label + ': ' + valueText) + '</title>'
         + bars
         + '<text class="mini-cols__value" x="' + round1(center) + '" y="' + valueY + '" text-anchor="middle">' + escapeHtml(format(row.value === null && hasSecond ? row.second : row.value)) + '</text>'
         + '<text class="mini-cols__label" x="' + round1(center) + '" y="114" text-anchor="middle">' + escapeHtml(shortLabel(row.label, maxChars)) + '</text>'

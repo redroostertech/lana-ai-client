@@ -16,7 +16,8 @@
     insufficient_data: 'Not enough data',
     timeout: 'Took too long',
     invalid_request: 'Check the request',
-    engine_error: 'Could not work this out'
+    engine_error: 'Could not work this out',
+    not_mapped: 'Not mapped yet'
   };
 
   function escapeHtml(value) {
@@ -44,8 +45,11 @@
   // a failure or a $0. Reports keep the plain titles above.
   var CALM_TITLES = {
     insufficient_data: 'Waiting for setup',
-    no_data_source: 'Connect a data source'
+    no_data_source: 'Connect a data source',
+    not_mapped: 'Waiting for mappings'
   };
+  // A number that needs the firm's case types mapped (Settings > Mappings).
+  var MAPPINGS_PAGE = 'settings-v2.html#mappings';
   var GOAL_TITLE = 'Waiting for a goal';
   var CATALOG_PAGE = 'admin/metric-catalog.html';
 
@@ -81,12 +85,13 @@
       };
     }
     var calmTitle = calm ? CALM_TITLES[state] : null;
+    var notMapped = state === 'not_mapped';
     return {
       state: state,
       title: calmTitle || TITLES[state],
-      reason: item.data_state_reason || '',
+      reason: item.data_state_reason || (notMapped ? 'Map your case types to see this number.' : ''),
       waiting: !!calmTitle,
-      action: null
+      action: notMapped && calm ? { label: 'Open Mappings', href: MAPPINGS_PAGE } : null
     };
   }
 

@@ -312,3 +312,11 @@ describe('the visual vocabulary drawings', () => {
     expect(Charts.breakdownHtml(model, fmt, { href })).toContain('data-metric-detail-link="detail?k.a"');
   });
 });
+
+test('a muted (Not mapped) column is styled apart and opens its own link', () => {
+  const model = View.listBars([{ label: 'A', value: 2 }, { service_key: 'not_mapped', value: 1 }], 12);
+  model.rows[1].linkHref = 'settings-v2.html#mappings';
+  const html = Charts.breakdownHtml(model, fmt, { href: () => 'detail' });
+  expect(html).toContain('mini-cols__group mini-cols__group--muted');
+  expect(html).toContain('data-metric-detail-link="settings-v2.html#mappings"');
+});
