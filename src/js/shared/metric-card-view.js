@@ -80,9 +80,23 @@
     return MONTHS[month - 1] + ' ' + date + ', ' + day.substring(0, 4);
   }
 
+  // The first field named *_name ("attorney_name"), for rows without a label.
+  function nameField(row) {
+    var keys = Object.keys(row);
+    for (var i = 0; i < keys.length; i += 1) {
+      var key = keys[i];
+      if (key.length > 5 && key.slice(-5) === '_name' && row[key] !== null && row[key] !== undefined && String(row[key]).trim() !== '') return key;
+    }
+    return null;
+  }
+
   function rowLabel(row, index) {
     if (row === null || row === undefined) return 'Item ' + (index + 1);
     if (typeof row !== 'object') return String(row);
+    if (row.service_label === undefined || row.service_label === null || row.service_label === '') {
+      var named = nameField(row);
+      if (named) return String(row[named]);
+    }
     for (var i = 0; i < LABEL_KEYS.length; i += 1) {
       var key = LABEL_KEYS[i];
       var value = row[key];

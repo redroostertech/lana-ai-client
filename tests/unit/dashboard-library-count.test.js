@@ -14,7 +14,9 @@ const js = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'js', 'admin'
 
 test('the table and its count hold every dashboard, pinned ones included', () => {
   const render = js.slice(js.indexOf('function renderDashboardLibrary'), js.indexOf('function confirmDelete'));
-  expect(render).toMatch(/table\.setData\(sourceDashboards\)/);
+  // Every dashboard goes in (each row gains its "Who can see it" text).
+  expect(render).toMatch(/var rows = sourceDashboards\.map\(/);
+  expect(render).toMatch(/table\.setData\(rows\)/);
   expect(render).not.toMatch(/pinnedIds\.has/);
 });
 

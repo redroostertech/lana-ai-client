@@ -549,6 +549,7 @@
         'js/shared/metric-tables.js',
         'js/admin/dashboard-catalog.js',
         'js/shared/data-state.js',
+        'js/shared/dashboard-library-columns.js',
         'js/admin/dashboard-library.js'
       ],
       stylesheets: [
@@ -584,6 +585,31 @@
         'css/title-switcher.css',
         'css/detail-page.css',
         'css/lex-motion.css',
+        'css/mini-charts.css'
+      ]
+    },
+
+    'admin/metric_detail.html': {
+      title: 'Metric Detail',
+      // Opened from a dashboard: keep the Insights context with All dashboards lit.
+      activeNav: 'insights-dashboards',
+      scripts: [
+        'js/lex/components/foundation/lex-tabs.js',
+        'js/lex/components/foundation/lex-badge.js',
+        'js/lex/components/form/lex-input.js',
+        'js/lex/components/form/lex-select.js',
+        'js/lex/components/data/lex-table.js',
+        'js/shared/library-column-filters.js',
+        'js/shared/metric-tables.js',
+        'js/shared/data-state.js',
+        'js/dashboard/metric-goal-comparison.js',
+        'js/shared/metric-card-view.js',
+        'js/shared/mini-charts.js',
+        'js/shared/metric-detail-view.js',
+        'js/admin/metric-detail.js'
+      ],
+      stylesheets: [
+        'css/admin/insights-dashboard.css',
         'css/mini-charts.css'
       ]
     },

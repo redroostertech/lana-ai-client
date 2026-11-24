@@ -287,7 +287,10 @@
       var x = round1(((i + 0.5) / model.days) * W);
       ticks += '<line class="mini-timeline__tick" x1="' + x + '" x2="' + x + '" y1="30" y2="34"></line>';
       if (o.dayLabel && (i === 0 || i === 7 || i === model.days - 1)) {
-        ticks += '<text class="mini-timeline__day" x="' + x + '" y="46" text-anchor="middle">' + escapeHtml(o.dayLabel(i)) + '</text>';
+        // The first and last labels hug the ends so they are never cut off.
+        var anchor = i === 0 ? 'start' : (i === model.days - 1 ? 'end' : 'middle');
+        var lx = i === 0 ? 0 : (i === model.days - 1 ? W : x);
+        ticks += '<text class="mini-timeline__day" x="' + lx + '" y="46" text-anchor="' + anchor + '">' + escapeHtml(o.dayLabel(i)) + '</text>';
       }
     }
     var dots = model.dots.map(function (dot, n) {

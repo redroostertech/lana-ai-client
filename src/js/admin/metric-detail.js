@@ -60,13 +60,7 @@
     return formatNumber(numeric);
   }
 
-  function formatMovement(movement) {
-    if (!movement || movement.percent_change == null || !isFinite(Number(movement.percent_change))) return EMPTY;
-    var pct = Number(movement.percent_change);
-    if (pct === 0) return EMPTY;
-    var signed = movement.direction === 'down' ? -Math.abs(pct) : Math.abs(pct);
-    return (signed > 0 ? '+' : '') + signed.toFixed(1) + '%';
-  }
+
 
   function escapeHtml(value) {
     return String(value == null ? '' : value)
@@ -119,16 +113,26 @@
     };
   }
 
-  function rawRenderers(dateColumns, columns) {
+  function view() {
+    return window.MetricDetailView;
+  }
+
+  // Source records read as words: no internal ids, dates as days, a muted
+  // dash for an empty cell, and the matter opening its workspace when the
+  // row carries one (js/shared/metric-detail-view.js).
+  var MUTED_DASH = '<span class="metric-detail-muted">-</span>';
+
+  function recordRenderers(columns) {
     var renderers = {};
     columns.forEach(function (col) {
-      renderers[col] = dateColumns.indexOf(col) !== -1
-        ? dateTimeCell
-        : function (value) {
-          if (value === null || value === undefined || value === '') return muted();
-          var text = String(value);
-          return '<span class="metric-detail-cell-truncate" title="' + escapeHtml(text) + '">' + escapeHtml(text) + '</span>';
-        };
+      renderers[col.key] = function (value, row) {
+        var text = view().cellText(value, col.type);
+        if (text === null) return MUTED_DASH;
+        if (col.key === 'matter_name' && row && row._href) {
+          return '<a class="metric-detail-link" href="#" data-metric-record-link="' + escapeHtml(row._href) + '">' + escapeHtml(text) + '</a>';
+        }
+        return '<span class="metric-detail-cell-truncate" title="' + escapeHtml(text) + '">' + escapeHtml(text) + '</span>';
+      };
     });
     return renderers;
   }
@@ -177,26 +181,27 @@
     var table = el('metricRawDataTable');
     if (!table || typeof table.setData !== 'function') return;
     var shared = tables();
-    var model = shared.rawDataTable(sourceRows, 12);
+    var model = view().recordsTable(sourceRows);
     if (model.columns.length) {
-      table.setAttribute('columns', model.columns.join(','));
-      table.setAttribute('labels', model.labels.join(','));
+      table.setAttribute('columns', model.columns.map(function (c) { return c.key; }).join(','));
+      table.setAttribute('labels', model.columns.map(function (c) { return c.label; }).join(','));
     }
-    table.setCellRenderers(rawRenderers(model.dateColumns, model.columns));
+    table.setCellRenderers(recordRenderers(model.columns));
     var filterMap = {};
-    model.dateColumns.forEach(function (col) {
+    model.columns.filter(function (c) { return c.type === 'date' || c.type === 'datetime'; }).forEach(function (col) {
       var range = shared.createdRangeFilter();
-      if (range) filterMap[col] = range;
+      if (range) filterMap[col.key] = range;
     });
     table.setColumnFilterOptions(filterMap);
-    var sortOptions = model.columns.map(function (col, i) { return { value: col, label: model.labels[i] }; });
-    var defaultSort = model.columns.indexOf('created_at') !== -1 ? 'created_at' : (model.columns[0] || '');
-    var defaultDir = defaultSort === 'created_at' ? 'desc' : 'asc';
+    var sortOptions = model.columns.map(function (col) { return { value: col.key, label: col.label }; });
+    var firstDate = model.columns.filter(function (c) { return c.type === 'date' || c.type === 'datetime'; })[0];
+    var defaultSort = firstDate ? firstDate.key : (model.columns[0] ? model.columns[0].key : '');
+    var defaultDir = firstDate ? 'desc' : 'asc';
     setSelectOptions('metricRawDataSort', sortOptions, defaultSort);
     var order = el('metricRawDataSortOrder');
     if (order) order.dataset.order = defaultDir;
     var empty = function () {
-      setEmptyText(table, 'No source records for this period', 'No matching source records. Try a different search or clear the filters.');
+      setEmptyText(table, 'No records for these dates', 'No matching records. Try a different search or clear the filters.');
     };
     if (!toolbars.raw) {
       toolbars.raw = shared.bindClientToolbar(table, {
@@ -208,7 +213,7 @@
       table.addEventListener('lex-filter-change', empty);
     }
     empty();
-    table.setData(model.rows);
+    table.setData((Array.isArray(sourceRows) ? sourceRows : []).map(view().recordsRow));
     if (defaultSort && table.dataSource) {
       table.sortBy = defaultSort;
       table.sortDir = defaultDir;
@@ -217,13 +222,52 @@
     toolbars.raw.updateCount();
   }
 
-  function movementFromComparison(comparison) {
-    if (!comparison || typeof comparison !== 'object') return null;
-    return {
-      prior_value: comparison.previous_value,
-      percent_change: comparison.percent_change,
-      direction: comparison.direction,
-    };
+  // The summary card: value with its unit, the change both ways, the prior
+  // period's days, and a small comparison (or the trend when history exists).
+  function renderSummary(payload, snapshots) {
+    var summary = view().summary(payload);
+    setText('metricSummaryValue', summary.value);
+    var chip = el('metricSummaryChange');
+    if (chip) {
+      chip.hidden = !summary.changeText;
+      chip.textContent = summary.changeText || '';
+      chip.className = 'metric-summary__chip metric-summary__chip--' + (summary.direction || 'flat');
+    }
+    var prior = el('metricSummaryPrior');
+    if (prior) {
+      var days = view().dayRangeText(summary.priorDays);
+      prior.textContent = summary.priorText ? summary.priorText + (days ? ' (' + days + ')' : '') : '';
+    }
+    var visual = el('metricSummaryVisual');
+    if (!visual) return;
+    var line = window.MetricCardView ? window.MetricCardView.sparkline(snapshots, 100, 24) : null;
+    if (line && window.MiniCharts) {
+      visual.innerHTML = window.MiniCharts.sparklineSvg(line);
+    } else if (summary.bars) {
+      visual.innerHTML = '<div class="metric-summary__bars">'
+        + '<div class="metric-summary__bar-row"><span>This period</span><svg viewBox="0 0 100 10" preserveAspectRatio="none"><rect class="metric-summary__bar metric-summary__bar--current" x="0" y="0" width="' + summary.bars.currentPct + '" height="10"></rect></svg></div>'
+        + '<div class="metric-summary__bar-row"><span>Prior period</span><svg viewBox="0 0 100 10" preserveAspectRatio="none"><rect class="metric-summary__bar metric-summary__bar--prior" x="0" y="0" width="' + summary.bars.priorPct + '" height="10"></rect></svg></div>'
+        + '</div>';
+    } else {
+      visual.innerHTML = '';
+    }
+  }
+
+  // History shows only with at least two stored values; otherwise nothing.
+  function renderHistory(snapshots) {
+    var section = el('metricHistorySection');
+    var line = window.MetricCardView ? window.MetricCardView.sparkline(snapshots, 100, 24) : null;
+    if (section) section.hidden = !line;
+    var chart = el('metricHistoryChart');
+    if (chart) chart.innerHTML = line && window.MiniCharts ? window.MiniCharts.sparklineSvg(line) : '';
+    if (line) renderSnapshots(snapshots);
+  }
+
+  function showBlock(blockId, textId, text) {
+    var block = el(blockId);
+    if (block) block.hidden = !text;
+    var node = el(textId);
+    if (node) node.textContent = text || '';
   }
 
   // When the server sent only the first page of source records, say so in
@@ -282,8 +326,6 @@
       var payload = response && response.data ? response.data : response;
       var metric = payload.metric || {};
       var current = payload.current || {};
-      // Older servers send movement; newer ones send the comparison block.
-      var movement = payload.movement || movementFromComparison(payload.comparison);
       // Title falls through to humanized key so the page never shows
       // `legal_firm.family_law.upcoming_custody_hearings` as a heading.
       var rawTitle = current.title || metric.title || metric.name || metric.key || metricKey;
@@ -293,31 +335,23 @@
       var banner = el('metricDetailBanner');
       if (banner) {
         banner.heading = title;
-        banner.subtitle = metric.description || current.description || 'Metric calculation and drilldown';
+        banner.subtitle = 'The number, how it moved, and the records behind it.';
       }
 
       renderBreadcrumb({ ...metric, title: title });
       setText('metricTitle', title);
-      setText('metricDomain', humanize(metric.domain || current.domain) || 'Metric');
-      setText('metricStatus', humanize(current.status || metric.status) || EMPTY);
-      setText('metricDescription', current.description || metric.description || '');
-      setText('metricCalculation', metric.calculation || current.calculation || EMPTY);
-      setText('metricBusinessLogic', metric.businessLogic || current.businessLogic || EMPTY);
-      setText('metricCurrentValue', formatValue(current.value_numeric != null ? current.value_numeric : current.value, current.format));
-      setText('metricPriorValue', movement ? formatValue(movement.prior_value, current.format) : EMPTY);
-      setText('metricMovement', formatMovement(movement));
-      // When the period had no movement (flat / 0% change), direction is
-      // also not meaningful, so it shows the empty token like the value
-      // cards on either side.
-      var directionLabel = EMPTY;
-      if (movement && movement.direction && movement.direction !== 'flat' && Number(movement.percent_change) !== 0) {
-        directionLabel = movement.direction;
-      }
-      setText('metricDirection', directionLabel);
+      // About this number: plain words from the catalog; empty blocks hide.
+      var description = current.description || metric.description || '';
+      var lead = el('metricDescription');
+      if (lead) { lead.textContent = description; lead.hidden = !description; }
+      showBlock('metricCalculationBlock', 'metricCalculation', metric.calculation || current.calculation || '');
+      showBlock('metricBusinessLogicBlock', 'metricBusinessLogic', metric.businessLogic || current.businessLogic || '');
       // The backend names the period in the firm's days (data.period.label).
       setText('metricPeriod', payload.period && payload.period.label);
 
-      renderSnapshots(payload.snapshots || []);
+      var snapshots = payload.snapshots || [];
+      renderSummary(payload, snapshots);
+      renderHistory(snapshots);
       renderRawData(payload.raw_data && payload.raw_data.rows ? payload.raw_data.rows : []);
       renderRawDataTotal(payload.raw_data);
     } catch (err) {
@@ -327,36 +361,13 @@
     }
   }
 
-  // Configure the History/Source tabs and wire the panel show/hide. Two
-  // tables answer different questions (time series vs. current-period rows)
-  // so they live behind tabs instead of stacking, which previously made the
-  // page look like it had two redundant empty states.
-  function initDetailTabs() {
-    var tabs = el('metricDetailTabs');
-    var historyPanel = el('metricHistoryPanel');
-    var sourcePanel = el('metricSourcePanel');
-    if (!tabs || !historyPanel || !sourcePanel) return;
-
-    if (typeof tabs.setAttribute === 'function') {
-      tabs.setAttribute('tabs', JSON.stringify([
-        { id: 'history', label: 'History', icon: 'activity' },
-        { id: 'source', label: 'Source Records', icon: 'table' },
-      ]));
-    }
-
-    function showPanel(tabId) {
-      historyPanel.hidden = tabId !== 'history';
-      sourcePanel.hidden = tabId !== 'source';
-    }
-    // A dashboard tile's "See the records" opens straight on the source
-    // records (tab=source).
-    var initialTab = params().get('tab') === 'source' ? 'source' : 'history';
-    if (initialTab !== 'history' && typeof tabs.setAttribute === 'function') tabs.setAttribute('active', initialTab);
-    showPanel(initialTab);
-
-    tabs.addEventListener('tab-change', function (event) {
-      var next = event.detail && event.detail.tab;
-      if (next) showPanel(next);
+  // A matter in the records opens its workspace.
+  function initRecordLinks() {
+    document.addEventListener('click', function (event) {
+      var link = event.target && event.target.closest ? event.target.closest('[data-metric-record-link]') : null;
+      if (!link) return;
+      event.preventDefault();
+      if (window.Lex && Lex.Nav) Lex.Nav.go(link.getAttribute('data-metric-record-link'));
     });
   }
 
@@ -368,7 +379,7 @@
       Lex.Nav.go('dashboard.html', { replace: true });
       return;
     }
-    initDetailTabs();
+    initRecordLinks();
     var ready = window.customElements && typeof window.customElements.whenDefined === 'function'
       ? window.customElements.whenDefined('lex-table')
       : Promise.resolve();

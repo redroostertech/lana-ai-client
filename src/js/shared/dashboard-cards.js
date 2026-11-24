@@ -65,9 +65,13 @@
       chart: raw.chart === 'funnel' ? 'funnel' : 'bars',
       note: raw.note ? String(raw.note) : '',
       visual: raw.visual ? String(raw.visual) : '',
+      chapter: raw.chapter ? String(raw.chapter) : '',
       // Saved cards keep their options in visual_options; the spec wrote
       // them on the card itself. Both read the same.
-      options: cardOptions(Object.assign({}, raw, raw.visual_options && typeof raw.visual_options === 'object' ? raw.visual_options : {})),
+      options: Object.assign(cardOptions(Object.assign({}, raw, raw.visual_options && typeof raw.visual_options === 'object' ? raw.visual_options : {})), {
+        // Only visual_options.note is shown; the spec's card note is internal.
+        note: raw.visual_options && raw.visual_options.note ? String(raw.visual_options.note) : '',
+      }),
     };
   }
 
@@ -194,6 +198,11 @@
     });
     var max = 0;
     rows.forEach(function (row) { if (row.value !== null && row.value > max) max = row.value; });
+    // A group that mixes "right now" metrics with period metrics tags the
+    // right-now ones, so no one reads them as following the dates.
+    var scopes = {};
+    rows.forEach(function (row) { if (row.metric && row.metric.period_scope) scopes[row.metric.period_scope] = true; });
+    var mixed = Object.keys(scopes).length > 1;
     return rows.map(function (row, i) {
       var before = i > 0 ? rows[i - 1].value : null;
       var conversion = card.chart === 'funnel' && i > 0 && before !== null && before > 0 && row.value !== null
@@ -206,6 +215,7 @@
         waiting: row.waiting,
         pct: row.value !== null && row.value > 0 && max > 0 ? round1((row.value / max) * 100) : 0,
         conversionPct: conversion,
+        scopeTag: mixed && row.metric && row.metric.period_scope === 'snapshot' ? 'now' : null,
       };
     });
   }
@@ -227,26 +237,59 @@
   }
 
   /** Cards to draw ({ resolved, role, span }) in declared order, and the waiting ones for the strip. */
+  var CHAPTER_MIN_CARDS = 6;
+  var CHAPTER_LABELS = { now: 'Now', attention: 'Needs attention', coming_up: 'Coming up', wrapping_up: 'Wrapping up', pace: 'Pace' };
+
+  function chapterLabel(chapter) {
+    if (CHAPTER_LABELS[chapter]) return CHAPTER_LABELS[chapter];
+    var words = String(chapter || '').split('_').join(' ').trim();
+    return words ? words.charAt(0).toUpperCase() + words.slice(1) : '';
+  }
+
   function planDeclared(resolved) {
     var items = [];
     var waiting = [];
     (resolved || []).forEach(function (entry) {
-      if (entry.state === 'waiting') { waiting.push(entry); return; }
+      // A waiting headline stays in place as a calm hero; other waiting
+      // cards go to the strip.
+      if (entry.state === 'waiting' && entry.def.kind !== 'headline') { waiting.push(entry); return; }
       var size = sizeFor(entry.def.kind);
       items.push({ resolved: entry, role: size.role, span: size.span });
     });
-    // The hero takes two of four columns: the next compact cards (span 1,
-    // up to two) move up beside it so its row stays short.
-    if (items.length && items[0].role === 'hero') {
+    // Chapters (card.chapter): a label row before each chapter's first card,
+    // only when the dashboard has 6 or more cards and some card names one.
+    // A chapter whose cards are all waiting has nothing here, so it is skipped.
+    var chaptered = (resolved || []).length >= CHAPTER_MIN_CARDS && items.some(function (item) { return item.resolved.def.chapter; });
+    var sections = [];
+    if (chaptered) {
+      var at = {};
+      items.forEach(function (item) {
+        var chapter = item.resolved.def.chapter || '';
+        if (at[chapter] === undefined) {
+          at[chapter] = sections.length;
+          sections.push({ chapter: chapter, label: chapter ? chapterLabel(chapter) : '', items: [] });
+        }
+        sections[at[chapter]].items.push(item);
+      });
+    } else {
+      sections.push({ chapter: '', label: '', items: items });
+    }
+    // The hero takes two of four columns: the next compact cards of its
+    // chapter (span 1, up to two) move up beside it so its row stays short.
+    var first = sections[0];
+    if (first && first.items.length && first.items[0].role === 'hero') {
       var beside = [];
-      for (var i = 1; i < items.length && beside.length < 2; i += 1) {
-        if (items[i].span === 1) beside.push(items[i]);
+      for (var i = 1; i < first.items.length && beside.length < 2; i += 1) {
+        if (first.items[i].span === 1) beside.push(first.items[i]);
       }
       if (beside.length) {
-        items = [items[0]].concat(beside, items.slice(1).filter(function (item) { return beside.indexOf(item) === -1; }));
+        first.items = [first.items[0]].concat(beside, first.items.slice(1).filter(function (item) { return beside.indexOf(item) === -1; }));
       }
     }
-    return { items: items, waiting: waiting };
+    items = [];
+    sections.forEach(function (section) { items = items.concat(section.items); });
+    if (!chaptered) sections[0].items = items;
+    return { items: items, waiting: waiting, sections: sections };
   }
 
   /** For older layouts: stand-alone waiting cards go to the strip. */
@@ -352,7 +395,26 @@
     return shared.length ? shared.join(' ') : titles[0];
   }
 
+  // The dashboard's "About" text: the server's description_long or
+  // layout.story, else a plain how-to.
+  var GENERIC_STORY = [
+    'Each card shows one number or a breakdown for the dates in the date picker. Change the dates to see another period.',
+    'Cards marked Right now show where things stand today and do not follow the dates.',
+    'Click a bar, slice or row, or See the records, to open the records behind it for the same dates.',
+    'Cards that are waiting for setup, a goal or a data source collect in one strip at the bottom.',
+  ];
+
+  function storyFor(dashboard) {
+    var text = dashboard && (dashboard.description_long || (dashboard.layout && dashboard.layout.story));
+    if (text && String(text).trim()) {
+      return { source: 'server', paragraphs: String(text).split('\n\n').map(function (p) { return p.trim(); }).filter(Boolean) };
+    }
+    return { source: 'generic', paragraphs: GENERIC_STORY.slice() };
+  }
+
   return {
+    chapterLabel: chapterLabel,
+    storyFor: storyFor,
     compositeTitle: compositeTitle,
     worklistColumns: worklistColumns,
     isDateColumn: isDateColumn,

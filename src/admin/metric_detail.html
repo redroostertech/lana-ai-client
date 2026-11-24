@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="../css/components.css">
   <link rel="stylesheet" href="../css/tailwind-output.css">
   <link rel="stylesheet" href="../css/admin/insights-dashboard.css">
+  <link rel="stylesheet" href="../css/mini-charts.css">
   <script src="../js/tailwind-loader.js"></script>
   <link rel="stylesheet" href="../css/lex-chat.css">
   <!-- target="_blank" links open through the guarded channel (js/shared/external-links.js). -->
@@ -22,7 +23,7 @@
     logo-src="../img/logo-light.png"
     logo-alt="LANA AI"
     logo-href="../dashboard.html"
-    active-nav-id="insights-dashboard"
+    active-nav-id="insights-dashboards"
     page-title="Metric Detail"
   ></lex-app>
 
@@ -40,119 +41,95 @@
       <lex-breadcrumb id="metricDetailBreadcrumb"></lex-breadcrumb>
 
       <section class="metric-detail-layout">
-        <div class="dash-summary-grid dash-summary-grid--five">
-          <div class="dash-stat"><div class="dash-stat__label">Current Value</div><div class="dash-stat__value" id="metricCurrentValue">-</div></div>
-          <div class="dash-stat"><div class="dash-stat__label">Prior Value</div><div class="dash-stat__value" id="metricPriorValue">-</div></div>
-          <div class="dash-stat"><div class="dash-stat__label">Movement</div><div class="dash-stat__value" id="metricMovement">-</div></div>
-          <div class="dash-stat"><div class="dash-stat__label">Direction</div><div class="dash-stat__value" id="metricDirection">-</div></div>
-          <div class="dash-stat"><div class="dash-stat__label">Period</div><div class="dash-stat__value" id="metricPeriod">-</div></div>
-        </div>
-
-        <section class="metric-detail-card">
-          <div class="metric-detail-card__header">
-            <div>
-              <div class="metric-detail-card__eyebrow" id="metricDomain">Metric</div>
-              <h2 id="metricTitle">Metric Detail</h2>
+        <!-- One summary: the value with its unit, the change against the prior
+             period, and a small comparison (or the trend when history exists). -->
+        <section class="metric-summary" aria-labelledby="metricTitle">
+          <div class="metric-summary__main">
+            <h2 id="metricTitle" class="metric-summary__title">Metric</h2>
+            <div id="metricSummaryValue" class="metric-summary__value">-</div>
+            <div class="metric-summary__change-row">
+              <span id="metricSummaryChange" class="metric-summary__chip" hidden></span>
+              <span id="metricSummaryPrior" class="metric-summary__prior"></span>
             </div>
-            <div id="metricStatus" class="metric-detail-chip">-</div>
+            <p class="metric-summary__period">For <span id="metricPeriod">-</span></p>
           </div>
-          <p id="metricDescription" class="metric-detail-description"></p>
-          <div class="metric-detail-definition">
-            <div>
-              <div class="metric-detail-label">Calculation</div>
-              <p id="metricCalculation">-</p>
+          <div id="metricSummaryVisual" class="metric-summary__visual" aria-hidden="true"></div>
+        </section>
+
+        <!-- About this number: plain words from the catalog. -->
+        <section class="metric-about" aria-labelledby="metricAboutHeading">
+          <div class="metric-about__header">
+            <svg class="metric-about__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+            <h2 id="metricAboutHeading" class="metric-about__heading">About this number</h2>
+          </div>
+          <p id="metricDescription" class="metric-about__lead"></p>
+          <div class="metric-about__blocks">
+            <div id="metricCalculationBlock" class="metric-about__block">
+              <h3 class="metric-about__label">How it's calculated</h3>
+              <p id="metricCalculation"></p>
             </div>
-            <div>
-              <div class="metric-detail-label">Business Logic</div>
-              <p id="metricBusinessLogic">-</p>
+            <div id="metricBusinessLogicBlock" class="metric-about__block">
+              <h3 class="metric-about__label">Why it matters</h3>
+              <p id="metricBusinessLogic"></p>
             </div>
           </div>
         </section>
 
-        <section class="metric-detail-card">
-          <lex-tabs id="metricDetailTabs" active="history"></lex-tabs>
-
-          <div id="metricHistoryPanel" class="metric-detail-tab-panel">
-            <div class="metric-detail-card__header">
-              <div>
-                <div class="metric-detail-card__eyebrow">History</div>
-                <h2>Recent Values</h2>
-                <p class="metric-detail-tab-help">How this metric has changed over time. Each row is one captured snapshot.</p>
-              </div>
-            </div>
-            <div class="metric-detail-toolbar bg-white rounded-lg shadow-sm border mb-4 mt-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and filter snapshots">
-              <div class="flex items-center gap-4 flex-wrap">
-                <div class="flex-1 min-w-[200px]">
-                  <lex-input id="metricSnapshotsSearch" placeholder="Search snapshots..." clearable="true" leading-icon="search"></lex-input>
-                </div>
-                <div class="flex items-center gap-2">
-                  <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Sort by:</label>
-                  <lex-select id="metricSnapshotsSort" options='[{"value":"created_at","label":"Created"},{"value":"value","label":"Value"},{"value":"status","label":"Status"},{"value":"period_start","label":"Period start"},{"value":"period_end","label":"Period end"}]' value="created_at"></lex-select>
-                </div>
-                <lex-btn id="metricSnapshotsSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path></svg></lex-btn>
-                <div class="flex items-center gap-2">
-                  <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Status:</label>
-                  <lex-select id="metricSnapshotsStatusFilter" options='[{"value":"all","label":"All"}]' value="all"></lex-select>
-                </div>
-                <div id="metricSnapshotsCount" class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)"></div>
-              </div>
-            </div>
-            <div class="flex items-center justify-between mb-3">
-              <h3 class="text-lg font-semibold" style="color: var(--lex-text-primary)">Snapshots</h3>
-              <span id="metricSnapshotsSectionCount" class="text-sm" style="color: var(--lex-text-secondary)" aria-live="polite"></span>
-            </div>
-            <lex-table
-              id="metricSnapshotsTable"
-              class="lex-table--card"
-              column-filters
-              columns="created_at,value,status,period_start,period_end"
-              labels="Created,Value,Status,Period start,Period end"
-              sortable-columns="created_at,value,status,period_start,period_end"
-              sort-by="created_at"
-              sort-dir="desc"
-              limit="20"
-              id-key="id"
-              empty-text="No snapshots captured yet"
-              aria-label="Metric snapshots"
-            ></lex-table>
+        <!-- History: only when there are at least two stored values. -->
+        <section id="metricHistorySection" class="metric-detail-card" hidden>
+          <div class="metric-detail-card__header">
+            <h2>How it has moved</h2>
           </div>
-
-          <div id="metricSourcePanel" class="metric-detail-tab-panel" hidden>
-            <div class="metric-detail-card__header">
-              <div>
-                <div class="metric-detail-card__eyebrow">Source Records</div>
-                <h2>Underlying Rows</h2>
-                <p class="metric-detail-tab-help">The records that produced the current value. One row per source record.</p>
-                <p id="metricRawDataTotalNote" class="metric-detail-tab-help" hidden></p>
-              </div>
-            </div>
-            <div class="metric-detail-toolbar bg-white rounded-lg shadow-sm border mb-4 mt-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and filter source records">
-              <div class="flex items-center gap-4 flex-wrap">
-                <div class="flex-1 min-w-[200px]">
-                  <lex-input id="metricRawDataSearch" placeholder="Search source records..." clearable="true" leading-icon="search"></lex-input>
-                </div>
-                <div class="flex items-center gap-2">
-                  <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Sort by:</label>
-                  <lex-select id="metricRawDataSort" options='[]' value=""></lex-select>
-                </div>
-                <lex-btn id="metricRawDataSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="asc"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path></svg></lex-btn>
-                <div id="metricRawDataCount" class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)"></div>
-              </div>
-            </div>
-            <div class="flex items-center justify-between mb-3">
-              <h3 class="text-lg font-semibold" style="color: var(--lex-text-primary)">Source records</h3>
-              <span id="metricRawDataSectionCount" class="text-sm" style="color: var(--lex-text-secondary)" aria-live="polite"></span>
-            </div>
-            <lex-table
-              id="metricRawDataTable"
-              class="lex-table--card"
-              column-filters
-              limit="20"
-              id-key="_row_id"
-              empty-text="No source records for this period"
-              aria-label="Metric source records"
-            ></lex-table>
+          <div id="metricHistoryChart" class="metric-history__chart" aria-hidden="true"></div>
+          <div class="metric-detail-toolbar" role="search" aria-label="Search and filter snapshots">
+            <lex-input id="metricSnapshotsSearch" class="metric-detail-toolbar__search" placeholder="Search snapshots..." clearable="true" leading-icon="search"></lex-input>
+            <lex-select id="metricSnapshotsSort" options='[{"value":"created_at","label":"Created"},{"value":"value","label":"Value"},{"value":"status","label":"Status"},{"value":"period_start","label":"Period start"},{"value":"period_end","label":"Period end"}]' value="created_at"></lex-select>
+            <lex-btn id="metricSnapshotsSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc"><svg class="metric-detail-toolbar__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path></svg></lex-btn>
+            <lex-select id="metricSnapshotsStatusFilter" options='[{"value":"all","label":"All"}]' value="all"></lex-select>
+            <div id="metricSnapshotsCount" class="metric-detail-toolbar__count"></div>
           </div>
+          <span id="metricSnapshotsSectionCount" class="metric-detail-toolbar__count" aria-live="polite"></span>
+          <lex-table
+            id="metricSnapshotsTable"
+            class="lex-table--card"
+            column-filters
+            columns="created_at,value,status,period_start,period_end"
+            labels="Created,Value,Status,Period start,Period end"
+            sortable-columns="created_at,value,status,period_start,period_end"
+            sort-by="created_at"
+            sort-dir="desc"
+            limit="20"
+            id-key="id"
+            empty-text="No snapshots captured yet"
+            aria-label="Metric snapshots"
+          ></lex-table>
+        </section>
+
+        <!-- The records behind the number. -->
+        <section id="metricSourcePanel" class="metric-detail-card">
+          <div class="metric-detail-card__header">
+            <div>
+              <h2>The records behind this number</h2>
+              <p class="metric-detail-tab-help">One row per record counted for these dates.</p>
+              <p id="metricRawDataTotalNote" class="metric-detail-tab-help" hidden></p>
+            </div>
+            <span id="metricRawDataSectionCount" class="metric-detail-toolbar__count" aria-live="polite"></span>
+          </div>
+          <div class="metric-detail-toolbar" role="search" aria-label="Search source records">
+            <lex-input id="metricRawDataSearch" class="metric-detail-toolbar__search" placeholder="Search records..." clearable="true" leading-icon="search"></lex-input>
+            <lex-select id="metricRawDataSort" options='[]' value=""></lex-select>
+            <lex-btn id="metricRawDataSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="asc"><svg class="metric-detail-toolbar__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path></svg></lex-btn>
+            <div id="metricRawDataCount" class="metric-detail-toolbar__count"></div>
+          </div>
+          <lex-table
+            id="metricRawDataTable"
+            class="lex-table--card"
+            column-filters
+            limit="20"
+            id-key="_row_id"
+            empty-text="No records for these dates"
+            aria-label="Records behind this number"
+          ></lex-table>
         </section>
       </section>
     </main>
@@ -203,6 +180,10 @@
   <script src="../js/shared/library-column-filters.js"></script>
   <script src="../js/shared/metric-tables.js"></script>
   <script src="../js/shared/data-state.js"></script>
+  <script src="../js/dashboard/metric-goal-comparison.js"></script>
+  <script src="../js/shared/metric-card-view.js"></script>
+  <script src="../js/shared/mini-charts.js"></script>
+  <script src="../js/shared/metric-detail-view.js"></script>
   <script src="../js/admin/metric-detail.js"></script>
   <script src="../js/auth-guard.js"></script>
   <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>

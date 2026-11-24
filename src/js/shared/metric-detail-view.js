@@ -1,0 +1,220 @@
+/**
+ * Metric detail view model (pure, no DOM).
+ *
+ * The friendly source records table (no internal ids, words for headers,
+ * dates as days, empty cells left for the page to show as a muted dash) and
+ * the one summary card (the value with its unit, the change against the
+ * prior period both ways, the prior period's days, a two-bar comparison).
+ * No regex (per Lex rules).
+ */
+(function (root, factory) {
+  var api = factory();
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (root) root.MetricDetailView = api;
+})(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : this), function () {
+  'use strict';
+
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  var LABELS = {
+    matter_name: 'Matter', client_name: 'Client', status: 'Status', stage: 'Stage', opened_at: 'Opened', closed_at: 'Closed',
+    days: 'Days in stage', due_date: 'Due', amount: 'Amount', created_at: 'Created', updated_at: 'Updated',
+  };
+  var LINK_IDS = ['workspace_id', 'matter_id'];
+
+  function endsWith(text, tail) {
+    return text.length >= tail.length && text.slice(-tail.length) === tail;
+  }
+
+  function isHex(ch) {
+    return (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
+  }
+
+  function isUuid(value) {
+    if (typeof value !== 'string' || value.length !== 36) return false;
+    for (var i = 0; i < 36; i += 1) {
+      var ch = value.charAt(i);
+      if (i === 8 || i === 13 || i === 18 || i === 23) { if (ch !== '-') return false; } else if (!isHex(ch)) return false;
+    }
+    return true;
+  }
+
+  function isEmpty(value) {
+    return value === null || value === undefined || value === '';
+  }
+
+  function isInternal(key, rows) {
+    var k = key.toLowerCase();
+    if (k === 'id' || k === 'uuid' || k === 'request_access' || k.charAt(0) === '_' || endsWith(k, '_key') || endsWith(k, '_id') || endsWith(k, '_uuid')) return true;
+    var filled = rows.filter(function (row) { return !isEmpty(row[key]); });
+    return filled.length > 0 && filled.every(function (row) { return isUuid(row[key]); });
+  }
+
+  function isTimeKey(key) {
+    var k = key.toLowerCase();
+    return endsWith(k, '_time') || k === 'time' || endsWith(k, '_datetime');
+  }
+
+  function isDateKey(key) {
+    var k = key.toLowerCase();
+    return endsWith(k, '_at') || endsWith(k, '_date') || k === 'date' || endsWith(k, '_on');
+  }
+
+  function labelFor(key) {
+    if (LABELS[key]) return LABELS[key];
+    var k = key;
+    ['_at', '_date', '_on'].forEach(function (tail) { if (endsWith(k, tail) && k.length > tail.length) k = k.slice(0, -tail.length); });
+    var words = k.split('_').join(' ').trim();
+    return words ? words.charAt(0).toUpperCase() + words.slice(1) : key;
+  }
+
+  function dayText(value) {
+    var text = String(value);
+    if (text.length < 10 || text.charAt(4) !== '-' || text.charAt(7) !== '-') return text;
+    var month = Number(text.substring(5, 7));
+    var day = Number(text.substring(8, 10));
+    if (!(month >= 1 && month <= 12) || !(day >= 1)) return text;
+    return MONTHS[month - 1] + ' ' + day + ', ' + text.substring(0, 4);
+  }
+
+  function dateTimeText(value) {
+    var time = Date.parse(String(value));
+    if (!isFinite(time)) return String(value);
+    return new Date(time).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'UTC' });
+  }
+
+  function typeOf(key, rows) {
+    if (isTimeKey(key)) return 'datetime';
+    if (isDateKey(key)) return 'date';
+    var filled = rows.filter(function (row) { return !isEmpty(row[key]); });
+    return filled.length && filled.every(function (row) { return typeof row[key] === 'number'; }) ? 'number' : 'text';
+  }
+
+  function cellText(value, type) {
+    if (isEmpty(value)) return null;
+    if (type === 'date') return dayText(value);
+    if (type === 'datetime') return dateTimeText(value);
+    if (type === 'number') return Number(value).toLocaleString('en-US', { maximumFractionDigits: 2 });
+    return String(value);
+  }
+
+  function linkFor(row) {
+    for (var i = 0; i < LINK_IDS.length; i += 1) {
+      if (isUuid(row[LINK_IDS[i]])) return 'workspace-details.html?id=' + encodeURIComponent(row[LINK_IDS[i]]);
+    }
+    return null;
+  }
+
+  /** { columns: [{ key, label, type }], rows: [{ cells: [{ key, text, href }] }] } */
+  function recordsTable(rows) {
+    var list = (Array.isArray(rows) ? rows : []).filter(function (row) { return row && typeof row === 'object'; });
+    var keys = [];
+    list.forEach(function (row) { Object.keys(row).forEach(function (key) { if (keys.indexOf(key) === -1) keys.push(key); }); });
+    var columns = keys.filter(function (key) {
+      return !isInternal(key, list) && list.some(function (row) { return !isEmpty(row[key]); });
+    }).map(function (key) { return { key: key, label: labelFor(key), type: typeOf(key, list) }; });
+    return {
+      columns: columns,
+      rows: list.map(function (row, index) {
+        var href = linkFor(row);
+        return {
+          id: 'row-' + index,
+          cells: columns.map(function (col) {
+            return { key: col.key, text: cellText(row[col.key], col.type), href: col.key === 'matter_name' ? href : null };
+          }),
+        };
+      }),
+    };
+  }
+
+  function toNumber(value) {
+    if (value === null || value === undefined || value === '' || typeof value === 'boolean') return null;
+    var n = Number(value);
+    return isFinite(n) ? n : null;
+  }
+
+  function oneDecimal(n) {
+    return Number(Math.abs(n).toFixed(1)).toLocaleString('en-US', { maximumFractionDigits: 1 });
+  }
+
+  /** A value in the metric's format and unit ("301.7 days", "$5,389", "38.5%"). */
+  function formatValue(value, meta) {
+    var n = toNumber(value);
+    if (n === null) return null;
+    var format = String((meta && meta.format) || 'number').toLowerCase();
+    var unit = meta && meta.unit ? String(meta.unit) : '';
+    if (format === 'currency') return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+    if (format === 'percentage' || format === 'percent') return Number(n.toFixed(1)).toLocaleString('en-US', { maximumFractionDigits: 1 }) + '%';
+    if (format === 'integer' || format === 'count') return Math.round(n).toLocaleString('en-US');
+    if (format === 'days') unit = n === 1 ? 'day' : 'days';
+    var text = Number(n.toFixed(1)).toLocaleString('en-US', { maximumFractionDigits: 1 });
+    return unit ? text + ' ' + unit : text;
+  }
+
+  function changeText(abs, meta) {
+    var format = String((meta && meta.format) || 'number').toLowerCase();
+    var sign = abs > 0 ? '+' : (abs < 0 ? '-' : '');
+    if (format === 'currency') return sign + Math.abs(abs).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+    if (format === 'integer' || format === 'count') return sign + Math.round(Math.abs(abs)).toLocaleString('en-US');
+    if (format === 'percentage' || format === 'percent') return sign + Math.abs(abs).toFixed(1) + ' points';
+    var unit = format === 'days' ? 'days' : (meta && meta.unit ? String(meta.unit) : '');
+    return sign + Math.abs(abs).toFixed(1) + (unit ? ' ' + unit : '');
+  }
+
+  function dayBefore(iso) {
+    var time = Date.parse(String(iso).substring(0, 10) + 'T00:00:00Z');
+    return isFinite(time) ? new Date(time - 86400000).toISOString().substring(0, 10) : null;
+  }
+
+  /** The summary card: { value, direction, changeText, priorText, priorDays, bars }. */
+  function summary(payload) {
+    var current = (payload && payload.current) || {};
+    var meta = { format: current.format, unit: current.unit || (payload && payload.metric && payload.metric.unit) };
+    var value = toNumber(current.value_numeric !== undefined && current.value_numeric !== null ? current.value_numeric : current.value);
+    var cmp = payload && payload.comparison;
+    if (!cmp && payload && payload.movement) {
+      cmp = { previous_value: payload.movement.prior_value, percent_change: payload.movement.percent_change, direction: payload.movement.direction };
+    }
+    var prior = cmp ? toNumber(cmp.previous_value) : null;
+    var empty = { value: formatValue(value, meta), direction: null, changeText: null, priorText: null, priorDays: null, bars: null };
+    if (!cmp || prior === null || value === null) return empty;
+    var abs = toNumber(cmp.absolute_change);
+    if (abs === null) abs = value - prior;
+    var pct = toNumber(cmp.percent_change);
+    var direction = cmp.direction === 'up' || cmp.direction === 'down' ? cmp.direction : 'flat';
+    var words = direction === 'up' ? 'Up' : (direction === 'down' ? 'Down' : 'No change');
+    var change = words + (pct !== null && direction !== 'flat' ? ' ' + oneDecimal(pct) + '%' : '') + ', ' + changeText(abs, meta);
+    var period = cmp.previous_period;
+    var max = Math.max(Math.abs(value), Math.abs(prior));
+    return {
+      value: formatValue(value, meta),
+      direction: direction,
+      changeText: change,
+      priorText: 'vs ' + formatValue(prior, meta) + ' in the prior period',
+      priorDays: period && period.start && period.end ? { start: String(period.start).substring(0, 10), end: dayBefore(period.end) } : null,
+      bars: max > 0 ? { currentPct: Math.round((Math.abs(value) / max) * 1000) / 10, priorPct: Math.round((Math.abs(prior) / max) * 1000) / 10 } : null,
+    };
+  }
+
+  function dayRangeText(days) {
+    if (!days || !days.start || !days.end) return '';
+    return dayText(days.start) + ' to ' + dayText(days.end);
+  }
+
+  // A records row for the table: raw values (so sorting works), plus the
+  // workspace link for the matter when the row carries one.
+  function recordsRow(row, index) {
+    var out = { _row_id: 'row-' + index, _href: linkFor(row || {}) };
+    Object.keys(row || {}).forEach(function (key) { out[key] = row[key]; });
+    return out;
+  }
+
+  return {
+    dayRangeText: dayRangeText,
+    cellText: cellText,
+    recordsRow: recordsRow,
+    recordsTable: recordsTable,
+    formatValue: formatValue,
+    summary: summary,
+    isUuid: isUuid,
+  };
+});

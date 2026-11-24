@@ -268,3 +268,89 @@ test('options are read from card.visual_options (the saved shape), with full key
   expect(Cards.requestKeys({ cards: [{ id: 'p', kind: 'goal', metric_keys: ['finance.a'], visual_options: { detail: ['finance.b'] } }] }))
     .toEqual(['legal_firm.finance.a', 'legal_firm.finance.b']);
 });
+
+describe('storyFor: the dashboard info popover text', () => {
+  test('the server text wins: description_long, then layout.story', () => {
+    expect(Cards.storyFor({ description_long: 'Long words.', layout: { story: 'Story.' } })).toEqual({ source: 'server', paragraphs: ['Long words.'] });
+    expect(Cards.storyFor({ layout: { story: 'First.\n\nSecond.' } })).toEqual({ source: 'server', paragraphs: ['First.', 'Second.'] });
+  });
+  test('otherwise a plain how-to', () => {
+    const story = Cards.storyFor({ name: 'Owner Overview' });
+    expect(story.source).toBe('generic');
+    expect(story.paragraphs.join(' ')).toContain('Right now');
+    expect(story.paragraphs.join(' ')).toContain('waiting');
+    expect(Cards.storyFor(null).source).toBe('generic');
+  });
+});
+
+test('a waiting headline stays as the hero (calm), not in the strip', () => {
+  const plan = Cards.planDeclared([
+    { def: { id: 'h', kind: 'headline' }, state: 'waiting' }, { def: { id: 'n', kind: 'number' }, state: 'waiting' }, { def: { id: 'c', kind: 'breakdown' }, state: 'ok' },
+  ]);
+  expect(plan.items.map((i) => [i.resolved.def.id, i.role])).toEqual([['h', 'hero'], ['c', 'chart']]);
+  expect(plan.waiting.map((r) => r.def.id)).toEqual(['n']);
+});
+
+test('groupRows tags "now" on snapshot metrics only when the group mixes scopes', () => {
+  const idx = Cards.indexMetrics([
+    { metric_key: 'legal_firm.p.a', title: 'Probate', value: 3, data_state: 'ok', period_scope: 'flow' },
+    { metric_key: 'legal_firm.p.b', title: 'Trust settlement', value: 5, data_state: 'ok', period_scope: 'snapshot' },
+    { metric_key: 'legal_firm.p.c', title: 'Small estate', value: 1, data_state: 'ok', period_scope: 'flow' },
+  ]);
+  expect(Cards.groupRows({ keys: ['p.a', 'p.b', 'p.c'].map(Cards.normalizeKey) }, idx).map((r) => r.scopeTag)).toEqual([null, 'now', null]);
+  const same = Cards.indexMetrics([
+    { metric_key: 'legal_firm.p.a', value: 3, data_state: 'ok', period_scope: 'snapshot' },
+    { metric_key: 'legal_firm.p.b', value: 5, data_state: 'ok', period_scope: 'snapshot' },
+  ]);
+  expect(Cards.groupRows({ keys: ['legal_firm.p.a', 'legal_firm.p.b'] }, same).map((r) => r.scopeTag)).toEqual([null, null]);
+});
+
+test('visual_options.note is the card note people see; the spec card note stays internal', () => {
+  const cards = Cards.normalizeLayout({ cards: [
+    { id: 'a', kind: 'number', metric_key: 'a.b', note: 'internal planning note', visual_options: { note: 'Closed matters only.' } },
+    { id: 'b', kind: 'number', metric_key: 'a.c', note: 'internal only' },
+  ] }).cards;
+  expect(cards[0].options.note).toBe('Closed matters only.');
+  expect(cards[1].options.note).toBe('');
+});
+
+describe('chapters', () => {
+  const card = (id, kind, chapter, state) => ({ def: { id, kind, chapter: chapter || '' }, state: state || 'ok' });
+
+  test('normalised from card.chapter', () => {
+    expect(Cards.normalizeLayout({ cards: [{ id: 'a', kind: 'number', metric_key: 'a.b', chapter: 'coming_up' }] }).cards[0].chapter).toBe('coming_up');
+  });
+
+  test('labels from one map; unknown values title-cased', () => {
+    expect(['now', 'attention', 'coming_up', 'wrapping_up', 'pace', 'next_steps'].map(Cards.chapterLabel))
+      .toEqual(['Now', 'Needs attention', 'Coming up', 'Wrapping up', 'Pace', 'Next steps']);
+  });
+
+  test('cards group by chapter in the order chapters first appear; each section starts with its label', () => {
+    const plan = Cards.planDeclared([
+      card('h', 'headline', 'now'), card('n1', 'number', 'now'), card('w1', 'worklist', 'attention'),
+      card('c1', 'breakdown', 'coming_up'), card('n2', 'number', 'now'), card('w2', 'worklist', 'attention'), card('p', 'number', 'pace'),
+    ]);
+    expect(plan.sections.map((s) => [s.label, s.items.map((i) => i.resolved.def.id)])).toEqual([
+      ['Now', ['h', 'n1', 'n2']], ['Needs attention', ['w1', 'w2']], ['Coming up', ['c1']], ['Pace', ['p']],
+    ]);
+    expect(plan.items.map((i) => i.resolved.def.id)).toEqual(['h', 'n1', 'n2', 'w1', 'w2', 'c1', 'p']);
+  });
+
+  test('a chapter whose cards are all waiting is skipped; its cards go to the strip', () => {
+    const plan = Cards.planDeclared([
+      card('h', 'headline', 'now'), card('a', 'number', 'now'), card('b', 'number', 'now'),
+      card('x', 'number', 'pace', 'waiting'), card('y', 'number', 'pace', 'waiting'), card('c', 'breakdown', 'coming_up'), card('d', 'number', 'coming_up'),
+    ]);
+    expect(plan.sections.map((s) => s.label)).toEqual(['Now', 'Coming up']);
+    expect(plan.waiting.map((r) => r.def.id)).toEqual(['x', 'y']);
+  });
+
+  test('fewer than 6 cards, or no chapters at all: one section without a label', () => {
+    const few = Cards.planDeclared([card('h', 'headline', 'now'), card('a', 'number', 'attention'), card('b', 'number', 'pace')]);
+    expect(few.sections).toEqual([{ chapter: '', label: '', items: few.items }]);
+    const none = Cards.planDeclared(Array.from({ length: 7 }, (_, i) => card('c' + i, 'number')));
+    expect(none.sections).toHaveLength(1);
+    expect(none.sections[0].label).toBe('');
+  });
+});

@@ -95,6 +95,50 @@
       .concat(items(kpis, 'kpi'), items(charts, 'chart'), items(support, 'support'), items(states, 'support'));
   }
 
+  // Row packing: place cards in order, start a new row when the next card
+  // does not fit, then give each row's leftover columns to its cards (charts
+  // first, then wide cards, then the hero, then small numbers), so every
+  // row adds up to the column count. A card alone in a row spans it all.
+  var GROW_ORDER = { chart: 0, wide: 1, hero: 2 };
+
+  function packRows(items, columns) {
+    var cols = Math.max(1, columns || 1);
+    var placed = [];
+    var row = [];
+    var used = 0;
+    var rowIndex = 0;
+    function close() {
+      if (!row.length) return;
+      if (row.length === 1) {
+        row[0].span = cols;
+      } else {
+        var leftover = cols - used;
+        var order = row.slice().sort(function (a, b) {
+          var pa = GROW_ORDER[a.role] !== undefined ? GROW_ORDER[a.role] : 3;
+          var pb = GROW_ORDER[b.role] !== undefined ? GROW_ORDER[b.role] : 3;
+          return pa - pb || a.index - b.index;
+        });
+        for (var i = 0; leftover > 0; i = (i + 1) % order.length) {
+          order[i].span += 1;
+          leftover -= 1;
+        }
+      }
+      rowIndex += 1;
+      row = [];
+      used = 0;
+    }
+    (items || []).forEach(function (item, index) {
+      var span = Math.min(Math.max(1, item.span || 1), cols);
+      if (used + span > cols) close();
+      var entry = { item: item, role: item.role, span: span, row: rowIndex, index: index };
+      row.push(entry);
+      placed.push(entry);
+      used += span;
+    });
+    close();
+    return placed.map(function (entry) { return { item: entry.item, span: entry.span, row: entry.row }; });
+  }
+
   function partOfDay(now) {
     var hour = now.getHours();
     if (hour < 12) return 'morning';
@@ -122,6 +166,7 @@
   }
 
   return {
+    packRows: packRows,
     KPI_BAND: KPI_BAND,
     cardShape: cardShape,
     orderCards: orderCards,

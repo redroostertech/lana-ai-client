@@ -61,7 +61,7 @@
             <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Sort by:</label>
             <lex-select
               id="dashboardLibrarySort"
-              options='[{"value":"updated_at","label":"Last edited"},{"value":"created_at","label":"Created"},{"value":"name","label":"Name"},{"value":"audience","label":"Audience"},{"value":"category","label":"Category"}]'
+              options='[{"value":"updated_at","label":"Last edited"},{"value":"created_at","label":"Created"},{"value":"name","label":"Name"},{"value":"who","label":"Who can see it"},{"value":"category","label":"Area"}]'
               value="updated_at"
             ></lex-select>
           </div>
@@ -71,7 +71,7 @@
             </svg>
           </lex-btn>
           <div class="flex items-center gap-2">
-            <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Audience:</label>
+            <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Who can see it:</label>
             <lex-select id="dashboardLibraryAudienceFilter" options='[{"value":"all","label":"All"}]' value="all"></lex-select>
           </div>
           <div id="dashboardLibraryCount" class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)"></div>
@@ -88,9 +88,9 @@
           id="dashboardLibraryTable"
           class="lex-table--card"
           column-filters
-          columns="pin,name,audience,category,scope,visibility,state,created_at,updated_at,actions"
-          labels=" ,Name,Audience,Category,Scope,Visibility,State,Created,Last edited,Actions"
-          sortable-columns="name,audience,category,scope,visibility,state,created_at,updated_at"
+          columns="pin,name,who,category,state,created_at,updated_at,actions"
+          labels=" ,Name,Who can see it,Area,State,Created,Last edited,Actions"
+          sortable-columns="name,who,category,state,created_at,updated_at"
           sort-by="updated_at"
           sort-dir="desc"
           limit="20"
@@ -149,6 +149,7 @@
   <script src="../js/shared/metric-tables.js"></script>
   <script src="../js/admin/dashboard-catalog.js"></script>
   <script src="../js/shared/data-state.js"></script>
+  <script src="../js/shared/dashboard-library-columns.js"></script>
   <script src="../js/admin/dashboard-library.js"></script>
   <script src="../js/auth-guard.js"></script>
   <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>

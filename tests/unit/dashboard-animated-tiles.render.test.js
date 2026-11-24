@@ -282,12 +282,12 @@ describe('when the saved dashboard cannot be read', () => {
   });
 });
 
-// The server accepts raw_limit from 1 (0 is a 400), so sparklines ask for one row.
-test('sparklines ask for history and the fewest source rows (raw_limit 1), with the page dates', async () => {
+// The server now accepts raw_limit=0: sparklines ask for the history only.
+test('sparklines ask for history only (raw_limit 0), with the page dates', async () => {
   const getMetricDetail = jest.fn().mockResolvedValue({ data: { snapshots: [] } });
   const p = page({ getMetricDetail });
   await p.exports.fetchSparkline({ metricKey: 'a.b', cacheKey: 'a.b|x' });
-  expect(getMetricDetail).toHaveBeenCalledWith('a.b', { periodStart: '2026-01-01', periodEnd: '2026-01-31', compareBy: 'monthly', rawLimit: 1 });
+  expect(getMetricDetail).toHaveBeenCalledWith('a.b', { periodStart: '2026-01-01', periodEnd: '2026-01-31', compareBy: 'monthly', rawLimit: 0 });
 });
 
 describe('declared cards (layout.cards from the trim spec)', () => {
@@ -424,4 +424,110 @@ describe('every visual family renders on the seven consolidated dashboards', () 
       expect([r.def.id, visual, html.includes(SIGNATURE[visual])]).toEqual([r.def.id, visual, true]);
     });
   });
+});
+
+describe('one card shell', () => {
+  const declared = require(path.join(__dirname, '../fixtures/dashboard/declared-layouts.json'));
+
+  test('every card in the bento has a header and a footer row; the footer carries the period and a records link where one metric stands alone', async () => {
+    const layout = declared.layouts['Owner Overview'];
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'Owner Overview', layout } }),
+      getDashboardMetricCards: jest.fn().mockResolvedValue({ data: declared.cards_synthetic }),
+      getMetricDetail: jest.fn().mockResolvedValue({ data: { snapshots: [], raw_data: { rows: [] } } }) });
+    await p.exports.loadDashboardById('d1');
+    const html = p.nodes.dashboardMetricGrid.innerHTML.split('dash-waiting-strip')[0];
+    const articles = html.split('<article ').slice(1);
+    articles.forEach((a) => {
+      expect(a).toContain('dash-metric-card__top');
+      expect(a).toContain('dash-card__footer');
+      expect(a.indexOf('dash-metric-card__top')).toBeLessThan(a.indexOf('dash-card__footer'));
+    });
+    const active = articles.find((a) => a.includes('Total Active Cases'));
+    expect(text(active.split('dash-card__footer')[1])).toContain('Right now');
+    expect(text(active.split('dash-card__footer')[1])).toContain('See the records');
+  });
+
+  test('a waiting headline stays a one-row hero with the calm state', async () => {
+    const layout = { cards: [{ id: 'h', kind: 'headline', metric_key: 'finance.missing_total' }, { id: 'n', kind: 'number', metric_key: 'case_volume.active_cases_total' }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }),
+      getDashboardMetricCards: jest.fn().mockResolvedValue({ data: declared.cards_synthetic }) });
+    await p.exports.loadDashboardById('d1');
+    const hero = p.nodes.dashboardMetricGrid.innerHTML.split('<article ')[1];
+    expect(hero).toContain('dash-metric-card--hero');
+    expect(hero).toContain('lex-data-state--calm');
+    expect(hero).not.toContain('dash-bento__item--tall');
+  });
+
+  test('a group that mixes right-now and period metrics tags the right-now bars', async () => {
+    const layout = { cards: [{ id: 'g', kind: 'group', title: 'Mixed', metric_keys: ['case_volume.active_cases_total', 'case_volume.new_cases_opened_total'] }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }),
+      getDashboardMetricCards: jest.fn().mockResolvedValue({ data: declared.cards_synthetic }) });
+    await p.exports.loadDashboardById('d1');
+    expect(text(p.nodes.dashboardMetricGrid.innerHTML)).toContain('(now)');
+  });
+});
+
+describe('server revisions', () => {
+  const declared = require(path.join(__dirname, '../fixtures/dashboard/declared-layouts.json'));
+  const listCard = { metric_key: 'legal_firm.bonus_compensation.completed_trust_design_meetings_by_attorney', title: 'Trust Design Meetings by Attorney',
+    format: 'table', data_state: 'ok', period: 'Jan 1, 2026 - Jan 31, 2026', period_scope: 'flow',
+    value: [{ attorney_id: 'a1', attorney_name: 'Avery Stone', value: 4 }, { attorney_id: 'a2', attorney_name: 'Blake Ross', value: 7 }] };
+
+  test('a headline can be a list drawn as ranked bars with initials, on the hero', async () => {
+    const layout = { cards: [{ id: 'h', kind: 'headline', metric_key: 'bonus_compensation.completed_trust_design_meetings_by_attorney',
+      visual: 'ranked_bars', visual_options: { initials: true } }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'Attorney Performance', layout } }),
+      getDashboardMetricCards: jest.fn().mockResolvedValue({ data: declared.cards_synthetic.concat([listCard]) }) });
+    await p.exports.loadDashboardById('d1');
+    const hero = p.nodes.dashboardMetricGrid.innerHTML.split('<article ')[1];
+    expect(hero).toContain('dash-metric-card--hero');
+    expect(hero).toContain('mini-rank');
+    expect(hero.indexOf('Blake Ross')).toBeLessThan(hero.indexOf('Avery Stone'));
+    expect(hero).toContain('>BR<');
+  });
+
+  test('visual_options.note shows as a muted line above the footer', async () => {
+    const layout = { cards: [{ id: 'n', kind: 'number', metric_key: 'case_volume.active_cases_total', visual_options: { note: 'Closed matters only. Best viewed over This Year.' } }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }),
+      getDashboardMetricCards: jest.fn().mockResolvedValue({ data: declared.cards_synthetic }) });
+    await p.exports.loadDashboardById('d1');
+    const card = p.nodes.dashboardMetricGrid.innerHTML;
+    expect(card).toContain('<p class="dash-card__note">Closed matters only. Best viewed over This Year.</p>');
+    expect(card.indexOf('dash-card__note')).toBeLessThan(card.indexOf('dash-card__footer'));
+  });
+});
+
+describe('declared titles and header actions', () => {
+  const declared = require(path.join(__dirname, '../fixtures/dashboard/declared-layouts.json'));
+  test('a declared title wins on single-metric cards too', async () => {
+    const layout = { cards: [{ id: 'h', kind: 'headline', title: 'Open Probate Matters', metric_key: 'case_volume.active_cases_total' },
+      { id: 'n', kind: 'number', title: 'Trust Settlement Clients', metric_key: 'case_volume.new_cases_opened_total' }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }),
+      getDashboardMetricCards: jest.fn().mockResolvedValue({ data: declared.cards_synthetic }) });
+    await p.exports.loadDashboardById('d1');
+    const html = p.nodes.dashboardMetricGrid.innerHTML;
+    expect(html).toContain('>Open Probate Matters<');
+    expect(html).toContain('>Trust Settlement Clients<');
+    expect(html).not.toContain('>Total Active Cases<');
+  });
+
+  test('the header has Learn More and no Open Reports', () => {
+    const html = fs.readFileSync(path.join(__dirname, '../../src/admin/dashboard-detail.html'), 'utf8');
+    expect(html).toContain('id="dashboardLearnMoreBtn"');
+    expect(html).not.toContain('Open Reports');
+    expect(html).not.toContain('dashboardStoryToggle');
+  });
+});
+
+test('packed rows: the hero and one stat fill four columns; a lone chart spans the row', async () => {
+  const declared = require(path.join(__dirname, '../fixtures/dashboard/declared-layouts.json'));
+  const layout = { cards: [{ id: 'h', kind: 'headline', metric_key: 'case_volume.active_cases_total' },
+    { id: 'n', kind: 'number', metric_key: 'case_volume.new_cases_opened_total' },
+    { id: 'c', kind: 'breakdown', metric_key: 'sales_intake.new_clients_by_service_offering' }] };
+  const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }),
+    getDashboardMetricCards: jest.fn().mockResolvedValue({ data: declared.cards_synthetic }) });
+  await p.exports.loadDashboardById('d1');
+  const articles = p.nodes.dashboardMetricGrid.innerHTML.split('<article ').slice(1);
+  expect(articles.map((a) => (a.match(/dash-span-4-(\d)/) || [])[1])).toEqual(['3', '1', '4']);
+  expect(articles.map((a) => (a.match(/dash-span-2-(\d)/) || [])[1])).toEqual(['2', '2', '2']);
 });

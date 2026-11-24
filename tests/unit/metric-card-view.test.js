@@ -223,3 +223,9 @@ describe('splitFormatted / formatTween drive the count-up', () => {
     expect(View.easeOut(0.5)).toBeGreaterThan(0.5);
   });
 });
+
+test('list rows are labelled from the first *_name field before label or name', () => {
+  const model = View.listBars([{ attorney_id: 'a1', attorney_name: 'Avery Stone', value: 4 }, { attorney_id: 'a2', attorney_name: 'Blake Ross', value: 2 }]);
+  expect(model.rows.map((r) => r.label)).toEqual(['Avery Stone', 'Blake Ross']);
+  expect(View.listBars([{ service_label: 'Probate', client_name: 'X', value: 1 }]).rows[0].label).toBe('Probate');
+});

@@ -106,3 +106,38 @@ describe('greeting', () => {
     expect(Layout.greeting(at(9), {}, '')).toBe('Dashboard');
   });
 });
+
+describe('packRows: every row adds up to the column count, no empty cells', () => {
+  const it = (role, span) => ({ role, span });
+  const spans = (items, cols) => Layout.packRows(items, cols).map((p) => p.span);
+
+  test('hero + one stat at 4 columns: the leftover goes to the wider card', () => {
+    expect(spans([it('hero', 2), it('kpi', 1)], 4)).toEqual([3, 1]);
+  });
+  test('rows close when the next card does not fit; each row fills', () => {
+    // Row 1: kpi kpi chart (1+1+2). Row 2: chart kpi (2+1, leftover to the chart).
+    expect(spans([it('kpi', 1), it('kpi', 1), it('chart', 2), it('chart', 2), it('kpi', 1)], 4)).toEqual([1, 1, 2, 3, 1]);
+    // Row 1: chart kpi (2+1), the next chart does not fit: leftover to the chart.
+    expect(spans([it('chart', 2), it('kpi', 1), it('chart', 2)], 4)).toEqual([3, 1, 4]);
+  });
+  test('charts take the leftover before stats', () => {
+    expect(spans([it('kpi', 1), it('chart', 2)], 4)).toEqual([1, 3]);
+    expect(spans([it('chart', 2), it('kpi', 1)], 4)).toEqual([3, 1]);
+  });
+  test('a card alone in a row spans the full width', () => {
+    expect(spans([it('kpi', 1)], 4)).toEqual([4]);
+    expect(spans([it('chart', 2), it('chart', 2), it('kpi', 1)], 4)).toEqual([2, 2, 4]);
+  });
+  test('three small cards: the leftover goes to the first', () => {
+    expect(spans([it('kpi', 1), it('kpi', 1), it('kpi', 1)], 4)).toEqual([2, 1, 1]);
+  });
+  test('at 2 columns: pairs of small cards, wide cards alone', () => {
+    expect(spans([it('hero', 2), it('kpi', 1), it('kpi', 1), it('chart', 2), it('kpi', 1)], 2)).toEqual([2, 1, 1, 2, 2]);
+  });
+  test('at 1 column every card spans 1', () => {
+    expect(spans([it('hero', 2), it('kpi', 1)], 1)).toEqual([1, 1]);
+  });
+  test('rows are returned with each card', () => {
+    expect(Layout.packRows([it('kpi', 1), it('chart', 2), it('chart', 2)], 4).map((p) => p.row)).toEqual([0, 0, 1]);
+  });
+});

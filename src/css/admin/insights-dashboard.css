@@ -2095,8 +2095,16 @@
   display: none;
 }
 
-/* The banner keeps its actions (LANA, Open Reports, menu) but sits flat in
-   the header: no frame, no corner brackets. */
+/* The header carries the same treatment as lex-banner on other pages (its
+   light surface, border and corner radius); the banner inside it keeps its
+   actions (LANA, Open Reports, menu) and sits flat within that frame. */
+.dash-header {
+  padding: var(--lex-card-padding, 1.25rem) calc(var(--lex-card-padding, 1.25rem) * 1.33);
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 0 var(--lex-radius-lg, 16px) 0 var(--lex-radius-lg, 16px);
+  background: var(--lex-bg-primary);
+}
+
 .dash-header__banner .lex-banner {
   padding: 0;
   border: 0;
@@ -2940,4 +2948,527 @@ button.dash-lines__label:hover,
 
 .dash-metric-card--hero-gauge .mini-gauge__label:empty {
   display: none;
+}
+
+/* ══ One card shell: header, body (takes the spare height), footer ══════ */
+.dash-bento .dash-metric-card,
+.dash-waiting-strip__cards .dash-metric-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.dash-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: auto;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--lex-border-subtle);
+}
+
+.dash-card__footer .dash-metric-card__period {
+  margin: 0;
+}
+
+.dash-card__records {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+}
+
+.dash-card__records svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+/* The body: a single number sits centred; charts stretch to fill. */
+.dash-bento .dash-metric-card > .dash-metric-card__result,
+.dash-bento .dash-metric-card > .dash-metric-card__chart,
+.dash-bento .dash-metric-card > .dash-pair,
+.dash-bento .dash-metric-card > .dash-worklist,
+.dash-bento .dash-metric-card > .lex-data-state {
+  flex: 1 1 auto;
+}
+
+.dash-bento .dash-metric-card > .dash-metric-card__result {
+  justify-content: center;
+}
+
+.dash-bento .dash-metric-card__chart {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 0;
+}
+
+.dash-bento .dash-metric-card__chart > .mini-cols {
+  flex: 1 1 auto;
+}
+
+.dash-bento .dash-metric-card__chart .mini-cols__svg {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 9rem;
+  max-height: 13rem;
+}
+
+.dash-bento .dash-metric-card > .dash-pair {
+  align-content: center;
+}
+
+.dash-metric-card--hero .dash-card__footer {
+  border-top-color: rgba(255, 255, 255, 0.22);
+}
+
+.dash-metric-card--hero .dash-card__records {
+  color: inherit;
+}
+
+/* A calm state on the evergreen hero reads in its colours. */
+.dash-metric-card--hero .lex-data-state {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.dash-metric-card--hero .lex-data-state__title,
+.dash-metric-card--hero .lex-data-state__reason,
+.dash-metric-card--hero .lex-data-state__action {
+  color: inherit;
+}
+
+/* ══ About this dashboard ═══════════════════════════════════════════════ */
+.dash-header__about {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.dash-story {
+  position: relative;
+}
+
+.dash-story__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--lex-text-secondary);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dash-story__toggle svg {
+  width: 0.9375rem;
+  height: 0.9375rem;
+}
+
+.dash-story__toggle:hover,
+.dash-story__toggle[aria-expanded="true"] {
+  color: var(--lex-text-primary);
+}
+
+.dash-story__panel {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  z-index: 30;
+  width: min(24rem, calc(100vw - 2rem));
+  padding: 1rem 1.125rem;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 14px;
+  background: var(--lex-bg-elevated, var(--lex-bg-primary));
+  box-shadow: var(--lex-shadow-lg);
+  animation: lex-rise-in 240ms var(--lex-ease-out, ease-out) both;
+}
+
+.dash-story__panel[hidden] {
+  display: none;
+}
+
+.dash-story__heading {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--lex-text-primary);
+}
+
+.dash-story__body p {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--lex-text-secondary);
+}
+
+.dash-story__body p:last-child {
+  margin-bottom: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-story__panel {
+    animation: none;
+  }
+}
+
+.dash-card__note {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--lex-text-tertiary);
+}
+
+.dash-metric-card--hero .dash-card__note {
+  color: inherit;
+  opacity: 0.8;
+}
+
+/* Charts on the evergreen hero draw in its colours. */
+.dash-metric-card--hero .mini-rank__label,
+.dash-metric-card--hero .mini-rank__value,
+.dash-metric-card--hero .mini-group__label,
+.dash-metric-card--hero .mini-group__value {
+  color: inherit;
+}
+
+.dash-metric-card--hero .mini-rank__avatar {
+  background: rgba(255, 255, 255, 0.18);
+  color: inherit;
+}
+
+.dash-metric-card--hero .mini-rank__track,
+.dash-metric-card--hero .mini-group__track {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.dash-metric-card--hero .mini-rank__fill,
+.dash-metric-card--hero .mini-group__fill,
+.dash-metric-card--hero .mini-cols__bar {
+  fill: var(--lex-text-on-evergreen);
+}
+
+.dash-metric-card--hero .mini-cols__value,
+.dash-metric-card--hero .mini-cols__label {
+  fill: var(--lex-text-on-evergreen);
+}
+
+/* ══ Metric detail: summary, about, toolbar ═════════════════════════════ */
+.metric-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(12rem, 20rem);
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 18px;
+  background: var(--lex-bg-card, var(--lex-bg-primary));
+  box-shadow: var(--lex-shadow-sm);
+}
+
+.metric-summary__title {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--lex-text-secondary);
+}
+
+.metric-summary__value {
+  margin-top: 0.375rem;
+  font-size: 2.75rem;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--lex-text-primary);
+}
+
+.metric-summary__change-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.metric-summary__chip {
+  border-radius: 999px;
+  padding: 0.1875rem 0.625rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  background: var(--lex-bg-tertiary);
+  color: var(--lex-text-secondary);
+}
+
+.metric-summary__chip[hidden] {
+  display: none;
+}
+
+.metric-summary__chip--up {
+  background: var(--lex-status-success-bg);
+  color: var(--lex-status-success);
+}
+
+.metric-summary__chip--down {
+  background: var(--lex-status-danger-bg);
+  color: var(--lex-status-danger);
+}
+
+.metric-summary__prior,
+.metric-summary__period {
+  font-size: 0.8125rem;
+  color: var(--lex-text-tertiary);
+}
+
+.metric-summary__period {
+  margin: 0.5rem 0 0;
+}
+
+.metric-summary__visual .mini-spark {
+  height: 4.5rem;
+}
+
+.metric-summary__bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.metric-summary__bar-row {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+}
+
+.metric-summary__bar-row svg {
+  display: block;
+  width: 100%;
+  height: 0.75rem;
+  border-radius: 999px;
+  background: var(--lex-bg-tertiary);
+  overflow: hidden;
+}
+
+.metric-summary__bar {
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation: mini-bar-grow 600ms var(--lex-ease-out, ease-out) both;
+}
+
+.metric-summary__bar--current { fill: var(--lex-chart-evergreen); }
+.metric-summary__bar--prior { fill: var(--lex-chart-color-6); }
+
+.metric-detail-layout {
+  container: metric-detail / inline-size;
+}
+
+@container metric-detail (max-width: 639px) {
+  .metric-summary,
+  .metric-about__blocks {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.metric-about {
+  padding: 1.5rem;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 18px;
+  background: var(--lex-bg-card, var(--lex-bg-primary));
+}
+
+.metric-about__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--lex-text-secondary);
+}
+
+.metric-about__icon {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.metric-about__heading {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--lex-text-primary);
+}
+
+.metric-about__lead {
+  margin: 0.75rem 0 0;
+  font-size: 1rem;
+  line-height: 1.55;
+  color: var(--lex-text-primary);
+}
+
+.metric-about__lead[hidden],
+.metric-about__block[hidden] {
+  display: none;
+}
+
+.metric-about__blocks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin-top: 1.25rem;
+}
+
+.metric-about__label {
+  margin: 0 0 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--lex-text-tertiary);
+}
+
+.metric-about__block p {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--lex-text-secondary);
+}
+
+.metric-history__chart .mini-spark {
+  height: 6rem;
+}
+
+.metric-detail-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.metric-detail-toolbar__search {
+  flex: 1 1 14rem;
+  min-width: 12rem;
+}
+
+.metric-detail-toolbar__icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.metric-detail-toolbar__count {
+  font-size: 0.8125rem;
+  white-space: nowrap;
+  color: var(--lex-text-secondary);
+}
+
+.metric-detail-link {
+  color: var(--lex-text-accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.metric-detail-link:hover {
+  text-decoration: underline;
+}
+
+#metricHistorySection[hidden] {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .metric-summary__bar {
+    animation: none;
+  }
+}
+
+/* The story panel opens under the header's actions. */
+.dash-header {
+  position: relative;
+}
+
+.dash-header > .dash-story__panel {
+  top: 4.5rem;
+  right: 1.25rem;
+  left: auto;
+}
+
+/* Chapters: a quiet label row across the grid. */
+.dash-chapter {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lex-text-tertiary);
+}
+
+.dash-chapter::after {
+  content: '';
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--lex-border-subtle);
+}
+
+.dash-chapter:first-child {
+  margin-top: 0;
+}
+
+/* ══ Packed rows (DashboardLayout.packRows): no empty grid cells ═════════ */
+#dashboardMetricGrid.dash-bento {
+  grid-auto-flow: row;
+}
+
+.dash-span-4-1 { grid-column: span 1; }
+.dash-span-4-2 { grid-column: span 2; }
+.dash-span-4-3 { grid-column: span 3; }
+.dash-span-4-4 { grid-column: span 4; }
+
+@container dash-detail (max-width: 959px) {
+  .dash-span-2-1 { grid-column: span 1; }
+  .dash-span-2-2 { grid-column: span 2; }
+}
+
+@container dash-detail (max-width: 559px) {
+  .dash-span-2-1,
+  .dash-span-2-2 {
+    grid-column: span 1;
+  }
+}
+
+/* Text stacks (a worklist's number and its rows) sit at the top; only
+   charts stretch to fill the card. */
+.dash-bento .dash-metric-card--worklist > .dash-metric-card__result {
+  flex: 0 0 auto;
+}
+
+.dash-bento .dash-metric-card--worklist > .dash-worklist {
+  flex: 1 1 auto;
+}
+
+/* All dashboards: the description under the name, and the scope tag. */
+.insights-library-description {
+  margin-top: 0.125rem;
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+  white-space: normal;
+}
+
+.insights-library-tag {
+  display: inline-block;
+  margin-left: 0.375rem;
+  padding: 0 0.4375rem;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--lex-text-secondary);
+  vertical-align: 1px;
 }

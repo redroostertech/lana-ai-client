@@ -201,9 +201,17 @@
       pin: function (value, row) {
         return renderPinCell(row);
       },
-      name: function (value) {
-        return '<div class="insights-library-name">' + escapeHtml(value || 'Untitled dashboard') + '</div>';
+      // The name, a scope tag when the dashboard is not organization-wide,
+      // and its one-line description under it.
+      name: function (value, row) {
+        var columns = window.DashboardLibraryColumns;
+        var scope = columns && row ? columns.scopeTag(row) : '';
+        var description = row && row.description ? String(row.description) : '';
+        return '<div class="insights-library-name">' + escapeHtml(value || 'Untitled dashboard')
+          + (scope ? ' <span class="insights-library-tag">' + escapeHtml(scope) + '</span>' : '') + '</div>'
+          + (description ? '<div class="insights-library-description">' + escapeHtml(description) + '</div>' : '');
       },
+      who: function (value) { return labelCell(value); },
       audience: function (value) { return labelCell(shared.humanizeLabel(value)); },
       category: function (value) { return labelCell(shared.capitalizeFirst(value)); },
       scope: function (value) { return labelCell(shared.capitalizeFirst(value)); },
@@ -242,14 +250,25 @@
 
     // Pinned dashboards stay in the table (filled pin) so its count names
     // every dashboard; the pinned strip above is a shortcut, not a split.
-    var filters = tables().dashboardFilterOptions(sourceDashboards);
+    // "Who can see it" replaces Audience and Visibility; Area and State show
+    // only when they differ (js/shared/dashboard-library-columns.js).
+    var columns = window.DashboardLibraryColumns;
+    var rows = sourceDashboards.map(function (row) { return Object.assign({}, row, { who: columns.whoCanSee(row) }); });
+    var layout = columns.tableColumns(rows);
+    table.setAttribute('columns', layout.columns.join(','));
+    table.setAttribute('labels', layout.labels.join(','));
+    table.setAttribute('sortable-columns', layout.sortable.join(','));
+    var filters = tables().dashboardFilterOptions(rows);
+    var whoValues = [];
+    rows.forEach(function (row) { if (row.who && whoValues.indexOf(row.who) === -1) whoValues.push(row.who); });
+    filters.who = { options: whoValues.sort().map(function (who) { return { value: who, label: who }; }) };
     table.setColumnFilterOptions(filters);
-    var audienceSelect = el('dashboardLibraryAudienceFilter');
-    if (audienceSelect) {
-      audienceSelect.options = [{ value: 'all', label: 'All' }].concat(filters.audience.options);
+    var whoSelect = el('dashboardLibraryAudienceFilter');
+    if (whoSelect) {
+      whoSelect.options = [{ value: 'all', label: 'All' }].concat(filters.who.options);
     }
     syncEmptyState(table);
-    table.setData(sourceDashboards);
+    table.setData(rows);
     if (toolbar) {
       toolbar.updateCount();
       toolbar.syncToolbar();
@@ -350,7 +369,7 @@
       table.setCellRenderers(cellRenderers());
       // Search also covers the description, which has no column.
       table._getSearchColumns = function () {
-        return ['name', 'description', 'audience', 'category', 'scope', 'visibility', 'state'];
+        return ['name', 'description', 'who', 'category', 'state'];
       };
       toolbar = tables().bindClientToolbar(table, {
         search: 'dashboardLibrarySearch',
@@ -358,7 +377,7 @@
         order: 'dashboardLibrarySortOrder',
         filter: 'dashboardLibraryAudienceFilter',
         counts: ['dashboardLibraryCount', 'dashboardLibrarySectionCount']
-      }, { filterKey: 'audience', noun: ['dashboard', 'dashboards'], defaultSort: 'updated_at',
+      }, { filterKey: 'who', noun: ['dashboard', 'dashboards'], defaultSort: 'updated_at',
         // "12 dashboards, 1 pinned": the total, with the pinned split.
         onCount: function (total) {
           var pinned = (state.sourceDashboards || []).filter(function (item) { return item && item.id && pinnedIds.has(item.id); }).length;

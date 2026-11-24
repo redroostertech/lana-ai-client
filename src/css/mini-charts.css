@@ -83,7 +83,7 @@
   width: 0.625rem;
   height: 0.625rem;
   border-radius: 2px;
-  background: var(--lex-chart-color-3);
+  background: var(--lex-chart-evergreen);
 }
 
 .mini-bars__key--second::before {
@@ -142,7 +142,7 @@
 }
 
 .mini-bars__fill {
-  fill: var(--lex-chart-color-3);
+  fill: var(--lex-chart-evergreen);
   transform-box: fill-box;
   transform-origin: left center;
   animation: mini-bar-grow 600ms var(--lex-ease-out, ease-out) both;
@@ -190,7 +190,7 @@
 }
 
 .mini-cols__bar {
-  fill: var(--lex-chart-color-3);
+  fill: var(--lex-chart-evergreen);
   transform-box: fill-box;
   transform-origin: center bottom;
   animation: mini-col-grow 650ms var(--lex-ease-out, ease-out) both;
@@ -454,7 +454,7 @@
 }
 
 .mini-group__fill {
-  fill: var(--lex-chart-color-3);
+  fill: var(--lex-chart-evergreen);
   transform-box: fill-box;
   transform-origin: left center;
   animation: mini-bar-grow 600ms var(--lex-ease-out, ease-out) both;
@@ -467,7 +467,7 @@
 }
 
 .mini-group--funnel .mini-group__fill {
-  fill: var(--lex-chart-color-3);
+  fill: var(--lex-chart-evergreen);
   transform-origin: center center;
 }
 
@@ -502,8 +502,8 @@
 
 /* ══ Visual vocabulary ═══════════════════════════════════════════ */
 /* Series tones cycle through the Lex chart colours. */
-.mini-donut__slice--1, .mini-stack__part--1 { stroke: var(--lex-chart-color-3); fill: var(--lex-chart-color-3); }
-.mini-donut__slice--2, .mini-stack__part--2 { stroke: var(--lex-chart-color-2); fill: var(--lex-chart-color-2); }
+.mini-donut__slice--1, .mini-stack__part--1 { stroke: var(--lex-chart-evergreen); fill: var(--lex-chart-evergreen); }
+.mini-donut__slice--2, .mini-stack__part--2 { stroke: var(--lex-chart-color-3); fill: var(--lex-chart-color-3); }
 .mini-donut__slice--3, .mini-stack__part--3 { stroke: var(--lex-chart-color-4); fill: var(--lex-chart-color-4); }
 .mini-donut__slice--4, .mini-stack__part--4 { stroke: var(--lex-chart-color-7); fill: var(--lex-chart-color-7); }
 .mini-donut__slice--5, .mini-stack__part--5 { stroke: var(--lex-chart-color-8); fill: var(--lex-chart-color-8); }
@@ -511,15 +511,15 @@
 .mini-donut__slice--7, .mini-stack__part--7 { stroke: var(--lex-chart-color-9); fill: var(--lex-chart-color-9); }
 .mini-donut__slice--8, .mini-stack__part--8 { stroke: var(--lex-chart-color-10); fill: var(--lex-chart-color-10); }
 .mini-donut__slice { fill: none; }
-.mini-donut__key--1::before { background: var(--lex-chart-color-3); }
-.mini-donut__key--2::before { background: var(--lex-chart-color-2); }
+.mini-donut__key--1::before { background: var(--lex-chart-evergreen); }
+.mini-donut__key--2::before { background: var(--lex-chart-color-3); }
 .mini-donut__key--3::before { background: var(--lex-chart-color-4); }
 .mini-donut__key--4::before { background: var(--lex-chart-color-7); }
 .mini-donut__key--5::before { background: var(--lex-chart-color-8); }
 .mini-donut__key--6::before { background: var(--lex-chart-color-6); }
 .mini-donut__key--7::before { background: var(--lex-chart-color-9); }
 .mini-donut__key--8::before { background: var(--lex-chart-color-10); }
-.mini-timeline__dot--1 circle { fill: var(--lex-chart-color-3); }
+.mini-timeline__dot--1 circle { fill: var(--lex-chart-evergreen); }
 .mini-timeline__dot--2 circle { fill: var(--lex-chart-color-2); }
 .mini-timeline__dot--3 circle { fill: var(--lex-chart-color-4); }
 .mini-timeline__dot--4 circle { fill: var(--lex-chart-color-7); }
@@ -743,13 +743,12 @@
 }
 
 .mini-rank__fill {
-  fill: var(--lex-chart-color-3);
+  fill: var(--lex-chart-evergreen);
   transform-box: fill-box;
   transform-origin: left center;
   animation: mini-bar-grow 600ms var(--lex-ease-out, ease-out) both;
 }
 
-.mini-rank__row:first-child .mini-rank__fill { fill: var(--lex-chart-color-2); }
 
 /* Stacked bar */
 .mini-stack {
@@ -790,7 +789,7 @@
 .mini-bullet__track { fill: var(--lex-bg-tertiary); }
 
 .mini-bullet__fill {
-  fill: var(--lex-chart-color-3);
+  fill: var(--lex-chart-evergreen);
   transform-box: fill-box;
   transform-origin: left center;
   animation: mini-bar-grow 600ms var(--lex-ease-out, ease-out) both;

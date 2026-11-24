@@ -35,6 +35,11 @@
       <!-- One header: greeting, the dashboard's title and actions, the
            Insights mark and the date-range control. The breadcrumb sits under it. -->
       <header class="dash-header">
+        <!-- "Learn More" in the banner opens this: the dashboard's story. -->
+        <div id="dashboardStoryPanel" class="dash-story__panel" role="dialog" aria-label="About this dashboard" hidden>
+          <p class="dash-story__heading">About this dashboard</p>
+          <div id="dashboardStoryBody" class="dash-story__body"></div>
+        </div>
         <div class="dash-header__main">
           <!-- Insights brand animation: plays once on load, first frame under Reduce Motion. -->
           <lex-brand-mark id="dashboardHeaderMark" class="dash-header__mark" animation="chart" size="48" once></lex-brand-mark>
@@ -51,7 +56,7 @@
               lana
               lana-context-type="full_chat"
             >
-              <lex-btn id="openReportingBtn" variant="secondary" size="sm">Open Reports</lex-btn>
+              <lex-btn id="dashboardLearnMoreBtn" variant="secondary" size="sm" aria-haspopup="dialog" aria-controls="dashboardStoryPanel">Learn More</lex-btn>
               <button id="editDashboardBtn" type="button" role="menuitem">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                 Edit
@@ -64,7 +69,9 @@
           </div>
         </div>
         <div class="dash-header__bar">
-          <div id="dashboardViewContext" class="dash-header__meta"></div>
+          <div class="dash-header__about">
+            <div id="dashboardViewContext" class="dash-header__meta"></div>
+          </div>
           <div class="dash-period">
             <lex-brand-mark id="dashboardPeriodLoading" class="dash-period__loading" animation="spinner" size="24" label="Loading the numbers" hidden></lex-brand-mark>
             <button id="dashboardPeriodToggle" class="dash-period__toggle" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="dashboardPeriodPanel">
