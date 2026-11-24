@@ -60,9 +60,42 @@ describe('tiles', () => {
   });
 
   test('an empty list is a calm card, not an empty chart', () => {
-    const html = page().exports.renderMetricCard({ metric_key: 'x.expected_cash_by_week', title: 'Expected Cash by Week', value: [], format: 'table', data_state: 'ok' });
+    const html = page().exports.renderMetricCard(card('gross_revenue_by_service_offering'));
     expect(html).not.toContain('mini-bars');
     expect(text(html)).toContain('Waiting for setup');
+  });
+
+  test('currency_breakdown bars are dollars; table bars are plain numbers', () => {
+    const revenue = Object.assign({}, card('gross_revenue_by_service_offering'), { value: sample.currency_breakdown_rows_synthetic });
+    const money = text(page().exports.renderMetricCard(revenue));
+    expect(money).toContain('$84,250');
+    expect(money).toContain('$31,001');
+    const closed = text(page().exports.renderMetricCard(card('closed_cases_by_service_offering')));
+    expect(closed).toContain('Estate Planning 6');
+    expect(closed).not.toContain('$');
+  });
+
+  test('actual vs needed before a goal: actual bars only and a quiet note', () => {
+    const html = page().exports.renderMetricCard(card('actual_vs_needed_service_offerings'));
+    expect(html).toContain('mini-bars');
+    expect(html).not.toContain('mini-bars__fill--second');
+    expect(text(html)).not.toContain('4 rows');
+    expect(text(html)).not.toContain('null');
+    expect(text(html)).toContain('Needed counts appear once a goal is set.');
+    expect(html).not.toContain('data-data-state-action');
+  });
+
+  test('the needed note links to the Metric Catalog when the card says which goal to set', () => {
+    const withPrompt = Object.assign({}, card('actual_vs_needed_service_offerings'), {
+      goal_input: { metric_key: 'legal_firm.finance.annual_revenue_goal', message: 'Set the goal in the Metric Catalog.' } });
+    expect(page().exports.renderMetricCard(withPrompt)).toContain('data-data-state-action="admin/metric-catalog.html?editGoal=legal_firm.finance.annual_revenue_goal"');
+  });
+
+  test('expected cash is a plain currency tile, right now', () => {
+    const html = page().exports.renderMetricCard(card('expected_cash_by_week'));
+    expect(html).not.toContain('mini-bars');
+    expect(text(html)).toContain('$48,250');
+    expect(text(html)).toContain('Right now');
   });
 
   test('a card without its goal waits for the goal and links to the catalog, never $0', () => {

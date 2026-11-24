@@ -33,12 +33,20 @@ test('bars carry their width as an SVG attribute and escape labels', () => {
 });
 
 test('paired bars show both series with a legend', () => {
-  const html = Charts.barsHtml(View.listBars([{ service_label: 'Estate Planning', actual: 12, needed: 20 }]), fmt);
+  const html = Charts.barsHtml(View.listBars([{ service_label: 'Estate Planning', actual_count: 12, needed_count: 20 }]), fmt);
   expect(html).toContain('mini-bars--paired');
   expect(html).toContain('Actual');
   expect(html).toContain('Needed');
   expect(html).toContain('mini-bars__fill--second');
   expect(html).toContain('12 of 20');
+});
+
+test('a row with no needed count has one bar and no "of null"', () => {
+  const html = Charts.barsHtml(View.listBars([{ service_label: 'A', actual_count: 4, needed_count: 8 }, { service_label: 'B', actual_count: 2, needed_count: null }]), fmt);
+  expect(html.split('mini-bars__fill--second').length - 1).toBe(1);
+  expect(html).not.toContain('of null');
+  expect(html).not.toContain('of n/a');
+  expect(html).toContain('>2<');
 });
 
 test('hidden rows are counted in plain words', () => {

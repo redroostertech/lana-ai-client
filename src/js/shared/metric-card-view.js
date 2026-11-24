@@ -55,26 +55,19 @@
   }
 
   // ── List values to bars ───────────────────────────────────────
-  var PRIMARY_KEYS = ['actual', 'value', 'metric_value', 'total', 'count', 'amount'];
-  var SECOND_KEYS = ['needed', 'target', 'required', 'expected', 'goal'];
+  // The list row fields the server sends (no guessing):
+  //   plain lists:        { service_key, service_label, value }
+  //   actual vs needed:   { service_key, service_label, actual_count, needed_count, variance, average_case_value }
+  // needed_count is null until a goal exists.
+  var ACTUAL_KEY = 'actual_count';
+  var NEEDED_KEY = 'needed_count';
+  var VALUE_KEY = 'value';
   var LABEL_KEYS = ['service_label', 'label', 'name', 'title', 'display_name', 'period_label', 'week_label', 'month_label',
     'week', 'month', 'week_start', 'month_start', 'period_start', 'period', 'service_key', 'key', 'id'];
-  var GENERIC_SERIES = { value: 'Actual', metric_value: 'Actual', total: 'Actual', count: 'Actual', amount: 'Actual' };
   var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-  function firstKeyPresent(row, keys, skip) {
-    if (!row || typeof row !== 'object') return null;
-    for (var k = 0; k < keys.length; k += 1) {
-      if (keys[k] !== skip && row[keys[k]] !== undefined) return keys[k];
-    }
-    return null;
-  }
-
-  // Which fields hold the bar numbers for one row: { primary, second }.
-  function rowKeys(row) {
-    var primary = firstKeyPresent(row, PRIMARY_KEYS);
-    var second = firstKeyPresent(row, SECOND_KEYS, primary);
-    return primary ? { primary: primary, second: second } : { primary: second, second: null };
+  function isActualVsNeeded(row) {
+    return !!row && typeof row === 'object' && row[ACTUAL_KEY] !== undefined;
   }
 
   // "2026-01-05" or an ISO instant -> "Jan 5, 2026"; anything else unchanged.
@@ -108,24 +101,25 @@
   /**
    * @param {*} value - card.value
    * @param {number} [limit=8] - rows to draw; the rest are counted
-   * @returns {null|{empty, rows:[{label,value,second,pct,secondPct}], paired, max, seriesLabels, hiddenCount}}
+   * @returns {null|{empty, rows:[{label,value,second,pct,secondPct}], paired, neededPending, max, seriesLabels, hiddenCount}}
+   *   paired: at least one row has a needed count, so needed bars are drawn.
+   *   neededPending: actual vs needed rows whose needed counts are all still
+   *   null (no goal yet): only actual bars are drawn.
    */
   function listBars(value, limit) {
     if (!Array.isArray(value)) return null;
-    if (!value.length) return { empty: true, rows: [], paired: false, max: 0, seriesLabels: [], hiddenCount: 0 };
+    if (!value.length) return { empty: true, rows: [], paired: false, neededPending: false, max: 0, seriesLabels: [], hiddenCount: 0 };
     var cap = limit > 0 ? limit : 8;
-    var seriesKeys = null;
+    var actualVsNeeded = value.some(isActualVsNeeded);
     var parsed = value.map(function (row, index) {
       var isObject = row && typeof row === 'object';
-      var keys = isObject ? rowKeys(row) : { primary: null, second: null };
-      if (keys.second && !seriesKeys) seriesKeys = keys;
       return {
         label: rowLabel(row, index),
-        value: isObject ? (keys.primary ? toNumber(row[keys.primary]) : null) : toNumber(row),
-        second: keys.second ? toNumber(row[keys.second]) : null,
+        value: isObject ? toNumber(row[actualVsNeeded ? ACTUAL_KEY : VALUE_KEY]) : toNumber(row),
+        second: isObject && actualVsNeeded ? toNumber(row[NEEDED_KEY]) : null,
       };
     });
-    var paired = !!seriesKeys;
+    var paired = parsed.some(function (row) { return row.second !== null; });
     var max = 0;
     parsed.forEach(function (row) {
       if (row.value !== null && row.value > max) max = row.value;
@@ -135,19 +129,31 @@
       return {
         label: row.label,
         value: row.value,
-        second: paired ? row.second : null,
+        second: row.second,
         pct: pctOf(row.value, max),
-        secondPct: paired ? pctOf(row.second, max) : null,
+        secondPct: row.second === null ? null : pctOf(row.second, max),
       };
     });
     return {
       empty: false,
       rows: rows,
       paired: paired,
+      neededPending: actualVsNeeded && !paired,
       max: max,
-      seriesLabels: paired ? [GENERIC_SERIES[seriesKeys.primary] || sentenceCase(seriesKeys.primary), sentenceCase(seriesKeys.second)] : [],
+      seriesLabels: paired ? ['Actual', 'Needed'] : [],
       hiddenCount: Math.max(0, parsed.length - cap),
     };
+  }
+
+  // The unit of a list card's numbers, keyed by the card format until the
+  // server sends a unit per list: currency_breakdown is dollars, table (and
+  // the *_count fields) are plain numbers.
+  var LIST_VALUE_FORMATS = { currency_breakdown: 'currency', table: 'number' };
+
+  function listValueFormat(card) {
+    var format = card && card.format;
+    if (format && typeof format === 'object') format = format.type || format.style;
+    return LIST_VALUE_FORMATS[String(format || '').toLowerCase()] || 'number';
   }
 
   // ── Comparison arrow ──────────────────────────────────────────
@@ -290,6 +296,7 @@
     isPointInTime: isPointInTime,
     periodScope: periodScope,
     listBars: listBars,
+    listValueFormat: listValueFormat,
     comparisonArrow: comparisonArrow,
     goalProgress: goalProgress,
     sparkline: sparkline,

@@ -2024,3 +2024,53 @@
   from { background-position: 200% 0; }
   to { background-position: -200% 0; }
 }
+
+.dash-metric-card__list-note {
+  margin: 0.625rem 0 0;
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+}
+
+.dash-metric-card__list-note .lex-data-state__action {
+  margin-top: 0;
+  font-size: 0.75rem;
+}
+
+/* Dashboard header: the Insights brand animation beside the view summary.
+   The mark has a fixed size, so nothing moves when it loads. */
+.dash-view-context--with-mark {
+  justify-content: flex-start;
+}
+
+.dash-view-context__mark {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+}
+
+.dash-view-context__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+@container dash-detail (max-width: 819px) {
+  .dash-view-context--with-mark {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .dash-view-context__body {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@container dash-detail (max-width: 479px) {
+  .dash-view-context__mark {
+    display: none;
+  }
+}

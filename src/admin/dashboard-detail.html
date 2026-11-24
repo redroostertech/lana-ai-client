@@ -56,7 +56,11 @@
       <lex-breadcrumb id="dashboardDetailBreadcrumb"></lex-breadcrumb>
 
       <section class="dash-detail-content">
-        <div id="dashboardViewContext" class="dash-view-context"></div>
+        <div class="dash-view-context dash-view-context--with-mark">
+          <!-- Insights brand animation: plays once on load, first frame under Reduce Motion. -->
+          <lex-brand-mark id="dashboardHeaderMark" class="dash-view-context__mark" animation="chart" size="56" once></lex-brand-mark>
+          <div id="dashboardViewContext" class="dash-view-context__body"></div>
+        </div>
         <section class="detail-period-card" aria-labelledby="dashboardPeriodHeading">
           <div class="detail-period-card__presets">
             <div class="dash-period-heading">

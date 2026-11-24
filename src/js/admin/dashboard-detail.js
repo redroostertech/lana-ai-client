@@ -714,8 +714,19 @@
       return '<article class="' + cardClass('dash-metric-card--waiting') + '">' + cardTop(metric, cardId)
         + window.DataState.render(EMPTY_LIST_STATE, { calm: true }) + periodLine(metric) + '</article>';
     }
+    // The unit comes from the card format (currency_breakdown is dollars).
+    var unit = window.MetricCardView.listValueFormat(metric);
+    var formatBar = unit === 'currency'
+      ? function (n) { return n === null ? window.DataState.EMPTY_VALUE : formatMetricCardValue({ value: n, format: 'currency' }); }
+      : plainNumber;
+    var action = bars.neededPending ? window.DataState.goalAction(metric) : null;
+    var pendingNote = bars.neededPending
+      ? '<p class="dash-metric-card__list-note">Needed counts appear once a goal is set.'
+        + (action ? ' <button type="button" class="lex-data-state__action" data-data-state-action="' + escapeHtml(action.href) + '">' + escapeHtml(action.label) + '</button>' : '')
+        + '</p>'
+      : '';
     return '<article class="' + cardClass('dash-metric-card--list') + '">' + cardTop(metric, cardId)
-      + '<div class="dash-metric-card__chart">' + window.MiniCharts.barsHtml(bars, plainNumber) + '</div>'
+      + '<div class="dash-metric-card__chart">' + window.MiniCharts.barsHtml(bars, formatBar) + pendingNote + '</div>'
       + periodLine(metric)
       + recordsLink(cardId)
       + '</article>';

@@ -55,6 +55,15 @@
     return item.data_state === 'no_goal' ? {} : null;
   }
 
+  // Where to set the goal a card is waiting on: { label, href } or null.
+  // Also used on cards that show numbers but are missing their goal part.
+  function goalAction(item) {
+    var prompt = item ? goalPrompt(item) : null;
+    if (!prompt) return null;
+    var goalKey = prompt.metric_key || item.metric_key || item.key || '';
+    return goalKey ? { label: 'Open the Metric Catalog', href: CATALOG_PAGE + '?editGoal=' + encodeURIComponent(goalKey) } : null;
+  }
+
   // The one state model: { state, title, reason, waiting, action } or null.
   function view(item, options) {
     if (!isProblem(item)) return null;
@@ -62,13 +71,12 @@
     var state = item.data_state;
     var prompt = calm ? goalPrompt(item) : null;
     if (prompt) {
-      var goalKey = prompt.metric_key || item.metric_key || item.key || '';
       return {
         state: state,
         title: GOAL_TITLE,
         reason: prompt.message || item.data_state_reason || '',
         waiting: true,
-        action: goalKey ? { label: 'Open the Metric Catalog', href: CATALOG_PAGE + '?editGoal=' + encodeURIComponent(goalKey) } : null
+        action: goalAction(item)
       };
     }
     var calmTitle = calm ? CALM_TITLES[state] : null;
@@ -109,5 +117,5 @@
     return text ? text.charAt(0).toUpperCase() + text.slice(1) : EMPTY_VALUE;
   }
 
-  global.DataState = { EMPTY_VALUE: EMPTY_VALUE, TITLES: TITLES, isProblem: isProblem, fromApiError: fromApiError, view: view, render: render, label: label, escapeHtml: escapeHtml };
+  global.DataState = { EMPTY_VALUE: EMPTY_VALUE, TITLES: TITLES, isProblem: isProblem, fromApiError: fromApiError, view: view, goalAction: goalAction, render: render, label: label, escapeHtml: escapeHtml };
 })(window);

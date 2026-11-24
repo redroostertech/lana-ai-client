@@ -51,11 +51,11 @@
         + '</div>'
       : '';
     var rows = model.rows.map(function (row) {
-      var valueText = model.paired
+      var valueText = row.second !== null
         ? format(row.value) + ' of ' + format(row.second)
         : format(row.value);
       var bars = '<rect class="mini-bars__fill" x="0" y="0" width="' + row.pct + '" height="6"></rect>';
-      if (model.paired) {
+      if (row.second !== null) {
         bars += '<rect class="mini-bars__fill mini-bars__fill--second" x="0" y="8" width="' + row.secondPct + '" height="6"></rect>';
       }
       return '<li class="mini-bars__row">'

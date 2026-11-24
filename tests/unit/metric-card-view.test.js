@@ -48,27 +48,56 @@ describe('listBars detects lists from the value shape', () => {
   });
 
   test('labels fall back to label, name, then a readable key', () => {
-    const model = View.listBars([{ label: 'Week of Jan 5', amount: 10 }, { name: 'Probate', total: 5 }, { service_key: 'trust_admin', count: 2 }]);
+    const model = View.listBars([{ label: 'Week of Jan 5', value: 10 }, { name: 'Probate', value: 5 }, { service_key: 'trust_admin', value: 2 }]);
     expect(model.rows.map((r) => r.label)).toEqual(['Week of Jan 5', 'Probate', 'Trust admin']);
     expect(model.rows.map((r) => r.pct)).toEqual([100, 50, 20]);
   });
 
-  test('actual against needed rows become paired bars on one scale', () => {
+  test('plain list cards read value', () => {
+    const model = View.listBars(card('closed_cases_by_service_offering').value);
+    expect(model.rows.map((r) => [r.label, r.value])).toEqual([['Estate Planning', 6], ['Guardianship', 2]]);
+    expect(model.paired).toBe(false);
+  });
+
+  test('only the server field names are read, never guesses', () => {
+    const model = View.listBars([{ label: 'A', amount: 10, total: 4, count: 3 }]);
+    expect(model.rows[0].value).toBe(null);
+  });
+
+  test('actual against needed with needed set draws paired bars on one scale', () => {
     const model = View.listBars([
-      { service_label: 'Estate Planning', actual: 12, needed: 20 },
-      { service_label: 'Probate', actual: 9, needed: 6 },
+      { service_key: 'estate_planning', service_label: 'Estate Planning', actual_count: 12, needed_count: 20, variance: -8, average_case_value: 4000 },
+      { service_key: 'probate', service_label: 'Probate', actual_count: 9, needed_count: 6, variance: 3, average_case_value: 5000 },
     ]);
     expect(model.paired).toBe(true);
+    expect(model.neededPending).toBe(false);
     expect(model.seriesLabels).toEqual(['Actual', 'Needed']);
     expect(model.max).toBe(20);
     expect(model.rows[0]).toMatchObject({ value: 12, second: 20, pct: 60, secondPct: 100 });
   });
 
-  test('an empty list is empty, not a chart', () => {
-    expect(View.listBars([])).toEqual({ empty: true, rows: [], paired: false, max: 0, seriesLabels: [], hiddenCount: 0 });
+  test('actual against needed before a goal draws only actual bars and says needed is pending', () => {
+    const model = View.listBars(card('actual_vs_needed_service_offerings').value);
+    expect(model.paired).toBe(false);
+    expect(model.neededPending).toBe(true);
+    expect(model.seriesLabels).toEqual([]);
+    expect(model.rows.map((r) => [r.label, r.value, r.second, r.secondPct])).toEqual([
+      ['Estate Planning', 21, null, null], ['Guardianship', 0, null, null], ['Probate', 0, null, null], ['Medicaid', 0, null, null],
+    ]);
   });
 
-  test('not a list is null', () => {
+  test('a row whose needed count is still null keeps a single bar inside a paired chart', () => {
+    const model = View.listBars([{ service_label: 'A', actual_count: 4, needed_count: 8 }, { service_label: 'B', actual_count: 2, needed_count: null }]);
+    expect(model.paired).toBe(true);
+    expect(model.rows[1]).toMatchObject({ value: 2, second: null, secondPct: null });
+  });
+
+  test('an empty list is empty, not a chart', () => {
+    expect(View.listBars([])).toEqual({ empty: true, rows: [], paired: false, neededPending: false, max: 0, seriesLabels: [], hiddenCount: 0 });
+  });
+
+  test('not a list is null (expected cash cards are plain currency numbers)', () => {
+    expect(View.listBars(card('expected_cash_by_week').value)).toBe(null);
     expect(View.listBars(916)).toBe(null);
     expect(View.listBars(null)).toBe(null);
     expect(View.listBars({ value: 3 })).toBe(null);
@@ -86,6 +115,17 @@ describe('listBars detects lists from the value shape', () => {
     const model = View.listBars([{ label: 'A', value: -5 }, { label: 'B', value: 'n/a' }, { label: 'C', value: 10 }]);
     expect(model.rows.map((r) => r.pct)).toEqual([0, 0, 100]);
     expect(model.rows[1].value).toBe(null);
+  });
+});
+
+describe('listValueFormat: the unit for list numbers comes from the card format', () => {
+  test('currency_breakdown means dollars', () => {
+    expect(View.listValueFormat(card('gross_revenue_by_service_offering'))).toBe('currency');
+  });
+  test('table means plain numbers', () => {
+    expect(View.listValueFormat(card('new_cases_opened_by_service_offering'))).toBe('number');
+    expect(View.listValueFormat(card('actual_vs_needed_service_offerings'))).toBe('number');
+    expect(View.listValueFormat({})).toBe('number');
   });
 });
 
