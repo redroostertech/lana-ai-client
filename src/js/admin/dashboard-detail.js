@@ -751,7 +751,7 @@
     + '<path d="M3 5h18M3 12h18M3 19h18"/></svg>';
 
   // One card shell: a header row [title][details], the body (the visual,
-  // which takes the spare height), and a footer row [period or Right now]
+  // which takes the spare height), and a footer row [the picked period]
   // [See the records]. withRecords is kept for callers; the records link
   // lives in the footer (cardFooter).
   function cardTop(metric, cardId, withRecords) {
@@ -776,16 +776,12 @@
     return renderComparison(metric.comparison, metric.format);
   }
 
-  // "Right now" for point-in-time cards (the server's period_scope), so no
-  // one expects them to follow the dates; otherwise the period itself.
+  // Every card follows the picked dates, so the footer names the period.
   function periodLine(metric) {
-    if (window.MetricCardView.isPointInTime(metric)) {
-      return '<div class="dash-metric-card__period dash-metric-card__period--now" title="This number is as of today. It does not follow the dates above.">Right now</div>';
-    }
     return '<div class="dash-metric-card__period">' + escapeHtml(metric.period || metric.period_label || currentPeriod.label || 'Current period') + '</div>';
   }
 
-  // The footer row: the period (or "Right now") and the records link.
+  // The footer row: the period and the records link.
   function cardFooter(metric, recordsKey, linkLabel) {
     var link = recordsKey
       ? '<button class="dash-metric-card__link dash-card__records" type="button" data-metric-detail-link="' + escapeHtml(recordsHref(recordsKey)) + '">'
@@ -934,9 +930,7 @@
 
   function renderDeclaredGroup(resolved, layoutItem) {
     var def = resolved.def;
-    var rows = window.DashboardCards.groupRows(def, declaredIndex).map(function (row) {
-      return row.scopeTag ? Object.assign({}, row, { label: row.label + ' (now)' }) : row;
-    });
+    var rows = window.DashboardCards.groupRows(def, declaredIndex);
     var firstOk = resolved.metrics.filter(function (entry) { return !entry.waiting; })[0];
     var chart = window.MiniCharts.groupHtml(rows, {
       funnel: def.chart === 'funnel',
@@ -1032,7 +1026,7 @@
     var groupRows = window.DashboardCards.groupRows(def, declaredIndex);
     var labels = window.CardVisuals.shortLabels(groupRows.map(function (row) { return row.label; }));
     return groupRows.map(function (row, i) {
-      return { label: labels[i] + (row.scopeTag ? ' (now)' : ''), value: row.value, key: row.key, waiting: row.waiting, metric: row.metric,
+      return { label: labels[i], value: row.value, key: row.key, waiting: row.waiting, metric: row.metric,
         text: row.waiting ? '' : formatMetricCardValue(row.metric), conversionPct: row.conversionPct, pct: row.pct };
     });
   }
@@ -1340,7 +1334,7 @@
       + '<div class="dash-waiting-strip__cards">' + cardsHtml.join('') + '</div></details>';
   }
 
-  // ── Worklists: the first rows behind a snapshot number ─────────────
+  // ── Worklists: the first rows behind a number ─────────────
   var worklistCache = {};
 
   // The worklist uses the same cell formatting as the records table on the
@@ -1689,8 +1683,7 @@
         periodStart: currentPeriod.start, periodEnd: currentPeriod.end, compareBy: currentPeriod.compareBy, rawLimit: 0,
       }).then(function (response) {
         var payload = response && response.data ? response.data : response;
-        lineageCache[cacheKey].model = window.LineageView.detailModel(payload && payload.lineage, Date.now(),
-          { snapshot: window.MetricCardView.isPointInTime(entry.metric) });
+        lineageCache[cacheKey].model = window.LineageView.detailModel(payload && payload.lineage, Date.now());
         redraw();
       }).catch(function () { /* the instant summary stays */ });
     });

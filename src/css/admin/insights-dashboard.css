@@ -1946,22 +1946,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.dash-metric-card__period--now {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  font-weight: 700;
-  color: var(--lex-text-secondary);
-}
-
-.dash-metric-card__period--now::before {
-  content: '';
-  width: 0.4375rem;
-  height: 0.4375rem;
-  border-radius: 999px;
-  background: var(--lex-status-success);
-}
-
 .dash-metric-card__result .mini-spark-slot {
   margin-top: 0.625rem;
 }
@@ -2476,10 +2460,6 @@
   color: inherit;
 }
 
-.dash-metric-card--hero .dash-metric-card__period--now::before {
-  background: currentColor;
-}
-
 .dash-metric-card--hero .dash-metric-card__info,
 .dash-metric-card--hero .dash-metric-card__icon-btn {
   border-color: rgba(255, 255, 255, 0.35);
@@ -2669,7 +2649,7 @@ button.dash-lines__label:hover,
   color: var(--lex-text-primary);
 }
 
-/* Worklist: the first rows behind a snapshot number. */
+/* Worklist: the first rows behind a number. */
 .dash-worklist {
   min-height: 3rem;
   overflow-x: auto;

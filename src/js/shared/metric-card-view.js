@@ -2,8 +2,7 @@
  * Metric card view model (pure, no DOM).
  *
  * Reads one dashboard card (GET /api/v1/modules/dashboard-metric-cards) or a
- * metric detail payload and decides what a tile draws: a "Right now" label,
- * bars for a list value, the arrow against the previous period, progress
+ * metric detail payload and decides what a tile draws: bars for a list value, the arrow against the previous period, progress
  * toward a goal, a sparkline from stored history, and the numbers the
  * count-up passes through. Drawing lives in mini-charts.js; goal and
  * comparison wording reuse metric-goal-comparison.js.
@@ -39,20 +38,6 @@
     return words ? words.charAt(0).toUpperCase() + words.slice(1) : '';
   }
 
-  // ── Point in time ─────────────────────────────────────────────
-  // The server owns this: card.period_scope (snapshot | flow | cumulative),
-  // or metric.periodScope on a metric detail payload. Missing means an older
-  // server, which gets no label.
-  function periodScope(item) {
-    if (!item || typeof item !== 'object') return '';
-    var scope = item.period_scope || item.periodScope
-      || (item.metric && (item.metric.periodScope || item.metric.period_scope)) || '';
-    return String(scope).toLowerCase();
-  }
-
-  function isPointInTime(item) {
-    return periodScope(item) === 'snapshot';
-  }
 
   // ── List values to bars ───────────────────────────────────────
   // The list row fields the server sends (no guessing):
@@ -315,8 +300,6 @@
   }
 
   return {
-    isPointInTime: isPointInTime,
-    periodScope: periodScope,
     listBars: listBars,
     listValueFormat: listValueFormat,
     comparisonArrow: comparisonArrow,

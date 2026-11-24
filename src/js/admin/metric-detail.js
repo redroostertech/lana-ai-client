@@ -378,11 +378,11 @@
     });
   }
 
-  function renderDataUsed(lineage, snapshot, resultText, calculation) {
+  function renderDataUsed(lineage, resultText, calculation) {
     var node = el('metricDataUsed');
     if (!node) return;
     var L = window.LineageView;
-    var model = L ? L.detailModel(lineage, Date.now(), { snapshot: snapshot }) : null;
+    var model = L ? L.detailModel(lineage, Date.now()) : null;
     node.hidden = !model;
     if (!model) { node.innerHTML = ''; return; }
     function draw() {
@@ -391,7 +391,7 @@
       if (model.formula && !L.sameText(model.formula, calculation)) parts.push('<p class="mabout__formula">' + escapeHtml(model.formula) + '</p>');
       parts.push(equationHtml(L.equationPills(lineage, inputValues, resultText)));
       parts.push('<h3 class="mabout__heading">How the number is built</h3>' + flowHtml(L.flowSteps(model, lineage)));
-      parts.push(sourcesHtml(L.sourceCards(lineage, Date.now(), { snapshot: snapshot })));
+      parts.push(sourcesHtml(L.sourceCards(lineage, Date.now())));
       parts.push(fieldsHtml(L.fieldRows(lineage)));
       if (model.goal) {
         parts.push('<div class="mabout__row">' + icon('target', 'mabout__row-icon') + '<span>' + (model.goal.set
@@ -538,7 +538,7 @@
 
       var snapshots = payload.snapshots || [];
       renderSummary(payload, snapshots);
-      renderDataUsed(payload.lineage, window.MetricCardView ? window.MetricCardView.isPointInTime(payload) || window.MetricCardView.isPointInTime(current) : false,
+      renderDataUsed(payload.lineage,
         view().summary(payload).value || '', metric.calculation || current.calculation || '');
       renderHistory(snapshots);
       // Records the server could not read get the calm note, not a table.

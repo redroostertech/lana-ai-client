@@ -3,8 +3,8 @@
 /**
  * Renders real dashboard tiles (dashboard-detail.js) from a real owner
  * dashboard response (names redacted), and runs the page's card loading
- * with a mocked API: lists draw bars, goal-less cards wait calmly, snapshot
- * cards say "Right now", every ok tile links to its records with the same
+ * with a mocked API: lists draw bars, goal-less cards wait calmly, every card
+ * shows the picked dates (no "Right now"), every ok tile links to its records with the same
  * dates, and the empty state only shows after a finished request.
  */
 
@@ -94,11 +94,12 @@ describe('tiles', () => {
     expect(page().exports.renderMetricCard(withPrompt)).toContain('data-data-state-action="admin/metric-catalog.html?editGoal=legal_firm.finance.annual_revenue_goal"');
   });
 
-  test('expected cash is a plain currency tile, right now', () => {
+  test('expected cash is a plain currency tile with the picked dates', () => {
     const html = page().exports.renderMetricCard(card('expected_cash_by_week'));
     expect(html).not.toContain('mini-bars');
     expect(text(html)).toContain('$48,250');
-    expect(text(html)).toContain('Right now');
+    expect(text(html)).not.toContain('Right now');
+    expect(text(html)).toContain('Jan 1, 2026 - Jan 31, 2026');
   });
 
   test('a card without its goal waits for the goal and links to the catalog, never $0', () => {
@@ -111,8 +112,11 @@ describe('tiles', () => {
     expect(text(html)).not.toContain('Not enough data');
   });
 
-  test('snapshot cards say "Right now"; flow cards show the dates', () => {
-    expect(text(page().exports.renderMetricCard(card('active_cases_total')))).toContain('Right now');
+  test('every card shows the dates, whatever period_scope the server sends (no "Right now")', () => {
+    const snapshot = page().exports.renderMetricCard(card('active_cases_total'));
+    expect(text(snapshot)).not.toContain('Right now');
+    expect(snapshot).not.toContain('period--now');
+    expect(text(snapshot)).toContain('Jan 1, 2026 - Jan 31, 2026');
     const flow = text(page().exports.renderMetricCard(card('average_case_value')));
     expect(flow).not.toContain('Right now');
     expect(flow).toContain('Jan 1, 2026 - Jan 31, 2026');
@@ -446,7 +450,8 @@ describe('one card shell', () => {
       expect(a.indexOf('dash-metric-card__top')).toBeLessThan(a.indexOf('dash-card__footer'));
     });
     const active = articles.find((a) => a.includes('Total Active Cases'));
-    expect(text(active.split('dash-card__footer')[1])).toContain('Right now');
+    expect(text(active.split('dash-card__footer')[1])).not.toContain('Right now');
+    expect(text(active.split('dash-card__footer')[1])).toContain('Jan 1, 2026');
     expect(text(active.split('dash-card__footer')[1])).toContain('See the records');
   });
 
@@ -463,12 +468,13 @@ describe('one card shell', () => {
     expect(hero).toContain('dash-span-4-4');
   });
 
-  test('a group that mixes right-now and period metrics tags the right-now bars', async () => {
+  test('a group with mixed period_scope gets no "(now)" tags', async () => {
     const layout = { cards: [{ id: 'g', kind: 'group', title: 'Mixed', metric_keys: ['case_volume.active_cases_total', 'case_volume.new_cases_opened_total'] }] };
     const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }),
       getDashboardMetricCards: jest.fn().mockResolvedValue({ data: declared.cards_synthetic }) });
     await p.exports.loadDashboardById('d1');
-    expect(text(p.nodes.dashboardMetricGrid.innerHTML)).toContain('(now)');
+    expect(text(p.nodes.dashboardMetricGrid.innerHTML)).not.toContain('(now)');
+    expect(text(p.nodes.dashboardMetricGrid.innerHTML)).not.toContain('Right now');
   });
 });
 

@@ -201,11 +201,6 @@
     });
     var max = 0;
     rows.forEach(function (row) { if (row.value !== null && row.value > max) max = row.value; });
-    // A group that mixes "right now" metrics with period metrics tags the
-    // right-now ones, so no one reads them as following the dates.
-    var scopes = {};
-    rows.forEach(function (row) { if (row.metric && row.metric.period_scope) scopes[row.metric.period_scope] = true; });
-    var mixed = Object.keys(scopes).length > 1;
     return rows.map(function (row, i) {
       var before = i > 0 ? rows[i - 1].value : null;
       var conversion = card.chart === 'funnel' && i > 0 && before !== null && before > 0 && row.value !== null
@@ -218,7 +213,6 @@
         waiting: row.waiting,
         pct: row.value !== null && row.value > 0 && max > 0 ? round1((row.value / max) * 100) : 0,
         conversionPct: conversion,
-        scopeTag: mixed && row.metric && row.metric.period_scope === 'snapshot' ? 'now' : null,
       };
     });
   }
@@ -402,7 +396,6 @@
   // layout.story, else a plain how-to.
   var GENERIC_STORY = [
     'Each card shows one number or a breakdown for the dates in the date picker. Change the dates to see another period.',
-    'Cards marked Right now show where things stand today and do not follow the dates.',
     'Click a bar, slice or row, or See the records, to open the records behind it for the same dates.',
     'Cards that are waiting for setup, a goal or a data source collect in one strip at the bottom.',
   ];

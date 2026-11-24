@@ -22,22 +22,9 @@ const cashGoalCard = {
     pacing: { elapsed_fraction: 0.77, expected_to_date: 38500, pace_status: 'behind' }, target_type: 'static' },
 };
 
-describe('isPointInTime reads period_scope from the server', () => {
-  test('snapshot cards are "right now"', () => {
-    expect(View.isPointInTime(card('active_cases_total'))).toBe(true);
-    expect(View.isPointInTime(card('overdue_expected_cash'))).toBe(true);
-  });
-  test('flow cards follow the dates', () => {
-    expect(View.isPointInTime(card('average_case_value'))).toBe(false);
-    expect(View.isPointInTime({ period_scope: 'cumulative' })).toBe(false);
-  });
-  test('metric detail carries it as metric.periodScope', () => {
-    expect(View.isPointInTime(detail)).toBe(false);
-    expect(View.isPointInTime({ metric: { periodScope: 'snapshot' } })).toBe(true);
-  });
-  test('an older server without the field shows no label', () => {
-    expect(View.isPointInTime({ metric_key: 'legal_firm.finance.overdue_expected_cash' })).toBe(false);
-  });
+test('period_scope is not read for display: no point-in-time helpers', () => {
+  expect(View.isPointInTime).toBeUndefined();
+  expect(View.periodScope).toBeUndefined();
 });
 
 describe('listBars detects lists from the value shape', () => {

@@ -62,13 +62,13 @@
   }
 
   // The entity leads: "7,723 matters on file, 36 counted in your dates".
-  // records_in_period follows the metric's own date field (null for Right now
-  // and whole-file numbers, and never shown for Right now numbers).
+  // records_in_period follows the metric's own date field (null for
+  // whole-file numbers).
   // count_scope is the server's note on what the counts cover.
-  function sourceLine(source, now, snapshot) {
+  function sourceLine(source, now) {
     var noun = String(source.label || '').toLowerCase();
     var total = count(source.records_total);
-    var added = snapshot || source.records_in_period === null || source.records_in_period === undefined ? null : count(source.records_in_period);
+    var added = source.records_in_period === null || source.records_in_period === undefined ? null : count(source.records_in_period);
     var synced = latestSync(source);
     var time = synced ? Date.parse(synced) : NaN;
     var stale = isFinite(time) && (now - time) > STALE_DAYS * MS_PER_DAY;
@@ -92,9 +92,8 @@
     });
   }
 
-  /** metric-detail data.lineage -> the Data used view, or null. options.snapshot: a Right now number. */
-  function detailModel(lineage, now, options) {
-    var snapshot = !!(options && options.snapshot);
+  /** metric-detail data.lineage -> the Data used view, or null. */
+  function detailModel(lineage, now) {
     if (!lineage || typeof lineage !== 'object') return null;
     var fields = list(lineage.fields).slice().sort(function (a, b) {
       return FIELD_ORDER.indexOf(a.role) - FIELD_ORDER.indexOf(b.role);
@@ -103,7 +102,7 @@
       formula: lineage.formula && lineage.formula.plain ? String(lineage.formula.plain) : '',
       equation: equationOf(lineage),
       sources: list(lineage.sources).filter(function (source) { return Number(source.records_total) !== 0; })
-        .map(function (source) { return sourceLine(source, now, snapshot); }),
+        .map(function (source) { return sourceLine(source, now); }),
       fieldSentences: fields.filter(function (f) { return FIELD_SENTENCES[f.role] && f.label; })
         .map(function (f) { return f.label + FIELD_SENTENCES[f.role]; }),
       filters: list(lineage.filters).map(function (f) { return { label: String(f.label || ''), detail: String(f.detail || '') }; }),
@@ -223,12 +222,11 @@
   }
 
   /** Source cards: entity, big total, in-dates chip, via line with sync status, count_scope once. */
-  function sourceCards(lineage, now, options) {
-    var snapshot = !!(options && options.snapshot);
+  function sourceCards(lineage, now) {
     return list(lineage && lineage.sources).filter(function (source) { return Number(source.records_total) !== 0; }).map(function (source) {
       var noun = String(source.label || '').toLowerCase();
       var total = count(source.records_total);
-      var inDates = snapshot || source.records_in_period === null || source.records_in_period === undefined ? null : count(source.records_in_period);
+      var inDates = source.records_in_period === null || source.records_in_period === undefined ? null : count(source.records_in_period);
       var via = list(source.systems).map(function (system) {
         var label = String((system && system.label) || '');
         if (!label) return '';

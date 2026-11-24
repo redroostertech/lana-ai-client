@@ -277,7 +277,7 @@ describe('storyFor: the dashboard info popover text', () => {
   test('otherwise a plain how-to', () => {
     const story = Cards.storyFor({ name: 'Owner Overview' });
     expect(story.source).toBe('generic');
-    expect(story.paragraphs.join(' ')).toContain('Right now');
+    expect(story.paragraphs.join(' ')).not.toContain('Right now');
     expect(story.paragraphs.join(' ')).toContain('waiting');
     expect(Cards.storyFor(null).source).toBe('generic');
   });
@@ -291,18 +291,13 @@ test('a waiting headline stays as the hero (calm), not in the strip', () => {
   expect(plan.waiting.map((r) => r.def.id)).toEqual(['n']);
 });
 
-test('groupRows tags "now" on snapshot metrics only when the group mixes scopes', () => {
+test('groupRows never tags rows by period_scope', () => {
   const idx = Cards.indexMetrics([
     { metric_key: 'legal_firm.p.a', title: 'Probate', value: 3, data_state: 'ok', period_scope: 'flow' },
     { metric_key: 'legal_firm.p.b', title: 'Trust settlement', value: 5, data_state: 'ok', period_scope: 'snapshot' },
     { metric_key: 'legal_firm.p.c', title: 'Small estate', value: 1, data_state: 'ok', period_scope: 'flow' },
   ]);
-  expect(Cards.groupRows({ keys: ['p.a', 'p.b', 'p.c'].map(Cards.normalizeKey) }, idx).map((r) => r.scopeTag)).toEqual([null, 'now', null]);
-  const same = Cards.indexMetrics([
-    { metric_key: 'legal_firm.p.a', value: 3, data_state: 'ok', period_scope: 'snapshot' },
-    { metric_key: 'legal_firm.p.b', value: 5, data_state: 'ok', period_scope: 'snapshot' },
-  ]);
-  expect(Cards.groupRows({ keys: ['legal_firm.p.a', 'legal_firm.p.b'] }, same).map((r) => r.scopeTag)).toEqual([null, null]);
+  Cards.groupRows({ keys: ['p.a', 'p.b', 'p.c'].map(Cards.normalizeKey) }, idx).forEach((r) => expect(r).not.toHaveProperty('scopeTag'));
 });
 
 test('visual_options.note is the card note people see; the spec card note stays internal', () => {

@@ -71,8 +71,8 @@ describe('detailModel', () => {
     expect(L.detailModel(conversion, NOW).sources[0].systemsLabel).toBe('records of this type, by system');
   });
 
-  test('a Right now metric never shows "counted in your dates"', () => {
-    expect(L.detailModel(conversion, NOW, { snapshot: true }).sources[0].line).toBe('1,204 leads on file');
+  test('"counted in your dates" shows whenever the server sends it (no Right now exception)', () => {
+    expect(L.detailModel(conversion, NOW, { snapshot: true }).sources[0].line).toBe('1,204 leads on file, 36 counted in your dates');
   });
 
   test('the systems line counts records of this type by system (not records used): via a connector, in LANA', () => {
@@ -194,6 +194,6 @@ describe('the styled About section helpers', () => {
     const lineage = { sources: [Object.assign({}, conversion.sources[0], { count_scope: 'All leads, not only these.' })] };
     expect(L.sourceCards(lineage, NOW)).toEqual([{ label: 'Leads', entity: 'lead', total: '1,204 leads', inDates: '36 in your dates',
       via: 'via Leadly, 24 in LANA', syncedAt: '2026-11-24T09:00:00Z', status: 'fresh', scopeNote: 'All leads, not only these.' }]);
-    expect(L.sourceCards(lineage, NOW, { snapshot: true })[0].inDates).toBe(null);
+    expect(L.sourceCards(lineage, NOW, { snapshot: true })[0].inDates).toBe('36 in your dates');
   });
 });
