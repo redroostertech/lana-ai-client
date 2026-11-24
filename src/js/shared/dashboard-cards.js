@@ -149,8 +149,11 @@
 
   // Waiting: not in the response, or any state other than ok (setup, a goal,
   // a data source to connect, or a failure).
+  // Not ok, or ok with a null value (nothing recorded for these dates).
   function isWaiting(metric) {
-    return !metric || (!!metric.data_state && metric.data_state !== 'ok');
+    if (!metric) return true;
+    if (metric.data_state === 'ok' && Object.prototype.hasOwnProperty.call(metric, 'value') && metric.value === null) return true;
+    return !!metric.data_state && metric.data_state !== 'ok';
   }
 
   function sizeFor(kind) {

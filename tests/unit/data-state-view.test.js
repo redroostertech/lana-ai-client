@@ -86,3 +86,31 @@ test('not_mapped is a calm waiting state that links to Mappings', () => {
   expect(html).toContain('data-data-state-action="settings-v2.html#mappings"');
   expect(load().view(item).title).toBe('Not mapped yet');
 });
+
+describe('ok with no value (the server now sends null, not 0)', () => {
+  test('ok with value null is the calm "No data for these dates" state', () => {
+    const view = load().view({ metric_key: 'a.b', data_state: 'ok', value: null }, { calm: true });
+    expect(view).toMatchObject({ state: 'no_data', title: 'No data for these dates', waiting: true, action: null });
+    expect(view.reason).toBe('Nothing was recorded for these dates.');
+    expect(load().isProblem({ data_state: 'ok', value: null })).toBe(true);
+  });
+
+  test('a real zero, a list, or a value not sent at all is not touched', () => {
+    expect(load().view({ data_state: 'ok', value: 0 }, { calm: true })).toBe(null);
+    expect(load().view({ data_state: 'ok', value: [] }, { calm: true })).toBe(null);
+    expect(load().view({ data_state: 'ok' }, { calm: true })).toBe(null);
+  });
+
+  test('the render never shows 0, $0, NaN or null', () => {
+    const html = load().render({ metric_key: 'a.b', data_state: 'ok', value: null, format: 'currency' }, { calm: true });
+    expect(text(html)).toBe('No data for these dates Nothing was recorded for these dates.');
+    expect(load().render({ data_state: 'ok', value: null })).toContain('No data for these dates');
+  });
+
+  test('insufficient_data with value null (an average with no records) stays calm', () => {
+    const html = load().render({ metric_key: 'a.avg', data_state: 'insufficient_data', value: null, data_state_reason: 'No records to average for these dates.' }, { calm: true });
+    expect(text(html)).toContain('No records to average for these dates.');
+    expect(html).not.toContain('NaN');
+    expect(html).not.toContain('$0');
+  });
+});

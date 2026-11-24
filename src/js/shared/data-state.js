@@ -17,15 +17,29 @@
     timeout: 'Took too long',
     invalid_request: 'Check the request',
     engine_error: 'Could not work this out',
-    not_mapped: 'Not mapped yet'
+    not_mapped: 'Not mapped yet',
+    no_data: 'No data for these dates'
   };
+  var NO_DATA_REASON = 'Nothing was recorded for these dates.';
 
   function escapeHtml(value) {
     return String(value === null || value === undefined ? '' : value)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  // An ok result whose value is null (the server sends null, not 0, when
+  // nothing was recorded) is shown as "No data for these dates", never as
+  // 0, $0 or n/a. A real zero, a list, or no value key at all is untouched.
+  function isEmptyOk(item) {
+    return !!(item && item.data_state === 'ok' && Object.prototype.hasOwnProperty.call(item, 'value') && item.value === null);
+  }
+
+  function stateOf(item) {
+    return isEmptyOk(item) ? 'no_data' : item.data_state;
+  }
+
   function isProblem(item) {
+    if (isEmptyOk(item)) return true;
     return !!(item && item.data_state && item.data_state !== 'ok' && TITLES[item.data_state]);
   }
 
@@ -46,7 +60,8 @@
   var CALM_TITLES = {
     insufficient_data: 'Waiting for setup',
     no_data_source: 'Connect a data source',
-    not_mapped: 'Waiting for mappings'
+    not_mapped: 'Waiting for mappings',
+    no_data: TITLES.no_data
   };
   // A number that needs the firm's case types mapped (Settings > Mappings).
   var MAPPINGS_PAGE = 'settings-v2.html#mappings';
@@ -73,7 +88,7 @@
   function view(item, options) {
     if (!isProblem(item)) return null;
     var calm = !!(options && options.calm);
-    var state = item.data_state;
+    var state = stateOf(item);
     var prompt = calm ? goalPrompt(item) : null;
     if (prompt) {
       return {
@@ -89,7 +104,7 @@
     return {
       state: state,
       title: calmTitle || TITLES[state],
-      reason: item.data_state_reason || (notMapped ? 'Map your case types to see this number.' : ''),
+      reason: item.data_state_reason || (notMapped ? 'Map your case types to see this number.' : (state === 'no_data' ? NO_DATA_REASON : '')),
       waiting: !!calmTitle,
       action: notMapped && calm ? { label: 'Open Mappings', href: MAPPINGS_PAGE } : null
     };

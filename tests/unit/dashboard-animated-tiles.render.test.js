@@ -802,3 +802,27 @@ describe('worklists when the server could not read the records', () => {
     expect(s.label.textContent).toBe('View all');
   });
 });
+
+describe('ok cards whose value is null', () => {
+  const declared = require(path.join(__dirname, '../fixtures/dashboard/declared-layouts.json'));
+  const nulled = (c) => Object.assign({}, c, { value: null, formatted_value: null, data_state: 'ok', goal: null, comparison: null, metadata: undefined });
+
+  test.each(['currency', 'number', 'percent', 'days'])('a %s card shows the calm state, never 0, $0, NaN or null', (format) => {
+    const html = page().exports.renderMetricCard(nulled(Object.assign({}, card('expected_cash_by_week'), { format })));
+    const words = text(html);
+    expect(words).toContain('No data for these dates');
+    ['$0', 'NaN', 'null', ' 0 ', '0%'].forEach((bad) => expect(' ' + words + ' ').not.toContain(bad));
+  });
+
+  test('composite slots with null show the muted chip', async () => {
+    const cardsNull = declared.cards_synthetic.map((c) => (/payroll_clients_needed|payroll_leads_needed/.test(c.metric_key) ? nulled(c) : c));
+    const layout = declared.layouts['Owner Overview'];
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'Owner Overview', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: cardsNull }),
+      getMetricDetail: jest.fn().mockResolvedValue({ data: { snapshots: [] } }) });
+    await p.exports.loadDashboardById('d1');
+    const payroll = p.nodes.dashboardMetricGrid.innerHTML.split('<article ').slice(1).find((a) => a.includes('Cash This Month'));
+    expect(payroll).toContain('<span class="dash-chip-waiting" title="Nothing was recorded for these dates.">No data for these dates</span>');
+    expect(text(payroll)).not.toContain('Payroll Clients Needed 0');
+    expect(text(payroll)).not.toContain('NaN');
+  });
+});

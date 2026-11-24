@@ -354,3 +354,9 @@ describe('chapters', () => {
     expect(none.sections[0].label).toBe('');
   });
 });
+
+test('isWaiting: ok with value null waits, a real zero does not', () => {
+  expect(Cards.isWaiting({ data_state: 'ok', value: null })).toBe(true);
+  expect(Cards.isWaiting({ data_state: 'ok', value: 0 })).toBe(false);
+  expect(Cards.isWaiting({ data_state: 'ok', value: [] })).toBe(false);
+});
