@@ -73,6 +73,8 @@
               <p id="metricBusinessLogic"></p>
             </div>
           </div>
+          <!-- Data used: the sources, the details we read, and the rules (data.lineage). -->
+          <div id="metricDataUsed" class="metric-data" hidden></div>
         </section>
 
         <!-- History: only when there are at least two stored values. -->
@@ -184,6 +186,7 @@
   <script src="../js/shared/metric-card-view.js"></script>
   <script src="../js/shared/mini-charts.js"></script>
   <script src="../js/shared/metric-detail-view.js"></script>
+  <script src="../js/shared/lineage-view.js"></script>
   <script src="../js/admin/metric-detail.js"></script>
   <script src="../js/auth-guard.js"></script>
   <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>

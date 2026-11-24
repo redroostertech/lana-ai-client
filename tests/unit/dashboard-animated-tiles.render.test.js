@@ -35,10 +35,10 @@ function page(api = {}, user = null) {
   let source = fs.readFileSync(path.join(__dirname, '../../src/js/admin/dashboard-detail.js'), 'utf8');
   const end = source.lastIndexOf('  init();');
   source = source.slice(0, end)
-    + '  window.testExports = { renderMetricCard, loadMetrics, loadDashboardById, readPeriodControls, setBanner, fetchSparkline, renderMetrics, variantPicks, allMetrics: function () { return allDashboardMetrics; }, cardLoads: function () { return cardLoads; } };'
+    + '  window.testExports = { renderMetricCard, loadMetrics, loadDashboardById, readPeriodControls, setBanner, fetchSparkline, renderMetrics, openMetricModal, variantPicks, allMetrics: function () { return allDashboardMetrics; }, cardLoads: function () { return cardLoads; } };'
     + source.slice(end + '  init();'.length);
   const nodes = {};
-  const document = { addEventListener() {}, getElementById: (id) => (nodes[id] = nodes[id] || node()), querySelector: () => null, querySelectorAll: () => [] };
+  const document = { body: node(), addEventListener() {}, getElementById: (id) => (nodes[id] = nodes[id] || node()), querySelector: () => null, querySelectorAll: () => [] };
   const window = withDashboardScripts(withReportSharedScripts({ location: { search: '' }, setInterval() {}, addEventListener() {} }));
   const LanaTime = { nowMs: () => 0, formatUtcDayRange: (a, b) => a + ' to ' + b, reportPresetDays: () => ({ start: '2026-01-01', end: '2026-01-31' }), MS_PER_DAY: 86400000 };
   const Lex = { Utils: { getFirmTimezone: () => 'America/New_York' }, Nav: { getParams: () => new URLSearchParams('') } };
@@ -561,5 +561,62 @@ describe('the header names the saved dashboard', () => {
     await p.exports.loadDashboardById('d1');
     expect(p.nodes.dashboardDetailBanner.attrs.heading).toBe('Dashboard');
     expect(p.nodes.dashboardDetailBanner.attrs.heading).not.toBe('Owner Performance');
+  });
+});
+
+describe('How this card works', () => {
+  const declared = require(path.join(__dirname, '../fixtures/dashboard/declared-layouts.json'));
+  const withLineage = declared.cards_synthetic.map((c) => (c.metric_key.endsWith('marketing_spend') || c.metric_key.endsWith('client_acquisition_cost')
+    ? Object.assign({}, c, { lineage: { sources: [{ entity: 'expense', label: 'Expenses' }], formula: { kind: 'sum', plain: 'Adds up marketing expenses.' }, period_rule: 'Expenses dated between your dates.' } })
+    : c));
+  const full = { sources: [{ entity: 'expense', label: 'Expenses', records_total: 52, records_in_period: 7,
+    systems: [{ label: 'QuickBooks', records: 52, last_synced_at: '2020-01-01T00:00:00Z' }] }], formula: { kind: 'sum', plain: 'Adds up marketing expenses.' } };
+
+  async function openPair() {
+    const layout = { cards: [{ id: 'p', kind: 'pair', title: 'Spend and Cost', visual: 'compare', metric_keys: ['marketing.marketing_spend', 'marketing.client_acquisition_cost'] }] };
+    const getMetricDetail = jest.fn().mockResolvedValue({ data: { snapshots: [], lineage: full } });
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }),
+      getDashboardMetricCards: jest.fn().mockResolvedValue({ data: withLineage }), getMetricDetail });
+    await p.exports.loadDashboardById('d1');
+    getMetricDetail.mockClear();
+    p.exports.openMetricModal('legal_firm.marketing.marketing_spend');
+    return { p, getMetricDetail };
+  }
+
+  test('a composite card: one sentence on how it is put together, then each metric with its formula, dates and sources', async () => {
+    const { p } = await openPair();
+    const html = p.nodes.dashboardMetricModalBody.innerHTML;
+    expect(p.nodes.dashboardMetricModalTitle.textContent).toBe('Spend and Cost');
+    expect(text(html)).toContain('Shows these 2 numbers side by side.');
+    expect(text(html)).toContain('Marketing Spend');
+    expect(text(html)).toContain('Adds up marketing expenses.');
+    expect(text(html)).toContain('Expenses dated between your dates.');
+    expect(html).toContain('dash-howto__chip');
+    expect(html.split('See full details').length - 1).toBe(2);
+    expect(text(html)).not.toContain('legal_firm.');
+  });
+
+  test('the full lineage loads only when the panel opens (raw_limit 0), then adds source counts and sync', async () => {
+    const { p, getMetricDetail } = await openPair();
+    expect(getMetricDetail).toHaveBeenCalledTimes(2);
+    expect(getMetricDetail.mock.calls[0][1]).toMatchObject({ rawLimit: 0, periodStart: '2026-01-01', periodEnd: '2026-01-31' });
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    const html = p.nodes.dashboardMetricModalBody.innerHTML;
+    expect(text(html)).toContain('52 expenses, 7 in your dates');
+    expect(text(html)).toContain('Last synced Jan 1');
+  });
+
+  test('no lineage on the card: the panel still explains the card without breaking', async () => {
+    const layout = { cards: [{ id: 'g', kind: 'group', title: 'Leads by Source', visual: 'ranked_bars', metric_keys: ['marketing.website_lead_count', 'marketing.referral_lead_count'] }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }),
+      getDashboardMetricCards: jest.fn().mockResolvedValue({ data: declared.cards_synthetic }),
+      getMetricDetail: jest.fn().mockResolvedValue({ data: { lineage: null } }) });
+    await p.exports.loadDashboardById('d1');
+    p.exports.openMetricModal('legal_firm.marketing.website_lead_count');
+    const html = p.nodes.dashboardMetricModalBody.innerHTML;
+    expect(text(html)).toContain('Each bar is one number.');
+    expect(text(html)).toContain('Website Leads');
+    expect(html).not.toMatch(/undefined|null/);
   });
 });

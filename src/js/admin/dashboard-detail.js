@@ -1230,7 +1230,14 @@
     });
   }
 
+  // The declared card behind each info button (any of its keys), for the
+  // "How this card works" panel.
+  var cardInfoByKey = {};
+
   function renderDeclaredCard(item) {
+    item.resolved.def.keys.concat(item.resolved.def.options.metric_keys_override || []).forEach(function (key) {
+      if (!cardInfoByKey[key]) cardInfoByKey[key] = item.resolved;
+    });
     var note = item.resolved.def.options && item.resolved.def.options.note;
     var html = renderDeclaredVisual(item);
     // The card's note: one muted line above the footer.
@@ -1555,7 +1562,81 @@
       + '</div>';
   }
 
+  // ── How this card works (card.lineage now; the full lineage on open) ──
+  var lineageCache = {};
+
+  function howtoMetricHtml(key, metric) {
+    var title = metricTitle(metric, key);
+    var lines = window.LineageView.cardLines(metric && metric.lineage);
+    var full = lineageCache[[key, currentPeriod.start, currentPeriod.end].join('|')];
+    var model = full && full.model;
+    var parts = ['<section class="dash-howto__metric">', '<h3 class="dash-howto__title">' + escapeHtml(title) + '</h3>'];
+    var formula = (model && model.formula) || (lines && lines.formula);
+    if (formula) parts.push('<p class="dash-howto__formula">' + escapeHtml(formula) + '</p>');
+    var periodRule = (model && model.periodRule) || (lines && lines.periodRule);
+    if (periodRule) parts.push('<p class="dash-howto__dates">' + escapeHtml(periodRule) + '</p>');
+    if (model && model.sources.length) {
+      parts.push('<ul class="dash-howto__sources">' + model.sources.map(function (source) {
+        var stale = source.systems.filter(function (s) { return s.stale; })[0];
+        return '<li><span class="dash-howto__chip">' + escapeHtml(source.label) + '</span> ' + escapeHtml(source.line)
+          + (stale ? ' <span class="dash-howto__stale">' + escapeHtml(stale.label + ': ' + stale.staleText) + '</span>' : '') + '</li>';
+      }).join('') + '</ul>');
+    } else if (lines && lines.sources.length) {
+      parts.push('<div class="dash-howto__chips">' + lines.sources.map(function (label) {
+        return '<span class="dash-howto__chip">' + escapeHtml(label) + '</span>';
+      }).join('') + '</div>');
+    }
+    parts.push('<button type="button" class="dash-metric-card__link" data-metric-detail-link="' + escapeHtml(recordsHref(key)) + '">See full details</button>');
+    parts.push('</section>');
+    return parts.join('');
+  }
+
+  function howtoHtml(resolved) {
+    var def = resolved.def;
+    var first = resolved.metrics[0];
+    var isList = resolved.metrics.length === 1 && first.metric && Array.isArray(first.metric.value);
+    var sentence = window.LineageView.cardSummary(window.CardVisuals.visualFor(def), resolved.metrics.length,
+      window.DashboardCards.compositeTitle(def, resolved.metrics), isList);
+    return '<div class="dash-howto">'
+      + (sentence ? '<p class="dash-howto__lead">' + escapeHtml(sentence) + '</p>' : '')
+      + resolved.metrics.map(function (entry) { return howtoMetricHtml(entry.key, entry.metric); }).join('')
+      + '</div>';
+  }
+
+  // The full lineage (metric detail, history only) loads when the panel opens.
+  function loadHowtoLineage(resolved, redraw) {
+    if (!window.api || typeof api.getMetricDetail !== 'function') return;
+    resolved.metrics.forEach(function (entry) {
+      var cacheKey = [entry.key, currentPeriod.start, currentPeriod.end].join('|');
+      if (lineageCache[cacheKey]) return;
+      lineageCache[cacheKey] = { model: null };
+      api.getMetricDetail(entry.key, {
+        periodStart: currentPeriod.start, periodEnd: currentPeriod.end, compareBy: currentPeriod.compareBy, rawLimit: 0,
+      }).then(function (response) {
+        var payload = response && response.data ? response.data : response;
+        lineageCache[cacheKey].model = window.LineageView.detailModel(payload && payload.lineage, Date.now());
+        redraw();
+      }).catch(function () { /* the instant summary stays */ });
+    });
+  }
+
   function openMetricModal(metricId) {
+    var resolved = cardInfoByKey[metricId];
+    if (resolved && window.LineageView) {
+      var modalNode = el('dashboardMetricModal');
+      var titleNode = el('dashboardMetricModalTitle');
+      var bodyNode = el('dashboardMetricModalBody');
+      var eyebrowNode = el('dashboardMetricModalEyebrow');
+      if (!modalNode || !titleNode || !bodyNode) return;
+      if (eyebrowNode) eyebrowNode.textContent = 'How this card works';
+      titleNode.textContent = window.DashboardCards.compositeTitle(resolved.def, resolved.metrics);
+      var redraw = function () { bodyNode.innerHTML = howtoHtml(resolved); };
+      redraw();
+      loadHowtoLineage(resolved, redraw);
+      modalNode.hidden = false;
+      document.body.classList.add('dash-metric-modal-open');
+      return;
+    }
     var metric = metricInfoById[metricId];
     var modal = el('dashboardMetricModal');
     var eyebrow = el('dashboardMetricModalEyebrow');
@@ -1568,7 +1649,9 @@
     // Title fallback humanizes the raw key so the modal heading never shows
     // an identifier like `legal_firm.family_law.upcoming_custody_hearings`.
     title.textContent = metric.title || metric.name || humanize(metric.metric_key) || 'Metric';
-    body.innerHTML = renderModalDetails(metric);
+    // A card with lineage also says how it is worked out.
+    body.innerHTML = (metric.lineage && window.LineageView ? '<div class="dash-howto">' + howtoMetricHtml(metricId, metric) + '</div>' : '')
+      + renderModalDetails(metric);
     modal.hidden = false;
     document.body.classList.add('dash-metric-modal-open');
   }
@@ -1636,6 +1719,7 @@
     tileIndex = 0;
     var unfiltered = activeTypeFilter === 'all' && !getActiveSearchQuery();
     declaredIndex = window.DashboardCards.indexMetrics(allDashboardMetrics);
+    cardInfoByKey = {};
     if (currentDeclaredCards && unfiltered) {
       // The saved dashboard's own cards, in its order (dashboard-cards.js).
       var plan = window.DashboardCards.planDeclared(window.DashboardCards.resolveCards(currentDeclaredCards, declaredIndex));

@@ -263,6 +263,74 @@
     if (line) renderSnapshots(snapshots);
   }
 
+  // Data used (data.lineage, js/shared/lineage-view.js): the calculation in
+  // words, the inputs as an equation, where the data comes from, which
+  // details we read, what is included, the dates rule, the goal, and caveats.
+  function metricHref(key) {
+    var qp = params();
+    var parts = ['metric_key=' + encodeURIComponent(key)];
+    ['periodStart', 'periodEnd', 'compareBy'].forEach(function (name) {
+      if (qp.get(name)) parts.push(name + '=' + encodeURIComponent(qp.get(name)));
+    });
+    return 'admin/metric_detail.html?' + parts.join('&');
+  }
+
+  function syncedText(system) {
+    if (system.stale) return '<span class="metric-data__stale" title="This source has not synced for over a week">' + escapeHtml(system.staleText) + '</span>';
+    if (!system.syncedAt || !window.Lex || !Lex.Utils || !Lex.Utils.timeAgo) return '';
+    return '<span class="metric-data__synced">synced ' + escapeHtml(Lex.Utils.timeAgo(system.syncedAt)) + '</span>';
+  }
+
+  function renderDataUsed(lineage) {
+    var node = el('metricDataUsed');
+    if (!node) return;
+    var model = window.LineageView ? window.LineageView.detailModel(lineage, Date.now()) : null;
+    node.hidden = !model;
+    if (!model) { node.innerHTML = ''; return; }
+    var parts = ['<h3 class="metric-about__label">Data used</h3>'];
+    if (model.formula) parts.push('<p class="metric-data__formula">' + escapeHtml(model.formula) + '</p>');
+    if (model.equation) {
+      parts.push('<p class="metric-data__equation">' + model.equation.map(function (term) {
+        return (term.op ? '<span class="metric-data__op">' + escapeHtml(term.op) + '</span> ' : '')
+          + '<a href="#" class="metric-detail-link" data-metric-record-link="' + escapeHtml(metricHref(term.metric_key)) + '">' + escapeHtml(term.title) + '</a>';
+      }).join(' ') + '</p>');
+    }
+    if (model.sources.length) {
+      parts.push('<h4 class="metric-data__heading">Where the data comes from</h4><ul class="metric-data__list">' + model.sources.map(function (source) {
+        return '<li><span class="metric-data__source">' + escapeHtml(source.line) + '</span>'
+          + (source.systems.length ? '<span class="metric-data__systems">' + source.systems.map(function (system) {
+            return '<span class="metric-data__system">' + escapeHtml(system.label) + (system.records ? ' (' + escapeHtml(system.records) + ')' : '') + ' ' + syncedText(system) + '</span>';
+          }).join('') + '</span>' : '')
+          + '</li>';
+      }).join('') + '</ul>');
+    }
+    if (model.fieldSentences.length) {
+      parts.push('<h4 class="metric-data__heading">Which details we use</h4><ul class="metric-data__list">'
+        + model.fieldSentences.map(function (sentence) { return '<li>' + escapeHtml(sentence) + '</li>'; }).join('') + '</ul>');
+    }
+    if (model.filters.length) {
+      parts.push('<h4 class="metric-data__heading">Included</h4><div class="metric-data__chips">' + model.filters.map(function (filter) {
+        return '<span class="metric-data__chip" title="' + escapeHtml(filter.detail) + '">' + escapeHtml(filter.label) + '</span>';
+      }).join('') + '</div>');
+    }
+    if (model.periodRule) parts.push('<h4 class="metric-data__heading">Dates</h4><p>' + escapeHtml(model.periodRule) + '</p>');
+    if (model.goal) {
+      parts.push('<h4 class="metric-data__heading">Goal</h4><p>' + (model.goal.set
+        ? 'A goal is set for this number.'
+        : 'No goal yet. <a href="#" class="metric-detail-link" data-metric-record-link="admin/metric-catalog.html?editGoal='
+          + escapeHtml(encodeURIComponent(model.goal.metric_key)) + '">Set one in the Metric Catalog</a>') + '</p>');
+    }
+    if (model.caveats.length) {
+      parts.push('<div class="metric-data__caveats">' + model.caveats.map(function (c) { return '<p>' + escapeHtml(c) + '</p>'; }).join('') + '</div>');
+    }
+    // The raw expression only for admins, folded away.
+    var isAdmin = window.Lex && Lex.Auth && typeof Lex.Auth.isAdmin === 'function' && Lex.Auth.isAdmin();
+    if (model.expression && isAdmin) {
+      parts.push('<details class="metric-data__technical"><summary>Technical details</summary><code>' + escapeHtml(model.expression) + '</code></details>');
+    }
+    node.innerHTML = parts.join('');
+  }
+
   function showBlock(blockId, textId, text) {
     var block = el(blockId);
     if (block) block.hidden = !text;
@@ -351,6 +419,7 @@
 
       var snapshots = payload.snapshots || [];
       renderSummary(payload, snapshots);
+      renderDataUsed(payload.lineage);
       renderHistory(snapshots);
       renderRawData(payload.raw_data && payload.raw_data.rows ? payload.raw_data.rows : []);
       renderRawDataTotal(payload.raw_data);

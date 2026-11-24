@@ -577,6 +577,7 @@
         'js/shared/dashboard-layout.js',
         'js/shared/dashboard-cards.js',
         'js/shared/card-visuals.js',
+        'js/shared/lineage-view.js',
         'js/shared/title-switcher.js',
         'js/admin/dashboard-detail.js'
       ],
@@ -606,6 +607,7 @@
         'js/shared/metric-card-view.js',
         'js/shared/mini-charts.js',
         'js/shared/metric-detail-view.js',
+        'js/shared/lineage-view.js',
         'js/admin/metric-detail.js'
       ],
       stylesheets: [

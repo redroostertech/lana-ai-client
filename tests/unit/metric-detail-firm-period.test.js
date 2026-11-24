@@ -29,7 +29,7 @@ async function page(search, payload) {
   const context = vm.createContext({ window, document, console: { log() {}, error() {}, warn() {} }, Intl, URLSearchParams,
     Promise, setTimeout, Lex, api });
   vm.runInContext(dataState, context);
-  for (const rel of ['js/dashboard/metric-goal-comparison.js', 'js/shared/metric-card-view.js', 'js/shared/mini-charts.js', 'js/shared/metric-detail-view.js']) {
+  for (const rel of ['js/dashboard/metric-goal-comparison.js', 'js/shared/metric-card-view.js', 'js/shared/mini-charts.js', 'js/shared/metric-detail-view.js', 'js/shared/lineage-view.js']) {
     vm.runInContext(fs.readFileSync(path.join(__dirname, '../../src', rel), 'utf8'), context);
   }
   vm.runInContext(source, context);
@@ -103,4 +103,44 @@ test('a blank snapshot value is the muted empty token', async () => {
   expect(value(0, {})).toBe('<span class="metric-detail-muted">' + p.empty + '</span>');
   expect(value(null, {})).toBe('<span class="metric-detail-muted">' + p.empty + '</span>');
   expect(value(9.4, {})).toBe('9.4');
+});
+
+describe('Data used', () => {
+  const lineage = {
+    sources: [{ entity: 'lead', label: 'Leads', records_total: 1204, records_in_period: 36,
+      systems: [{ label: 'Leadly', records: 1180, last_synced_at: '2020-01-01T00:00:00Z' }], last_synced_at: '2020-01-01T00:00:00Z' }],
+    fields: [{ entity: 'lead', field: 'created_at', label: 'Date created', role: 'date filter' }],
+    filters: [{ label: 'Estate planning only', detail: 'Practice area is Estate Planning' }],
+    formula: { kind: 'ratio', plain: 'Converted clients divided by potential new clients.', expression: 'count(a) / count(b)' },
+    period_rule: 'Counts leads created between your dates.',
+    inputs: [{ metric_key: 'legal_firm.s.converted', title: 'Converted clients', role: 'numerator' },
+      { metric_key: 'legal_firm.s.pnc', title: 'Potential new clients', role: 'denominator' }],
+    goal_source: { metric_key: 'legal_firm.s.target', set: false },
+    caveats: ['Leads without a source are left out.'],
+  };
+
+  test('no lineage, no section', async () => {
+    const p = await page('?metric_key=matters_opened', payload);
+    expect(p.nodes.metricDataUsed.hidden).toBe(true);
+  });
+
+  test('the calculation, the equation with links, sources with a stale sync, details, dates, goal and caveats', async () => {
+    const p = await page('?metric_key=matters_opened&periodStart=2026-10-01&periodEnd=2026-10-31', { ...payload, lineage });
+    const html = p.nodes.metricDataUsed.innerHTML;
+    const text = html.split('<').map((part) => part.slice(part.indexOf('>') + 1)).join(' ').split(/\s+/).join(' ');
+    expect(p.nodes.metricDataUsed.hidden).toBe(false);
+    expect(text).toContain('Converted clients divided by potential new clients.');
+    expect(html).toContain('data-metric-record-link="admin/metric_detail.html?metric_key=legal_firm.s.pnc&amp;periodStart=2026-10-01&amp;periodEnd=2026-10-31"');
+    expect(text).toContain('1,204 leads, 36 in your dates');
+    expect(text).toContain('Last synced Jan 1');
+    expect(html).toContain('metric-data__stale');
+    expect(text).toContain('Date created decides which dates count.');
+    expect(html).toContain('title="Practice area is Estate Planning"');
+    expect(text).toContain('Counts leads created between your dates.');
+    expect(html).toContain('admin/metric-catalog.html?editGoal=legal_firm.s.target');
+    expect(text).toContain('Leads without a source are left out.');
+    expect(html).not.toContain('legal_firm.s.converted</');
+    expect(html).toContain('<details class="metric-data__technical">');
+    expect(text).toContain('count(a) / count(b)');
+  });
 });
