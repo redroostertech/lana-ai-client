@@ -273,6 +273,26 @@ async function buildMac(ctx, target, parts, pins) {
   return done;
 }
 
+// LANA.cpp's release names for the raw Pip binaries kept in lana-build-parts.
+const PIP_ASSET = Object.freeze({ 'linux-x64': 'lqe-linux-x64', 'windows-x64': 'lqe-win32-x64.exe', 'macos-arm64': 'lqe-darwin-arm64', 'macos-x64': 'lqe-darwin-x64' });
+
+/**
+ * The pinned Pip for a system, from <target>/lqe-<build>/<asset> in the parts
+ * bucket, checked against the pin's sha256. The VM runs the embedding match
+ * with it when Pip itself is not built there.
+ */
+async function pinnedPipBinary(ctx, target, pipPin) {
+  const want = (pipPin.builds || {})[target];
+  if (!want) {throw new Error(`${target}: the Pip pin has no build for this system, so there is no Pip to check the embedding match with.`);}
+  const key = `${target}/lqe-${pipPin.build}/${PIP_ASSET[target]}`;
+  const file = path.join(ctx.dir, 'pip-binaries', target, PIP_ASSET[target]);
+  if (!fs.existsSync(file) || sha256File(file) !== want.sha256) {
+    await (await ctx.r2()).download(PARTS_BUCKET, key, file);
+    if (sha256File(file) !== want.sha256) {throw new Error(`${target}: ${key} is not the pinned Pip (sha256 differs).`);}
+  }
+  return file;
+}
+
 /**
  * Builds the given pieces for Windows or Linux on a throwaway Azure VM with
  * LANA-AI's azure-verify.sh client-parts job. The job makes its own resource
@@ -288,12 +308,17 @@ async function buildAzure(ctx, target, parts, pins) {
   const clientCommit = ctx.clientCommit || (await ctx.git.tip(REPOS.client, 'production'));
   const logFile = path.join(ctx.dir, 'logs', `${target}.log`);
   fs.mkdirSync(path.dirname(logFile), { recursive: true });
-  const result = await ctx.run('bash', [
-    path.join(ctx.serverRepo, 'scripts', 'release', 'azure-verify.sh'), 'client-parts',
-    '--target', target, '--parts', parts.join(','), '--client-commit', clientCommit,
-    '--pip-commit', pins.pip.commit, '--engine-commit', pins.engine.commit, '--redactor-commit', pins.redactor.commit,
+  // One-commit sources made here; azure-verify.sh packs them for the VM (no token goes there).
+  const args = [
+    path.join(ctx.serverRepo, 'scripts', 'release', 'azure-verify.sh'), 'client-parts', '--target', target, '--parts', parts.join(','),
+    '--client', await prepareSource(ctx, 'client', clientCommit, target),
+    '--engine', await prepareSource(ctx, 'server', pins.engine.commit, target),
+    '--redactor', await prepareSource(ctx, 'redactor', pins.redactor.commit, target),
     '--out', out
-  ], { cwd: ctx.serverRepo, env: ctx.env, logFile });
+  ];
+  if (parts.includes('pip')) {args.push('--lana-cpp', await prepareSource(ctx, 'pip', pins.pip.commit, target));}
+  else {args.push('--pip-binary', await pinnedPipBinary(ctx, target, pins.pip));}
+  const result = await ctx.run('bash', args, { cwd: ctx.serverRepo, env: ctx.env, logFile });
   if (result.code !== 0) {throw new Error(`${target}: the Azure build failed (exit ${result.code}; see logs/${target}.log). Its resource group is deleted.`);}
   const done = [];
   for (const part of parts) {
@@ -316,5 +341,6 @@ async function buildAzure(ctx, target, parts, pins) {
 }
 
 module.exports = {
+  PIP_ASSET, pinnedPipBinary,
   NODE_X64, parseNewEntry, acceptNewEntry, engineCommand, prepareSource, clientCheckout, intelToolchain, builtId, packAndUpload, embedModel, buildMac, buildAzure, sha256File
 };

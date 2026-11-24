@@ -24,6 +24,7 @@ const { HEROKU_APP, REPOS } = require('../config');
 const { requireYes } = require('../approvals');
 const { scrub } = require('../exec');
 const { herokuCommand } = require('../r2');
+const { prepareSource } = require('../builders');
 
 const IMAGE_NAMES = ['chef', 'embed', 'redactor', 'minio'];
 
@@ -37,6 +38,20 @@ async function heroku(ctx, args, what) {
   const result = await ctx.run(command, [...prefix, ...args], { env: ctx.env });
   if (result.code !== 0) {throw new Error(`Server: could not ${what} on Heroku (${scrub(result.stderr)}).`);}
   return result.stdout.trim();
+}
+
+const REGISTRY_PASSWORD_VAR = 'LANA_REGISTRY_PUSH_PASSWORD';
+
+/** The registry push password from Heroku, in a private (600) file. Never printed. */
+async function registryPasswordFile(ctx) {
+  const name = ctx.env.LANA_REGISTRY_PASSWORD_VAR || REGISTRY_PASSWORD_VAR;
+  const value = await heroku(ctx, ['config:get', name, '-a', HEROKU_APP], `read ${name}`);
+  if (!value) {throw new Error(`Server: Heroku app ${HEROKU_APP} has no ${name}. Add the lana-push password there.`);}
+  fs.mkdirSync(ctx.dir, { recursive: true, mode: 0o700 });
+  const file = path.join(ctx.dir, `.registry-push-${process.pid}`);
+  fs.writeFileSync(file, value, { mode: 0o600 });
+  fs.chmodSync(file, 0o600);
+  return file;
 }
 
 /** RAILWAY_IMAGE_<NAME>=<registry>/lana-<name>@sha256:<digest> lines from build-images.sh's railway-images.env. */
@@ -81,17 +96,24 @@ async function server(ctx, options = {}) {
   // 2. Railway images.
   if (!fs.existsSync(envFile)) {
     requireYes(ctx, 'azure-vms', 'one Linux VM for the Railway images');
+    const redactorSource = await prepareSource(ctx, 'redactor', redactorCommit, 'railway');
     const built = await ctx.run('bash', [path.join(repo, 'scripts', 'release', 'azure-verify.sh'), 'railway-images',
-      '--commit', commit, '--redactor-commit', redactorCommit, '--out', out], { cwd: repo, env: ctx.env, logFile });
+      '--commit', commit, '--redactor', redactorSource, '--out', out], { cwd: repo, env: ctx.env, logFile });
     if (built.code !== 0) {throw new Error(`Server: the Railway image build failed (exit ${built.code}; see logs/server.log). Its resource group is deleted.`);}
   }
   const vars = readImageVars(envFile);
   ctx.desk('server.image');
 
   requireYes(ctx, 'railway-images', `the four images from ${commit.slice(0, 9)}`);
-  const password = needOption(options.registryPasswordFile, '--registry-password-file', 'a 600 file with the lana-push password');
   if (!ctx.state.imagesPushed) {
-    const pushed = await ctx.run('bash', [path.join(repo, 'deploy', 'railway', 'push-images.sh'), '--out', out, '--password-file', password], { cwd: repo, env: ctx.env, logFile });
+    // The lana-push password comes from Heroku (Michael, 2026-11-23) into a private file that is removed after the push.
+    const password = options.registryPasswordFile || await registryPasswordFile(ctx);
+    let pushed;
+    try {
+      pushed = await ctx.run('bash', [path.join(repo, 'deploy', 'railway', 'push-images.sh'), '--out', out, '--password-file', password], { cwd: repo, env: ctx.env, logFile });
+    } finally {
+      if (!options.registryPasswordFile) {fs.rmSync(password, { force: true });}
+    }
     if (pushed.code !== 0) {throw new Error(`Server: push-images.sh failed (exit ${pushed.code}; see logs/server.log).`);}
     ctx.state.imagesPushed = { at: new Date().toISOString(), vars };
     ctx.report.uploaded.push('four Railway images to LANA\'s registry');
@@ -134,4 +156,4 @@ async function server(ctx, options = {}) {
   return { vars };
 }
 
-module.exports = { server, readImageVars, IMAGE_NAMES };
+module.exports = { server, readImageVars, registryPasswordFile, IMAGE_NAMES, REGISTRY_PASSWORD_VAR };
