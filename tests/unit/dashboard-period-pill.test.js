@@ -86,3 +86,11 @@ test('the date pill sits on the left under the title, before the counts; the pan
   const panel = css.slice(css.lastIndexOf('.dash-period__panel {'));
   expect(panel.slice(0, panel.indexOf('}'))).toContain('left: 0;');
 });
+
+test('a calm state hugs its content; on the hero it is one compact row', () => {
+  const css = fs.readFileSync(path.join(SRC, 'css/admin/insights-dashboard.css'), 'utf8');
+  const tail = css.slice(css.lastIndexOf('/* Calm states hug their content'));
+  expect(tail).toContain('.dash-bento .dash-metric-card > .lex-data-state {\n  flex: 0 0 auto;');
+  expect(tail).toContain('.dash-metric-card--hero .lex-data-state--calm {');
+  expect(tail).toContain('-webkit-line-clamp: 1;');
+});

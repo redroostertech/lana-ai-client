@@ -1325,18 +1325,24 @@
   // ── Worklists: the first rows behind a snapshot number ─────────────
   var worklistCache = {};
 
+  // The worklist uses the same cell formatting as the records table on the
+  // metric's page (js/shared/metric-detail-view.js): no ids, words for
+  // codes, dates as days, amounts as money (right-aligned).
   function worklistHtml(rows) {
     if (!rows.length) return '<p class="dash-worklist__empty">No records right now.</p>';
-    var columns = window.DashboardCards.worklistColumns(rows);
-    var head = '<tr>' + columns.map(function (col) { return '<th scope="col">' + escapeHtml(humanize(col)) + '</th>'; }).join('') + '</tr>';
-    var body = rows.slice(0, 5).map(function (row) {
+    var view = window.MetricDetailView;
+    var table = view.recordsTable(rows);
+    var columns = view.worklistColumns(table.columns, 4);
+    var head = '<tr>' + columns.map(function (col) {
+      return '<th scope="col"' + (col.align === 'right' ? ' class="dash-worklist__num"' : '') + '>' + escapeHtml(col.label) + '</th>';
+    }).join('') + '</tr>';
+    var body = table.rows.slice(0, 5).map(function (row, index) {
       return '<tr>' + columns.map(function (col) {
-        var value = row[col];
-        if (value === null || value === undefined || value === '') return '<td class="dash-worklist__muted">' + escapeHtml(window.DataState.EMPTY_VALUE) + '</td>';
-        var text = window.DashboardCards.isDateColumn(col) && window.Lex && Lex.Utils && Lex.Utils.formatDate ? Lex.Utils.formatDate(value)
-          : (typeof value === 'number' ? value.toLocaleString('en-US', { maximumFractionDigits: 2 }) : String(value));
-        var dot = col === 'status' ? '<span class="dash-dot dash-dot--' + escapeHtml(String(value).toLowerCase()) + '" aria-hidden="true"></span>' : '';
-        return '<td>' + dot + escapeHtml(text) + '</td>';
+        var source = rows[index][col.key];
+        var text = view.cellText(source, col.type, col.key);
+        if (text === null) return '<td class="dash-worklist__muted">-</td>';
+        var dot = col.key === 'status' ? '<span class="dash-dot dash-dot--' + escapeHtml(String(source).toLowerCase()) + '" aria-hidden="true"></span>' : '';
+        return '<td' + (col.align === 'right' ? ' class="dash-worklist__num"' : '') + '>' + dot + escapeHtml(text) + '</td>';
       }).join('') + '</tr>';
     }).join('');
     return '<table class="dash-worklist__table"><thead>' + head + '</thead><tbody>' + body + '</tbody></table>';

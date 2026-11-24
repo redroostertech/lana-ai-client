@@ -126,8 +126,9 @@
     var renderers = {};
     columns.forEach(function (col) {
       renderers[col.key] = function (value, row) {
-        var text = view().cellText(value, col.type);
+        var text = view().cellText(value, col.type, col.key);
         if (text === null) return MUTED_DASH;
+        if (col.align === 'right') return '<span class="metric-detail-num">' + escapeHtml(text) + '</span>';
         if (col.key === 'matter_name' && row && row._href) {
           return '<a class="metric-detail-link" href="#" data-metric-record-link="' + escapeHtml(row._href) + '">' + escapeHtml(text) + '</a>';
         }

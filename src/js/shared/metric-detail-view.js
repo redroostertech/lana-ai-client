@@ -44,7 +44,7 @@
 
   function isInternal(key, rows) {
     var k = key.toLowerCase();
-    if (k === 'id' || k === 'uuid' || k === 'request_access' || k.charAt(0) === '_' || endsWith(k, '_key') || endsWith(k, '_id') || endsWith(k, '_uuid')) return true;
+    if (k === 'id' || k === 'uuid' || k === 'request_access' || k.charAt(0) === '_' || endsWith(k, '_key') || endsWith(k, '_id') || endsWith(k, '_uuid') || endsWith(k, '_ref')) return true;
     var filled = rows.filter(function (row) { return !isEmpty(row[key]); });
     return filled.length > 0 && filled.every(function (row) { return isUuid(row[key]); });
   }
@@ -82,19 +82,78 @@
     return new Date(time).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'UTC' });
   }
 
+  var MONEY_WORDS = ['amount', 'value', 'fee', 'balance', 'total', 'price', 'revenue', 'cost'];
+
+  function isMoneyKey(key) {
+    var k = key.toLowerCase();
+    return MONEY_WORDS.some(function (word) { return k.indexOf(word) !== -1; });
+  }
+
+  function isNumeric(value) {
+    if (typeof value === 'number') return isFinite(value);
+    if (typeof value !== 'string' || !value.trim()) return false;
+    return isFinite(Number(value));
+  }
+
+  function isLower(ch) { return ch >= 'a' && ch <= 'z'; }
+  function isDigitCh(ch) { return ch >= '0' && ch <= '9'; }
+
+  // A code-like value: lower case letters, digits and underscores, with a letter.
+  function isSnake(value) {
+    if (typeof value !== 'string' || !value || value.length > 40) return false;
+    var letter = false;
+    for (var i = 0; i < value.length; i += 1) {
+      var ch = value.charAt(i);
+      if (isLower(ch)) letter = true;
+      else if (!isDigitCh(ch) && ch !== '_') return false;
+    }
+    return letter;
+  }
+
   function typeOf(key, rows) {
     if (isTimeKey(key)) return 'datetime';
     if (isDateKey(key)) return 'date';
     var filled = rows.filter(function (row) { return !isEmpty(row[key]); });
-    return filled.length && filled.every(function (row) { return typeof row[key] === 'number'; }) ? 'number' : 'text';
+    if (!filled.length) return 'text';
+    if (isMoneyKey(key) && filled.every(function (row) { return isNumeric(row[key]); })) return 'money';
+    if (filled.every(function (row) { return typeof row[key] === 'number'; })) return 'number';
+    if (filled.every(function (row) { return isSnake(row[key]); })) return 'enum';
+    return 'text';
   }
 
-  function cellText(value, type) {
+  function words(value) {
+    var text = String(value).split('_').join(' ').trim();
+    return text ? text.charAt(0).toUpperCase() + text.slice(1) : text;
+  }
+
+  // One formatter for the records table and the dashboard worklists.
+  function cellText(value, type, key) {
     if (isEmpty(value)) return null;
     if (type === 'date') return dayText(value);
     if (type === 'datetime') return dateTimeText(value);
+    if (type === 'money') return Number(value).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
     if (type === 'number') return Number(value).toLocaleString('en-US', { maximumFractionDigits: 2 });
+    if (type === 'enum') {
+      var k = String(key || '').toLowerCase();
+      // A product or service the firm has not mapped yet (Settings > Mappings).
+      if (value === 'uncategorized' && (k.indexOf('product') !== -1 || k.indexOf('service') !== -1)) return 'Not mapped';
+      return words(value);
+    }
     return String(value);
+  }
+
+  // Up to n columns for a short list: names, then dates, then amounts, then the rest.
+  function worklistColumns(columns, n) {
+    function rank(col) {
+      var k = col.key.toLowerCase();
+      if (k === 'name' || k.slice(-5) === '_name') return 0;
+      if (col.type === 'date' || col.type === 'datetime') return 1;
+      if (col.type === 'money') return 2;
+      return 3;
+    }
+    return (columns || []).map(function (col, i) { return { col: col, i: i }; })
+      .sort(function (a, b) { return rank(a.col) - rank(b.col) || a.i - b.i; })
+      .slice(0, n || 4).map(function (entry) { return entry.col; });
   }
 
   function linkFor(row) {
@@ -111,7 +170,10 @@
     list.forEach(function (row) { Object.keys(row).forEach(function (key) { if (keys.indexOf(key) === -1) keys.push(key); }); });
     var columns = keys.filter(function (key) {
       return !isInternal(key, list) && list.some(function (row) { return !isEmpty(row[key]); });
-    }).map(function (key) { return { key: key, label: labelFor(key), type: typeOf(key, list) }; });
+    }).map(function (key) {
+      var type = typeOf(key, list);
+      return { key: key, label: labelFor(key), type: type, align: type === 'money' || type === 'number' ? 'right' : 'left' };
+    });
     return {
       columns: columns,
       rows: list.map(function (row, index) {
@@ -119,7 +181,7 @@
         return {
           id: 'row-' + index,
           cells: columns.map(function (col) {
-            return { key: col.key, text: cellText(row[col.key], col.type), href: col.key === 'matter_name' ? href : null };
+            return { key: col.key, text: cellText(row[col.key], col.type, col.key), href: col.key === 'matter_name' ? href : null };
           }),
         };
       }),
@@ -211,6 +273,7 @@
   return {
     dayRangeText: dayRangeText,
     cellText: cellText,
+    worklistColumns: worklistColumns,
     recordsRow: recordsRow,
     recordsTable: recordsTable,
     formatValue: formatValue,

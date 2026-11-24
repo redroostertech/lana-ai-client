@@ -3994,3 +3994,47 @@ button.dash-lines__label:hover,
 .dash-metric-card--hero .dash-card__caveat-link {
   color: inherit;
 }
+
+/* Numbers line up on the right in worklists and the records table. */
+.dash-worklist__table .dash-worklist__num,
+.metric-detail-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-detail-num {
+  display: block;
+}
+
+/* Calm states hug their content (no tall dashed box); the card's spare
+   height sits below them. On the hero the state is one compact row:
+   mark, title, one line of reason, link. */
+.dash-bento .dash-metric-card > .lex-data-state {
+  flex: 0 0 auto;
+}
+
+.dash-metric-card--hero .lex-data-state--calm {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0.875rem;
+}
+
+.dash-metric-card--hero .lex-data-state--calm .lex-data-state__body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+}
+
+.dash-metric-card--hero .lex-data-state--calm .lex-data-state__reason {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  overflow: hidden;
+  margin: 0;
+}
+
+.dash-metric-card--hero .lex-data-state--calm .lex-data-state__action {
+  margin-top: 0;
+}

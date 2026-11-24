@@ -583,6 +583,7 @@
         'js/shared/insights-breadcrumbs.js',
         'js/settings-mappings.model.js',
         'js/shared/setup-banner.js',
+        'js/shared/metric-detail-view.js',
         'js/shared/title-switcher.js',
         'js/admin/dashboard-detail.js'
       ],

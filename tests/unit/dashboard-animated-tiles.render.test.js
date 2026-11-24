@@ -35,7 +35,7 @@ function page(api = {}, user = null) {
   let source = fs.readFileSync(path.join(__dirname, '../../src/js/admin/dashboard-detail.js'), 'utf8');
   const end = source.lastIndexOf('  init();');
   source = source.slice(0, end)
-    + '  window.testExports = { renderMetricCard, loadMetrics, loadDashboardById, readPeriodControls, setBanner, fetchSparkline, renderMetrics, openMetricModal, variantPicks, allMetrics: function () { return allDashboardMetrics; }, cardLoads: function () { return cardLoads; } };'
+    + '  window.testExports = { renderMetricCard, loadMetrics, loadDashboardById, readPeriodControls, setBanner, fetchSparkline, renderMetrics, openMetricModal, worklistHtml, variantPicks, allMetrics: function () { return allDashboardMetrics; }, cardLoads: function () { return cardLoads; } };'
     + source.slice(end + '  init();'.length);
   const nodes = {};
   const document = { body: node(), addEventListener() {}, getElementById: (id) => (nodes[id] = nodes[id] || node()), querySelector: () => null, querySelectorAll: () => [] };
@@ -662,4 +662,17 @@ describe('mappings on dashboard cards', () => {
     expect(text(html)).toContain('1 card is waiting for setup');
     expect(text(html)).toContain('Map your case types to see this number.');
   });
+});
+
+test('worklist cells use the shared formatter: money right-aligned, codes as words, dates as days, ids hidden', () => {
+  const p = page();
+  const html = p.exports.worklistHtml([
+    { matter_ref: 'm-1', matter_name: 'Estate', product: 'uncategorized', payment_step: 'payment_2', due_date: '2023-07-18T04:00:00Z', expected_amount: '2750' },
+    { matter_ref: 'm-2', matter_name: 'Trust', product: 'trust_based_plan', payment_step: 'payment_1', due_date: '2023-08-01T04:00:00Z', expected_amount: '1250' },
+  ]);
+  expect(text(html)).toContain('Matter Due Expected amount Product');
+  expect(text(html)).toContain('Estate Jul 18, 2023 $2,750 Not mapped');
+  expect(html).toContain('<td class="dash-worklist__num">$2,750</td>');
+  expect(html).not.toContain('m-1');
+  expect(html).not.toContain('uncategorized');
 });
