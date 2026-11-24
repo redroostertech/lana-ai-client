@@ -90,12 +90,12 @@
   <li><span class="box"></span><span class="n">13</span><span><span class="t">Each firm's server updated, Norton first</span><span class="h">To the engine commit or newer, before that firm's team gets the new app.</span></span></li>
 </ol>
 
-<h2>Phase 5. Build the app installers (installer build machine)</h2>
+<h2>Phase 5. Build the LANA Client App installers (installer build machine)</h2>
 <p class="intro">All four, together, in one session. Never one system early.</p>
 <ol>
   <li><span class="box"></span><span class="n">14</span><span><span class="t">Every system shows READY</span><span class="h">All 12 boxes in step 3 ticked.</span></span></li>
   <li><span class="box"></span><span class="n">15</span><span><span class="t">Fresh parts links file made</span><span class="h">Read-only links to lana-build-parts; they expire after 7 days, so make it right before building.</span></span></li>
-  <li><span class="box"></span><span class="n">16</span><span><span class="t">All installers built</span><span class="h">scripts/build-client.sh from client production: npm ci, no --clean, --publish on the last build.</span></span></li>
+  <li><span class="box"></span><span class="n">16</span><span><span class="t">All LANA Client App installers built</span><span class="h">scripts/build-client.sh from client production: npm ci, no --clean, --publish on the last build.</span></span></li>
   <li><span class="box"></span><span class="n">17</span><span><span class="t">The build packed its own parts</span><span class="h">Document editor, Briefs speech package for each system, and the Mac helpers (screen voice, Briefs Bluetooth wake).</span></span></li>
   <li><span class="box"></span><span class="n">18</span><span><span class="t">Mac, Apple chip: .dmg and .zip</span></span></li>
   <li><span class="box"></span><span class="n">19</span><span><span class="t">Mac, Intel: .dmg and .zip</span></span></li>
@@ -108,7 +108,7 @@
 
 <h2>Phase 6. Publish</h2>
 <ol>
-  <li><span class="box"></span><span class="n">25</span><span><span class="t">Installers uploaded to releases.lanaai.io</span><span class="h">client/X.Y.Z/ and client/latest/.</span></span></li>
+  <li><span class="box"></span><span class="n">25</span><span><span class="t">LANA Client App installers uploaded to releases.lanaai.io</span><span class="h">client/X.Y.Z/ and client/latest/.</span></span></li>
   <li><span class="box"></span><span class="n">26</span><span><span class="t">Update feeds uploaded last</span><span class="h">latest-mac.yml (merges both Mac builds), latest.yml, latest-linux.yml.</span></span></li>
   <li><span class="box"></span><span class="n">27</span><span><span class="t">Every download link opens</span><span class="h">curl -sI on each link answers 200.</span></span></li>
   <li><span class="box"></span><span class="n">28</span><span><span class="t">Released to firms</span><span class="h">Only firms whose server was updated in step 13.</span></span></li>

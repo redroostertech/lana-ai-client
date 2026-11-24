@@ -86,7 +86,7 @@ Required environment on the central Mac (the script prompts if unset):
 Build one system at a time. Each `build-client.sh` run fetches and checks the parts again while `LANA_CLIENT_PARTS_URLS` is set; `dist/` is only emptied with `--clean`, so the four runs collect in one `dist/`:
 
 ```bash
-cd <clean clone at development-new>
+cd <clean clone at production>
 npm ci
 export APPLE_TEAM_ID=... APPLE_ID=... APPLE_APP_SPECIFIC_PASSWORD=...
 export LANA_CLIENT_PARTS_URLS=/path/to/client-parts-urls.txt
