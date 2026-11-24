@@ -51,20 +51,38 @@ test('the page sends the link\'s plain firm days unchanged and shows the backend
   expect(p.nodes.metricPeriod.textContent).toBe('Oct 1, 2026 - Oct 31, 2026');
 });
 
-test('no period from the backend shows the shared empty token, not a guessed window', async () => {
+test('no period from the backend and no picked dates hides the period line, never "For n/a"', async () => {
   const p = await page('?metric_key=matters_opened', { ...payload, period: null });
   expect(p.api.getMetricDetail).toHaveBeenCalledWith('matters_opened');
-  expect(p.empty).toBe('n/a');
-  expect(p.nodes.metricPeriod.textContent).toBe(p.empty);
+  expect(p.nodes.metricPeriodLine.hidden).toBe(true);
+  expect(p.nodes.metricPeriod.textContent).not.toBe(p.empty);
+});
+
+test('no period label from the backend shows the picked dates', async () => {
+  const p = await page('?metric_key=matters_opened&periodStart=2026-11-18&periodEnd=2026-11-24', { ...payload, period: null });
+  expect(p.nodes.metricPeriodLine.hidden).toBe(false);
+  expect(p.nodes.metricPeriod.textContent).toBe('Nov 18, 2026 to Nov 24, 2026');
+});
+
+test('a null value is the calm "No data for these dates": no n/a, no chip, no two bars', async () => {
+  const p = await page('?metric_key=matters_opened&periodStart=2026-11-18&periodEnd=2026-11-24', { ...payload, period: null,
+    current: { value: null, format: 'integer' }, movement: { prior_value: 8, percent_change: 50, direction: 'down' } });
+  expect(p.nodes.metricSummaryValue.textContent).toBe('No data for these dates');
+  expect(p.nodes.metricSummaryValue.className).toBe('metric-summary__value metric-summary__value--empty');
+  expect(p.nodes.metricSummaryChange.hidden).toBe(true);
+  expect(p.nodes.metricSummaryPrior.textContent).toBe('');
+  expect(p.nodes.metricSummaryVisual.innerHTML).toBe('');
+  expect(p.nodes.metricPeriod.textContent).toBe('Nov 18, 2026 to Nov 24, 2026');
 });
 
 test('one summary: the value in its format, the change both ways, and the prior period', async () => {
   const blank = await page('?metric_key=matters_opened', { ...payload, current: { value: null }, movement: null });
-  expect(blank.nodes.metricSummaryValue.textContent).toBe(blank.empty);
+  expect(blank.nodes.metricSummaryValue.textContent).toBe('No data for these dates');
   expect(blank.nodes.metricSummaryChange.hidden).toBe(true);
 
   const zero = await page('?metric_key=matters_opened', { ...payload, current: { value: 0, format: 'integer' } });
   expect(zero.nodes.metricSummaryValue.textContent).toBe('0');
+  expect(zero.nodes.metricSummaryValue.className).toBe('metric-summary__value');
 
   const down = await page('?metric_key=matters_opened', { ...payload, current: { value: 4, format: 'integer' },
     movement: { prior_value: 8, percent_change: 50, direction: 'down' } });

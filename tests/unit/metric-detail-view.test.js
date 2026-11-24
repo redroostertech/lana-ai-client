@@ -225,3 +225,15 @@ describe('rowsStatus: could the server read the records?', () => {
       + '<p class="records-unavailable__text">Bills &amp; payments &lt;synced&gt;</p></div>');
   });
 });
+
+test('summary: a null value is no data, with no change, prior or bars', () => {
+  const s = V.summary({ current: { value: null }, comparison: { previous_value: 5, percent_change: 10, direction: 'up' } });
+  expect(s).toMatchObject({ noData: true, value: 'No data for these dates', changeText: null, priorText: null, bars: null });
+  expect(V.summary({ current: { value: 0 } }).noData).toBeFalsy();
+});
+
+test('periodText: the backend label, else the picked dates, else nothing', () => {
+  expect(V.periodText({ label: 'Oct 1, 2026 - Oct 31, 2026' }, '2026-11-18', '2026-11-24')).toBe('Oct 1, 2026 - Oct 31, 2026');
+  expect(V.periodText(null, '2026-11-18', '2026-11-24')).toBe('Nov 18, 2026 to Nov 24, 2026');
+  expect(V.periodText(null, null, null)).toBe('');
+});

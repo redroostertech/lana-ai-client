@@ -3187,6 +3187,14 @@ button.dash-lines__label:hover,
   color: var(--lex-text-primary);
 }
 
+/* A null value: calm words instead of a big number. */
+.metric-summary__value--empty {
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--lex-text-secondary);
+}
+
 .metric-summary__change-row {
   display: flex;
   flex-wrap: wrap;

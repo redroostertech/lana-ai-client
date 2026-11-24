@@ -230,6 +230,8 @@
   function renderSummary(payload, snapshots) {
     var summary = view().summary(payload);
     setText('metricSummaryValue', summary.value);
+    var valueNode = el('metricSummaryValue');
+    if (valueNode) valueNode.className = 'metric-summary__value' + (summary.noData ? ' metric-summary__value--empty' : '');
     var chip = el('metricSummaryChange');
     if (chip) {
       chip.hidden = !summary.changeText;
@@ -244,7 +246,9 @@
     var visual = el('metricSummaryVisual');
     if (!visual) return;
     var line = window.MetricCardView ? window.MetricCardView.sparkline(snapshots, 100, 24) : null;
-    if (line && window.MiniCharts) {
+    if (summary.noData) {
+      visual.innerHTML = '';
+    } else if (line && window.MiniCharts) {
       visual.innerHTML = window.MiniCharts.sparklineSvg(line);
     } else if (summary.bars) {
       visual.innerHTML = '<div class="metric-summary__bars">'
@@ -525,7 +529,12 @@
       showBlock('metricCalculationBlock', 'metricCalculation', metric.calculation || current.calculation || '');
       showBlock('metricBusinessLogicBlock', 'metricBusinessLogic', metric.businessLogic || current.businessLogic || '');
       // The backend names the period in the firm's days (data.period.label).
-      setText('metricPeriod', payload.period && payload.period.label);
+      // The backend's label, else the picked dates; no line at all otherwise.
+      var periodWords = view().periodText(payload.period, qp.get('periodStart'), qp.get('periodEnd'));
+      var periodLine = el('metricPeriodLine');
+      if (periodLine) periodLine.hidden = !periodWords;
+      var periodNode = el('metricPeriod');
+      if (periodNode) periodNode.textContent = periodWords;
 
       var snapshots = payload.snapshots || [];
       renderSummary(payload, snapshots);

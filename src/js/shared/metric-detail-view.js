@@ -268,8 +268,13 @@
       cmp = { previous_value: payload.movement.prior_value, percent_change: payload.movement.percent_change, direction: payload.movement.direction };
     }
     var prior = cmp ? toNumber(cmp.previous_value) : null;
+    // A null value means nothing was recorded for these dates: the calm
+    // words, and no change, prior or bars to compare against.
+    if (value === null) {
+      return { value: NO_DATA_TEXT, noData: true, direction: null, changeText: null, priorText: null, priorDays: null, bars: null };
+    }
     var empty = { value: formatValue(value, meta), direction: null, changeText: null, priorText: null, priorDays: null, bars: null };
-    if (!cmp || prior === null || value === null) return empty;
+    if (!cmp || prior === null) return empty;
     var abs = toNumber(cmp.absolute_change);
     if (abs === null) abs = value - prior;
     var pct = toNumber(cmp.percent_change);
@@ -286,6 +291,14 @@
       priorDays: period && period.start && period.end ? { start: String(period.start).substring(0, 10), end: dayBefore(period.end) } : null,
       bars: max > 0 ? { currentPct: Math.round((Math.abs(value) / max) * 1000) / 10, priorPct: Math.round((Math.abs(prior) / max) * 1000) / 10 } : null,
     };
+  }
+
+  var NO_DATA_TEXT = 'No data for these dates';
+
+  // The period line: the backend's label, else the picked dates, else ''.
+  function periodText(period, start, end) {
+    if (period && period.label) return String(period.label);
+    return start && end ? dayRangeText({ start: String(start).substring(0, 10), end: String(end).substring(0, 10) }) : '';
   }
 
   function dayRangeText(days) {
@@ -335,6 +348,7 @@
     recordsTable: recordsTable,
     formatValue: formatValue,
     summary: summary,
+    periodText: periodText,
     isUuid: isUuid,
     rowsStatus: rowsStatus,
     unavailableHtml: unavailableHtml,
