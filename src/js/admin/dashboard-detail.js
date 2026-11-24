@@ -1225,6 +1225,11 @@
   // Every row adds up to the column count (four, or two when narrow), so
   // no grid cell is ever empty; a card alone in its row spans it all.
   function withSpans(items) {
+    // A hero in a calm state takes its own short row (full width), so it
+    // never stretches into a tall, mostly empty green card.
+    items = items.map(function (item) {
+      return item.role === 'hero' && item.resolved && item.resolved.state === 'waiting' ? Object.assign({}, item, { span: 4 }) : item;
+    });
     var four = window.DashboardLayout.packRows(items, 4);
     var two = window.DashboardLayout.packRows(items, 2);
     return items.map(function (item, i) {

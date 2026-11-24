@@ -459,6 +459,8 @@ describe('one card shell', () => {
     expect(hero).toContain('dash-metric-card--hero');
     expect(hero).toContain('lex-data-state--calm');
     expect(hero).not.toContain('dash-bento__item--tall');
+    // A calm hero takes its own short row across the grid, not a tall green box.
+    expect(hero).toContain('dash-span-4-4');
   });
 
   test('a group that mixes right-now and period metrics tags the right-now bars', async () => {
