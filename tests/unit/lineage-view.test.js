@@ -138,3 +138,62 @@ describe('cardLines: the instant summary from card.lineage', () => {
     expect(L.cardLines(null)).toBe(null);
   });
 });
+
+describe('the styled About section helpers', () => {
+  test('equationPills: inputs as pills with values and the result, operators as symbols', () => {
+    const pills = L.equationPills(conversion, { 'legal_firm.sales_intake.pnc_converted_count': '16', 'legal_firm.sales_intake.pnc_count': '211' }, '7.6%');
+    expect(pills).toEqual({ type: 'equation', terms: [
+      { op: '', label: 'Converted clients', value: '16', metric_key: 'legal_firm.sales_intake.pnc_converted_count' },
+      { op: '÷', label: 'Potential new clients', value: '211', metric_key: 'legal_firm.sales_intake.pnc_count' },
+    ], result: '7.6%' });
+  });
+
+  test('equationPills: a count reads as a sentence of pills from the source and the filters', () => {
+    expect(L.equationPills({ formula: { kind: 'count' }, sources: [{ label: 'Matters' }], filters: [{ label: 'Practice area is Probate' }] }, {}, '36'))
+      .toEqual({ type: 'sentence', parts: [{ text: 'Count of' }, { pill: 'Matters' }, { text: 'where' }, { pill: 'Practice area is Probate' }], result: '36' });
+    expect(L.equationPills({ formula: { kind: 'sum' }, sources: [{ label: 'Payments' }] }, {}, '$5').parts).toEqual([{ text: 'Total of' }, { pill: 'Payments' }]);
+    expect(L.equationPills(null, {}, '')).toBe(null);
+    expect(L.equationPills({ formula: { kind: 'ratio' }, inputs: [] }, {}, '1')).toBe(null);
+  });
+
+  test('syncStatus: green under a day, amber up to a week, red beyond, unknown without a time', () => {
+    expect(L.syncStatus('2026-11-24T09:00:00Z', NOW)).toBe('fresh');
+    expect(L.syncStatus('2026-11-20T09:00:00Z', NOW)).toBe('recent');
+    expect(L.syncStatus('2026-08-10T15:00:00Z', NOW)).toBe('stale');
+    expect(L.syncStatus(null, NOW)).toBe('unknown');
+  });
+
+  test('sameText: the Data used sentence hides when it repeats How it is calculated', () => {
+    expect(L.sameText('Counts open matters.', ' counts open  matters ')).toBe(true);
+    expect(L.sameText('Counts open matters.', 'Counts closed matters.')).toBe(false);
+    expect(L.sameText('', 'x')).toBe(false);
+  });
+
+  test('flowSteps: Data, Filters, Dates, Result', () => {
+    const steps = L.flowSteps(L.detailModel(conversion, NOW), conversion);
+    expect(steps.map((s) => [s.key, s.title, s.lines])).toEqual([
+      ['data', 'Data', ['Leads', 'Matters']],
+      ['filters', 'Filters', ['Estate planning only']],
+      ['dates', 'Dates', ['Counts leads created between your dates.']],
+      ['result', 'Result', ['Ratio']],
+    ]);
+    expect(L.flowSteps(L.detailModel({ formula: { kind: 'count' } }, NOW), { formula: { kind: 'count' } }).map((s) => s.lines))
+      .toEqual([['No sources listed'], ['Everything counts'], ['Follows the dates you pick'], ['Count']]);
+  });
+
+  test('fieldRows: each detail with its role icon', () => {
+    expect(L.fieldRows(conversion).map((r) => [r.icon, r.sentence])).toEqual([
+      ['calendar', 'Date created decides which dates count.'],
+      ['funnel', 'Practice area decides what is included.'],
+      ['layers', 'Service offering splits the number into groups.'],
+      ['sigma', 'Fee is the value we use.'],
+    ]);
+  });
+
+  test('source cards: a big total, the in-dates chip, via and sync status, and count_scope once as a note', () => {
+    const lineage = { sources: [Object.assign({}, conversion.sources[0], { count_scope: 'All leads, not only these.' })] };
+    expect(L.sourceCards(lineage, NOW)).toEqual([{ label: 'Leads', entity: 'lead', total: '1,204 leads', inDates: '36 in your dates',
+      via: 'via Leadly, 24 in LANA', syncedAt: '2026-11-24T09:00:00Z', status: 'fresh', scopeNote: 'All leads, not only these.' }]);
+    expect(L.sourceCards(lineage, NOW, { snapshot: true })[0].inDates).toBe(null);
+  });
+});

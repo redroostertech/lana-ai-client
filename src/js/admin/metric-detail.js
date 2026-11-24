@@ -275,71 +275,135 @@
     return 'admin/metric_detail.html?' + parts.join('&');
   }
 
-  // Under the entity, a small line: records of this type by system
-  // ("7,715 via ActionStep, 8 in LANA") and when it last synced. These count
-  // every record of the type, not only the ones this number uses.
-  function systemsLine(source) {
-    var synced = '';
-    if (source.stale) {
-      synced = ', <span class="metric-data__stale" title="This source has not synced for over a week">' + escapeHtml(source.staleText) + '</span>';
-    } else if (source.syncedAt && window.Lex && Lex.Utils && Lex.Utils.timeAgo) {
-      synced = ', synced ' + escapeHtml(Lex.Utils.timeAgo(source.syncedAt));
-    }
-    if (!source.systemsText && !synced) return '';
-    // The server's count_scope is a full sentence: show it as its own muted
-    // note; the short fallback reads as a label in front of the counts.
-    var sentence = source.systemsLabel.charAt(source.systemsLabel.length - 1) === '.';
-    return '<span class="metric-data__via">' + (source.systemsText
-      ? (sentence ? '' : escapeHtml(source.systemsLabel) + ': ') + escapeHtml(source.systemsText) : 'Synced') + synced + '</span>'
-      + (sentence ? '<span class="metric-data__scope">' + escapeHtml(source.systemsLabel) + '</span>' : '');
+  // ── About this number: the styled Data used section ───────────────
+  // (js/shared/lineage-view.js maps everything; this only draws it.)
+  var ICON_PATHS = {
+    database: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>',
+    funnel: '<path d="M3 4h18l-7 8v6l-4 2v-8z"/>',
+    calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+    sigma: '<path d="M18 4H6l6 8-6 8h12"/>',
+    layers: '<path d="M12 2l10 5-10 5L2 7z"/><path d="M2 12l10 5 10-5M2 17l10 5 10-5"/>',
+    info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
+    alert: '<path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
+    target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  };
+
+  function icon(name, cls) {
+    return '<svg class="' + (cls || 'mabout__icon') + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+      + (ICON_PATHS[name] || ICON_PATHS.info) + '</svg>';
   }
 
-  function renderDataUsed(lineage, snapshot) {
+  function relative(iso) {
+    return iso && window.Lex && Lex.Utils && Lex.Utils.timeAgo ? Lex.Utils.timeAgo(iso) : '';
+  }
+
+  function pillLink(label, value, key) {
+    return '<a href="#" class="mabout__pill mabout__pill--link" data-metric-record-link="' + escapeHtml(metricHref(key)) + '">'
+      + '<span>' + escapeHtml(label) + '</span>' + (value ? '<strong>' + escapeHtml(value) + '</strong>' : '') + '</a>';
+  }
+
+  function equationHtml(pills) {
+    if (!pills) return '';
+    var body;
+    if (pills.type === 'equation') {
+      body = pills.terms.map(function (term) {
+        return (term.op ? '<span class="mabout__op">' + escapeHtml(term.op) + '</span>' : '') + pillLink(term.label, term.value, term.metric_key);
+      }).join('');
+    } else {
+      body = pills.parts.map(function (part) {
+        return part.pill ? '<span class="mabout__pill">' + escapeHtml(part.pill) + '</span>' : '<span class="mabout__word">' + escapeHtml(part.text) + '</span>';
+      }).join('');
+    }
+    return '<div class="mabout__equation">' + body
+      + (pills.result ? '<span class="mabout__op">=</span><span class="mabout__pill mabout__pill--result"><strong>' + escapeHtml(pills.result) + '</strong></span>' : '')
+      + '</div>';
+  }
+
+  function flowHtml(steps) {
+    return '<ol class="mabout__flow">' + steps.map(function (step) {
+      return '<li class="mabout__step mabout__step--' + escapeHtml(step.key) + '">' + icon(step.icon, 'mabout__step-icon')
+        + '<span class="mabout__step-title">' + escapeHtml(step.title) + '</span>'
+        + step.lines.slice(0, 3).map(function (line) { return '<span class="mabout__step-line">' + escapeHtml(line) + '</span>'; }).join('')
+        + '</li>';
+    }).join('') + '</ol>';
+  }
+
+  function sourcesHtml(cards) {
+    if (!cards.length) return '';
+    return '<h3 class="mabout__heading">Where the data comes from</h3><div class="mabout__sources">' + cards.map(function (card) {
+      var synced = relative(card.syncedAt);
+      return '<div class="mabout__source">'
+        + '<div class="mabout__source-head">' + icon('database', 'mabout__source-icon') + '<span>' + escapeHtml(card.label) + '</span></div>'
+        + '<div class="mabout__total">' + escapeHtml(card.total)
+        + (card.scopeNote ? ' <span class="mabout__scope" tabindex="0" title="' + escapeHtml(card.scopeNote) + '" aria-label="' + escapeHtml(card.scopeNote) + '">' + icon('info', 'mabout__scope-icon') + '</span>' : '')
+        + '</div>'
+        + (card.inDates ? '<span class="mabout__chip">' + escapeHtml(card.inDates) + '</span>' : '')
+        + '<div class="mabout__via"><span class="mabout__dot mabout__dot--' + escapeHtml(card.status) + '" aria-hidden="true"></span>'
+        + escapeHtml(card.via) + (synced ? ' \u00b7 synced ' + escapeHtml(synced) : '') + '</div>'
+        + '</div>';
+    }).join('') + '</div>';
+  }
+
+  function fieldsHtml(rows) {
+    if (!rows.length) return '';
+    return '<h3 class="mabout__heading">Which details we use</h3><ul class="mabout__fields">' + rows.map(function (row) {
+      return '<li>' + icon(row.icon, 'mabout__field-icon') + '<span>' + escapeHtml(row.sentence) + '</span></li>';
+    }).join('') + '</ul>';
+  }
+
+  // Current values of the inputs, for the equation pills (loaded once).
+  var inputValues = {};
+
+  function loadInputValues(lineage, redraw) {
+    var inputs = lineage && Array.isArray(lineage.inputs) ? lineage.inputs : [];
+    if (!inputs.length || typeof api === 'undefined' || typeof api.getMetricDetail !== 'function') return;
+    var qp = params();
+    inputs.forEach(function (input) {
+      if (!input.metric_key || inputValues[input.metric_key] !== undefined) return;
+      inputValues[input.metric_key] = '';
+      api.getMetricDetail(input.metric_key, { periodStart: qp.get('periodStart') || undefined, periodEnd: qp.get('periodEnd') || undefined, rawLimit: 0 })
+        .then(function (response) {
+          var payload = response && response.data ? response.data : response;
+          var current = (payload && payload.current) || {};
+          inputValues[input.metric_key] = view().formatValue(current.value, { format: current.format, unit: current.unit }) || '';
+          redraw();
+        }).catch(function () { /* the pill keeps its name */ });
+    });
+  }
+
+  function renderDataUsed(lineage, snapshot, resultText, calculation) {
     var node = el('metricDataUsed');
     if (!node) return;
-    var model = window.LineageView ? window.LineageView.detailModel(lineage, Date.now(), { snapshot: snapshot }) : null;
+    var L = window.LineageView;
+    var model = L ? L.detailModel(lineage, Date.now(), { snapshot: snapshot }) : null;
     node.hidden = !model;
     if (!model) { node.innerHTML = ''; return; }
-    var parts = ['<h3 class="metric-about__label">Data used</h3>'];
-    if (model.formula) parts.push('<p class="metric-data__formula">' + escapeHtml(model.formula) + '</p>');
-    if (model.equation) {
-      parts.push('<p class="metric-data__equation">' + model.equation.map(function (term) {
-        return (term.op ? '<span class="metric-data__op">' + escapeHtml(term.op) + '</span> ' : '')
-          + '<a href="#" class="metric-detail-link" data-metric-record-link="' + escapeHtml(metricHref(term.metric_key)) + '">' + escapeHtml(term.title) + '</a>';
-      }).join(' ') + '</p>');
+    function draw() {
+      var parts = [];
+      // The calculation in words, unless "How it's calculated" already says it.
+      if (model.formula && !L.sameText(model.formula, calculation)) parts.push('<p class="mabout__formula">' + escapeHtml(model.formula) + '</p>');
+      parts.push(equationHtml(L.equationPills(lineage, inputValues, resultText)));
+      parts.push('<h3 class="mabout__heading">How the number is built</h3>' + flowHtml(L.flowSteps(model, lineage)));
+      parts.push(sourcesHtml(L.sourceCards(lineage, Date.now(), { snapshot: snapshot })));
+      parts.push(fieldsHtml(L.fieldRows(lineage)));
+      if (model.goal) {
+        parts.push('<div class="mabout__row">' + icon('target', 'mabout__row-icon') + '<span>' + (model.goal.set
+          ? 'A goal is set for this number.'
+          : 'No goal yet. <a href="#" class="metric-detail-link" data-metric-record-link="admin/metric-catalog.html?editGoal='
+            + escapeHtml(encodeURIComponent(model.goal.metric_key)) + '">Set one in the Metric Catalog</a>') + '</span></div>');
+      }
+      model.caveats.forEach(function (caveat) {
+        parts.push('<div class="mabout__caveat">' + icon('alert', 'mabout__row-icon') + '<span>' + escapeHtml(caveat) + '</span></div>');
+      });
+      // The raw expression only for admins, folded away.
+      var isAdmin = window.Lex && Lex.Auth && typeof Lex.Auth.isAdmin === 'function' && Lex.Auth.isAdmin();
+      if (model.expression && isAdmin) {
+        parts.push('<details class="metric-data__technical"><summary>Technical details</summary><code>' + escapeHtml(model.expression) + '</code></details>');
+      }
+      node.innerHTML = parts.join('');
     }
-    if (model.sources.length) {
-      parts.push('<h4 class="metric-data__heading">Where the data comes from</h4><ul class="metric-data__list">' + model.sources.map(function (source) {
-        return '<li><span class="metric-data__source">' + escapeHtml(source.line) + '</span>'
-          + systemsLine(source)
-          + '</li>';
-      }).join('') + '</ul>');
-    }
-    if (model.fieldSentences.length) {
-      parts.push('<h4 class="metric-data__heading">Which details we use</h4><ul class="metric-data__list">'
-        + model.fieldSentences.map(function (sentence) { return '<li>' + escapeHtml(sentence) + '</li>'; }).join('') + '</ul>');
-    }
-    if (model.filters.length) {
-      parts.push('<h4 class="metric-data__heading">Included</h4><div class="metric-data__chips">' + model.filters.map(function (filter) {
-        return '<span class="metric-data__chip" title="' + escapeHtml(filter.detail) + '">' + escapeHtml(filter.label) + '</span>';
-      }).join('') + '</div>');
-    }
-    if (model.periodRule) parts.push('<h4 class="metric-data__heading">Dates</h4><p>' + escapeHtml(model.periodRule) + '</p>');
-    if (model.goal) {
-      parts.push('<h4 class="metric-data__heading">Goal</h4><p>' + (model.goal.set
-        ? 'A goal is set for this number.'
-        : 'No goal yet. <a href="#" class="metric-detail-link" data-metric-record-link="admin/metric-catalog.html?editGoal='
-          + escapeHtml(encodeURIComponent(model.goal.metric_key)) + '">Set one in the Metric Catalog</a>') + '</p>');
-    }
-    if (model.caveats.length) {
-      parts.push('<div class="metric-data__caveats">' + model.caveats.map(function (c) { return '<p>' + escapeHtml(c) + '</p>'; }).join('') + '</div>');
-    }
-    // The raw expression only for admins, folded away.
-    var isAdmin = window.Lex && Lex.Auth && typeof Lex.Auth.isAdmin === 'function' && Lex.Auth.isAdmin();
-    if (model.expression && isAdmin) {
-      parts.push('<details class="metric-data__technical"><summary>Technical details</summary><code>' + escapeHtml(model.expression) + '</code></details>');
-    }
-    node.innerHTML = parts.join('');
+    draw();
+    loadInputValues(lineage, draw);
   }
 
   function showBlock(blockId, textId, text) {
@@ -446,7 +510,8 @@
 
       var snapshots = payload.snapshots || [];
       renderSummary(payload, snapshots);
-      renderDataUsed(payload.lineage, window.MetricCardView ? window.MetricCardView.isPointInTime(payload) || window.MetricCardView.isPointInTime(current) : false);
+      renderDataUsed(payload.lineage, window.MetricCardView ? window.MetricCardView.isPointInTime(payload) || window.MetricCardView.isPointInTime(current) : false,
+        view().summary(payload).value || '', metric.calculation || current.calculation || '');
       renderHistory(snapshots);
       renderRawData(payload.raw_data && payload.raw_data.rows ? payload.raw_data.rows : []);
       renderRawDataTotal(payload.raw_data);

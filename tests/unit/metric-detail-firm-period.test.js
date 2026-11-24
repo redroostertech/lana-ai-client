@@ -126,24 +126,33 @@ describe('Data used', () => {
     expect(p.nodes.metricDataUsed.hidden).toBe(true);
   });
 
-  test('the calculation, the equation with links, sources with a stale sync, details, dates, goal and caveats', async () => {
-    const p = await page('?metric_key=matters_opened&periodStart=2026-10-01&periodEnd=2026-10-31', { ...payload, lineage });
+  test('the equation as pills, the four-step flow, source cards with a stale dot, details with icons, goal, caveats', async () => {
+    const p = await page('?metric_key=matters_opened&periodStart=2026-10-01&periodEnd=2026-10-31', { ...payload, current: { value: 7.6, format: 'percentage' }, lineage });
     const html = p.nodes.metricDataUsed.innerHTML;
     const text = html.split('<').map((part) => part.slice(part.indexOf('>') + 1)).join(' ').split(/\s+/).join(' ');
     expect(p.nodes.metricDataUsed.hidden).toBe(false);
-    expect(text).toContain('Converted clients divided by potential new clients.');
+    expect(html).toContain('mabout__equation');
     expect(html).toContain('data-metric-record-link="admin/metric_detail.html?metric_key=legal_firm.s.pnc&amp;periodStart=2026-10-01&amp;periodEnd=2026-10-31"');
-    expect(text).toContain('1,204 leads on file, 36 counted in your dates');
-    expect(text).toContain('records of this type, by system: 1,180 via Leadly, last synced Jan 1');
-    expect(html).toContain('metric-data__stale');
-    expect(text).toContain('Date created decides which dates count.');
-    expect(html).toContain('title="Practice area is Estate Planning"');
+    // Inputs carry their current values (fetched once); the result closes the equation.
+    expect(text).toMatch(/Converted clients \S+ ÷ Potential new clients \S+ = 7\.6%/);
+    expect(html.split('class="mabout__step ').length - 1).toBe(4);
+    expect(text).toContain('Estate planning only');
     expect(text).toContain('Counts leads created between your dates.');
+    expect(text).toContain('1,204 leads');
+    expect(text).toContain('36 in your dates');
+    expect(html).toContain('mabout__dot--stale');
+    expect(text).toContain('via Leadly');
+    expect(text).toContain('Date created decides which dates count.');
     expect(html).toContain('admin/metric-catalog.html?editGoal=legal_firm.s.target');
+    expect(html).toContain('mabout__caveat');
     expect(text).toContain('Leads without a source are left out.');
-    expect(html).not.toContain('legal_firm.s.converted</');
     expect(html).toContain('<details class="metric-data__technical">');
     expect(text).toContain('count(a) / count(b)');
+  });
+
+  test('the Data used sentence hides when How it is calculated already says it', async () => {
+    const p = await page('?metric_key=matters_opened', { ...payload, metric: { ...payload.metric, calculation: 'Converted clients divided by potential new clients.' }, lineage });
+    expect(p.nodes.metricDataUsed.innerHTML).not.toContain('mabout__formula');
   });
 });
 
@@ -166,15 +175,16 @@ describe('breadcrumbs', () => {
   });
 });
 
-test('the server count_scope shows as its own muted note under the counts', async () => {
+test('the server count_scope sits once in a tooltip on the total, not repeated as text', async () => {
   const lineage = { sources: [{ entity: 'matter', label: 'Matters', records_total: 7723, records_in_period: null,
     count_scope: 'All records of this type the firm has, by system, not only the ones this number uses.',
     systems: [{ label: 'ActionStep', records: 7715, last_synced_at: '2020-08-10T00:00:00Z' }, { label: 'LANA', records: 8, last_synced_at: null }],
     last_synced_at: '2020-08-10T00:00:00Z' }], formula: { kind: 'count', plain: 'Counts open matters.' } };
   const p = await page('?metric_key=matters_opened', { ...payload, lineage });
   const html = p.nodes.metricDataUsed.innerHTML;
-  expect(html).toContain('7,723 matters on file');
-  expect(html).toContain('7,715 via ActionStep, 8 in LANA');
-  expect(html).toContain('<span class="metric-data__scope">All records of this type the firm has, by system, not only the ones this number uses.</span>');
-  expect(html).not.toContain('records of this type, by system:');
+  expect(html).toContain('7,723 matters');
+  expect(html).toContain('via ActionStep, 8 in LANA');
+  expect(html.split('title="All records of this type the firm has').length - 1).toBe(1);
+  expect(html).not.toContain('in your dates');
+  expect(html).toContain('Count of');
 });
