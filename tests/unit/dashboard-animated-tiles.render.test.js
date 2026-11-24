@@ -826,3 +826,37 @@ describe('ok cards whose value is null', () => {
     expect(text(payroll)).not.toContain('NaN');
   });
 });
+
+describe('every drilldown link from a declared card carries a full catalog key', () => {
+  const declared = require(path.join(__dirname, '../fixtures/dashboard/declared-layouts.json'));
+  const keysIn = (html) => html.split('data-metric-detail-link="').slice(1)
+    .map((part) => new URLSearchParams(part.split('"')[0].split('&amp;').join('&').split('?')[1]).get('metric_key'));
+  const catalogKeys = new Set(declared.cards_synthetic.map((c) => c.metric_key));
+
+  test.each(Object.keys(declared.layouts))('%s', async (name) => {
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name, layout: declared.layouts[name] } }),
+      getDashboardMetricCards: jest.fn().mockResolvedValue({ data: declared.cards_synthetic }), getMetricDetail: jest.fn().mockResolvedValue({ data: { snapshots: [] } }) });
+    await p.exports.loadDashboardById('d1');
+    const keys = keysIn(p.nodes.dashboardMetricGrid.innerHTML);
+    expect(keys.length).toBeGreaterThan(0);
+    keys.forEach((key) => {
+      expect(key.startsWith('legal_firm.')).toBe(true);
+      expect(key.split('.').length).toBeGreaterThanOrEqual(3);
+    });
+  });
+
+  test('a layout key matched by its last part links with the card\'s own catalog key', async () => {
+    const metric = Object.assign({}, declared.cards_synthetic.find((c) => c.metric_key.endsWith('overdue_expected_cash')),
+      { metric_key: 'legal_firm.bonus_compensation.overdue_expected_cash' });
+    const layout = { cards: [{ id: 'g', kind: 'goal', metric_keys: ['finance.overdue_expected_cash', 'finance.cash_this_month'], chips: ['finance.cash_this_month'] }] };
+    const cash = Object.assign({}, declared.cards_synthetic.find((c) => c.metric_key.endsWith('cash_this_month')), { metric_key: 'legal_firm.bonus_compensation.cash_this_month' });
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [metric, cash] }),
+      getMetricDetail: jest.fn().mockResolvedValue({ data: { snapshots: [] } }) });
+    await p.exports.loadDashboardById('d1');
+    const keys = keysIn(p.nodes.dashboardMetricGrid.innerHTML);
+    expect(keys).toContain('legal_firm.bonus_compensation.overdue_expected_cash');
+    expect(keys).toContain('legal_firm.bonus_compensation.cash_this_month');
+    expect(keys).not.toContain('legal_firm.finance.overdue_expected_cash');
+    expect(keys).not.toContain('legal_firm.finance.cash_this_month');
+  });
+});

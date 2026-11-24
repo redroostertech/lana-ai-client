@@ -733,8 +733,16 @@
 
   // One click to the records behind the number: the metric detail page,
   // opened on its source records with the same dates.
+  // A layout key can match its card by the last part only (older saved
+  // layouts, spec keys); links and detail requests always use the card's
+  // own catalog key.
+  function catalogKey(key) {
+    var metric = declaredIndex && key ? window.DashboardCards.metricFor(declaredIndex, key) : null;
+    return (metric && (metric.metric_key || metric.key)) || key;
+  }
+
   function recordsHref(cardId) {
-    return window.DashboardPeriod.metricDetailHref(cardId, {
+    return window.DashboardPeriod.metricDetailHref(catalogKey(cardId), {
       periodStart: currentPeriod.start, periodEnd: currentPeriod.end, compareBy: currentPeriod.compareBy,
     }, currentDashboardId ? { from: 'dashboard', dashboardId: currentDashboardId } : {});
   }
@@ -1414,7 +1422,7 @@
       var limit = visual === 'worklist' ? 5 : 25;
       var cacheKey = [key, limit, currentPeriod.start, currentPeriod.end].join('|');
       if (!worklistCache[cacheKey]) {
-        worklistCache[cacheKey] = api.getMetricDetail(key, {
+        worklistCache[cacheKey] = api.getMetricDetail(catalogKey(key), {
           periodStart: currentPeriod.start, periodEnd: currentPeriod.end, compareBy: currentPeriod.compareBy, rawLimit: limit,
         }).then(function (response) {
           var payload = response && response.data ? response.data : response;
@@ -1677,7 +1685,7 @@
       var cacheKey = [entry.key, currentPeriod.start, currentPeriod.end].join('|');
       if (lineageCache[cacheKey]) return;
       lineageCache[cacheKey] = { model: null };
-      api.getMetricDetail(entry.key, {
+      api.getMetricDetail(catalogKey(entry.key), {
         periodStart: currentPeriod.start, periodEnd: currentPeriod.end, compareBy: currentPeriod.compareBy, rawLimit: 0,
       }).then(function (response) {
         var payload = response && response.data ? response.data : response;
@@ -1885,7 +1893,7 @@
     var period = currentPeriod;
     var entry = { done: false, line: null };
     // The sparkline needs only the history: raw_limit=0 skips the source rows.
-    entry.promise = api.getMetricDetail(job.metricKey, {
+    entry.promise = api.getMetricDetail(catalogKey(job.metricKey), {
       periodStart: period.start, periodEnd: period.end, compareBy: period.compareBy, rawLimit: 0,
     }).then(function (response) {
       var payload = response && response.data ? response.data : response;
