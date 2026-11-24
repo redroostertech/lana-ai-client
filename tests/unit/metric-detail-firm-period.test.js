@@ -133,8 +133,8 @@ describe('Data used', () => {
     expect(p.nodes.metricDataUsed.hidden).toBe(false);
     expect(text).toContain('Converted clients divided by potential new clients.');
     expect(html).toContain('data-metric-record-link="admin/metric_detail.html?metric_key=legal_firm.s.pnc&amp;periodStart=2026-10-01&amp;periodEnd=2026-10-31"');
-    expect(text).toContain('1,204 leads, 36 in your dates');
-    expect(text).toContain('via Leadly, last synced Jan 1');
+    expect(text).toContain('1,204 leads on file, 36 counted in your dates');
+    expect(text).toContain('records of this type, by system: 1,180 via Leadly, last synced Jan 1');
     expect(html).toContain('metric-data__stale');
     expect(text).toContain('Date created decides which dates count.');
     expect(html).toContain('title="Practice area is Estate Planning"');
@@ -164,4 +164,17 @@ describe('breadcrumbs', () => {
     const p = await page('?metric_key=matters_opened', payload);
     expect(p.nodes.metricDetailBreadcrumb.items).toEqual([{ label: 'Insights', href: 'admin/analytics.html' }, { label: 'Matters opened' }]);
   });
+});
+
+test('the server count_scope shows as its own muted note under the counts', async () => {
+  const lineage = { sources: [{ entity: 'matter', label: 'Matters', records_total: 7723, records_in_period: null,
+    count_scope: 'All records of this type the firm has, by system, not only the ones this number uses.',
+    systems: [{ label: 'ActionStep', records: 7715, last_synced_at: '2020-08-10T00:00:00Z' }, { label: 'LANA', records: 8, last_synced_at: null }],
+    last_synced_at: '2020-08-10T00:00:00Z' }], formula: { kind: 'count', plain: 'Counts open matters.' } };
+  const p = await page('?metric_key=matters_opened', { ...payload, lineage });
+  const html = p.nodes.metricDataUsed.innerHTML;
+  expect(html).toContain('7,723 matters on file');
+  expect(html).toContain('7,715 via ActionStep, 8 in LANA');
+  expect(html).toContain('<span class="metric-data__scope">All records of this type the firm has, by system, not only the ones this number uses.</span>');
+  expect(html).not.toContain('records of this type, by system:');
 });

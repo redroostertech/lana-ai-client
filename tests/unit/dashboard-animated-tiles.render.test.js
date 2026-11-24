@@ -605,8 +605,8 @@ describe('How this card works', () => {
     await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
     const html = p.nodes.dashboardMetricModalBody.innerHTML;
-    expect(text(html)).toContain('52 expenses, 7 in your dates');
-    expect(text(html)).toContain('via QuickBooks, last synced Jan 1');
+    expect(text(html)).toContain('52 expenses on file, 7 counted in your dates');
+    expect(text(html)).toContain('records of this type, by system: 52 via QuickBooks, last synced Jan 1');
     expect(html).not.toContain('dash-howto__chip">QuickBooks');
   });
 

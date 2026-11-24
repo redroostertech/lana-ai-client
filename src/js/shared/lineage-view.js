@@ -43,29 +43,43 @@
     return MONTHS[d.getUTCMonth()] + ' ' + d.getUTCDate();
   }
 
-  function systemLine(system, now) {
-    var synced = system && system.last_synced_at ? String(system.last_synced_at) : null;
+  // One system's share: "7,715 via ActionStep", "8 in LANA". These count
+  // every record of the type in that system, not only the records this
+  // number uses; the page labels them so.
+  function systemPart(system) {
+    var label = String((system && system.label) || '');
+    var n = count(system && system.records);
+    if (!label || n === null) return '';
+    return n + (label.toUpperCase() === 'LANA' ? ' in LANA' : ' via ' + label);
+  }
+
+  function latestSync(source) {
+    var best = source.last_synced_at ? String(source.last_synced_at) : null;
+    list(source.systems).forEach(function (system) {
+      if (system && system.last_synced_at && (!best || Date.parse(system.last_synced_at) > Date.parse(best))) best = String(system.last_synced_at);
+    });
+    return best;
+  }
+
+  // The entity leads: "7,723 matters on file, 36 counted in your dates".
+  // records_in_period follows the metric's own date field (null for Right now
+  // and whole-file numbers, and never shown for Right now numbers).
+  // count_scope is the server's note on what the counts cover.
+  function sourceLine(source, now, snapshot) {
+    var noun = String(source.label || '').toLowerCase();
+    var total = count(source.records_total);
+    var added = snapshot || source.records_in_period === null || source.records_in_period === undefined ? null : count(source.records_in_period);
+    var synced = latestSync(source);
     var time = synced ? Date.parse(synced) : NaN;
     var stale = isFinite(time) && (now - time) > STALE_DAYS * MS_PER_DAY;
-    // The connector is a small secondary detail ("via ActionStep"); the
-    // entity it provides (Matters, Leads) is what the page leads with.
     return {
-      via: system && system.label ? 'via ' + String(system.label) : '',
-      records: count(system && system.records),
+      label: String(source.label || ''),
+      line: total !== null ? total + ' ' + noun + ' on file' + (added !== null ? ', ' + added + ' counted in your dates' : '') : String(source.label || ''),
+      systemsLabel: source.count_scope ? String(source.count_scope) : 'records of this type, by system',
+      systemsText: list(source.systems).map(systemPart).filter(Boolean).join(', '),
       syncedAt: synced,
       stale: stale,
       staleText: stale ? 'last synced ' + shortDay(synced) : null,
-    };
-  }
-
-  function sourceLine(source, now) {
-    var noun = String(source.label || '').toLowerCase();
-    var total = count(source.records_total);
-    var inPeriod = source.records_in_period === null || source.records_in_period === undefined ? null : count(source.records_in_period);
-    return {
-      label: String(source.label || ''),
-      line: total !== null ? total + ' ' + noun + (inPeriod !== null ? ', ' + inPeriod + ' in your dates' : '') : String(source.label || ''),
-      systems: list(source.systems).map(function (system) { return systemLine(system, now); }),
     };
   }
 
@@ -78,8 +92,9 @@
     });
   }
 
-  /** metric-detail data.lineage -> the Data used view, or null. */
-  function detailModel(lineage, now) {
+  /** metric-detail data.lineage -> the Data used view, or null. options.snapshot: a Right now number. */
+  function detailModel(lineage, now, options) {
+    var snapshot = !!(options && options.snapshot);
     if (!lineage || typeof lineage !== 'object') return null;
     var fields = list(lineage.fields).slice().sort(function (a, b) {
       return FIELD_ORDER.indexOf(a.role) - FIELD_ORDER.indexOf(b.role);
@@ -87,7 +102,8 @@
     return {
       formula: lineage.formula && lineage.formula.plain ? String(lineage.formula.plain) : '',
       equation: equationOf(lineage),
-      sources: list(lineage.sources).map(function (source) { return sourceLine(source, now); }),
+      sources: list(lineage.sources).filter(function (source) { return Number(source.records_total) !== 0; })
+        .map(function (source) { return sourceLine(source, now, snapshot); }),
       fieldSentences: fields.filter(function (f) { return FIELD_SENTENCES[f.role] && f.label; })
         .map(function (f) { return f.label + FIELD_SENTENCES[f.role]; }),
       filters: list(lineage.filters).map(function (f) { return { label: String(f.label || ''), detail: String(f.detail || '') }; }),

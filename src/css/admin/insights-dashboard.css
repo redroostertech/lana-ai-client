@@ -3692,3 +3692,9 @@ button.dash-lines__label:hover,
   font-size: 0.75rem;
   color: var(--lex-text-tertiary);
 }
+
+.metric-data__scope {
+  font-size: 0.75rem;
+  font-style: italic;
+  color: var(--lex-text-tertiary);
+}

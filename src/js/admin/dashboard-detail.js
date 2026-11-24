@@ -1573,12 +1573,14 @@
     if (periodRule) parts.push('<p class="dash-howto__dates">' + escapeHtml(periodRule) + '</p>');
     if (model && model.sources.length) {
       parts.push('<ul class="dash-howto__sources">' + model.sources.map(function (source) {
-        // The entity and its counts lead; the connector is a small "via" detail.
-        var via = source.systems.map(function (system) {
-          return escapeHtml(system.via) + (system.stale ? ', <span class="dash-howto__stale">' + escapeHtml(system.staleText) + '</span>' : '');
-        }).join('; ');
+        // The entity and its counts lead; a small line counts records of
+        // this type by system (not the records this number uses).
+        var sentence = source.systemsLabel.charAt(source.systemsLabel.length - 1) === '.';
+        var via = source.systemsText ? (sentence ? '' : escapeHtml(source.systemsLabel) + ': ') + escapeHtml(source.systemsText) : '';
+        if (source.stale) via += (via ? ', ' : '') + '<span class="dash-howto__stale">' + escapeHtml(source.staleText) + '</span>';
         return '<li><span class="dash-howto__entity">' + escapeHtml(source.line) + '</span>'
-          + (via ? '<span class="dash-howto__via">' + via + '</span>' : '') + '</li>';
+          + (via ? '<span class="dash-howto__via">' + via + '</span>' : '')
+          + (sentence ? '<span class="dash-howto__via">' + escapeHtml(source.systemsLabel) + '</span>' : '') + '</li>';
       }).join('') + '</ul>');
     } else if (lines && lines.sources.length) {
       parts.push('<div class="dash-howto__chips">' + lines.sources.map(function (label) {
@@ -1613,7 +1615,8 @@
         periodStart: currentPeriod.start, periodEnd: currentPeriod.end, compareBy: currentPeriod.compareBy, rawLimit: 0,
       }).then(function (response) {
         var payload = response && response.data ? response.data : response;
-        lineageCache[cacheKey].model = window.LineageView.detailModel(payload && payload.lineage, Date.now());
+        lineageCache[cacheKey].model = window.LineageView.detailModel(payload && payload.lineage, Date.now(),
+          { snapshot: window.MetricCardView.isPointInTime(entry.metric) });
         redraw();
       }).catch(function () { /* the instant summary stays */ });
     });

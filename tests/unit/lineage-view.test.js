@@ -60,21 +60,32 @@ describe('detailModel', () => {
     expect(L.detailModel({ formula: { kind: 'count', plain: 'Counts matters.' }, inputs: [] }, NOW).equation).toBe(null);
   });
 
-  test('sources say how many records, and how many in your dates when the source has its own date', () => {
+  test('sources lead with the entity on file, plus "counted in your dates" (the metric\'s own date window) when not null', () => {
     const m = L.detailModel(conversion, NOW);
-    expect(m.sources.map((s) => s.line)).toEqual(['1,204 leads, 36 in your dates', '916 matters']);
+    expect(m.sources.map((s) => s.line)).toEqual(['1,204 leads on file, 36 counted in your dates', '916 matters on file']);
   });
 
-  test('the entity leads; the connector is only a small "via" detail beside its sync time', () => {
+  test('count_scope from the server is the note on the counts; without it, the fallback wording', () => {
+    const withScope = L.detailModel({ sources: [Object.assign({}, conversion.sources[0], { count_scope: 'All leads the firm has, by system.' })] }, NOW);
+    expect(withScope.sources[0].systemsLabel).toBe('All leads the firm has, by system.');
+    expect(L.detailModel(conversion, NOW).sources[0].systemsLabel).toBe('records of this type, by system');
+  });
+
+  test('a Right now metric never shows "counted in your dates"', () => {
+    expect(L.detailModel(conversion, NOW, { snapshot: true }).sources[0].line).toBe('1,204 leads on file');
+  });
+
+  test('the systems line counts records of this type by system (not records used): via a connector, in LANA', () => {
     const m = L.detailModel(conversion, NOW);
-    expect(m.sources[0].label).toBe('Leads');
-    expect(m.sources[0].systems).toEqual([
-      { via: 'via Leadly', records: '1,180', syncedAt: '2026-11-24T09:00:00Z', stale: false, staleText: null },
-      { via: 'via LANA', records: '24', syncedAt: null, stale: false, staleText: null },
-    ]);
-    expect(m.sources[1].systems[0]).toMatchObject({ via: 'via ActionStep', stale: true, staleText: 'last synced Aug 10' });
-    // No connector name stands on its own as a label.
-    expect(m.sources.every((s) => s.systems.every((sys) => sys.label === undefined))).toBe(true);
+    expect(m.sources[0]).toMatchObject({ systemsLabel: 'records of this type, by system', systemsText: '1,180 via Leadly, 24 in LANA', stale: false, staleText: null,
+      syncedAt: '2026-11-24T09:00:00Z' });
+    expect(m.sources[1]).toMatchObject({ systemsText: '916 via ActionStep', stale: true, staleText: 'last synced Aug 10' });
+    expect(m.sources.every((s) => s.label && s.systemsText.indexOf('used') === -1)).toBe(true);
+  });
+
+  test('a source with nothing on file is left out', () => {
+    const m = L.detailModel({ sources: [{ entity: 'lead', label: 'Leads', records_total: 0, records_in_period: 0, systems: [] }, conversion.sources[1]] }, NOW);
+    expect(m.sources.map((s) => s.label)).toEqual(['Matters']);
   });
 
   test('fields read as sentences, grouped by what they do', () => {

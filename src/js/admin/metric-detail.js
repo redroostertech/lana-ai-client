@@ -275,22 +275,29 @@
     return 'admin/metric_detail.html?' + parts.join('&');
   }
 
-  // "via ActionStep, synced 3 hours ago": the connector is a small detail
-  // under the entity, never a headline or a chip on its own.
-  function viaText(system) {
+  // Under the entity, a small line: records of this type by system
+  // ("7,715 via ActionStep, 8 in LANA") and when it last synced. These count
+  // every record of the type, not only the ones this number uses.
+  function systemsLine(source) {
     var synced = '';
-    if (system.stale) {
-      synced = ', <span class="metric-data__stale" title="This source has not synced for over a week">' + escapeHtml(system.staleText) + '</span>';
-    } else if (system.syncedAt && window.Lex && Lex.Utils && Lex.Utils.timeAgo) {
-      synced = ', synced ' + escapeHtml(Lex.Utils.timeAgo(system.syncedAt));
+    if (source.stale) {
+      synced = ', <span class="metric-data__stale" title="This source has not synced for over a week">' + escapeHtml(source.staleText) + '</span>';
+    } else if (source.syncedAt && window.Lex && Lex.Utils && Lex.Utils.timeAgo) {
+      synced = ', synced ' + escapeHtml(Lex.Utils.timeAgo(source.syncedAt));
     }
-    return '<span class="metric-data__via">' + escapeHtml(system.via) + synced + '</span>';
+    if (!source.systemsText && !synced) return '';
+    // The server's count_scope is a full sentence: show it as its own muted
+    // note; the short fallback reads as a label in front of the counts.
+    var sentence = source.systemsLabel.charAt(source.systemsLabel.length - 1) === '.';
+    return '<span class="metric-data__via">' + (source.systemsText
+      ? (sentence ? '' : escapeHtml(source.systemsLabel) + ': ') + escapeHtml(source.systemsText) : 'Synced') + synced + '</span>'
+      + (sentence ? '<span class="metric-data__scope">' + escapeHtml(source.systemsLabel) + '</span>' : '');
   }
 
-  function renderDataUsed(lineage) {
+  function renderDataUsed(lineage, snapshot) {
     var node = el('metricDataUsed');
     if (!node) return;
-    var model = window.LineageView ? window.LineageView.detailModel(lineage, Date.now()) : null;
+    var model = window.LineageView ? window.LineageView.detailModel(lineage, Date.now(), { snapshot: snapshot }) : null;
     node.hidden = !model;
     if (!model) { node.innerHTML = ''; return; }
     var parts = ['<h3 class="metric-about__label">Data used</h3>'];
@@ -304,7 +311,7 @@
     if (model.sources.length) {
       parts.push('<h4 class="metric-data__heading">Where the data comes from</h4><ul class="metric-data__list">' + model.sources.map(function (source) {
         return '<li><span class="metric-data__source">' + escapeHtml(source.line) + '</span>'
-          + (source.systems.length ? '<span class="metric-data__systems">' + source.systems.map(viaText).join('') + '</span>' : '')
+          + systemsLine(source)
           + '</li>';
       }).join('') + '</ul>');
     }
@@ -439,7 +446,7 @@
 
       var snapshots = payload.snapshots || [];
       renderSummary(payload, snapshots);
-      renderDataUsed(payload.lineage);
+      renderDataUsed(payload.lineage, window.MetricCardView ? window.MetricCardView.isPointInTime(payload) || window.MetricCardView.isPointInTime(current) : false);
       renderHistory(snapshots);
       renderRawData(payload.raw_data && payload.raw_data.rows ? payload.raw_data.rows : []);
       renderRawDataTotal(payload.raw_data);
