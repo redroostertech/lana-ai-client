@@ -31,11 +31,11 @@ function node(value = '') {
   };
 }
 
-function page(api = {}) {
+function page(api = {}, user = null) {
   let source = fs.readFileSync(path.join(__dirname, '../../src/js/admin/dashboard-detail.js'), 'utf8');
   const end = source.lastIndexOf('  init();');
   source = source.slice(0, end)
-    + '  window.testExports = { renderMetricCard, loadMetrics, readPeriodControls, cardLoads: function () { return cardLoads; } };'
+    + '  window.testExports = { renderMetricCard, loadMetrics, readPeriodControls, setBanner, cardLoads: function () { return cardLoads; } };'
     + source.slice(end + '  init();'.length);
   const nodes = {};
   const document = { addEventListener() {}, getElementById: (id) => (nodes[id] = nodes[id] || node()), querySelector: () => null, querySelectorAll: () => [] };
@@ -43,6 +43,7 @@ function page(api = {}) {
   const LanaTime = { nowMs: () => 0, formatUtcDayRange: (a, b) => a + ' to ' + b, reportPresetDays: () => ({ start: '2026-01-01', end: '2026-01-31' }), MS_PER_DAY: 86400000 };
   const Lex = { Utils: { getFirmTimezone: () => 'America/New_York' }, Nav: { getParams: () => new URLSearchParams('') } };
   window.Lex = Lex;
+  window.api = { user };
   vm.runInNewContext(source, { window, document, console: { log() {}, error() {}, warn() {} }, Intl, URLSearchParams,
     setTimeout: jest.fn(), clearTimeout: jest.fn(), LanaTime, Lex, api: Object.assign({ listBIDashboards: jest.fn().mockResolvedValue({ data: [] }) }, api),
     DashboardTiles: { cardRequestKeys: () => null } });
@@ -51,9 +52,9 @@ function page(api = {}) {
 }
 
 describe('tiles', () => {
-  test('a list value draws bars labelled from the rows, never "1 row"', () => {
+  test('a list value draws columns labelled from the rows, never "1 row"', () => {
     const html = page().exports.renderMetricCard(card('new_cases_opened_by_service_offering'));
-    expect(html).toContain('mini-bars');
+    expect(html).toContain('mini-cols');
     expect(text(html)).toContain('Estate Planning');
     expect(text(html)).toContain('21');
     expect(text(html)).not.toContain('1 row');
@@ -71,14 +72,14 @@ describe('tiles', () => {
     expect(money).toContain('$84,250');
     expect(money).toContain('$31,001');
     const closed = text(page().exports.renderMetricCard(card('closed_cases_by_service_offering')));
-    expect(closed).toContain('Estate Planning 6');
+    expect(closed).toContain('Estate Planning: 6');
     expect(closed).not.toContain('$');
   });
 
   test('actual vs needed before a goal: actual bars only and a quiet note', () => {
     const html = page().exports.renderMetricCard(card('actual_vs_needed_service_offerings'));
-    expect(html).toContain('mini-bars');
-    expect(html).not.toContain('mini-bars__fill--second');
+    expect(html).toContain('mini-cols');
+    expect(html).not.toContain('mini-cols__bar--second');
     expect(text(html)).not.toContain('4 rows');
     expect(text(html)).not.toContain('null');
     expect(text(html)).toContain('Needed counts appear once a goal is set.');
@@ -202,3 +203,44 @@ describe('loading', () => {
     expect(getDashboardMetricCards.mock.calls[0][0]).toMatchObject({ periodStart: '2026-01-01', periodEnd: '2026-01-31' });
   });
 });
+
+describe('bento layout and header', () => {
+  test('the first ok number by server order is the hero; charts span wide; waiting cards come last', async () => {
+    const p = page({ getDashboardMetricCards: jest.fn().mockResolvedValue({ data: cards }) });
+    await p.exports.loadMetrics('owner');
+    const html = p.nodes.dashboardMetricGrid.innerHTML;
+    const articles = html.split('<article ').slice(1);
+    expect(articles.filter((a) => a.includes('dash-metric-card--hero'))).toHaveLength(1);
+    expect(articles[0]).toContain('dash-bento__item--hero');
+    expect(articles[0]).toContain('Average Case Value');
+    expect(articles.filter((a) => a.includes('dash-bento__item--chart')).length).toBeGreaterThan(0);
+    expect(articles[articles.length - 1]).toContain('dash-metric-card--waiting');
+  });
+
+  test('pill tabs list All and each group with counts', async () => {
+    const p = page({ getDashboardMetricCards: jest.fn().mockResolvedValue({ data: cards }) });
+    await p.exports.loadMetrics('owner');
+    const tabs = text(p.nodes.dashboardTypeFilters.innerHTML);
+    expect(tabs).toContain('All ' + cards.length);
+    expect(tabs).toContain('Finance');
+    expect(p.nodes.dashboardTypeFilters.innerHTML).toContain('aria-selected="true" data-dashboard-type-filter="all"');
+  });
+
+  test('the greeting names the signed-in person, and hides when there is no first name', () => {
+    const named = page({}, { first_name: 'Ana' });
+    named.exports.setBanner({ title: 'Owner Performance', subtitle: 'x' });
+    expect(named.nodes.dashboardGreeting.textContent).toMatch(/^Good (morning|afternoon|evening), Ana$/);
+    expect(named.nodes.dashboardGreeting.hidden).toBe(false);
+    const nameless = page({}, null);
+    nameless.exports.setBanner({ title: 'Owner Performance', subtitle: 'x' });
+    expect(nameless.nodes.dashboardGreeting.hidden).toBe(true);
+  });
+
+  test('a kpi card shows the delta chip under its number', () => {
+    const html = page().exports.renderMetricCard(Object.assign({}, card('average_case_value'), {
+      comparison: { previous_value: 5000, absolute_change: 389, percent_change: 7.8, direction: 'up' } }));
+    expect(html).toContain('mini-delta mini-delta--up');
+    expect(text(html)).toContain('+7.8% vs previous period');
+  });
+});
+

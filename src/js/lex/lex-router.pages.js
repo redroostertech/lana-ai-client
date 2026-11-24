@@ -573,6 +573,7 @@
         'js/shared/load-state.js',
         'js/shared/metric-card-view.js',
         'js/shared/mini-charts.js',
+        'js/shared/dashboard-layout.js',
         'js/shared/title-switcher.js',
         'js/admin/dashboard-detail.js'
       ],

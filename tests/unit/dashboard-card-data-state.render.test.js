@@ -77,5 +77,5 @@ test('the populated count leaves out tiles that have no data', () => {
   const metrics = [{ metric_key: 'a', value: 1, data_state: 'ok' }, { metric_key: 'b', value: 0, data_state: 'ok' },
     { metric_key: 'c', value: null, data_state: 'no_data_source', data_state_reason: 'x' }];
   page().renderViewContext('owner', metrics, [{}, {}]);
-  expect(text(nodes.dashboardViewContext.innerHTML)).toContain('2 populated metrics');
+  expect(text(nodes.dashboardViewContext.innerHTML)).toContain('2 metrics with data');
 });

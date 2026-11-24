@@ -32,84 +32,87 @@
 
   <template id="page-content">
     <main>
-      <lex-banner
-        id="dashboardDetailBanner"
-        class="detail-banner detail-banner--no-actions"
-        variant="light"
-        heading="Dashboard"
-        subtitle="Role-aware metric cards backed by the report module metric catalog"
-        max-actions="1"
-        lana
-        lana-context-type="full_chat"
-      >
-        <lex-btn id="openReportingBtn" variant="secondary" size="sm">Open Reports</lex-btn>
-        <button id="editDashboardBtn" type="button" role="menuitem">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-          Edit
-        </button>
-        <button id="deleteDashboardBtn" type="button" role="menuitem" data-variant="danger">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a2 2 0 012-2h2a2 2 0 012 2v3"/></svg>
-          Delete
-        </button>
-      </lex-banner>
-
-      <lex-breadcrumb id="dashboardDetailBreadcrumb"></lex-breadcrumb>
+      <!-- One header: breadcrumb, greeting, the dashboard's title and actions,
+           the Insights mark, and the date-range control. -->
+      <header class="dash-header">
+        <lex-breadcrumb id="dashboardDetailBreadcrumb" class="dash-header__crumbs"></lex-breadcrumb>
+        <div class="dash-header__main">
+          <!-- Insights brand animation: plays once on load, first frame under Reduce Motion. -->
+          <lex-brand-mark id="dashboardHeaderMark" class="dash-header__mark" animation="chart" size="48" once></lex-brand-mark>
+          <div class="dash-header__titles">
+            <p id="dashboardGreeting" class="dash-header__greeting" hidden></p>
+            <lex-banner
+              id="dashboardDetailBanner"
+              class="dash-header__banner detail-banner detail-banner--no-actions"
+              variant="light"
+              size="compact"
+              heading="Dashboard"
+              subtitle="Role-aware metric cards backed by the report module metric catalog"
+              max-actions="1"
+              lana
+              lana-context-type="full_chat"
+            >
+              <lex-btn id="openReportingBtn" variant="secondary" size="sm">Open Reports</lex-btn>
+              <button id="editDashboardBtn" type="button" role="menuitem">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                Edit
+              </button>
+              <button id="deleteDashboardBtn" type="button" role="menuitem" data-variant="danger">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a2 2 0 012-2h2a2 2 0 012 2v3"/></svg>
+                Delete
+              </button>
+            </lex-banner>
+          </div>
+        </div>
+        <div class="dash-header__bar">
+          <div id="dashboardViewContext" class="dash-header__meta"></div>
+          <div class="dash-period">
+            <lex-brand-mark id="dashboardPeriodLoading" class="dash-period__loading" animation="spinner" size="24" label="Loading the numbers" hidden></lex-brand-mark>
+            <button id="dashboardPeriodToggle" class="dash-period__toggle" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="dashboardPeriodPanel">
+              <svg class="dash-period__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+              <span id="dashboardPeriodLabel" class="dash-period__label">Dates</span>
+              <svg class="dash-period__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div id="dashboardPeriodPanel" class="dash-period__panel" role="dialog" aria-label="Choose the dates" hidden>
+              <section class="detail-period-card" aria-labelledby="dashboardPeriodHeading">
+              <div class="detail-period-card__presets">
+              <p class="detail-period-card__label" id="dashboardPeriodHeading">Quick picks</p>
+              <div id="dashboardPeriodPresets" class="detail-period-card__buttons">
+                <lex-btn data-dashboard-preset="last7days" variant="secondary" size="sm">Last 7 Days</lex-btn>
+                <lex-btn data-dashboard-preset="last30days" variant="secondary" size="sm">Last 30 Days</lex-btn>
+                <lex-btn data-dashboard-preset="thisMonth" variant="secondary" size="sm">This Month</lex-btn>
+                <lex-btn data-dashboard-preset="lastMonth" variant="secondary" size="sm">Last Month</lex-btn>
+                <lex-btn data-dashboard-preset="thisQuarter" variant="secondary" size="sm">This Quarter</lex-btn>
+                <lex-btn data-dashboard-preset="thisYear" variant="secondary" size="sm">This Year</lex-btn>
+                <lex-btn data-dashboard-preset="lastYear" variant="secondary" size="sm">Last Year</lex-btn>
+              </div>
+              </div>
+              <div class="detail-period-card__fields">
+                <lex-input id="dashboardPeriodStart" label="Start Date" type="date" name="dashboardPeriodStart"></lex-input>
+                <lex-input id="dashboardPeriodEnd" label="End Date" type="date" name="dashboardPeriodEnd"></lex-input>
+                <lex-select
+                  id="dashboardPeriodType"
+                  label="Compare By"
+                  name="dashboardPeriodType"
+                  value="monthly"
+                  options='[{"value":"daily","label":"Daily"},{"value":"weekly","label":"Weekly"},{"value":"monthly","label":"Monthly"},{"value":"quarterly","label":"Quarterly"},{"value":"yearly","label":"Yearly"}]'
+                ></lex-select>
+              </div>
+              </section>
+            </div>
+          </div>
+        </div>
+      </header>
 
       <section class="dash-detail-content">
-        <div class="dash-view-context dash-view-context--with-mark">
-          <!-- Insights brand animation: plays once on load, first frame under Reduce Motion. -->
-          <lex-brand-mark id="dashboardHeaderMark" class="dash-view-context__mark" animation="chart" size="56" once></lex-brand-mark>
-          <div id="dashboardViewContext" class="dash-view-context__body"></div>
+        <div class="dash-tabs-row">
+          <div id="dashboardTypeFilters" class="dash-tabs" role="tablist" aria-label="Metric types"></div>
+          <label class="dash-tabs-row__search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
+            <input id="dashboardMetricSearch" type="search" placeholder="Search cards..." autocomplete="off" aria-label="Search cards">
+          </label>
         </div>
-        <section class="detail-period-card" aria-labelledby="dashboardPeriodHeading">
-          <div class="detail-period-card__presets">
-            <div class="dash-period-heading">
-              <p class="detail-period-card__label" id="dashboardPeriodHeading">Quick Select Period</p>
-              <lex-brand-mark id="dashboardPeriodLoading" class="dash-period-heading__loading" animation="spinner" size="24" label="Loading the numbers" hidden></lex-brand-mark>
-            </div>
-            <div id="dashboardPeriodPresets" class="detail-period-card__buttons">
-              <lex-btn data-dashboard-preset="last7days" variant="secondary" size="sm">Last 7 Days</lex-btn>
-              <lex-btn data-dashboard-preset="last30days" variant="secondary" size="sm">Last 30 Days</lex-btn>
-              <lex-btn data-dashboard-preset="thisMonth" variant="secondary" size="sm">This Month</lex-btn>
-              <lex-btn data-dashboard-preset="lastMonth" variant="secondary" size="sm">Last Month</lex-btn>
-              <lex-btn data-dashboard-preset="thisQuarter" variant="secondary" size="sm">This Quarter</lex-btn>
-              <lex-btn data-dashboard-preset="thisYear" variant="secondary" size="sm">This Year</lex-btn>
-              <lex-btn data-dashboard-preset="lastYear" variant="secondary" size="sm">Last Year</lex-btn>
-            </div>
-          </div>
-
-          <div class="detail-period-card__fields">
-            <lex-input id="dashboardPeriodStart" label="Start Date" type="date" name="dashboardPeriodStart"></lex-input>
-            <lex-input id="dashboardPeriodEnd" label="End Date" type="date" name="dashboardPeriodEnd"></lex-input>
-            <lex-select
-              id="dashboardPeriodType"
-              label="Compare By"
-              name="dashboardPeriodType"
-              value="monthly"
-              options='[{"value":"daily","label":"Daily"},{"value":"weekly","label":"Weekly"},{"value":"monthly","label":"Monthly"},{"value":"quarterly","label":"Quarterly"},{"value":"yearly","label":"Yearly"}]'
-            ></lex-select>
-          </div>
-        </section>
-        <div class="dash-browser">
-          <aside class="dash-browser__rail" aria-label="Dashboard metric filters">
-            <div class="dash-browser__rail-title">Types</div>
-            <div class="dash-browser__search">
-              <span class="dash-browser__search-icon" aria-hidden="true">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="11" cy="11" r="8"></circle>
-                  <path d="m21 21-4.35-4.35"></path>
-                </svg>
-              </span>
-              <input id="dashboardMetricSearch" type="search" placeholder="Search cards..." autocomplete="off">
-            </div>
-            <!-- Shown instead of the filter list when the column is narrow -->
-            <lex-select id="dashboardTypeSelect" class="dash-browser__type-select" name="dashboardTypeSelect" variant="outlined" placeholder="Search types..." searchable></lex-select>
-            <div id="dashboardTypeFilters" class="dash-browser__filters"></div>
-          </aside>
-          <div class="dash-browser__content">
-            <div id="dashboardMetricGrid" class="dash-card-grid"></div>
-          </div>
-        </div>
+        <div id="dashboardMetricGrid" class="dash-bento"></div>
         <lex-empty id="dashboardMetricEmpty" message="No metrics found" description="This dashboard view does not have cataloged metrics yet" icon="chart" hidden></lex-empty>
       </section>
 
@@ -181,6 +184,7 @@
   <script src="../js/shared/load-state.js"></script>
   <script src="../js/shared/metric-card-view.js"></script>
   <script src="../js/shared/mini-charts.js"></script>
+  <script src="../js/shared/dashboard-layout.js"></script>
   <script src="../js/shared/title-switcher.js"></script>
   <script src="../js/admin/dashboard-detail.js"></script>
   <script src="../js/auth-guard.js"></script>

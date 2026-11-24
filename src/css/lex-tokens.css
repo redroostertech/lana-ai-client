@@ -154,6 +154,10 @@
   --lex-text-accent:      var(--lex-color-brand-600);
   --lex-text-accent-hover:var(--lex-color-brand-700);
   --lex-text-on-accent:   var(--lex-color-white);
+  /* LANA evergreen: the filled accent for a page's lead card (the Dashboards hero). */
+  --lex-bg-evergreen:        #2F7D5F;
+  --lex-bg-evergreen-strong: #24624B;
+  --lex-text-on-evergreen:   #FFFFFF;
   --lex-text-link:        var(--lex-color-brand-600);
   --lex-text-link-hover:  var(--lex-color-brand-800);
 
@@ -658,6 +662,9 @@
     --lex-text-accent:      #67C9A0;
     --lex-text-accent-hover:#8FD9B9;
     --lex-text-on-accent:   #151715;
+    --lex-bg-evergreen:        #1F5A45;
+    --lex-bg-evergreen-strong: #184A39;
+    --lex-text-on-evergreen:   #EEF1EE;
     --lex-text-link:        #67C9A0;
     --lex-text-link-hover:  #8FD9B9;
 

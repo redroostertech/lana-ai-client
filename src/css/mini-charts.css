@@ -24,10 +24,19 @@
   stroke-linejoin: round;
 }
 
+/* The area under the line fades out downward (its own gradient, fill set
+   on the element). */
 .mini-spark__area {
-  fill: currentColor;
-  opacity: 0.12;
   stroke: none;
+}
+
+.mini-spark__stop {
+  stop-color: currentColor;
+  stop-opacity: 0.28;
+}
+
+.mini-spark__stop--end {
+  stop-opacity: 0;
 }
 
 /* Holds the sparkline's space while history loads, so nothing jumps. */
@@ -155,6 +164,107 @@
   color: var(--lex-text-tertiary);
 }
 
+/* ── Columns ───────────────────────────────────────────────── */
+.mini-cols {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.mini-cols__svg {
+  display: block;
+  width: 100%;
+  height: 11rem;
+  overflow: visible;
+}
+
+.mini-cols__grid line {
+  stroke: var(--lex-border-subtle);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.mini-cols__grid .mini-cols__base {
+  stroke-dasharray: none;
+}
+
+.mini-cols__bar {
+  fill: var(--lex-chart-color-3);
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: mini-col-grow 650ms var(--lex-ease-out, ease-out) both;
+}
+
+.mini-cols__bar--second {
+  fill: var(--lex-chart-color-6);
+}
+
+.mini-cols__group:hover .mini-cols__bar {
+  filter: brightness(1.08);
+}
+
+.mini-cols__group:nth-of-type(2) .mini-cols__bar { animation-delay: 50ms; }
+.mini-cols__group:nth-of-type(3) .mini-cols__bar { animation-delay: 100ms; }
+.mini-cols__group:nth-of-type(4) .mini-cols__bar { animation-delay: 150ms; }
+.mini-cols__group:nth-of-type(n+5) .mini-cols__bar { animation-delay: 200ms; }
+
+.mini-cols__value {
+  font-size: 9px;
+  font-weight: 700;
+  fill: var(--lex-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.mini-cols__label {
+  font-size: 8.5px;
+  fill: var(--lex-text-tertiary);
+}
+
+/* ── Delta chip ────────────────────────────────────────────── */
+.mini-delta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mini-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 999px;
+  padding: 0.1875rem 0.5625rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.mini-delta--up {
+  background: var(--lex-status-success-bg);
+  color: var(--lex-status-success);
+}
+
+.mini-delta--down {
+  background: var(--lex-status-danger-bg);
+  color: var(--lex-status-danger);
+}
+
+.mini-delta--flat {
+  background: var(--lex-bg-tertiary);
+  color: var(--lex-text-secondary);
+}
+
+.mini-delta__arrow {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+.mini-delta__words {
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+}
+
 /* ── Goal ring ─────────────────────────────────────────────── */
 .mini-ring {
   display: flex;
@@ -267,6 +377,11 @@
   to { transform: scaleX(1); }
 }
 
+@keyframes mini-col-grow {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
 @keyframes mini-ring-fill {
   from { stroke-dashoffset: 100; }
 }
@@ -284,6 +399,7 @@
 @media (prefers-reduced-motion: reduce) {
   .mini-spark,
   .mini-bars__fill,
+  .mini-cols__bar,
   .mini-ring__fill,
   .mini-spark-slot--loading {
     animation: none;
