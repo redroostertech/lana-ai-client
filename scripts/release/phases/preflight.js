@@ -12,6 +12,9 @@
  * Every check runs; the phase fails at the end if any failed, listing them all.
  */
 
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const { PARTS_BUCKET, TARGETS } = require('../config');
 const { allPieces } = require('../pieces');
 
@@ -67,16 +70,28 @@ async function commonChecks(ctx, checks) {
   return { tips, pins, listing };
 }
 
+/** azure-verify's own credential file (its service principal, never the operator's az login). */
+function azureVerifyCredentials(env, home) {
+  const file = env.LANA_AZURE_VERIFY_CREDENTIALS || path.join(home || os.homedir(), '.config', 'lana', 'azure-verify.json');
+  if (!fs.existsSync(file)) {return { ok: false, detail: `no ${file}` };}
+  const mode = fs.statSync(file).mode & 0o777;
+  return mode === 0o600 ? { ok: true, detail: `${file} (600)` } : { ok: false, detail: `${file} must be mode 600` };
+}
+
 async function partsChecks(ctx, checks, found) {
-  const needAzure = ctx.targets.some((t) => t === 'windows-x64' || t === 'linux-x64');
-  if (needAzure) {
-    const az = await ctx.run('az', ['account', 'show', '--query', 'name', '-o', 'tsv']);
-    check(checks, 'Azure login', az.code === 0, az.code === 0 ? 'logged in' : 'run az login');
+  const missing = allPieces({ listing: found.listing, pins: found.pins, targets: ctx.targets }).filter((p) => p.state === 'missing');
+  if (missing.some((p) => p.target === 'windows-x64' || p.target === 'linux-x64')) {
+    const cred = azureVerifyCredentials(ctx.env, ctx.home);
+    check(checks, 'Azure (azure-verify credentials)', cred.ok, cred.detail);
   }
   if (!ctx.serverRepo) {check(checks, 'LANA-AI checkout given', false, 'pass --server-repo <path to a LANA-AI checkout>');}
-  // The release folder holds sources, builds and archives, so its disk is the one that counts.
+  // The release folder holds sources, builds and archives, so its disk is the one that counts, and only when something is built.
   const gb = await freeGb(ctx.run, ctx.workDir || ctx.home || process.env.HOME || '/');
-  check(checks, 'Disk space', gb !== null && gb >= MIN_FREE_GB.parts, `${gb} GB free, ${MIN_FREE_GB.parts} GB needed${ctx.workDir ? '' : ' (or pass --work-dir on a bigger disk)'}`);
+  if (missing.length) {
+    check(checks, 'Disk space', gb !== null && gb >= MIN_FREE_GB.parts, `${gb} GB free, ${MIN_FREE_GB.parts} GB needed to build ${missing.length} piece(s)${ctx.workDir ? '' : ' (or pass --work-dir on a bigger disk)'}`);
+  } else {
+    ctx.report.notes.push(`Every piece is in R2; nothing to build here (${gb} GB free).`);
+  }
   const version = await ctx.packageVersionAt('origin/production');
   // On the parts machine the version is set in the pins phase; here it is only reported.
   ctx.report.notes.push(version === ctx.version ? `Client production already says ${version}.` : `Client production says ${version}; the pins phase sets ${ctx.version}.`);
@@ -88,7 +103,8 @@ async function installerChecks(ctx, checks, found) {
   check(checks, 'Version set', version === ctx.version, `client production says ${version}, this release is ${ctx.version}`);
   const head = await ctx.git.head(ctx.clientRoot);
   check(checks, 'Checkout is client production', head === found.tips.client, `this checkout is ${head.slice(0, 9)}, production is ${String(found.tips.client).slice(0, 9)}`);
-  check(checks, 'Checkout is clean', await ctx.git.clean(ctx.clientRoot), 'no local changes');
+  const clean = await ctx.git.clean(ctx.clientRoot);
+  check(checks, 'Checkout is clean', clean, clean ? 'no local changes' : 'this checkout has local changes to tracked files');
   const pieces = allPieces({ listing: found.listing, pins: found.pins, targets: TARGETS });
   const notReady = pieces.filter((p) => p.state !== 'ready');
   check(checks, 'All 12 pieces in R2 with pin entries', notReady.length === 0,
@@ -118,4 +134,4 @@ async function preflight(ctx) {
   return { checks, found };
 }
 
-module.exports = { preflight, freeGb, MIN_FREE_GB };
+module.exports = { preflight, freeGb, azureVerifyCredentials, MIN_FREE_GB };

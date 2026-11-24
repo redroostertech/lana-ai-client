@@ -5,9 +5,11 @@
  * client's pins.
  *
  * An archive is <target>/<part>-<12-char id>.tar.gz with a .sha256 beside it.
- * Its id is the start of what the pin records for that build: Pip's sha256,
- * the engine's tree sha256, the redactor's lana-redactor commit. So the
- * archive that belongs to a pin entry can be found by name.
+ * Its id is the first 12 characters of the commit the piece is built from:
+ * LANA.cpp for Pip, LANA-AI for the engine, lana-redactor for the redactor
+ * (the names in lana-build-parts for 4.2.0). Whether a build is pinned is the
+ * pin's entry for that system; the content is checked against that entry when
+ * it is unpacked (fetch-client-parts.js), and an archive is never overwritten.
  */
 
 const { TARGETS, PARTS } = require('./config');
@@ -22,12 +24,10 @@ function pinEntry(pins, target, part) {
   return pins.redactor && pins.redactor.commit ? { commit: pins.redactor.commit } : null;
 }
 
-/** The archive id a pin entry points at, or null when the pin has no entry. */
-function expectedId(pins, target, part) {
-  const entry = pinEntry(pins, target, part);
-  if (!entry) {return null;}
-  const value = part === 'pip' ? entry.sha256 : part === 'engine' ? entry.treeSha256 : entry.commit;
-  return value ? String(value).slice(0, 12) : null;
+/** The archive id for a piece: the first 12 characters of its source commit. */
+function expectedId(pins, _target, part) {
+  const commit = part === 'pip' ? pins.pip.commit : part === 'engine' ? pins.engine.commit : pins.redactor.commit;
+  return commit ? String(commit).slice(0, 12) : null;
 }
 
 function archiveKey(target, part, id) {
@@ -46,20 +46,15 @@ function archivesIn(listing, target, part) {
 
 /**
  * One piece's state:
- *   ready       the pin has an entry and its archive and .sha256 are in the bucket
- *   unpinned    an archive is in the bucket but the pin has no entry for it yet
- *   missing     nothing usable in the bucket: it must be built
+ *   ready       its archive and .sha256 are in the bucket and the pin has its entry
+ *   unpinned    its archive is in the bucket but the pin has no entry for it yet
+ *   missing     no archive for its commit: it must be built
  */
 function pieceStatus({ listing, pins, target, part }) {
-  const archives = archivesIn(listing, target, part).filter((a) => a.hasSha);
   const want = expectedId(pins, target, part);
-  if (want) {
-    const archive = archives.find((a) => a.id === want);
-    if (archive) {return { target, part, state: 'ready', archive };}
-    return { target, part, state: 'missing', reason: `the pin's build (${want}) is not in the bucket` };
-  }
-  if (archives.length) {return { target, part, state: 'unpinned', archive: archives[0] };}
-  return { target, part, state: 'missing', reason: 'not built yet' };
+  const archive = archivesIn(listing, target, part).find((a) => a.hasSha && a.id === want);
+  if (!archive) {return { target, part, state: 'missing', reason: `no archive for ${want} in the bucket` };}
+  return { target, part, state: pinEntry(pins, target, part) ? 'ready' : 'unpinned', archive };
 }
 
 function allPieces({ listing, pins, targets = TARGETS }) {

@@ -93,6 +93,12 @@ Options: `--phase <name>` runs one phase; `--target <system>` limits the pieces 
 
 **Secrets.** Each machine reads the R2 keys from Heroku itself (`heroku login` first). They go only to the `aws` program's environment and are never printed. If the `heroku` command does not start on a Mac (a Homebrew Node problem), set `LANA_HEROKU_BIN` to the Heroku CLI's script and the command runs it with its own Node. The links file is private (mode 600), lives in the release folder, and is never printed or passed to another agent.
 
+**Pieces in R2.** Each piece is `lana-build-parts/<target>/<part>-<id>.tar.gz` with a `.sha256` beside it, where `<id>` is the first 12 characters of the commit it is built from (LANA.cpp for Pip, LANA-AI for the engine, lana-redactor for the redactor). A piece counts as ready when its archive is there and the client's pin has its entry; the archive's content is checked against that entry when it is unpacked. An archive is never overwritten.
+
+**Azure.** Windows and Linux pieces and the Railway images are built by LANA-AI's `scripts/release/azure-verify.sh` (suites `client-parts` and `railway-images`), with its own service principal (`~/.config/lana/azure-verify.json`, mode 600), inside its resource group, every resource tagged with the run and deleted when the run ends. The command never uses a personal `az login` and never creates a resource group. VM sizes are tried in order (`LANA_BUILD_VM_SIZES`). Windows Pip comes from LANA.cpp's release build; the Windows VM checks its embedding match with the pinned binary.
+
+**Registry password.** The lana-push password for LANA's image registry is read from Heroku (`LANA_REGISTRY_PUSH_PASSWORD` on `redroostertec-prod`) into a private file that is removed after the push.
+
 **The order.**
 
 1. On the parts Mac: `npm run release -- parts --version 4.2.0 --server-repo ../LANA-AI --work-dir /Volumes/<big disk>/lana-release`. It builds what is missing, uploads it, makes branch `release/4.2.0-pins`, and stops.

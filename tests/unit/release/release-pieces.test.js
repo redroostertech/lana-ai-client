@@ -16,29 +16,29 @@ const PINS = {
 };
 
 describe('the bucket against the pins', () => {
-  test('an archive is the pinned one by its 12-character id: Pip\'s sha256, the engine\'s tree sha256, the redactor commit', () => {
-    expect(expectedId(PINS, 'linux-x64', 'pip')).toBe('333333333333');
-    expect(expectedId(PINS, 'macos-arm64', 'engine')).toBe('444444444444');
+  test('an archive is named by the first 12 characters of its source commit (the names in lana-build-parts)', () => {
+    expect(expectedId(PINS, 'linux-x64', 'pip')).toBe('8ee218c47371');
+    expect(expectedId(PINS, 'macos-arm64', 'engine')).toBe('aaaaaaaaaaaa');
     expect(expectedId(PINS, 'windows-x64', 'redactor')).toBe('e4ea4861f9fc');
-    expect(expectedId(PINS, 'macos-x64', 'pip')).toBeNull();
+    expect(expectedId(PINS, 'macos-x64', 'pip')).toBe('8ee218c47371');
   });
 
   test('ready, unpinned and missing', () => {
-    const listing = listingOf([...readyKeys(), 'macos-x64/pip-abcdefabcdef.tar.gz']);
+    const listing = listingOf([...readyKeys(), 'macos-x64/pip-8ee218c47371.tar.gz']);
     expect(pieceStatus({ listing, pins: PINS, target: 'linux-x64', part: 'pip' }).state).toBe('ready');
-    expect(pieceStatus({ listing, pins: PINS, target: 'macos-x64', part: 'pip' })).toMatchObject({ state: 'unpinned', archive: { key: 'macos-x64/pip-abcdefabcdef.tar.gz' } });
+    expect(pieceStatus({ listing, pins: PINS, target: 'macos-x64', part: 'pip' })).toMatchObject({ state: 'unpinned', archive: { key: 'macos-x64/pip-8ee218c47371.tar.gz' } });
     expect(pieceStatus({ listing, pins: PINS, target: 'windows-x64', part: 'engine' }).state).toBe('missing');
   });
 
   test('an archive without its .sha256 does not count', () => {
-    const listing = [{ key: 'linux-x64/pip-333333333333.tar.gz', size: 1, modified: 'x' }];
+    const listing = [{ key: 'linux-x64/pip-8ee218c47371.tar.gz', size: 1, modified: 'x' }];
     expect(archivesIn(listing, 'linux-x64', 'pip')[0].hasSha).toBe(false);
     expect(pieceStatus({ listing, pins: PINS, target: 'linux-x64', part: 'pip' }).state).toBe('missing');
   });
 
-  test('a pinned build whose archive is not in the bucket is missing, even if another build of it is', () => {
+  test('an archive from another commit does not count', () => {
     const listing = listingOf(['linux-x64/pip-999999999999.tar.gz']);
-    expect(pieceStatus({ listing, pins: PINS, target: 'linux-x64', part: 'pip' })).toMatchObject({ state: 'missing', reason: expect.stringMatching(/333333333333/) });
+    expect(pieceStatus({ listing, pins: PINS, target: 'linux-x64', part: 'pip' })).toMatchObject({ state: 'missing', reason: expect.stringMatching(/8ee218c47371/) });
   });
 
   test('12 pieces: 4 systems by 3 parts', () => {
@@ -54,7 +54,7 @@ describe('the pieces phase', () => {
 
   test('skips what is in the bucket and builds nothing when all 12 are there', async () => {
     const buildMac = jest.fn();
-    const ctx = ctxWith([...readyKeys(), 'macos-x64/pip-aaaaaaaaaaaa.tar.gz', ...['macos-x64', 'windows-x64', 'linux-x64'].map((t) => `${t}/engine-bbbbbbbbbbbb.tar.gz`)]);
+    const ctx = ctxWith([...readyKeys(), 'macos-x64/pip-8ee218c47371.tar.gz', ...['macos-x64', 'windows-x64', 'linux-x64'].map((t) => `${t}/engine-aaaaaaaaaaaa.tar.gz`)]);
     await pieces(ctx, { buildMac, buildAzure: buildMac });
     expect(buildMac).not.toHaveBeenCalled();
     expect(ctx.lines.join('\n')).toMatch(/Every piece is in the bucket/);

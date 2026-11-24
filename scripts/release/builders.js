@@ -24,7 +24,7 @@ const { archiveKey } = require('./pieces');
 const { githubUrl } = require('./git');
 const { scrub } = require('./exec');
 const { engineLoadCheck, redactorSmoke, embedMatch } = require('./smoke');
-const { checkEngine, treeDigest } = require('../local-ai-pins');
+const { checkEngine } = require('../local-ai-pins');
 
 const NODE_X64 = Object.freeze({
   version: '24.21.0',
@@ -149,11 +149,17 @@ function macRunner(ctx, target, env) {
   };
 }
 
-/** The 12-character id of a built piece: Pip's sha256, the engine's tree sha256, the redactor's commit. */
-function builtId({ part, root, platform, redactorCommit }) {
-  if (part === 'pip') {return sha256File(path.join(root, 'build', 'pip', platform === 'win32' ? 'lqe.exe' : 'lqe')).slice(0, 12);}
-  if (part === 'engine') {return treeDigest(path.join(root, 'build', 'engine')).sha256.slice(0, 12);}
-  return redactorCommit.slice(0, 12);
+/** The 12-character id of a built piece: the start of the commit it is built from. */
+function builtId({ part, pins }) {
+  return String(part === 'pip' ? pins.pip.commit : part === 'engine' ? pins.engine.commit : pins.redactor.commit).slice(0, 12);
+}
+
+/** An archive in the bucket is never replaced: a rebuild of the same commit would land on its name. */
+async function refuseOverwrite(r2, key) {
+  const there = await r2.list(PARTS_BUCKET, key);
+  if (there.some((item) => item.key === key || item.key === `${key}.sha256`)) {
+    throw new Error(`${key} is already in ${PARTS_BUCKET}; it is never overwritten. Remove it by hand first if this build must replace it.`);
+  }
 }
 
 /**
@@ -173,6 +179,7 @@ async function packAndUpload(ctx, { target, part, root, id }) {
   fs.writeFileSync(`${file}.sha256`, `${sha256File(file)}  ${name}\n`);
   const r2 = await ctx.r2();
   const key = archiveKey(target, part, id);
+  await refuseOverwrite(r2, key);
   await r2.upload(file, PARTS_BUCKET, key, 'application/gzip');
   await r2.upload(`${file}.sha256`, PARTS_BUCKET, `${key}.sha256`, 'text/plain');
   ctx.report.uploaded.push(`${PARTS_BUCKET}/${key}`);
@@ -266,7 +273,7 @@ async function buildMac(ctx, target, parts, pins) {
       checks.push(...await redactorSmoke({ binary: path.join(root, 'build', 'redactor', 'lana-redactor', 'lana-redactor') }));
     }
     if (checks.length) {throw new Error(`${target}/${part}: ${checks.join('; ')}. Not uploaded.`);}
-    const id = builtId({ part, root, platform: 'darwin', redactorCommit: pins.redactor.commit });
+    const id = builtId({ part, pins });
     const key = await packAndUpload(ctx, { target, part, root, id });
     done.push({ part, key, newEntry: newEntry && newEntry.entry });
   }
@@ -329,7 +336,10 @@ async function buildAzure(ctx, target, parts, pins) {
     const want = fs.readFileSync(`${archive}.sha256`, 'utf8').split(/\s+/)[0];
     if (sha256File(archive) !== want) {throw new Error(`${target}/${part}: the archive from the VM does not match its .sha256. Not uploaded.`);}
     const r2 = await ctx.r2();
+    // The VM's id is checked, not trusted: it must be the piece's source commit.
+    if (outcome.id !== builtId({ part, pins })) {throw new Error(`${target}/${part}: the VM named it ${outcome.id}, not ${builtId({ part, pins })}. Not uploaded.`);}
     const key = archiveKey(target, part, outcome.id);
+    await refuseOverwrite(r2, key);
     const name = path.basename(key);
     fs.writeFileSync(`${archive}.sha256`, `${want}  ${name}\n`);
     await r2.upload(archive, PARTS_BUCKET, key, 'application/gzip');
@@ -341,6 +351,6 @@ async function buildAzure(ctx, target, parts, pins) {
 }
 
 module.exports = {
-  PIP_ASSET, pinnedPipBinary,
+  PIP_ASSET, pinnedPipBinary, refuseOverwrite,
   NODE_X64, parseNewEntry, acceptNewEntry, engineCommand, prepareSource, clientCheckout, intelToolchain, builtId, packAndUpload, embedModel, buildMac, buildAzure, sha256File
 };

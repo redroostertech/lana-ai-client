@@ -22,11 +22,13 @@ const df = { code: 0, stdout: 'Filesystem 1024-blocks Used Available Capacity Mo
 describe('preflight', () => {
   test('parts machine: every check runs and every failure is listed, not just the first', async () => {
     const git = fakeGit({ files: pinsFixture(), tips: { 'redroostertech/LANA-AI:production': 'b'.repeat(40) }, reachable: false, editorServer: 'f'.repeat(40) });
-    const run = fakeRun({ df, az: { code: 1, stdout: '', stderr: 'Please run az login' } });
-    const ctx = makeCtx({ git, run, r2: fakeR2(listingOf(readyKeys())) });
+    const run = fakeRun({ df });
+    const ctx = makeCtx({ git, run, r2: fakeR2(listingOf(readyKeys())), env: { LANA_AZURE_VERIFY_CREDENTIALS: '/nonexistent/azure-verify.json' } });
     const error = await preflight(ctx).catch((e) => e);
     const failed = error.checks.filter((c) => !c.ok).map((c) => c.name);
-    expect(failed).toEqual(expect.arrayContaining(['Engine pin is the server production commit', 'Redactor pin is on lana-redactor main', 'Editor locks match', 'Editor commit is on lana-editor production', 'Azure login']));
+    expect(failed).toEqual(expect.arrayContaining(['Engine pin is the server production commit', 'Redactor pin is on lana-redactor main', 'Editor locks match', 'Editor commit is on lana-editor production', 'Azure (azure-verify credentials)']));
+    // Never the operator's own az login.
+    expect(run.mock.calls.some(([command]) => command === 'az')).toBe(false);
     expect(ctx.report.desk).not.toContain('gate.servercode');
   });
 
@@ -40,6 +42,16 @@ describe('preflight', () => {
     expect(byName['Apple signing identity'].ok).toBe(false);
     expect(byName['Notarization settings'].detail).toBe('not set: APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID');
   });
+});
+
+test('preflight: with every piece in R2, the disk and Azure are not required', async () => {
+  const keys = allKeys();
+  const run = fakeRun({ df: { code: 0, stdout: 'F 1 1 1048576 1% /\n', stderr: '' } });
+  const ctx = makeCtx({ git: fakeGit({ files: pinsFixture({ pipBuilds: allPip(), engineBuilds: allEngine() }) }), run, r2: fakeR2(listingOf(keys)), env: { LANA_AZURE_VERIFY_CREDENTIALS: '/nonexistent' } });
+  const { checks } = await preflight(ctx);
+  expect(checks.map((c) => c.name)).not.toEqual(expect.arrayContaining(['Disk space']));
+  expect(checks.map((c) => c.name)).not.toContain('Azure (azure-verify credentials)');
+  expect(ctx.report.notes.join(' ')).toMatch(/nothing to build here \(1 GB free\)/);
 });
 
 describe('installers', () => {
@@ -60,7 +72,7 @@ describe('installers', () => {
     const lines = fs.readFileSync(file, 'utf8').trim().split('\n');
     expect(fs.statSync(file).mode & 0o777).toBe(0o600);
     expect(lines.filter((l) => !l.startsWith('#'))).toHaveLength(24);
-    expect(lines).toContain(`linux-x64/engine https://secret.example/linux-x64/engine-999999999999.tar.gz?X-Amz-Signature=${'f'.repeat(64)}`);
+    expect(lines).toContain(`linux-x64/engine https://secret.example/linux-x64/engine-aaaaaaaaaaaa.tar.gz?X-Amz-Signature=${'f'.repeat(64)}`);
     expect(ctx.lines.join('\n')).not.toMatch(/secret\.example/);
   });
 

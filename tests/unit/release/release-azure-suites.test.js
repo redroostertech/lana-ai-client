@@ -34,7 +34,7 @@ test('Windows engine and redactor: client-parts with one-commit sources and the 
         fs.mkdirSync(path.join(out, part), { recursive: true });
         fs.writeFileSync(path.join(out, part, `${part}.tar.gz`), part);
         fs.writeFileSync(path.join(out, part, `${part}.tar.gz.sha256`), `${sha(part)}  ${part}.tar.gz\n`);
-        fs.writeFileSync(path.join(out, part, 'result.json'), JSON.stringify({ id: `${part.slice(0, 3)}000000000`.slice(0, 12), newEntry: part === 'engine' ? { files: 1, treeSha256: 'e'.repeat(64) } : null, checks: [] }));
+        fs.writeFileSync(path.join(out, part, 'result.json'), JSON.stringify({ id: part === 'engine' ? SERVER.slice(0, 12) : REDACTOR.slice(0, 12), newEntry: part === 'engine' ? { files: 1, treeSha256: 'e'.repeat(64) } : null, checks: [] }));
       }
       return { code: 0, stdout: '', stderr: '' };
     }
@@ -47,7 +47,7 @@ test('Windows engine and redactor: client-parts with one-commit sources and the 
   expect(call).toEqual(expect.arrayContaining(['--target', 'windows-x64', '--parts', 'engine,redactor', '--client', '--engine', '--redactor', '--pip-binary']));
   expect(call).not.toContain('--lana-cpp');
   expect(r2.download.mock.calls[0][1]).toBe('windows-x64/lqe-8ee218c47371/lqe-win32-x64.exe');
-  expect(done.map((d) => d.key)).toEqual(['windows-x64/engine-eng000000000.tar.gz', 'windows-x64/redactor-red000000000.tar.gz']);
+  expect(done.map((d) => d.key)).toEqual(['windows-x64/engine-aaaaaaaaaaaa.tar.gz', 'windows-x64/redactor-e4ea4861f9fc.tar.gz']);
   expect(done[0].newEntry).toEqual({ files: 1, treeSha256: 'e'.repeat(64) });
 });
 
@@ -67,4 +67,10 @@ test('the registry password comes from Heroku into a private file and is never i
   expect(run.mock.calls[0][1]).toEqual(['config:get', 'LANA_REGISTRY_PUSH_PASSWORD', '-a', 'redroostertec-prod']);
   const missing = makeCtx({ run: fakeRun({ heroku: { code: 0, stdout: '\n', stderr: '' } }) });
   await expect(registryPasswordFile(missing)).rejects.toThrow(/has no LANA_REGISTRY_PUSH_PASSWORD/);
+});
+
+test('an archive already in the bucket is never overwritten', async () => {
+  const r2 = fakeR2([{ key: 'linux-x64/engine-aaaaaaaaaaaa.tar.gz' }]);
+  await expect(builders.refuseOverwrite(r2, 'linux-x64/engine-aaaaaaaaaaaa.tar.gz')).rejects.toThrow(/never overwritten/);
+  await expect(builders.refuseOverwrite(fakeR2([]), 'linux-x64/engine-aaaaaaaaaaaa.tar.gz')).resolves.toBeUndefined();
 });

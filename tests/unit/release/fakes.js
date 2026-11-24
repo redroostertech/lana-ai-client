@@ -41,11 +41,11 @@ function listingOf(keys) {
   ]);
 }
 
-/** The archives the pins above point at: everything except the missing ones. */
+/** Archives named by source commit (LANA.cpp 8ee218c47371, LANA-AI aaaaaaaaaaaa, lana-redactor e4ea4861f9fc): the pinned ones only. */
 function readyKeys() {
   return [
-    'macos-arm64/pip-111111111111.tar.gz', 'windows-x64/pip-222222222222.tar.gz', 'linux-x64/pip-333333333333.tar.gz',
-    'macos-arm64/engine-444444444444.tar.gz',
+    'macos-arm64/pip-8ee218c47371.tar.gz', 'windows-x64/pip-8ee218c47371.tar.gz', 'linux-x64/pip-8ee218c47371.tar.gz',
+    'macos-arm64/engine-aaaaaaaaaaaa.tar.gz',
     ...['macos-arm64', 'macos-x64', 'windows-x64', 'linux-x64'].map((t) => `${t}/redactor-e4ea4861f9fc.tar.gz`)
   ];
 }
@@ -113,8 +113,8 @@ function allEngine() {
 }
 function allKeys() {
   return [
-    ...readyKeys(), 'macos-x64/pip-555555555555.tar.gz',
-    'macos-arm64/engine-666666666666.tar.gz', 'macos-x64/engine-777777777777.tar.gz', 'windows-x64/engine-888888888888.tar.gz', 'linux-x64/engine-999999999999.tar.gz'
+    ...readyKeys(), 'macos-x64/pip-8ee218c47371.tar.gz',
+    'macos-x64/engine-aaaaaaaaaaaa.tar.gz', 'windows-x64/engine-aaaaaaaaaaaa.tar.gz', 'linux-x64/engine-aaaaaaaaaaaa.tar.gz'
   ];
 }
 
