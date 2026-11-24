@@ -2310,9 +2310,15 @@
   gap: 1.25rem;
 }
 
+/* The hero spans two columns and one row; it grows to two rows only when
+   it carries a chart (a gauge). Content sets every card's height. */
 .dash-bento__item--hero {
   grid-column: span 2;
+}
+
+.dash-bento__item--tall {
   grid-row: span 2;
+  max-height: 32rem;
 }
 
 .dash-bento__item--chart {
@@ -2325,7 +2331,7 @@
     gap: 1rem;
   }
 
-  .dash-bento__item--hero {
+  .dash-bento__item--tall {
     grid-row: span 1;
   }
 }
@@ -2483,9 +2489,8 @@
   color: var(--lex-text-on-evergreen);
 }
 
-.dash-metric-card--hero .mini-spark-slot,
 .dash-metric-card--hero .mini-spark {
-  height: 4rem;
+  height: 3.5rem;
 }
 
 #dashboardMetricGrid.dash-card-grid--refreshing .dash-metric-card--hero .dash-metric-card__value {
@@ -2773,4 +2778,166 @@ button.dash-lines__label:hover,
   .dash-variants__btn {
     transition: none;
   }
+}
+
+/* ══ Card visuals ════════════════════════════════════════════════════════ */
+.dash-tabs[hidden] {
+  display: none;
+}
+
+.dash-tabs-row:has(.dash-tabs[hidden]) {
+  justify-content: flex-end;
+}
+
+/* Accents: a thin status-coloured rule along the top of the card. */
+.dash-accent {
+  border-top-width: 3px;
+}
+
+.dash-accent--danger { border-top-color: var(--lex-status-danger); }
+.dash-accent--warning { border-top-color: var(--lex-status-warning); }
+.dash-accent--success { border-top-color: var(--lex-status-success); }
+
+/* Chips: small labelled values that open their metric. */
+.dash-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.dash-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 999px;
+  background: var(--lex-bg-secondary);
+  color: var(--lex-text-secondary);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.dash-chip strong {
+  color: var(--lex-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-chip:hover {
+  border-color: var(--lex-text-tertiary);
+}
+
+.dash-metric-card__unit,
+.dash-metric-card__benchmark {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+}
+
+.dash-metric-card--gauge .dash-metric-card__value {
+  display: none;
+}
+
+.dash-metric-card--hero .mini-gauge {
+  max-width: 14rem;
+}
+
+.dash-metric-card--hero .mini-gauge__track { stroke: rgba(255, 255, 255, 0.2); }
+.dash-metric-card--hero .mini-gauge__fill { stroke: var(--lex-text-on-evergreen); }
+.dash-metric-card--hero .mini-gauge__needle line,
+.dash-metric-card--hero .mini-gauge__needle circle { stroke: var(--lex-text-on-evergreen); fill: var(--lex-text-on-evergreen); }
+.dash-metric-card--hero .mini-gauge__label { color: inherit; }
+
+/* Compare: the relation line and the ratio bar. */
+.dash-compare__relation {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+}
+
+.dash-compare__ratio {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--lex-text-secondary);
+}
+
+.dash-compare__ratio svg {
+  display: block;
+  width: 100%;
+  height: 0.5rem;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.dash-compare__ratio-track { fill: var(--lex-bg-tertiary); }
+
+.dash-compare__ratio-fill {
+  fill: var(--lex-status-success);
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation: mini-bar-grow 600ms var(--lex-ease-out, ease-out) both;
+}
+
+.dash-worklist--checklist .dash-worklist__table td:first-child::before {
+  content: '';
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-right: 0.5rem;
+  border: 1.5px solid var(--lex-text-tertiary);
+  border-radius: 3px;
+  vertical-align: -1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-compare__ratio-fill {
+    animation: none;
+  }
+}
+
+/* Detail lines on the evergreen hero read in its own colours. */
+.dash-metric-card--hero .dash-lines {
+  border-top-color: rgba(255, 255, 255, 0.25);
+}
+
+.dash-metric-card--hero .dash-lines__label,
+.dash-metric-card--hero .dash-lines__value {
+  color: inherit;
+}
+
+.dash-metric-card--hero .dash-lines__label {
+  opacity: 0.85;
+}
+
+/* A hero with a dial: the number on the left, the dial beside it, one row tall. */
+.dash-bento .dash-metric-card--hero-gauge {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(8rem, 12rem);
+  align-items: center;
+  column-gap: 1rem;
+}
+
+.dash-metric-card--hero-gauge > .dash-metric-card__top {
+  grid-column: 1 / -1;
+}
+
+.dash-metric-card--hero-gauge > .dash-metric-card__result {
+  grid-column: 1;
+}
+
+.dash-metric-card--hero-gauge > .mini-gauge {
+  grid-column: 2;
+  grid-row: 2 / span 2;
+}
+
+.dash-metric-card--hero-gauge > .mini-spark-slot {
+  grid-column: 1;
+}
+
+.dash-metric-card--hero-gauge .mini-gauge__label:empty {
+  display: none;
 }

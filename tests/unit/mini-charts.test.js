@@ -233,3 +233,82 @@ describe('groupHtml: one bar per metric, each opening its own records', () => {
     expect(Charts.groupHtml([], opts())).toBe('');
   });
 });
+
+describe('the visual vocabulary drawings', () => {
+  const V = require(path.join(__dirname, '../../src/js/shared/card-visuals.js'));
+  const href = (key) => 'detail?' + key;
+  const noStyle = (html) => expect(html).not.toContain('style=');
+
+  test('gauge: a semicircle and a needle turned to the value', () => {
+    const html = Charts.gaugeHtml(V.gaugeModel(75), '75%');
+    expect(html).toContain('class="mini-gauge"');
+    expect(html).toContain('stroke-dashoffset="25"');
+    expect(html).toContain('transform="rotate(45 50 50)"');
+    expect(html).toContain('>75%<');
+    expect(Charts.gaugeHtml(null, '')).toBe('');
+    noStyle(html);
+  });
+
+  test('donut: one clickable slice per part, total in the centre, legend with values', () => {
+    const model = V.donutModel([{ label: 'Website', value: 9, key: 'k.a' }, { label: 'Referral', value: 3, key: 'k.b' }]);
+    const html = Charts.donutHtml(model, { centre: '12', centreLabel: 'Total', format: (v) => String(v), href });
+    expect(html.split('class="mini-donut__slice').length - 1).toBe(2);
+    expect(html).toContain('stroke-dasharray="75 25"');
+    expect(html).toContain('stroke-dashoffset="-75"');
+    expect(html).toContain('data-metric-detail-link="detail?k.a"');
+    expect(html).toContain('>12<');
+    expect(html).toContain('Website');
+    noStyle(html);
+  });
+
+  test('ranked bars: high to low, value at the end, initials when asked, each row clickable', () => {
+    const rows = V.rankedModel([{ label: 'Team member B', value: 35, key: 'k' }, { label: 'Team member A', value: 42, key: 'k' }]);
+    const html = Charts.rankedHtml(rows, { format: (r) => r.value + '%', href, initials: true });
+    expect(html.indexOf('Team member A')).toBeLessThan(html.indexOf('Team member B'));
+    expect(html).toContain('>TA<');
+    expect(html).toContain('42%');
+    expect(html).toContain('data-metric-detail-link="detail?k"');
+    noStyle(html);
+  });
+
+  test('stacked bar: parts with percent labels', () => {
+    const html = Charts.stackedHtml(V.stackedModel([{ label: 'Fully funded', value: 12, key: 'a' }, { label: 'Not fully funded', value: 4, key: 'b' }]), { href, format: String });
+    expect(html).toContain('x="75" y="0" width="25"');
+    expect(html).toContain('75%');
+    expect(html).toContain('Not fully funded');
+    noStyle(html);
+  });
+
+  test('bullet: the actual bar, the goal mark and the gap in words', () => {
+    const html = Charts.bulletHtml(V.bulletModel(60, 80), { actual: '$60', goal: '$80', gap: '$20' });
+    expect(html).toContain('width="75"');
+    expect(html).toContain('x1="100"');
+    expect(html).toContain('$20 to go');
+    expect(Charts.bulletHtml(V.bulletModel(100, 80), { actual: 'a', goal: 'g', gap: '20' })).toContain('Goal met');
+    expect(Charts.bulletHtml(null, {})).toBe('');
+  });
+
+  test('timeline: 14 days with a dot on each item date', () => {
+    const choice = V.chooseRowsVisual('timeline', [{ name: 'Signing', meeting_date: '2026-11-26' }], 'worklist', '2026-11-24');
+    const html = Charts.timelineHtml(choice.model, { href: 'detail?x', dayLabel: (i) => 'D' + i });
+    expect(html).toContain('class="mini-timeline"');
+    expect(html.split('<g class="mini-timeline__dot ').length - 1).toBe(1);
+    expect(html).toContain('<title>Signing</title>');
+    expect(html).toContain('data-metric-detail-link="detail?x"');
+    noStyle(html);
+  });
+
+  test('aging: one column per age bucket, labelled', () => {
+    const choice = V.chooseRowsVisual('aging', [{ days_in_stage: 10 }, { days_in_stage: 100 }], 'worklist', '2026-11-24');
+    const html = Charts.agingHtml(choice.model, { href: 'detail?x' });
+    expect(html).toContain('0 to 30 days');
+    expect(html).toContain('Over 90 days');
+    expect(html).toContain('data-metric-detail-link="detail?x"');
+  });
+
+  test('columns can open each row\'s metric', () => {
+    const model = View.listBars([{ label: 'A', value: 2 }], 12);
+    model.rows[0].key = 'k.a';
+    expect(Charts.breakdownHtml(model, fmt, { href })).toContain('data-metric-detail-link="detail?k.a"');
+  });
+});

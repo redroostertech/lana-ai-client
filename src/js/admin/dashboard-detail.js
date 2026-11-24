@@ -678,6 +678,8 @@
   // Tiles animate (entrance, count-up, bars) only when new data arrives,
   // not when a search or type filter redraws the same numbers.
   var animateNextRender = false;
+  // True while declared cards are being drawn (no section eyebrows).
+  var renderingDeclared = false;
   var tileIndex = 0;
 
   // Nothing to chart for a list card that came back empty.
@@ -719,8 +721,11 @@
       ? '<button class="dash-metric-card__icon-btn" type="button" title="See the records" aria-label="See the records" data-metric-detail-link="'
         + escapeHtml(recordsHref(cardId)) + '">' + RECORDS_ICON + '</button>'
       : '';
+    // Declared cards (layout.cards) leave out the catalog section eyebrow.
+    var eyebrow = renderingDeclared ? ''
+      : '<div class="dash-metric-card__eyebrow">' + escapeHtml(getGroupLabel(metric, currentDashboardType)) + '</div>';
     return '<div class="dash-metric-card__top"><div class="dash-metric-card__label">'
-      + '<div class="dash-metric-card__eyebrow">' + escapeHtml(getGroupLabel(metric, currentDashboardType)) + '</div>'
+      + eyebrow
       + '<div class="dash-metric-card__title">' + escapeHtml(metric.title || metric.name || humanize(metric.metric_key) || 'Metric') + '</div>'
       + '</div>'
       + '<div class="dash-metric-card__tools">' + records
@@ -839,15 +844,18 @@
       main = valueBlock(metric) + (goal && goal.progress && !goal.progress.available
         ? '<p class="dash-metric-card__goal-note">' + escapeHtml(goal.progress.note) + '</p>' : '');
     }
+    var chipKeys = def.options ? def.options.chips : [];
+    var chips = chipKeys.map(function (key) { return chipHtml(key, window.DashboardCards.metricFor(declaredIndex, key)); }).join('');
     var lines = (goal ? goal.details : []).map(function (detail) {
       return detailLine(detail.label, escapeHtml(formatMetricCardValue({ value: detail.value, format: metric.format })), null);
-    }).concat(resolved.metrics.slice(1).map(function (entry) {
+    }).concat(resolved.metrics.slice(1).filter(function (entry) { return chipKeys.indexOf(entry.key) === -1; }).map(function (entry) {
       return detailLine(metricTitle(entry.metric, entry.key),
         entry.waiting ? waitingChip(entry.metric) : escapeHtml(formatMetricCardValue(entry.metric)), entry.key);
     }));
-    return '<article class="' + cardClass('dash-metric-card--goal', layoutItem) + '">'
-      + declaredTop(def, first.key, metric, !first.waiting)
+    return '<article class="' + cardClass(accentClass(def, 'dash-metric-card--goal'), layoutItem) + '">'
+      + declaredTop(def, first.key, metric, !first.waiting, window.DashboardCards.compositeTitle(def, resolved.metrics))
       + main
+      + (chips ? '<div class="dash-chips">' + chips + '</div>' : '')
       + (lines.length ? '<ul class="dash-lines">' + lines.join('') + '</ul>' : '')
       + '</article>';
   }
@@ -887,22 +895,23 @@
       },
     });
     return '<article class="' + cardClass('dash-metric-card--group', layoutItem) + '">'
-      + declaredTop(def, def.keys[0], resolved.metrics[0].metric, false, def.title || metricTitle(resolved.metrics[0].metric, def.keys[0]))
+      + declaredTop(def, def.keys[0], resolved.metrics[0].metric, false, window.DashboardCards.compositeTitle(def, resolved.metrics))
       + '<div class="dash-metric-card__chart">' + chart + '</div>'
       + (firstOk ? periodLine(firstOk.metric) : '')
       + '</article>';
   }
 
-  function renderDeclaredPair(resolved, layoutItem) {
+  function renderDeclaredPair(resolved, layoutItem, captions) {
     var def = resolved.def;
-    var halves = resolved.metrics.map(function (entry) {
+    var halves = resolved.metrics.map(function (entry, i) {
+      var caption = captions && captions[i] ? '<span class="dash-compare__relation">' + escapeHtml(captions[i]) + '</span>' : '';
       var value = entry.waiting ? waitingChip(entry.metric)
-        : '<span class="dash-pair__value">' + escapeHtml(formatMetricCardValue(entry.metric)) + '</span>' + deltaHtml(entry.metric);
+        : '<span class="dash-pair__value">' + escapeHtml(formatMetricCardValue(entry.metric)) + '</span>' + caption + deltaHtml(entry.metric);
       return '<div class="dash-pair__half">'
         + '<button type="button" class="dash-pair__label" data-metric-detail-link="' + escapeHtml(recordsHref(entry.key)) + '" title="See the records">'
         + escapeHtml(metricTitle(entry.metric, entry.key)) + '</button>' + value + '</div>';
     }).join('');
-    var title = def.title || resolved.metrics.map(function (entry) { return metricTitle(entry.metric, entry.key); }).join(' and ');
+    var title = window.DashboardCards.compositeTitle(def, resolved.metrics);
     var firstOk = resolved.metrics.filter(function (entry) { return !entry.waiting; })[0];
     return '<article class="' + cardClass('dash-metric-card--pair', layoutItem) + '">'
       + declaredTop(def, def.keys[0], resolved.metrics[0].metric, false, title)
@@ -911,26 +920,282 @@
       + '</article>';
   }
 
-  function renderDeclaredWorklist(resolved, layoutItem) {
+  // A card drawn from the source rows behind one metric: worklist, timeline
+  // or aging. The rows load after the card is on screen; a timeline without
+  // dates or aging without ages draws its fallback (a hidden template holds
+  // a chart fallback), never an empty chart.
+  function rowsSlot(key, visual, def, fallbackHtml) {
+    var o = def.options || {};
+    return '<div class="dash-worklist mini-spark-slot--loading' + (o.style === 'checklist' ? ' dash-worklist--checklist' : '') + '"'
+      + ' data-worklist-key="' + escapeHtml(key) + '" data-rows-visual="' + escapeHtml(visual) + '"'
+      + ' data-rows-fallback="' + escapeHtml(o.fallback || 'worklist') + '" data-rows-sort="' + escapeHtml(o.sort || '') + '"></div>'
+      + (fallbackHtml ? '<template class="dash-rows-fallback">' + fallbackHtml + '</template>' : '');
+  }
+
+  function renderDeclaredWorklist(resolved, layoutItem, visual) {
     var def = resolved.def;
     var entry = resolved.metrics[0];
-    return '<article class="' + cardClass('dash-metric-card--worklist', layoutItem) + '">'
-      + declaredTop(def, entry.key, entry.metric, true)
+    var fallbackHtml = visual !== 'worklist' && def.options.fallback && def.options.fallback !== 'worklist'
+      ? seriesChartHtml(resolved, def.options.fallback) : '';
+    return '<article class="' + cardClass(accentClass(def, 'dash-metric-card--worklist'), layoutItem) + '">'
+      + declaredTop(def, entry.key, entry.metric, true, def.title || metricTitle(entry.metric, entry.key))
       + valueBlock(entry.metric)
-      + '<div class="dash-worklist mini-spark-slot--loading" data-worklist-key="' + escapeHtml(entry.key) + '"></div>'
+      + rowsSlot(entry.key, visual || 'worklist', def, fallbackHtml)
       + '<button type="button" class="dash-metric-card__link dash-worklist__all" data-metric-detail-link="' + escapeHtml(recordsHref(entry.key)) + '">View all</button>'
       + '</article>';
   }
 
+  // ── The visual vocabulary (js/shared/card-visuals.js, mini-charts.js) ──
+  function accentClass(def, extra) {
+    var accent = def.options && def.options.accent;
+    return (extra || '') + (accent ? ' dash-accent dash-accent--' + accent : '');
+  }
+
+  function formatList(metric) {
+    var unit = window.MetricCardView.listValueFormat(metric);
+    return unit === 'number' ? plainNumber : function (n) {
+      return n === null ? window.DataState.EMPTY_VALUE : formatMetricCardValue({ value: n, format: unit === 'percent' ? 'percentage' : unit });
+    };
+  }
+
+  // The card's series: the rows of its one list metric, or one row per
+  // scalar metric. Each row knows the metric its records live under.
+  function seriesOf(resolved) {
+    var def = resolved.def;
+    var first = resolved.metrics[0];
+    if (resolved.metrics.length === 1 && first.metric && Array.isArray(first.metric.value)) {
+      var model = window.MetricCardView.listBars(first.metric.value, 1000);
+      var fmt = formatList(first.metric);
+      return model.rows.map(function (row) {
+        return { label: row.label, value: row.value, key: first.key, waiting: false, text: fmt(row.value) };
+      });
+    }
+    var groupRows = window.DashboardCards.groupRows(def, declaredIndex);
+    var labels = window.CardVisuals.shortLabels(groupRows.map(function (row) { return row.label; }));
+    return groupRows.map(function (row, i) {
+      return { label: labels[i], value: row.value, key: row.key, waiting: row.waiting, metric: row.metric,
+        text: row.waiting ? '' : formatMetricCardValue(row.metric), conversionPct: row.conversionPct, pct: row.pct };
+    });
+  }
+
+  function waitingTitle(row) {
+    var view = window.DataState.view((row && row.metric) || MISSING_METRIC, { calm: true });
+    return view ? view.title : 'Waiting';
+  }
+
+  // Columns from a series (the fallback and group "columns" visual).
+  function seriesColumnsModel(rows, labels) {
+    var shown = rows.filter(function (row) { return !row.waiting; });
+    var max = 0;
+    shown.forEach(function (row) {
+      if (row.value !== null && row.value > max) max = row.value;
+      if (row.second !== null && row.second !== undefined && row.second > max) max = row.second;
+    });
+    var pct = function (v) { return v !== null && v !== undefined && v > 0 && max > 0 ? Math.round((v / max) * 1000) / 10 : 0; };
+    var paired = shown.some(function (row) { return row.second !== null && row.second !== undefined; });
+    return {
+      empty: !shown.length,
+      rows: shown.map(function (row) {
+        var second = row.second === undefined ? null : row.second;
+        return { label: row.label, value: row.value, second: second, pct: pct(row.value), secondPct: second === null ? null : pct(second), key: row.key };
+      }),
+      paired: paired,
+      seriesLabels: paired ? (labels && labels.length === 2 ? labels : ['Actual', 'Needed']) : [],
+      hiddenCount: 0,
+    };
+  }
+
+  function seriesChartHtml(resolved, visual) {
+    var rows = seriesOf(resolved);
+    var textOf = function (row) { return row.text; };
+    var byValue = {};
+    rows.forEach(function (row) { byValue[row.value] = row.text; });
+    if (visual === 'donut') {
+      var centreKey = resolved.def.options.centre_key;
+      var centreMetric = centreKey ? window.DashboardCards.metricFor(declaredIndex, centreKey) : null;
+      var donut = window.CardVisuals.donutModel(rows);
+      if (!donut) return window.DataState.render(EMPTY_LIST_STATE, { calm: true });
+      // The centre: the named total metric, else the sum in the series' unit.
+      var first = resolved.metrics[0].metric;
+      var totalText = first && Array.isArray(first.value) ? formatList(first)(donut.total)
+        : formatMetricCardValue({ value: donut.total, format: first && first.format });
+      return window.MiniCharts.donutHtml(donut, {
+        centre: centreMetric && !window.DashboardCards.isWaiting(centreMetric) ? formatMetricCardValue(centreMetric) : totalText,
+        centreLabel: centreMetric ? metricTitle(centreMetric, centreKey) : 'Total',
+        format: function (v) { return byValue[v] !== undefined ? byValue[v] : String(v); },
+        href: recordsHref,
+      });
+    }
+    if (visual === 'ranked_bars') {
+      return window.MiniCharts.rankedHtml(window.CardVisuals.rankedModel(rows), {
+        format: textOf, href: recordsHref, initials: resolved.def.options.initials, waitingLabel: waitingTitle,
+      });
+    }
+    if (visual === 'stacked_bar') {
+      var labels = resolved.def.options.series_labels;
+      var parts = rows.map(function (row, i) { return Object.assign({}, row, { label: labels[i] || row.label }); });
+      var stacked = window.CardVisuals.stackedModel(parts);
+      return stacked ? window.MiniCharts.stackedHtml(stacked, { href: recordsHref, format: function (v) { return byValue[v] !== undefined ? byValue[v] : String(v); } })
+        : window.DataState.render(EMPTY_LIST_STATE, { calm: true });
+    }
+    if (visual === 'funnel') {
+      return window.MiniCharts.groupHtml(rows, { funnel: true, format: textOf, href: recordsHref, waitingLabel: waitingTitle });
+    }
+    // columns and paired_columns
+    var model = seriesColumnsModel(rows, resolved.def.options.series_labels);
+    if (model.empty) return window.DataState.render(EMPTY_LIST_STATE, { calm: true });
+    return window.MiniCharts.breakdownHtml(model, function (n) { return byValue[n] !== undefined ? byValue[n] : plainNumber(n); }, { href: recordsHref });
+  }
+
+  function seriesCard(resolved, layoutItem, visual) {
+    var def = resolved.def;
+    var firstOk = resolved.metrics.filter(function (entry) { return !entry.waiting; })[0];
+    var single = resolved.metrics.length === 1;
+    return '<article class="' + cardClass(accentClass(def, 'dash-metric-card--chart'), layoutItem) + '">'
+      + declaredTop(def, def.keys[0], resolved.metrics[0].metric, single, window.DashboardCards.compositeTitle(def, resolved.metrics))
+      + '<div class="dash-metric-card__chart">' + seriesChartHtml(resolved, visual) + '</div>'
+      + (firstOk ? periodLine(firstOk.metric) : '')
+      + '</article>';
+  }
+
+  // Two list metrics side by side by label (new and closed by service).
+  function renderPairedColumns(resolved, layoutItem) {
+    var def = resolved.def;
+    var lists = def.options.metric_keys_override.map(function (key) { return { key: key, metric: window.DashboardCards.metricFor(declaredIndex, key) }; });
+    var usable = lists.length === 2 && lists.every(function (l) { return l.metric && !window.DashboardCards.isWaiting(l.metric) && Array.isArray(l.metric.value); });
+    if (!usable) {
+      var one = resolved.metrics[0];
+      if (resolved.metrics.length === 1 && one.metric && Array.isArray(one.metric.value)) return renderDeclaredBreakdown(resolved, layoutItem);
+      return seriesCard(resolved, layoutItem, 'columns');
+    }
+    var rows = window.CardVisuals.pairedSeries(lists[0].metric.value, lists[1].metric.value).map(function (row) {
+      return Object.assign(row, { key: lists[0].key });
+    });
+    var model = seriesColumnsModel(rows, def.options.series_labels);
+    var chips = def.options.headline_keys.map(function (key) {
+      var metric = window.DashboardCards.metricFor(declaredIndex, key);
+      return chipHtml(key, metric);
+    }).join('');
+    return '<article class="' + cardClass(accentClass(def, 'dash-metric-card--chart'), layoutItem) + '">'
+      + declaredTop(def, lists[0].key, lists[0].metric, false, window.DashboardCards.compositeTitle(def, resolved.metrics))
+      + (chips ? '<div class="dash-chips">' + chips + '</div>' : '')
+      + '<div class="dash-metric-card__chart">' + window.MiniCharts.breakdownHtml(model, plainNumber, { href: recordsHref }) + '</div>'
+      + periodLine(lists[0].metric)
+      + '</article>';
+  }
+
+  // A small labelled value that opens its metric's records.
+  function chipHtml(key, metric) {
+    var value = window.DashboardCards.isWaiting(metric) ? waitingChip(metric) : '<strong>' + escapeHtml(formatMetricCardValue(metric)) + '</strong>';
+    return '<button type="button" class="dash-chip" data-metric-detail-link="' + escapeHtml(recordsHref(key)) + '">'
+      + '<span>' + escapeHtml(metricTitle(metric, key)) + '</span>' + value + '</button>';
+  }
+
+  function appendToCard(html, extra) {
+    if (!extra) return html;
+    var end = html.lastIndexOf('</article>');
+    return end === -1 ? html : html.slice(0, end) + extra + html.slice(end);
+  }
+
+  function heroOrStat(resolved, layoutItem, visual) {
+    var def = resolved.def;
+    var entry = resolved.metrics[0];
+    var o = def.options;
+    var extra = '';
+    if (o.inner === 'gauge' || visual === 'gauge') {
+      // On the hero the big number already says the value; the dial sits beside it.
+      extra += window.MiniCharts.gaugeHtml(window.CardVisuals.gaugeModel(entry.metric.value), visual === 'hero' ? '' : formatMetricCardValue(entry.metric));
+    }
+    if (o.unit && visual !== 'gauge') {
+      var text = formatMetricCardValue(entry.metric);
+      if (text.toLowerCase().indexOf(o.unit.toLowerCase()) === -1) extra += '<p class="dash-metric-card__unit">' + escapeHtml(o.unit) + '</p>';
+    }
+    if (o.benchmark) extra += '<p class="dash-metric-card__benchmark">Benchmark: ' + escapeHtml(o.benchmark) + '</p>';
+    if (o.badge_key) extra += '<div class="dash-chips">' + chipHtml(o.badge_key, window.DashboardCards.metricFor(declaredIndex, o.badge_key)) + '</div>';
+    var lines = o.detail.map(function (key) {
+      var metric = window.DashboardCards.metricFor(declaredIndex, key);
+      return detailLine(metricTitle(metric, key), window.DashboardCards.isWaiting(metric) ? waitingChip(metric) : escapeHtml(formatMetricCardValue(metric)), key);
+    });
+    if (lines.length) extra += '<ul class="dash-lines">' + lines.join('') + '</ul>';
+    var item = Object.assign({}, layoutItem, { role: visual === 'hero' ? 'hero' : layoutItem.role });
+    var html = renderMetricCard(entry.metric, item);
+    if (visual === 'gauge') {
+      // The dial replaces the big number on a gauge card.
+      html = html.replace('dash-metric-card--kpi', 'dash-metric-card--kpi dash-metric-card--gauge');
+    }
+    if (o.inner === 'gauge' && visual === 'hero') html = html.replace('dash-metric-card--hero', 'dash-metric-card--hero dash-metric-card--hero-gauge');
+    return appendToCard(html, extra);
+  }
+
+  function renderBullet(resolved, layoutItem) {
+    var def = resolved.def;
+    var first = resolved.metrics[0];
+    var goal = window.DashboardCards.goalFor(first.metric);
+    var last = resolved.metrics.length > 1 ? resolved.metrics[resolved.metrics.length - 1] : null;
+    var target = goal && goal.progress && goal.progress.target !== null ? goal.progress.target
+      : (last && !last.waiting ? Number(last.metric.value) : null);
+    var model = first.waiting ? null : window.CardVisuals.bulletModel(first.metric.value, target);
+    if (!model) return renderDeclaredGoal(resolved, layoutItem);
+    var fmt = function (v) { return formatMetricCardValue({ value: v, format: first.metric.format }); };
+    var lines = resolved.metrics.slice(1, last ? -1 : undefined).map(function (entry) {
+      return detailLine(metricTitle(entry.metric, entry.key), entry.waiting ? waitingChip(entry.metric) : escapeHtml(formatMetricCardValue(entry.metric)), entry.key);
+    });
+    return '<article class="' + cardClass(accentClass(def, 'dash-metric-card--goal'), layoutItem) + '">'
+      + declaredTop(def, first.key, first.metric, true, window.DashboardCards.compositeTitle(def, resolved.metrics))
+      + valueBlock(first.metric)
+      + window.MiniCharts.bulletHtml(model, { actual: fmt(first.metric.value), goal: fmt(target), gap: fmt(Math.abs(model.gap)) })
+      + (lines.length ? '<ul class="dash-lines">' + lines.join('') + '</ul>' : '')
+      + '</article>';
+  }
+
+  function renderCompare(resolved, layoutItem) {
+    var def = resolved.def;
+    // The relation reads under the second value ("$305 per new client").
+    var html = renderDeclaredPair(resolved, layoutItem, ['', def.options.relation]);
+    var a = resolved.metrics[0];
+    var b = resolved.metrics[1];
+    var extra = '';
+    if (def.options.ratio_bar && a && b && !a.waiting && !b.waiting) {
+      var ratio = window.CardVisuals.compareModel(a.metric.value, b.metric.value);
+      if (ratio.ratioPct !== null) {
+        extra += '<div class="dash-compare__ratio"><svg viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true" focusable="false">'
+          + '<rect class="dash-compare__ratio-track" x="0" y="0" width="100" height="8"></rect>'
+          + '<rect class="dash-compare__ratio-fill" x="0" y="0" width="' + ratio.ratioPct + '" height="8"></rect></svg>'
+          + '<span>' + escapeHtml(Math.round(ratio.ratioPct) + '% ' + def.options.relation) + '</span></div>';
+      }
+    }
+    html = html.replace('dash-metric-card--pair', accentClass(def, 'dash-metric-card--pair'));
+    return appendToCard(html, extra);
+  }
+
   function renderDeclaredCard(item) {
     var resolved = item.resolved;
+    var def = resolved.def;
     var layoutItem = { role: item.role, span: item.span };
-    switch (resolved.def.kind) {
-      case 'goal': return renderDeclaredGoal(resolved, layoutItem);
-      case 'breakdown': return renderDeclaredBreakdown(resolved, layoutItem);
-      case 'group': return renderDeclaredGroup(resolved, layoutItem);
-      case 'pair': return renderDeclaredPair(resolved, layoutItem);
-      case 'worklist': return renderDeclaredWorklist(resolved, layoutItem);
+    var visual = window.CardVisuals.visualFor(def);
+    switch (visual) {
+      case 'hero':
+      case 'stat':
+      case 'gauge':
+        return resolved.metrics[0].metric && !Array.isArray(resolved.metrics[0].metric.value)
+          ? heroOrStat(resolved, layoutItem, visual) : seriesCard(resolved, layoutItem, 'columns');
+      case 'ring': return renderDeclaredGoal(resolved, layoutItem);
+      case 'bullet': return renderBullet(resolved, layoutItem);
+      case 'columns':
+        return def.kind === 'breakdown' || (resolved.metrics.length === 1 && resolved.metrics[0].metric && Array.isArray(resolved.metrics[0].metric.value))
+          ? renderDeclaredBreakdown(resolved, layoutItem) : seriesCard(resolved, layoutItem, 'columns');
+      case 'paired_columns': return renderPairedColumns(resolved, layoutItem);
+      case 'ranked_bars':
+      case 'donut':
+      case 'stacked_bar':
+        return seriesCard(resolved, layoutItem, visual);
+      case 'funnel': return renderDeclaredGroup(resolved, layoutItem);
+      case 'compare': return renderCompare(resolved, layoutItem);
+      case 'worklist':
+      case 'timeline':
+      case 'aging':
+        return resolved.metrics.length === 1 ? renderDeclaredWorklist(resolved, layoutItem, visual)
+          : seriesCard(resolved, layoutItem, def.options.fallback && def.options.fallback !== 'worklist' ? def.options.fallback : 'columns');
       default: return renderMetricCard(resolved.metrics[0].metric, layoutItem);
     }
   }
@@ -940,7 +1205,7 @@
   function renderDeclaredWaitingCard(resolved) {
     var pick = resolved.metrics.filter(function (entry) { return entry.metric && entry.metric.goal_input; })[0] || resolved.metrics[0];
     return '<article class="dash-metric-card dash-metric-card--waiting">'
-      + declaredTop(resolved.def, pick.key, pick.metric, false, resolved.def.title || metricTitle(pick.metric, pick.key))
+      + declaredTop(resolved.def, pick.key, pick.metric, false, window.DashboardCards.compositeTitle(resolved.def, resolved.metrics))
       + window.DataState.render(pick.metric || MISSING_METRIC, { calm: true }) + '</article>';
   }
 
@@ -975,24 +1240,56 @@
     return '<table class="dash-worklist__table"><thead>' + head + '</thead><tbody>' + body + '</tbody></table>';
   }
 
+  function firmToday() {
+    var zone = window.Lex && Lex.Utils && Lex.Utils.getFirmTimezone ? Lex.Utils.getFirmTimezone() : undefined;
+    return LanaTime.reportPresetDays('today', zone).start;
+  }
+
+  function dayLabel(offset) {
+    var base = Date.parse(firmToday() + 'T00:00:00Z');
+    if (!isFinite(base)) return '';
+    return new Date(base + offset * 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  }
+
+  function drawRows(slot, rows) {
+    slot.classList.remove('mini-spark-slot--loading');
+    var key = slot.getAttribute('data-worklist-key');
+    var visual = slot.getAttribute('data-rows-visual') || 'worklist';
+    var template = slot.nextElementSibling && slot.nextElementSibling.classList && slot.nextElementSibling.classList.contains('dash-rows-fallback')
+      ? slot.nextElementSibling : null;
+    var choice = window.CardVisuals.chooseRowsVisual(visual, rows || [], slot.getAttribute('data-rows-fallback'), firmToday());
+    if (rows && choice.visual === 'timeline') {
+      slot.innerHTML = window.MiniCharts.timelineHtml(choice.model, { href: recordsHref(key), dayLabel: dayLabel });
+    } else if (rows && choice.visual === 'aging') {
+      slot.innerHTML = window.MiniCharts.agingHtml(choice.model, { href: recordsHref(key) });
+    } else if (choice.visual !== 'worklist' && template) {
+      slot.innerHTML = template.innerHTML;
+    } else if (rows) {
+      var sort = choice.sort || slot.getAttribute('data-rows-sort');
+      slot.innerHTML = worklistHtml(window.CardVisuals.sortRows(rows, sort));
+    } else {
+      slot.innerHTML = '';
+    }
+  }
+
   function queueWorklists(grid) {
     if (!grid.querySelectorAll || !window.api || typeof api.getMetricDetail !== 'function') return;
     Array.prototype.forEach.call(grid.querySelectorAll('[data-worklist-key]'), function (slot) {
       var key = slot.getAttribute('data-worklist-key');
-      var cacheKey = [key, currentPeriod.start, currentPeriod.end].join('|');
+      var visual = slot.getAttribute('data-rows-visual') || 'worklist';
+      // A worklist shows five rows; a timeline or aging chart reads more.
+      var limit = visual === 'worklist' ? 5 : 25;
+      var cacheKey = [key, limit, currentPeriod.start, currentPeriod.end].join('|');
       if (!worklistCache[cacheKey]) {
         worklistCache[cacheKey] = api.getMetricDetail(key, {
-          periodStart: currentPeriod.start, periodEnd: currentPeriod.end, compareBy: currentPeriod.compareBy, rawLimit: 5,
+          periodStart: currentPeriod.start, periodEnd: currentPeriod.end, compareBy: currentPeriod.compareBy, rawLimit: limit,
         }).then(function (response) {
           var payload = response && response.data ? response.data : response;
           var rows = payload && payload.raw_data && Array.isArray(payload.raw_data.rows) ? payload.raw_data.rows : [];
-          return rows.slice(0, 5);
+          return rows.slice(0, limit);
         }).catch(function () { return null; });
       }
-      worklistCache[cacheKey].then(function (rows) {
-        slot.classList.remove('mini-spark-slot--loading');
-        slot.innerHTML = rows ? worklistHtml(rows) : '';
-      });
+      worklistCache[cacheKey].then(function (rows) { drawRows(slot, rows); });
     });
   }
 
@@ -1249,6 +1546,10 @@
     metricInfoById = {};
     renderViewContext(dashboardType, allDashboardMetrics, allGroups);
     renderTypeFilters(allGroups);
+    // A short declared dashboard needs no section tabs (catalog section names
+    // mean little to people); the search stays. Older dashboards keep tabs.
+    var tabs = el('dashboardTypeFilters');
+    if (tabs) tabs.hidden = !!(currentDeclaredCards && currentDeclaredCards.length <= 12);
 
     if (!filteredMetrics.length) {
       grid.innerHTML = '';
@@ -1263,8 +1564,13 @@
     if (currentDeclaredCards && unfiltered) {
       // The saved dashboard's own cards, in its order (dashboard-cards.js).
       var plan = window.DashboardCards.planDeclared(window.DashboardCards.resolveCards(currentDeclaredCards, declaredIndex));
-      grid.innerHTML = plan.items.map(renderDeclaredCard).join('')
-        + renderWaitingStrip(plan.waiting.map(renderDeclaredWaitingCard));
+      renderingDeclared = true;
+      try {
+        grid.innerHTML = plan.items.map(renderDeclaredCard).join('')
+          + renderWaitingStrip(plan.waiting.map(renderDeclaredWaitingCard));
+      } finally {
+        renderingDeclared = false;
+      }
     } else {
       // Bento grid: hero band, wide charts, then supporting cards
       // (js/shared/dashboard-layout.js owns the order and sizes); waiting

@@ -64,6 +64,39 @@
       variants: variants,
       chart: raw.chart === 'funnel' ? 'funnel' : 'bars',
       note: raw.note ? String(raw.note) : '',
+      visual: raw.visual ? String(raw.visual) : '',
+      options: cardOptions(raw),
+    };
+  }
+
+  // Visual options (card-visuals.js): keys come back in full, accents only
+  // from the status tokens, everything else as plain values.
+  var ACCENTS = { danger: true, warning: true, success: true };
+
+  function keyList(value) {
+    return Array.isArray(value) ? uniqueKeys(value) : [];
+  }
+
+  function cardOptions(raw) {
+    return {
+      detail: keyList(raw.detail),
+      chips: keyList(raw.chips),
+      metric_keys_override: keyList(raw.metric_keys_override),
+      headline_keys: keyList(raw.headline_keys),
+      centre_key: raw.centre_key ? normalizeKey(raw.centre_key) : '',
+      badge_key: raw.badge_key ? normalizeKey(raw.badge_key) : '',
+      series_labels: Array.isArray(raw.series_labels) ? raw.series_labels.map(String) : [],
+      accent: ACCENTS[raw.accent] ? raw.accent : null,
+      sort: raw.sort ? String(raw.sort) : '',
+      unit: raw.unit ? String(raw.unit) : '',
+      relation: raw.relation ? String(raw.relation) : '',
+      ratio_bar: raw.ratio_bar === true,
+      benchmark: raw.benchmark ? String(raw.benchmark) : '',
+      fallback: raw.fallback ? String(raw.fallback) : '',
+      inner: raw.inner ? String(raw.inner) : '',
+      initials: raw.initials === true,
+      style: raw.style ? String(raw.style) : '',
+      sparkline: raw.sparkline === true,
     };
   }
 
@@ -77,7 +110,9 @@
   function requestKeys(layout) {
     var keys = layout && Array.isArray(layout.metric_keys) ? layout.metric_keys.slice() : [];
     normalizeLayout(layout).cards.forEach(function (card) {
-      keys = keys.concat(card.keys, card.variants.map(function (variant) { return variant.key; }));
+      var o = card.options;
+      keys = keys.concat(card.keys, card.variants.map(function (variant) { return variant.key; }),
+        o.detail, o.chips, o.metric_keys_override, o.headline_keys, o.centre_key ? [o.centre_key] : [], o.badge_key ? [o.badge_key] : []);
     });
     return uniqueKeys(keys);
   }
@@ -197,6 +232,17 @@
       var size = sizeFor(entry.def.kind);
       items.push({ resolved: entry, role: size.role, span: size.span });
     });
+    // The hero takes two of four columns: the next compact cards (span 1,
+    // up to two) move up beside it so its row stays short.
+    if (items.length && items[0].role === 'hero') {
+      var beside = [];
+      for (var i = 1; i < items.length && beside.length < 2; i += 1) {
+        if (items[i].span === 1) beside.push(items[i]);
+      }
+      if (beside.length) {
+        items = [items[0]].concat(beside, items.slice(1).filter(function (item) { return beside.indexOf(item) === -1; }));
+      }
+    }
     return { items: items, waiting: waiting };
   }
 
@@ -270,7 +316,41 @@
     }).slice(0, 4);
   }
 
+  // A card title: the declared one, else the words every metric title shares
+  // ("Medicaid Case Count" + "Medicaid Cases Won" -> "Medicaid Cases"), else
+  // the first metric's title.
+  function stem(word) {
+    var w = word.toLowerCase();
+    return w.length > 3 && w.charAt(w.length - 1) === 's' ? w.slice(0, -1) : w;
+  }
+
+  function titleOf(entry) {
+    var metric = entry && entry.metric;
+    if (metric && (metric.title || metric.name)) return String(metric.title || metric.name);
+    var key = String((entry && entry.key) || '').split('.').pop().split('_').join(' ');
+    return key ? key.charAt(0).toUpperCase() + key.slice(1) : '';
+  }
+
+  function compositeTitle(def, metrics) {
+    if (def && def.title) return def.title;
+    var titles = (metrics || []).map(titleOf).filter(Boolean);
+    if (titles.length < 2) return titles[0] || '';
+    var others = titles.slice(1).map(function (title) { return title.split(' ').filter(Boolean); });
+    var shared = titles[0].split(' ').filter(Boolean).map(function (word) {
+      var forms = [word];
+      var everywhere = others.every(function (words) {
+        var match = words.filter(function (w) { return stem(w) === stem(word); })[0];
+        if (match) forms.push(match);
+        return !!match;
+      });
+      if (!everywhere) return null;
+      return forms.reduce(function (longest, form) { return form.length > longest.length ? form : longest; }, '');
+    }).filter(Boolean);
+    return shared.length ? shared.join(' ') : titles[0];
+  }
+
   return {
+    compositeTitle: compositeTitle,
     worklistColumns: worklistColumns,
     isDateColumn: isDateColumn,
     normalizeKey: normalizeKey,

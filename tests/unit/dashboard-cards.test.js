@@ -145,8 +145,10 @@ describe('resolve and the waiting rollup', () => {
   test('waiting cards are pulled out for the strip; the rest keep their order and sizes', () => {
     const { items, waiting } = Cards.planDeclared(resolved);
     expect(waiting.map((r) => r.def.id)).toEqual(['owner_benefit']);
+    // The two compact cards after the hero move up beside it, so the hero's
+    // row stays short; everything else keeps the declared order.
     expect(items.map((i) => [i.resolved.def.id, i.role, i.span])).toEqual([
-      ['revenue', 'hero', 2], ['revenue_by_service', 'chart', 2], ['revenue_target', 'kpi', 1], ['payroll', 'kpi', 1],
+      ['revenue', 'hero', 2], ['revenue_target', 'kpi', 1], ['payroll', 'kpi', 1], ['revenue_by_service', 'chart', 2],
       ['cash_coming_in', 'chart', 2], ['overdue_cash', 'chart', 2], ['cases_by_service', 'chart', 2],
       ['actual_vs_needed', 'chart', 2], ['active_cases', 'kpi', 1],
     ]);
@@ -200,4 +202,60 @@ describe('worklistColumns', () => {
   test('date columns are named *_at, *_date or date', () => {
     expect(['opened_at', 'due_date', 'date', 'status'].map(Cards.isDateColumn)).toEqual([true, true, true, false]);
   });
+});
+
+describe('compositeTitle', () => {
+  const m = (title) => ({ metric: { title } });
+  test('the declared title wins', () => {
+    expect(Cards.compositeTitle({ title: 'Leads by Source' }, [m('Website Leads')])).toBe('Leads by Source');
+  });
+  test('otherwise the words the metric titles share, plural kept', () => {
+    expect(Cards.compositeTitle({}, [m('Medicaid Case Count'), m('Medicaid Cases Won')])).toBe('Medicaid Cases');
+    expect(Cards.compositeTitle({}, [m('Payment Plan Client Count'), m('Payment Plan Balance Owed')])).toBe('Payment Plan');
+  });
+  test('nothing shared, or a single metric, falls back to the first title', () => {
+    expect(Cards.compositeTitle({}, [m('Marketing Spend'), m('Client Acquisition Cost')])).toBe('Marketing Spend');
+    expect(Cards.compositeTitle({}, [m('Total Active Cases')])).toBe('Total Active Cases');
+    expect(Cards.compositeTitle({}, [{ metric: null, key: 'legal_firm.a.website_lead_count' }])).toBe('Website lead count');
+  });
+});
+
+describe('visual options on declared cards', () => {
+  const raw = { cards: [{ id: 'cases', kind: 'group', metric_keys: ['case_volume.new_total', 'case_volume.closed_total'], visual: 'paired_columns',
+    metric_keys_override: ['case_volume.new_by_service', 'case_volume.closed_by_service'], series_labels: ['New', 'Closed'], accent: 'danger',
+    chips: ['finance.x'], detail: ['finance.net_revenue'], centre_key: 'finance.total', badge_key: 'finance.month', relation: 'per new client', ratio_bar: true }] };
+
+  test('options are kept with full keys', () => {
+    const card = Cards.normalizeLayout(raw).cards[0];
+    expect(card.visual).toBe('paired_columns');
+    expect(card.options).toMatchObject({
+      metric_keys_override: ['legal_firm.case_volume.new_by_service', 'legal_firm.case_volume.closed_by_service'],
+      series_labels: ['New', 'Closed'], accent: 'danger', chips: ['legal_firm.finance.x'], detail: ['legal_firm.finance.net_revenue'],
+      centre_key: 'legal_firm.finance.total', badge_key: 'legal_firm.finance.month', relation: 'per new client', ratio_bar: true,
+    });
+  });
+
+  test('keys named by options are requested too', () => {
+    const keys = Cards.requestKeys(raw);
+    ['legal_firm.case_volume.new_by_service', 'legal_firm.finance.x', 'legal_firm.finance.net_revenue', 'legal_firm.finance.total', 'legal_firm.finance.month']
+      .forEach((key) => expect(keys).toContain(key));
+  });
+
+  test('an unknown accent is dropped', () => {
+    expect(Cards.normalizeLayout({ cards: [{ id: 'a', kind: 'number', metric_key: 'a.b', accent: 'purple' }] }).cards[0].options.accent).toBe(null);
+  });
+});
+
+test('with no compact cards to pull up, the order is unchanged', () => {
+  const plan = Cards.planDeclared([
+    { def: { id: 'h', kind: 'headline' }, state: 'ok' }, { def: { id: 'c', kind: 'breakdown' }, state: 'ok' }, { def: { id: 'w', kind: 'worklist' }, state: 'ok' },
+  ]);
+  expect(plan.items.map((i) => i.resolved.def.id)).toEqual(['h', 'c', 'w']);
+});
+
+test('only one compact card is pulled up when only one exists', () => {
+  const plan = Cards.planDeclared([
+    { def: { id: 'h', kind: 'headline' }, state: 'ok' }, { def: { id: 'c', kind: 'breakdown' }, state: 'ok' }, { def: { id: 'n', kind: 'number' }, state: 'ok' },
+  ]);
+  expect(plan.items.map((i) => i.resolved.def.id)).toEqual(['h', 'n', 'c']);
 });

@@ -1,5 +1,5 @@
 {
- "_note": "Layouts copied from the approved dashboard trim spec (Owner Overview, Sales & Marketing). Keys omit the legal_firm. prefix, as in the spec. cards_synthetic: made-up values for those keys (a few real ones from the Jan 2026 sample), some waiting on purpose.",
+ "_note": "Layouts copied from the approved dashboard trim spec (all 7), with the approved per-card visuals merged in. Keys omit the legal_firm. prefix, as in the spec. cards_synthetic and rows_synthetic are made-up values (a few real ones from the Jan 2026 sample), some waiting on purpose.",
  "layouts": {
   "Owner Overview": {
    "dashboard_type": "owner",
@@ -29,12 +29,18 @@
      "id": "revenue",
      "kind": "headline",
      "metric_key": "finance.gross_revenue_total",
-     "note": "detail shows net_revenue and prior period"
+     "note": "detail shows net_revenue and prior period",
+     "visual": "hero",
+     "detail": [
+      "finance.net_revenue",
+      "finance.gross_revenue_prior_period_comparison"
+     ]
     },
     {
      "id": "revenue_by_service",
      "kind": "breakdown",
-     "metric_key": "finance.gross_revenue_by_service_offering"
+     "metric_key": "finance.gross_revenue_by_service_offering",
+     "visual": "donut"
     },
     {
      "id": "revenue_target",
@@ -43,7 +49,8 @@
       "finance.actual_vs_target_revenue",
       "finance.revenue_gap_to_target",
       "finance.annual_revenue_target"
-     ]
+     ],
+     "visual": "ring"
     },
     {
      "id": "payroll",
@@ -51,6 +58,11 @@
      "metric_keys": [
       "finance.cash_this_month",
       "finance.payroll_gap_month",
+      "finance.payroll_clients_needed",
+      "finance.payroll_leads_needed"
+     ],
+     "visual": "ring",
+     "chips": [
       "finance.payroll_clients_needed",
       "finance.payroll_leads_needed"
      ]
@@ -62,7 +74,8 @@
       "finance.owner_benefit_actual",
       "finance.owner_benefit_gap",
       "finance.total_owner_benefit_goal"
-     ]
+     ],
+     "visual": "bullet"
     },
     {
      "id": "cash_coming_in",
@@ -78,12 +91,17 @@
        "label": "Next 6 months",
        "metric_key": "finance.expected_cash_by_month"
       }
-     ]
+     ],
+     "visual": "columns",
+     "variants_toggle": true
     },
     {
      "id": "overdue_cash",
      "kind": "worklist",
-     "metric_key": "finance.overdue_expected_cash"
+     "metric_key": "finance.overdue_expected_cash",
+     "visual": "worklist",
+     "accent": "danger",
+     "sort": "oldest_due_first"
     },
     {
      "id": "cases_by_service",
@@ -94,17 +112,37 @@
       "case_volume.new_cases_opened_total",
       "case_volume.closed_cases_total"
      ],
-     "note": "breakdowns new_cases_opened_by_service_offering and closed_cases_by_service_offering in detail"
+     "note": "breakdowns new_cases_opened_by_service_offering and closed_cases_by_service_offering in detail",
+     "visual": "paired_columns",
+     "metric_keys_override": [
+      "case_volume.new_cases_opened_by_service_offering",
+      "case_volume.closed_cases_by_service_offering"
+     ],
+     "series_labels": [
+      "New",
+      "Closed"
+     ],
+     "headline_keys": [
+      "case_volume.new_cases_opened_total",
+      "case_volume.closed_cases_total"
+     ]
     },
     {
      "id": "actual_vs_needed",
      "kind": "breakdown",
-     "metric_key": "case_volume.actual_vs_needed_service_offerings"
+     "metric_key": "case_volume.actual_vs_needed_service_offerings",
+     "visual": "paired_columns",
+     "series_labels": [
+      "Actual",
+      "Needed"
+     ]
     },
     {
      "id": "active_cases",
      "kind": "number",
-     "metric_key": "case_volume.active_cases_total"
+     "metric_key": "case_volume.active_cases_total",
+     "visual": "stat",
+     "sparkline": true
     }
    ]
   },
@@ -136,7 +174,9 @@
     {
      "id": "conversion",
      "kind": "headline",
-     "metric_key": "sales_intake.firm_conversion_rate"
+     "metric_key": "sales_intake.firm_conversion_rate",
+     "visual": "hero",
+     "inner": "gauge"
     },
     {
      "id": "funnel",
@@ -148,18 +188,24 @@
       "sales_intake.truth_talks_scheduled",
       "sales_intake.truth_talk_show_count",
       "sales_intake.pnc_converted_count"
-     ]
+     ],
+     "visual": "funnel"
     },
     {
      "id": "show_rate",
      "kind": "number",
-     "metric_key": "sales_intake.truth_talk_show_rate"
+     "metric_key": "sales_intake.truth_talk_show_rate",
+     "visual": "gauge"
     },
     {
      "id": "target",
      "kind": "goal",
      "metric_keys": [
       "sales_intake.monthly_target_attainment",
+      "sales_intake.target_miss_recovery_needed"
+     ],
+     "visual": "ring",
+     "chips": [
       "sales_intake.target_miss_recovery_needed"
      ]
     },
@@ -184,17 +230,22 @@
        "label": "Year",
        "metric_key": "sales_intake.yearly_new_clients_by_service_offering"
       }
-     ]
+     ],
+     "visual": "columns",
+     "variants_toggle": true
     },
     {
      "id": "team_conversion",
      "kind": "breakdown",
-     "metric_key": "sales_intake.team_member_conversion_rate"
+     "metric_key": "sales_intake.team_member_conversion_rate",
+     "visual": "ranked_bars",
+     "initials": true
     },
     {
      "id": "new_clients_by_source",
      "kind": "breakdown",
-     "metric_key": "marketing.new_clients_by_source"
+     "metric_key": "marketing.new_clients_by_source",
+     "visual": "donut"
     },
     {
      "id": "leads_by_source",
@@ -205,12 +256,15 @@
       "marketing.website_lead_count",
       "marketing.referral_lead_count",
       "marketing.review_site_lead_count"
-     ]
+     ],
+     "visual": "ranked_bars"
     },
     {
      "id": "source_conversion",
      "kind": "breakdown",
-     "metric_key": "marketing.source_conversion_rate"
+     "metric_key": "marketing.source_conversion_rate",
+     "visual": "ranked_bars",
+     "unit": "percent"
     },
     {
      "id": "spend_vs_cac",
@@ -218,7 +272,441 @@
      "metric_keys": [
       "marketing.marketing_spend",
       "marketing.client_acquisition_cost"
+     ],
+     "visual": "compare",
+     "relation": "per new client"
+    }
+   ]
+  },
+  "Estate Planning & Maintenance": {
+   "dashboard_type": "department",
+   "metric_keys": [
+    "case_volume.active_estate_planning_cases",
+    "estate_planning.will_based_plan_count",
+    "estate_planning.trust_based_plan_count",
+    "estate_planning.deeds_only_count",
+    "estate_planning.poa_deeds_count",
+    "estate_planning.will_based_average_duration_weeks",
+    "estate_planning.trust_based_average_duration_weeks",
+    "estate_planning.deeds_only_average_duration_weeks",
+    "estate_planning.poa_deeds_average_duration_weeks",
+    "estate_planning.upcoming_will_design_meetings",
+    "estate_planning.upcoming_will_signing_meetings",
+    "estate_planning.upcoming_trust_design_meetings",
+    "estate_planning.upcoming_trust_signing_meetings",
+    "estate_planning.upcoming_deed_design_meetings",
+    "estate_planning.upcoming_deed_signing_meetings",
+    "estate_planning.upcoming_poa_deed_design_meetings",
+    "estate_planning.upcoming_poa_deed_signing_meetings",
+    "estate_planning.unsigned_engagement_letter_count",
+    "estate_planning.payment_plan_client_count",
+    "estate_planning.payment_plan_balance_owed",
+    "legacy_maintenance_retention.maintenance_active_member_count",
+    "legacy_maintenance_retention.maintenance_renewal_rate",
+    "legacy_maintenance_retention.maintenance_renewal_due_count",
+    "legacy_maintenance_retention.maintenance_renewed_count",
+    "legacy_maintenance_retention.maintenance_lapsed_member_count",
+    "legacy_maintenance_retention.maintenance_lapsed_revenue_at_risk",
+    "legacy_maintenance_retention.maintenance_outreach_due_count"
+   ],
+   "cards": [
+    {
+     "id": "active_ep",
+     "kind": "headline",
+     "metric_key": "case_volume.active_estate_planning_cases",
+     "visual": "hero"
+    },
+    {
+     "id": "plans_by_type",
+     "kind": "group",
+     "title": "Plans by Type",
+     "chart": "bars",
+     "metric_keys": [
+      "estate_planning.will_based_plan_count",
+      "estate_planning.trust_based_plan_count",
+      "estate_planning.deeds_only_count",
+      "estate_planning.poa_deeds_count"
+     ],
+     "visual": "donut"
+    },
+    {
+     "id": "duration_by_type",
+     "kind": "group",
+     "title": "Average Weeks to Complete",
+     "chart": "bars",
+     "metric_keys": [
+      "estate_planning.will_based_average_duration_weeks",
+      "estate_planning.trust_based_average_duration_weeks",
+      "estate_planning.deeds_only_average_duration_weeks",
+      "estate_planning.poa_deeds_average_duration_weeks"
+     ],
+     "visual": "ranked_bars",
+     "unit": "weeks"
+    },
+    {
+     "id": "upcoming_meetings",
+     "kind": "group",
+     "title": "Upcoming Design and Signing Meetings",
+     "chart": "bars",
+     "metric_keys": [
+      "estate_planning.upcoming_will_design_meetings",
+      "estate_planning.upcoming_will_signing_meetings",
+      "estate_planning.upcoming_trust_design_meetings",
+      "estate_planning.upcoming_trust_signing_meetings",
+      "estate_planning.upcoming_deed_design_meetings",
+      "estate_planning.upcoming_deed_signing_meetings",
+      "estate_planning.upcoming_poa_deed_design_meetings",
+      "estate_planning.upcoming_poa_deed_signing_meetings"
+     ],
+     "visual": "timeline",
+     "color_by": "design_or_signing",
+     "fallback": "paired_columns"
+    },
+    {
+     "id": "unsigned_letters",
+     "kind": "worklist",
+     "metric_key": "estate_planning.unsigned_engagement_letter_count",
+     "visual": "worklist",
+     "accent": "warning",
+     "sort": "oldest_first"
+    },
+    {
+     "id": "payment_plans",
+     "kind": "pair",
+     "metric_keys": [
+      "estate_planning.payment_plan_client_count",
+      "estate_planning.payment_plan_balance_owed"
+     ],
+     "visual": "compare",
+     "relation": "owed across plans"
+    },
+    {
+     "id": "maintenance_members",
+     "kind": "number",
+     "metric_key": "legacy_maintenance_retention.maintenance_active_member_count",
+     "visual": "stat",
+     "sparkline": true
+    },
+    {
+     "id": "renewal_rate",
+     "kind": "goal",
+     "metric_keys": [
+      "legacy_maintenance_retention.maintenance_renewal_rate",
+      "legacy_maintenance_retention.maintenance_renewal_due_count",
+      "legacy_maintenance_retention.maintenance_renewed_count"
+     ],
+     "visual": "ring",
+     "chips": [
+      "legacy_maintenance_retention.maintenance_renewal_due_count",
+      "legacy_maintenance_retention.maintenance_renewed_count"
      ]
+    },
+    {
+     "id": "lapsed",
+     "kind": "pair",
+     "metric_keys": [
+      "legacy_maintenance_retention.maintenance_lapsed_member_count",
+      "legacy_maintenance_retention.maintenance_lapsed_revenue_at_risk"
+     ],
+     "visual": "compare",
+     "accent": "danger",
+     "relation": "revenue at risk"
+    },
+    {
+     "id": "outreach_due",
+     "kind": "worklist",
+     "metric_key": "legacy_maintenance_retention.maintenance_outreach_due_count",
+     "visual": "worklist",
+     "style": "checklist"
+    }
+   ]
+  },
+  "Funding": {
+   "dashboard_type": "department",
+   "metric_keys": [
+    "funding_settlement.funding_stage_client_count",
+    "funding_settlement.funded_within_six_month_rate",
+    "funding_settlement.funded_within_six_month_count",
+    "funding_settlement.outside_six_month_goal_count",
+    "funding_settlement.funding_stage_average_duration",
+    "funding_settlement.bank_account_asset_value",
+    "funding_settlement.retirement_asset_value",
+    "funding_settlement.life_insurance_asset_value",
+    "funding_settlement.annuity_asset_value",
+    "funding_settlement.fully_funded_client_count",
+    "funding_settlement.not_fully_funded_client_count",
+    "funding_settlement.upcoming_funding_meetings"
+   ],
+   "cards": [
+    {
+     "id": "in_funding",
+     "kind": "headline",
+     "metric_key": "funding_settlement.funding_stage_client_count",
+     "visual": "hero"
+    },
+    {
+     "id": "six_month_goal",
+     "kind": "goal",
+     "metric_keys": [
+      "funding_settlement.funded_within_six_month_rate",
+      "funding_settlement.funded_within_six_month_count",
+      "funding_settlement.outside_six_month_goal_count"
+     ],
+     "visual": "ring",
+     "chips": [
+      "funding_settlement.funded_within_six_month_count",
+      "funding_settlement.outside_six_month_goal_count"
+     ]
+    },
+    {
+     "id": "time_in_funding",
+     "kind": "number",
+     "metric_key": "funding_settlement.funding_stage_average_duration",
+     "visual": "stat",
+     "benchmark": "6 months"
+    },
+    {
+     "id": "assets_by_type",
+     "kind": "group",
+     "title": "Assets Funded by Type",
+     "chart": "bars",
+     "metric_keys": [
+      "funding_settlement.bank_account_asset_value",
+      "funding_settlement.retirement_asset_value",
+      "funding_settlement.life_insurance_asset_value",
+      "funding_settlement.annuity_asset_value"
+     ],
+     "note": "headline value funding_asset_total_value",
+     "visual": "donut",
+     "centre_key": "funding_settlement.funding_asset_total_value"
+    },
+    {
+     "id": "funded_status",
+     "kind": "pair",
+     "metric_keys": [
+      "funding_settlement.fully_funded_client_count",
+      "funding_settlement.not_fully_funded_client_count"
+     ],
+     "visual": "stacked_bar",
+     "series_labels": [
+      "Fully funded",
+      "Not fully funded"
+     ]
+    },
+    {
+     "id": "funding_meetings",
+     "kind": "worklist",
+     "metric_key": "funding_settlement.upcoming_funding_meetings",
+     "visual": "timeline",
+     "fallback": "worklist"
+    }
+   ]
+  },
+  "Probate & Trust Settlement": {
+   "dashboard_type": "department",
+   "metric_keys": [
+    "guardianship_probate_medicaid.probate_case_count",
+    "guardianship_probate_medicaid.supervised_probate_case_count",
+    "guardianship_probate_medicaid.unsupervised_probate_case_count",
+    "guardianship_probate_medicaid.small_estate_case_count",
+    "funding_settlement.trust_settlement_stage_client_count",
+    "guardianship_probate_medicaid.supervised_probate_average_duration",
+    "guardianship_probate_medicaid.unsupervised_probate_average_duration",
+    "funding_settlement.trust_settlement_average_duration_months",
+    "probate_operations.probate_stage_aging_days",
+    "probate_operations.probate_upcoming_hearings_count",
+    "finance.probates_near_close"
+   ],
+   "cards": [
+    {
+     "id": "probate_cases",
+     "kind": "headline",
+     "metric_key": "guardianship_probate_medicaid.probate_case_count",
+     "visual": "hero"
+    },
+    {
+     "id": "cases_by_type",
+     "kind": "group",
+     "title": "Settlement Cases by Type",
+     "chart": "bars",
+     "metric_keys": [
+      "guardianship_probate_medicaid.supervised_probate_case_count",
+      "guardianship_probate_medicaid.unsupervised_probate_case_count",
+      "guardianship_probate_medicaid.small_estate_case_count",
+      "funding_settlement.trust_settlement_stage_client_count"
+     ],
+     "visual": "columns"
+    },
+    {
+     "id": "duration",
+     "kind": "group",
+     "title": "Average Months to Settle",
+     "chart": "bars",
+     "metric_keys": [
+      "guardianship_probate_medicaid.supervised_probate_average_duration",
+      "guardianship_probate_medicaid.unsupervised_probate_average_duration",
+      "funding_settlement.trust_settlement_average_duration_months"
+     ],
+     "visual": "ranked_bars",
+     "unit": "months"
+    },
+    {
+     "id": "stage_aging",
+     "kind": "worklist",
+     "metric_key": "probate_operations.probate_stage_aging_days",
+     "visual": "aging",
+     "fallback": "worklist"
+    },
+    {
+     "id": "hearings",
+     "kind": "worklist",
+     "metric_key": "probate_operations.probate_upcoming_hearings_count",
+     "visual": "timeline",
+     "fallback": "worklist"
+    },
+    {
+     "id": "near_close",
+     "kind": "worklist",
+     "metric_key": "finance.probates_near_close",
+     "visual": "worklist",
+     "accent": "success"
+    }
+   ]
+  },
+  "Medicaid & Guardianship": {
+   "dashboard_type": "department",
+   "metric_keys": [
+    "medicaid_operations.medicaid_application_in_progress_count",
+    "medicaid_operations.medicaid_documents_needed_count",
+    "medicaid_operations.medicaid_average_approval_days",
+    "guardianship_probate_medicaid.medicaid_case_count",
+    "guardianship_probate_medicaid.medicaid_cases_won",
+    "guardianship_probate_medicaid.medicaid_average_planning_fee",
+    "medicaid_operations.medicaid_cocounsel_split_total",
+    "guardianship_probate_medicaid.guardianship_case_count",
+    "guardianship_probate_medicaid.guardianship_cases_won",
+    "guardianship_probate_medicaid.guardianship_average_duration",
+    "guardianship_operations.guardianship_upcoming_hearings_count",
+    "guardianship_probate_medicaid.upcoming_guardianship_meetings",
+    "guardianship_probate_medicaid.upcoming_medicaid_meetings"
+   ],
+   "cards": [
+    {
+     "id": "apps_in_progress",
+     "kind": "headline",
+     "metric_key": "medicaid_operations.medicaid_application_in_progress_count",
+     "visual": "hero"
+    },
+    {
+     "id": "docs_needed",
+     "kind": "worklist",
+     "metric_key": "medicaid_operations.medicaid_documents_needed_count",
+     "visual": "worklist",
+     "style": "checklist",
+     "accent": "warning"
+    },
+    {
+     "id": "approval_days",
+     "kind": "number",
+     "metric_key": "medicaid_operations.medicaid_average_approval_days",
+     "visual": "stat",
+     "unit": "days"
+    },
+    {
+     "id": "medicaid_cases",
+     "kind": "pair",
+     "metric_keys": [
+      "guardianship_probate_medicaid.medicaid_case_count",
+      "guardianship_probate_medicaid.medicaid_cases_won"
+     ],
+     "visual": "compare",
+     "relation": "won",
+     "ratio_bar": true
+    },
+    {
+     "id": "medicaid_fees",
+     "kind": "group",
+     "title": "Medicaid Fees",
+     "chart": "bars",
+     "metric_keys": [
+      "guardianship_probate_medicaid.medicaid_average_planning_fee",
+      "medicaid_operations.medicaid_cocounsel_split_total"
+     ],
+     "note": "fee_realization_rate shown as detail line",
+     "visual": "compare",
+     "relation": "co-counsel share"
+    },
+    {
+     "id": "guardianship_cases",
+     "kind": "pair",
+     "metric_keys": [
+      "guardianship_probate_medicaid.guardianship_case_count",
+      "guardianship_probate_medicaid.guardianship_cases_won"
+     ],
+     "visual": "compare",
+     "relation": "won",
+     "ratio_bar": true
+    },
+    {
+     "id": "guardianship_duration",
+     "kind": "number",
+     "metric_key": "guardianship_probate_medicaid.guardianship_average_duration",
+     "visual": "stat",
+     "unit": "months"
+    },
+    {
+     "id": "hearings_meetings",
+     "kind": "group",
+     "title": "Upcoming Hearings and Meetings",
+     "chart": "bars",
+     "metric_keys": [
+      "guardianship_operations.guardianship_upcoming_hearings_count",
+      "guardianship_probate_medicaid.upcoming_guardianship_meetings",
+      "guardianship_probate_medicaid.upcoming_medicaid_meetings"
+     ],
+     "visual": "timeline",
+     "color_by": "type",
+     "fallback": "columns"
+    }
+   ]
+  },
+  "Attorney Performance": {
+   "dashboard_type": "attorney",
+   "metric_keys": [
+    "bonus_compensation.completed_trust_design_meetings",
+    "bonus_compensation.attorney_target_minimum",
+    "bonus_compensation.meetings_above_target",
+    "bonus_compensation.attorney_bonus_compensation",
+    "bonus_compensation.trust_based_acv"
+   ],
+   "cards": [
+    {
+     "id": "design_meetings",
+     "kind": "goal",
+     "metric_keys": [
+      "bonus_compensation.completed_trust_design_meetings",
+      "bonus_compensation.attorney_target_minimum",
+      "bonus_compensation.meetings_above_target"
+     ],
+     "visual": "ring",
+     "chips": [
+      "bonus_compensation.meetings_above_target"
+     ]
+    },
+    {
+     "id": "bonus",
+     "kind": "number",
+     "metric_key": "bonus_compensation.attorney_bonus_compensation",
+     "note": "bonus_payment_month as its label",
+     "visual": "stat",
+     "badge_key": "bonus_compensation.bonus_payment_month"
+    },
+    {
+     "id": "trust_acv",
+     "kind": "number",
+     "metric_key": "bonus_compensation.trust_based_acv",
+     "visual": "stat",
+     "sparkline": true
     }
    ]
   }
@@ -1170,6 +1658,1316 @@
     "key": "legal_firm.marketing",
     "label": "Marketing"
    }
+  },
+  {
+   "metric_key": "legal_firm.case_volume.actual_vs_needed_service_offerings",
+   "title": "Actual vs Needed Service Offerings",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.case_volume",
+    "label": "Case Volume"
+   },
+   "period_scope": "snapshot",
+   "value": [
+    {
+     "service_key": "estate_planning",
+     "service_label": "Estate Planning",
+     "actual_count": 21,
+     "needed_count": null,
+     "variance": null,
+     "average_case_value": null
+    },
+    {
+     "service_key": "probate",
+     "service_label": "Probate",
+     "actual_count": 0,
+     "needed_count": null,
+     "variance": null,
+     "average_case_value": null
+    }
+   ],
+   "format": "table",
+   "formatted_value": "4 rows"
+  },
+  {
+   "metric_key": "legal_firm.case_volume.closed_cases_by_service_offering",
+   "title": "Closed Cases By Service Offering",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.case_volume",
+    "label": "Case Volume"
+   },
+   "period_scope": "flow",
+   "value": [
+    {
+     "service_label": "Estate Planning",
+     "value": 6
+    },
+    {
+     "service_label": "Guardianship",
+     "value": 2
+    }
+   ],
+   "format": "table",
+   "formatted_value": "3 rows"
+  },
+  {
+   "metric_key": "legal_firm.case_volume.new_cases_opened_by_service_offering",
+   "title": "New Cases Opened By Service Offering",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.case_volume",
+    "label": "Case Volume"
+   },
+   "period_scope": "flow",
+   "value": [
+    {
+     "service_label": "Estate Planning",
+     "value": 21
+    },
+    {
+     "service_label": "Probate",
+     "value": 4
+    }
+   ],
+   "format": "table",
+   "formatted_value": "3 rows"
+  },
+  {
+   "metric_key": "legal_firm.finance.gross_revenue_prior_period_comparison",
+   "title": "Gross Revenue Prior Period Comparison",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.finance",
+    "label": "Finance"
+   },
+   "period_scope": "flow",
+   "value": 42000,
+   "format": "currency",
+   "formatted_value": "$42,000"
+  },
+  {
+   "metric_key": "legal_firm.finance.net_revenue",
+   "title": "Net Revenue",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.finance",
+    "label": "Finance"
+   },
+   "period_scope": "flow",
+   "value": 18400,
+   "format": "currency",
+   "formatted_value": "$18,400"
+  },
+  {
+   "metric_key": "legal_firm.case_volume.active_estate_planning_cases",
+   "title": "Active Estate Planning Cases",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.case_volume",
+    "label": "Case Volume"
+   },
+   "period_scope": "snapshot",
+   "value": 9,
+   "format": "integer",
+   "formatted_value": "9"
+  },
+  {
+   "metric_key": "legal_firm.estate_planning.deeds_only_average_duration_weeks",
+   "title": "Deeds Only Average Duration Weeks",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.estate_planning",
+    "label": "Estate Planning"
+   },
+   "period_scope": "flow",
+   "value": 6,
+   "format": "number",
+   "formatted_value": "6 weeks"
+  },
+  {
+   "metric_key": "legal_firm.estate_planning.deeds_only_count",
+   "title": "Deeds Only Count",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.estate_planning",
+    "label": "Estate Planning"
+   },
+   "period_scope": "snapshot",
+   "value": 12,
+   "format": "integer",
+   "formatted_value": "12"
+  },
+  {
+   "metric_key": "legal_firm.estate_planning.payment_plan_balance_owed",
+   "title": "Payment Plan Balance Owed",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.estate_planning",
+    "label": "Estate Planning"
+   },
+   "period_scope": "flow",
+   "value": 42000,
+   "format": "currency",
+   "formatted_value": "$42,000"
+  },
+  {
+   "metric_key": "legal_firm.estate_planning.payment_plan_client_count",
+   "title": "Payment Plan Client Count",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.estate_planning",
+    "label": "Estate Planning"
+   },
+   "period_scope": "snapshot",
+   "value": 19,
+   "format": "integer",
+   "formatted_value": "19"
+  },
+  {
+   "metric_key": "legal_firm.estate_planning.poa_deeds_average_duration_weeks",
+   "title": "POA Deeds Average Duration Weeks",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.estate_planning",
+    "label": "Estate Planning"
+   },
+   "period_scope": "flow",
+   "value": 6,
+   "format": "number",
+   "formatted_value": "6 weeks"
+  },
+  {
+   "metric_key": "legal_firm.estate_planning.poa_deeds_count",
+   "title": "POA Deeds Count",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.estate_planning",
+    "label": "Estate Planning"
+   },
+   "period_scope": "snapshot",
+   "value": 26,
+   "format": "integer",
+   "formatted_value": "26"
+  },
+  {
+   "metric_key": "legal_firm.estate_planning.trust_based_average_duration_weeks",
+   "title": "Trust Based Average Duration Weeks",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.estate_planning",
+    "label": "Estate Planning"
+   },
+   "period_scope": "flow",
+   "value": 9,
+   "format": "number",
+   "formatted_value": "9 weeks"
+  },
+  {
+   "metric_key": "legal_firm.estate_planning.trust_based_plan_count",
+   "title": "Trust Based Plan Count",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.estate_planning",
+    "label": "Estate Planning"
+   },
+   "period_scope": "snapshot",
+   "value": 9,
+   "format": "integer",
+   "formatted_value": "9"
+  },
+  {
+   "metric_key": "legal_firm.estate_planning.unsigned_engagement_letter_count",
+   "title": "Unsigned Engagement Letter Count",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.estate_planning",
+    "label": "Estate Planning"
+   },
+   "period_scope": "snapshot",
+   "value": 15,
+   "format": "integer",
+   "formatted_value": "15"
+  },
+  {
+   "metric_key": "legal_firm.estate_planning.upcoming_deed_design_meetings",
+   "title": "Upcoming Deed Design Meetings",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.estate_planning",
+    "label": "Estate Planning"
+   },
+   "period_scope": "snapshot",
+   "value": 12,
+   "format": "integer",
+   "formatted_value": "12"
+  },
+  {
+   "metric_key": "legal_firm.estate_planning.upcoming_deed_signing_meetings",
+   "title": "Upcoming Deed Signing Meetings",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.estate_planning",
+    "label": "Estate Planning"
+   },
+   "period_scope": "snapshot",
+   "value": 7,
+   "format": "integer",
+   "formatted_value": "7"
+  },
+  {
+   "metric_key": "legal_firm.estate_planning.upcoming_poa_deed_design_meetings",
+   "title": "Upcoming POA Deed Design Meetings",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.estate_planning",
+    "label": "Estate Planning"
+   },
+   "period_scope": "snapshot",
+   "value": 19,
+   "format": "integer",
+   "formatted_value": "19"
+  },
+  {
+   "metric_key": "legal_firm.estate_planning.upcoming_poa_deed_signing_meetings",
+   "title": "Upcoming POA Deed Signing Meetings",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.estate_planning",
+    "label": "Estate Planning"
+   },
+   "period_scope": "snapshot",
+   "value": 4,
+   "format": "integer",
+   "formatted_value": "4"
+  },
+  {
+   "metric_key": "legal_firm.estate_planning.upcoming_trust_design_meetings",
+   "title": "Upcoming Trust Design Meetings",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.estate_planning",
+    "label": "Estate Planning"
+   },
+   "period_scope": "snapshot",
+   "value": 26,
+   "format": "integer",
+   "formatted_value": "26"
+  },
+  {
+   "metric_key": "legal_firm.estate_planning.upcoming_trust_signing_meetings",
+   "title": "Upcoming Trust Signing Meetings",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.estate_planning",
+    "label": "Estate Planning"
+   },
+   "period_scope": "snapshot",
+   "value": 3,
+   "format": "integer",
+   "formatted_value": "3"
+  },
+  {
+   "metric_key": "legal_firm.estate_planning.upcoming_will_design_meetings",
+   "title": "Upcoming Will Design Meetings",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.estate_planning",
+    "label": "Estate Planning"
+   },
+   "period_scope": "snapshot",
+   "value": 9,
+   "format": "integer",
+   "formatted_value": "9"
+  },
+  {
+   "metric_key": "legal_firm.estate_planning.upcoming_will_signing_meetings",
+   "title": "Upcoming Will Signing Meetings",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.estate_planning",
+    "label": "Estate Planning"
+   },
+   "period_scope": "snapshot",
+   "value": 15,
+   "format": "integer",
+   "formatted_value": "15"
+  },
+  {
+   "metric_key": "legal_firm.estate_planning.will_based_average_duration_weeks",
+   "title": "Will Based Average Duration Weeks",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.estate_planning",
+    "label": "Estate Planning"
+   },
+   "period_scope": "flow",
+   "value": 14,
+   "format": "number",
+   "formatted_value": "14 weeks"
+  },
+  {
+   "metric_key": "legal_firm.estate_planning.will_based_plan_count",
+   "title": "Will Based Plan Count",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.estate_planning",
+    "label": "Estate Planning"
+   },
+   "period_scope": "snapshot",
+   "value": 7,
+   "format": "integer",
+   "formatted_value": "7"
+  },
+  {
+   "metric_key": "legal_firm.legacy_maintenance_retention.maintenance_active_member_count",
+   "title": "Maintenance Active Member Count",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.legacy_maintenance_retention",
+    "label": "Legacy Maintenance Retention"
+   },
+   "period_scope": "snapshot",
+   "value": 19,
+   "format": "integer",
+   "formatted_value": "19"
+  },
+  {
+   "metric_key": "legal_firm.legacy_maintenance_retention.maintenance_lapsed_member_count",
+   "title": "Maintenance Lapsed Member Count",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.legacy_maintenance_retention",
+    "label": "Legacy Maintenance Retention"
+   },
+   "period_scope": "snapshot",
+   "value": 4,
+   "format": "integer",
+   "formatted_value": "4"
+  },
+  {
+   "metric_key": "legal_firm.legacy_maintenance_retention.maintenance_lapsed_revenue_at_risk",
+   "title": "Maintenance Lapsed Revenue At Risk",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.legacy_maintenance_retention",
+    "label": "Legacy Maintenance Retention"
+   },
+   "period_scope": "flow",
+   "value": 3100,
+   "format": "currency",
+   "formatted_value": "$3,100"
+  },
+  {
+   "metric_key": "legal_firm.legacy_maintenance_retention.maintenance_outreach_due_count",
+   "title": "Maintenance Outreach Due Count",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.legacy_maintenance_retention",
+    "label": "Legacy Maintenance Retention"
+   },
+   "period_scope": "snapshot",
+   "value": 3,
+   "format": "integer",
+   "formatted_value": "3"
+  },
+  {
+   "metric_key": "legal_firm.legacy_maintenance_retention.maintenance_renewal_due_count",
+   "title": "Maintenance Renewal Due Count",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.legacy_maintenance_retention",
+    "label": "Legacy Maintenance Retention"
+   },
+   "period_scope": "snapshot",
+   "value": 9,
+   "format": "integer",
+   "formatted_value": "9"
+  },
+  {
+   "metric_key": "legal_firm.legacy_maintenance_retention.maintenance_renewal_rate",
+   "title": "Maintenance Renewal Rate",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.legacy_maintenance_retention",
+    "label": "Legacy Maintenance Retention"
+   },
+   "period_scope": "flow",
+   "value": 55,
+   "format": "percentage",
+   "formatted_value": "55%"
+  },
+  {
+   "metric_key": "legal_firm.legacy_maintenance_retention.maintenance_renewed_count",
+   "title": "Maintenance Renewed Count",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.legacy_maintenance_retention",
+    "label": "Legacy Maintenance Retention"
+   },
+   "period_scope": "snapshot",
+   "value": 12,
+   "format": "integer",
+   "formatted_value": "12"
+  },
+  {
+   "metric_key": "legal_firm.funding_settlement.annuity_asset_value",
+   "title": "Annuity Asset Value",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.funding_settlement",
+    "label": "Funding Settlement"
+   },
+   "period_scope": "flow",
+   "value": 3100,
+   "format": "currency",
+   "formatted_value": "$3,100"
+  },
+  {
+   "metric_key": "legal_firm.funding_settlement.bank_account_asset_value",
+   "title": "Bank Account Asset Value",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.funding_settlement",
+    "label": "Funding Settlement"
+   },
+   "period_scope": "snapshot",
+   "value": 42000,
+   "format": "currency",
+   "formatted_value": "$42,000"
+  },
+  {
+   "metric_key": "legal_firm.funding_settlement.fully_funded_client_count",
+   "title": "Fully Funded Client Count",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.funding_settlement",
+    "label": "Funding Settlement"
+   },
+   "period_scope": "snapshot",
+   "value": 4,
+   "format": "integer",
+   "formatted_value": "4"
+  },
+  {
+   "metric_key": "legal_firm.funding_settlement.funded_within_six_month_count",
+   "title": "Funded Within Six Month Count",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.funding_settlement",
+    "label": "Funding Settlement"
+   },
+   "period_scope": "snapshot",
+   "value": 26,
+   "format": "integer",
+   "formatted_value": "26"
+  },
+  {
+   "metric_key": "legal_firm.funding_settlement.funded_within_six_month_rate",
+   "title": "Funded Within Six Month Rate",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.funding_settlement",
+    "label": "Funding Settlement"
+   },
+   "period_scope": "flow",
+   "value": 48,
+   "format": "percentage",
+   "formatted_value": "48%"
+  },
+  {
+   "metric_key": "legal_firm.funding_settlement.funding_asset_total_value",
+   "title": "Funding Asset Total Value",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.funding_settlement",
+    "label": "Funding Settlement"
+   },
+   "period_scope": "flow",
+   "value": 3100,
+   "format": "currency",
+   "formatted_value": "$3,100"
+  },
+  {
+   "metric_key": "legal_firm.funding_settlement.funding_stage_average_duration",
+   "title": "Funding Stage Average Duration",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.funding_settlement",
+    "label": "Funding Settlement"
+   },
+   "period_scope": "flow",
+   "value": 6,
+   "format": "number",
+   "formatted_value": "6 months"
+  },
+  {
+   "metric_key": "legal_firm.funding_settlement.funding_stage_client_count",
+   "title": "Funding Stage Client Count",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.funding_settlement",
+    "label": "Funding Settlement"
+   },
+   "period_scope": "snapshot",
+   "value": 12,
+   "format": "integer",
+   "formatted_value": "12"
+  },
+  {
+   "metric_key": "legal_firm.funding_settlement.life_insurance_asset_value",
+   "title": "Life Insurance Asset Value",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.funding_settlement",
+    "label": "Funding Settlement"
+   },
+   "period_scope": "flow",
+   "value": 6250,
+   "format": "currency",
+   "formatted_value": "$6,250"
+  },
+  {
+   "metric_key": "legal_firm.funding_settlement.not_fully_funded_client_count",
+   "title": "Not Fully Funded Client Count",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.funding_settlement",
+    "label": "Funding Settlement"
+   },
+   "period_scope": "snapshot",
+   "value": 19,
+   "format": "integer",
+   "formatted_value": "19"
+  },
+  {
+   "metric_key": "legal_firm.funding_settlement.outside_six_month_goal_count",
+   "title": "Outside Six Month Goal Count",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.funding_settlement",
+    "label": "Funding Settlement"
+   },
+   "period_scope": "snapshot",
+   "value": 4,
+   "format": "integer",
+   "formatted_value": "4"
+  },
+  {
+   "metric_key": "legal_firm.funding_settlement.retirement_asset_value",
+   "title": "Retirement Asset Value",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "no_data_source",
+   "data_state_reason": "No payment data yet. Connect the app that holds it to see this number.",
+   "section": {
+    "key": "legal_firm.funding_settlement",
+    "label": "Funding Settlement"
+   },
+   "period_scope": "flow",
+   "value": null,
+   "format": "currency",
+   "formatted_value": null
+  },
+  {
+   "metric_key": "legal_firm.funding_settlement.upcoming_funding_meetings",
+   "title": "Upcoming Funding Meetings",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.funding_settlement",
+    "label": "Funding Settlement"
+   },
+   "period_scope": "snapshot",
+   "value": 3,
+   "format": "integer",
+   "formatted_value": "3"
+  },
+  {
+   "metric_key": "legal_firm.finance.probates_near_close",
+   "title": "Probates Near Close",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.finance",
+    "label": "Finance"
+   },
+   "period_scope": "flow",
+   "value": 9,
+   "format": "integer",
+   "formatted_value": "9"
+  },
+  {
+   "metric_key": "legal_firm.funding_settlement.trust_settlement_average_duration_months",
+   "title": "Trust Settlement Average Duration Months",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.funding_settlement",
+    "label": "Funding Settlement"
+   },
+   "period_scope": "flow",
+   "value": 6,
+   "format": "number",
+   "formatted_value": "6 months"
+  },
+  {
+   "metric_key": "legal_firm.funding_settlement.trust_settlement_stage_client_count",
+   "title": "Trust Settlement Stage Client Count",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.funding_settlement",
+    "label": "Funding Settlement"
+   },
+   "period_scope": "snapshot",
+   "value": 12,
+   "format": "integer",
+   "formatted_value": "12"
+  },
+  {
+   "metric_key": "legal_firm.guardianship_probate_medicaid.probate_case_count",
+   "title": "Probate Case Count",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.guardianship_probate_medicaid",
+    "label": "Guardianship Probate Medicaid"
+   },
+   "period_scope": "snapshot",
+   "value": 7,
+   "format": "integer",
+   "formatted_value": "7"
+  },
+  {
+   "metric_key": "legal_firm.guardianship_probate_medicaid.small_estate_case_count",
+   "title": "Small Estate Case Count",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.guardianship_probate_medicaid",
+    "label": "Guardianship Probate Medicaid"
+   },
+   "period_scope": "snapshot",
+   "value": 19,
+   "format": "integer",
+   "formatted_value": "19"
+  },
+  {
+   "metric_key": "legal_firm.guardianship_probate_medicaid.supervised_probate_average_duration",
+   "title": "Supervised Probate Average Duration",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.guardianship_probate_medicaid",
+    "label": "Guardianship Probate Medicaid"
+   },
+   "period_scope": "flow",
+   "value": 6,
+   "format": "number",
+   "formatted_value": "6 months"
+  },
+  {
+   "metric_key": "legal_firm.guardianship_probate_medicaid.supervised_probate_case_count",
+   "title": "Supervised Probate Case Count",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.guardianship_probate_medicaid",
+    "label": "Guardianship Probate Medicaid"
+   },
+   "period_scope": "snapshot",
+   "value": 26,
+   "format": "integer",
+   "formatted_value": "26"
+  },
+  {
+   "metric_key": "legal_firm.guardianship_probate_medicaid.unsupervised_probate_average_duration",
+   "title": "Unsupervised Probate Average Duration",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.guardianship_probate_medicaid",
+    "label": "Guardianship Probate Medicaid"
+   },
+   "period_scope": "flow",
+   "value": 9,
+   "format": "number",
+   "formatted_value": "9 months"
+  },
+  {
+   "metric_key": "legal_firm.guardianship_probate_medicaid.unsupervised_probate_case_count",
+   "title": "Unsupervised Probate Case Count",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.guardianship_probate_medicaid",
+    "label": "Guardianship Probate Medicaid"
+   },
+   "period_scope": "snapshot",
+   "value": 9,
+   "format": "integer",
+   "formatted_value": "9"
+  },
+  {
+   "metric_key": "legal_firm.probate_operations.probate_stage_aging_days",
+   "title": "Probate Stage Aging Days",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.probate_operations",
+    "label": "Probate Operations"
+   },
+   "period_scope": "flow",
+   "value": 6,
+   "format": "number",
+   "formatted_value": "6 days"
+  },
+  {
+   "metric_key": "legal_firm.probate_operations.probate_upcoming_hearings_count",
+   "title": "Probate Upcoming Hearings Count",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.probate_operations",
+    "label": "Probate Operations"
+   },
+   "period_scope": "snapshot",
+   "value": 12,
+   "format": "integer",
+   "formatted_value": "12"
+  },
+  {
+   "metric_key": "legal_firm.guardianship_operations.guardianship_upcoming_hearings_count",
+   "title": "Guardianship Upcoming Hearings Count",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.guardianship_operations",
+    "label": "Guardianship Operations"
+   },
+   "period_scope": "snapshot",
+   "value": 7,
+   "format": "integer",
+   "formatted_value": "7"
+  },
+  {
+   "metric_key": "legal_firm.guardianship_probate_medicaid.guardianship_average_duration",
+   "title": "Guardianship Average Duration",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.guardianship_probate_medicaid",
+    "label": "Guardianship Probate Medicaid"
+   },
+   "period_scope": "flow",
+   "value": 22,
+   "format": "number",
+   "formatted_value": "22 months"
+  },
+  {
+   "metric_key": "legal_firm.guardianship_probate_medicaid.guardianship_case_count",
+   "title": "Guardianship Case Count",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.guardianship_probate_medicaid",
+    "label": "Guardianship Probate Medicaid"
+   },
+   "period_scope": "snapshot",
+   "value": 4,
+   "format": "integer",
+   "formatted_value": "4"
+  },
+  {
+   "metric_key": "legal_firm.guardianship_probate_medicaid.guardianship_cases_won",
+   "title": "Guardianship Cases Won",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.guardianship_probate_medicaid",
+    "label": "Guardianship Probate Medicaid"
+   },
+   "period_scope": "flow",
+   "value": 26,
+   "format": "integer",
+   "formatted_value": "26"
+  },
+  {
+   "metric_key": "legal_firm.guardianship_probate_medicaid.medicaid_average_planning_fee",
+   "title": "Medicaid Average Planning Fee",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.guardianship_probate_medicaid",
+    "label": "Guardianship Probate Medicaid"
+   },
+   "period_scope": "flow",
+   "value": 6250,
+   "format": "currency",
+   "formatted_value": "$6,250"
+  },
+  {
+   "metric_key": "legal_firm.guardianship_probate_medicaid.medicaid_case_count",
+   "title": "Medicaid Case Count",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.guardianship_probate_medicaid",
+    "label": "Guardianship Probate Medicaid"
+   },
+   "period_scope": "snapshot",
+   "value": 9,
+   "format": "integer",
+   "formatted_value": "9"
+  },
+  {
+   "metric_key": "legal_firm.guardianship_probate_medicaid.medicaid_cases_won",
+   "title": "Medicaid Cases Won",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.guardianship_probate_medicaid",
+    "label": "Guardianship Probate Medicaid"
+   },
+   "period_scope": "flow",
+   "value": 15,
+   "format": "integer",
+   "formatted_value": "15"
+  },
+  {
+   "metric_key": "legal_firm.guardianship_probate_medicaid.upcoming_guardianship_meetings",
+   "title": "Upcoming Guardianship Meetings",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.guardianship_probate_medicaid",
+    "label": "Guardianship Probate Medicaid"
+   },
+   "period_scope": "snapshot",
+   "value": 12,
+   "format": "integer",
+   "formatted_value": "12"
+  },
+  {
+   "metric_key": "legal_firm.guardianship_probate_medicaid.upcoming_medicaid_meetings",
+   "title": "Upcoming Medicaid Meetings",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.guardianship_probate_medicaid",
+    "label": "Guardianship Probate Medicaid"
+   },
+   "period_scope": "snapshot",
+   "value": 7,
+   "format": "integer",
+   "formatted_value": "7"
+  },
+  {
+   "metric_key": "legal_firm.medicaid_operations.medicaid_application_in_progress_count",
+   "title": "Medicaid Application In Progress Count",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.medicaid_operations",
+    "label": "Medicaid Operations"
+   },
+   "period_scope": "snapshot",
+   "value": 19,
+   "format": "integer",
+   "formatted_value": "19"
+  },
+  {
+   "metric_key": "legal_firm.medicaid_operations.medicaid_average_approval_days",
+   "title": "Medicaid Average Approval Days",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.medicaid_operations",
+    "label": "Medicaid Operations"
+   },
+   "period_scope": "flow",
+   "value": 6,
+   "format": "number",
+   "formatted_value": "6 days"
+  },
+  {
+   "metric_key": "legal_firm.medicaid_operations.medicaid_cocounsel_split_total",
+   "title": "Medicaid Cocounsel Split Total",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.medicaid_operations",
+    "label": "Medicaid Operations"
+   },
+   "period_scope": "flow",
+   "value": 3100,
+   "format": "currency",
+   "formatted_value": "$3,100"
+  },
+  {
+   "metric_key": "legal_firm.medicaid_operations.medicaid_documents_needed_count",
+   "title": "Medicaid Documents Needed Count",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.medicaid_operations",
+    "label": "Medicaid Operations"
+   },
+   "period_scope": "snapshot",
+   "value": 3,
+   "format": "integer",
+   "formatted_value": "3"
+  },
+  {
+   "metric_key": "legal_firm.bonus_compensation.attorney_bonus_compensation",
+   "title": "Attorney Bonus Compensation",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.bonus_compensation",
+    "label": "Bonus Compensation"
+   },
+   "period_scope": "flow",
+   "value": 18400,
+   "format": "currency",
+   "formatted_value": "$18,400"
+  },
+  {
+   "metric_key": "legal_firm.bonus_compensation.attorney_target_minimum",
+   "title": "Attorney Target Minimum",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.bonus_compensation",
+    "label": "Bonus Compensation"
+   },
+   "period_scope": "flow",
+   "value": 15,
+   "format": "integer",
+   "formatted_value": "15"
+  },
+  {
+   "metric_key": "legal_firm.bonus_compensation.bonus_payment_month",
+   "title": "Bonus Payment Month",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.bonus_compensation",
+    "label": "Bonus Compensation"
+   },
+   "period_scope": "flow",
+   "value": 12900,
+   "format": "currency",
+   "formatted_value": "$12,900"
+  },
+  {
+   "metric_key": "legal_firm.bonus_compensation.completed_trust_design_meetings",
+   "title": "Completed Trust Design Meetings",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.bonus_compensation",
+    "label": "Bonus Compensation"
+   },
+   "period_scope": "flow",
+   "value": 7,
+   "format": "integer",
+   "formatted_value": "7"
+  },
+  {
+   "metric_key": "legal_firm.bonus_compensation.meetings_above_target",
+   "title": "Meetings Above Target",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.bonus_compensation",
+    "label": "Bonus Compensation"
+   },
+   "period_scope": "flow",
+   "value": 19,
+   "format": "integer",
+   "formatted_value": "19"
+  },
+  {
+   "metric_key": "legal_firm.bonus_compensation.trust_based_acv",
+   "title": "Trust Based ACV",
+   "period": "Jan 1, 2026 - Jan 31, 2026",
+   "goal": null,
+   "comparison": null,
+   "data_state": "ok",
+   "data_state_reason": null,
+   "section": {
+    "key": "legal_firm.bonus_compensation",
+    "label": "Bonus Compensation"
+   },
+   "period_scope": "flow",
+   "value": 18400,
+   "format": "currency",
+   "formatted_value": "$18,400"
   }
  ],
  "worklist_rows_synthetic": [
@@ -1221,5 +3019,66 @@
    "due_date": "2026-01-10",
    "amount": 2250
   }
- ]
+ ],
+ "rows_synthetic": {
+  "timeline": [
+   {
+    "meeting_type": "Will signing",
+    "client_name": "",
+    "scheduled_date": "2026-11-26"
+   },
+   {
+    "meeting_type": "Trust design",
+    "client_name": "",
+    "scheduled_date": "2026-11-27"
+   },
+   {
+    "meeting_type": "Deed signing",
+    "client_name": "",
+    "scheduled_date": "2026-12-02"
+   },
+   {
+    "meeting_type": "Trust signing",
+    "client_name": "",
+    "scheduled_date": "2026-12-05"
+   }
+  ],
+  "aging": [
+   {
+    "matter_name": "[matter 0]",
+    "stage": "Inventory",
+    "days_in_stage": 12
+   },
+   {
+    "matter_name": "[matter 1]",
+    "stage": "Inventory",
+    "days_in_stage": 25
+   },
+   {
+    "matter_name": "[matter 2]",
+    "stage": "Inventory",
+    "days_in_stage": 44
+   },
+   {
+    "matter_name": "[matter 3]",
+    "stage": "Inventory",
+    "days_in_stage": 58
+   },
+   {
+    "matter_name": "[matter 4]",
+    "stage": "Inventory",
+    "days_in_stage": 73
+   },
+   {
+    "matter_name": "[matter 5]",
+    "stage": "Inventory",
+    "days_in_stage": 95
+   },
+   {
+    "matter_name": "[matter 6]",
+    "stage": "Inventory",
+    "days_in_stage": 130
+   }
+  ]
+ }
 }
