@@ -104,3 +104,8 @@ describe('matchPreset: the highlighted chip comes from the dates', () => {
     expect(matchPreset(null, presets)).toBe(null);
   });
 });
+
+test('metricDetailHref carries where it was opened from', () => {
+  const qs = new URLSearchParams(metricDetailHref('a.b', { periodStart: '2026-01-01', periodEnd: '2026-01-31' }, { from: 'dashboard', dashboardId: 'd-1' }).split('?')[1]);
+  expect([qs.get('from'), qs.get('dashboardId')]).toEqual(['dashboard', 'd-1']);
+});

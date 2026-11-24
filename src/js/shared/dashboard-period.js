@@ -64,6 +64,9 @@
     if (period && period.periodEnd) parts.push('periodEnd=' + encodeURIComponent(period.periodEnd));
     if (period && period.compareBy) parts.push('compareBy=' + encodeURIComponent(period.compareBy));
     if (options && options.tab) parts.push('tab=' + encodeURIComponent(options.tab));
+    // Where it was opened from, so its breadcrumbs and Back lead there.
+    if (options && options.from) parts.push('from=' + encodeURIComponent(options.from));
+    if (options && options.dashboardId) parts.push('dashboardId=' + encodeURIComponent(options.dashboardId));
     return 'admin/metric_detail.html?' + parts.join('&');
   }
 

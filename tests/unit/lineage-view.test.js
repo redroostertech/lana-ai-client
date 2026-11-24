@@ -65,13 +65,16 @@ describe('detailModel', () => {
     expect(m.sources.map((s) => s.line)).toEqual(['1,204 leads, 36 in your dates', '916 matters']);
   });
 
-  test('systems carry their sync time; older than 7 days is stale with a dated note', () => {
+  test('the entity leads; the connector is only a small "via" detail beside its sync time', () => {
     const m = L.detailModel(conversion, NOW);
+    expect(m.sources[0].label).toBe('Leads');
     expect(m.sources[0].systems).toEqual([
-      { label: 'Leadly', records: '1,180', syncedAt: '2026-11-24T09:00:00Z', stale: false, staleText: null },
-      { label: 'LANA', records: '24', syncedAt: null, stale: false, staleText: null },
+      { via: 'via Leadly', records: '1,180', syncedAt: '2026-11-24T09:00:00Z', stale: false, staleText: null },
+      { via: 'via LANA', records: '24', syncedAt: null, stale: false, staleText: null },
     ]);
-    expect(m.sources[1].systems[0]).toMatchObject({ label: 'ActionStep', stale: true, staleText: 'Last synced Aug 10' });
+    expect(m.sources[1].systems[0]).toMatchObject({ via: 'via ActionStep', stale: true, staleText: 'last synced Aug 10' });
+    // No connector name stands on its own as a label.
+    expect(m.sources.every((s) => s.systems.every((sys) => sys.label === undefined))).toBe(true);
   });
 
   test('fields read as sentences, grouped by what they do', () => {

@@ -341,6 +341,15 @@
     var content = el('lex-main-content');
     if (!content) return;
 
+    // Insights / All dashboards; Back goes to Insights.
+    var breadcrumb = el('dashboardLibraryBreadcrumb');
+    if (breadcrumb && window.InsightsBreadcrumbs) {
+      var crumbs = window.InsightsBreadcrumbs.dashboardLibrary();
+      breadcrumb.items = crumbs;
+      var app = document.querySelector('lex-app');
+      if (app) app.backHref = window.InsightsBreadcrumbs.backHref(crumbs);
+    }
+
     // Admin gate: dashboard library exposes share/delete actions, admin-only.
     if (Lex.Auth && !Lex.Auth.isAdmin()) {
       Lex.Nav.go('dashboard.html', { replace: true });

@@ -17,25 +17,27 @@ function node() {
     setCellRenderers(r) { this.renderers = r; }, querySelector: () => null, querySelectorAll: () => [] };
 }
 
-async function page(search, payload) {
+async function page(search, payload, apiExtra) {
   const source = fs.readFileSync(path.join(__dirname, '../../src/js/admin/metric-detail.js'), 'utf8');
   const dataState = fs.readFileSync(path.join(__dirname, '../../src/js/shared/data-state.js'), 'utf8');
   const nodes = {};
   const document = { addEventListener() {}, getElementById: id => (nodes[id] = nodes[id] || node()), createElement: () => node(),
-    querySelector: () => null, querySelectorAll: () => [] };
-  const api = { getMetricDetail: jest.fn().mockResolvedValue({ success: true, data: payload }) };
+    querySelectorApp: null,
+    querySelector: (sel) => (sel === 'lex-app' ? app : null), querySelectorAll: () => [] };
+  const api = Object.assign({ getMetricDetail: jest.fn().mockResolvedValue({ success: true, data: payload }) }, apiExtra || {});
+  const app = { backHref: '' };
   const Lex = { Auth: { isAdmin: () => true }, Nav: { getParams: () => new URLSearchParams(search), go: jest.fn() } };
   const window = { location: { search }, Lex, customElements: null };
   const context = vm.createContext({ window, document, console: { log() {}, error() {}, warn() {} }, Intl, URLSearchParams,
     Promise, setTimeout, Lex, api });
   vm.runInContext(dataState, context);
-  for (const rel of ['js/dashboard/metric-goal-comparison.js', 'js/shared/metric-card-view.js', 'js/shared/mini-charts.js', 'js/shared/metric-detail-view.js', 'js/shared/lineage-view.js']) {
+  for (const rel of ['js/dashboard/metric-goal-comparison.js', 'js/shared/metric-card-view.js', 'js/shared/mini-charts.js', 'js/shared/metric-detail-view.js', 'js/shared/lineage-view.js', 'js/shared/insights-breadcrumbs.js']) {
     vm.runInContext(fs.readFileSync(path.join(__dirname, '../../src', rel), 'utf8'), context);
   }
   vm.runInContext(source, context);
   await new Promise(resolve => { setImmediate(resolve); });
   await new Promise(resolve => { setImmediate(resolve); });
-  return { api, nodes, empty: window.DataState.EMPTY_VALUE };
+  return { api, nodes, app, empty: window.DataState.EMPTY_VALUE };
 }
 
 const payload = { metric: { key: 'matters_opened', title: 'Matters opened' }, current: { value: 4 }, movement: null,
@@ -132,7 +134,7 @@ describe('Data used', () => {
     expect(text).toContain('Converted clients divided by potential new clients.');
     expect(html).toContain('data-metric-record-link="admin/metric_detail.html?metric_key=legal_firm.s.pnc&amp;periodStart=2026-10-01&amp;periodEnd=2026-10-31"');
     expect(text).toContain('1,204 leads, 36 in your dates');
-    expect(text).toContain('Last synced Jan 1');
+    expect(text).toContain('via Leadly, last synced Jan 1');
     expect(html).toContain('metric-data__stale');
     expect(text).toContain('Date created decides which dates count.');
     expect(html).toContain('title="Practice area is Estate Planning"');
@@ -142,5 +144,24 @@ describe('Data used', () => {
     expect(html).not.toContain('legal_firm.s.converted</');
     expect(html).toContain('<details class="metric-data__technical">');
     expect(text).toContain('count(a) / count(b)');
+  });
+});
+
+describe('breadcrumbs', () => {
+  test('opened from a dashboard: All dashboards / the dashboard with the same dates / the metric; Back goes to the dashboard', async () => {
+    const p = await page('?metric_key=matters_opened&periodStart=2026-10-01&periodEnd=2026-10-31&from=dashboard&dashboardId=d-1', payload,
+      { getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'Owner Overview' } }) });
+    await new Promise((r) => setImmediate(r));
+    expect(p.nodes.metricDetailBreadcrumb.items).toEqual([
+      { label: 'All dashboards', href: 'admin/dashboard-library.html' },
+      { label: 'Owner Overview', href: 'admin/dashboard-detail.html?id=d-1&periodStart=2026-10-01&periodEnd=2026-10-31' },
+      { label: 'Matters opened' },
+    ]);
+    expect(p.app.backHref).toBe('admin/dashboard-detail.html?id=d-1&periodStart=2026-10-01&periodEnd=2026-10-31');
+  });
+
+  test('a direct link: Insights / the metric', async () => {
+    const p = await page('?metric_key=matters_opened', payload);
+    expect(p.nodes.metricDetailBreadcrumb.items).toEqual([{ label: 'Insights', href: 'admin/analytics.html' }, { label: 'Matters opened' }]);
   });
 });

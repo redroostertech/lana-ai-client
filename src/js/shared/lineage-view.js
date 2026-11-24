@@ -47,12 +47,14 @@
     var synced = system && system.last_synced_at ? String(system.last_synced_at) : null;
     var time = synced ? Date.parse(synced) : NaN;
     var stale = isFinite(time) && (now - time) > STALE_DAYS * MS_PER_DAY;
+    // The connector is a small secondary detail ("via ActionStep"); the
+    // entity it provides (Matters, Leads) is what the page leads with.
     return {
-      label: String((system && system.label) || ''),
+      via: system && system.label ? 'via ' + String(system.label) : '',
       records: count(system && system.records),
       syncedAt: synced,
       stale: stale,
-      staleText: stale ? 'Last synced ' + shortDay(synced) : null,
+      staleText: stale ? 'last synced ' + shortDay(synced) : null,
     };
   }
 

@@ -60,8 +60,14 @@ test('the Insights home is titled Dashboard and names the two the same way', () 
   expect(read('admin/report.html')).toContain(`items='[{"label":"Reports","href":"admin/reports-list.html"},{"label":"Report"}]'`);
 });
 
-test('dashboard detail and builder breadcrumbs read Dashboard / All dashboards', () => {
-  ['js/admin/dashboard-detail.js', 'js/admin/dashboard-builder.js'].forEach((file) => {
+// Dashboard detail builds its trail from the real path (insights-breadcrumbs.js:
+// All dashboards / <name>); the builder keeps Dashboard / All dashboards.
+test('dashboard detail reads its trail from the breadcrumb builder', () => {
+  expect(read('js/admin/dashboard-detail.js')).toContain('InsightsBreadcrumbs.dashboardDetail(');
+});
+
+test('the builder breadcrumbs read Dashboard / All dashboards', () => {
+  ['js/admin/dashboard-builder.js'].forEach((file) => {
     const js = read(file);
     expect(js).toContain("{ label: 'Dashboard', href: 'admin/analytics.html' },\n        { label: 'All dashboards', href: 'admin/dashboard-library.html' },");
     expect(js).not.toContain("{ label: 'Library', href: 'admin/dashboard-library.html' }");

@@ -588,25 +588,21 @@
     }
   }
 
-  function setActiveType(type) {
+  // Breadcrumbs follow the real path (js/shared/insights-breadcrumbs.js);
+  // the shell's Back goes to the parent crumb.
+  function setCrumbs(items) {
     var breadcrumb = el('dashboardDetailBreadcrumb');
-    if (breadcrumb) {
-      breadcrumb.items = [
-        { label: 'Dashboard', href: 'admin/analytics.html' },
-        { label: VIEW_CONFIG[type].title },
-      ];
-    }
+    if (breadcrumb) breadcrumb.items = items;
+    var app = document.querySelector ? document.querySelector('lex-app') : null;
+    if (app) app.backHref = window.InsightsBreadcrumbs.backHref(items);
+  }
+
+  function setActiveType(type) {
+    setCrumbs(window.InsightsBreadcrumbs.dashboardDetail({ name: VIEW_CONFIG[type].title, standard: true }));
   }
 
   function setActiveDashboardBreadcrumb(dashboard) {
-    var breadcrumb = el('dashboardDetailBreadcrumb');
-    if (breadcrumb) {
-      breadcrumb.items = [
-        { label: 'Dashboard', href: 'admin/analytics.html' },
-        { label: 'All dashboards', href: 'admin/dashboard-library.html' },
-        { label: dashboard && dashboard.name ? dashboard.name : 'Dashboard' },
-      ];
-    }
+    setCrumbs(window.InsightsBreadcrumbs.dashboardDetail({ name: dashboard && dashboard.name ? dashboard.name : 'Dashboard' }));
   }
 
   function normalizeCardResponse(response) {
@@ -740,7 +736,7 @@
   function recordsHref(cardId) {
     return window.DashboardPeriod.metricDetailHref(cardId, {
       periodStart: currentPeriod.start, periodEnd: currentPeriod.end, compareBy: currentPeriod.compareBy,
-    }, { tab: 'source' });
+    }, currentDashboardId ? { from: 'dashboard', dashboardId: currentDashboardId } : {});
   }
 
   var RECORDS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
@@ -1577,9 +1573,12 @@
     if (periodRule) parts.push('<p class="dash-howto__dates">' + escapeHtml(periodRule) + '</p>');
     if (model && model.sources.length) {
       parts.push('<ul class="dash-howto__sources">' + model.sources.map(function (source) {
-        var stale = source.systems.filter(function (s) { return s.stale; })[0];
-        return '<li><span class="dash-howto__chip">' + escapeHtml(source.label) + '</span> ' + escapeHtml(source.line)
-          + (stale ? ' <span class="dash-howto__stale">' + escapeHtml(stale.label + ': ' + stale.staleText) + '</span>' : '') + '</li>';
+        // The entity and its counts lead; the connector is a small "via" detail.
+        var via = source.systems.map(function (system) {
+          return escapeHtml(system.via) + (system.stale ? ', <span class="dash-howto__stale">' + escapeHtml(system.staleText) + '</span>' : '');
+        }).join('; ');
+        return '<li><span class="dash-howto__entity">' + escapeHtml(source.line) + '</span>'
+          + (via ? '<span class="dash-howto__via">' + via + '</span>' : '') + '</li>';
       }).join('') + '</ul>');
     } else if (lines && lines.sources.length) {
       parts.push('<div class="dash-howto__chips">' + lines.sources.map(function (label) {
@@ -2012,7 +2011,22 @@
 
   // Returns the default preset's promise: the first card load waits for it.
   function initPeriodControls() {
-    var initialPeriod = selectDashboardPeriodPreset('last7days', false);
+    // Coming back from a metric's page: keep the dates it was opened with.
+    var urlParams = getParams();
+    var backStart = urlParams.get('periodStart');
+    var backEnd = urlParams.get('periodEnd');
+    var initialPeriod;
+    if (window.DashboardPeriod.isPlainDay(backStart) && window.DashboardPeriod.isPlainDay(backEnd) && backStart <= backEnd) {
+      var startNode = el('dashboardPeriodStart');
+      var endNode = el('dashboardPeriodEnd');
+      if (startNode) startNode.value = backStart;
+      if (endNode) endNode.value = backEnd;
+      currentPeriodIsPreset = false;
+      readPeriodControls();
+      initialPeriod = Promise.resolve();
+    } else {
+      initialPeriod = selectDashboardPeriodPreset('last7days', false);
+    }
 
     var presets = el('dashboardPeriodPresets');
     if (presets) {

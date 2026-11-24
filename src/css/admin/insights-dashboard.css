@@ -3669,3 +3669,26 @@ button.dash-lines__label:hover,
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+#dashboardLibraryBreadcrumb {
+  display: block;
+  margin: 0.75rem 0;
+}
+
+/* Lineage: the entity leads; the connector is a small "via" line. */
+.dash-howto__sources li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.dash-howto__entity {
+  font-weight: 600;
+  color: var(--lex-text-primary);
+}
+
+.dash-howto__via,
+.metric-data__via {
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+}

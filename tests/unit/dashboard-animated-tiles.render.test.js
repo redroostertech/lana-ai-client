@@ -123,7 +123,8 @@ describe('tiles', () => {
     const href = html.split('data-metric-detail-link="')[1].split('"')[0].split('&amp;').join('&');
     const qs = new URLSearchParams(href.split('?')[1]);
     expect(qs.get('metric_key')).toBe('legal_firm.finance.average_case_value');
-    expect([qs.get('periodStart'), qs.get('periodEnd'), qs.get('tab')]).toEqual(['2026-01-01', '2026-01-31', 'source']);
+    // Metric detail has no tabs now: the records always show.
+    expect([qs.get('periodStart'), qs.get('periodEnd'), qs.get('tab')]).toEqual(['2026-01-01', '2026-01-31', null]);
     expect(html).toContain('data-sparkline-key="legal_firm.finance.average_case_value"');
   });
 
@@ -591,7 +592,8 @@ describe('How this card works', () => {
     expect(text(html)).toContain('Marketing Spend');
     expect(text(html)).toContain('Adds up marketing expenses.');
     expect(text(html)).toContain('Expenses dated between your dates.');
-    expect(html).toContain('dash-howto__chip');
+    // The entity (Expenses) leads, from card.lineage or the full lineage.
+    expect(text(html).toLowerCase()).toContain('expenses');
     expect(html.split('See full details').length - 1).toBe(2);
     expect(text(html)).not.toContain('legal_firm.');
   });
@@ -604,7 +606,8 @@ describe('How this card works', () => {
     await new Promise((r) => setImmediate(r));
     const html = p.nodes.dashboardMetricModalBody.innerHTML;
     expect(text(html)).toContain('52 expenses, 7 in your dates');
-    expect(text(html)).toContain('Last synced Jan 1');
+    expect(text(html)).toContain('via QuickBooks, last synced Jan 1');
+    expect(html).not.toContain('dash-howto__chip">QuickBooks');
   });
 
   test('no lineage on the card: the panel still explains the card without breaking', async () => {
@@ -618,5 +621,20 @@ describe('How this card works', () => {
     expect(text(html)).toContain('Each bar is one number.');
     expect(text(html)).toContain('Website Leads');
     expect(html).not.toMatch(/undefined|null/);
+  });
+});
+
+describe('breadcrumbs and the way back', () => {
+  const declared = require(path.join(__dirname, '../fixtures/dashboard/declared-layouts.json'));
+  test('a saved dashboard reads All dashboards / its name, and its records links say where they came from', async () => {
+    const layout = { cards: [{ id: 'n', kind: 'number', metric_key: 'case_volume.active_cases_total' }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'Owner Overview', layout } }),
+      getDashboardMetricCards: jest.fn().mockResolvedValue({ data: declared.cards_synthetic }) });
+    await p.exports.loadDashboardById('d1');
+    expect(p.nodes.dashboardDetailBreadcrumb.items).toEqual([
+      { label: 'All dashboards', href: 'admin/dashboard-library.html' }, { label: 'Owner Overview' }]);
+    const href = p.nodes.dashboardMetricGrid.innerHTML.split('data-metric-detail-link="')[1].split('"')[0].split('&amp;').join('&');
+    const qs = new URLSearchParams(href.split('?')[1]);
+    expect([qs.get('from'), qs.get('dashboardId')]).toEqual(['dashboard', 'd1']);
   });
 });

@@ -269,16 +269,22 @@
   function metricHref(key) {
     var qp = params();
     var parts = ['metric_key=' + encodeURIComponent(key)];
-    ['periodStart', 'periodEnd', 'compareBy'].forEach(function (name) {
+    ['periodStart', 'periodEnd', 'compareBy', 'from', 'dashboardId'].forEach(function (name) {
       if (qp.get(name)) parts.push(name + '=' + encodeURIComponent(qp.get(name)));
     });
     return 'admin/metric_detail.html?' + parts.join('&');
   }
 
-  function syncedText(system) {
-    if (system.stale) return '<span class="metric-data__stale" title="This source has not synced for over a week">' + escapeHtml(system.staleText) + '</span>';
-    if (!system.syncedAt || !window.Lex || !Lex.Utils || !Lex.Utils.timeAgo) return '';
-    return '<span class="metric-data__synced">synced ' + escapeHtml(Lex.Utils.timeAgo(system.syncedAt)) + '</span>';
+  // "via ActionStep, synced 3 hours ago": the connector is a small detail
+  // under the entity, never a headline or a chip on its own.
+  function viaText(system) {
+    var synced = '';
+    if (system.stale) {
+      synced = ', <span class="metric-data__stale" title="This source has not synced for over a week">' + escapeHtml(system.staleText) + '</span>';
+    } else if (system.syncedAt && window.Lex && Lex.Utils && Lex.Utils.timeAgo) {
+      synced = ', synced ' + escapeHtml(Lex.Utils.timeAgo(system.syncedAt));
+    }
+    return '<span class="metric-data__via">' + escapeHtml(system.via) + synced + '</span>';
   }
 
   function renderDataUsed(lineage) {
@@ -298,9 +304,7 @@
     if (model.sources.length) {
       parts.push('<h4 class="metric-data__heading">Where the data comes from</h4><ul class="metric-data__list">' + model.sources.map(function (source) {
         return '<li><span class="metric-data__source">' + escapeHtml(source.line) + '</span>'
-          + (source.systems.length ? '<span class="metric-data__systems">' + source.systems.map(function (system) {
-            return '<span class="metric-data__system">' + escapeHtml(system.label) + (system.records ? ' (' + escapeHtml(system.records) + ')' : '') + ' ' + syncedText(system) + '</span>';
-          }).join('') + '</span>' : '')
+          + (source.systems.length ? '<span class="metric-data__systems">' + source.systems.map(viaText).join('') + '</span>' : '')
           + '</li>';
       }).join('') + '</ul>');
     }
@@ -354,15 +358,31 @@
     note.textContent = 'Showing the first ' + shown.toLocaleString('en-US') + ' of ' + total.toLocaleString('en-US') + ' records.';
   }
 
+  // The trail reflects where the page was opened from (from=dashboard with
+  // dashboardId, from=catalog, from=report; else Insights). The dashboard's
+  // name comes from the API. The shell's Back goes to the parent crumb.
   function renderBreadcrumb(metric) {
     var breadcrumb = el('metricDetailBreadcrumb');
-    if (!breadcrumb) return;
-    var leaf = metric.title || metric.name || humanize(metric.key);
-    breadcrumb.items = [
-      { label: 'Dashboard', href: 'admin/analytics.html' },
-      { label: 'Metric Detail' },
-      { label: leaf },
-    ];
+    if (!breadcrumb || !window.InsightsBreadcrumbs) return;
+    var qp = params();
+    var opts = {
+      from: qp.get('from') || '', dashboardId: qp.get('dashboardId') || '', dashboardName: '',
+      periodStart: qp.get('periodStart') || '', periodEnd: qp.get('periodEnd') || '',
+      metricTitle: metric.title || metric.name || humanize(metric.key),
+    };
+    function draw() {
+      var items = window.InsightsBreadcrumbs.metricDetail(opts);
+      breadcrumb.items = items;
+      var app = document.querySelector ? document.querySelector('lex-app') : null;
+      if (app) app.backHref = window.InsightsBreadcrumbs.backHref(items);
+    }
+    draw();
+    if (opts.from === 'dashboard' && opts.dashboardId && typeof api !== 'undefined' && typeof api.getBIDashboard === 'function') {
+      api.getBIDashboard(opts.dashboardId).then(function (response) {
+        var dashboard = response && response.data ? response.data : response;
+        if (dashboard && dashboard.name) { opts.dashboardName = dashboard.name; draw(); }
+      }).catch(function () { /* the crumb keeps "Dashboard" */ });
+    }
   }
 
   async function loadMetricDetail() {

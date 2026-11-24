@@ -549,6 +549,8 @@
         'js/shared/metric-tables.js',
         'js/admin/dashboard-catalog.js',
         'js/shared/data-state.js',
+        'js/lex/components/foundation/lex-breadcrumb.js',
+        'js/shared/insights-breadcrumbs.js',
         'js/shared/dashboard-library-columns.js',
         'js/admin/dashboard-library.js'
       ],
@@ -578,6 +580,7 @@
         'js/shared/dashboard-cards.js',
         'js/shared/card-visuals.js',
         'js/shared/lineage-view.js',
+        'js/shared/insights-breadcrumbs.js',
         'js/shared/title-switcher.js',
         'js/admin/dashboard-detail.js'
       ],
@@ -608,6 +611,7 @@
         'js/shared/mini-charts.js',
         'js/shared/metric-detail-view.js',
         'js/shared/lineage-view.js',
+        'js/shared/insights-breadcrumbs.js',
         'js/admin/metric-detail.js'
       ],
       stylesheets: [
