@@ -97,7 +97,7 @@ Options: `--phase <name>` runs one phase; `--target <system>` limits the pieces 
 
 **Azure.** Windows and Linux pieces and the Railway images are built by LANA-AI's `scripts/release/azure-verify.sh` (suites `client-parts` and `railway-images`), with its own service principal (`~/.config/lana/azure-verify.json`, mode 600), inside its resource group, every resource tagged with the run and deleted when the run ends. The command never uses a personal `az login` and never creates a resource group. VM sizes are tried in order (`LANA_BUILD_VM_SIZES`). Windows Pip comes from LANA.cpp's release build; the Windows VM checks its embedding match with the pinned binary.
 
-**Registry password.** The lana-push password for LANA's image registry is read from Heroku (`LANA_REGISTRY_PUSH_PASSWORD` on `redroostertec-prod`) into a private file that is removed after the push.
+**Registry password.** The lana-push password for LANA's image registry is read from Heroku (`RAILWAY_REGISTRY_PUSH_PASSWORD` on `redroostertec-prod`) into a private file that is removed after the push.
 
 **The order.**
 

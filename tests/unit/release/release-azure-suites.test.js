@@ -64,9 +64,9 @@ test('the registry password comes from Heroku into a private file and is never i
   const file = await registryPasswordFile(ctx);
   expect(fs.readFileSync(file, 'utf8')).toBe('p4ss-w0rd');
   expect(fs.statSync(file).mode & 0o777).toBe(0o600);
-  expect(run.mock.calls[0][1]).toEqual(['config:get', 'LANA_REGISTRY_PUSH_PASSWORD', '-a', 'redroostertec-prod']);
+  expect(run.mock.calls[0][1]).toEqual(['config:get', 'RAILWAY_REGISTRY_PUSH_PASSWORD', '-a', 'redroostertec-prod']);
   const missing = makeCtx({ run: fakeRun({ heroku: { code: 0, stdout: '\n', stderr: '' } }) });
-  await expect(registryPasswordFile(missing)).rejects.toThrow(/has no LANA_REGISTRY_PUSH_PASSWORD/);
+  await expect(registryPasswordFile(missing)).rejects.toThrow(/has no RAILWAY_REGISTRY_PUSH_PASSWORD/);
 });
 
 test('an archive already in the bucket is never overwritten', async () => {

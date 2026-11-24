@@ -40,7 +40,8 @@ async function heroku(ctx, args, what) {
   return result.stdout.trim();
 }
 
-const REGISTRY_PASSWORD_VAR = 'LANA_REGISTRY_PUSH_PASSWORD';
+// Beside RAILWAY_REGISTRY_USERNAME and RAILWAY_REGISTRY_PASSWORD (the lana-pull account Railway uses) on the portal app.
+const REGISTRY_PASSWORD_VAR = 'RAILWAY_REGISTRY_PUSH_PASSWORD';
 
 /** The registry push password from Heroku, in a private (600) file. Never printed. */
 async function registryPasswordFile(ctx) {
