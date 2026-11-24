@@ -76,3 +76,13 @@ test('the header banner comes first, then the breadcrumb, then the tab row', () 
   expect(banner).toBeLessThan(crumbs);
   expect(crumbs).toBeLessThan(tabs);
 });
+
+test('the date pill sits on the left under the title, before the counts; the panel opens left-aligned', () => {
+  const html = fs.readFileSync(path.join(SRC, 'admin/dashboard-detail.html'), 'utf8');
+  const bar = html.slice(html.indexOf('class="dash-header__bar"'), html.indexOf('</header>'));
+  expect(bar.indexOf('id="dashboardPeriodToggle"')).toBeGreaterThan(-1);
+  expect(bar.indexOf('id="dashboardPeriodToggle"')).toBeLessThan(bar.indexOf('id="dashboardViewContext"'));
+  const css = fs.readFileSync(path.join(SRC, 'css/admin/insights-dashboard.css'), 'utf8');
+  const panel = css.slice(css.lastIndexOf('.dash-period__panel {'));
+  expect(panel.slice(0, panel.indexOf('}'))).toContain('left: 0;');
+});

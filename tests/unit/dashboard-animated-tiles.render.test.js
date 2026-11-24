@@ -24,7 +24,7 @@ function node(value = '') {
   return {
     value, hidden: false, innerHTML: '', textContent: '', dataset: {}, options: [],
     classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c), toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)), contains: (c) => classes.has(c) },
-    addEventListener() {}, setAttribute() {}, getAttribute() { return null; },
+    attrs: {}, addEventListener() {}, setAttribute(k, v) { this.attrs[k] = v; }, getAttribute(k) { return this.attrs[k] === undefined ? null : this.attrs[k]; },
     // The grid "has cards" when its markup has a tile in it.
     querySelector(selector) { return selector === '.dash-metric-card' && this.innerHTML.includes('dash-metric-card') ? {} : null; },
     querySelectorAll: () => [],
@@ -44,6 +44,8 @@ function page(api = {}, user = null) {
   const Lex = { Utils: { getFirmTimezone: () => 'America/New_York' }, Nav: { getParams: () => new URLSearchParams('') } };
   window.Lex = Lex;
   window.api = { user };
+  // The dashboard switcher draws into the shell's title bar, which this test has no DOM for.
+  window.TitleSwitcher = { render() {} };
   vm.runInNewContext(source, { window, document, console: { log() {}, error() {}, warn() {} }, Intl, URLSearchParams,
     setTimeout: jest.fn(), clearTimeout: jest.fn(), LanaTime, Lex, api: Object.assign({ listBIDashboards: jest.fn().mockResolvedValue({ data: [] }) }, api),
     DashboardTiles: window.DashboardTiles });
@@ -530,4 +532,34 @@ test('packed rows: the hero and one stat fill four columns; a lone chart spans t
   const articles = p.nodes.dashboardMetricGrid.innerHTML.split('<article ').slice(1);
   expect(articles.map((a) => (a.match(/dash-span-4-(\d)/) || [])[1])).toEqual(['3', '1', '4']);
   expect(articles.map((a) => (a.match(/dash-span-2-(\d)/) || [])[1])).toEqual(['2', '2', '2']);
+});
+
+describe('the header names the saved dashboard', () => {
+  const declared = require(path.join(__dirname, '../fixtures/dashboard/declared-layouts.json'));
+
+  test('a readable saved dashboard shows its own name and one-line description', async () => {
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'Owner Overview', description: 'How the firm is doing.', layout: { dashboard_type: 'owner', metric_keys: [] } } }),
+      getDashboardMetricCards: jest.fn().mockResolvedValue({ data: declared.cards_synthetic }) });
+    await p.exports.loadDashboardById('d1');
+    expect(p.nodes.dashboardDetailBanner.attrs).toMatchObject({ heading: 'Owner Overview', subtitle: 'How the firm is doing.' });
+  });
+
+  test('when the definition cannot be read, the saved name and description still win over the type view title', async () => {
+    const blip = Object.assign(new Error('server cannot reach its database'), { status: 503 });
+    const p = page({ getBIDashboard: jest.fn().mockRejectedValue(blip),
+      listBIDashboards: jest.fn().mockResolvedValue({ data: [{ id: 'd1', name: 'Owner Overview', description: 'How the firm is doing.' }] }),
+      getDashboardMetricCards: jest.fn().mockResolvedValue({ data: declared.cards_synthetic }) });
+    await p.exports.loadDashboardById('d1');
+    expect(p.nodes.dashboardDetailBanner.attrs.heading).toBe('Owner Overview');
+    expect(p.nodes.dashboardDetailBanner.attrs.subtitle).toBe('How the firm is doing.');
+  });
+
+  test('when nothing names it, the header says Dashboard, never the old type title', async () => {
+    const blip = Object.assign(new Error('blip'), { status: 503 });
+    const p = page({ getBIDashboard: jest.fn().mockRejectedValue(blip), listBIDashboards: jest.fn().mockResolvedValue({ data: [] }),
+      getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [] }) });
+    await p.exports.loadDashboardById('d1');
+    expect(p.nodes.dashboardDetailBanner.attrs.heading).toBe('Dashboard');
+    expect(p.nodes.dashboardDetailBanner.attrs.heading).not.toBe('Owner Performance');
+  });
 });

@@ -3472,3 +3472,24 @@ button.dash-lines__label:hover,
   color: var(--lex-text-secondary);
   vertical-align: 1px;
 }
+
+/* The date pill sits on the left under the title, aligned with the title
+   text; its panel opens left-aligned from the pill. The banner's actions
+   (LANA, Learn More, menu) stay on the right, centred on the title block. */
+.dash-header__bar {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.dash-header__main {
+  align-items: center;
+}
+
+.dash-header__banner .lex-banner {
+  align-items: center;
+}
+
+.dash-period__panel {
+  left: 0;
+  right: auto;
+}

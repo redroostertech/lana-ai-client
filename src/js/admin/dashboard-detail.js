@@ -546,7 +546,7 @@
     var banner = el('dashboardDetailBanner');
     if (!banner || !dashboard) return;
     banner.setAttribute('heading', dashboard.name || 'Dashboard');
-    banner.setAttribute('subtitle', dashboard.description || 'Metric cards backed by the report module metric catalog');
+    banner.setAttribute('subtitle', dashboard.description || '');
     setGreeting(dashboard.name || 'Dashboard');
   }
 
@@ -565,11 +565,15 @@
     });
   }
 
-  async function loadDashboardSwitcher() {
-    if (dashboardSwitcherLoaded) {
-      renderDashboardSwitcher();
-      return;
-    }
+  var switcherPromise = null;
+
+  function loadDashboardSwitcher() {
+    if (!switcherPromise) switcherPromise = fetchDashboardSwitcher();
+    else renderDashboardSwitcher();
+    return switcherPromise;
+  }
+
+  async function fetchDashboardSwitcher() {
     dashboardSwitcherLoaded = true;
 
     try {
@@ -1763,7 +1767,12 @@
     note.hidden = !show;
   }
 
-  async function loadMetrics(type) {
+  // Saved dashboards read in this session, by id: their name and description
+  // still head the page if a later read of the definition fails.
+  var knownDashboards = {};
+
+  async function loadMetrics(type, options) {
+    var keepHeader = !!(options && options.keepHeader);
     var myLoad = cardLoads.begin();
     currentDeclaredCards = null;
     var config = VIEW_CONFIG[type];
@@ -1776,8 +1785,10 @@
     activeTypeFilter = 'all';
     activeSearchQuery = '';
     lastSearchInputValue = '';
-    setBanner(config);
-    setStory(null);
+    if (!keepHeader) {
+      setBanner(config);
+      setStory(null);
+    }
     loadDashboardSwitcher();
     setActiveType(type);
     var search = el('dashboardMetricSearch');
@@ -1829,7 +1840,21 @@
       // say so, and try the saved dashboard again on the next date change.
       console.warn('[DashboardDetail] Could not read the saved dashboard:', definitionErr && definitionErr.message);
       setFallbackNote(true);
-      await loadMetrics(currentDashboardType || 'owner');
+      // The saved dashboard's name and description still head the page
+      // (from this session, or the dashboard list); never the type title.
+      var known = knownDashboards[id];
+      if (!known) {
+        await loadDashboardSwitcher();
+        known = dashboardSwitcherItems.filter(function (item) { return item.id === id; })[0] || null;
+      }
+      if (known) {
+        setBannerForDashboard(known);
+        setStory(known);
+      } else {
+        setBannerForDashboard({ name: 'Dashboard', description: '' });
+        setStory(null);
+      }
+      await loadMetrics(currentDashboardType || 'owner', { keepHeader: true });
       currentDashboardId = id;
       return;
     }
@@ -1839,6 +1864,7 @@
       if (!cardLoads.isLatest(myLoad)) return;
       var dashboard = dashboardResponse && dashboardResponse.data ? dashboardResponse.data : dashboardResponse;
       currentDashboardName = dashboard && dashboard.name ? dashboard.name : '';
+      if (dashboard) knownDashboards[id] = dashboard;
       loadDashboardSwitcher();
       var banner = el('dashboardDetailBanner');
       if (banner) banner.classList.remove('detail-banner--no-actions');
