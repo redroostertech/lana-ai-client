@@ -421,6 +421,9 @@ bundle_electron() {
     print_step "Bundling Electron files with current version..."
     cd "$PROJECT_ROOT"
 
+    # Build Briefs from source every time, so the installer never ships a stale or missing briefs/dist
+    node scripts/build-briefs.js
+
     # Run the bundle script to regenerate electron-dist with current version from package.json
     node scripts/bundle-electron.js
 
