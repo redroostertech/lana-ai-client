@@ -89,7 +89,9 @@ describe('createExternalOpener', () => {
     const files = [];
     const walk = (dir) => {
       for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-        if (entry.name === 'vendor' || entry.name === 'node_modules') continue;
+        // tiptap-bundle-built.js is build output (scripts/build-tiptap.js, git ignores it); its source
+        // tiptap-bundle.js is scanned. Bundled library defaults would otherwise fail this on any built tree.
+        if (entry.name === 'vendor' || entry.name === 'node_modules' || entry.name === 'tiptap-bundle-built.js') continue;
         const full = path.join(dir, entry.name);
         if (entry.isDirectory()) walk(full);
         else if (/\.(js|html)$/.test(entry.name)) files.push(full);

@@ -13,6 +13,10 @@ const SRC_JS = path.join(__dirname, '..', '..', 'src', 'js');
 // last client code that named it.
 const ALLOWED = [];
 
+// Build output, not client code: scripts/build-tiptap.js writes it (git ignores it), and its bundled
+// libraries carry words like "realestate" (a domain list). Its source, tiptap-bundle.js, is scanned.
+const GENERATED = ['tiptap-bundle-built.js'];
+
 // The page files phase 7 deleted; none may come back.
 const DELETED_PAGE_FILES = [
   'implementation-assurance.js',
@@ -35,7 +39,7 @@ function jsFiles(dir) {
 function offenders(root, allowed) {
   return jsFiles(root)
     .map((file) => path.relative(root, file).split(path.sep).join('/'))
-    .filter((rel) => !allowed.includes(rel))
+    .filter((rel) => !allowed.includes(rel) && !GENERATED.includes(rel))
     .filter((rel) => fs.readFileSync(path.join(root, rel), 'utf8').includes('estate'));
 }
 
