@@ -418,6 +418,22 @@
 
   // When the server sent only the first page of source records, say so in
   // plain words with the full count (raw_data.total, raw_data.has_more).
+  // When the server could not read the records (raw_data.rows_status
+  // available: false), the calm note replaces the table, toolbar and help.
+  function renderRowsStatus(status) {
+    var note = el('metricRawDataUnavailable');
+    if (note) {
+      note.hidden = !status;
+      note.innerHTML = status ? view().unavailableHtml(status) : '';
+    }
+    ['metricRawDataTable', 'metricRawDataToolbar', 'metricRawDataHelp', 'metricRawDataSectionCount'].forEach(function (id) {
+      var node = el(id);
+      if (node) node.hidden = !!status;
+    });
+    var total = el('metricRawDataTotalNote');
+    if (status && total) total.hidden = true;
+  }
+
   function renderRawDataTotal(rawData) {
     var note = el('metricRawDataTotalNote');
     if (!note) return;
@@ -516,8 +532,13 @@
       renderDataUsed(payload.lineage, window.MetricCardView ? window.MetricCardView.isPointInTime(payload) || window.MetricCardView.isPointInTime(current) : false,
         view().summary(payload).value || '', metric.calculation || current.calculation || '');
       renderHistory(snapshots);
-      renderRawData(payload.raw_data && payload.raw_data.rows ? payload.raw_data.rows : [], payload.row_columns);
-      renderRawDataTotal(payload.raw_data);
+      // Records the server could not read get the calm note, not a table.
+      var rowsStatus = view().rowsStatus(payload.raw_data);
+      renderRowsStatus(rowsStatus);
+      if (!rowsStatus) {
+        renderRawData(payload.raw_data && payload.raw_data.rows ? payload.raw_data.rows : [], payload.row_columns);
+        renderRawDataTotal(payload.raw_data);
+      }
     } catch (err) {
       console.error('[MetricDetail] Failed to load metric detail:', err);
       setText('metricTitle', 'Metric unavailable');

@@ -112,12 +112,13 @@
           <div class="metric-detail-card__header">
             <div>
               <h2>The records behind this number</h2>
-              <p class="metric-detail-tab-help">One row per record counted for these dates.</p>
+              <p id="metricRawDataHelp" class="metric-detail-tab-help">One row per record counted for these dates.</p>
               <p id="metricRawDataTotalNote" class="metric-detail-tab-help" hidden></p>
             </div>
             <span id="metricRawDataSectionCount" class="metric-detail-toolbar__count" aria-live="polite"></span>
           </div>
-          <div class="metric-detail-toolbar" role="search" aria-label="Search source records">
+          <div id="metricRawDataUnavailable" hidden></div>
+          <div id="metricRawDataToolbar" class="metric-detail-toolbar" role="search" aria-label="Search source records">
             <lex-input id="metricRawDataSearch" class="metric-detail-toolbar__search" placeholder="Search records..." clearable="true" leading-icon="search"></lex-input>
             <lex-select id="metricRawDataSort" options='[]' value=""></lex-select>
             <lex-btn id="metricRawDataSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="asc"><svg class="metric-detail-toolbar__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path></svg></lex-btn>

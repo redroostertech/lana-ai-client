@@ -763,3 +763,42 @@ describe('the server sends no_goal for cards that need a goal', () => {
     expect(text(payroll + target)).not.toContain('No goal set Waiting');
   });
 });
+
+describe('worklists when the server could not read the records', () => {
+  const unavailable = { reason: 'no_rows', title: 'Records not available for this card', message: 'This card does not keep a list of records.' };
+  function slot(visual, templateHtml) {
+    const label = { textContent: 'View all' };
+    const card = { querySelector: (sel) => (sel === '.dash-card__records span' ? label : null) };
+    const attrs = { 'data-worklist-key': 'k', 'data-rows-visual': visual, 'data-rows-fallback': templateHtml ? 'columns' : 'worklist', 'data-rows-sort': '' };
+    const template = templateHtml ? { innerHTML: templateHtml, classList: { contains: (c) => c === 'dash-rows-fallback' } } : null;
+    return { label, inserted: [], innerHTML: '', parentNode: card, nextElementSibling: template, classList: { remove() {} },
+      getAttribute: (n) => attrs[n], insertAdjacentHTML() {} };
+  }
+
+  test('a worklist shows the calm note, no table, no "No records right now", and the link reads See the records', () => {
+    const s = slot('worklist');
+    page().exports.drawRows(s, [], null, [], unavailable);
+    expect(s.innerHTML).toContain('Records not available for this card');
+    expect(s.innerHTML).toContain('This card does not keep a list of records.');
+    expect(s.innerHTML).not.toContain('<table');
+    expect(s.innerHTML).not.toContain('No records right now');
+    expect(s.label.textContent).toBe('See the records');
+  });
+
+  test('a timeline falls back to its fallback visual, else to the note, never to an empty list', () => {
+    const withFallback = slot('timeline', '<div class="mini-chart">fallback</div>');
+    page().exports.drawRows(withFallback, [], null, [], unavailable);
+    expect(withFallback.innerHTML).toBe('<div class="mini-chart">fallback</div>');
+    const without = slot('aging');
+    page().exports.drawRows(without, [], null, [], unavailable);
+    expect(without.innerHTML).toContain('Records not available for this card');
+    expect(without.innerHTML).not.toContain('No records right now');
+  });
+
+  test('without rows_status an empty worklist is unchanged', () => {
+    const s = slot('worklist');
+    page().exports.drawRows(s, [], null, [], null);
+    expect(s.innerHTML).toContain('No records right now');
+    expect(s.label.textContent).toBe('View all');
+  });
+});

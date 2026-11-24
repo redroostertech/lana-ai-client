@@ -1373,14 +1373,21 @@
 
   // caveats: metric detail's lineage caveats, shown as a short muted note
   // when the card did not already show one of its own.
-  function drawRows(slot, rows, rowColumns, caveats) {
+  // rowsStatus: MetricDetailView.rowsStatus of the payload; when the server
+  // could not read the rows, show the calm note instead of an empty list.
+  function drawRows(slot, rows, rowColumns, caveats, rowsStatus) {
     slot.classList.remove('mini-spark-slot--loading');
     var key = slot.getAttribute('data-worklist-key');
     var visual = slot.getAttribute('data-rows-visual') || 'worklist';
     var template = slot.nextElementSibling && slot.nextElementSibling.classList && slot.nextElementSibling.classList.contains('dash-rows-fallback')
       ? slot.nextElementSibling : null;
     var choice = window.CardVisuals.chooseRowsVisual(visual, rows || [], slot.getAttribute('data-rows-fallback'), firmToday());
-    if (rows && choice.visual === 'timeline') {
+    if (rowsStatus) {
+      // A fallback visual still shows; otherwise the note, never "no records".
+      slot.innerHTML = choice.visual !== 'worklist' && template ? template.innerHTML : window.MetricDetailView.unavailableHtml(rowsStatus);
+      var label = slot.parentNode && slot.parentNode.querySelector ? slot.parentNode.querySelector('.dash-card__records span') : null;
+      if (label && label.textContent === 'View all') label.textContent = 'See the records';
+    } else if (rows && choice.visual === 'timeline') {
       slot.innerHTML = window.MiniCharts.timelineHtml(choice.model, { href: recordsHref(key), dayLabel: dayLabel });
     } else if (rows && choice.visual === 'aging') {
       slot.innerHTML = window.MiniCharts.agingHtml(choice.model, { href: recordsHref(key) });
@@ -1417,6 +1424,7 @@
             rows: rows.slice(0, limit),
             columns: payload && Array.isArray(payload.row_columns) ? payload.row_columns : null,
             caveats: lineage && Array.isArray(lineage.caveats) ? lineage.caveats : [],
+            rowsStatus: window.MetricDetailView.rowsStatus(payload && payload.raw_data),
           };
         }).catch(function () { return null; });
       }
@@ -1424,7 +1432,7 @@
         // The card's own row_columns answer first; metric detail's otherwise.
         var metric = declaredIndex ? window.DashboardCards.metricFor(declaredIndex, key) : null;
         var columns = metric && Array.isArray(metric.row_columns) ? metric.row_columns : (result && result.columns);
-        drawRows(slot, result ? result.rows : null, columns, result ? result.caveats : []);
+        drawRows(slot, result ? result.rows : null, columns, result ? result.caveats : [], result ? result.rowsStatus : null);
       });
     });
   }

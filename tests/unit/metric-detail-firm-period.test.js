@@ -199,3 +199,30 @@ test('the records table follows the server row_columns: columns, headers and lab
   expect(table.renderers.item_kind('invoice', {})).toContain('Bill');
   expect(table.renderers.expected_amount('2750', {})).toBe('<span class="metric-detail-num">$2,750</span>');
 });
+
+describe('records the server could not read (raw_data.rows_status)', () => {
+  test('available: false shows the calm note and hides the table, toolbar and help line', async () => {
+    const p = await page('?metric_key=matters_opened', { ...payload,
+      raw_data: { rows: [], rows_status: { available: false, reason: 'governed', message: 'These records are kept private by your firm settings.' } } });
+    const note = p.nodes.metricRawDataUnavailable;
+    expect(note.hidden).toBe(false);
+    expect(note.innerHTML).toContain('Records not available for this card');
+    expect(note.innerHTML).toContain('These records are kept private by your firm settings.');
+    expect(p.nodes.metricRawDataTable.hidden).toBe(true);
+    expect(p.nodes.metricRawDataToolbar.hidden).toBe(true);
+    expect(p.nodes.metricRawDataHelp.hidden).toBe(true);
+  });
+
+  test('available: true with zero rows keeps the table (and its empty text)', async () => {
+    const p = await page('?metric_key=matters_opened', { ...payload, raw_data: { rows: [], rows_status: { available: true } } });
+    expect(p.nodes.metricRawDataUnavailable.hidden).toBe(true);
+    expect(p.nodes.metricRawDataTable.hidden).toBe(false);
+    expect(p.nodes.metricRawDataToolbar.hidden).toBe(false);
+  });
+
+  test('missing rows_status keeps today\'s table', async () => {
+    const p = await page('?metric_key=matters_opened', { ...payload, raw_data: { rows: [] } });
+    expect(p.nodes.metricRawDataUnavailable.hidden).toBe(true);
+    expect(p.nodes.metricRawDataTable.hidden).toBe(false);
+  });
+});

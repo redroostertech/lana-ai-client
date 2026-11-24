@@ -301,6 +301,31 @@
     return out;
   }
 
+  // raw_data.rows_status from metric detail. Missing, or available: true,
+  // means the rows were read (even zero): null. available: false means the
+  // server could not read them, so say so calmly instead of "no records".
+  var UNAVAILABLE_TITLE = 'Records not available for this card';
+  var UNAVAILABLE_MESSAGE = 'LANA could not read the records behind this number.';
+
+  function rowsStatus(rawData) {
+    var status = rawData && rawData.rows_status;
+    if (!status || typeof status !== 'object' || status.available !== false) return null;
+    var message = typeof status.message === 'string' && status.message.trim() ? status.message.trim() : UNAVAILABLE_MESSAGE;
+    return { reason: status.reason || null, title: UNAVAILABLE_TITLE, message: message };
+  }
+
+  var HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+
+  function escapeText(value) {
+    return String(value).split('').map(function (ch) { return HTML_ESCAPES[ch] || ch; }).join('');
+  }
+
+  // The calm note shown in place of a records table.
+  function unavailableHtml(status) {
+    return '<div class="records-unavailable"><p class="records-unavailable__title">' + escapeText(status.title) + '</p>'
+      + '<p class="records-unavailable__text">' + escapeText(status.message) + '</p></div>';
+  }
+
   return {
     dayRangeText: dayRangeText,
     cellText: cellText,
@@ -311,5 +336,7 @@
     formatValue: formatValue,
     summary: summary,
     isUuid: isUuid,
+    rowsStatus: rowsStatus,
+    unavailableHtml: unavailableHtml,
   };
 });

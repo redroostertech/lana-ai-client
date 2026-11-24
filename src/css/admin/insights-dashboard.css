@@ -4056,3 +4056,32 @@ button.dash-lines__label:hover,
 .dash-metric-card--hero .lex-data-state--calm .lex-data-state__action {
   margin-top: 0;
 }
+
+/* Records the server could not read (raw_data.rows_status available:
+   false): a calm note in place of the table, on worklists and on metric
+   detail. */
+.records-unavailable {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.875rem 1rem;
+  border-radius: var(--lex-radius-md, 8px);
+  background: var(--lex-bg-secondary);
+}
+
+.records-unavailable__title {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--lex-text-primary);
+}
+
+.records-unavailable__text {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--lex-text-tertiary);
+}
+
+#metricRawDataUnavailable {
+  margin-top: 0.75rem;
+}

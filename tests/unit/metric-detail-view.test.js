@@ -195,3 +195,33 @@ test('worklistColumns keeps every column the server chose, in its order', () => 
   const cols = V.recordsTable([{ a: 1, b: 2, c: 3, d: 4, e: 5 }], ['e', 'd', 'c', 'b', 'a'].map((f) => ({ field: f, header: f.toUpperCase() }))).columns;
   expect(V.worklistColumns(cols, 4).map((c) => c.key)).toEqual(['e', 'd', 'c', 'b', 'a']);
 });
+
+describe('rowsStatus: could the server read the records?', () => {
+  test('missing rows_status means the rows were read (today\'s behaviour)', () => {
+    expect(V.rowsStatus({ rows: [] })).toBe(null);
+    expect(V.rowsStatus(null)).toBe(null);
+    expect(V.rowsStatus(undefined)).toBe(null);
+  });
+
+  test('available: true means the rows were read, even when there are none', () => {
+    expect(V.rowsStatus({ rows: [], rows_status: { available: true } })).toBe(null);
+  });
+
+  test('available: false gives the calm title and the server message', () => {
+    expect(V.rowsStatus({ rows: [], rows_status: { available: false, reason: 'governed', message: 'These records are kept private by your firm settings.' } })).toEqual({
+      reason: 'governed', title: 'Records not available for this card', message: 'These records are kept private by your firm settings.',
+    });
+  });
+
+  test('available: false without a message still gives a plain sentence', () => {
+    const status = V.rowsStatus({ rows_status: { available: false, reason: 'module_unavailable' } });
+    expect(status.title).toBe('Records not available for this card');
+    expect(status.message).toBe('LANA could not read the records behind this number.');
+  });
+
+  test('unavailableHtml is a calm note with the title and escaped message', () => {
+    const html = V.unavailableHtml({ title: 'Records not available for this card', message: 'Bills & payments <synced>' });
+    expect(html).toBe('<div class="records-unavailable"><p class="records-unavailable__title">Records not available for this card</p>'
+      + '<p class="records-unavailable__text">Bills &amp; payments &lt;synced&gt;</p></div>');
+  });
+});
