@@ -128,25 +128,68 @@
     }
   }
 
+  // The page's default range (the preset it boots on), in the firm's days.
+  function defaultPeriodDays() {
+    var zone = window.Lex && Lex.Utils && Lex.Utils.getFirmTimezone ? Lex.Utils.getFirmTimezone() : undefined;
+    return LanaTime.reportPresetDays(window.DashboardPeriod.DEFAULT_PRESET, zone);
+  }
+
+  // Always a full range: when the inputs are empty, half filled or not real
+  // days, the default range is used and written back into the inputs, so
+  // every card and link uses the window the page shows.
   function readPeriodControls() {
     var start = el('dashboardPeriodStart');
     var end = el('dashboardPeriodEnd');
     var compare = el('dashboardPeriodType');
+    var picked = { start: start ? start.value || '' : '', end: end ? end.value || '' : '' };
+    var resolved = window.DashboardPeriod.resolveRequestPeriod(picked, defaultPeriodDays);
+    if (resolved.usedDefault) {
+      if (start && start.value !== resolved.periodStart) start.value = resolved.periodStart;
+      if (end && end.value !== resolved.periodEnd) end.value = resolved.periodEnd;
+    }
     currentPeriod = {
-      start: start ? start.value || '' : '',
-      end: end ? end.value || '' : '',
+      start: resolved.periodStart,
+      end: resolved.periodEnd,
       compareBy: compare && compare.value ? compare.value : 'monthly',
-      label: formatPeriodLabel(start ? start.value : '', end ? end.value : ''),
+      label: formatPeriodLabel(resolved.periodStart, resolved.periodEnd),
     };
+    syncPresetChips();
     return currentPeriod;
+  }
+
+  // The lit quick-select chip always comes from the dates on screen.
+  function syncPresetChips() {
+    var container = el('dashboardPeriodPresets');
+    if (!container || !container.querySelectorAll) return;
+    var chips = Array.prototype.slice.call(container.querySelectorAll('lex-btn[data-dashboard-preset]'));
+    var zone = window.Lex && Lex.Utils && Lex.Utils.getFirmTimezone ? Lex.Utils.getFirmTimezone() : undefined;
+    var presets = chips.map(function (chip) {
+      var name = chip.getAttribute('data-dashboard-preset');
+      return [name, LanaTime.reportPresetDays(name, zone)];
+    });
+    var active = window.DashboardPeriod.matchPreset(currentPeriod, presets);
+    chips.forEach(function (chip) {
+      var on = chip.getAttribute('data-dashboard-preset') === active;
+      var variant = on ? 'primary' : 'secondary';
+      if (chip.getAttribute('variant') !== variant) chip.setAttribute('variant', variant);
+      chip.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+
+  function setPeriodLoading(loading) {
+    var mark = el('dashboardPeriodLoading');
+    if (mark) mark.hidden = !loading;
+    var grid = el('dashboardMetricGrid');
+    if (grid && grid.classList) grid.classList.toggle('dash-card-grid--refreshing', !!loading);
   }
 
   function getMetricCardRequestParams(type, limit) {
     var period = readPeriodControls();
     var params = { type: type, limit: limit };
-    // Plain days (inclusive end): the backend bounds them in the firm's zone.
-    if (period.start) params.periodStart = period.start;
-    if (period.end) params.periodEnd = period.end;
+    // Plain days (inclusive end), always both: the backend bounds them in
+    // the firm's zone.
+    params.periodStart = period.start;
+    params.periodEnd = period.end;
     if (period.compareBy) params.compareBy = period.compareBy;
     // Period-over-period comparison: ask the metric layer to attach a
     // `comparison` block. Preset periods use the calendar mode, custom ranges
@@ -168,23 +211,29 @@
   // Build the metric_detail href with the currently selected period serialized
   // into query params. Without this the detail page falls back to its default
   // period and shows numbers that don't match the modal the user just opened.
-  function buildMetricDetailHref(metricKey) {
-    var qs = 'metric_key=' + encodeURIComponent(metricKey || '');
+  function buildMetricDetailHref(metricKey, options) {
     // The days the person picked (firm days before the cards load, too), as
     // plain days: the metric detail endpoint bounds them in the firm's zone,
     // the same way the cards were bounded.
     var period = readPeriodControls();
-    if (period.start) qs += '&periodStart=' + encodeURIComponent(period.start);
-    if (period.end) qs += '&periodEnd=' + encodeURIComponent(period.end);
-    if (period.compareBy) qs += '&compareBy=' + encodeURIComponent(period.compareBy);
-    return 'admin/metric_detail.html?' + qs;
+    return window.DashboardPeriod.metricDetailHref(metricKey, {
+      periodStart: period.start, periodEnd: period.end, compareBy: period.compareBy,
+    }, options);
   }
 
   // Presets are the firm's days (the firm's zone, Lex.Utils.getFirmTimezone),
   // so everyone in the firm sees the same cards. A stored user without the
   // firm's zone refetches the profile first (api.ensureFirmTimezone).
+  // Each pick of dates bumps this; a preset still waiting on the firm zone
+  // gives up when a newer pick happened, so a slow first click can never
+  // overwrite the dates of a later one.
+  var periodPickToken = 0;
+
   async function selectDashboardPeriodPreset(preset, reload) {
+    periodPickToken += 1;
+    var myPick = periodPickToken;
     await api.ensureFirmTimezone();
+    if (myPick !== periodPickToken) return;
     var days = LanaTime.reportPresetDays(preset, Lex.Utils.getFirmTimezone());
 
     var start = el('dashboardPeriodStart');
@@ -201,7 +250,12 @@
   // load* call captures the value at entry and refuses to commit results
   // if it is no longer the latest, so quick changes to start/end/compare
   // can't leave the dashboard rendering metrics for an older period.
-  var dashboardLoadToken = 0;
+  // Card loads: idle/loading/loaded/empty/error, latest request wins
+  // (js/shared/load-state.js). Replaces a bare counter so "No metrics" only
+  // shows after a finished request returned nothing.
+  var cardLoads = window.LoadState.createLoadTracker();
+  // The text each tile showed last, so new dates count from the old number.
+  var previousValues = {};
 
   function reloadDashboardMetricsForCurrentPeriod() {
     if (currentDashboardId) {
@@ -601,18 +655,97 @@
     return hasValue(value) ? '<div class="dash-metric-modal__block"><span>' + escapeHtml(label) + '</span><p>' + escapeHtml(displayText(value)) + '</p></div>' : '';
   }
 
+  // Tiles animate (entrance, count-up, bars) only when new data arrives,
+  // not when a search or type filter redraws the same numbers.
+  var animateNextRender = false;
+  var tileIndex = 0;
+
+  // Nothing to chart for a list card that came back empty.
+  var EMPTY_LIST_STATE = {
+    data_state: 'insufficient_data',
+    data_state_reason: 'There is nothing to show for these dates yet.',
+  };
+
+  function cardClass(extra) {
+    var classes = 'dash-metric-card' + (extra ? ' ' + extra : '');
+    if (animateNextRender) {
+      tileIndex += 1;
+      classes += ' lex-entrance' + (tileIndex <= 5 ? ' lex-entrance-step-' + tileIndex : ' lex-entrance-step-5');
+    }
+    return classes;
+  }
+
+  function cardTop(metric, cardId) {
+    return '<div class="dash-metric-card__top"><div>'
+      + '<div class="dash-metric-card__eyebrow">' + escapeHtml(getGroupLabel(metric, currentDashboardType)) + '</div>'
+      + '<div class="dash-metric-card__title">' + escapeHtml(metric.title || metric.name || humanize(metric.metric_key) || 'Metric') + '</div>'
+      + '</div>'
+      + '<button class="dash-metric-card__info" type="button" aria-label="Metric details" data-metric-info="' + escapeHtml(cardId) + '">i</button>'
+      + '</div>';
+  }
+
+  // "Right now" for point-in-time cards (the server's period_scope), so no
+  // one expects them to follow the dates; otherwise the period itself.
+  function periodLine(metric) {
+    if (window.MetricCardView.isPointInTime(metric)) {
+      return '<div class="dash-metric-card__period dash-metric-card__period--now" title="This number is as of today. It does not follow the dates above.">Right now</div>';
+    }
+    return '<div class="dash-metric-card__period">' + escapeHtml(metric.period || metric.period_label || currentPeriod.label || 'Current period') + '</div>';
+  }
+
+  // One click to the records behind the number (the metric detail page,
+  // opened on its source records with the same dates).
+  function recordsLink(cardId) {
+    return '<div class="dash-metric-card__actions">'
+      + '<button class="dash-metric-card__link" type="button" data-metric-detail-link="'
+      + escapeHtml(window.DashboardPeriod.metricDetailHref(cardId, {
+        periodStart: currentPeriod.start, periodEnd: currentPeriod.end, compareBy: currentPeriod.compareBy,
+      }, { tab: 'source' })) + '">See the records</button>'
+      + '</div>';
+  }
+
+  function plainNumber(value) {
+    return value === null || value === undefined ? window.DataState.EMPTY_VALUE
+      : Number(value).toLocaleString('en-US', { maximumFractionDigits: 2 });
+  }
+
+  function renderListCard(metric, cardId, bars) {
+    if (bars.empty) {
+      return '<article class="' + cardClass('dash-metric-card--waiting') + '">' + cardTop(metric, cardId)
+        + window.DataState.render(EMPTY_LIST_STATE, { calm: true }) + periodLine(metric) + '</article>';
+    }
+    return '<article class="' + cardClass('dash-metric-card--list') + '">' + cardTop(metric, cardId)
+      + '<div class="dash-metric-card__chart">' + window.MiniCharts.barsHtml(bars, plainNumber) + '</div>'
+      + periodLine(metric)
+      + recordsLink(cardId)
+      + '</article>';
+  }
+
+  function renderGoalCard(metric, cardId, progress, value) {
+    var target = formatMetricCardValue({ value: progress.target, format: metric.format });
+    var met = progress.met
+      ? '<lex-brand-mark class="dash-metric-card__goal-met" animation="success" size="32" label="Goal met"></lex-brand-mark>'
+      : '';
+    return '<article class="' + cardClass('dash-metric-card--goal') + '">' + cardTop(metric, cardId)
+      + '<div class="dash-metric-card__result dash-metric-card__result--goal">'
+      + window.MiniCharts.ringHtml(progress, { value: value, target: target }) + met
+      + '</div>'
+      + periodLine(metric)
+      + renderComparison(metric.comparison, metric.format)
+      + recordsLink(cardId)
+      + '</article>';
+  }
+
   function renderMetricCard(metric) {
     // A tile whose result is not ok (the backend failure model) shows the
-    // shared state block, whatever kind of metric it is.
+    // shared state block, whatever kind of metric it is: calm "waiting"
+    // wording for setup and goals, never a $0.
     if (window.DataState && window.DataState.isProblem(metric)) {
       var stateId = metric.metric_key || metric.key || metric.title;
       metricInfoById[stateId] = metric;
-      return '<article class="dash-metric-card"><div class="dash-metric-card__top"><div>'
-        + '<div class="dash-metric-card__eyebrow">' + escapeHtml(getGroupLabel(metric, currentDashboardType)) + '</div>'
-        + '<div class="dash-metric-card__title">'
-        + escapeHtml(metric.title || metric.name || humanize(metric.metric_key) || 'Metric') + '</div></div>'
-        + '<button class="dash-metric-card__info" type="button" aria-label="Metric details" data-metric-info="'
-        + escapeHtml(stateId) + '">i</button></div>' + window.DataState.render(metric) + '</article>';
+      var stateView = window.DataState.view(metric, { calm: true });
+      return '<article class="' + cardClass(stateView && stateView.waiting ? 'dash-metric-card--waiting' : 'dash-metric-card--problem') + '">'
+        + cardTop(metric, stateId) + window.DataState.render(metric, { calm: true }) + '</article>';
     }
     var intake = window.OpportunityIntakePresentation && window.OpportunityIntakePresentation.opportunityIntakePresentation(metric);
     if (intake) {
@@ -645,29 +778,31 @@
         + window.CurrentPipelinePresentation.renderCurrentPipeline(pipeline) + '</article>';
     }
     var title = metric.title || metric.name || humanize(metric.metric_key) || 'Metric';
-    var value = formatMetricCardValue(metric);
     var cardId = metric.metric_key || metric.key || title;
-    var typeLabel = getGroupLabel(metric, currentDashboardType);
-    var periodLabel = metric.period || metric.period_label || currentPeriod.label || 'Current period';
     metricInfoById[cardId] = metric;
 
-    var comparisonHtml = renderComparison(metric.comparison, metric.format);
-    var goalHtml = renderGoal(metric.goal);
+    // A list value (rows of label + number) draws as bars, never "4 rows".
+    var bars = window.MetricCardView.listBars(metric.value);
+    if (bars) return renderListCard(metric, cardId, bars);
 
-    return '<article class="dash-metric-card">'
-      + '<div class="dash-metric-card__top">'
-      + '<div>'
-      + '<div class="dash-metric-card__eyebrow">' + escapeHtml(typeLabel) + '</div>'
-      + '<div class="dash-metric-card__title">' + escapeHtml(title) + '</div>'
-      + '</div>'
-      + '<button class="dash-metric-card__info" type="button" aria-label="Metric details" data-metric-info="' + escapeHtml(cardId) + '">i</button>'
-      + '</div>'
+    var value = formatMetricCardValue(metric);
+    var progress = window.MetricCardView.goalProgress(metric.goal);
+    if (progress && progress.available) return renderGoalCard(metric, cardId, progress, value);
+
+    var countUp = animateNextRender
+      ? ' data-count-up="' + escapeHtml(value) + '"' + (previousValues[cardId] ? ' data-count-from="' + escapeHtml(previousValues[cardId]) + '"' : '')
+      : '';
+    previousValues[cardId] = value;
+    return '<article class="' + cardClass() + '">'
+      + cardTop(metric, cardId)
       + '<div class="dash-metric-card__result">'
-      + '<div class="dash-metric-card__value">' + escapeHtml(value) + '</div>'
-      + '<div class="dash-metric-card__period">' + escapeHtml(periodLabel) + '</div>'
+      + '<div class="dash-metric-card__value"' + countUp + '>' + escapeHtml(value) + '</div>'
+      + periodLine(metric)
+      + '<div class="mini-spark-slot" data-sparkline-key="' + escapeHtml(cardId) + '"></div>'
       + '</div>'
-      + comparisonHtml
-      + goalHtml
+      + renderComparison(metric.comparison, metric.format)
+      + renderGoal(metric.goal, progress)
+      + recordsLink(cardId)
       + '</article>';
   }
 
@@ -692,8 +827,14 @@
       deltaText = formatMetricCardValue({ value: Math.abs(comparison.absolute_change), format: format });
     }
 
+    var arrow = window.MetricCardView ? window.MetricCardView.comparisonArrow(comparison) : null;
+    var arrowHtml = arrow && arrow.direction !== 'flat'
+      ? '<svg class="dash-metric-card__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+        + (arrow.direction === 'up' ? '<path d="M12 19V5M5 12l7-7 7 7"/>' : '<path d="M12 5v14M5 12l7 7 7-7"/>') + '</svg>'
+      : '';
     var deltaHtml = deltaText
-      ? '<span class="dash-metric-card__delta ' + dirClass + '">' + escapeHtml(sign + deltaText) + '</span>'
+      ? '<span class="dash-metric-card__delta ' + dirClass + '"' + (arrow ? ' title="' + escapeHtml(arrow.spoken) + '"' : '') + '>'
+        + arrowHtml + escapeHtml(sign + deltaText) + '</span>'
       : '';
     var priorHtml = view.hasPrevious
       ? '<span class="dash-metric-card__delta-prior">was ' + escapeHtml(formatMetricCardValue({ value: view.previousValue, format: format })) + '</span>'
@@ -707,8 +848,12 @@
   }
 
   // Goal status band: status pill + attainment + optional pace indicator.
-  // Null goal -> render nothing.
-  function renderGoal(goal) {
+  // Null goal -> render nothing. A goal the server could not measure shows
+  // a quiet note under the value instead (no ring, no band).
+  function renderGoal(goal, progress) {
+    if (progress && !progress.available) {
+      return '<p class="dash-metric-card__goal-note">' + escapeHtml(progress.note) + '</p>';
+    }
     if (typeof MetricGoalComparison === 'undefined') return '';
     var view = MetricGoalComparison.buildGoalView(goal);
     if (!view) return '';
@@ -790,6 +935,18 @@
     document.body.classList.remove('dash-metric-modal-open');
   }
 
+  function renderSkeleton() {
+    var tile = '<div class="dash-metric-card dash-metric-card--skeleton" aria-hidden="true">'
+      + '<span class="dash-skeleton dash-skeleton--eyebrow"></span>'
+      + '<span class="dash-skeleton dash-skeleton--title"></span>'
+      + '<span class="dash-skeleton dash-skeleton--value"></span>'
+      + '<span class="dash-skeleton dash-skeleton--line"></span>'
+      + '</div>';
+    var tiles = '';
+    for (var i = 0; i < 6; i += 1) tiles += tile;
+    return '<div class="dash-card-grid" role="status" aria-label="Loading your numbers">' + tiles + '</div>';
+  }
+
   function renderGroup(group) {
     return '<section class="dash-metric-section">'
       + '<div class="dash-metric-section__header">'
@@ -810,6 +967,23 @@
     if (!grid) return;
 
     var dashboardType = type || getCurrentType();
+    setPeriodLoading(cardLoads.isLoading());
+    if (cardLoads.isLoading()) {
+      // Never "No metrics" while a request is out: keep the cards on screen
+      // (dimmed by the refreshing class), or show skeleton tiles the first time.
+      if (empty) empty.hidden = true;
+      if (!grid.querySelector || !grid.querySelector('.dash-metric-card')) grid.innerHTML = renderSkeleton();
+      return;
+    }
+
+    if (cardLoads.state === 'error') {
+      if (empty) empty.hidden = true;
+      grid.innerHTML = '<div class="dash-load-error">' + window.DataState.render({
+        data_state: 'engine_error', data_state_reason: 'The numbers could not be loaded. Pick the dates again to retry.',
+      }, { calm: true }) + '</div>';
+      return;
+    }
+
     var allGroups = groupMetrics(allDashboardMetrics, dashboardType);
     var filteredMetrics = filterMetrics(metrics, dashboardType);
     var groups = groupMetrics(filteredMetrics, dashboardType);
@@ -824,12 +998,108 @@
     }
 
     if (empty) empty.hidden = true;
+    tileIndex = 0;
     grid.innerHTML = groups.map(renderGroup).join('');
+    if (animateNextRender && grid.querySelectorAll) {
+      Array.prototype.forEach.call(grid.querySelectorAll('[data-count-up]'), function (node) {
+        window.MiniCharts.countUp(node, node.getAttribute('data-count-up'), { from: node.getAttribute('data-count-from') });
+      });
+    }
+    animateNextRender = false;
+    queueSparklines(grid);
+  }
+
+  // ── Sparklines ───────────────────────────────────────────────
+  // Drawn from the metric's stored history (metric detail snapshots), after
+  // the tiles are on screen: at most three requests at a time, one result
+  // kept per metric and dates, and a failed or short history just leaves
+  // the space empty.
+  var SPARKLINE_CONCURRENCY = 3;
+  var sparklineCache = {};
+  var sparklineQueue = [];
+  var sparklineActive = 0;
+
+  function sparklineCacheKey(metricKey) {
+    return [metricKey, currentPeriod.start, currentPeriod.end, currentPeriod.compareBy].join('|');
+  }
+
+  function paintSparkline(slot, line) {
+    slot.classList.remove('mini-spark-slot--loading');
+    slot.innerHTML = window.MiniCharts.sparklineSvg(line);
+  }
+
+  var sparklineObserver = null;
+
+  function enqueueSparkline(slot) {
+    var metricKey = slot.getAttribute('data-sparkline-key');
+    sparklineQueue.push({ slot: slot, metricKey: metricKey, cacheKey: sparklineCacheKey(metricKey) });
+    pumpSparklines();
+  }
+
+  // Only tiles that scroll into view ask for their history.
+  function queueSparklines(grid) {
+    if (!grid.querySelectorAll || !window.api || typeof api.getMetricDetail !== 'function') return;
+    sparklineQueue = [];
+    if (sparklineObserver) sparklineObserver.disconnect();
+    sparklineObserver = typeof window.IntersectionObserver === 'function'
+      ? new window.IntersectionObserver(function (entries, observer) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          observer.unobserve(entry.target);
+          enqueueSparkline(entry.target);
+        });
+      }, { rootMargin: '200px 0px' })
+      : null;
+    Array.prototype.forEach.call(grid.querySelectorAll('[data-sparkline-key]'), function (slot) {
+      var cached = sparklineCache[sparklineCacheKey(slot.getAttribute('data-sparkline-key'))];
+      if (cached && cached.done) {
+        paintSparkline(slot, cached.line);
+        return;
+      }
+      slot.classList.add('mini-spark-slot--loading');
+      if (sparklineObserver) sparklineObserver.observe(slot);
+      else enqueueSparkline(slot);
+    });
+  }
+
+  function pumpSparklines() {
+    while (sparklineActive < SPARKLINE_CONCURRENCY && sparklineQueue.length) {
+      runSparkline(sparklineQueue.shift());
+    }
+  }
+
+  function fetchSparkline(job) {
+    var cached = sparklineCache[job.cacheKey];
+    if (cached) return cached.promise;
+    var period = currentPeriod;
+    var entry = { done: false, line: null };
+    entry.promise = api.getMetricDetail(job.metricKey, {
+      periodStart: period.start, periodEnd: period.end, compareBy: period.compareBy,
+    }).then(function (response) {
+      var payload = response && response.data ? response.data : response;
+      entry.line = window.MetricCardView.sparkline(payload && payload.snapshots, 100, 24);
+    }).catch(function () {
+      entry.line = null;
+    }).then(function () {
+      entry.done = true;
+      return entry.line;
+    });
+    sparklineCache[job.cacheKey] = entry;
+    return entry.promise;
+  }
+
+  function runSparkline(job) {
+    sparklineActive += 1;
+    fetchSparkline(job).then(function (line) {
+      sparklineActive -= 1;
+      // A redraw may have replaced this slot; the new one reads the cache.
+      if (job.slot.isConnected !== false) paintSparkline(job.slot, line);
+      pumpSparklines();
+    });
   }
 
   async function loadMetrics(type) {
-    dashboardLoadToken += 1;
-    var myToken = dashboardLoadToken;
+    var myLoad = cardLoads.begin();
     var config = VIEW_CONFIG[type];
     var banner = el('dashboardDetailBanner');
     if (banner) banner.classList.add('detail-banner--no-actions');
@@ -840,8 +1110,6 @@
     activeTypeFilter = 'all';
     activeSearchQuery = '';
     lastSearchInputValue = '';
-    allDashboardMetrics = [];
-    currentSummary = null;
     setBanner(config);
     loadDashboardSwitcher();
     setActiveType(type);
@@ -851,8 +1119,10 @@
 
     try {
       var response = await api.getDashboardMetricCards(getMetricCardRequestParams(type, 250));
-      if (myToken !== dashboardLoadToken) return;
+      if (!cardLoads.isLatest(myLoad)) return;
       var normalized = normalizeCardResponse(response);
+      cardLoads.finish(myLoad, normalized.metrics.length);
+      animateNextRender = true;
       allDashboardMetrics = normalized.metrics;
       currentSummary = normalized.summary;
       var params = getParams();
@@ -864,7 +1134,7 @@
       }
       renderMetrics(allDashboardMetrics, currentSummary, type);
     } catch (err) {
-      if (myToken !== dashboardLoadToken) return;
+      if (!cardLoads.fail(myLoad)) return;
       console.error('[DashboardDetail] Failed to load metrics:', err);
       allDashboardMetrics = [];
       currentSummary = null;
@@ -873,20 +1143,18 @@
   }
 
   async function loadDashboardById(id) {
-    dashboardLoadToken += 1;
-    var myToken = dashboardLoadToken;
+    var myLoad = cardLoads.begin();
     currentDashboardId = id;
     currentDashboardName = '';
     currentDashboardMetricKeys = null;
     activeTypeFilter = 'all';
     activeSearchQuery = '';
     lastSearchInputValue = '';
-    allDashboardMetrics = [];
-    currentSummary = null;
+    renderMetrics([], null, currentDashboardType);
 
     try {
       var dashboardResponse = await api.getBIDashboard(id);
-      if (myToken !== dashboardLoadToken) return;
+      if (!cardLoads.isLatest(myLoad)) return;
       var dashboard = dashboardResponse && dashboardResponse.data ? dashboardResponse.data : dashboardResponse;
       currentDashboardName = dashboard && dashboard.name ? dashboard.name : '';
       loadDashboardSwitcher();
@@ -906,7 +1174,7 @@
       var tileKeys = DashboardTiles.cardRequestKeys(layout);
       if (tileKeys) cardParams.metric_keys = tileKeys;
       var metricResponse = await api.getDashboardMetricCards(cardParams);
-      if (myToken !== dashboardLoadToken) return;
+      if (!cardLoads.isLatest(myLoad)) return;
       var normalized = normalizeCardResponse(metricResponse);
       allDashboardMetrics = normalized.metrics.filter(function (metric) {
         if (currentDashboardMetricKeys.size === 0) return true;
@@ -914,10 +1182,12 @@
         var shortKey = String(key || '').split('.').pop();
         return currentDashboardMetricKeys.has(key) || currentDashboardMetricKeys.has(shortKey);
       });
+      cardLoads.finish(myLoad, allDashboardMetrics.length);
+      animateNextRender = true;
       currentSummary = null;
       renderMetrics(allDashboardMetrics, currentSummary, type);
     } catch (err) {
-      if (myToken !== dashboardLoadToken) return;
+      if (!cardLoads.fail(myLoad)) return;
       console.error('[DashboardDetail] Failed to load dashboard:', err);
       allDashboardMetrics = [];
       currentSummary = null;
@@ -960,6 +1230,7 @@
       var start = el('dashboardPeriodStart');
       var end = el('dashboardPeriodEnd');
       // A manual edit to the start/end inputs is a custom range, not a preset.
+      periodPickToken += 1;
       currentPeriodIsPreset = false;
       if (start && end && start.value && end.value) {
         updateCompareByOptions(start.value, end.value, null);
@@ -1006,6 +1277,12 @@
       var reportBtn = event.target.closest('[data-report-link]');
       if (reportBtn) {
         Lex.Nav.go(reportBtn.getAttribute('data-report-link'));
+      }
+
+      var stateAction = event.target.closest('[data-data-state-action]');
+      if (stateAction) {
+        Lex.Nav.go(stateAction.getAttribute('data-data-state-action'));
+        return;
       }
 
       var metricDetailBtn = event.target.closest('[data-metric-detail-link]');

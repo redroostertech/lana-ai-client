@@ -1,0 +1,291 @@
+/* Mini charts (js/shared/mini-charts.js): sparkline, bars and goal ring
+   inside dashboard tiles. Colours are the Lex chart and status tokens the
+   Reports charts use, so light and dark match. Entrances are short ease-out
+   moves (300 to 700 ms); Reduce Motion turns them off. */
+
+/* ── Sparkline ─────────────────────────────────────────────── */
+.mini-spark {
+  display: block;
+  width: 100%;
+  height: 2rem;
+  overflow: visible;
+  color: var(--lex-chart-color-1);
+  animation: mini-chart-reveal 700ms var(--lex-ease-out, ease-out) both;
+}
+
+.mini-spark--up { color: var(--lex-status-success); }
+.mini-spark--down { color: var(--lex-status-danger); }
+
+.mini-spark__line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.mini-spark__area {
+  fill: currentColor;
+  opacity: 0.12;
+  stroke: none;
+}
+
+/* Holds the sparkline's space while history loads, so nothing jumps. */
+.mini-spark-slot {
+  min-height: 2rem;
+}
+
+.mini-spark-slot:empty {
+  min-height: 0;
+}
+
+.mini-spark-slot--loading {
+  min-height: 2rem;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--lex-bg-tertiary) 0%, var(--lex-bg-secondary) 50%, var(--lex-bg-tertiary) 100%);
+  background-size: 200% 100%;
+  animation: mini-chart-shimmer 1200ms linear infinite;
+}
+
+/* ── Bars ──────────────────────────────────────────────────── */
+.mini-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.mini-bars__legend {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--lex-text-secondary);
+}
+
+.mini-bars__key {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.mini-bars__key::before {
+  content: '';
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 2px;
+  background: var(--lex-chart-color-3);
+}
+
+.mini-bars__key--second::before {
+  background: var(--lex-chart-color-6);
+}
+
+.mini-bars__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mini-bars__row {
+  min-width: 0;
+}
+
+.mini-bars__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.mini-bars__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--lex-text-secondary);
+}
+
+.mini-bars__value {
+  flex: 0 0 auto;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--lex-text-primary);
+}
+
+.mini-bars__track {
+  display: block;
+  width: 100%;
+  height: 0.5rem;
+  margin-top: 0.25rem;
+  border-radius: 999px;
+  background: var(--lex-bg-tertiary);
+  overflow: hidden;
+}
+
+.mini-bars__track--paired {
+  height: 1rem;
+  border-radius: 4px;
+}
+
+.mini-bars__fill {
+  fill: var(--lex-chart-color-3);
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation: mini-bar-grow 600ms var(--lex-ease-out, ease-out) both;
+}
+
+.mini-bars__fill--second {
+  fill: var(--lex-chart-color-6);
+  animation-delay: 80ms;
+}
+
+.mini-bars__row:nth-child(2) .mini-bars__fill { animation-delay: 60ms; }
+.mini-bars__row:nth-child(3) .mini-bars__fill { animation-delay: 120ms; }
+.mini-bars__row:nth-child(4) .mini-bars__fill { animation-delay: 180ms; }
+.mini-bars__row:nth-child(n+5) .mini-bars__fill { animation-delay: 240ms; }
+
+.mini-bars__more {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+}
+
+/* ── Goal ring ─────────────────────────────────────────────── */
+.mini-ring {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  min-width: 0;
+  --mini-ring-color: var(--lex-color-gray-400, #a9a49d);
+}
+
+.mini-ring--green { --mini-ring-color: var(--lex-status-success); }
+.mini-ring--yellow { --mini-ring-color: var(--lex-status-warning); }
+.mini-ring--red { --mini-ring-color: var(--lex-status-danger); }
+
+.mini-ring__dial {
+  position: relative;
+  flex: 0 0 auto;
+  width: 4.5rem;
+  height: 4.5rem;
+}
+
+.mini-ring__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.mini-ring__track {
+  fill: none;
+  stroke: var(--lex-border-subtle);
+  stroke-width: 3.2;
+}
+
+.mini-ring__fill {
+  fill: none;
+  stroke: var(--mini-ring-color);
+  stroke-width: 3.2;
+  stroke-linecap: round;
+  animation: mini-ring-fill 700ms var(--lex-ease-out, ease-out) both;
+}
+
+.mini-ring__pace {
+  stroke: var(--lex-text-primary);
+  stroke-width: 1;
+  stroke-linecap: round;
+}
+
+.mini-ring__pct {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--lex-text-primary);
+}
+
+.mini-ring__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.mini-ring__value {
+  font-size: 1.125rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--lex-text-primary);
+}
+
+.mini-ring__target {
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+}
+
+.mini-ring__status {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--mini-ring-color);
+}
+
+.mini-ring__chip {
+  border-radius: 999px;
+  padding: 0.0625rem 0.4375rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  background: var(--lex-bg-tertiary);
+  color: var(--lex-text-secondary);
+}
+
+.mini-ring__chip--ahead {
+  background: var(--lex-status-success-bg);
+  color: var(--lex-status-success);
+}
+
+.mini-ring__chip--behind {
+  background: var(--lex-status-warning-bg);
+  color: var(--lex-status-warning);
+}
+
+/* ── Motion ────────────────────────────────────────────────── */
+@keyframes mini-bar-grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes mini-ring-fill {
+  from { stroke-dashoffset: 100; }
+}
+
+@keyframes mini-chart-reveal {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+
+@keyframes mini-chart-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mini-spark,
+  .mini-bars__fill,
+  .mini-ring__fill,
+  .mini-spark-slot--loading {
+    animation: none;
+  }
+}

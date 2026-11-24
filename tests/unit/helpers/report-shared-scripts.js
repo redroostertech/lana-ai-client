@@ -9,6 +9,8 @@ const path = require('path');
 const SRC = path.join(__dirname, '..', '..', '..', 'src');
 
 function withReportSharedScripts(window) {
+  // The Dashboards page script also needs its own shared modules.
+  require('./dashboard-shared-scripts').withDashboardScripts(window);
   for (const rel of ['js/shared/data-state.js', 'js/admin/report-metric-card.js', 'js/admin/report-builder.js', 'js/admin/reports-list.model.js', 'js/shared/title-switcher.js']) {
     new Function('window', fs.readFileSync(path.join(SRC, rel), 'utf8'))(window);
   }

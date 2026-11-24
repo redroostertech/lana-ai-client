@@ -10,16 +10,17 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { withReportSharedScripts } = require('./helpers/report-shared-scripts');
+const { withDashboardScripts } = require('./helpers/dashboard-shared-scripts');
 
 const nodes = { dashboardViewContext: { innerHTML: '' } };
 function page() {
   let source = fs.readFileSync(path.join(__dirname, '../../src/js/admin/dashboard-detail.js'), 'utf8');
   const end = source.lastIndexOf('  init();');
   source = source.slice(0, end) + '  window.testExports = { renderMetricCard, renderModalDetails, formatMetricCardValue, renderViewContext, emptyValue: window.DataState.EMPTY_VALUE };' + source.slice(end + '  init();'.length);
-  const window = withReportSharedScripts({ addEventListener() {} });
+  const window = withDashboardScripts(withReportSharedScripts({ addEventListener() {} }));
   window.testNodes = nodes;
   vm.runInNewContext(source, { window, document: { addEventListener() {}, getElementById: (id) => nodes[id] || null }, console,
-    Intl, URLSearchParams, setTimeout: jest.fn(), clearTimeout: jest.fn(), LanaTime: { nowMs: () => 0, formatUtcDayRange: () => '' } });
+    Intl, URLSearchParams, setTimeout: jest.fn(), clearTimeout: jest.fn(), LanaTime: { nowMs: () => 0, formatUtcDayRange: () => '', reportPresetDays: () => ({ start: '2026-01-01', end: '2026-01-07' }) } });
   return window.testExports;
 }
 

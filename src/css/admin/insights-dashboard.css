@@ -1894,3 +1894,133 @@
 #metricRawDataTable table { min-width: 760px; }
 #metricRawDataTable th { min-width: 120px; }
 #metricRawDataTable td { max-width: 280px; overflow: hidden; }
+
+/* ── Animated dashboard tiles (dashboard-detail.js + js/shared/mini-charts.js) ── */
+
+.dash-period-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dash-period-heading__loading[hidden] {
+  display: none;
+}
+
+/* New dates on the way: the current tiles stay put, dimmed, with a soft
+   shimmer, until the new numbers arrive. */
+#dashboardMetricGrid.dash-card-grid--refreshing .dash-metric-card {
+  opacity: 0.55;
+  pointer-events: none;
+  transition: opacity 300ms var(--lex-ease-out, ease-out);
+}
+
+#dashboardMetricGrid.dash-card-grid--refreshing .dash-metric-card__value,
+#dashboardMetricGrid.dash-card-grid--refreshing .mini-ring__value {
+  color: transparent;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--lex-bg-tertiary) 0%, var(--lex-bg-secondary) 50%, var(--lex-bg-tertiary) 100%);
+  background-size: 200% 100%;
+  animation: dash-shimmer 1200ms linear infinite;
+}
+
+.dash-metric-card--skeleton {
+  gap: 0.75rem;
+  min-height: 11rem;
+}
+
+.dash-skeleton {
+  display: block;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--lex-bg-tertiary) 0%, var(--lex-bg-secondary) 50%, var(--lex-bg-tertiary) 100%);
+  background-size: 200% 100%;
+  animation: dash-shimmer 1200ms linear infinite;
+}
+
+.dash-skeleton--eyebrow { width: 30%; height: 0.625rem; }
+.dash-skeleton--title { width: 65%; height: 0.875rem; }
+.dash-skeleton--value { width: 45%; height: 2rem; margin-top: 0.5rem; }
+.dash-skeleton--line { width: 100%; height: 2rem; }
+
+.dash-metric-card__value {
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-metric-card__period--now {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-weight: 700;
+  color: var(--lex-text-secondary);
+}
+
+.dash-metric-card__period--now::before {
+  content: '';
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: 999px;
+  background: var(--lex-status-success);
+}
+
+.dash-metric-card__result .mini-spark-slot {
+  margin-top: 0.625rem;
+}
+
+.dash-metric-card__delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.dash-metric-card__arrow {
+  width: 0.875rem;
+  height: 0.875rem;
+  flex: 0 0 auto;
+}
+
+.dash-metric-card__chart {
+  min-width: 0;
+}
+
+.dash-metric-card__result--goal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.dash-metric-card__goal-met {
+  flex: 0 0 auto;
+}
+
+.dash-metric-card__goal-note {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+}
+
+/* Tiles end with "See the records"; push it to the bottom so rows line up. */
+.dash-metric-card__actions {
+  margin-top: auto;
+}
+
+.dash-load-error {
+  grid-column: 1 / -1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #dashboardMetricGrid.dash-card-grid--refreshing .dash-metric-card {
+    transition: none;
+  }
+
+  #dashboardMetricGrid.dash-card-grid--refreshing .dash-metric-card__value,
+  #dashboardMetricGrid.dash-card-grid--refreshing .mini-ring__value,
+  .dash-skeleton {
+    animation: none;
+  }
+}
+
+@keyframes dash-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}

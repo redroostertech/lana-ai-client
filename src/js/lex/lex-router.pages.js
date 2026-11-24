@@ -563,16 +563,25 @@
         'js/shared/current-pipeline-presentation.js',
         'js/shared/acquisition-source-presentation.js',
         'js/shared/opportunity-intake-presentation.js',
+        'js/vendor/lottie_light.min.js',
+        'js/lex/brand/lex-brand-animations.js',
+        'js/lex/components/foundation/lex-brand-mark.js',
         'js/dashboard/metric-goal-comparison.js',
         'js/shared/data-state.js',
         'js/shared/dashboard-tiles.js',
+        'js/shared/dashboard-period.js',
+        'js/shared/load-state.js',
+        'js/shared/metric-card-view.js',
+        'js/shared/mini-charts.js',
         'js/shared/title-switcher.js',
         'js/admin/dashboard-detail.js'
       ],
       stylesheets: [
         'css/admin/insights-dashboard.css',
         'css/title-switcher.css',
-        'css/detail-page.css'
+        'css/detail-page.css',
+        'css/lex-motion.css',
+        'css/mini-charts.css'
       ]
     },
 

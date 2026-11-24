@@ -217,6 +217,31 @@
     toolbars.raw.updateCount();
   }
 
+  function movementFromComparison(comparison) {
+    if (!comparison || typeof comparison !== 'object') return null;
+    return {
+      prior_value: comparison.previous_value,
+      percent_change: comparison.percent_change,
+      direction: comparison.direction,
+    };
+  }
+
+  // When the server sent only the first page of source records, say so in
+  // plain words with the full count (raw_data.total, raw_data.has_more).
+  function renderRawDataTotal(rawData) {
+    var note = el('metricRawDataTotalNote');
+    if (!note) return;
+    var shown = rawData && Array.isArray(rawData.rows) ? rawData.rows.length : 0;
+    var total = rawData ? Number(rawData.total) : NaN;
+    if (!rawData || !rawData.has_more || !isFinite(total) || total <= shown) {
+      note.hidden = true;
+      note.textContent = '';
+      return;
+    }
+    note.hidden = false;
+    note.textContent = 'Showing the first ' + shown.toLocaleString('en-US') + ' of ' + total.toLocaleString('en-US') + ' records.';
+  }
+
   function renderBreadcrumb(metric) {
     var breadcrumb = el('metricDetailBreadcrumb');
     if (!breadcrumb) return;
@@ -257,7 +282,8 @@
       var payload = response && response.data ? response.data : response;
       var metric = payload.metric || {};
       var current = payload.current || {};
-      var movement = payload.movement || null;
+      // Older servers send movement; newer ones send the comparison block.
+      var movement = payload.movement || movementFromComparison(payload.comparison);
       // Title falls through to humanized key so the page never shows
       // `legal_firm.family_law.upcoming_custody_hearings` as a heading.
       var rawTitle = current.title || metric.title || metric.name || metric.key || metricKey;
@@ -293,6 +319,7 @@
 
       renderSnapshots(payload.snapshots || []);
       renderRawData(payload.raw_data && payload.raw_data.rows ? payload.raw_data.rows : []);
+      renderRawDataTotal(payload.raw_data);
     } catch (err) {
       console.error('[MetricDetail] Failed to load metric detail:', err);
       setText('metricTitle', 'Metric unavailable');
@@ -321,7 +348,11 @@
       historyPanel.hidden = tabId !== 'history';
       sourcePanel.hidden = tabId !== 'source';
     }
-    showPanel('history');
+    // A dashboard tile's "See the records" opens straight on the source
+    // records (tab=source).
+    var initialTab = params().get('tab') === 'source' ? 'source' : 'history';
+    if (initialTab !== 'history' && typeof tabs.setAttribute === 'function') tabs.setAttribute('active', initialTab);
+    showPanel(initialTab);
 
     tabs.addEventListener('tab-change', function (event) {
       var next = event.detail && event.detail.tab;

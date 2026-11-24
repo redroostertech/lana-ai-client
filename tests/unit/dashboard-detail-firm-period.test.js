@@ -11,6 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { withDashboardScripts } = require('./helpers/dashboard-shared-scripts');
 
 function node(value = '') {
   return { value, hidden: false, innerHTML: '', textContent: '', style: {}, options: [], dataset: {}, classList: { add() {}, remove() {}, toggle() {} },
@@ -39,7 +40,7 @@ function page({ storedZone = 'America/Los_Angeles' } = {}) {
   const view = { period: { start: '2026-10-01T07:00:00.000Z', end: '2026-11-01T06:59:59.999Z', label: 'Oct 1, 2026 - Oct 31, 2026' } };
   const api = { getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [], view, summary: null }),
     getBIDashboards: jest.fn().mockResolvedValue({ data: [] }), ensureFirmTimezone, listBIDashboards: jest.fn().mockResolvedValue({ data: [] }) };
-  const window = { location: { search: '' }, setInterval() {}, LanaTime: timeWin.LanaTime };
+  const window = withDashboardScripts({ location: { search: '' }, setInterval() {}, LanaTime: timeWin.LanaTime });
   const Lex = { Utils: { getFirmTimezone: () => zone.firm, getOrganizationTimezone: () => 'America/New_York' },
     Nav: { getParams: () => new URLSearchParams('') } };
   window.Lex = Lex;
