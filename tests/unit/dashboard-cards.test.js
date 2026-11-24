@@ -259,3 +259,12 @@ test('only one compact card is pulled up when only one exists', () => {
   ]);
   expect(plan.items.map((i) => i.resolved.def.id)).toEqual(['h', 'n', 'c']);
 });
+
+test('options are read from card.visual_options (the saved shape), with full keys kept', () => {
+  const card = Cards.normalizeLayout({ cards: [{ id: 'p', kind: 'goal', metric_keys: ['legal_firm.finance.cash_this_month'], visual: 'ring',
+    title: 'Payroll', visual_options: { chips: ['legal_firm.finance.payroll_clients_needed'], accent: 'warning', relation: 'per client', ratio_bar: true } }] }).cards[0];
+  expect(card).toMatchObject({ visual: 'ring', title: 'Payroll' });
+  expect(card.options).toMatchObject({ chips: ['legal_firm.finance.payroll_clients_needed'], accent: 'warning', relation: 'per client', ratio_bar: true });
+  expect(Cards.requestKeys({ cards: [{ id: 'p', kind: 'goal', metric_keys: ['finance.a'], visual_options: { detail: ['finance.b'] } }] }))
+    .toEqual(['legal_firm.finance.a', 'legal_firm.finance.b']);
+});

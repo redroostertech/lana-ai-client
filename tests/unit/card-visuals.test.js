@@ -168,3 +168,10 @@ describe('shortLabels', () => {
     expect(V.shortLabels(['Estate Planning', 'Probate'])).toEqual(['Estate Planning', 'Probate']);
   });
 });
+
+test('pairedSeries pairs by service_key when rows carry it, labelled by service_label', () => {
+  const rows = V.pairedSeries(
+    [{ service_key: 'estate_planning', service_label: 'Estate Planning', value: 21 }],
+    [{ service_key: 'estate_planning', service_label: 'Estate planning', value: 6 }, { service_key: 'guardianship', service_label: 'Guardianship', value: 2 }]);
+  expect(rows).toEqual([{ label: 'Estate Planning', value: 21, second: 6 }, { label: 'Guardianship', value: null, second: 2 }]);
+});

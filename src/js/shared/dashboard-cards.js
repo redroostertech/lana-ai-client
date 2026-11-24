@@ -65,7 +65,9 @@
       chart: raw.chart === 'funnel' ? 'funnel' : 'bars',
       note: raw.note ? String(raw.note) : '',
       visual: raw.visual ? String(raw.visual) : '',
-      options: cardOptions(raw),
+      // Saved cards keep their options in visual_options; the spec wrote
+      // them on the card itself. Both read the same.
+      options: cardOptions(Object.assign({}, raw, raw.visual_options && typeof raw.visual_options === 'object' ? raw.visual_options : {})),
     };
   }
 
@@ -110,6 +112,7 @@
   function requestKeys(layout) {
     var keys = layout && Array.isArray(layout.metric_keys) ? layout.metric_keys.slice() : [];
     normalizeLayout(layout).cards.forEach(function (card) {
+      // (options already include visual_options)
       var o = card.options;
       keys = keys.concat(card.keys, card.variants.map(function (variant) { return variant.key; }),
         o.detail, o.chips, o.metric_keys_override, o.headline_keys, o.centre_key ? [o.centre_key] : [], o.badge_key ? [o.badge_key] : []);

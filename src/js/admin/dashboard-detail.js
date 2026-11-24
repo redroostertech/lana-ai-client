@@ -1061,7 +1061,10 @@
   // Two list metrics side by side by label (new and closed by service).
   function renderPairedColumns(resolved, layoutItem) {
     var def = resolved.def;
-    var lists = def.options.metric_keys_override.map(function (key) { return { key: key, metric: window.DashboardCards.metricFor(declaredIndex, key) }; });
+    // The two lists: metric_keys_override (the spec), else the card's own
+    // keys when both are list metrics (the saved dashboards).
+    var listKeys = def.options.metric_keys_override.length ? def.options.metric_keys_override : def.keys;
+    var lists = listKeys.map(function (key) { return { key: key, metric: window.DashboardCards.metricFor(declaredIndex, key) }; });
     var usable = lists.length === 2 && lists.every(function (l) { return l.metric && !window.DashboardCards.isWaiting(l.metric) && Array.isArray(l.metric.value); });
     if (!usable) {
       var one = resolved.metrics[0];

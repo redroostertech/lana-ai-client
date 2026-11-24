@@ -216,19 +216,23 @@
     return '';
   }
 
-  // Two lists side by side by label (new and closed by service offering).
+  // Two lists side by side (new and closed by service offering), paired by
+  // service_key when the rows carry it, otherwise by label.
+  function pairKey(row) {
+    return row && row.service_key ? 'key:' + row.service_key : 'label:' + listLabel(row);
+  }
+
   function pairedSeries(first, second) {
     var rows = [];
     var at = {};
     (first || []).forEach(function (row) {
-      var label = listLabel(row);
-      at[label] = rows.length;
-      rows.push({ label: label, value: toNumber(row && row.value), second: null });
+      at[pairKey(row)] = rows.length;
+      rows.push({ label: listLabel(row), value: toNumber(row && row.value), second: null });
     });
     (second || []).forEach(function (row) {
-      var label = listLabel(row);
-      if (at[label] === undefined) { at[label] = rows.length; rows.push({ label: label, value: null, second: null }); }
-      rows[at[label]].second = toNumber(row && row.value);
+      var key = pairKey(row);
+      if (at[key] === undefined) { at[key] = rows.length; rows.push({ label: listLabel(row), value: null, second: null }); }
+      rows[at[key]].second = toNumber(row && row.value);
     });
     return rows;
   }
