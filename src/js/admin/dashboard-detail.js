@@ -1371,7 +1371,9 @@
     return new Date(base + offset * 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
   }
 
-  function drawRows(slot, rows, rowColumns) {
+  // caveats: metric detail's lineage caveats, shown as a short muted note
+  // when the card did not already show one of its own.
+  function drawRows(slot, rows, rowColumns, caveats) {
     slot.classList.remove('mini-spark-slot--loading');
     var key = slot.getAttribute('data-worklist-key');
     var visual = slot.getAttribute('data-rows-visual') || 'worklist';
@@ -1390,6 +1392,10 @@
     } else {
       slot.innerHTML = '';
     }
+    var card = slot.parentNode;
+    if (Array.isArray(caveats) && caveats.length && card && !card.querySelector('.dash-card__note') && slot.insertAdjacentHTML) {
+      (template || slot).insertAdjacentHTML('afterend', '<p class="dash-card__note">' + escapeHtml(caveats[0]) + '</p>');
+    }
   }
 
   function queueWorklists(grid) {
@@ -1406,14 +1412,19 @@
         }).then(function (response) {
           var payload = response && response.data ? response.data : response;
           var rows = payload && payload.raw_data && Array.isArray(payload.raw_data.rows) ? payload.raw_data.rows : [];
-          return { rows: rows.slice(0, limit), columns: payload && Array.isArray(payload.row_columns) ? payload.row_columns : null };
+          var lineage = payload && payload.lineage;
+          return {
+            rows: rows.slice(0, limit),
+            columns: payload && Array.isArray(payload.row_columns) ? payload.row_columns : null,
+            caveats: lineage && Array.isArray(lineage.caveats) ? lineage.caveats : [],
+          };
         }).catch(function () { return null; });
       }
       worklistCache[cacheKey].then(function (result) {
         // The card's own row_columns answer first; metric detail's otherwise.
         var metric = declaredIndex ? window.DashboardCards.metricFor(declaredIndex, key) : null;
         var columns = metric && Array.isArray(metric.row_columns) ? metric.row_columns : (result && result.columns);
-        drawRows(slot, result ? result.rows : null, columns);
+        drawRows(slot, result ? result.rows : null, columns, result ? result.caveats : []);
       });
     });
   }

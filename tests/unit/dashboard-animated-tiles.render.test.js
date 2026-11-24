@@ -35,7 +35,7 @@ function page(api = {}, user = null) {
   let source = fs.readFileSync(path.join(__dirname, '../../src/js/admin/dashboard-detail.js'), 'utf8');
   const end = source.lastIndexOf('  init();');
   source = source.slice(0, end)
-    + '  window.testExports = { renderMetricCard, loadMetrics, loadDashboardById, readPeriodControls, setBanner, fetchSparkline, renderMetrics, openMetricModal, worklistHtml, variantPicks, allMetrics: function () { return allDashboardMetrics; }, cardLoads: function () { return cardLoads; } };'
+    + '  window.testExports = { renderMetricCard, loadMetrics, loadDashboardById, readPeriodControls, setBanner, fetchSparkline, renderMetrics, openMetricModal, worklistHtml, drawRows, variantPicks, allMetrics: function () { return allDashboardMetrics; }, cardLoads: function () { return cardLoads; } };'
     + source.slice(end + '  init();'.length);
   const nodes = {};
   const document = { body: node(), addEventListener() {}, getElementById: (id) => (nodes[id] = nodes[id] || node()), querySelector: () => null, querySelectorAll: () => [] };
@@ -699,5 +699,31 @@ describe('server row_columns and caveats on worklists', () => {
     const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: cards }) });
     await p.exports.loadDashboardById('d1');
     expect(p.nodes.dashboardMetricGrid.innerHTML).toContain('<p class="dash-card__note">Bills come from your practice system as of its last sync.</p>');
+  });
+});
+
+describe('caveat note from metric detail when the card has none', () => {
+  function slot(existingNote) {
+    const inserted = [];
+    const card = { querySelector: (sel) => (sel === '.dash-card__note' && existingNote ? {} : null) };
+    const attrs = { 'data-worklist-key': 'k', 'data-rows-visual': 'worklist', 'data-rows-fallback': 'worklist', 'data-rows-sort': '' };
+    return { inserted, innerHTML: '', parentNode: card, nextElementSibling: null, classList: { remove() {} },
+      getAttribute: (n) => attrs[n], insertAdjacentHTML: (where, html) => inserted.push([where, html]) };
+  }
+  const rows = [{ matter_name: 'A', due_date: '2023-07-18' }];
+
+  test('adds the first detail caveat after the rows', () => {
+    const s = slot(false);
+    page().exports.drawRows(s, rows, null, ['Bills come from your practice system as of its last sync.', 'Other']);
+    expect(s.inserted).toEqual([['afterend', '<p class="dash-card__note">Bills come from your practice system as of its last sync.</p>']]);
+  });
+
+  test('keeps the card note when the card already has one, and adds nothing without caveats', () => {
+    const a = slot(true);
+    page().exports.drawRows(a, rows, null, ['x']);
+    expect(a.inserted).toEqual([]);
+    const b = slot(false);
+    page().exports.drawRows(b, rows, null, []);
+    expect(b.inserted).toEqual([]);
   });
 });
