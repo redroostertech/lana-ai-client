@@ -155,6 +155,7 @@
     "electron-winstaller@5.4.0": false,
     "esbuild@0.27.2": false,
     "fsevents@2.3.2": false,
+    "fsevents@2.3.3": false,
     "@parcel/watcher@2.6.0": false,
     "unrs-resolver@1.12.2": false
   }
