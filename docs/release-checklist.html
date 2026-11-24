@@ -52,7 +52,7 @@
 <p class="intro">Nothing gets built until the code it comes from is final.</p>
 <ol>
   <li><span class="box"></span><span class="n">1</span><span><span class="t">Server code final for this release</span><span class="h">LANA-AI production. The engine is built from it.</span></span></li>
-  <li><span class="box"></span><span class="n">2</span><span><span class="t">Write down what this release is built from</span><span class="h">Fill in the fields at the top. A changed pin later means that piece is built again for every system.</span></span></li>
+  <li><span class="box"></span><span class="n">2</span><span><span class="t">Write down what this release is built from</span><span class="h">Fill in the fields at the top. A changed pin later means that piece is built again for every system. Before settling the redactor pin, check it has everything the cloud redactor image needs (it must listen on IPv4 and IPv6, REDACTOR_BIND_HOST=all); otherwise step 11 forces a new redactor pin and all four redactor pieces rebuilt.</span></span></li>
 </ol>
 
 <h2>Phase 2. Build the pieces for every system</h2>
@@ -85,7 +85,7 @@
 <ol>
   <li><span class="box"></span><span class="n">9</span><span><span class="t">Classifiers checked</span><span class="h">release.sh step 0 (PINS) decides. Publish any missing archive to models.lanaai.io first.</span></span></li>
   <li><span class="box"></span><span class="n">10</span><span><span class="t">Signed server update for boxes (on-prem)</span><span class="h">scripts/release/release.sh: signed, staged, verified, published to releases.lanaai.io/server/updates/.</span></span></li>
-  <li><span class="box"></span><span class="n">11</span><span><span class="t">Cloud images built and pushed</span><span class="h">The four Railway images (lana-chef, lana-embed, lana-redactor, lana-minio): deploy/railway/build-images.sh on an Azure Linux VM, push-images.sh to LANA's registry (stored on R2, never GitHub), then the control plane image variables and update policy set to the new digests.</span></span></li>
+  <li><span class="box"></span><span class="n">11</span><span><span class="t">Cloud images built and pushed</span><span class="h">First, the prerequisites: (1) the pinned lana-redactor commit listens on IPv4 and IPv6 (build-images.sh refuses otherwise); (2) release.sh records the Railway chef image, not the old lana-stack; (3) the registry and Railway access are set on Heroku. Then: the four Railway images (lana-chef, lana-embed, lana-redactor, lana-minio) built with deploy/railway/build-images.sh on an Azure Linux VM, pushed with push-images.sh to LANA's registry (stored on R2, never GitHub), the control plane RAILWAY_IMAGE_* settings and the update policy set to the new digests (QA, then prod), and the cloud test server brought up to the release.</span></span></li>
   <li><span class="box"></span><span class="n">12</span><span><span class="t">Release recorded in the portal</span></span></li>
   <li><span class="box"></span><span class="n">13</span><span><span class="t">Each firm's server updated, Norton first</span><span class="h">To the engine commit or newer, before that firm's team gets the new app.</span></span></li>
 </ol>
