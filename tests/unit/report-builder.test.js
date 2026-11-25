@@ -110,3 +110,27 @@ describe('declared table columns', () => {
     expect(builder.declaredTableColumns(result)).toBeNull();
   });
 });
+
+describe('report data sources', () => {
+  const source = { id: 's1', name: 'ActionStep (Firm)', connectorType: 'actionstep', entities: ['matter', 'contact', 'invoice_line'], lastSuccessfulSyncAt: '2026-08-10T14:03:00Z' };
+
+  test('leads with the entities, then the name and the last sync', () => {
+    expect(builder.dataSourceView(source)).toEqual({ lead: 'Matter, Contact, Invoice line', name: 'ActionStep (Firm)', lastSync: 'Last synced Aug 10, 2026' });
+  });
+  test('entities can be objects; no entities leads with the name; no sync says so', () => {
+    expect(builder.dataSourceView({ name: 'Leadly', entities: [{ label: 'Leads' }, { name: 'appointment' }] }).lead).toBe('Leads, Appointment');
+    expect(builder.dataSourceView({ name: 'Leadly', entities: [] })).toEqual({ lead: 'Leadly', name: '', lastSync: 'Not synced yet' });
+    expect(builder.dataSourceView({ connectorType: 'quickbooks' }).lead).toBe('Quickbooks');
+  });
+  test('the row markup is escaped and has no inline styles', () => {
+    const html = builder.dataSourceHtml({ name: '<b>X</b>', entities: ['matter'], lastSuccessfulSyncAt: null });
+    expect(html).toContain('&lt;b&gt;X&lt;/b&gt;');
+    expect(html).not.toContain('<b>');
+    expect(html).not.toContain('style=');
+    expect(html).toContain('Not synced yet');
+  });
+  test('the report page uses it for the data sources list', () => {
+    const report = require('fs').readFileSync(require('path').join(__dirname, '../../src/js/admin/report.js'), 'utf8');
+    expect(report).toContain('ReportBuilder.dataSourceHtml(');
+  });
+});

@@ -103,7 +103,59 @@
     });
   }
 
+  // ── Report data sources ─────────────────────────────────────────────
+  // dataSources[] = { id, name, connectorType, entities[], lastSuccessfulSyncAt }.
+  // A row leads with what the source holds (its entities), then its name
+  // and when it last synced.
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  function sourceWords(value) {
+    var text = String(value === null || value === undefined ? '' : value).split('_').join(' ').trim();
+    return text ? text.charAt(0).toUpperCase() + text.slice(1) : '';
+  }
+
+  function dayText(value) {
+    var text = String(value || '');
+    if (text.length < 10 || text.charAt(4) !== '-' || text.charAt(7) !== '-') return '';
+    var month = Number(text.substring(5, 7));
+    var day = Number(text.substring(8, 10));
+    if (!(month >= 1 && month <= 12) || !(day >= 1 && day <= 31)) return '';
+    return MONTHS[month - 1] + ' ' + day + ', ' + text.substring(0, 4);
+  }
+
+  function entityText(entity) {
+    if (entity && typeof entity === 'object') return sourceWords(entity.label || entity.name || entity.entity || entity.type || '');
+    return sourceWords(entity);
+  }
+
+  function dataSourceView(source) {
+    var s = source || {};
+    var name = String(s.name || sourceWords(s.connectorType) || '');
+    var entities = (Array.isArray(s.entities) ? s.entities : []).map(entityText).filter(Boolean);
+    var day = dayText(s.lastSuccessfulSyncAt);
+    return {
+      lead: entities.length ? entities.join(', ') : name,
+      name: entities.length ? name : '',
+      lastSync: day ? 'Last synced ' + day : 'Not synced yet',
+    };
+  }
+
+  function esc(value) {
+    return String(value === null || value === undefined ? '' : value)
+      .split('&').join('&amp;').split('<').join('&lt;').split('>').join('&gt;').split('"').join('&quot;').split("'").join('&#39;');
+  }
+
+  function dataSourceHtml(source) {
+    var v = dataSourceView(source);
+    return '<div class="report-source">'
+      + '<p class="report-source__lead">' + esc(v.lead) + '</p>'
+      + '<p class="report-source__meta">' + (v.name ? esc(v.name) + ' · ' : '') + esc(v.lastSync) + '</p>'
+      + '</div>';
+  }
+
   var moduleApi = {
+    dataSourceView: dataSourceView,
+    dataSourceHtml: dataSourceHtml,
     KINDS: KINDS,
     catalogMetricOptions: catalogMetricOptions,
     catalogReportDefinition: catalogReportDefinition,

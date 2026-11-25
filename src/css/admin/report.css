@@ -346,3 +346,30 @@
 .reporting-info__pre--tall {
   max-height: 240px;
 }
+
+/* Report data sources (ReportBuilder.dataSourceHtml): what each source
+   holds first, then its name and last sync. */
+.report-source {
+  padding: 0.75rem 0.875rem;
+  border: 1px solid var(--lex-border-default, #e5e7eb);
+  border-radius: var(--lex-radius-md, 8px);
+  background: var(--lex-bg-primary, #ffffff);
+}
+
+.report-source + .report-source {
+  margin-top: 0.5rem;
+}
+
+.report-source__lead {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--lex-text-primary, #111827);
+  overflow-wrap: anywhere;
+}
+
+.report-source__meta {
+  margin: 0.125rem 0 0;
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary, #6b7280);
+}

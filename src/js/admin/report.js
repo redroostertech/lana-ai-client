@@ -277,22 +277,9 @@
     if (currentDataSources.length === 0) {
       list.innerHTML = '<p class="text-sm text-gray-500 text-center py-4">No data sources found</p>';
     } else {
-      currentDataSources.forEach(function (connector) {
-        var connectorCard = document.createElement('div');
-        connectorCard.className = 'flex items-center gap-3 p-3 border border-gray-200 rounded-lg bg-white hover:bg-gray-50 transition-colors';
-        connectorCard.innerHTML = '<div class="flex-shrink-0">' +
-          '<svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>' +
-          '</svg></div>' +
-          '<div class="flex-1 min-w-0">' +
-          '<p class="text-sm font-medium text-gray-900 truncate">' + (connector.name || connector.connectorType) + '</p>' +
-          '<p class="text-xs text-gray-500">' + (connector.connectorType || '') + '</p>' +
-          '</div>' +
-          '<div class="flex-shrink-0">' +
-          '<span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Active</span>' +
-          '</div>';
-        list.appendChild(connectorCard);
-      });
+      // Each source leads with what it holds (its entities), then its name
+      // and its last sync (ReportBuilder.dataSourceHtml).
+      list.innerHTML = currentDataSources.map(function (source) { return window.ReportBuilder.dataSourceHtml(source); }).join('');
     }
 
     modal.classList.remove('hidden');
