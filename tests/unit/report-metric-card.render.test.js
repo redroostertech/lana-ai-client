@@ -145,3 +145,44 @@ describe('tile styles live in report.css, not inline', () => {
     for (const cls of used) expect(css).toContain('.' + cls);
   });
 });
+
+describe('calm states on report tiles (matching dashboards)', () => {
+  test('ok with current null (and prior null) is the calm "No data for these dates", never n/a numbers', () => {
+    const html = win.ReportMetricCard.render({ key: 'avg', name: 'Average Fee', type: 'currency', current: null, prior: null, data_state: 'ok' }, ctx);
+    expect(html).toContain('lex-data-state--calm');
+    expect(text(html)).toContain('No data for these dates');
+    expect(text(html)).toContain('Nothing was recorded for these dates.');
+    expect(text(html)).not.toContain(win.DataState.EMPTY_VALUE);
+    expect(text(html)).not.toContain('% Change');
+    expect(text(html)).not.toContain('$0');
+    expect(html).toContain('data-add-to-dashboard');
+  });
+
+  test('a current null with a prior still is no data for these dates', () => {
+    const html = win.ReportMetricCard.render({ key: 'r', name: 'Rate', current: null, prior: 12, data_state: 'ok' }, ctx);
+    expect(text(html)).toContain('No data for these dates');
+  });
+
+  test('a real 0 and a server-formatted value are not touched', () => {
+    expect(text(win.ReportMetricCard.render({ key: 'c', name: 'Count', type: 'count', current: 0, data_state: 'ok' }, ctx))).toContain('0');
+    expect(win.ReportMetricCard.render({ key: 'c', name: 'Count', type: 'count', current: 0, data_state: 'ok' }, ctx)).not.toContain('lex-data-state');
+    expect(win.ReportMetricCard.render({ key: 'c', name: 'Count', current: null, formattedCurrent: 'Pending', data_state: 'ok' }, ctx)).not.toContain('lex-data-state');
+  });
+
+  test('no_data_source uses the calm block like dashboards', () => {
+    const html = win.ReportMetricCard.render({ key: 'g', name: 'Gross Revenue', current: null, data_state: 'no_data_source', data_state_reason: 'Connect the app that holds invoices.' }, ctx);
+    expect(html).toContain('lex-data-state--calm');
+    expect(text(html)).toContain('Connect a data source');
+    expect(text(html)).toContain('Connect the app that holds invoices.');
+    expect(text(html)).not.toContain('$0');
+  });
+
+  test('other states keep the plain Reports titles', () => {
+    const html = win.ReportMetricCard.render({ key: 't', name: 'T', data_state: 'timeout', data_state_reason: 'r' }, ctx);
+    expect(html).not.toContain('lex-data-state--calm');
+  });
+
+  test('dashboard behaviour is unchanged: an ok item without a value key is not a problem', () => {
+    expect(win.DataState.isProblem({ data_state: 'ok', current: null })).toBe(false);
+  });
+});

@@ -44,16 +44,37 @@
     return 'data-metric-drilldown="' + kind + '" data-metric-key="' + esc(metric.key) + '" data-metric-name="' + esc(metric.name) + '"';
   }
 
+  // States that read the same calm way as on dashboards: no data source,
+  // and no data for these dates. Other states keep the plain Reports titles.
+  var CALM_STATES = { no_data_source: true, no_data: true };
+
   function renderState(metric, ctx) {
+    var item = metric;
+    var calm = CALM_STATES[metric.data_state] === true;
+    // An ok tile with no number goes through the shared no-data state
+    // (DataState reads an ok item with value null as no_data).
+    if (isEmptyTile(metric)) {
+      item = Object.assign({}, metric, { data_state: 'ok', value: null });
+      calm = true;
+    }
     return '<div data-metric-card class="report-tile bg-white rounded-xl shadow-sm border border-gray-200">' +
       '<div class="mb-4"><h3 class="report-tile__title font-medium text-gray-500 uppercase tracking-wide">' + esc(metric.name) + '</h3></div>' +
-      global.DataState.render(metric) +
+      global.DataState.render(item, calm ? { calm: true } : undefined) +
       footer(ctx, '') + '</div>';
+  }
+
+  // Ok (or no state sent) with no current value and no server-formatted
+  // value: nothing was recorded for these dates. A real 0 is a value.
+  function isEmptyTile(metric) {
+    var ok = !metric.data_state || metric.data_state === 'ok';
+    var empty = metric.current === null || metric.current === undefined;
+    var formatted = metric.formattedCurrent !== null && metric.formattedCurrent !== undefined && metric.formattedCurrent !== '';
+    return ok && empty && !formatted;
   }
 
   function render(metric, ctx) {
     ctx = ctx || {};
-    if (global.DataState.isProblem(metric)) return renderState(metric, ctx);
+    if (global.DataState.isProblem(metric) || isEmptyTile(metric)) return renderState(metric, ctx);
     var ReportingGoalComparisonMapper = global.ReportingGoalComparisonMapper;
     // Resolve the metric's display type from its format (object { type } or a
     // string) or the legacy type/unit fields, so values render by type
