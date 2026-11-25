@@ -9,6 +9,13 @@
 (function () {
   'use strict';
 
+  // The firm's currency (Lex.Utils.getFirmCurrency, from /auth/me), else USD.
+  function firmCurrency() {
+    var host = typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : {});
+    var utils = host.Lex && host.Lex.Utils;
+    return utils && typeof utils.getFirmCurrency === 'function' ? utils.getFirmCurrency() : 'USD';
+  }
+
   // Shared with the other Reports page (reports-list.model.js).
   var ReportsList = window.ReportsList;
 
@@ -99,7 +106,7 @@
     if (value === null || value === undefined) return EMPTY;
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: firmCurrency(),
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     }).format(value);

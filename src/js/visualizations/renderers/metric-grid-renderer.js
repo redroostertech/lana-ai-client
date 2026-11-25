@@ -29,6 +29,12 @@
 import { destroyChart } from '../chart-utils.js';
 import { ChartTheme } from '../chart-theme.js';
 
+// The firm's currency (Lex.Utils.getFirmCurrency, from /auth/me), else USD.
+function firmCurrency() {
+  const utils = globalThis.Lex && globalThis.Lex.Utils;
+  return utils && typeof utils.getFirmCurrency === 'function' ? utils.getFirmCurrency() : 'USD';
+}
+
 /**
  * MetricGridRenderer class
  * Renders a grid of metric cards with status indicators, values, and drilldown integration
@@ -638,7 +644,7 @@ export class MetricGridRenderer {
     }
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: firmCurrency(),
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     }).format(value);

@@ -20,6 +20,13 @@
 (function (global) {
   'use strict';
 
+  // The firm's currency (Lex.Utils.getFirmCurrency, from /auth/me), else USD.
+  function firmCurrency() {
+    var host = typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : {});
+    var utils = host.Lex && host.Lex.Utils;
+    return utils && typeof utils.getFirmCurrency === 'function' ? utils.getFirmCurrency() : 'USD';
+  }
+
   var TARGET_TYPES = ['static', 'rolling_average', 'growth_rate'];
   var TARGET_PERIODS = ['weekly', 'monthly'];
 
@@ -156,7 +163,7 @@
     var fmt = String(formatTok || 'number').toLowerCase();
 
     if (fmt === 'currency' || fmt === 'currency_breakdown') {
-      return num.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+      return num.toLocaleString('en-US', { style: 'currency', currency: firmCurrency(), maximumFractionDigits: 0 });
     }
     if (fmt === 'percentage' || fmt === 'percent') {
       return num.toLocaleString('en-US', { maximumFractionDigits: 1 }) + '%';

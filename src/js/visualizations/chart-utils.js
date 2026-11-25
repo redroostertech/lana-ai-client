@@ -8,6 +8,12 @@
  * @module visualizations/chart-utils
  */
 
+// The firm's currency (Lex.Utils.getFirmCurrency, from /auth/me), else USD.
+function firmCurrency() {
+  const utils = globalThis.Lex && globalThis.Lex.Utils;
+  return utils && typeof utils.getFirmCurrency === 'function' ? utils.getFirmCurrency() : 'USD';
+}
+
 /**
  * Sample a large dataset to improve rendering performance.
  * Preserves first and last points to maintain data boundaries.
@@ -96,7 +102,7 @@ export function formatValue(value, format) {
 
   if (format === 'currency') {
     return new Intl.NumberFormat('en-US', {
-      style: 'currency', currency: 'USD',
+      style: 'currency', currency: firmCurrency(),
       minimumFractionDigits: 0, maximumFractionDigits: 0,
     }).format(value);
   }

@@ -3,6 +3,13 @@
 (function () {
   'use strict';
 
+  // The firm's currency (Lex.Utils.getFirmCurrency, from /auth/me), else USD.
+  function firmCurrency() {
+    var host = typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : {});
+    var utils = host.Lex && host.Lex.Utils;
+    return utils && typeof utils.getFirmCurrency === 'function' ? utils.getFirmCurrency() : 'USD';
+  }
+
   function el(id) { return document.getElementById(id); }
 
   // Blank stats and cells use the shared empty token (js/shared/data-state.js).
@@ -52,7 +59,7 @@
     if (!isFinite(numeric)) return value == null ? EMPTY : String(value);
     if (numeric === 0) return EMPTY;
     if (format === 'currency') {
-      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(numeric);
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: firmCurrency(), maximumFractionDigits: 0 }).format(numeric);
     }
     if (format === 'percent' || format === 'percentage') {
       return numeric.toFixed(1) + '%';

@@ -1935,6 +1935,8 @@ class ApiClient {
       firm_timezone: profile.firm_timezone,
       // False when the firm never chose a zone (admins are asked to set one).
       firm_timezone_set: profile.firm_timezone_set,
+      // The firm's currency, "USD" when unset (Lex.Utils.getFirmCurrency).
+      default_currency: profile.default_currency || 'USD',
       // The person's own zone (users.time_zone), null when they have none;
       // read first by Lex.Utils.getOrganizationTimezone.
       timezone: profile.timezone || null,

@@ -26,6 +26,13 @@
 (function (global) {
   'use strict';
 
+  // The firm's currency (Lex.Utils.getFirmCurrency, from /auth/me), else USD.
+  function firmCurrency() {
+    var host = typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : {});
+    var utils = host.Lex && host.Lex.Utils;
+    return utils && typeof utils.getFirmCurrency === 'function' ? utils.getFirmCurrency() : 'USD';
+  }
+
   var LEAD_PAGE_SIZE = 500;
   // Stop after 20 pages (10,000 leads) and say so in the table heading.
   var LEAD_MAX_PAGES = 20;
@@ -304,7 +311,7 @@
     var text;
     if (column.format === 'percent') text = Number(value).toFixed(1) + '%';
     else if (column.format === 'currency') {
-      text = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
+      text = new Intl.NumberFormat('en-US', { style: 'currency', currency: firmCurrency(), maximumFractionDigits: 0 }).format(value);
     } else text = Number(value).toLocaleString('en-US');
     return '<span class="admin-table-text reporting-table-number">' + k.esc(text) + '</span>';
   }

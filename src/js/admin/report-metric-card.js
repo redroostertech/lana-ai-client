@@ -6,6 +6,13 @@
 (function (global) {
   'use strict';
 
+  // The firm's currency (Lex.Utils.getFirmCurrency, from /auth/me), else USD.
+  function firmCurrency() {
+    var host = typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : {});
+    var utils = host.Lex && host.Lex.Utils;
+    return utils && typeof utils.getFirmCurrency === 'function' ? utils.getFirmCurrency() : 'USD';
+  }
+
   var EMPTY = global.DataState.EMPTY_VALUE;
   var esc = global.DataState.escapeHtml;
 
@@ -89,7 +96,7 @@
 
     var fmtCurrency = function (value) {
       if (value === null || value === undefined || isNaN(value)) return EMPTY;
-      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: firmCurrency(), minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
     };
 
     // Prior and Target now flow from the backend-provided goal/comparison blocks

@@ -14,6 +14,13 @@
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : this), function () {
   'use strict';
 
+  // The firm's currency (Lex.Utils.getFirmCurrency, from /auth/me), else USD.
+  function firmCurrency() {
+    var host = typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : {});
+    var utils = host.Lex && host.Lex.Utils;
+    return utils && typeof utils.getFirmCurrency === 'function' ? utils.getFirmCurrency() : 'USD';
+  }
+
   var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   var LABELS = {
     matter_name: 'Matter', client_name: 'Client', status: 'Status', stage: 'Stage', opened_at: 'Opened', closed_at: 'Closed',
@@ -131,7 +138,7 @@
     if (isEmpty(value)) return null;
     if (type === 'date') return dayText(value);
     if (type === 'datetime') return dateTimeText(value);
-    if (type === 'money') return Number(value).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+    if (type === 'money') return Number(value).toLocaleString('en-US', { style: 'currency', currency: firmCurrency(), maximumFractionDigits: 0 });
     if (type === 'number') return Number(value).toLocaleString('en-US', { maximumFractionDigits: 2 });
     if (type === 'enum') {
       var k = String(key || '').toLowerCase();
@@ -235,7 +242,7 @@
     if (n === null) return null;
     var format = String((meta && meta.format) || 'number').toLowerCase();
     var unit = meta && meta.unit ? String(meta.unit) : '';
-    if (format === 'currency') return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+    if (format === 'currency') return n.toLocaleString('en-US', { style: 'currency', currency: firmCurrency(), maximumFractionDigits: 0 });
     if (format === 'percentage' || format === 'percent') return Number(n.toFixed(1)).toLocaleString('en-US', { maximumFractionDigits: 1 }) + '%';
     if (format === 'integer' || format === 'count') return Math.round(n).toLocaleString('en-US');
     if (format === 'days') unit = n === 1 ? 'day' : 'days';
@@ -246,7 +253,7 @@
   function changeText(abs, meta) {
     var format = String((meta && meta.format) || 'number').toLowerCase();
     var sign = abs > 0 ? '+' : (abs < 0 ? '-' : '');
-    if (format === 'currency') return sign + Math.abs(abs).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+    if (format === 'currency') return sign + Math.abs(abs).toLocaleString('en-US', { style: 'currency', currency: firmCurrency(), maximumFractionDigits: 0 });
     if (format === 'integer' || format === 'count') return sign + Math.round(Math.abs(abs)).toLocaleString('en-US');
     if (format === 'percentage' || format === 'percent') return sign + Math.abs(abs).toFixed(1) + ' points';
     var unit = format === 'days' ? 'days' : (meta && meta.unit ? String(meta.unit) : '');
