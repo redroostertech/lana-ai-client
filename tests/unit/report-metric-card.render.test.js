@@ -186,3 +186,16 @@ describe('calm states on report tiles (matching dashboards)', () => {
     expect(win.DataState.isProblem({ data_state: 'ok', current: null })).toBe(false);
   });
 });
+
+describe('freshness badge on report tiles', () => {
+  const stale = { stale: true, label: 'Data from ActionStep API as of Aug 10, 2026' };
+  test('a stale tile shows the badge under its title', () => {
+    const html = win.ReportMetricCard.render({ key: 'c', name: 'Count', current: 3, data_state: 'ok', freshness: stale }, ctx);
+    expect(html).toContain('<span class="lex-freshness" title="Data from ActionStep API as of Aug 10, 2026">');
+    expect(html.indexOf('report-tile__title')).toBeLessThan(html.indexOf('lex-freshness'));
+  });
+  test('a state tile shows it too; a fresh tile does not', () => {
+    expect(win.ReportMetricCard.render({ key: 'g', name: 'G', data_state: 'no_data_source', data_state_reason: 'r', freshness: stale }, ctx)).toContain('lex-freshness');
+    expect(win.ReportMetricCard.render({ key: 'c', name: 'Count', current: 3, data_state: 'ok', freshness: { stale: false, label: 'x' } }, ctx)).not.toContain('lex-freshness');
+  });
+});

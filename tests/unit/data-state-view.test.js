@@ -114,3 +114,24 @@ describe('ok with no value (the server now sends null, not 0)', () => {
     expect(html).not.toContain('$0');
   });
 });
+
+describe('freshness: a calm badge when the data is stale', () => {
+  const stale = { stale: true, as_of: '2026-08-10T00:00:00Z', systems: ['ActionStep API'], label: 'Data from ActionStep API as of Aug 10, 2026' };
+  test('stale shows the server label as a small badge', () => {
+    expect(load().freshnessBadge({ freshness: stale })).toBe(
+      '<span class="lex-freshness" title="Data from ActionStep API as of Aug 10, 2026">Data from ActionStep API as of Aug 10, 2026</span>');
+  });
+  test('nothing when freshness is null, missing or not stale', () => {
+    expect(load().freshnessBadge({ freshness: null })).toBe('');
+    expect(load().freshnessBadge({})).toBe('');
+    expect(load().freshnessBadge(null)).toBe('');
+    expect(load().freshnessBadge({ freshness: Object.assign({}, stale, { stale: false }) })).toBe('');
+  });
+  test('a stale result without a label still says how old it is, in plain words', () => {
+    expect(load().freshnessBadge({ freshness: { stale: true, as_of: '2026-08-10T12:00:00Z' } })).toContain('>Data as of Aug 10, 2026<');
+    expect(load().freshnessBadge({ freshness: { stale: true } })).toContain('>Data may be out of date<');
+  });
+  test('the label is escaped', () => {
+    expect(load().freshnessBadge({ freshness: { stale: true, label: '<b>x</b>' } })).toContain('&lt;b&gt;x&lt;/b&gt;');
+  });
+});

@@ -866,3 +866,16 @@ describe('every drilldown link from a declared card carries a full catalog key',
     expect(keys).not.toContain('legal_firm.finance.cash_this_month');
   });
 });
+
+describe('freshness badge on dashboard cards', () => {
+  const stale = { stale: true, as_of: '2026-08-10', systems: ['ActionStep API'], label: 'Data from ActionStep API as of Aug 10, 2026' };
+  test('a stale card shows the server label in its footer, next to the period', () => {
+    const html = page().exports.renderMetricCard(Object.assign({}, card('average_case_value'), { freshness: stale }));
+    const footer = html.split('dash-card__footer')[1];
+    expect(footer).toContain('<span class="lex-freshness" title="Data from ActionStep API as of Aug 10, 2026">Data from ActionStep API as of Aug 10, 2026</span>');
+  });
+  test('fresh or missing freshness shows nothing', () => {
+    expect(page().exports.renderMetricCard(Object.assign({}, card('average_case_value'), { freshness: Object.assign({}, stale, { stale: false }) }))).not.toContain('lex-freshness');
+    expect(page().exports.renderMetricCard(Object.assign({}, card('average_case_value'), { freshness: null }))).not.toContain('lex-freshness');
+  });
+});

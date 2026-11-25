@@ -776,9 +776,11 @@
     return renderComparison(metric.comparison, metric.format);
   }
 
-  // Every card follows the picked dates, so the footer names the period.
+  // Every card follows the picked dates, so the footer names the period,
+  // plus a small calm badge when the server says the data is stale.
   function periodLine(metric) {
-    return '<div class="dash-metric-card__period">' + escapeHtml(metric.period || metric.period_label || currentPeriod.label || 'Current period') + '</div>';
+    return '<div class="dash-metric-card__period">' + escapeHtml(metric.period || metric.period_label || currentPeriod.label || 'Current period')
+      + window.DataState.freshnessBadge(metric) + '</div>';
   }
 
   // The footer row: the period and the records link.

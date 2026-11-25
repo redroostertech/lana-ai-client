@@ -58,7 +58,8 @@
       calm = true;
     }
     return '<div data-metric-card class="report-tile bg-white rounded-xl shadow-sm border border-gray-200">' +
-      '<div class="mb-4"><h3 class="report-tile__title font-medium text-gray-500 uppercase tracking-wide">' + esc(metric.name) + '</h3></div>' +
+      '<div class="mb-4"><h3 class="report-tile__title font-medium text-gray-500 uppercase tracking-wide">' + esc(metric.name) + '</h3>' +
+      global.DataState.freshnessBadge(metric) + '</div>' +
       global.DataState.render(item, calm ? { calm: true } : undefined) +
       footer(ctx, '') + '</div>';
   }
@@ -198,7 +199,9 @@
       // Header: title (auto-fit, up to 2 lines, 14px -> 10px)
       '<div class="mb-4"><div class="flex items-start justify-between gap-2">' +
       '<h3 data-fit-text="14:10:2" class="report-tile__title font-medium text-gray-500 uppercase tracking-wide flex-1 min-w-0">' + esc(metric.name) + '</h3>' +
-      '</div></div>' +
+      '</div>' +
+      // A small calm badge when the server says the data is stale.
+      global.DataState.freshnessBadge(metric) + '</div>' +
       // Current period value (auto-fit, 1 line, 30px -> 14px)
       '<div class="mb-4"><div class="flex items-center justify-between mb-1"><p class="text-xs text-gray-500">Current Period</p></div>' +
       '<p data-fit-text="30:14:1" class="report-tile__value font-bold text-gray-900">' + currentValue + '</p></div>' +

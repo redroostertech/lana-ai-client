@@ -531,6 +531,12 @@
       // The backend names the period in the firm's days (data.period.label).
       // The backend's label, else the picked dates; no line at all otherwise.
       var periodWords = view().periodText(payload.period, qp.get('periodStart'), qp.get('periodEnd'));
+      // A small calm badge when the server says the data is stale.
+      var freshness = el('metricFreshness');
+      if (freshness) {
+        freshness.innerHTML = window.DataState.freshnessBadge({ freshness: payload.freshness || current.freshness || null });
+        freshness.hidden = !freshness.innerHTML;
+      }
       var periodLine = el('metricPeriodLine');
       if (periodLine) periodLine.hidden = !periodWords;
       var periodNode = el('metricPeriod');

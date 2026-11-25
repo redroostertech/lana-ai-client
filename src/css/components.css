@@ -107,6 +107,29 @@
   margin: 0.25rem 0 0;
 }
 
+/* Freshness (DataState.freshnessBadge): a small calm badge when the server
+   says a number's data is stale, in the server's own words. */
+.lex-freshness {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  margin: 0.25rem 0.5rem 0 0;
+  padding: 0.0625rem 0.5rem;
+  border: 1px solid var(--lex-border-default, #e5e7eb);
+  border-radius: 999px;
+  background: var(--lex-bg-subtle, #f9fafb);
+  color: var(--lex-text-secondary, #4b5563);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.metric-summary__freshness[hidden] {
+  display: none;
+}
+
 .lex-data-state--timeout,
 .lex-data-state--engine-error {
   border-color: var(--lex-border-warning, #fcd34d);

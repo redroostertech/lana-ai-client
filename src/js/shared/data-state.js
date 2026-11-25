@@ -131,6 +131,33 @@
       + '</div></div>';
   }
 
+  // ── Freshness ──────────────────────────────────────────────────
+  // item.freshness = { stale, as_of, systems, label } or null. A small calm
+  // badge only when the server says the data is stale, in its own words.
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  function dayText(value) {
+    var text = String(value || '');
+    if (text.length < 10 || text.charAt(4) !== '-' || text.charAt(7) !== '-') return '';
+    var month = Number(text.substring(5, 7));
+    var day = Number(text.substring(8, 10));
+    if (!(month >= 1 && month <= 12) || !(day >= 1 && day <= 31)) return '';
+    return MONTHS[month - 1] + ' ' + day + ', ' + text.substring(0, 4);
+  }
+
+  function freshnessText(item) {
+    var freshness = item && item.freshness;
+    if (!freshness || typeof freshness !== 'object' || freshness.stale !== true) return '';
+    if (freshness.label) return String(freshness.label);
+    var day = dayText(freshness.as_of);
+    return day ? 'Data as of ' + day : 'Data may be out of date';
+  }
+
+  function freshnessBadge(item) {
+    var text = freshnessText(item);
+    return text ? '<span class="lex-freshness" title="' + escapeHtml(text) + '">' + escapeHtml(text) + '</span>' : '';
+  }
+
   // Display label for a backend enum value ("monthly" -> "Monthly",
   // "in_review" -> "In review").
   function label(value) {
@@ -138,5 +165,5 @@
     return text ? text.charAt(0).toUpperCase() + text.slice(1) : EMPTY_VALUE;
   }
 
-  global.DataState = { EMPTY_VALUE: EMPTY_VALUE, TITLES: TITLES, isProblem: isProblem, fromApiError: fromApiError, view: view, goalAction: goalAction, render: render, label: label, escapeHtml: escapeHtml };
+  global.DataState = { EMPTY_VALUE: EMPTY_VALUE, freshnessText: freshnessText, freshnessBadge: freshnessBadge, TITLES: TITLES, isProblem: isProblem, fromApiError: fromApiError, view: view, goalAction: goalAction, render: render, label: label, escapeHtml: escapeHtml };
 })(window);

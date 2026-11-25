@@ -4078,3 +4078,15 @@ button.dash-lines__label:hover,
 #metricRawDataToolbar[hidden] {
   display: none;
 }
+
+/* The stale-data badge (DataState.freshnessBadge) sits in the card footer
+   next to the period; on the evergreen hero it takes the hero's colors. */
+.dash-metric-card__period .lex-freshness {
+  margin: 0 0 0 0.5rem;
+}
+
+.dash-metric-card--hero .lex-freshness {
+  background: transparent;
+  border-color: currentColor;
+  color: inherit;
+}
