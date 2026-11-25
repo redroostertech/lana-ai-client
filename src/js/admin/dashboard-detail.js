@@ -383,6 +383,8 @@
     if (!hasValue(value)) return window.DataState.EMPTY_VALUE;
 
     if (Array.isArray(value)) {
+      // Rates and averages are never summed: the items stand alone.
+      if (window.MetricCardView && window.MetricCardView.listHasNoTotal(metric)) return '';
       var metadataTotal = Number(metadata.total);
       if (Number.isFinite(metadataTotal)) {
         return formatMetricCardValue({ value: metadataTotal, format: format });
@@ -1075,8 +1077,10 @@
       if (!donut) return window.DataState.render(EMPTY_LIST_STATE, { calm: true });
       // The centre: the named total metric, else the sum in the series' unit.
       var first = resolved.metrics[0].metric;
-      var totalText = first && Array.isArray(first.value) ? formatList(first)(donut.total)
-        : formatMetricCardValue({ value: donut.total, format: first && first.format });
+      // No summed centre for rates or averages.
+      var totalText = first && window.MetricCardView.listHasNoTotal(first) ? ''
+        : (first && Array.isArray(first.value) ? formatList(first)(donut.total)
+          : formatMetricCardValue({ value: donut.total, format: first && first.format }));
       return window.MiniCharts.donutHtml(donut, {
         centre: centreMetric && !window.DashboardCards.isWaiting(centreMetric) ? formatMetricCardValue(centreMetric) : totalText,
         centreLabel: centreMetric ? metricTitle(centreMetric, centreKey) : 'Total',

@@ -222,3 +222,23 @@ test('a "Not mapped" row in a breakdown is marked muted and labelled plainly', (
   expect(model.rows.map((r) => [r.label, r.muted])).toEqual([['Estate Planning', false], ['Not mapped', true]]);
   expect(View.listBars([{ label: 'X', value: 1, not_mapped: true }]).rows[0].muted).toBe(true);
 });
+
+describe('listHasNoTotal: rate and average lists are never summed', () => {
+  const rows = [{ label: 'A', value: 40 }, { label: 'B', value: 60 }];
+  test('formatted_value null on a list means no total', () => {
+    expect(View.listHasNoTotal({ value: rows, formatted_value: null, format: 'table' })).toBe(true);
+  });
+  test('a percentage list never has a client total', () => {
+    expect(View.listHasNoTotal({ value: rows, row_format: 'percentage', formatted_value: '2 rows' })).toBe(true);
+    expect(View.listHasNoTotal({ value: rows, format: 'percentage' })).toBe(true);
+  });
+  test('an average or rate list (metadata.aggregation) never has a client total', () => {
+    expect(View.listHasNoTotal({ value: rows, format: 'table', metadata: { aggregation: 'average' } })).toBe(true);
+    expect(View.listHasNoTotal({ value: rows, format: 'table', metadata: { aggregation: 'rate' } })).toBe(true);
+  });
+  test('count and money lists, and non-lists, are unchanged', () => {
+    expect(View.listHasNoTotal({ value: rows, format: 'currency_breakdown', formatted_value: '$100' })).toBe(false);
+    expect(View.listHasNoTotal({ value: rows, format: 'table' })).toBe(false);
+    expect(View.listHasNoTotal({ value: 3, formatted_value: null })).toBe(false);
+  });
+});

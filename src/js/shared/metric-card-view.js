@@ -163,6 +163,21 @@
     return LIST_VALUE_FORMATS[String(format || '').toLowerCase()] || 'number';
   }
 
+  // A list whose items are rates or averages has no meaningful sum: the
+  // server says so with formatted_value null, a percentage format, or
+  // metadata.aggregation average | rate. Show the items only, no total.
+  var NO_TOTAL_AGGREGATIONS = { average: true, avg: true, mean: true, rate: true, ratio: true, percentage: true };
+
+  function listHasNoTotal(card) {
+    if (!card || !Array.isArray(card.value)) return false;
+    if (Object.prototype.hasOwnProperty.call(card, 'formatted_value') && card.formatted_value === null) return true;
+    if (listValueFormat(card) === 'percent') return true;
+    var format = card.format && typeof card.format === 'object' ? card.format.type || card.format.style : card.format;
+    if (String(format || '').toLowerCase().indexOf('percent') === 0) return true;
+    var aggregation = card.metadata && card.metadata.aggregation;
+    return !!(aggregation && NO_TOTAL_AGGREGATIONS[String(aggregation).toLowerCase()]);
+  }
+
   // ── Comparison arrow ──────────────────────────────────────────
   // Uses the server's direction and percent_change. No percent, no arrow.
   function comparisonArrow(comparison) {
@@ -300,6 +315,7 @@
   }
 
   return {
+    listHasNoTotal: listHasNoTotal,
     listBars: listBars,
     listValueFormat: listValueFormat,
     comparisonArrow: comparisonArrow,

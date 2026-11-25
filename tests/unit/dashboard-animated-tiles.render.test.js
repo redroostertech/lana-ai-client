@@ -35,7 +35,7 @@ function page(api = {}, user = null) {
   let source = fs.readFileSync(path.join(__dirname, '../../src/js/admin/dashboard-detail.js'), 'utf8');
   const end = source.lastIndexOf('  init();');
   source = source.slice(0, end)
-    + '  window.testExports = { renderMetricCard, loadMetrics, loadDashboardById, readPeriodControls, setBanner, fetchSparkline, renderMetrics, openMetricModal, worklistHtml, drawRows, variantPicks, allMetrics: function () { return allDashboardMetrics; }, cardLoads: function () { return cardLoads; } };'
+    + '  window.testExports = { renderMetricCard, formatMetricCardValue, loadMetrics, loadDashboardById, readPeriodControls, setBanner, fetchSparkline, renderMetrics, openMetricModal, worklistHtml, drawRows, variantPicks, allMetrics: function () { return allDashboardMetrics; }, cardLoads: function () { return cardLoads; } };'
     + source.slice(end + '  init();'.length);
   const nodes = {};
   const document = { body: node(), addEventListener() {}, getElementById: (id) => (nodes[id] = nodes[id] || node()), querySelector: () => null, querySelectorAll: () => [] };
@@ -917,5 +917,21 @@ describe('not_mapped and metadata.mapping_coverage', () => {
       data_state_reason: '12 of your matter types are not linked to a LANA service yet, so this number would be incomplete.' }));
     expect(html).toContain('lex-data-state--calm');
     expect(text(html)).toContain('12 of your matter types are not linked to a LANA service yet, so this number would be incomplete.');
+  });
+});
+
+describe('rate and average lists show per-item values only', () => {
+  const rate = { metric_key: 'legal_firm.sales_intake.conversion_rate_by_source', title: 'Conversion Rate by Source', format: 'table', row_format: 'percentage',
+    formatted_value: null, data_state: 'ok', period: 'Jan 1, 2026 - Jan 31, 2026', value: [{ source_name: 'Referral', value: 40 }, { source_name: 'Web', value: 60 }] };
+  test('the list card shows each rate and no summed total (never 100%)', () => {
+    const html = page().exports.renderMetricCard(rate);
+    expect(text(html)).toContain('40%');
+    expect(text(html)).toContain('60%');
+    expect(text(html)).not.toContain('100%');
+  });
+  test('the card value text is empty, never a sum of percents', () => {
+    const p = page();
+    expect(p.exports.formatMetricCardValue(rate)).toBe('');
+    expect(p.exports.formatMetricCardValue(Object.assign({}, rate, { row_format: null, format: 'table', metadata: { aggregation: 'average' } }))).toBe('');
   });
 });
