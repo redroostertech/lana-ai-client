@@ -246,13 +246,15 @@ describe('records the server could not read (raw_data.rows_status)', () => {
 });
 
 describe('freshness on metric detail', () => {
-  test('stale data shows the server label as a badge by the period', async () => {
-    const p = await page('?metric_key=matters_opened', { ...payload, freshness: { stale: true, label: 'Data from ActionStep API as of Aug 10, 2026' } });
+  test('stale data (data.lineage.freshness) shows the server label as a badge by the period', async () => {
+    const p = await page('?metric_key=matters_opened', { ...payload,
+      lineage: { sources: [], formula: { kind: 'count', plain: 'x' }, freshness: { stale: true, label: 'Data from ActionStep API as of Aug 10, 2026' } } });
     expect(p.nodes.metricFreshness.hidden).toBe(false);
     expect(p.nodes.metricFreshness.innerHTML).toContain('Data from ActionStep API as of Aug 10, 2026');
   });
-  test('fresh data shows nothing', async () => {
-    const p = await page('?metric_key=matters_opened', { ...payload, freshness: null });
+  test('freshness anywhere but data.lineage.freshness is not read', async () => {
+    const stale = { stale: true, label: 'Old' };
+    const p = await page('?metric_key=matters_opened', { ...payload, freshness: stale, current: { value: 4, freshness: stale } });
     expect(p.nodes.metricFreshness.hidden).toBe(true);
     expect(p.nodes.metricFreshness.innerHTML).toBe('');
   });

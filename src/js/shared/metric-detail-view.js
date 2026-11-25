@@ -268,7 +268,8 @@
       ? current.formatted_value.trim() : formatValue(value, meta);
     // The server withheld the comparison (comparison_hidden): its message
     // goes in place of the change, and there is nothing to compare.
-    var hidden = (payload && payload.comparison_hidden) || current.comparison_hidden || null;
+    // Top level on the detail payload (data.comparison_hidden, with data.comparison null).
+    var hidden = (payload && payload.comparison_hidden) || null;
     if (hidden && typeof hidden === 'object' && value !== null) {
       var shared = typeof globalThis !== 'undefined' && globalThis.DataState ? globalThis.DataState : null;
       return { value: mainText, direction: null, changeText: null, priorText: null, priorDays: null, bars: null,

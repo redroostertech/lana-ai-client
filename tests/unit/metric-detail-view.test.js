@@ -253,3 +253,8 @@ describe('units come from the server, singular included', () => {
     expect(V.formatValue(1, { unit: 'case' })).toBe('1 case');
   });
 });
+
+test('summary: comparison_hidden is read from the top level only', () => {
+  const hidden = { reason: 'source_stale', message: 'No comparison while the source is behind.' };
+  expect(V.summary({ current: { value: 12, comparison_hidden: hidden } }).hiddenText).toBeFalsy();
+});
