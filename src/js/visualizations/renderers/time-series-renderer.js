@@ -22,6 +22,16 @@
 import { sampleData, keyToLabel, destroyChart } from '../chart-utils.js';
 import { ChartTheme } from '../chart-theme.js';
 
+// Chart points (js/shared/chart-points.js, loaded as a page script) when
+// present; the same rule inline otherwise.
+function pointValue(raw) {
+  const points = typeof globalThis !== 'undefined' ? globalThis.ChartPoints : null;
+  if (points) return points.value(raw);
+  if (raw === null || raw === undefined || raw === '') return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
 export class TimeSeriesRenderer {
   /**
    * Create a TimeSeriesRenderer instance
@@ -143,10 +153,12 @@ export class TimeSeriesRenderer {
 
       return {
         label: this._formatMetricLabel(metricKey),
+        // A null or missing point is a gap (js/shared/chart-points.js), not 0.
         data: this.timeSeries.map(point => {
-          const metric = point.metrics.find(m => m.key === metricKey);
-          return metric ? parseFloat(metric.value) || 0 : 0;
+          const metric = (point.metrics || []).find(m => m.key === metricKey);
+          return metric ? pointValue(metric.value) : null;
         }),
+        spanGaps: false,
         borderColor: color,
         backgroundColor: color + '20', // Add transparency for fill
         borderWidth: 2,
