@@ -93,14 +93,11 @@
     return 'Item ' + (index + 1);
   }
 
-  var VALUE_LABEL_KEYS = ['value_label', 'display_value', 'formatted_value'];
-
+  // A row the server could not rate (status insufficient_data, rate null)
+  // carries value_label, for example "Too few to rate".
   function rowValueLabel(row) {
-    for (var i = 0; i < VALUE_LABEL_KEYS.length; i += 1) {
-      var text = row[VALUE_LABEL_KEYS[i]];
-      if (typeof text === 'string' && text.trim() !== '') return text.trim();
-    }
-    return null;
+    var text = row.value_label;
+    return typeof text === 'string' && text.trim() !== '' ? text.trim() : null;
   }
 
   // metadata.second_line (for example a cohort rate under the main rate):
@@ -143,8 +140,8 @@
         value: value,
         second: isObject && actualVsNeeded ? toNumber(row[NEEDED_KEY]) : null,
         muted: muted,
-        // No number but the server's own words ("Too few to rate"): show
-        // them in place of the bar, never a 0 bar.
+        // No number but the server's value_label ("Too few to rate"): show
+        // it in place of the bar, never a 0 bar.
         valueLabel: isObject && value === null ? rowValueLabel(row) : null,
       };
     });

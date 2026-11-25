@@ -257,10 +257,18 @@ describe('second line and "Too few to rate" rows', () => {
     expect(model.rows[1]).toMatchObject({ label: 'Web', value: null, pct: 0, valueLabel: 'Too few to rate' });
     expect(model.rows[0].valueLabel).toBeUndefined();
   });
-  test('display_value works the same; a real 0 is still a bar value', () => {
-    const model = View.listBars([{ label: 'A', value: null, display_value: 'Too few to rate' }, { label: 'B', value: 0 }], 12);
-    expect(model.rows[0].valueLabel).toBe('Too few to rate');
+  test('only value_label is read (the server shape); a real 0 is still a bar value', () => {
+    const model = View.listBars([{ label: 'A', value: null, display_value: 'x', formatted_value: 'y' }, { label: 'B', value: 0 }], 12);
+    expect(model.rows[0].valueLabel).toBeUndefined();
     expect(model.rows[1]).toMatchObject({ value: 0 });
     expect(model.rows[1].valueLabel).toBeUndefined();
   });
+});
+
+test('team rows: conversion_rate null with status insufficient_data and value_label', () => {
+  const model = View.listBars([
+    { attorney_name: 'Avery Stone', conversion_rate: 40 },
+    { attorney_name: 'Blake Ross', conversion_rate: null, status: 'insufficient_data', value_label: 'Too few to rate' },
+  ], 12);
+  expect(model.rows[1]).toMatchObject({ label: 'Blake Ross', value: null, pct: 0, valueLabel: 'Too few to rate' });
 });
