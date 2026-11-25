@@ -64,11 +64,23 @@
     return { body: { name: name.slice(0, 255), description: choice.description || '', config: config } };
   }
 
-  // The execute body for a saved report. A metric-rows report reads the
-  // chosen period (plain days, the firm's days); other kinds run as before.
+  // "YYYY-MM-DD" (no regex, per Lex rules).
+  function isPlainDay(value) {
+    if (typeof value !== 'string' || value.length !== 10) return false;
+    var parts = value.split('-');
+    if (parts.length !== 3 || parts[0].length !== 4 || parts[1].length !== 2 || parts[2].length !== 2) return false;
+    return parts.every(function (part) {
+      return part.split('').every(function (ch) { return ch >= '0' && ch <= '9'; });
+    });
+  }
+
+  // The execute body for any saved report: the chosen period as plain firm
+  // days (end inclusive, as in the picker), which the server maps to
+  // periodStart/periodEnd. No period at all unless both days are set.
   function runReportBody(report, periodDays) {
+    void report;
     var body = { filters: {}, bypass_cache: false };
-    if (report && report.metric_rows_key && periodDays && periodDays.start && periodDays.end) {
+    if (periodDays && isPlainDay(periodDays.start) && isPlainDay(periodDays.end)) {
       body.period = { start: periodDays.start, end: periodDays.end };
     }
     return body;

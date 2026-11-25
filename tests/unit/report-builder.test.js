@@ -72,16 +72,22 @@ describe('the saved report body', () => {
 describe('the run body', () => {
   const october = { start: '2026-10-01', end: '2026-10-31' };
 
-  test('a metric-rows report sends the chosen period', () => {
-    expect(builder.runReportBody({ metric_rows_key: 'x' }, october))
-      .toEqual({ filters: {}, bypass_cache: false, period: october });
+  test.each([
+    ['a metric-rows report', { metric_rows_key: 'x' }],
+    ['any other saved report', { module_key: 'm' }],
+    ['a report with no details', null],
+  ])('%s sends the chosen period (firm days, end inclusive)', (_label, report) => {
+    expect(builder.runReportBody(report, october)).toEqual({ filters: {}, bypass_cache: false, period: october });
   });
 
   test.each([
-    ['another kind of saved report', { module_key: 'm' }, october],
-    ['a metric-rows report with no period chosen', { metric_rows_key: 'x' }, { start: '', end: '' }]
-  ])('%s sends no period', (_label, report, days) => {
-    expect(builder.runReportBody(report, days)).toEqual({ filters: {}, bypass_cache: false });
+    ['empty strings', { start: '', end: '' }],
+    ['only a start', { start: '2026-10-01', end: '' }],
+    ['only an end', { start: '', end: '2026-10-31' }],
+    ['no dates at all', null],
+    ['not plain days', { start: '10/01/2026', end: '2026-10-31T00:00:00Z' }],
+  ])('%s: no period at all', (_label, days) => {
+    expect(builder.runReportBody({ module_key: 'm' }, days)).toEqual({ filters: {}, bypass_cache: false });
   });
 });
 
