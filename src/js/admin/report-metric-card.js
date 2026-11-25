@@ -195,6 +195,7 @@
       pctToGoalCell = '<span class="text-gray-400">' + EMPTY + '</span>';
     }
 
+    var hiddenNote = global.DataState.comparisonNote(metric);
     return '<div data-metric-card class="report-tile bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">' +
       // Header: title (auto-fit, up to 2 lines, 14px -> 10px)
       '<div class="mb-4"><div class="flex items-start justify-between gap-2">' +
@@ -205,13 +206,16 @@
       // Current period value (auto-fit, 1 line, 30px -> 14px)
       '<div class="mb-4"><div class="flex items-center justify-between mb-1"><p class="text-xs text-gray-500">Current Period</p></div>' +
       '<p data-fit-text="30:14:1" class="report-tile__value font-bold text-gray-900">' + currentValue + '</p></div>' +
-      // Row 1: Prior Period | % Change (bottom border doubles as the divider).
-      '<div class="grid grid-cols-2 gap-4 text-sm mb-4 pb-4 border-b border-gray-100">' +
-      '<div><p class="text-xs text-gray-500 mb-1">Prior Period</p>' +
-      '<p data-fit-text="16:11:1" class="report-tile__cell report-tile__cell--fit font-semibold text-gray-700">' + priorValue + '</p></div>' +
-      '<div><p class="text-xs text-gray-500 mb-1">% Change</p>' +
-      '<p class="report-tile__cell font-semibold">' + pctChangeCell + '</p></div>' +
-      '</div>' +
+      // Row 1: Prior Period | % Change (bottom border doubles as the divider),
+      // or the server's message when it withheld the comparison.
+      (hiddenNote
+        ? '<div class="text-sm mb-4 pb-4 border-b border-gray-100">' + hiddenNote + '</div>'
+        : '<div class="grid grid-cols-2 gap-4 text-sm mb-4 pb-4 border-b border-gray-100">' +
+          '<div><p class="text-xs text-gray-500 mb-1">Prior Period</p>' +
+          '<p data-fit-text="16:11:1" class="report-tile__cell report-tile__cell--fit font-semibold text-gray-700">' + priorValue + '</p></div>' +
+          '<div><p class="text-xs text-gray-500 mb-1">% Change</p>' +
+          '<p class="report-tile__cell font-semibold">' + pctChangeCell + '</p></div>' +
+          '</div>') +
       // Row 2: Goal(s) | Percent to Goal.
       '<div class="grid grid-cols-2 gap-4 text-sm">' +
       '<div><p class="text-xs text-gray-500 mb-1">Goal(s)</p>' +

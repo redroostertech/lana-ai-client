@@ -237,3 +237,9 @@ test('periodText: the backend label, else the picked dates, else nothing', () =>
   expect(V.periodText(null, '2026-11-18', '2026-11-24')).toBe('Nov 18, 2026 to Nov 24, 2026');
   expect(V.periodText(null, null, null)).toBe('');
 });
+
+test('summary: a hidden comparison gives its message and no change, prior or bars', () => {
+  const s = V.summary({ current: { value: 12 }, comparison: null, comparison_hidden: { reason: 'source_stale', message: 'No comparison while the source is behind.' } });
+  expect(s).toMatchObject({ value: '12', changeText: null, priorText: null, bars: null, hiddenText: 'No comparison while the source is behind.' });
+  expect(V.summary({ current: { value: 12 } }).hiddenText).toBeFalsy();
+});

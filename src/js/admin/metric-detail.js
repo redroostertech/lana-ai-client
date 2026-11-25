@@ -241,7 +241,7 @@
     var prior = el('metricSummaryPrior');
     if (prior) {
       var days = view().dayRangeText(summary.priorDays);
-      prior.textContent = summary.priorText ? summary.priorText + (days ? ' (' + days + ')' : '') : '';
+      prior.textContent = summary.hiddenText || (summary.priorText ? summary.priorText + (days ? ' (' + days + ')' : '') : '');
     }
     var visual = el('metricSummaryVisual');
     if (!visual) return;

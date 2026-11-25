@@ -771,6 +771,9 @@
   // The change against the previous period: a chip with an arrow when the
   // server sent a percent, otherwise the older absolute row.
   function deltaHtml(metric) {
+    // The server withheld the comparison: its message, never a 0% or a dash.
+    var hidden = window.DataState.comparisonNote(metric);
+    if (hidden) return hidden;
     var arrow = window.MetricCardView.comparisonArrow(metric.comparison);
     if (arrow) return window.MiniCharts.deltaChip(arrow, 'vs previous period');
     return renderComparison(metric.comparison, metric.format);

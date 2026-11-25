@@ -257,3 +257,11 @@ describe('freshness on metric detail', () => {
     expect(p.nodes.metricFreshness.innerHTML).toBe('');
   });
 });
+
+test('metric detail shows the hidden-comparison message in place of the change', async () => {
+  const p = await page('?metric_key=matters_opened', { ...payload, current: { value: 4, format: 'integer' }, movement: null, comparison: null,
+    comparison_hidden: { reason: 'insufficient_history', message: 'No comparison yet: there is not enough history.' } });
+  expect(p.nodes.metricSummaryChange.hidden).toBe(true);
+  expect(p.nodes.metricSummaryPrior.textContent).toBe('No comparison yet: there is not enough history.');
+  expect(p.nodes.metricSummaryVisual.innerHTML).toBe('');
+});

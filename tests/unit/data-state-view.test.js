@@ -135,3 +135,20 @@ describe('freshness: a calm badge when the data is stale', () => {
     expect(load().freshnessBadge({ freshness: { stale: true, label: '<b>x</b>' } })).toContain('&lt;b&gt;x&lt;/b&gt;');
   });
 });
+
+describe('comparison_hidden: why there is no comparison', () => {
+  test('the server message, in place of a comparison', () => {
+    const item = { comparison: null, comparison_hidden: { reason: 'source_stale', message: 'No comparison while ActionStep is behind on syncing.', as_of: '2026-08-10', systems: ['ActionStep API'] } };
+    expect(load().comparisonHiddenText(item)).toBe('No comparison while ActionStep is behind on syncing.');
+    expect(load().comparisonNote(item)).toBe('<p class="lex-comparison-hidden">No comparison while ActionStep is behind on syncing.</p>');
+  });
+  test('plain words for each reason when the server sends no message', () => {
+    expect(load().comparisonHiddenText({ comparison_hidden: { reason: 'source_stale' } })).toBe('No comparison: the data source has not synced recently.');
+    expect(load().comparisonHiddenText({ comparison_hidden: { reason: 'insufficient_history' } })).toBe('No comparison yet: there is not enough history.');
+    expect(load().comparisonHiddenText({ comparison_hidden: { reason: 'other' } })).toBe('No comparison for these dates.');
+  });
+  test('nothing when the comparison is not hidden', () => {
+    expect(load().comparisonHiddenText({ comparison: { percent_change: 3 } })).toBe('');
+    expect(load().comparisonNote(null)).toBe('');
+  });
+});

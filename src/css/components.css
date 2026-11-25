@@ -130,6 +130,16 @@
   display: none;
 }
 
+/* A withheld comparison (DataState.comparisonNote): the server's reason in
+   muted words where the change would be. */
+.lex-comparison-hidden {
+  margin: 0.25rem 0 0;
+  color: var(--lex-text-tertiary, #6b7280);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
 .lex-data-state--timeout,
 .lex-data-state--engine-error {
   border-color: var(--lex-border-warning, #fcd34d);

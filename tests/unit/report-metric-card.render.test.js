@@ -199,3 +199,14 @@ describe('freshness badge on report tiles', () => {
     expect(win.ReportMetricCard.render({ key: 'c', name: 'Count', current: 3, data_state: 'ok', freshness: { stale: false, label: 'x' } }, ctx)).not.toContain('lex-freshness');
   });
 });
+
+describe('comparison_hidden on report tiles', () => {
+  test('the message replaces Prior Period and % Change; never 0% or the empty token as a comparison', () => {
+    const html = win.ReportMetricCard.render({ key: 'c', name: 'Count', type: 'count', current: 3, prior: null, changePercent: null, data_state: 'ok',
+      comparison: null, comparison_hidden: { reason: 'source_stale', message: 'No comparison while ActionStep is behind on syncing.' } }, ctx);
+    expect(html).toContain('<p class="lex-comparison-hidden">No comparison while ActionStep is behind on syncing.</p>');
+    expect(text(html)).not.toContain('% Change');
+    expect(text(html)).not.toContain('Prior Period');
+    expect(text(html)).not.toContain('0%');
+  });
+});

@@ -158,6 +158,27 @@
     return text ? '<span class="lex-freshness" title="' + escapeHtml(text) + '">' + escapeHtml(text) + '</span>' : '';
   }
 
+  // ── Hidden comparison ──────────────────────────────────────────
+  // item.comparison_hidden = { reason, message, as_of, systems }: the server
+  // withheld the comparison (comparison and prior are null). Its message
+  // goes where the comparison would be, never a 0% or a dash.
+  var HIDDEN_COMPARISON = {
+    source_stale: 'No comparison: the data source has not synced recently.',
+    insufficient_history: 'No comparison yet: there is not enough history.'
+  };
+
+  function comparisonHiddenText(item) {
+    var hidden = item && item.comparison_hidden;
+    if (!hidden || typeof hidden !== 'object') return '';
+    if (hidden.message) return String(hidden.message);
+    return HIDDEN_COMPARISON[hidden.reason] || 'No comparison for these dates.';
+  }
+
+  function comparisonNote(item) {
+    var text = comparisonHiddenText(item);
+    return text ? '<p class="lex-comparison-hidden">' + escapeHtml(text) + '</p>' : '';
+  }
+
   // Display label for a backend enum value ("monthly" -> "Monthly",
   // "in_review" -> "In review").
   function label(value) {
@@ -165,5 +186,5 @@
     return text ? text.charAt(0).toUpperCase() + text.slice(1) : EMPTY_VALUE;
   }
 
-  global.DataState = { EMPTY_VALUE: EMPTY_VALUE, freshnessText: freshnessText, freshnessBadge: freshnessBadge, TITLES: TITLES, isProblem: isProblem, fromApiError: fromApiError, view: view, goalAction: goalAction, render: render, label: label, escapeHtml: escapeHtml };
+  global.DataState = { EMPTY_VALUE: EMPTY_VALUE, comparisonHiddenText: comparisonHiddenText, comparisonNote: comparisonNote, freshnessText: freshnessText, freshnessBadge: freshnessBadge, TITLES: TITLES, isProblem: isProblem, fromApiError: fromApiError, view: view, goalAction: goalAction, render: render, label: label, escapeHtml: escapeHtml };
 })(window);

@@ -263,6 +263,14 @@
     var current = (payload && payload.current) || {};
     var meta = { format: current.format, unit: current.unit || (payload && payload.metric && payload.metric.unit) };
     var value = toNumber(current.value_numeric !== undefined && current.value_numeric !== null ? current.value_numeric : current.value);
+    // The server withheld the comparison (comparison_hidden): its message
+    // goes in place of the change, and there is nothing to compare.
+    var hidden = (payload && payload.comparison_hidden) || current.comparison_hidden || null;
+    if (hidden && typeof hidden === 'object' && value !== null) {
+      var shared = typeof globalThis !== 'undefined' && globalThis.DataState ? globalThis.DataState : null;
+      return { value: formatValue(value, meta), direction: null, changeText: null, priorText: null, priorDays: null, bars: null,
+        hiddenText: shared ? shared.comparisonHiddenText({ comparison_hidden: hidden }) : String(hidden.message || 'No comparison for these dates.') };
+    }
     var cmp = payload && payload.comparison;
     if (!cmp && payload && payload.movement) {
       cmp = { previous_value: payload.movement.prior_value, percent_change: payload.movement.percent_change, direction: payload.movement.direction };

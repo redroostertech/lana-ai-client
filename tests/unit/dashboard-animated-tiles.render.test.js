@@ -879,3 +879,14 @@ describe('freshness badge on dashboard cards', () => {
     expect(page().exports.renderMetricCard(Object.assign({}, card('average_case_value'), { freshness: null }))).not.toContain('lex-freshness');
   });
 });
+
+describe('comparison_hidden on dashboard cards', () => {
+  const hidden = { reason: 'insufficient_history', message: 'No comparison yet: this firm has less than a year of history.', as_of: null, systems: [] };
+  test('the message replaces the change chip; never 0% or a dash', () => {
+    const html = page().exports.renderMetricCard(Object.assign({}, card('average_case_value'), { comparison: null, prior: null, comparison_hidden: hidden }));
+    expect(html).toContain('<p class="lex-comparison-hidden">No comparison yet: this firm has less than a year of history.</p>');
+    expect(html).not.toContain('mini-delta');
+    expect(text(html)).not.toContain('0%');
+    expect(text(html)).not.toContain('vs previous period');
+  });
+});
