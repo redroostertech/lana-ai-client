@@ -976,7 +976,7 @@
 }
 
 #dashboardDetailBreadcrumb {
-  margin: 0.75rem 0 1rem;
+  margin: 0 0 0.75rem;
   display: block;
 }
 
@@ -1894,3 +1894,2187 @@
 #metricRawDataTable table { min-width: 760px; }
 #metricRawDataTable th { min-width: 120px; }
 #metricRawDataTable td { max-width: 280px; overflow: hidden; }
+
+/* ── Animated dashboard tiles (dashboard-detail.js + js/shared/mini-charts.js) ── */
+
+.dash-period-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dash-period-heading__loading[hidden] {
+  display: none;
+}
+
+/* New dates on the way: the current tiles stay put, dimmed, with a soft
+   shimmer, until the new numbers arrive. */
+#dashboardMetricGrid.dash-card-grid--refreshing .dash-metric-card {
+  opacity: 0.55;
+  pointer-events: none;
+  transition: opacity 300ms var(--lex-ease-out, ease-out);
+}
+
+#dashboardMetricGrid.dash-card-grid--refreshing .dash-metric-card__value,
+#dashboardMetricGrid.dash-card-grid--refreshing .mini-ring__value {
+  color: transparent;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--lex-bg-tertiary) 0%, var(--lex-bg-secondary) 50%, var(--lex-bg-tertiary) 100%);
+  background-size: 200% 100%;
+  animation: dash-shimmer 1200ms linear infinite;
+}
+
+.dash-metric-card--skeleton {
+  gap: 0.75rem;
+  min-height: 11rem;
+}
+
+.dash-skeleton {
+  display: block;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--lex-bg-tertiary) 0%, var(--lex-bg-secondary) 50%, var(--lex-bg-tertiary) 100%);
+  background-size: 200% 100%;
+  animation: dash-shimmer 1200ms linear infinite;
+}
+
+.dash-skeleton--eyebrow { width: 30%; height: 0.625rem; }
+.dash-skeleton--title { width: 65%; height: 0.875rem; }
+.dash-skeleton--value { width: 45%; height: 2rem; margin-top: 0.5rem; }
+.dash-skeleton--line { width: 100%; height: 2rem; }
+
+.dash-metric-card__value {
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-metric-card__result .mini-spark-slot {
+  margin-top: 0.625rem;
+}
+
+.dash-metric-card__delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.dash-metric-card__arrow {
+  width: 0.875rem;
+  height: 0.875rem;
+  flex: 0 0 auto;
+}
+
+.dash-metric-card__chart {
+  min-width: 0;
+}
+
+.dash-metric-card__result--goal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.dash-metric-card__goal-met {
+  flex: 0 0 auto;
+}
+
+.dash-metric-card__goal-note {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+}
+
+/* Tiles end with "See the records"; push it to the bottom so rows line up. */
+.dash-metric-card__actions {
+  margin-top: auto;
+}
+
+.dash-load-error {
+  grid-column: 1 / -1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #dashboardMetricGrid.dash-card-grid--refreshing .dash-metric-card {
+    transition: none;
+  }
+
+  #dashboardMetricGrid.dash-card-grid--refreshing .dash-metric-card__value,
+  #dashboardMetricGrid.dash-card-grid--refreshing .mini-ring__value,
+  .dash-skeleton {
+    animation: none;
+  }
+}
+
+@keyframes dash-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+.dash-metric-card__list-note {
+  margin: 0.625rem 0 0;
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+}
+
+.dash-metric-card__list-note .lex-data-state__action {
+  margin-top: 0;
+  font-size: 0.75rem;
+}
+
+
+/* ══ Dashboards redesign: one header, pill tabs, bento grid ══════════════ */
+
+/* ── Header: breadcrumb, greeting, title and actions, mark, dates ── */
+.dash-header {
+  container: dash-header / inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+/* Breadcrumb directly under the header, above the tab row. */
+.dash-crumbs .lex-breadcrumb {
+  font-size: 0.75rem;
+}
+
+.dash-fallback-note {
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px dashed var(--lex-border-subtle);
+  border-radius: 10px;
+  font-size: 0.8125rem;
+  color: var(--lex-text-secondary);
+}
+
+.dash-fallback-note[hidden] {
+  display: none;
+}
+
+.dash-header__main {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.dash-header__mark {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+}
+
+.dash-header__titles {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.dash-header__greeting {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--lex-text-secondary);
+}
+
+.dash-header__greeting[hidden] {
+  display: none;
+}
+
+/* The header carries the same treatment as lex-banner on other pages (its
+   light surface, border and corner radius); the banner inside it keeps its
+   actions (LANA, Open Reports, menu) and sits flat within that frame. */
+.dash-header {
+  padding: var(--lex-card-padding, 1.25rem) calc(var(--lex-card-padding, 1.25rem) * 1.33);
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 0 var(--lex-radius-lg, 16px) 0 var(--lex-radius-lg, 16px);
+  background: var(--lex-bg-primary);
+}
+
+.dash-header__banner .lex-banner {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.dash-header__banner .lex-banner-corner,
+.dash-header__banner .lex-banner-icon {
+  display: none;
+}
+
+.dash-header__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-left: calc(48px + 1rem);
+}
+
+.dash-header__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+}
+
+@container dash-header (max-width: 639px) {
+  .dash-header__mark {
+    display: none;
+  }
+
+  .dash-header__bar {
+    padding-left: 0;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* ── Date pill and its panel ── */
+.dash-period {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dash-period__loading[hidden] {
+  display: none;
+}
+
+.dash-period__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.25rem;
+  padding: 0.375rem 0.875rem;
+  border: 1px solid var(--lex-border-default, var(--lex-border-subtle));
+  border-radius: 999px;
+  background: var(--lex-bg-card, var(--lex-bg-primary));
+  color: var(--lex-text-primary);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--lex-shadow-sm);
+  transition: border-color 200ms var(--lex-ease-out, ease-out), box-shadow 200ms var(--lex-ease-out, ease-out);
+}
+
+.dash-period__toggle:hover,
+.dash-period__toggle[aria-expanded="true"] {
+  border-color: var(--lex-text-tertiary);
+  box-shadow: var(--lex-shadow-md);
+}
+
+.dash-period__icon,
+.dash-period__chevron {
+  width: 1rem;
+  height: 1rem;
+  color: var(--lex-text-secondary);
+}
+
+.dash-period__label {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.dash-period__panel {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  z-index: 30;
+  width: min(30rem, calc(100vw - 2rem));
+  padding: 1rem;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 16px;
+  background: var(--lex-bg-elevated, var(--lex-bg-primary));
+  box-shadow: var(--lex-shadow-lg);
+  animation: lex-rise-in 240ms var(--lex-ease-out, ease-out) both;
+}
+
+.dash-period__panel[hidden] {
+  display: none;
+}
+
+/* The shared period card (css/detail-page.css) sits flat inside the panel. */
+.dash-period__panel .detail-period-card {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* ── Tabs row: pill tabs and a small search ── */
+.dash-tabs-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.dash-tabs {
+  display: flex;
+  gap: 0.375rem;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.dash-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+  padding: 0.4375rem 0.875rem;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 999px;
+  background: var(--lex-bg-card, var(--lex-bg-primary));
+  color: var(--lex-text-secondary);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 200ms var(--lex-ease-out, ease-out), color 200ms var(--lex-ease-out, ease-out);
+}
+
+.dash-tab strong {
+  min-width: 1.25rem;
+  padding: 0 0.375rem;
+  border-radius: 999px;
+  background: var(--lex-bg-tertiary);
+  font-size: 0.6875rem;
+  text-align: center;
+}
+
+.dash-tab:hover {
+  color: var(--lex-text-primary);
+}
+
+.dash-tab.is-active {
+  border-color: transparent;
+  background: var(--lex-text-primary);
+  color: var(--lex-bg-primary);
+}
+
+.dash-tab.is-active strong {
+  background: transparent;
+  color: inherit;
+  opacity: 0.75;
+}
+
+.dash-tabs-row__search {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 1 15rem;
+  min-width: 10rem;
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 999px;
+  background: var(--lex-bg-card, var(--lex-bg-primary));
+  color: var(--lex-text-tertiary);
+}
+
+.dash-tabs-row__search svg {
+  width: 0.9375rem;
+  height: 0.9375rem;
+  flex: 0 0 auto;
+}
+
+.dash-tabs-row__search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--lex-text-primary);
+  font: inherit;
+  font-size: 0.8125rem;
+}
+
+/* ── Bento grid ── */
+#dashboardMetricGrid.dash-bento {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-flow: row dense;
+  gap: 1.25rem;
+}
+
+/* The hero spans two columns and one row; it grows to two rows only when
+   it carries a chart (a gauge). Content sets every card's height. */
+.dash-bento__item--hero {
+  grid-column: span 2;
+}
+
+.dash-bento__item--tall {
+  grid-row: span 2;
+  max-height: 32rem;
+}
+
+.dash-bento__item--chart {
+  grid-column: span 2;
+}
+
+@container dash-detail (max-width: 959px) {
+  #dashboardMetricGrid.dash-bento {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  .dash-bento__item--tall {
+    grid-row: span 1;
+  }
+}
+
+@container dash-detail (max-width: 559px) {
+  #dashboardMetricGrid.dash-bento {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dash-bento__item--hero,
+  .dash-bento__item--chart {
+    grid-column: span 1;
+  }
+
+  .dash-tabs-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* ── Cards ── */
+.dash-bento .dash-metric-card {
+  gap: 0.875rem;
+  padding: 1.25rem;
+  border-radius: 18px;
+  border-color: var(--lex-border-subtle);
+  box-shadow: var(--lex-shadow-sm);
+  transition: transform 240ms var(--lex-ease-out, ease-out), box-shadow 240ms var(--lex-ease-out, ease-out);
+}
+
+.dash-bento .dash-metric-card:not(.dash-metric-card--skeleton):hover {
+  transform: translateY(-2px);
+  box-shadow: var(--lex-shadow-md);
+}
+
+.dash-metric-card__label {
+  min-width: 0;
+}
+
+.dash-bento .dash-metric-card__eyebrow {
+  font-size: 0.625rem;
+}
+
+.dash-bento .dash-metric-card__title {
+  margin-top: 0.125rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--lex-text-secondary);
+}
+
+.dash-metric-card__tools {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex: 0 0 auto;
+}
+
+.dash-metric-card__icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.625rem;
+  height: 1.625rem;
+  padding: 0;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--lex-text-secondary);
+  cursor: pointer;
+}
+
+.dash-metric-card__icon-btn svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.dash-metric-card__icon-btn:hover,
+.dash-bento .dash-metric-card__info:hover {
+  color: var(--lex-text-primary);
+  border-color: var(--lex-text-tertiary);
+}
+
+.dash-bento .dash-metric-card__info {
+  background: transparent;
+}
+
+/* KPI: a very large number with the delta chip under it, no inner box. */
+.dash-bento .dash-metric-card__result {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0;
+  background: transparent;
+}
+
+.dash-bento .dash-metric-card__value {
+  margin-top: 0;
+  font-size: 2.25rem;
+  letter-spacing: -0.02em;
+}
+
+.dash-bento .dash-metric-card__period {
+  margin-top: 0;
+}
+
+.dash-bento .mini-spark-slot {
+  margin-top: auto;
+}
+
+.dash-bento .dash-metric-card__result--goal {
+  flex-direction: row;
+}
+
+/* ── Hero: the dashboard's lead number on the LANA evergreen fill ── */
+.dash-bento .dash-metric-card--hero {
+  justify-content: space-between;
+  border-color: transparent;
+  background: linear-gradient(145deg, var(--lex-bg-evergreen) 0%, var(--lex-bg-evergreen-strong) 100%);
+  color: var(--lex-text-on-evergreen);
+  box-shadow: var(--lex-shadow-md);
+}
+
+.dash-metric-card--hero .dash-metric-card__eyebrow,
+.dash-metric-card--hero .dash-metric-card__title,
+.dash-metric-card--hero .dash-metric-card__period,
+.dash-metric-card--hero .mini-delta__words,
+.dash-metric-card--hero .dash-metric-card__goal-note {
+  color: inherit;
+  opacity: 0.8;
+}
+
+.dash-bento .dash-metric-card--hero .dash-metric-card__value {
+  font-size: 3.5rem;
+  color: inherit;
+}
+
+.dash-metric-card--hero .dash-metric-card__info,
+.dash-metric-card--hero .dash-metric-card__icon-btn {
+  border-color: rgba(255, 255, 255, 0.35);
+  color: inherit;
+}
+
+.dash-metric-card--hero .mini-delta {
+  background: rgba(255, 255, 255, 0.16);
+  color: inherit;
+}
+
+.dash-metric-card--hero .mini-spark,
+.dash-metric-card--hero .mini-spark--up,
+.dash-metric-card--hero .mini-spark--down {
+  color: var(--lex-text-on-evergreen);
+}
+
+.dash-metric-card--hero .mini-spark {
+  height: 3.5rem;
+}
+
+#dashboardMetricGrid.dash-card-grid--refreshing .dash-metric-card--hero .dash-metric-card__value {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.dash-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-bento .dash-metric-card,
+  .dash-period__toggle,
+  .dash-tab {
+    transition: none;
+  }
+
+  .dash-bento .dash-metric-card:not(.dash-metric-card--skeleton):hover {
+    transform: none;
+  }
+
+  .dash-period__panel {
+    animation: none;
+  }
+}
+
+/* ══ Declared cards (layout.cards) ══════════════════════════════════════ */
+.dash-bento__item--wide {
+  grid-column: span 2;
+}
+
+@container dash-detail (max-width: 559px) {
+  .dash-bento__item--wide {
+    grid-column: span 1;
+  }
+}
+
+/* Detail lines under a goal: label (opens that metric's records) and value. */
+.dash-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin: 0;
+  padding: 0.625rem 0 0;
+  border-top: 1px solid var(--lex-border-subtle);
+  list-style: none;
+}
+
+.dash-lines__item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.dash-lines__label {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--lex-text-secondary);
+  font: inherit;
+  text-align: left;
+}
+
+button.dash-lines__label {
+  cursor: pointer;
+}
+
+button.dash-lines__label:hover,
+.mini-group__label:hover,
+.dash-pair__label:hover {
+  color: var(--lex-text-primary);
+  text-decoration: underline;
+}
+
+.dash-lines__value {
+  flex: 0 0 auto;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--lex-text-primary);
+}
+
+/* A metric that is waiting, inside a card that still shows the others. */
+.dash-chip-waiting,
+.mini-group__waiting {
+  display: inline-flex;
+  align-items: center;
+  border: 1px dashed var(--lex-border-subtle);
+  border-radius: 999px;
+  padding: 0.0625rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--lex-text-tertiary);
+  white-space: nowrap;
+}
+
+/* Breakdown variants: a small segmented toggle. */
+.dash-variants {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 0.125rem;
+  padding: 0.1875rem;
+  border-radius: 999px;
+  background: var(--lex-bg-tertiary);
+}
+
+.dash-variants__btn {
+  padding: 0.25rem 0.625rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--lex-text-secondary);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 200ms var(--lex-ease-out, ease-out), color 200ms var(--lex-ease-out, ease-out);
+}
+
+.dash-variants__btn.is-active {
+  background: var(--lex-bg-card, var(--lex-bg-primary));
+  color: var(--lex-text-primary);
+  box-shadow: var(--lex-shadow-sm);
+}
+
+/* Pair: two numbers side by side. */
+.dash-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.dash-pair__half {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.375rem;
+  min-width: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  background: var(--lex-bg-secondary);
+}
+
+.dash-pair__label {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--lex-text-secondary);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dash-pair__value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--lex-text-primary);
+}
+
+/* Worklist: the first rows behind a number. */
+.dash-worklist {
+  min-height: 3rem;
+  overflow-x: auto;
+}
+
+.dash-worklist__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.dash-worklist__table th {
+  padding: 0 1rem 0.375rem 0;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--lex-text-tertiary);
+}
+
+.dash-worklist__table td {
+  padding: 0.4375rem 1rem 0.4375rem 0;
+  border-top: 1px solid var(--lex-border-subtle);
+  color: var(--lex-text-primary);
+  white-space: nowrap;
+}
+
+.dash-worklist__muted {
+  color: var(--lex-text-tertiary);
+}
+
+.dash-worklist__empty {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--lex-text-tertiary);
+}
+
+.dash-worklist__all {
+  align-self: flex-start;
+}
+
+.dash-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-right: 0.375rem;
+  border-radius: 999px;
+  background: var(--lex-text-tertiary);
+}
+
+.dash-dot--active,
+.dash-dot--open,
+.dash-dot--paid {
+  background: var(--lex-status-success);
+}
+
+.dash-dot--overdue,
+.dash-dot--late {
+  background: var(--lex-status-danger);
+}
+
+.dash-dot--pending {
+  background: var(--lex-status-warning);
+}
+
+/* Waiting cards collect in one strip that spans the grid. */
+.dash-waiting-strip {
+  grid-column: 1 / -1;
+  border: 1px dashed var(--lex-border-subtle);
+  border-radius: 18px;
+  background: transparent;
+}
+
+.dash-waiting-strip__summary {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.875rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--lex-text-secondary);
+  cursor: pointer;
+  list-style: none;
+}
+
+.dash-waiting-strip__summary::-webkit-details-marker {
+  display: none;
+}
+
+.dash-waiting-strip__hint {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+}
+
+.dash-waiting-strip[open] .dash-waiting-strip__hint {
+  visibility: hidden;
+}
+
+.dash-waiting-strip__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: 1rem;
+  padding: 0 1.25rem 1.25rem;
+}
+
+.dash-waiting-strip__cards .dash-metric-card {
+  border-radius: 14px;
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-variants__btn {
+    transition: none;
+  }
+}
+
+/* ══ Card visuals ════════════════════════════════════════════════════════ */
+.dash-tabs[hidden] {
+  display: none;
+}
+
+.dash-tabs-row:has(.dash-tabs[hidden]) {
+  justify-content: flex-end;
+}
+
+/* Accents: a thin status-coloured rule along the top of the card. */
+.dash-accent {
+  border-top-width: 3px;
+}
+
+.dash-accent--danger { border-top-color: var(--lex-status-danger); }
+.dash-accent--warning { border-top-color: var(--lex-status-warning); }
+.dash-accent--success { border-top-color: var(--lex-status-success); }
+
+/* Chips: small labelled values that open their metric. */
+.dash-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.dash-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 999px;
+  background: var(--lex-bg-secondary);
+  color: var(--lex-text-secondary);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.dash-chip strong {
+  color: var(--lex-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-chip:hover {
+  border-color: var(--lex-text-tertiary);
+}
+
+.dash-metric-card__unit,
+.dash-metric-card__benchmark {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+}
+
+.dash-metric-card--gauge .dash-metric-card__value {
+  display: none;
+}
+
+.dash-metric-card--hero .mini-gauge {
+  max-width: 14rem;
+}
+
+.dash-metric-card--hero .mini-gauge__track { stroke: rgba(255, 255, 255, 0.2); }
+.dash-metric-card--hero .mini-gauge__fill { stroke: var(--lex-text-on-evergreen); }
+.dash-metric-card--hero .mini-gauge__needle line,
+.dash-metric-card--hero .mini-gauge__needle circle { stroke: var(--lex-text-on-evergreen); fill: var(--lex-text-on-evergreen); }
+.dash-metric-card--hero .mini-gauge__label { color: inherit; }
+
+/* Compare: the relation line and the ratio bar. */
+.dash-compare__relation {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+}
+
+.dash-compare__ratio {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--lex-text-secondary);
+}
+
+.dash-compare__ratio svg {
+  display: block;
+  width: 100%;
+  height: 0.5rem;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.dash-compare__ratio-track { fill: var(--lex-bg-tertiary); }
+
+.dash-compare__ratio-fill {
+  fill: var(--lex-status-success);
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation: mini-bar-grow 600ms var(--lex-ease-out, ease-out) both;
+}
+
+.dash-worklist--checklist .dash-worklist__table td:first-child::before {
+  content: '';
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-right: 0.5rem;
+  border: 1.5px solid var(--lex-text-tertiary);
+  border-radius: 3px;
+  vertical-align: -1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-compare__ratio-fill {
+    animation: none;
+  }
+}
+
+/* Detail lines on the evergreen hero read in its own colours. */
+.dash-metric-card--hero .dash-lines {
+  border-top-color: rgba(255, 255, 255, 0.25);
+}
+
+.dash-metric-card--hero .dash-lines__label,
+.dash-metric-card--hero .dash-lines__value {
+  color: inherit;
+}
+
+.dash-metric-card--hero .dash-lines__label {
+  opacity: 0.85;
+}
+
+/* A hero with a dial: the number on the left, the dial beside it, one row tall. */
+.dash-bento .dash-metric-card--hero-gauge {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(8rem, 12rem);
+  align-items: center;
+  column-gap: 1rem;
+}
+
+.dash-metric-card--hero-gauge > .dash-metric-card__top {
+  grid-column: 1 / -1;
+}
+
+.dash-metric-card--hero-gauge > .dash-metric-card__result {
+  grid-column: 1;
+}
+
+.dash-metric-card--hero-gauge > .mini-gauge {
+  grid-column: 2;
+  grid-row: 2 / span 2;
+}
+
+.dash-metric-card--hero-gauge > .mini-spark-slot {
+  grid-column: 1;
+}
+
+.dash-metric-card--hero-gauge .mini-gauge__label:empty {
+  display: none;
+}
+
+/* ══ One card shell: header, body (takes the spare height), footer ══════ */
+.dash-bento .dash-metric-card,
+.dash-waiting-strip__cards .dash-metric-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.dash-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: auto;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--lex-border-subtle);
+}
+
+.dash-card__footer .dash-metric-card__period {
+  margin: 0;
+}
+
+.dash-card__records {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+}
+
+.dash-card__records svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+/* The body: a single number sits centred; charts stretch to fill. */
+.dash-bento .dash-metric-card > .dash-metric-card__result,
+.dash-bento .dash-metric-card > .dash-metric-card__chart,
+.dash-bento .dash-metric-card > .dash-pair,
+.dash-bento .dash-metric-card > .dash-worklist,
+.dash-bento .dash-metric-card > .lex-data-state {
+  flex: 1 1 auto;
+}
+
+.dash-bento .dash-metric-card > .dash-metric-card__result {
+  justify-content: center;
+}
+
+.dash-bento .dash-metric-card__chart {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 0;
+}
+
+.dash-bento .dash-metric-card__chart > .mini-cols {
+  flex: 1 1 auto;
+}
+
+.dash-bento .dash-metric-card__chart .mini-cols__svg {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 9rem;
+  max-height: 13rem;
+}
+
+.dash-bento .dash-metric-card > .dash-pair {
+  align-content: center;
+}
+
+.dash-metric-card--hero .dash-card__footer {
+  border-top-color: rgba(255, 255, 255, 0.22);
+}
+
+.dash-metric-card--hero .dash-card__records {
+  color: inherit;
+}
+
+/* A calm state on the evergreen hero reads in its colours. */
+.dash-metric-card--hero .lex-data-state {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.dash-metric-card--hero .lex-data-state__title,
+.dash-metric-card--hero .lex-data-state__reason,
+.dash-metric-card--hero .lex-data-state__action {
+  color: inherit;
+}
+
+/* ══ About this dashboard ═══════════════════════════════════════════════ */
+.dash-header__about {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.dash-story {
+  position: relative;
+}
+
+.dash-story__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--lex-text-secondary);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dash-story__toggle svg {
+  width: 0.9375rem;
+  height: 0.9375rem;
+}
+
+.dash-story__toggle:hover,
+.dash-story__toggle[aria-expanded="true"] {
+  color: var(--lex-text-primary);
+}
+
+.dash-story__panel {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  z-index: 30;
+  width: min(24rem, calc(100vw - 2rem));
+  padding: 1rem 1.125rem;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 14px;
+  background: var(--lex-bg-elevated, var(--lex-bg-primary));
+  box-shadow: var(--lex-shadow-lg);
+  animation: lex-rise-in 240ms var(--lex-ease-out, ease-out) both;
+}
+
+.dash-story__panel[hidden] {
+  display: none;
+}
+
+.dash-story__heading {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--lex-text-primary);
+}
+
+.dash-story__body p {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--lex-text-secondary);
+}
+
+.dash-story__body p:last-child {
+  margin-bottom: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-story__panel {
+    animation: none;
+  }
+}
+
+.dash-card__note {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--lex-text-tertiary);
+}
+
+.dash-metric-card--hero .dash-card__note {
+  color: inherit;
+  opacity: 0.8;
+}
+
+/* Charts on the evergreen hero draw in its colours. */
+.dash-metric-card--hero .mini-rank__label,
+.dash-metric-card--hero .mini-rank__value,
+.dash-metric-card--hero .mini-group__label,
+.dash-metric-card--hero .mini-group__value {
+  color: inherit;
+}
+
+.dash-metric-card--hero .mini-rank__avatar {
+  background: rgba(255, 255, 255, 0.18);
+  color: inherit;
+}
+
+.dash-metric-card--hero .mini-rank__track,
+.dash-metric-card--hero .mini-group__track {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.dash-metric-card--hero .mini-rank__fill,
+.dash-metric-card--hero .mini-group__fill,
+.dash-metric-card--hero .mini-cols__bar {
+  fill: var(--lex-text-on-evergreen);
+}
+
+.dash-metric-card--hero .mini-cols__value,
+.dash-metric-card--hero .mini-cols__label {
+  fill: var(--lex-text-on-evergreen);
+}
+
+/* ══ Metric detail: summary, about, toolbar ═════════════════════════════ */
+.metric-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(12rem, 20rem);
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 18px;
+  background: var(--lex-bg-card, var(--lex-bg-primary));
+  box-shadow: var(--lex-shadow-sm);
+}
+
+.metric-summary__title {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--lex-text-secondary);
+}
+
+.metric-summary__value {
+  margin-top: 0.375rem;
+  font-size: 2.75rem;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--lex-text-primary);
+}
+
+/* A null value: calm words instead of a big number. */
+.metric-summary__value--empty {
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--lex-text-secondary);
+}
+
+.metric-summary__change-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.metric-summary__chip {
+  border-radius: 999px;
+  padding: 0.1875rem 0.625rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  background: var(--lex-bg-tertiary);
+  color: var(--lex-text-secondary);
+}
+
+.metric-summary__chip[hidden] {
+  display: none;
+}
+
+.metric-summary__chip--up {
+  background: var(--lex-status-success-bg);
+  color: var(--lex-status-success);
+}
+
+.metric-summary__chip--down {
+  background: var(--lex-status-danger-bg);
+  color: var(--lex-status-danger);
+}
+
+.metric-summary__prior,
+.metric-summary__period {
+  font-size: 0.8125rem;
+  color: var(--lex-text-tertiary);
+}
+
+.metric-summary__period {
+  margin: 0.5rem 0 0;
+}
+
+.metric-summary__visual .mini-spark {
+  height: 4.5rem;
+}
+
+.metric-summary__bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.metric-summary__bar-row {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+}
+
+.metric-summary__bar-row svg {
+  display: block;
+  width: 100%;
+  height: 0.75rem;
+  border-radius: 999px;
+  background: var(--lex-bg-tertiary);
+  overflow: hidden;
+}
+
+.metric-summary__bar {
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation: mini-bar-grow 600ms var(--lex-ease-out, ease-out) both;
+}
+
+.metric-summary__bar--current { fill: var(--lex-chart-evergreen); }
+.metric-summary__bar--prior { fill: var(--lex-chart-color-6); }
+
+.metric-detail-layout {
+  container: metric-detail / inline-size;
+}
+
+@container metric-detail (max-width: 639px) {
+  .metric-summary,
+  .metric-about__blocks {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.metric-about {
+  padding: 1.5rem;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 18px;
+  background: var(--lex-bg-card, var(--lex-bg-primary));
+}
+
+.metric-about__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--lex-text-secondary);
+}
+
+.metric-about__icon {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.metric-about__heading {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--lex-text-primary);
+}
+
+.metric-about__lead {
+  margin: 0.75rem 0 0;
+  font-size: 1rem;
+  line-height: 1.55;
+  color: var(--lex-text-primary);
+}
+
+.metric-about__lead[hidden],
+.metric-about__block[hidden] {
+  display: none;
+}
+
+.metric-about__blocks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin-top: 1.25rem;
+}
+
+.metric-about__label {
+  margin: 0 0 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--lex-text-tertiary);
+}
+
+.metric-about__block p {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--lex-text-secondary);
+}
+
+.metric-history__chart .mini-spark {
+  height: 6rem;
+}
+
+.metric-detail-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.metric-detail-toolbar__search {
+  flex: 1 1 14rem;
+  min-width: 12rem;
+}
+
+.metric-detail-toolbar__icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.metric-detail-toolbar__count {
+  font-size: 0.8125rem;
+  white-space: nowrap;
+  color: var(--lex-text-secondary);
+}
+
+.metric-detail-link {
+  color: var(--lex-text-accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.metric-detail-link:hover {
+  text-decoration: underline;
+}
+
+#metricHistorySection[hidden] {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .metric-summary__bar {
+    animation: none;
+  }
+}
+
+/* The story panel opens under the header's actions. */
+.dash-header {
+  position: relative;
+}
+
+.dash-header > .dash-story__panel {
+  top: 4.5rem;
+  right: 1.25rem;
+  left: auto;
+}
+
+/* Chapters: a quiet label row across the grid. */
+.dash-chapter {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lex-text-tertiary);
+}
+
+.dash-chapter::after {
+  content: '';
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--lex-border-subtle);
+}
+
+.dash-chapter:first-child {
+  margin-top: 0;
+}
+
+/* ══ Packed rows (DashboardLayout.packRows): no empty grid cells ═════════ */
+#dashboardMetricGrid.dash-bento {
+  grid-auto-flow: row;
+}
+
+.dash-span-4-1 { grid-column: span 1; }
+.dash-span-4-2 { grid-column: span 2; }
+.dash-span-4-3 { grid-column: span 3; }
+.dash-span-4-4 { grid-column: span 4; }
+
+@container dash-detail (max-width: 959px) {
+  .dash-span-2-1 { grid-column: span 1; }
+  .dash-span-2-2 { grid-column: span 2; }
+}
+
+@container dash-detail (max-width: 559px) {
+  .dash-span-2-1,
+  .dash-span-2-2 {
+    grid-column: span 1;
+  }
+}
+
+/* Text stacks (a worklist's number and its rows) sit at the top; only
+   charts stretch to fill the card. */
+.dash-bento .dash-metric-card--worklist > .dash-metric-card__result {
+  flex: 0 0 auto;
+}
+
+.dash-bento .dash-metric-card--worklist > .dash-worklist {
+  flex: 1 1 auto;
+}
+
+/* All dashboards: the description under the name, and the scope tag. */
+.insights-library-description {
+  margin-top: 0.125rem;
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+  white-space: normal;
+}
+
+.insights-library-tag {
+  display: inline-block;
+  margin-left: 0.375rem;
+  padding: 0 0.4375rem;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--lex-text-secondary);
+  vertical-align: 1px;
+}
+
+/* The date pill sits on the left under the title, aligned with the title
+   text; its panel opens left-aligned from the pill. The banner's actions
+   (LANA, Learn More, menu) stay on the right, centred on the title block. */
+.dash-header__bar {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.dash-header__main {
+  align-items: center;
+}
+
+.dash-header__banner .lex-banner {
+  align-items: center;
+}
+
+.dash-period__panel {
+  left: 0;
+  right: auto;
+}
+
+/* ══ How this card works / Data used ════════════════════════════════════ */
+.dash-howto {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.dash-howto__lead {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--lex-text-primary);
+}
+
+.dash-howto__metric {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.375rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 12px;
+}
+
+.dash-howto__title {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--lex-text-primary);
+}
+
+.dash-howto__formula,
+.dash-howto__dates {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--lex-text-secondary);
+}
+
+.dash-howto__dates {
+  color: var(--lex-text-tertiary);
+}
+
+.dash-howto__chips,
+.metric-data__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.dash-howto__chip,
+.metric-data__chip {
+  display: inline-flex;
+  padding: 0.0625rem 0.5rem;
+  border-radius: 999px;
+  background: var(--lex-bg-tertiary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--lex-text-secondary);
+}
+
+.dash-howto__sources,
+.metric-data__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8125rem;
+  color: var(--lex-text-secondary);
+}
+
+.dash-howto__stale,
+.metric-data__stale {
+  display: inline-flex;
+  padding: 0.0625rem 0.5rem;
+  border: 1px dashed var(--lex-status-warning);
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--lex-text-secondary);
+}
+
+.metric-data {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--lex-border-subtle);
+}
+
+.metric-data[hidden] {
+  display: none;
+}
+
+.metric-data p {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--lex-text-secondary);
+}
+
+.metric-data__formula {
+  color: var(--lex-text-primary);
+}
+
+.metric-data .metric-data__equation {
+  margin-top: 0.5rem;
+  font-weight: 600;
+}
+
+.metric-data__op {
+  color: var(--lex-text-tertiary);
+}
+
+.metric-data__heading {
+  margin: 1rem 0 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--lex-text-tertiary);
+}
+
+.metric-data__list li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.metric-data__source {
+  color: var(--lex-text-primary);
+  font-weight: 600;
+}
+
+.metric-data__systems {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.metric-data__system {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  color: var(--lex-text-secondary);
+}
+
+.metric-data__synced {
+  color: var(--lex-text-tertiary);
+}
+
+.metric-data__caveats {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  background: var(--lex-bg-secondary);
+}
+
+.metric-data__technical {
+  margin-top: 1rem;
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+}
+
+.metric-data__technical code {
+  display: block;
+  margin-top: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  background: var(--lex-bg-tertiary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+#dashboardLibraryBreadcrumb {
+  display: block;
+  margin: 0.75rem 0;
+}
+
+/* Lineage: the entity leads; the connector is a small "via" line. */
+.dash-howto__sources li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.dash-howto__entity {
+  font-weight: 600;
+  color: var(--lex-text-primary);
+}
+
+.dash-howto__via,
+.metric-data__via {
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+}
+
+.metric-data__scope {
+  font-size: 0.75rem;
+  font-style: italic;
+  color: var(--lex-text-tertiary);
+}
+
+/* ══ About this number: the styled Data used section ════════════════════ */
+.metric-data {
+  container: mabout / inline-size;
+}
+
+.mabout__formula {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--lex-text-primary);
+}
+
+.mabout__heading {
+  margin: 1.5rem 0 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--lex-text-primary);
+}
+
+/* The equation as pills. */
+.mabout__equation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 14px;
+  background: var(--lex-bg-secondary);
+}
+
+.mabout__pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 999px;
+  background: var(--lex-bg-card, var(--lex-bg-primary));
+  font-size: 0.875rem;
+  color: var(--lex-text-primary);
+  text-decoration: none;
+}
+
+.mabout__pill strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.mabout__pill--link:hover {
+  border-color: var(--lex-chart-evergreen);
+}
+
+.mabout__pill--result {
+  border-color: transparent;
+  background: var(--lex-bg-evergreen);
+  color: var(--lex-text-on-evergreen);
+}
+
+.mabout__op {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--lex-text-tertiary);
+}
+
+.mabout__word {
+  font-size: 0.875rem;
+  color: var(--lex-text-secondary);
+}
+
+/* How the number is built: four steps with light arrows between them. */
+.mabout__flow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mabout__step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 14px;
+  background: var(--lex-bg-card, var(--lex-bg-primary));
+}
+
+.mabout__step + .mabout__step::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: -1.1rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-top: 2px solid var(--lex-border-default, var(--lex-text-tertiary));
+  border-right: 2px solid var(--lex-border-default, var(--lex-text-tertiary));
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.mabout__step-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--lex-chart-evergreen);
+}
+
+.mabout__step-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--lex-text-tertiary);
+}
+
+.mabout__step-line {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--lex-text-primary);
+}
+
+@container mabout (max-width: 699px) {
+  .mabout__flow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+  }
+
+  .mabout__step + .mabout__step::before {
+    top: -0.8rem;
+    left: 50%;
+    transform: translateX(-50%) rotate(135deg);
+  }
+}
+
+/* Source cards. */
+.mabout__sources {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 0.75rem;
+}
+
+.mabout__source {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.375rem;
+  padding: 1rem;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 14px;
+  background: var(--lex-bg-card, var(--lex-bg-primary));
+}
+
+.mabout__source-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--lex-text-secondary);
+}
+
+.mabout__source-icon {
+  width: 1rem;
+  height: 1rem;
+  color: var(--lex-chart-evergreen);
+}
+
+.mabout__total {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 1.375rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--lex-text-primary);
+}
+
+.mabout__scope {
+  display: inline-flex;
+  color: var(--lex-text-tertiary);
+  cursor: help;
+}
+
+.mabout__scope-icon {
+  width: 0.9375rem;
+  height: 0.9375rem;
+}
+
+.mabout__chip {
+  display: inline-flex;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: var(--lex-status-success-bg);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--lex-status-success);
+}
+
+.mabout__via {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+}
+
+.mabout__dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--lex-text-tertiary);
+}
+
+.mabout__dot--fresh { background: var(--lex-status-success); }
+.mabout__dot--recent { background: var(--lex-status-warning); }
+.mabout__dot--stale { background: var(--lex-status-danger); }
+
+/* Which details we use. */
+.mabout__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mabout__fields li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  font-size: 0.875rem;
+  color: var(--lex-text-secondary);
+}
+
+.mabout__field-icon,
+.mabout__row-icon {
+  flex: 0 0 auto;
+  width: 1.125rem;
+  height: 1.125rem;
+  margin-top: 0.0625rem;
+  color: var(--lex-text-tertiary);
+}
+
+/* Goal row and caveats. */
+.mabout__row,
+.mabout__caveat {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  color: var(--lex-text-secondary);
+}
+
+.mabout__row {
+  background: var(--lex-bg-secondary);
+}
+
+.mabout__caveat {
+  background: var(--lex-status-warning-bg);
+}
+
+.mabout__caveat .mabout__row-icon {
+  color: var(--lex-status-warning);
+}
+
+/* Why it matters: a quiet callout with an accent bar. */
+#metricBusinessLogicBlock {
+  padding: 0.875rem 1rem;
+  border-left: 3px solid var(--lex-chart-evergreen);
+  border-radius: 0 12px 12px 0;
+  background: var(--lex-bg-secondary);
+}
+
+/* A card whose records are not all mapped yet (Settings > Mappings). */
+.dash-card__caveat {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--lex-text-tertiary);
+}
+
+.dash-card__caveat-link {
+  color: var(--lex-text-accent);
+  font-weight: 600;
+}
+
+.dash-metric-card--hero .dash-card__caveat,
+.dash-metric-card--hero .dash-card__caveat-link {
+  color: inherit;
+}
+
+/* Numbers line up on the right in worklists and the records table. */
+.dash-worklist__table .dash-worklist__num,
+.metric-detail-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-detail-num {
+  display: block;
+}
+
+/* Record tables: every column keeps at least a 16px gap (set on the cells
+   above, and by lex-table's own cell padding). A left-aligned column that
+   follows a right-aligned number gets extra room, so "$2,750" and
+   "Confirmed" do not read as one value. */
+.dash-worklist__table th:last-child,
+.dash-worklist__table td:last-child {
+  padding-right: 0;
+}
+
+.dash-worklist__table .dash-worklist__num + th:not(.dash-worklist__num),
+.dash-worklist__table .dash-worklist__num + td:not(.dash-worklist__num) {
+  padding-left: 1rem;
+}
+
+#metricRawDataTable td:has(.metric-detail-num) + td:not(:has(.metric-detail-num)) {
+  padding-left: 2rem;
+}
+
+/* Calm states hug their content (no tall dashed box); the card's spare
+   height sits below them. On the hero the state is one compact row:
+   mark, title, one line of reason, link. */
+.dash-bento .dash-metric-card > .lex-data-state {
+  flex: 0 0 auto;
+}
+
+.dash-metric-card--hero .lex-data-state--calm {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0.875rem;
+}
+
+.dash-metric-card--hero .lex-data-state--calm .lex-data-state__body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+}
+
+.dash-metric-card--hero .lex-data-state--calm .lex-data-state__reason {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  overflow: hidden;
+  margin: 0;
+}
+
+.dash-metric-card--hero .lex-data-state--calm .lex-data-state__action {
+  margin-top: 0;
+}
+
+/* Records the server could not read (raw_data.rows_status available:
+   false): a calm note in place of the table, on worklists and on metric
+   detail. */
+.records-unavailable {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.875rem 1rem;
+  border-radius: var(--lex-radius-md, 8px);
+  background: var(--lex-bg-secondary);
+}
+
+.records-unavailable__title {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--lex-text-primary);
+}
+
+.records-unavailable__text {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--lex-text-tertiary);
+}
+
+#metricRawDataUnavailable {
+  margin-top: 0.75rem;
+}
+
+/* The records toolbar is a flex row; keep it gone while hidden. */
+#metricRawDataToolbar[hidden] {
+  display: none;
+}

@@ -10,16 +10,17 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { withReportSharedScripts } = require('./helpers/report-shared-scripts');
+const { withDashboardScripts } = require('./helpers/dashboard-shared-scripts');
 
 const nodes = { dashboardViewContext: { innerHTML: '' } };
 function page() {
   let source = fs.readFileSync(path.join(__dirname, '../../src/js/admin/dashboard-detail.js'), 'utf8');
   const end = source.lastIndexOf('  init();');
   source = source.slice(0, end) + '  window.testExports = { renderMetricCard, renderModalDetails, formatMetricCardValue, renderViewContext, emptyValue: window.DataState.EMPTY_VALUE };' + source.slice(end + '  init();'.length);
-  const window = withReportSharedScripts({ addEventListener() {} });
+  const window = withDashboardScripts(withReportSharedScripts({ addEventListener() {} }));
   window.testNodes = nodes;
   vm.runInNewContext(source, { window, document: { addEventListener() {}, getElementById: (id) => nodes[id] || null }, console,
-    Intl, URLSearchParams, setTimeout: jest.fn(), clearTimeout: jest.fn(), LanaTime: { nowMs: () => 0, formatUtcDayRange: () => '' } });
+    Intl, URLSearchParams, setTimeout: jest.fn(), clearTimeout: jest.fn(), LanaTime: { nowMs: () => 0, formatUtcDayRange: () => '', reportPresetDays: () => ({ start: '2026-01-01', end: '2026-01-07' }) } });
   return window.testExports;
 }
 
@@ -76,5 +77,5 @@ test('the populated count leaves out tiles that have no data', () => {
   const metrics = [{ metric_key: 'a', value: 1, data_state: 'ok' }, { metric_key: 'b', value: 0, data_state: 'ok' },
     { metric_key: 'c', value: null, data_state: 'no_data_source', data_state_reason: 'x' }];
   page().renderViewContext('owner', metrics, [{}, {}]);
-  expect(text(nodes.dashboardViewContext.innerHTML)).toContain('2 populated metrics');
+  expect(text(nodes.dashboardViewContext.innerHTML)).toContain('2 metrics with data');
 });

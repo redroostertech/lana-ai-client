@@ -3917,6 +3917,33 @@ class ApiClient {
     return this.post('/api/v1/modules/metric-snapshots/capture', data);
   }
 
+  // ── Mappings (Settings > Mappings): source values to governed keys ──
+  // GET /api/v1/mappings/summary -> per vocabulary { mapped_records, unmapped_records, unmapped_values }
+  // options.quietStatuses: statuses the caller handles itself (setup-banner.js).
+  async getMappingSummary(options) {
+    return this.get('/api/v1/mappings/summary', options || {});
+  }
+
+  // GET /api/v1/vocabularies/:vocabulary -> [{ key, label, parent, description }]
+  async getVocabulary(vocabulary) {
+    return this.get('/api/v1/vocabularies/' + encodeURIComponent(vocabulary));
+  }
+
+  // GET /api/v1/mappings/:vocabulary?status=unmapped|mapped|all
+  async getMappings(vocabulary, status = 'all') {
+    return this.get('/api/v1/mappings/' + encodeURIComponent(vocabulary) + '?status=' + encodeURIComponent(status));
+  }
+
+  // PUT /api/v1/mappings/:vocabulary { items: [{ connector, source_value, canonical_key }] } -> { saved, records_to_update }
+  async saveMappings(vocabulary, items) {
+    return this.request('PUT', '/api/v1/mappings/' + encodeURIComponent(vocabulary), { items: items });
+  }
+
+  // DELETE /api/v1/mappings/:vocabulary/:id
+  async deleteMapping(vocabulary, id) {
+    return this.request('DELETE', '/api/v1/mappings/' + encodeURIComponent(vocabulary) + '/' + encodeURIComponent(id));
+  }
+
   async getMetricDetail(metricKey, params = {}, options = {}) {
     let url = '/api/v1/modules/metric-detail/' + encodeURIComponent(metricKey);
     const queryParts = [];
@@ -3926,6 +3953,8 @@ class ApiClient {
     if (params.compareBy) queryParts.push('compareBy=' + encodeURIComponent(params.compareBy));
     if (params.compareToPrevious !== undefined) queryParts.push('compareToPrevious=' + encodeURIComponent(String(params.compareToPrevious)));
     if (params.compareMode) queryParts.push('compareMode=' + encodeURIComponent(params.compareMode));
+    // rawLimit caps the source rows; 0 skips them (a sparkline needs only the history).
+    if (params.rawLimit !== undefined && params.rawLimit !== null) queryParts.push('raw_limit=' + encodeURIComponent(String(params.rawLimit)));
     if (queryParts.length > 0) url += '?' + queryParts.join('&');
     // options may carry { signal } so callers (e.g. the Metric Catalog "Run All"
     // batch runner) can cancel the in-flight request on a per-metric timeout.

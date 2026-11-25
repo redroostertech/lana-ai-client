@@ -111,3 +111,40 @@
 .lex-data-state--engine-error {
   border-color: var(--lex-border-warning, #fcd34d);
 }
+
+/* Calm variant (DataState.render(item, { calm: true })): a tile that is
+   waiting for setup or a goal, not a failure. */
+.lex-data-state--calm {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.lex-data-state--waiting {
+  border-style: dashed;
+  background: transparent;
+}
+
+.lex-data-state__mark {
+  flex: 0 0 auto;
+}
+
+.lex-data-state__body {
+  min-width: 0;
+}
+
+.lex-data-state__action {
+  margin-top: 0.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--lex-text-accent, #2563eb);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.lex-data-state__action:hover {
+  text-decoration: underline;
+}

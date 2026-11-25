@@ -1,0 +1,491 @@
+{
+ "dashboard_metric_cards_owner_jan_2026": {
+  "data": [
+   {
+    "metric_key": "legal_firm.case_volume.active_cases_total",
+    "title": "Total Active Cases",
+    "domain": "legal_operations",
+    "primaryAudience": "owner",
+    "dashboard_type": "owner",
+    "section": {
+     "key": "legal_firm.case_volume",
+     "label": "Case Volume",
+     "domain": "legal_operations",
+     "order": 2000
+    },
+    "group": {
+     "key": "legal_firm.case_volume",
+     "label": "Case Volume"
+    },
+    "audience": {
+     "key": "owner",
+     "label": "Owner",
+     "dashboard_type": "owner"
+    },
+    "sort_order": 2000,
+    "order": 2000,
+    "domain_group": {
+     "key": "legal_operations",
+     "label": "Legal Operations",
+     "order": 1
+    },
+    "status": "active",
+    "executable": true,
+    "value": 916,
+    "formatted_value": "916",
+    "format": "integer",
+    "period": "Jan 1, 2026 - Jan 31, 2026",
+    "period_scope": "snapshot",
+    "goal": null,
+    "comparison": null,
+    "target": null,
+    "report_link": null,
+    "report_drilldown": {
+     "metric_key": "legal_firm.case_volume.active_cases_total",
+     "dashboard_type": "owner",
+     "section_key": "legal_firm.case_volume",
+     "domain": "legal_operations"
+    },
+    "data_state": "ok",
+    "data_state_reason": null
+   },
+   {
+    "metric_key": "legal_firm.case_volume.new_cases_opened_by_service_offering",
+    "title": "New Cases Opened by Service Offering",
+    "domain": "legal_operations",
+    "section": {
+     "key": "legal_firm.case_volume",
+     "label": "Case Volume",
+     "domain": "legal_operations",
+     "order": 2000
+    },
+    "status": "active",
+    "executable": true,
+    "value": [
+     {
+      "service_key": "estate_planning",
+      "service_label": "Estate Planning",
+      "value": 21
+     }
+    ],
+    "formatted_value": "1 row",
+    "format": "table",
+    "period": "Jan 1, 2026 - Jan 31, 2026",
+    "period_scope": "flow",
+    "goal": null,
+    "comparison": null,
+    "target": null,
+    "report_link": null,
+    "data_state": "ok",
+    "data_state_reason": null
+   },
+   {
+    "metric_key": "legal_firm.finance.annual_revenue_target",
+    "title": "Annual Revenue Target",
+    "domain": "finance",
+    "section": {
+     "key": "legal_firm.finance",
+     "label": "Finance",
+     "domain": "finance",
+     "order": 1000
+    },
+    "status": "active",
+    "executable": true,
+    "value": null,
+    "formatted_value": null,
+    "format": "currency",
+    "period": "Jan 1, 2026 - Jan 31, 2026",
+    "period_scope": "snapshot",
+    "goal": null,
+    "comparison": null,
+    "target": null,
+    "report_link": null,
+    "goal_input": {
+     "metric_key": "legal_firm.finance.annual_revenue_target",
+     "name": "Annual Revenue Target",
+     "message": "Set the Annual Revenue Target goal in the Metric Catalog.",
+     "other_periods": []
+    },
+    "data_state": "insufficient_data",
+    "data_state_reason": "There is not enough data in this period to show this number."
+   },
+   {
+    "metric_key": "legal_firm.finance.average_case_value",
+    "title": "Average Case Value",
+    "domain": "finance",
+    "section": {
+     "key": "legal_firm.finance",
+     "label": "Finance",
+     "domain": "finance",
+     "order": 1000
+    },
+    "status": "active",
+    "executable": true,
+    "value": 5388.89,
+    "formatted_value": "$5,389",
+    "format": "currency",
+    "period": "Jan 1, 2026 - Jan 31, 2026",
+    "period_scope": "flow",
+    "goal": null,
+    "comparison": null,
+    "target": null,
+    "report_link": null,
+    "data_state": "ok",
+    "data_state_reason": null
+   },
+   {
+    "metric_key": "legal_firm.finance.overdue_expected_cash",
+    "title": "Overdue Expected Cash",
+    "description": "Expected cash whose due date has passed and is still unpaid.",
+    "domain": "finance",
+    "section": {
+     "key": "legal_firm.finance",
+     "label": "Finance",
+     "domain": "finance",
+     "order": 1000
+    },
+    "status": "active",
+    "executable": true,
+    "value": 549419.5,
+    "formatted_value": "$549,420",
+    "format": "currency",
+    "period": "Jan 1, 2026 - Jan 31, 2026",
+    "period_scope": "snapshot",
+    "goal": null,
+    "comparison": null,
+    "target": null,
+    "report_link": null,
+    "data_state": "ok",
+    "data_state_reason": null
+   },
+   {
+    "metric_key": "legal_firm.finance.payroll_gap_month",
+    "title": "Payroll Gap This Month",
+    "domain": "finance",
+    "section": {
+     "key": "legal_firm.finance",
+     "label": "Finance",
+     "domain": "finance",
+     "order": 1000
+    },
+    "status": "active",
+    "executable": true,
+    "value": null,
+    "formatted_value": null,
+    "format": "currency",
+    "period": "Jan 1, 2026 - Jan 31, 2026",
+    "period_scope": "snapshot",
+    "goal": null,
+    "comparison": null,
+    "target": null,
+    "report_link": null,
+    "goal_input": {
+     "metric_key": "core.financial-performance.cash_this_month",
+     "name": "Cash This Month",
+     "message": "Set the Cash This Month goal in the Metric Catalog.",
+     "other_periods": []
+    },
+    "data_state": "insufficient_data",
+    "data_state_reason": "There is not enough data in this period to show this number."
+   },
+   {
+    "domain": "finance",
+    "status": "active",
+    "executable": true,
+    "period": "Jan 1, 2026 - Jan 31, 2026",
+    "goal": null,
+    "comparison": null,
+    "target": null,
+    "report_link": null,
+    "data_state": "ok",
+    "data_state_reason": null,
+    "metric_key": "legal_firm.service_revenue.actual_vs_needed_service_offerings",
+    "title": "Actual vs Needed Service Offerings",
+    "section": {
+     "key": "legal_firm.service_revenue",
+     "label": "Service Revenue",
+     "domain": "finance",
+     "order": 1000
+    },
+    "format": "table",
+    "formatted_value": "4 rows",
+    "period_scope": "flow",
+    "value": [
+     {
+      "service_key": "estate_planning",
+      "service_label": "Estate Planning",
+      "actual_count": 21,
+      "needed_count": null,
+      "variance": null,
+      "average_case_value": null
+     },
+     {
+      "service_key": "guardianship",
+      "service_label": "Guardianship",
+      "actual_count": 0,
+      "needed_count": null,
+      "variance": null,
+      "average_case_value": null
+     },
+     {
+      "service_key": "probate",
+      "service_label": "Probate",
+      "actual_count": 0,
+      "needed_count": null,
+      "variance": null,
+      "average_case_value": null
+     },
+     {
+      "service_key": "medicaid",
+      "service_label": "Medicaid",
+      "actual_count": 0,
+      "needed_count": null,
+      "variance": null,
+      "average_case_value": null
+     }
+    ]
+   },
+   {
+    "domain": "legal_operations",
+    "status": "active",
+    "executable": true,
+    "period": "Jan 1, 2026 - Jan 31, 2026",
+    "goal": null,
+    "comparison": null,
+    "target": null,
+    "report_link": null,
+    "data_state": "ok",
+    "data_state_reason": null,
+    "metric_key": "legal_firm.case_volume.closed_cases_by_service_offering",
+    "title": "Closed Cases by Service Offering",
+    "section": {
+     "key": "legal_firm.case_volume",
+     "label": "Case Volume",
+     "domain": "legal_operations",
+     "order": 2000
+    },
+    "format": "table",
+    "formatted_value": "2 rows",
+    "period_scope": "flow",
+    "value": [
+     {
+      "service_key": "estate_planning",
+      "service_label": "Estate Planning",
+      "value": 6
+     },
+     {
+      "service_key": "guardianship",
+      "service_label": "Guardianship",
+      "value": 2
+     }
+    ]
+   },
+   {
+    "domain": "finance",
+    "status": "active",
+    "executable": true,
+    "period": "Jan 1, 2026 - Jan 31, 2026",
+    "goal": null,
+    "comparison": null,
+    "target": null,
+    "report_link": null,
+    "data_state": "ok",
+    "data_state_reason": null,
+    "metric_key": "legal_firm.service_revenue.gross_revenue_by_service_offering",
+    "title": "Gross Revenue by Service Offering",
+    "section": {
+     "key": "legal_firm.service_revenue",
+     "label": "Service Revenue",
+     "domain": "finance",
+     "order": 1000
+    },
+    "format": "currency_breakdown",
+    "formatted_value": "0 rows",
+    "period_scope": "flow",
+    "value": []
+   },
+   {
+    "domain": "finance",
+    "status": "active",
+    "executable": true,
+    "period": "Jan 1, 2026 - Jan 31, 2026",
+    "goal": null,
+    "comparison": null,
+    "target": null,
+    "report_link": null,
+    "data_state": "ok",
+    "data_state_reason": null,
+    "metric_key": "legal_firm.finance.expected_cash_by_week",
+    "title": "Expected Cash by Week",
+    "section": {
+     "key": "legal_firm.finance",
+     "label": "Finance",
+     "domain": "finance",
+     "order": 1000
+    },
+    "format": "currency",
+    "value": 48250,
+    "formatted_value": "$48,250",
+    "period_scope": "snapshot"
+   }
+  ],
+  "view": {
+   "type": "owner",
+   "title": "Owner Performance",
+   "dashboard_type": "owner",
+   "primaryAudiences": [
+    "owner",
+    "owner_and_legal"
+   ],
+   "period": {
+    "start": "2026-01-01T05:00:00.000Z",
+    "end": "2026-02-01T05:00:00.000Z",
+    "compareBy": "monthly",
+    "label": "Jan 1, 2026 - Jan 31, 2026"
+   },
+   "sections": [
+    {
+     "key": "legal_firm.finance",
+     "label": "Finance",
+     "domain": "finance",
+     "order": 1000,
+     "count": 25
+    },
+    {
+     "key": "legal_firm.service_revenue",
+     "label": "Service Revenue",
+     "domain": "finance",
+     "order": 1000,
+     "count": 15
+    },
+    {
+     "key": "legal_firm.case_volume",
+     "label": "Case Volume",
+     "domain": "legal_operations",
+     "order": 2000,
+     "count": 6
+    }
+   ],
+   "domain_groups": [
+    {
+     "key": "finance",
+     "label": "Finance",
+     "order": 0,
+     "count": 40
+    },
+    {
+     "key": "legal_operations",
+     "label": "Legal Operations",
+     "order": 1,
+     "count": 6
+    }
+   ]
+  },
+  "summary": {
+   "total": 46,
+   "executable": 46,
+   "planned": 0,
+   "domains": 2,
+   "sections": 3,
+   "domain_groups": 2
+  }
+ },
+ "metric_detail_new_cases_opened_total_jan1_nov24": {
+  "metric": {
+   "key": "legal_firm.case_volume.new_cases_opened_total",
+   "title": "Total New Cases Opened",
+   "periodScope": "flow"
+  },
+  "current": {
+   "metric_key": "legal_firm.case_volume.new_cases_opened_total",
+   "title": "Total New Cases Opened",
+   "value": 36,
+   "format": "integer",
+   "status": "active"
+  },
+  "movement": null,
+  "comparison": {
+   "previous_value": 241,
+   "previous_period": {
+    "start": "2025-02-07T05:00:00.000Z",
+    "end": "2026-01-01T05:00:00.000Z",
+    "mode": "previous_period"
+   },
+   "absolute_change": -205,
+   "percent_change": -85.06,
+   "direction": "down",
+   "source": "recompute"
+  },
+  "snapshots": [],
+  "snapshots_pagination": {
+   "total": 0,
+   "limit": 100,
+   "offset": 0,
+   "has_more": false
+  },
+  "raw_data": {
+   "total": 36,
+   "limit": 250,
+   "offset": 0,
+   "has_more": false,
+   "rows": [
+    {
+     "matter_key": "[matter id]",
+     "matter_name": "[matter name]",
+     "client_name": "[client name]",
+     "status": "active",
+     "stage": "active",
+     "opened_at": "2026-08-03T16:43:22.716Z",
+     "closed_at": null,
+     "request_access": null
+    },
+    {
+     "matter_key": "[matter id]",
+     "matter_name": "[matter name]",
+     "client_name": "",
+     "status": "active",
+     "stage": "active",
+     "opened_at": "2026-02-12T00:00:00.000Z",
+     "closed_at": null,
+     "request_access": null
+    },
+    {
+     "matter_key": "[matter id]",
+     "matter_name": "[matter name]",
+     "client_name": "",
+     "status": "active",
+     "stage": "active",
+     "opened_at": "2026-02-12T00:00:00.000Z",
+     "closed_at": null,
+     "request_access": null
+    }
+   ]
+  },
+  "period": {
+   "periodStart": "2026-01-01T05:00:00.000Z",
+   "periodEnd": "2026-11-25T05:00:00.000Z",
+   "startDate": "2026-01-01",
+   "endDate": "2026-11-24",
+   "timeZone": "America/New_York",
+   "label": "Jan 1, 2026 - Nov 24, 2026"
+  }
+ },
+ "_note": "Real owner dashboard sample for Jan 2026 (names redacted). currency_breakdown_rows_synthetic is made up: gross revenue is empty on this box.",
+ "currency_breakdown_rows_synthetic": [
+  {
+   "service_key": "estate_planning",
+   "service_label": "Estate Planning",
+   "value": 84250
+  },
+  {
+   "service_key": "probate",
+   "service_label": "Probate",
+   "value": 31000.5
+  },
+  {
+   "service_key": "guardianship",
+   "service_label": "Guardianship",
+   "value": 0
+  }
+ ]
+}

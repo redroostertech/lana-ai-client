@@ -36,6 +36,16 @@ describe('card request for a saved dashboard', () => {
     expect(tiles.cardRequestKeys({ metric_keys: ['b', 'a'] })).toBe('b,a');
     expect(tiles.cardRequestKeys({})).toBeNull();
   });
+
+  test('with layout.cards (and dashboard-cards.js loaded) it asks for every card key, full keys, once', () => {
+    const both = {};
+    for (const rel of ['js/shared/metric-card-view.js', 'js/shared/dashboard-cards.js', 'js/shared/dashboard-tiles.js']) {
+      new Function('window', fs.readFileSync(path.join(__dirname, '../../src', rel), 'utf8'))(both);
+    }
+    const layout = { metric_keys: ['finance.a'], cards: [{ id: 'x', kind: 'breakdown', metric_key: 'finance.a',
+      variants: [{ label: 'W', metric_key: 'finance.a' }, { label: 'M', metric_key: 'finance.b' }] }] };
+    expect(both.DashboardTiles.cardRequestKeys(layout)).toBe('legal_firm.finance.a,legal_firm.finance.b');
+  });
 });
 
 describe('pages use the shared tile model', () => {

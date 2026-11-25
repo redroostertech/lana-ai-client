@@ -1,0 +1,36 @@
+{
+ "_note": "Synthetic fixture for the Settings > Mappings screen, shaped like the planned API (mapping-api.md). The API is not live yet.",
+ "vocabularies": {
+  "matter_service": [
+   { "key": "estate_planning", "label": "Estate Planning", "parent": null },
+   { "key": "will_based_plan", "label": "Will-based plan", "parent": "estate_planning" },
+   { "key": "trust_based_plan", "label": "Trust-based plan", "parent": "estate_planning" },
+   { "key": "probate", "label": "Probate", "parent": null },
+   { "key": "small_estate", "label": "Small Estate or Heirship", "parent": "probate" },
+   { "key": "guardianship", "label": "Guardianship", "parent": null },
+   { "key": "not_a_case", "label": "Not a paying matter", "parent": null }
+  ],
+  "meeting_type": [
+   { "key": "consultation", "label": "Consultation or Truth Talk", "parent": null },
+   { "key": "signing", "label": "Signing", "parent": null },
+   { "key": "hearing", "label": "Court hearing", "parent": null }
+  ]
+ },
+ "mappings": {
+  "matter_service": [
+   { "id": "m1", "connector": "actionstep", "connector_label": "ActionStep", "source_field_label": "Matter type", "source_value": "EP - Will", "record_count": 212, "mapped_key": null, "suggested_key": "will_based_plan", "set_by": null, "set_at": null },
+   { "id": "m2", "connector": "actionstep", "connector_label": "ActionStep", "source_field_label": "Matter type", "source_value": "Probate Admin", "record_count": 64, "mapped_key": null, "suggested_key": "probate", "set_by": null, "set_at": null },
+   { "id": "m3", "connector": "actionstep", "connector_label": "ActionStep", "source_field_label": "Matter type", "source_value": "Consult only", "record_count": 12, "mapped_key": null, "suggested_key": null, "set_by": null, "set_at": null },
+   { "id": "m4", "connector": "actionstep", "connector_label": "ActionStep", "source_field_label": "Matter type", "source_value": "Trust Package", "record_count": 410, "mapped_key": "trust_based_plan", "suggested_key": "trust_based_plan", "set_by": "Avery Admin", "set_at": "2026-11-20T15:00:00Z" },
+   { "id": "m5", "connector": "actionstep", "connector_label": "ActionStep", "source_field_label": "Matter type", "source_value": "Guardianship", "record_count": 88, "mapped_key": "guardianship", "suggested_key": "guardianship", "set_by": "Avery Admin", "set_at": "2026-11-20T15:00:00Z" }
+  ],
+  "meeting_type": [
+   { "id": "a1", "connector": "leadly", "connector_label": "Leadly", "source_field_label": "Appointment type", "source_value": "Truth Talk", "record_count": 22, "mapped_key": null, "suggested_key": "consultation", "set_by": null, "set_at": null },
+   { "id": "a2", "connector": "leadly", "connector_label": "Leadly", "source_field_label": "Appointment type", "source_value": "Court", "record_count": 8, "mapped_key": null, "suggested_key": "hearing", "set_by": null, "set_at": null }
+  ]
+ },
+ "summary": {
+  "matter_service": { "mapped_records": 498, "unmapped_records": 288, "unmapped_values": 3 },
+  "meeting_type": { "mapped_records": 0, "unmapped_records": 30, "unmapped_values": 2 }
+ }
+}

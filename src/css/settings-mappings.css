@@ -1,0 +1,143 @@
+/* Settings > Mappings (js/pages/settings-mappings.js). */
+
+.sv2-map-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 1rem 0 0.5rem;
+}
+
+.sv2-map-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.sv2-map-note {
+  margin: 0.25rem 0;
+  font-size: 0.8125rem;
+  color: var(--lex-text-secondary);
+}
+
+.sv2-map-note:empty,
+.sv2-map-note[hidden] {
+  display: none;
+}
+
+.sv2-map-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--lex-border-subtle);
+}
+
+.sv2-map-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) 7rem minmax(12rem, 1.2fr) minmax(8rem, 0.8fr);
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--lex-border-subtle);
+}
+
+.sv2-map-row.is-unmapped {
+  box-shadow: inset 3px 0 0 var(--lex-status-warning);
+  padding-left: 0.75rem;
+}
+
+.sv2-map-row.is-changed {
+  background: var(--lex-bg-secondary);
+}
+
+.sv2-map-source {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sv2-map-value {
+  font-weight: 600;
+  color: var(--lex-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.sv2-map-from,
+.sv2-map-count,
+.sv2-map-set {
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+}
+
+.sv2-map-count {
+  font-variant-numeric: tabular-nums;
+}
+
+.sv2-map-pick {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.sv2-map-select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.sv2-map-suggested {
+  flex: 0 0 auto;
+  padding: 0.0625rem 0.5rem;
+  border-radius: 999px;
+  background: var(--lex-status-info-bg);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--lex-status-info);
+}
+
+.sv2-map-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.sv2-map-set--open {
+  color: var(--lex-status-warning);
+  font-weight: 600;
+}
+
+.sv2-map-clear {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--lex-text-accent);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sv2-map-empty {
+  padding: 1rem 0;
+  font-size: 0.875rem;
+  color: var(--lex-text-tertiary);
+}
+
+.sv2-mappings {
+  container: sv2-mappings / inline-size;
+}
+
+@container sv2-mappings (max-width: 719px) {
+  .sv2-map-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .sv2-map-pick,
+  .sv2-map-meta {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}

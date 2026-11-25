@@ -549,6 +549,9 @@
         'js/shared/metric-tables.js',
         'js/admin/dashboard-catalog.js',
         'js/shared/data-state.js',
+        'js/lex/components/foundation/lex-breadcrumb.js',
+        'js/shared/insights-breadcrumbs.js',
+        'js/shared/dashboard-library-columns.js',
         'js/admin/dashboard-library.js'
       ],
       stylesheets: [
@@ -563,16 +566,61 @@
         'js/shared/current-pipeline-presentation.js',
         'js/shared/acquisition-source-presentation.js',
         'js/shared/opportunity-intake-presentation.js',
+        'js/vendor/lottie_light.min.js',
+        'js/lex/brand/lex-brand-animations.js',
+        'js/lex/components/foundation/lex-brand-mark.js',
         'js/dashboard/metric-goal-comparison.js',
         'js/shared/data-state.js',
         'js/shared/dashboard-tiles.js',
+        'js/shared/dashboard-period.js',
+        'js/shared/load-state.js',
+        'js/shared/metric-card-view.js',
+        'js/shared/mini-charts.js',
+        'js/shared/dashboard-layout.js',
+        'js/shared/dashboard-cards.js',
+        'js/shared/card-visuals.js',
+        'js/shared/lineage-view.js',
+        'js/shared/insights-breadcrumbs.js',
+        'js/settings-mappings.model.js',
+        'js/shared/setup-banner.js',
+        'js/shared/metric-detail-view.js',
         'js/shared/title-switcher.js',
         'js/admin/dashboard-detail.js'
       ],
       stylesheets: [
         'css/admin/insights-dashboard.css',
         'css/title-switcher.css',
-        'css/detail-page.css'
+        'css/detail-page.css',
+        'css/lex-motion.css',
+        'css/mini-charts.css',
+        'css/setup-banner.css'
+      ]
+    },
+
+    'admin/metric_detail.html': {
+      title: 'Metric Detail',
+      // Opened from a dashboard: keep the Insights context with All dashboards lit.
+      activeNav: 'insights-dashboards',
+      scripts: [
+        'js/lex/components/foundation/lex-tabs.js',
+        'js/lex/components/foundation/lex-badge.js',
+        'js/lex/components/form/lex-input.js',
+        'js/lex/components/form/lex-select.js',
+        'js/lex/components/data/lex-table.js',
+        'js/shared/library-column-filters.js',
+        'js/shared/metric-tables.js',
+        'js/shared/data-state.js',
+        'js/dashboard/metric-goal-comparison.js',
+        'js/shared/metric-card-view.js',
+        'js/shared/mini-charts.js',
+        'js/shared/metric-detail-view.js',
+        'js/shared/lineage-view.js',
+        'js/shared/insights-breadcrumbs.js',
+        'js/admin/metric-detail.js'
+      ],
+      stylesheets: [
+        'css/admin/insights-dashboard.css',
+        'css/mini-charts.css'
       ]
     },
 

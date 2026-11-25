@@ -128,25 +128,128 @@
     }
   }
 
+  // The page's default range (the preset it boots on), in the firm's days.
+  function defaultPeriodDays() {
+    var zone = window.Lex && Lex.Utils && Lex.Utils.getFirmTimezone ? Lex.Utils.getFirmTimezone() : undefined;
+    return LanaTime.reportPresetDays(window.DashboardPeriod.DEFAULT_PRESET, zone);
+  }
+
+  // Always a full range: when the inputs are empty, half filled or not real
+  // days, the default range is used and written back into the inputs, so
+  // every card and link uses the window the page shows.
   function readPeriodControls() {
     var start = el('dashboardPeriodStart');
     var end = el('dashboardPeriodEnd');
     var compare = el('dashboardPeriodType');
+    var picked = { start: start ? start.value || '' : '', end: end ? end.value || '' : '' };
+    var resolved = window.DashboardPeriod.resolveRequestPeriod(picked, defaultPeriodDays);
+    if (resolved.usedDefault) {
+      if (start && start.value !== resolved.periodStart) start.value = resolved.periodStart;
+      if (end && end.value !== resolved.periodEnd) end.value = resolved.periodEnd;
+    }
     currentPeriod = {
-      start: start ? start.value || '' : '',
-      end: end ? end.value || '' : '',
+      start: resolved.periodStart,
+      end: resolved.periodEnd,
       compareBy: compare && compare.value ? compare.value : 'monthly',
-      label: formatPeriodLabel(start ? start.value : '', end ? end.value : ''),
+      label: formatPeriodLabel(resolved.periodStart, resolved.periodEnd),
     };
+    syncPresetChips();
     return currentPeriod;
+  }
+
+  // The lit quick-select chip, and the date pill's words, always come from
+  // the dates on screen.
+  function syncPresetChips() {
+    var container = el('dashboardPeriodPresets');
+    var pill = el('dashboardPeriodLabel');
+    if (pill) pill.textContent = currentPeriod.label;
+    if (!container || !container.querySelectorAll) return;
+    var chips = Array.prototype.slice.call(container.querySelectorAll('lex-btn[data-dashboard-preset]'));
+    var zone = window.Lex && Lex.Utils && Lex.Utils.getFirmTimezone ? Lex.Utils.getFirmTimezone() : undefined;
+    var presets = chips.map(function (chip) {
+      var name = chip.getAttribute('data-dashboard-preset');
+      return [name, LanaTime.reportPresetDays(name, zone)];
+    });
+    var active = window.DashboardPeriod.matchPreset(currentPeriod, presets);
+    chips.forEach(function (chip) {
+      var on = chip.getAttribute('data-dashboard-preset') === active;
+      var variant = on ? 'primary' : 'secondary';
+      if (chip.getAttribute('variant') !== variant) chip.setAttribute('variant', variant);
+      chip.setAttribute('aria-pressed', on ? 'true' : 'false');
+      if (on && pill) pill.textContent = chip.textContent.trim() + ' \u00b7 ' + currentPeriod.label;
+    });
+  }
+
+  // The date pill opens a small panel with the quick picks and the fields.
+  function setPeriodPanelOpen(open) {
+    var panel = el('dashboardPeriodPanel');
+    var toggle = el('dashboardPeriodToggle');
+    if (panel) panel.hidden = !open;
+    if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+
+  // A button that opens a small panel: a click on the button toggles it, a
+  // click outside or Escape closes it. Used by the date pill and the
+  // dashboard's About popover.
+  // Toggles are found at click time (delegated), because lex-banner redraws
+  // its action buttons when the heading changes.
+  function bindPopover(toggleId, panelId) {
+    function setOpen(open) {
+      var panel = el(panelId);
+      var toggle = el(toggleId);
+      if (panel) panel.hidden = !open;
+      if (toggle && toggle.setAttribute) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    document.addEventListener('click', function (event) {
+      var panel = el(panelId);
+      if (!panel || !event.target || !event.target.closest) return;
+      if (event.target.closest('#' + toggleId)) {
+        setOpen(panel.hidden);
+        return;
+      }
+      if (panel.hidden || panel.contains(event.target)) return;
+      // Date pickers and dropdowns render outside the panel; leave those alone.
+      if (event.target.closest('.lex-select-dropdown, .lex-dropdown')) return;
+      setOpen(false);
+    });
+    document.addEventListener('keydown', function (event) {
+      var panel = el(panelId);
+      if (event.key === 'Escape' && panel && !panel.hidden) {
+        setOpen(false);
+        var toggle = el(toggleId);
+        if (toggle && toggle.focus) toggle.focus();
+      }
+    });
+  }
+
+  function initPeriodPanel() {
+    bindPopover('dashboardPeriodToggle', 'dashboardPeriodPanel');
+    bindPopover('dashboardLearnMoreBtn', 'dashboardStoryPanel');
+  }
+
+  // The About popover: the server's story for this dashboard, else a how-to.
+  function setStory(dashboard) {
+    var body = el('dashboardStoryBody');
+    if (!body) return;
+    body.innerHTML = window.DashboardCards.storyFor(dashboard).paragraphs.map(function (text) {
+      return '<p>' + escapeHtml(text) + '</p>';
+    }).join('');
+  }
+
+  function setPeriodLoading(loading) {
+    var mark = el('dashboardPeriodLoading');
+    if (mark) mark.hidden = !loading;
+    var grid = el('dashboardMetricGrid');
+    if (grid && grid.classList) grid.classList.toggle('dash-card-grid--refreshing', !!loading);
   }
 
   function getMetricCardRequestParams(type, limit) {
     var period = readPeriodControls();
     var params = { type: type, limit: limit };
-    // Plain days (inclusive end): the backend bounds them in the firm's zone.
-    if (period.start) params.periodStart = period.start;
-    if (period.end) params.periodEnd = period.end;
+    // Plain days (inclusive end), always both: the backend bounds them in
+    // the firm's zone.
+    params.periodStart = period.start;
+    params.periodEnd = period.end;
     if (period.compareBy) params.compareBy = period.compareBy;
     // Period-over-period comparison: ask the metric layer to attach a
     // `comparison` block. Preset periods use the calendar mode, custom ranges
@@ -168,23 +271,29 @@
   // Build the metric_detail href with the currently selected period serialized
   // into query params. Without this the detail page falls back to its default
   // period and shows numbers that don't match the modal the user just opened.
-  function buildMetricDetailHref(metricKey) {
-    var qs = 'metric_key=' + encodeURIComponent(metricKey || '');
+  function buildMetricDetailHref(metricKey, options) {
     // The days the person picked (firm days before the cards load, too), as
     // plain days: the metric detail endpoint bounds them in the firm's zone,
     // the same way the cards were bounded.
     var period = readPeriodControls();
-    if (period.start) qs += '&periodStart=' + encodeURIComponent(period.start);
-    if (period.end) qs += '&periodEnd=' + encodeURIComponent(period.end);
-    if (period.compareBy) qs += '&compareBy=' + encodeURIComponent(period.compareBy);
-    return 'admin/metric_detail.html?' + qs;
+    return window.DashboardPeriod.metricDetailHref(metricKey, {
+      periodStart: period.start, periodEnd: period.end, compareBy: period.compareBy,
+    }, options);
   }
 
   // Presets are the firm's days (the firm's zone, Lex.Utils.getFirmTimezone),
   // so everyone in the firm sees the same cards. A stored user without the
   // firm's zone refetches the profile first (api.ensureFirmTimezone).
+  // Each pick of dates bumps this; a preset still waiting on the firm zone
+  // gives up when a newer pick happened, so a slow first click can never
+  // overwrite the dates of a later one.
+  var periodPickToken = 0;
+
   async function selectDashboardPeriodPreset(preset, reload) {
+    periodPickToken += 1;
+    var myPick = periodPickToken;
     await api.ensureFirmTimezone();
+    if (myPick !== periodPickToken) return;
     var days = LanaTime.reportPresetDays(preset, Lex.Utils.getFirmTimezone());
 
     var start = el('dashboardPeriodStart');
@@ -201,7 +310,16 @@
   // load* call captures the value at entry and refuses to commit results
   // if it is no longer the latest, so quick changes to start/end/compare
   // can't leave the dashboard rendering metrics for an older period.
-  var dashboardLoadToken = 0;
+  // Card loads: idle/loading/loaded/empty/error, latest request wins
+  // (js/shared/load-state.js). Replaces a bare counter so "No metrics" only
+  // shows after a finished request returned nothing.
+  var cardLoads = window.LoadState.createLoadTracker();
+  // The saved dashboard's declared cards (layout.cards), or null.
+  var currentDeclaredCards = null;
+  // The variant in view per declared card id (breakdown toggles).
+  var variantPicks = {};
+  // The text each tile showed last, so new dates count from the old number.
+  var previousValues = {};
 
   function reloadDashboardMetricsForCurrentPeriod() {
     if (currentDashboardId) {
@@ -405,18 +523,31 @@
     return order.map(function (key) { return groupsByKey[key]; });
   }
 
+  // "Good morning, Ana" above the dashboard's title (hidden when there is no
+  // first name, so the title is not said twice).
+  function setGreeting(title) {
+    var node = el('dashboardGreeting');
+    if (!node) return;
+    var user = (window.api && window.api.user) || (window.Lex && Lex.state && Lex.state.user) || null;
+    var line = window.DashboardLayout.greeting(new Date(), user, title);
+    node.textContent = line;
+    node.hidden = line === title;
+  }
+
   function setBanner(config) {
     var banner = el('dashboardDetailBanner');
     if (!banner) return;
     banner.setAttribute('heading', config.title);
     banner.setAttribute('subtitle', config.subtitle);
+    setGreeting(config.title);
   }
 
   function setBannerForDashboard(dashboard) {
     var banner = el('dashboardDetailBanner');
     if (!banner || !dashboard) return;
     banner.setAttribute('heading', dashboard.name || 'Dashboard');
-    banner.setAttribute('subtitle', dashboard.description || 'Metric cards backed by the report module metric catalog');
+    banner.setAttribute('subtitle', dashboard.description || '');
+    setGreeting(dashboard.name || 'Dashboard');
   }
 
   function renderDashboardSwitcher() {
@@ -434,11 +565,15 @@
     });
   }
 
-  async function loadDashboardSwitcher() {
-    if (dashboardSwitcherLoaded) {
-      renderDashboardSwitcher();
-      return;
-    }
+  var switcherPromise = null;
+
+  function loadDashboardSwitcher() {
+    if (!switcherPromise) switcherPromise = fetchDashboardSwitcher();
+    else renderDashboardSwitcher();
+    return switcherPromise;
+  }
+
+  async function fetchDashboardSwitcher() {
     dashboardSwitcherLoaded = true;
 
     try {
@@ -453,25 +588,21 @@
     }
   }
 
-  function setActiveType(type) {
+  // Breadcrumbs follow the real path (js/shared/insights-breadcrumbs.js);
+  // the shell's Back goes to the parent crumb.
+  function setCrumbs(items) {
     var breadcrumb = el('dashboardDetailBreadcrumb');
-    if (breadcrumb) {
-      breadcrumb.items = [
-        { label: 'Dashboard', href: 'admin/analytics.html' },
-        { label: VIEW_CONFIG[type].title },
-      ];
-    }
+    if (breadcrumb) breadcrumb.items = items;
+    var app = document.querySelector ? document.querySelector('lex-app') : null;
+    if (app) app.backHref = window.InsightsBreadcrumbs.backHref(items);
+  }
+
+  function setActiveType(type) {
+    setCrumbs(window.InsightsBreadcrumbs.dashboardDetail({ name: VIEW_CONFIG[type].title, standard: true }));
   }
 
   function setActiveDashboardBreadcrumb(dashboard) {
-    var breadcrumb = el('dashboardDetailBreadcrumb');
-    if (breadcrumb) {
-      breadcrumb.items = [
-        { label: 'Dashboard', href: 'admin/analytics.html' },
-        { label: 'All dashboards', href: 'admin/dashboard-library.html' },
-        { label: dashboard && dashboard.name ? dashboard.name : 'Dashboard' },
-      ];
-    }
+    setCrumbs(window.InsightsBreadcrumbs.dashboardDetail({ name: dashboard && dashboard.name ? dashboard.name : 'Dashboard' }));
   }
 
   function normalizeCardResponse(response) {
@@ -488,26 +619,18 @@
     };
   }
 
+  // Small muted counts in the header: how many cards have data, in how many groups.
   function renderViewContext(type, metrics, groups) {
     var context = el('dashboardViewContext');
-    var config = VIEW_CONFIG[type];
-    if (!context || !config) return;
+    if (!context) return;
 
     var groupLabel = groups.length === 1 ? '1 group' : groups.length + ' groups';
     // A tile with no data (a data_state that is not ok) is not populated.
     var populated = metrics.filter(function (metric) { return !window.DataState.isProblem(metric); }).length;
-    var metricLabel = populated === 1 ? '1 populated metric' : populated + ' populated metrics';
+    var metricLabel = populated === 1 ? '1 metric with data' : populated + ' metrics with data';
 
-    context.innerHTML = ''
-      + '<div>'
-      + '<div class="dash-view-context__eyebrow">' + escapeHtml(config.contextLabel) + '</div>'
-      + '<div class="dash-view-context__title">' + escapeHtml(config.title) + '</div>'
-      + '<div class="dash-view-context__text">' + escapeHtml(config.contextDescription) + '</div>'
-      + '</div>'
-      + '<div class="dash-view-context__meta">'
-      + '<span>' + escapeHtml(metricLabel) + '</span>'
-      + '<span>' + escapeHtml(groupLabel) + '</span>'
-      + '</div>';
+    context.innerHTML = '<span>' + escapeHtml(metricLabel) + '</span>'
+      + '<span>' + escapeHtml(groupLabel) + '</span>';
   }
 
   function metricMatchesSearch(metric, query) {
@@ -554,43 +677,20 @@
     });
   }
 
+  // Pill tabs across the top: All, then one per group, with counts.
   function renderTypeFilters(groups) {
     var container = el('dashboardTypeFilters');
     if (!container) return;
 
-    var total = allDashboardMetrics.length;
-    var buttons = [
-      '<button class="dash-browser__filter' + (activeTypeFilter === 'all' ? ' is-active' : '') + '" type="button" data-dashboard-type-filter="all">'
-      + '<span>All Types</span><strong>' + escapeHtml(total) + '</strong></button>'
-    ];
-
-    groups.forEach(function (group) {
-      buttons.push(
-        '<button class="dash-browser__filter' + (activeTypeFilter === group.key ? ' is-active' : '') + '" type="button" data-dashboard-type-filter="' + escapeHtml(group.key) + '">'
-        + '<span>' + escapeHtml(group.label) + '</span><strong>' + escapeHtml(group.metrics.length) + '</strong></button>'
-      );
-    });
-
-    container.innerHTML = buttons.join('');
-    renderTypeSelect(groups, total);
-  }
-
-  // Dropdown twin of the filter list, shown when the column is narrow.
-  // Options are only reassigned when they change so a search keystroke
-  // does not close an open dropdown.
-  function renderTypeSelect(groups, total) {
-    var select = el('dashboardTypeSelect');
-    if (!select) return;
-
-    var options = [{ value: 'all', label: 'All Types (' + total + ')' }].concat(groups.map(function (group) {
-      return { value: group.key, label: group.label + ' (' + group.metrics.length + ')' };
-    }));
-    var signature = JSON.stringify(options);
-    if (select.dataset.optionsSignature !== signature) {
-      select.dataset.optionsSignature = signature;
-      select.options = options;
+    function tab(key, label, count) {
+      var active = activeTypeFilter === key;
+      return '<button class="dash-tab' + (active ? ' is-active' : '') + '" type="button" role="tab" aria-selected="' + (active ? 'true' : 'false')
+        + '" data-dashboard-type-filter="' + escapeHtml(key) + '"><span>' + escapeHtml(label) + '</span><strong>' + escapeHtml(count) + '</strong></button>';
     }
-    if (select.value !== activeTypeFilter) select.value = activeTypeFilter;
+
+    container.innerHTML = [tab('all', 'All', allDashboardMetrics.length)].concat(groups.map(function (group) {
+      return tab(group.key, group.label, group.metrics.length);
+    })).join('');
   }
 
   function detailRow(label, value) {
@@ -601,18 +701,769 @@
     return hasValue(value) ? '<div class="dash-metric-modal__block"><span>' + escapeHtml(label) + '</span><p>' + escapeHtml(displayText(value)) + '</p></div>' : '';
   }
 
-  function renderMetricCard(metric) {
+  // Tiles animate (entrance, count-up, bars) only when new data arrives,
+  // not when a search or type filter redraws the same numbers.
+  var animateNextRender = false;
+  // True while declared cards are being drawn (no section eyebrows).
+  var renderingDeclared = false;
+  var tileIndex = 0;
+
+  // Nothing to chart for a list card that came back empty.
+  var EMPTY_LIST_STATE = {
+    data_state: 'insufficient_data',
+    data_state_reason: 'There is nothing to show for these dates yet.',
+  };
+
+  // item: { role, span } from DashboardLayout.buildLayout (absent when a
+  // single card is drawn on its own).
+  function cardClass(extra, item) {
+    var classes = 'dash-metric-card' + (extra ? ' ' + extra : '');
+    if (item && item.role) {
+      classes += ' dash-bento__item dash-bento__item--' + item.role;
+      if (item.role === 'hero') classes += ' dash-metric-card--hero';
+      // Packed spans (DashboardLayout.packRows) at four and two columns.
+      if (item.span4) classes += ' dash-span-4-' + item.span4 + ' dash-span-2-' + item.span2;
+    }
+    if (animateNextRender) {
+      tileIndex += 1;
+      classes += ' lex-entrance' + (tileIndex <= 5 ? ' lex-entrance-step-' + tileIndex : ' lex-entrance-step-5');
+    }
+    return classes;
+  }
+
+  // One click to the records behind the number: the metric detail page,
+  // opened on its source records with the same dates.
+  // A layout key can match its card by the last part only (older saved
+  // layouts, spec keys); links and detail requests always use the card's
+  // own catalog key.
+  function catalogKey(key) {
+    var metric = declaredIndex && key ? window.DashboardCards.metricFor(declaredIndex, key) : null;
+    return (metric && (metric.metric_key || metric.key)) || key;
+  }
+
+  function recordsHref(cardId) {
+    return window.DashboardPeriod.metricDetailHref(catalogKey(cardId), {
+      periodStart: currentPeriod.start, periodEnd: currentPeriod.end, compareBy: currentPeriod.compareBy,
+    }, currentDashboardId ? { from: 'dashboard', dashboardId: currentDashboardId } : {});
+  }
+
+  var RECORDS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+    + '<path d="M3 5h18M3 12h18M3 19h18"/></svg>';
+
+  // One card shell: a header row [title][details], the body (the visual,
+  // which takes the spare height), and a footer row [the picked period]
+  // [See the records]. withRecords is kept for callers; the records link
+  // lives in the footer (cardFooter).
+  function cardTop(metric, cardId, withRecords) {
+    var records = '';
+    // Declared cards (layout.cards) leave out the catalog section eyebrow.
+    var eyebrow = renderingDeclared ? ''
+      : '<div class="dash-metric-card__eyebrow">' + escapeHtml(getGroupLabel(metric, currentDashboardType)) + '</div>';
+    return '<div class="dash-metric-card__top"><div class="dash-metric-card__label">'
+      + eyebrow
+      + '<div class="dash-metric-card__title">' + escapeHtml(metric.title || metric.name || humanize(metric.metric_key) || 'Metric') + '</div>'
+      + '</div>'
+      + '<div class="dash-metric-card__tools">' + records
+      + '<button class="dash-metric-card__info" type="button" aria-label="Metric details" data-metric-info="' + escapeHtml(cardId) + '">i</button>'
+      + '</div></div>';
+  }
+
+  // The change against the previous period: a chip with an arrow when the
+  // server sent a percent, otherwise the older absolute row.
+  function deltaHtml(metric) {
+    var arrow = window.MetricCardView.comparisonArrow(metric.comparison);
+    if (arrow) return window.MiniCharts.deltaChip(arrow, 'vs previous period');
+    return renderComparison(metric.comparison, metric.format);
+  }
+
+  // Every card follows the picked dates, so the footer names the period.
+  function periodLine(metric) {
+    return '<div class="dash-metric-card__period">' + escapeHtml(metric.period || metric.period_label || currentPeriod.label || 'Current period') + '</div>';
+  }
+
+  // The footer row: the period and the records link.
+  function cardFooter(metric, recordsKey, linkLabel) {
+    var link = recordsKey
+      ? '<button class="dash-metric-card__link dash-card__records" type="button" data-metric-detail-link="' + escapeHtml(recordsHref(recordsKey)) + '">'
+        + RECORDS_ICON + '<span>' + escapeHtml(linkLabel || 'See the records') + '</span></button>'
+      : '';
+    return '<div class="dash-card__footer">' + (metric ? periodLine(metric) : '<span></span>') + link + '</div>';
+  }
+
+  function plainNumber(value) {
+    return value === null || value === undefined ? window.DataState.EMPTY_VALUE
+      : Number(value).toLocaleString('en-US', { maximumFractionDigits: 2 });
+  }
+
+  function renderListCard(metric, cardId, item) {
+    var bars = window.MetricCardView.listBars(metric.value, 12);
+    if (bars.empty) {
+      return '<article class="' + cardClass('dash-metric-card--waiting', item) + '">' + cardTop(metric, cardId, false)
+        + window.DataState.render(EMPTY_LIST_STATE, { calm: true }) + cardFooter(metric, null) + '</article>';
+    }
+    return '<article class="' + cardClass('dash-metric-card--list', item) + '">' + cardTop(metric, cardId, true)
+      + listChartHtml(metric)
+      + cardFooter(metric, cardId)
+      + '</article>';
+  }
+
+  // A list metric's chart (columns, or bars past 12 rows) and its notes.
+  function listChartHtml(metric) {
+    var bars = window.MetricCardView.listBars(metric.value, 12);
+    if (bars.empty) return window.DataState.render(EMPTY_LIST_STATE, { calm: true });
+    // The unit: the server's row_format, else the card format.
+    var unit = window.MetricCardView.listValueFormat(metric);
+    var formatBar = unit === 'number' ? plainNumber : function (n) {
+      return n === null ? window.DataState.EMPTY_VALUE : formatMetricCardValue({ value: n, format: unit === 'percent' ? 'percentage' : unit });
+    };
+    // More than 12 rows read better as horizontal bars (8 shown, the rest counted).
+    if (bars.hiddenCount > 0) bars = window.MetricCardView.listBars(metric.value, 8);
+    // Each column opens the records; a "Not mapped" column opens Mappings.
+    var listKey = metric.metric_key || metric.key;
+    bars.rows.forEach(function (row) {
+      row.key = listKey;
+      if (row.muted) row.linkHref = MAPPINGS_PAGE;
+    });
+    var action = bars.neededPending ? window.DataState.goalAction(metric) : null;
+    var pendingNote = bars.neededPending
+      ? '<p class="dash-metric-card__list-note">Needed counts appear once a goal is set.'
+        + (action ? ' <button type="button" class="lex-data-state__action" data-data-state-action="' + escapeHtml(action.href) + '">' + escapeHtml(action.label) + '</button>' : '')
+        + '</p>'
+      : '';
+    return '<div class="dash-metric-card__chart">' + window.MiniCharts.breakdownHtml(bars, formatBar, { href: recordsHref }) + pendingNote + '</div>';
+  }
+
+  // ── Declared cards (layout.cards; js/shared/dashboard-cards.js) ──────
+  // A metric the response did not include reads as waiting, like the rest.
+  var MISSING_METRIC = {
+    data_state: 'insufficient_data',
+    data_state_reason: 'This number did not come back for these dates.',
+  };
+  var declaredIndex = null;
+
+  function metricTitle(metric, key) {
+    return (metric && (metric.title || metric.name)) || humanize(String(key || '').split('.').pop());
+  }
+
+  function declaredTop(def, key, metric, withRecords, title) {
+    if (metric) metricInfoById[key] = metric;
+    var shown = Object.assign({}, metric || { metric_key: key }, { title: title || def.title || metricTitle(metric, key) });
+    return cardTop(shown, key, withRecords);
+  }
+
+  function waitingChip(metric) {
+    var view = window.DataState.view(metric || MISSING_METRIC, { calm: true }) || { title: 'Waiting', reason: '' };
+    return '<span class="dash-chip-waiting" title="' + escapeHtml(view.reason) + '">' + escapeHtml(view.title) + '</span>';
+  }
+
+  // One detail line: a label (a link to that metric's records when it is
+  // a metric) and its value. valueHtml is already escaped.
+  function detailLine(label, valueHtml, key) {
+    var labelHtml = key
+      ? '<button type="button" class="dash-lines__label" data-metric-detail-link="' + escapeHtml(recordsHref(key)) + '" title="See the records">' + escapeHtml(label) + '</button>'
+      : '<span class="dash-lines__label">' + escapeHtml(label) + '</span>';
+    return '<li class="dash-lines__item">' + labelHtml + '<span class="dash-lines__value">' + valueHtml + '</span></li>';
+  }
+
+  function valueBlock(metric) {
+    return '<div class="dash-metric-card__result">'
+      + '<div class="dash-metric-card__value">' + escapeHtml(formatMetricCardValue(metric)) + '</div>'
+      + deltaHtml(metric) + '</div>';
+  }
+
+  function renderDeclaredGoal(resolved, layoutItem) {
+    var def = resolved.def;
+    var first = resolved.metrics[0];
+    var metric = first.metric;
+    var goal = window.DashboardCards.goalFor(metric);
+    var main;
+    if (first.waiting) {
+      main = window.DataState.render(metric || MISSING_METRIC, { calm: true });
+    } else if (goal && goal.progress && goal.progress.available) {
+      var progress = goal.progress;
+      var target = progress.target !== null ? formatMetricCardValue({ value: progress.target, format: metric.format }) : '';
+      main = '<div class="dash-metric-card__result dash-metric-card__result--goal">'
+        + window.MiniCharts.ringHtml(progress, { value: formatMetricCardValue(metric), target: target })
+        + (progress.met ? '<lex-brand-mark class="dash-metric-card__goal-met" animation="success" size="32" label="Goal met"></lex-brand-mark>' : '')
+        + '</div>' + deltaHtml(metric);
+    } else {
+      main = valueBlock(metric) + (goal && goal.progress && !goal.progress.available
+        ? '<p class="dash-metric-card__goal-note">' + escapeHtml(goal.progress.note) + '</p>' : '');
+    }
+    var chipKeys = def.options ? def.options.chips : [];
+    var chips = chipKeys.map(function (key) { return chipHtml(key, window.DashboardCards.metricFor(declaredIndex, key)); }).join('');
+    var lines = (goal ? goal.details : []).map(function (detail) {
+      return detailLine(detail.label, escapeHtml(formatMetricCardValue({ value: detail.value, format: metric.format })), null);
+    }).concat(resolved.metrics.slice(1).filter(function (entry) { return chipKeys.indexOf(entry.key) === -1; }).map(function (entry) {
+      return detailLine(metricTitle(entry.metric, entry.key),
+        entry.waiting ? waitingChip(entry.metric) : escapeHtml(formatMetricCardValue(entry.metric)), entry.key);
+    }));
+    return '<article class="' + cardClass(accentClass(def, 'dash-metric-card--goal'), layoutItem) + '">'
+      + declaredTop(def, first.key, metric, !first.waiting, window.DashboardCards.compositeTitle(def, resolved.metrics))
+      + main
+      + (chips ? '<div class="dash-chips">' + chips + '</div>' : '')
+      + (lines.length ? '<ul class="dash-lines">' + lines.join('') + '</ul>' : '')
+      + cardFooter(metric, first.waiting ? null : first.key)
+      + '</article>';
+  }
+
+  function renderDeclaredBreakdown(resolved, layoutItem) {
+    var def = resolved.def;
+    var active = window.DashboardCards.activeVariant(def, variantPicks[def.id]);
+    var metric = window.DashboardCards.metricFor(declaredIndex, active.key);
+    var toggle = def.variants.length
+      ? '<div class="dash-variants" role="group" aria-label="Range">' + def.variants.map(function (variant, i) {
+        var on = i === active.index;
+        return '<button type="button" class="dash-variants__btn' + (on ? ' is-active' : '') + '" aria-pressed="' + (on ? 'true' : 'false')
+          + '" data-dashboard-variant="' + escapeHtml(def.id + '|' + i) + '">' + escapeHtml(variant.label) + '</button>';
+      }).join('') + '</div>'
+      : '';
+    var body;
+    if (window.DashboardCards.isWaiting(metric)) body = window.DataState.render(metric || MISSING_METRIC, { calm: true });
+    else if (Array.isArray(metric.value)) body = listChartHtml(metric);
+    else body = valueBlock(metric);
+    return '<article class="' + cardClass('dash-metric-card--list', layoutItem) + '">'
+      + declaredTop(def, active.key, metric, !!metric)
+      + toggle + body + cardFooter(metric, metric ? active.key : null)
+      + '</article>';
+  }
+
+  function renderDeclaredGroup(resolved, layoutItem) {
+    var def = resolved.def;
+    var rows = window.DashboardCards.groupRows(def, declaredIndex);
+    var firstOk = resolved.metrics.filter(function (entry) { return !entry.waiting; })[0];
+    var chart = window.MiniCharts.groupHtml(rows, {
+      funnel: def.chart === 'funnel',
+      format: function (row) { return formatMetricCardValue(row.metric); },
+      href: recordsHref,
+      waitingLabel: function (row) {
+        var view = window.DataState.view(row.metric || MISSING_METRIC, { calm: true });
+        return view ? view.title : 'Waiting';
+      },
+    });
+    return '<article class="' + cardClass('dash-metric-card--group', layoutItem) + '">'
+      + declaredTop(def, def.keys[0], resolved.metrics[0].metric, false, window.DashboardCards.compositeTitle(def, resolved.metrics))
+      + '<div class="dash-metric-card__chart">' + chart + '</div>'
+      + cardFooter(firstOk ? firstOk.metric : null, null)
+      + '</article>';
+  }
+
+  function renderDeclaredPair(resolved, layoutItem, captions) {
+    var def = resolved.def;
+    var halves = resolved.metrics.map(function (entry, i) {
+      var caption = captions && captions[i] ? '<span class="dash-compare__relation">' + escapeHtml(captions[i]) + '</span>' : '';
+      var value = entry.waiting ? waitingChip(entry.metric)
+        : '<span class="dash-pair__value">' + escapeHtml(formatMetricCardValue(entry.metric)) + '</span>' + caption + deltaHtml(entry.metric);
+      return '<div class="dash-pair__half">'
+        + '<button type="button" class="dash-pair__label" data-metric-detail-link="' + escapeHtml(recordsHref(entry.key)) + '" title="See the records">'
+        + escapeHtml(metricTitle(entry.metric, entry.key)) + '</button>' + value + '</div>';
+    }).join('');
+    var title = window.DashboardCards.compositeTitle(def, resolved.metrics);
+    var firstOk = resolved.metrics.filter(function (entry) { return !entry.waiting; })[0];
+    return '<article class="' + cardClass('dash-metric-card--pair', layoutItem) + '">'
+      + declaredTop(def, def.keys[0], resolved.metrics[0].metric, false, title)
+      + '<div class="dash-pair">' + halves + '</div>'
+      + (captions ? '<!--compare-extra-->' : '')
+      + cardFooter(firstOk ? firstOk.metric : null, null)
+      + '</article>';
+  }
+
+  // A card drawn from the source rows behind one metric: worklist, timeline
+  // or aging. The rows load after the card is on screen; a timeline without
+  // dates or aging without ages draws its fallback (a hidden template holds
+  // a chart fallback), never an empty chart.
+  function rowsSlot(key, visual, def, fallbackHtml) {
+    var o = def.options || {};
+    return '<div class="dash-worklist mini-spark-slot--loading' + (o.style === 'checklist' ? ' dash-worklist--checklist' : '') + '"'
+      + ' data-worklist-key="' + escapeHtml(key) + '" data-rows-visual="' + escapeHtml(visual) + '"'
+      + ' data-rows-fallback="' + escapeHtml(o.fallback || 'worklist') + '" data-rows-sort="' + escapeHtml(o.sort || '') + '"></div>'
+      + (fallbackHtml ? '<template class="dash-rows-fallback">' + fallbackHtml + '</template>' : '');
+  }
+
+  function renderDeclaredWorklist(resolved, layoutItem, visual) {
+    var def = resolved.def;
+    var entry = resolved.metrics[0];
+    // The first lineage caveat, as a short muted note (for example how
+    // fresh the bills are).
+    var caveats = entry.metric && entry.metric.lineage && Array.isArray(entry.metric.lineage.caveats) ? entry.metric.lineage.caveats : [];
+    var caveatNote = caveats.length ? '<p class="dash-card__note">' + escapeHtml(caveats[0]) + '</p>' : '';
+    var fallbackHtml = visual !== 'worklist' && def.options.fallback && def.options.fallback !== 'worklist'
+      ? seriesChartHtml(resolved, def.options.fallback) : '';
+    return '<article class="' + cardClass(accentClass(def, 'dash-metric-card--worklist'), layoutItem) + '">'
+      + declaredTop(def, entry.key, entry.metric, true, def.title || metricTitle(entry.metric, entry.key))
+      + valueBlock(entry.metric)
+      + rowsSlot(entry.key, visual || 'worklist', def, fallbackHtml)
+      + caveatNote
+      + cardFooter(entry.metric, entry.key, 'View all')
+      + '</article>';
+  }
+
+  // ── The visual vocabulary (js/shared/card-visuals.js, mini-charts.js) ──
+  function accentClass(def, extra) {
+    var accent = def.options && def.options.accent;
+    return (extra || '') + (accent ? ' dash-accent dash-accent--' + accent : '');
+  }
+
+  function formatList(metric) {
+    var unit = window.MetricCardView.listValueFormat(metric);
+    return unit === 'number' ? plainNumber : function (n) {
+      return n === null ? window.DataState.EMPTY_VALUE : formatMetricCardValue({ value: n, format: unit === 'percent' ? 'percentage' : unit });
+    };
+  }
+
+  // The card's series: the rows of its one list metric, or one row per
+  // scalar metric. Each row knows the metric its records live under.
+  function seriesOf(resolved) {
+    var def = resolved.def;
+    var first = resolved.metrics[0];
+    if (resolved.metrics.length === 1 && first.metric && Array.isArray(first.metric.value)) {
+      var model = window.MetricCardView.listBars(first.metric.value, 1000);
+      var fmt = formatList(first.metric);
+      return model.rows.map(function (row) {
+        return { label: row.label, value: row.value, key: first.key, waiting: false, text: fmt(row.value) };
+      });
+    }
+    var groupRows = window.DashboardCards.groupRows(def, declaredIndex);
+    var labels = window.CardVisuals.shortLabels(groupRows.map(function (row) { return row.label; }));
+    return groupRows.map(function (row, i) {
+      return { label: labels[i], value: row.value, key: row.key, waiting: row.waiting, metric: row.metric,
+        text: row.waiting ? '' : formatMetricCardValue(row.metric), conversionPct: row.conversionPct, pct: row.pct };
+    });
+  }
+
+  function waitingTitle(row) {
+    var view = window.DataState.view((row && row.metric) || MISSING_METRIC, { calm: true });
+    return view ? view.title : 'Waiting';
+  }
+
+  // Columns from a series (the fallback and group "columns" visual).
+  function seriesColumnsModel(rows, labels) {
+    var shown = rows.filter(function (row) { return !row.waiting; });
+    var max = 0;
+    shown.forEach(function (row) {
+      if (row.value !== null && row.value > max) max = row.value;
+      if (row.second !== null && row.second !== undefined && row.second > max) max = row.second;
+    });
+    var pct = function (v) { return v !== null && v !== undefined && v > 0 && max > 0 ? Math.round((v / max) * 1000) / 10 : 0; };
+    var paired = shown.some(function (row) { return row.second !== null && row.second !== undefined; });
+    return {
+      empty: !shown.length,
+      rows: shown.map(function (row) {
+        var second = row.second === undefined ? null : row.second;
+        return { label: row.label, value: row.value, second: second, pct: pct(row.value), secondPct: second === null ? null : pct(second), key: row.key };
+      }),
+      paired: paired,
+      seriesLabels: paired ? (labels && labels.length === 2 ? labels : ['Actual', 'Needed']) : [],
+      hiddenCount: 0,
+    };
+  }
+
+  function seriesChartHtml(resolved, visual) {
+    var rows = seriesOf(resolved);
+    var textOf = function (row) { return row.text; };
+    var byValue = {};
+    rows.forEach(function (row) { byValue[row.value] = row.text; });
+    if (visual === 'donut') {
+      var centreKey = resolved.def.options.centre_key;
+      var centreMetric = centreKey ? window.DashboardCards.metricFor(declaredIndex, centreKey) : null;
+      var donut = window.CardVisuals.donutModel(rows);
+      if (!donut) return window.DataState.render(EMPTY_LIST_STATE, { calm: true });
+      // The centre: the named total metric, else the sum in the series' unit.
+      var first = resolved.metrics[0].metric;
+      var totalText = first && Array.isArray(first.value) ? formatList(first)(donut.total)
+        : formatMetricCardValue({ value: donut.total, format: first && first.format });
+      return window.MiniCharts.donutHtml(donut, {
+        centre: centreMetric && !window.DashboardCards.isWaiting(centreMetric) ? formatMetricCardValue(centreMetric) : totalText,
+        centreLabel: centreMetric ? metricTitle(centreMetric, centreKey) : 'Total',
+        format: function (v) { return byValue[v] !== undefined ? byValue[v] : String(v); },
+        href: recordsHref,
+      });
+    }
+    if (visual === 'ranked_bars') {
+      return window.MiniCharts.rankedHtml(window.CardVisuals.rankedModel(rows), {
+        format: textOf, href: recordsHref, initials: resolved.def.options.initials, waitingLabel: waitingTitle,
+      });
+    }
+    if (visual === 'stacked_bar') {
+      var labels = resolved.def.options.series_labels;
+      var parts = rows.map(function (row, i) { return Object.assign({}, row, { label: labels[i] || row.label }); });
+      var stacked = window.CardVisuals.stackedModel(parts);
+      return stacked ? window.MiniCharts.stackedHtml(stacked, { href: recordsHref, format: function (v) { return byValue[v] !== undefined ? byValue[v] : String(v); } })
+        : window.DataState.render(EMPTY_LIST_STATE, { calm: true });
+    }
+    if (visual === 'funnel') {
+      return window.MiniCharts.groupHtml(rows, { funnel: true, format: textOf, href: recordsHref, waitingLabel: waitingTitle });
+    }
+    // columns and paired_columns
+    var model = seriesColumnsModel(rows, resolved.def.options.series_labels);
+    if (model.empty) return window.DataState.render(EMPTY_LIST_STATE, { calm: true });
+    return window.MiniCharts.breakdownHtml(model, function (n) { return byValue[n] !== undefined ? byValue[n] : plainNumber(n); }, { href: recordsHref });
+  }
+
+  function seriesCard(resolved, layoutItem, visual) {
+    var def = resolved.def;
+    var firstOk = resolved.metrics.filter(function (entry) { return !entry.waiting; })[0];
+    var single = resolved.metrics.length === 1;
+    return '<article class="' + cardClass(accentClass(def, 'dash-metric-card--chart'), layoutItem) + '">'
+      + declaredTop(def, def.keys[0], resolved.metrics[0].metric, single, window.DashboardCards.compositeTitle(def, resolved.metrics))
+      + '<div class="dash-metric-card__chart">' + seriesChartHtml(resolved, visual) + '</div>'
+      + cardFooter(firstOk ? firstOk.metric : null, single ? def.keys[0] : null)
+      + '</article>';
+  }
+
+  // Two list metrics side by side by label (new and closed by service).
+  function renderPairedColumns(resolved, layoutItem) {
+    var def = resolved.def;
+    // The two lists: metric_keys_override (the spec), else the card's own
+    // keys when both are list metrics (the saved dashboards).
+    var listKeys = def.options.metric_keys_override.length ? def.options.metric_keys_override : def.keys;
+    var lists = listKeys.map(function (key) { return { key: key, metric: window.DashboardCards.metricFor(declaredIndex, key) }; });
+    var usable = lists.length === 2 && lists.every(function (l) { return l.metric && !window.DashboardCards.isWaiting(l.metric) && Array.isArray(l.metric.value); });
+    if (!usable) {
+      var one = resolved.metrics[0];
+      if (resolved.metrics.length === 1 && one.metric && Array.isArray(one.metric.value)) return renderDeclaredBreakdown(resolved, layoutItem);
+      return seriesCard(resolved, layoutItem, 'columns');
+    }
+    var rows = window.CardVisuals.pairedSeries(lists[0].metric.value, lists[1].metric.value).map(function (row) {
+      return Object.assign(row, { key: lists[0].key });
+    });
+    var model = seriesColumnsModel(rows, def.options.series_labels);
+    var chips = def.options.headline_keys.map(function (key) {
+      var metric = window.DashboardCards.metricFor(declaredIndex, key);
+      return chipHtml(key, metric);
+    }).join('');
+    return '<article class="' + cardClass(accentClass(def, 'dash-metric-card--chart'), layoutItem) + '">'
+      + declaredTop(def, lists[0].key, lists[0].metric, false, window.DashboardCards.compositeTitle(def, resolved.metrics))
+      + (chips ? '<div class="dash-chips">' + chips + '</div>' : '')
+      + '<div class="dash-metric-card__chart">' + window.MiniCharts.breakdownHtml(model, plainNumber, { href: recordsHref }) + '</div>'
+      + cardFooter(lists[0].metric, null)
+      + '</article>';
+  }
+
+  // A small labelled value that opens its metric's records.
+  function chipHtml(key, metric) {
+    var value = window.DashboardCards.isWaiting(metric) ? waitingChip(metric) : '<strong>' + escapeHtml(formatMetricCardValue(metric)) + '</strong>';
+    return '<button type="button" class="dash-chip" data-metric-detail-link="' + escapeHtml(recordsHref(key)) + '">'
+      + '<span>' + escapeHtml(metricTitle(metric, key)) + '</span>' + value + '</button>';
+  }
+
+  function appendToCard(html, extra) {
+    if (!extra) return html;
+    // Extra content goes above the footer row when the card has one.
+    var footer = html.lastIndexOf('<div class="dash-card__footer">');
+    if (footer !== -1) return html.slice(0, footer) + extra + html.slice(footer);
+    var end = html.lastIndexOf('</article>');
+    return end === -1 ? html : html.slice(0, end) + extra + html.slice(end);
+  }
+
+  function heroOrStat(resolved, layoutItem, visual) {
+    var def = resolved.def;
+    var entry = resolved.metrics[0];
+    var o = def.options;
+    var extra = '';
+    if (o.inner === 'gauge' || visual === 'gauge') {
+      // On the hero the big number already says the value; the dial sits beside it.
+      extra += window.MiniCharts.gaugeHtml(window.CardVisuals.gaugeModel(entry.metric.value), visual === 'hero' ? '' : formatMetricCardValue(entry.metric));
+    }
+    if (o.unit && visual !== 'gauge') {
+      var text = formatMetricCardValue(entry.metric);
+      if (text.toLowerCase().indexOf(o.unit.toLowerCase()) === -1) extra += '<p class="dash-metric-card__unit">' + escapeHtml(o.unit) + '</p>';
+    }
+    if (o.benchmark) extra += '<p class="dash-metric-card__benchmark">Benchmark: ' + escapeHtml(o.benchmark) + '</p>';
+    if (o.badge_key) extra += '<div class="dash-chips">' + chipHtml(o.badge_key, window.DashboardCards.metricFor(declaredIndex, o.badge_key)) + '</div>';
+    var lines = o.detail.map(function (key) {
+      var metric = window.DashboardCards.metricFor(declaredIndex, key);
+      return detailLine(metricTitle(metric, key), window.DashboardCards.isWaiting(metric) ? waitingChip(metric) : escapeHtml(formatMetricCardValue(metric)), key);
+    });
+    if (lines.length) extra += '<ul class="dash-lines">' + lines.join('') + '</ul>';
+    var item = Object.assign({}, layoutItem, { role: visual === 'hero' ? 'hero' : layoutItem.role });
+    // The declared card title wins over the catalog title.
+    var html = renderMetricCard(def.title ? Object.assign({}, entry.metric, { title: def.title }) : entry.metric, item);
+    if (visual === 'gauge') {
+      // The dial replaces the big number on a gauge card.
+      html = html.replace('dash-metric-card--kpi', 'dash-metric-card--kpi dash-metric-card--gauge');
+    }
+    if (o.inner === 'gauge' && visual === 'hero') html = html.replace('dash-metric-card--hero', 'dash-metric-card--hero dash-metric-card--hero-gauge');
+    return appendToCard(html, extra);
+  }
+
+  function renderBullet(resolved, layoutItem) {
+    var def = resolved.def;
+    var first = resolved.metrics[0];
+    var goal = window.DashboardCards.goalFor(first.metric);
+    var last = resolved.metrics.length > 1 ? resolved.metrics[resolved.metrics.length - 1] : null;
+    var target = goal && goal.progress && goal.progress.target !== null ? goal.progress.target
+      : (last && !last.waiting ? Number(last.metric.value) : null);
+    var model = first.waiting ? null : window.CardVisuals.bulletModel(first.metric.value, target);
+    if (!model) return renderDeclaredGoal(resolved, layoutItem);
+    var fmt = function (v) { return formatMetricCardValue({ value: v, format: first.metric.format }); };
+    var lines = resolved.metrics.slice(1, last ? -1 : undefined).map(function (entry) {
+      return detailLine(metricTitle(entry.metric, entry.key), entry.waiting ? waitingChip(entry.metric) : escapeHtml(formatMetricCardValue(entry.metric)), entry.key);
+    });
+    return '<article class="' + cardClass(accentClass(def, 'dash-metric-card--goal'), layoutItem) + '">'
+      + declaredTop(def, first.key, first.metric, true, window.DashboardCards.compositeTitle(def, resolved.metrics))
+      + valueBlock(first.metric)
+      + window.MiniCharts.bulletHtml(model, { actual: fmt(first.metric.value), goal: fmt(target), gap: fmt(Math.abs(model.gap)) })
+      + (lines.length ? '<ul class="dash-lines">' + lines.join('') + '</ul>' : '')
+      + cardFooter(first.metric, first.key)
+      + '</article>';
+  }
+
+  function renderCompare(resolved, layoutItem) {
+    var def = resolved.def;
+    // The relation reads under the second value ("$305 per new client").
+    var html = renderDeclaredPair(resolved, layoutItem, ['', def.options.relation]);
+    var a = resolved.metrics[0];
+    var b = resolved.metrics[1];
+    var extra = '';
+    if (def.options.ratio_bar && a && b && !a.waiting && !b.waiting) {
+      var ratio = window.CardVisuals.compareModel(a.metric.value, b.metric.value);
+      if (ratio.ratioPct !== null) {
+        extra += '<div class="dash-compare__ratio"><svg viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true" focusable="false">'
+          + '<rect class="dash-compare__ratio-track" x="0" y="0" width="100" height="8"></rect>'
+          + '<rect class="dash-compare__ratio-fill" x="0" y="0" width="' + ratio.ratioPct + '" height="8"></rect></svg>'
+          + '<span>' + escapeHtml(Math.round(ratio.ratioPct) + '% ' + def.options.relation) + '</span></div>';
+      }
+    }
+    html = html.replace('dash-metric-card--pair', accentClass(def, 'dash-metric-card--pair'));
+    return html.replace('<!--compare-extra-->', extra);
+  }
+
+  // Every row adds up to the column count (four, or two when narrow), so
+  // no grid cell is ever empty; a card alone in its row spans it all.
+  function withSpans(items) {
+    // A hero in a calm state takes its own short row (full width), so it
+    // never stretches into a tall, mostly empty green card.
+    items = items.map(function (item) {
+      return item.role === 'hero' && item.resolved && item.resolved.state === 'waiting' ? Object.assign({}, item, { span: 4 }) : item;
+    });
+    var four = window.DashboardLayout.packRows(items, 4);
+    var two = window.DashboardLayout.packRows(items, 2);
+    return items.map(function (item, i) {
+      return Object.assign({}, item, { span4: four[i].span, span2: two[i].span });
+    });
+  }
+
+  // The declared card behind each info button (any of its keys), for the
+  // "How this card works" panel.
+  var cardInfoByKey = {};
+
+  // Settings > Mappings, where a firm maps its case and appointment types.
+  var MAPPINGS_PAGE = 'settings-v2.html#mappings';
+
+  // "42 matters are not mapped to a service yet" with a link, from the
+  // first metric on the card that reports mapping_coverage.
+  function coverageHtml(metrics) {
+    var model = window.SettingsMappingsModel;
+    if (!model) return '';
+    for (var i = 0; i < metrics.length; i += 1) {
+      var text = metrics[i] ? model.coverageCaveat(metrics[i].mapping_coverage) : null;
+      if (text) {
+        return '<p class="dash-card__caveat">' + escapeHtml(text) + '. <a href="#" class="dash-card__caveat-link" data-metric-detail-link="'
+          + escapeHtml(MAPPINGS_PAGE) + '">Map them</a></p>';
+      }
+    }
+    return '';
+  }
+
+  function renderDeclaredCard(item) {
+    item.resolved.def.keys.concat(item.resolved.def.options.metric_keys_override || []).forEach(function (key) {
+      if (!cardInfoByKey[key]) cardInfoByKey[key] = item.resolved;
+    });
+    var note = item.resolved.def.options && item.resolved.def.options.note;
+    var html = appendToCard(renderDeclaredVisual(item), coverageHtml(item.resolved.metrics.map(function (entry) { return entry.metric; })));
+    // The card's note: one muted line above the footer.
+    return note ? appendToCard(html, '<p class="dash-card__note">' + escapeHtml(note) + '</p>') : html;
+  }
+
+  function renderDeclaredVisual(item) {
+    var resolved = item.resolved;
+    var def = resolved.def;
+    var layoutItem = { role: item.role, span: item.span, span4: item.span4, span2: item.span2 };
+    var visual = window.CardVisuals.visualFor(def);
+    switch (visual) {
+      case 'hero':
+      case 'stat':
+      case 'gauge':
+        // A waiting hero stays one row tall with the calm state.
+        if (resolved.state === 'waiting') {
+          var first = resolved.metrics[0];
+          var shown = first.metric || Object.assign({ metric_key: first.key, title: metricTitle(null, first.key) }, MISSING_METRIC);
+          return renderMetricCard(def.title ? Object.assign({}, shown, { title: def.title }) : shown, layoutItem);
+        }
+        return resolved.metrics[0].metric && !Array.isArray(resolved.metrics[0].metric.value)
+          ? heroOrStat(resolved, layoutItem, visual) : seriesCard(resolved, layoutItem, 'columns');
+      case 'ring': return renderDeclaredGoal(resolved, layoutItem);
+      case 'bullet': return renderBullet(resolved, layoutItem);
+      case 'columns':
+        return def.kind === 'breakdown' || (resolved.metrics.length === 1 && resolved.metrics[0].metric && Array.isArray(resolved.metrics[0].metric.value))
+          ? renderDeclaredBreakdown(resolved, layoutItem) : seriesCard(resolved, layoutItem, 'columns');
+      case 'paired_columns': return renderPairedColumns(resolved, layoutItem);
+      case 'ranked_bars':
+      case 'donut':
+      case 'stacked_bar':
+        return seriesCard(resolved, layoutItem, visual);
+      case 'funnel': return renderDeclaredGroup(resolved, layoutItem);
+      case 'compare': return renderCompare(resolved, layoutItem);
+      case 'worklist':
+      case 'timeline':
+      case 'aging':
+        return resolved.metrics.length === 1 ? renderDeclaredWorklist(resolved, layoutItem, visual)
+          : seriesCard(resolved, layoutItem, def.options.fallback && def.options.fallback !== 'worklist' ? def.options.fallback : 'columns');
+      default: return renderMetricCard(resolved.metrics[0].metric, layoutItem);
+    }
+  }
+
+  // A declared card whose metrics are all waiting: one calm card in the
+  // strip, showing the goal prompt when one of them has it.
+  function renderDeclaredWaitingCard(resolved) {
+    var pick = resolved.metrics.filter(function (entry) { return entry.metric && entry.metric.goal_input; })[0] || resolved.metrics[0];
+    return '<article class="dash-metric-card dash-metric-card--waiting">'
+      + declaredTop(resolved.def, pick.key, pick.metric, false, window.DashboardCards.compositeTitle(resolved.def, resolved.metrics))
+      + window.DataState.render(pick.metric || MISSING_METRIC, { calm: true }) + '</article>';
+  }
+
+  // Waiting cards collect in one strip at the bottom that opens on click.
+  function renderWaitingStrip(cardsHtml) {
+    if (!cardsHtml.length) return '';
+    var count = cardsHtml.length === 1 ? '1 card is waiting for setup' : cardsHtml.length + ' cards are waiting for setup';
+    return '<details class="dash-waiting-strip">'
+      + '<summary class="dash-waiting-strip__summary"><lex-brand-mark animation="idle" size="24"></lex-brand-mark>'
+      + '<span class="dash-waiting-strip__count">' + escapeHtml(count) + '</span>'
+      + '<span class="dash-waiting-strip__hint">Show</span></summary>'
+      + '<div class="dash-waiting-strip__cards">' + cardsHtml.join('') + '</div></details>';
+  }
+
+  // ── Worklists: the first rows behind a number ─────────────
+  var worklistCache = {};
+
+  // The worklist uses the same cell formatting as the records table on the
+  // metric's page (js/shared/metric-detail-view.js): no ids, words for
+  // codes, dates as days, amounts as money (right-aligned).
+  // rowColumns: the server's row_columns for these rows (headers, formats,
+  // labels), which win over the inferred columns when present.
+  function worklistHtml(rows, rowColumns) {
+    if (!rows.length) return '<p class="dash-worklist__empty">No records right now.</p>';
+    var view = window.MetricDetailView;
+    var table = view.recordsTable(rows, rowColumns);
+    var columns = view.worklistColumns(table.columns, 4);
+    var head = '<tr>' + columns.map(function (col) {
+      return '<th scope="col"' + (col.align === 'right' ? ' class="dash-worklist__num"' : '') + '>' + escapeHtml(col.label) + '</th>';
+    }).join('') + '</tr>';
+    var body = table.rows.slice(0, 5).map(function (row, index) {
+      return '<tr>' + columns.map(function (col) {
+        var source = rows[index][col.key];
+        var text = view.formatCell(source, col);
+        if (text === null) return '<td class="dash-worklist__muted">-</td>';
+        var dot = col.key === 'status' ? '<span class="dash-dot dash-dot--' + escapeHtml(String(source).toLowerCase()) + '" aria-hidden="true"></span>' : '';
+        return '<td' + (col.align === 'right' ? ' class="dash-worklist__num"' : '') + '>' + dot + escapeHtml(text) + '</td>';
+      }).join('') + '</tr>';
+    }).join('');
+    return '<table class="dash-worklist__table"><thead>' + head + '</thead><tbody>' + body + '</tbody></table>';
+  }
+
+  function firmToday() {
+    var zone = window.Lex && Lex.Utils && Lex.Utils.getFirmTimezone ? Lex.Utils.getFirmTimezone() : undefined;
+    return LanaTime.reportPresetDays('today', zone).start;
+  }
+
+  function dayLabel(offset) {
+    var base = Date.parse(firmToday() + 'T00:00:00Z');
+    if (!isFinite(base)) return '';
+    return new Date(base + offset * 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  }
+
+  // caveats: metric detail's lineage caveats, shown as a short muted note
+  // when the card did not already show one of its own.
+  // rowsStatus: MetricDetailView.rowsStatus of the payload; when the server
+  // could not read the rows, show the calm note instead of an empty list.
+  function drawRows(slot, rows, rowColumns, caveats, rowsStatus) {
+    slot.classList.remove('mini-spark-slot--loading');
+    var key = slot.getAttribute('data-worklist-key');
+    var visual = slot.getAttribute('data-rows-visual') || 'worklist';
+    var template = slot.nextElementSibling && slot.nextElementSibling.classList && slot.nextElementSibling.classList.contains('dash-rows-fallback')
+      ? slot.nextElementSibling : null;
+    var choice = window.CardVisuals.chooseRowsVisual(visual, rows || [], slot.getAttribute('data-rows-fallback'), firmToday());
+    if (rowsStatus) {
+      // A fallback visual still shows; otherwise the note, never "no records".
+      slot.innerHTML = choice.visual !== 'worklist' && template ? template.innerHTML : window.MetricDetailView.unavailableHtml(rowsStatus);
+      var label = slot.parentNode && slot.parentNode.querySelector ? slot.parentNode.querySelector('.dash-card__records span') : null;
+      if (label && label.textContent === 'View all') label.textContent = 'See the records';
+    } else if (rows && choice.visual === 'timeline') {
+      slot.innerHTML = window.MiniCharts.timelineHtml(choice.model, { href: recordsHref(key), dayLabel: dayLabel });
+    } else if (rows && choice.visual === 'aging') {
+      slot.innerHTML = window.MiniCharts.agingHtml(choice.model, { href: recordsHref(key) });
+    } else if (choice.visual !== 'worklist' && template) {
+      slot.innerHTML = template.innerHTML;
+    } else if (rows) {
+      var sort = choice.sort || slot.getAttribute('data-rows-sort');
+      slot.innerHTML = worklistHtml(window.CardVisuals.sortRows(rows, sort), rowColumns);
+    } else {
+      slot.innerHTML = '';
+    }
+    var card = slot.parentNode;
+    if (Array.isArray(caveats) && caveats.length && card && !card.querySelector('.dash-card__note') && slot.insertAdjacentHTML) {
+      (template || slot).insertAdjacentHTML('afterend', '<p class="dash-card__note">' + escapeHtml(caveats[0]) + '</p>');
+    }
+  }
+
+  function queueWorklists(grid) {
+    if (!grid.querySelectorAll || !window.api || typeof api.getMetricDetail !== 'function') return;
+    Array.prototype.forEach.call(grid.querySelectorAll('[data-worklist-key]'), function (slot) {
+      var key = slot.getAttribute('data-worklist-key');
+      var visual = slot.getAttribute('data-rows-visual') || 'worklist';
+      // A worklist shows five rows; a timeline or aging chart reads more.
+      var limit = visual === 'worklist' ? 5 : 25;
+      var cacheKey = [key, limit, currentPeriod.start, currentPeriod.end].join('|');
+      if (!worklistCache[cacheKey]) {
+        worklistCache[cacheKey] = api.getMetricDetail(catalogKey(key), {
+          periodStart: currentPeriod.start, periodEnd: currentPeriod.end, compareBy: currentPeriod.compareBy, rawLimit: limit,
+        }).then(function (response) {
+          var payload = response && response.data ? response.data : response;
+          var rows = payload && payload.raw_data && Array.isArray(payload.raw_data.rows) ? payload.raw_data.rows : [];
+          var lineage = payload && payload.lineage;
+          return {
+            rows: rows.slice(0, limit),
+            columns: payload && Array.isArray(payload.row_columns) ? payload.row_columns : null,
+            caveats: lineage && Array.isArray(lineage.caveats) ? lineage.caveats : [],
+            rowsStatus: window.MetricDetailView.rowsStatus(payload && payload.raw_data),
+          };
+        }).catch(function () { return null; });
+      }
+      worklistCache[cacheKey].then(function (result) {
+        // The card's own row_columns answer first; metric detail's otherwise.
+        var metric = declaredIndex ? window.DashboardCards.metricFor(declaredIndex, key) : null;
+        var columns = metric && Array.isArray(metric.row_columns) ? metric.row_columns : (result && result.columns);
+        drawRows(slot, result ? result.rows : null, columns, result ? result.caveats : [], result ? result.rowsStatus : null);
+      });
+    });
+  }
+
+
+  function renderGoalCard(metric, cardId, progress, value, item) {
+    var target = formatMetricCardValue({ value: progress.target, format: metric.format });
+    var met = progress.met
+      ? '<lex-brand-mark class="dash-metric-card__goal-met" animation="success" size="32" label="Goal met"></lex-brand-mark>'
+      : '';
+    return '<article class="' + cardClass('dash-metric-card--goal', item) + '">' + cardTop(metric, cardId, true)
+      + '<div class="dash-metric-card__result dash-metric-card__result--goal">'
+      + window.MiniCharts.ringHtml(progress, { value: value, target: target }) + met
+      + '</div>'
+      + deltaHtml(metric)
+      + cardFooter(metric, cardId)
+      + '</article>';
+  }
+
+  function renderMetricCard(metric, item) {
     // A tile whose result is not ok (the backend failure model) shows the
-    // shared state block, whatever kind of metric it is.
+    // shared state block, whatever kind of metric it is: calm "waiting"
+    // wording for setup and goals, never a $0.
     if (window.DataState && window.DataState.isProblem(metric)) {
       var stateId = metric.metric_key || metric.key || metric.title;
       metricInfoById[stateId] = metric;
-      return '<article class="dash-metric-card"><div class="dash-metric-card__top"><div>'
-        + '<div class="dash-metric-card__eyebrow">' + escapeHtml(getGroupLabel(metric, currentDashboardType)) + '</div>'
-        + '<div class="dash-metric-card__title">'
-        + escapeHtml(metric.title || metric.name || humanize(metric.metric_key) || 'Metric') + '</div></div>'
-        + '<button class="dash-metric-card__info" type="button" aria-label="Metric details" data-metric-info="'
-        + escapeHtml(stateId) + '">i</button></div>' + window.DataState.render(metric) + '</article>';
+      var stateView = window.DataState.view(metric, { calm: true });
+      return '<article class="' + cardClass(stateView && stateView.waiting ? 'dash-metric-card--waiting' : 'dash-metric-card--problem', item) + '">'
+        + cardTop(metric, stateId, false) + window.DataState.render(metric, { calm: true }) + '</article>';
     }
     var intake = window.OpportunityIntakePresentation && window.OpportunityIntakePresentation.opportunityIntakePresentation(metric);
     if (intake) {
@@ -645,29 +1496,29 @@
         + window.CurrentPipelinePresentation.renderCurrentPipeline(pipeline) + '</article>';
     }
     var title = metric.title || metric.name || humanize(metric.metric_key) || 'Metric';
-    var value = formatMetricCardValue(metric);
     var cardId = metric.metric_key || metric.key || title;
-    var typeLabel = getGroupLabel(metric, currentDashboardType);
-    var periodLabel = metric.period || metric.period_label || currentPeriod.label || 'Current period';
     metricInfoById[cardId] = metric;
 
-    var comparisonHtml = renderComparison(metric.comparison, metric.format);
-    var goalHtml = renderGoal(metric.goal);
+    // A list value (rows of label + number) draws as columns, never "4 rows".
+    if (Array.isArray(metric.value)) return renderListCard(metric, cardId, item);
 
-    return '<article class="dash-metric-card">'
-      + '<div class="dash-metric-card__top">'
-      + '<div>'
-      + '<div class="dash-metric-card__eyebrow">' + escapeHtml(typeLabel) + '</div>'
-      + '<div class="dash-metric-card__title">' + escapeHtml(title) + '</div>'
-      + '</div>'
-      + '<button class="dash-metric-card__info" type="button" aria-label="Metric details" data-metric-info="' + escapeHtml(cardId) + '">i</button>'
-      + '</div>'
+    var value = formatMetricCardValue(metric);
+    var progress = window.MetricCardView.goalProgress(metric.goal);
+    if (progress && progress.available) return renderGoalCard(metric, cardId, progress, value, item);
+
+    var countUp = animateNextRender
+      ? ' data-count-up="' + escapeHtml(value) + '"' + (previousValues[cardId] ? ' data-count-from="' + escapeHtml(previousValues[cardId]) + '"' : '')
+      : '';
+    previousValues[cardId] = value;
+    return '<article class="' + cardClass('dash-metric-card--kpi', item) + '">'
+      + cardTop(metric, cardId, true)
       + '<div class="dash-metric-card__result">'
-      + '<div class="dash-metric-card__value">' + escapeHtml(value) + '</div>'
-      + '<div class="dash-metric-card__period">' + escapeHtml(periodLabel) + '</div>'
+      + '<div class="dash-metric-card__value"' + countUp + '>' + escapeHtml(value) + '</div>'
+      + deltaHtml(metric)
       + '</div>'
-      + comparisonHtml
-      + goalHtml
+      + '<div class="mini-spark-slot" data-sparkline-key="' + escapeHtml(cardId) + '"></div>'
+      + renderGoal(metric.goal, progress)
+      + cardFooter(metric, cardId)
       + '</article>';
   }
 
@@ -692,8 +1543,14 @@
       deltaText = formatMetricCardValue({ value: Math.abs(comparison.absolute_change), format: format });
     }
 
+    var arrow = window.MetricCardView ? window.MetricCardView.comparisonArrow(comparison) : null;
+    var arrowHtml = arrow && arrow.direction !== 'flat'
+      ? '<svg class="dash-metric-card__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+        + (arrow.direction === 'up' ? '<path d="M12 19V5M5 12l7-7 7 7"/>' : '<path d="M12 5v14M5 12l7 7 7-7"/>') + '</svg>'
+      : '';
     var deltaHtml = deltaText
-      ? '<span class="dash-metric-card__delta ' + dirClass + '">' + escapeHtml(sign + deltaText) + '</span>'
+      ? '<span class="dash-metric-card__delta ' + dirClass + '"' + (arrow ? ' title="' + escapeHtml(arrow.spoken) + '"' : '') + '>'
+        + arrowHtml + escapeHtml(sign + deltaText) + '</span>'
       : '';
     var priorHtml = view.hasPrevious
       ? '<span class="dash-metric-card__delta-prior">was ' + escapeHtml(formatMetricCardValue({ value: view.previousValue, format: format })) + '</span>'
@@ -707,8 +1564,12 @@
   }
 
   // Goal status band: status pill + attainment + optional pace indicator.
-  // Null goal -> render nothing.
-  function renderGoal(goal) {
+  // Null goal -> render nothing. A goal the server could not measure shows
+  // a quiet note under the value instead (no ring, no band).
+  function renderGoal(goal, progress) {
+    if (progress && !progress.available) {
+      return '<p class="dash-metric-card__goal-note">' + escapeHtml(progress.note) + '</p>';
+    }
     if (typeof MetricGoalComparison === 'undefined') return '';
     var view = MetricGoalComparison.buildGoalView(goal);
     if (!view) return '';
@@ -765,7 +1626,86 @@
       + '</div>';
   }
 
+  // ── How this card works (card.lineage now; the full lineage on open) ──
+  var lineageCache = {};
+
+  function howtoMetricHtml(key, metric) {
+    var title = metricTitle(metric, key);
+    var lines = window.LineageView.cardLines(metric && metric.lineage);
+    var full = lineageCache[[key, currentPeriod.start, currentPeriod.end].join('|')];
+    var model = full && full.model;
+    var parts = ['<section class="dash-howto__metric">', '<h3 class="dash-howto__title">' + escapeHtml(title) + '</h3>'];
+    var formula = (model && model.formula) || (lines && lines.formula);
+    if (formula) parts.push('<p class="dash-howto__formula">' + escapeHtml(formula) + '</p>');
+    var periodRule = (model && model.periodRule) || (lines && lines.periodRule);
+    if (periodRule) parts.push('<p class="dash-howto__dates">' + escapeHtml(periodRule) + '</p>');
+    if (model && model.sources.length) {
+      parts.push('<ul class="dash-howto__sources">' + model.sources.map(function (source) {
+        // The entity and its counts lead; a small line counts records of
+        // this type by system (not the records this number uses).
+        var sentence = source.systemsLabel.charAt(source.systemsLabel.length - 1) === '.';
+        var via = source.systemsText ? (sentence ? '' : escapeHtml(source.systemsLabel) + ': ') + escapeHtml(source.systemsText) : '';
+        if (source.stale) via += (via ? ', ' : '') + '<span class="dash-howto__stale">' + escapeHtml(source.staleText) + '</span>';
+        return '<li><span class="dash-howto__entity">' + escapeHtml(source.line) + '</span>'
+          + (via ? '<span class="dash-howto__via">' + via + '</span>' : '')
+          + (sentence ? '<span class="dash-howto__via">' + escapeHtml(source.systemsLabel) + '</span>' : '') + '</li>';
+      }).join('') + '</ul>');
+    } else if (lines && lines.sources.length) {
+      parts.push('<div class="dash-howto__chips">' + lines.sources.map(function (label) {
+        return '<span class="dash-howto__chip">' + escapeHtml(label) + '</span>';
+      }).join('') + '</div>');
+    }
+    parts.push('<button type="button" class="dash-metric-card__link" data-metric-detail-link="' + escapeHtml(recordsHref(key)) + '">See full details</button>');
+    parts.push('</section>');
+    return parts.join('');
+  }
+
+  function howtoHtml(resolved) {
+    var def = resolved.def;
+    var first = resolved.metrics[0];
+    var isList = resolved.metrics.length === 1 && first.metric && Array.isArray(first.metric.value);
+    var sentence = window.LineageView.cardSummary(window.CardVisuals.visualFor(def), resolved.metrics.length,
+      window.DashboardCards.compositeTitle(def, resolved.metrics), isList);
+    return '<div class="dash-howto">'
+      + (sentence ? '<p class="dash-howto__lead">' + escapeHtml(sentence) + '</p>' : '')
+      + resolved.metrics.map(function (entry) { return howtoMetricHtml(entry.key, entry.metric); }).join('')
+      + '</div>';
+  }
+
+  // The full lineage (metric detail, history only) loads when the panel opens.
+  function loadHowtoLineage(resolved, redraw) {
+    if (!window.api || typeof api.getMetricDetail !== 'function') return;
+    resolved.metrics.forEach(function (entry) {
+      var cacheKey = [entry.key, currentPeriod.start, currentPeriod.end].join('|');
+      if (lineageCache[cacheKey]) return;
+      lineageCache[cacheKey] = { model: null };
+      api.getMetricDetail(catalogKey(entry.key), {
+        periodStart: currentPeriod.start, periodEnd: currentPeriod.end, compareBy: currentPeriod.compareBy, rawLimit: 0,
+      }).then(function (response) {
+        var payload = response && response.data ? response.data : response;
+        lineageCache[cacheKey].model = window.LineageView.detailModel(payload && payload.lineage, Date.now());
+        redraw();
+      }).catch(function () { /* the instant summary stays */ });
+    });
+  }
+
   function openMetricModal(metricId) {
+    var resolved = cardInfoByKey[metricId];
+    if (resolved && window.LineageView) {
+      var modalNode = el('dashboardMetricModal');
+      var titleNode = el('dashboardMetricModalTitle');
+      var bodyNode = el('dashboardMetricModalBody');
+      var eyebrowNode = el('dashboardMetricModalEyebrow');
+      if (!modalNode || !titleNode || !bodyNode) return;
+      if (eyebrowNode) eyebrowNode.textContent = 'How this card works';
+      titleNode.textContent = window.DashboardCards.compositeTitle(resolved.def, resolved.metrics);
+      var redraw = function () { bodyNode.innerHTML = howtoHtml(resolved); };
+      redraw();
+      loadHowtoLineage(resolved, redraw);
+      modalNode.hidden = false;
+      document.body.classList.add('dash-metric-modal-open');
+      return;
+    }
     var metric = metricInfoById[metricId];
     var modal = el('dashboardMetricModal');
     var eyebrow = el('dashboardMetricModalEyebrow');
@@ -778,7 +1718,9 @@
     // Title fallback humanizes the raw key so the modal heading never shows
     // an identifier like `legal_firm.family_law.upcoming_custody_hearings`.
     title.textContent = metric.title || metric.name || humanize(metric.metric_key) || 'Metric';
-    body.innerHTML = renderModalDetails(metric);
+    // A card with lineage also says how it is worked out.
+    body.innerHTML = (metric.lineage && window.LineageView ? '<div class="dash-howto">' + howtoMetricHtml(metricId, metric) + '</div>' : '')
+      + renderModalDetails(metric);
     modal.hidden = false;
     document.body.classList.add('dash-metric-modal-open');
   }
@@ -790,18 +1732,17 @@
     document.body.classList.remove('dash-metric-modal-open');
   }
 
-  function renderGroup(group) {
-    return '<section class="dash-metric-section">'
-      + '<div class="dash-metric-section__header">'
-      + '<div>'
-      + '<h2 class="dash-metric-section__title">' + escapeHtml(group.label) + '</h2>'
-      + '<div class="dash-metric-section__subtitle">' + escapeHtml(group.metrics.length + (group.metrics.length === 1 ? ' metric' : ' metrics')) + '</div>'
-      + '</div>'
-      + '</div>'
-      + '<div class="dash-card-grid">'
-      + group.metrics.map(renderMetricCard).join('')
-      + '</div>'
-      + '</section>';
+  function renderSkeleton() {
+    function tile(role) {
+      return '<div class="dash-metric-card dash-metric-card--skeleton dash-bento__item dash-bento__item--' + role + '" aria-hidden="true">'
+        + '<span class="dash-skeleton dash-skeleton--eyebrow"></span>'
+        + '<span class="dash-skeleton dash-skeleton--title"></span>'
+        + '<span class="dash-skeleton dash-skeleton--value"></span>'
+        + '<span class="dash-skeleton dash-skeleton--line"></span>'
+        + '</div>';
+    }
+    return ['hero', 'kpi', 'kpi', 'kpi', 'kpi', 'chart', 'chart'].map(tile).join('')
+      + '<span class="dash-sr-only" role="status">Loading your numbers</span>';
   }
 
   function renderMetrics(metrics, summary, type) {
@@ -810,12 +1751,32 @@
     if (!grid) return;
 
     var dashboardType = type || getCurrentType();
+    setPeriodLoading(cardLoads.isLoading());
+    if (cardLoads.isLoading()) {
+      // Never "No metrics" while a request is out: keep the cards on screen
+      // (dimmed by the refreshing class), or show skeleton tiles the first time.
+      if (empty) empty.hidden = true;
+      if (!grid.querySelector || !grid.querySelector('.dash-metric-card')) grid.innerHTML = renderSkeleton();
+      return;
+    }
+
+    if (cardLoads.state === 'error') {
+      if (empty) empty.hidden = true;
+      grid.innerHTML = '<div class="dash-load-error">' + window.DataState.render({
+        data_state: 'engine_error', data_state_reason: 'The numbers could not be loaded. Pick the dates again to retry.',
+      }, { calm: true }) + '</div>';
+      return;
+    }
+
     var allGroups = groupMetrics(allDashboardMetrics, dashboardType);
     var filteredMetrics = filterMetrics(metrics, dashboardType);
-    var groups = groupMetrics(filteredMetrics, dashboardType);
     metricInfoById = {};
     renderViewContext(dashboardType, allDashboardMetrics, allGroups);
     renderTypeFilters(allGroups);
+    // A short declared dashboard needs no section tabs (catalog section names
+    // mean little to people); the search stays. Older dashboards keep tabs.
+    var tabs = el('dashboardTypeFilters');
+    if (tabs) tabs.hidden = !!(currentDeclaredCards && currentDeclaredCards.length <= 12);
 
     if (!filteredMetrics.length) {
       grid.innerHTML = '';
@@ -824,12 +1785,149 @@
     }
 
     if (empty) empty.hidden = true;
-    grid.innerHTML = groups.map(renderGroup).join('');
+    tileIndex = 0;
+    var unfiltered = activeTypeFilter === 'all' && !getActiveSearchQuery();
+    declaredIndex = window.DashboardCards.indexMetrics(allDashboardMetrics);
+    cardInfoByKey = {};
+    if (currentDeclaredCards && unfiltered) {
+      // The saved dashboard's own cards, in its order (dashboard-cards.js).
+      var plan = window.DashboardCards.planDeclared(window.DashboardCards.resolveCards(currentDeclaredCards, declaredIndex));
+      renderingDeclared = true;
+      try {
+        // Chapters: a quiet label row before each chapter's first card.
+        grid.innerHTML = plan.sections.map(function (section) {
+          return (section.label ? '<div class="dash-chapter" role="heading" aria-level="2">' + escapeHtml(section.label) + '</div>' : '')
+            + withSpans(section.items).map(renderDeclaredCard).join('');
+        }).join('') + renderWaitingStrip(plan.waiting.map(renderDeclaredWaitingCard));
+      } finally {
+        renderingDeclared = false;
+      }
+    } else {
+      // Bento grid: hero band, wide charts, then supporting cards
+      // (js/shared/dashboard-layout.js owns the order and sizes); waiting
+      // cards collect in one strip at the bottom.
+      var split = window.DashboardCards.splitWaiting(filteredMetrics);
+      grid.innerHTML = withSpans(window.DashboardLayout.buildLayout(split.shown)).map(function (item) {
+        return appendToCard(renderMetricCard(item.card, item), coverageHtml([item.card]));
+      }).join('') + renderWaitingStrip(split.waiting.map(function (metric) { return renderMetricCard(metric); }));
+    }
+    if (animateNextRender && grid.querySelectorAll) {
+      Array.prototype.forEach.call(grid.querySelectorAll('[data-count-up]'), function (node) {
+        window.MiniCharts.countUp(node, node.getAttribute('data-count-up'), { from: node.getAttribute('data-count-from') });
+      });
+    }
+    animateNextRender = false;
+    queueSparklines(grid);
+    queueWorklists(grid);
   }
 
-  async function loadMetrics(type) {
-    dashboardLoadToken += 1;
-    var myToken = dashboardLoadToken;
+  // ── Sparklines ───────────────────────────────────────────────
+  // Drawn from the metric's stored history (metric detail snapshots), after
+  // the tiles are on screen: at most three requests at a time, one result
+  // kept per metric and dates, and a failed or short history just leaves
+  // the space empty.
+  var SPARKLINE_CONCURRENCY = 3;
+  var sparklineCache = {};
+  var sparklineQueue = [];
+  var sparklineActive = 0;
+
+  function sparklineCacheKey(metricKey) {
+    return [metricKey, currentPeriod.start, currentPeriod.end, currentPeriod.compareBy].join('|');
+  }
+
+  function paintSparkline(slot, line) {
+    slot.classList.remove('mini-spark-slot--loading');
+    slot.innerHTML = window.MiniCharts.sparklineSvg(line);
+  }
+
+  var sparklineObserver = null;
+
+  function enqueueSparkline(slot) {
+    var metricKey = slot.getAttribute('data-sparkline-key');
+    sparklineQueue.push({ slot: slot, metricKey: metricKey, cacheKey: sparklineCacheKey(metricKey) });
+    pumpSparklines();
+  }
+
+  // Only tiles that scroll into view ask for their history.
+  function queueSparklines(grid) {
+    if (!grid.querySelectorAll || !window.api || typeof api.getMetricDetail !== 'function') return;
+    sparklineQueue = [];
+    if (sparklineObserver) sparklineObserver.disconnect();
+    sparklineObserver = typeof window.IntersectionObserver === 'function'
+      ? new window.IntersectionObserver(function (entries, observer) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          observer.unobserve(entry.target);
+          enqueueSparkline(entry.target);
+        });
+      }, { rootMargin: '200px 0px' })
+      : null;
+    Array.prototype.forEach.call(grid.querySelectorAll('[data-sparkline-key]'), function (slot) {
+      var cached = sparklineCache[sparklineCacheKey(slot.getAttribute('data-sparkline-key'))];
+      if (cached && cached.done) {
+        paintSparkline(slot, cached.line);
+        return;
+      }
+      slot.classList.add('mini-spark-slot--loading');
+      if (sparklineObserver) sparklineObserver.observe(slot);
+      else enqueueSparkline(slot);
+    });
+  }
+
+  function pumpSparklines() {
+    while (sparklineActive < SPARKLINE_CONCURRENCY && sparklineQueue.length) {
+      runSparkline(sparklineQueue.shift());
+    }
+  }
+
+  function fetchSparkline(job) {
+    var cached = sparklineCache[job.cacheKey];
+    if (cached) return cached.promise;
+    var period = currentPeriod;
+    var entry = { done: false, line: null };
+    // The sparkline needs only the history: raw_limit=0 skips the source rows.
+    entry.promise = api.getMetricDetail(catalogKey(job.metricKey), {
+      periodStart: period.start, periodEnd: period.end, compareBy: period.compareBy, rawLimit: 0,
+    }).then(function (response) {
+      var payload = response && response.data ? response.data : response;
+      entry.line = window.MetricCardView.sparkline(payload && payload.snapshots, 100, 24);
+    }).catch(function () {
+      entry.line = null;
+    }).then(function () {
+      entry.done = true;
+      return entry.line;
+    });
+    sparklineCache[job.cacheKey] = entry;
+    return entry.promise;
+  }
+
+  function runSparkline(job) {
+    sparklineActive += 1;
+    fetchSparkline(job).then(function (line) {
+      sparklineActive -= 1;
+      // A redraw may have replaced this slot; the new one reads the cache.
+      if (job.slot.isConnected !== false) paintSparkline(job.slot, line);
+      pumpSparklines();
+    });
+  }
+
+  function setFallbackNote(show) {
+    var note = el('dashboardFallbackNote');
+    if (!note) return;
+    note.innerHTML = show
+      ? 'This saved dashboard could not be opened right now, so these are the standard cards for its type. Change the dates to try again.'
+      : '';
+    note.hidden = !show;
+  }
+
+  // Saved dashboards read in this session, by id: their name and description
+  // still head the page if a later read of the definition fails.
+  var knownDashboards = {};
+
+  async function loadMetrics(type, options) {
+    var keepHeader = !!(options && options.keepHeader);
+    var myLoad = cardLoads.begin();
+    currentDeclaredCards = null;
     var config = VIEW_CONFIG[type];
     var banner = el('dashboardDetailBanner');
     if (banner) banner.classList.add('detail-banner--no-actions');
@@ -840,9 +1938,10 @@
     activeTypeFilter = 'all';
     activeSearchQuery = '';
     lastSearchInputValue = '';
-    allDashboardMetrics = [];
-    currentSummary = null;
-    setBanner(config);
+    if (!keepHeader) {
+      setBanner(config);
+      setStory(null);
+    }
     loadDashboardSwitcher();
     setActiveType(type);
     var search = el('dashboardMetricSearch');
@@ -851,8 +1950,10 @@
 
     try {
       var response = await api.getDashboardMetricCards(getMetricCardRequestParams(type, 250));
-      if (myToken !== dashboardLoadToken) return;
+      if (!cardLoads.isLatest(myLoad)) return;
       var normalized = normalizeCardResponse(response);
+      cardLoads.finish(myLoad, normalized.metrics.length);
+      animateNextRender = true;
       allDashboardMetrics = normalized.metrics;
       currentSummary = normalized.summary;
       var params = getParams();
@@ -864,7 +1965,7 @@
       }
       renderMetrics(allDashboardMetrics, currentSummary, type);
     } catch (err) {
-      if (myToken !== dashboardLoadToken) return;
+      if (!cardLoads.fail(myLoad)) return;
       console.error('[DashboardDetail] Failed to load metrics:', err);
       allDashboardMetrics = [];
       currentSummary = null;
@@ -873,31 +1974,64 @@
   }
 
   async function loadDashboardById(id) {
-    dashboardLoadToken += 1;
-    var myToken = dashboardLoadToken;
+    var myLoad = cardLoads.begin();
     currentDashboardId = id;
     currentDashboardName = '';
     currentDashboardMetricKeys = null;
     activeTypeFilter = 'all';
     activeSearchQuery = '';
     lastSearchInputValue = '';
-    allDashboardMetrics = [];
-    currentSummary = null;
+    renderMetrics([], null, currentDashboardType);
+
+    var dashboardResponse;
+    try {
+      dashboardResponse = await api.getBIDashboard(id);
+    } catch (definitionErr) {
+      if (!cardLoads.isLatest(myLoad)) return;
+      // The saved dashboard could not be read (a permission check or a
+      // server blip): show the standard cards for its type in the same bento,
+      // say so, and try the saved dashboard again on the next date change.
+      console.warn('[DashboardDetail] Could not read the saved dashboard:', definitionErr && definitionErr.message);
+      setFallbackNote(true);
+      // The saved dashboard's name and description still head the page
+      // (from this session, or the dashboard list); never the type title.
+      var known = knownDashboards[id];
+      if (!known) {
+        await loadDashboardSwitcher();
+        known = dashboardSwitcherItems.filter(function (item) { return item.id === id; })[0] || null;
+      }
+      if (known) {
+        setBannerForDashboard(known);
+        setStory(known);
+      } else {
+        setBannerForDashboard({ name: 'Dashboard', description: '' });
+        setStory(null);
+      }
+      await loadMetrics(currentDashboardType || 'owner', { keepHeader: true });
+      currentDashboardId = id;
+      return;
+    }
+    setFallbackNote(false);
 
     try {
-      var dashboardResponse = await api.getBIDashboard(id);
-      if (myToken !== dashboardLoadToken) return;
+      if (!cardLoads.isLatest(myLoad)) return;
       var dashboard = dashboardResponse && dashboardResponse.data ? dashboardResponse.data : dashboardResponse;
       currentDashboardName = dashboard && dashboard.name ? dashboard.name : '';
+      if (dashboard) knownDashboards[id] = dashboard;
       loadDashboardSwitcher();
       var banner = el('dashboardDetailBanner');
       if (banner) banner.classList.remove('detail-banner--no-actions');
       var layout = dashboard && dashboard.layout ? dashboard.layout : {};
       var type = VIEW_CONFIG[layout.dashboard_type] ? layout.dashboard_type : 'owner';
-      var metricKeys = Array.isArray(layout.metric_keys) ? layout.metric_keys : [];
-      currentDashboardMetricKeys = new Set(metricKeys);
+      // Declared cards (layout.cards) when the saved dashboard has them,
+      // otherwise its metric_keys as before.
+      var declared = window.DashboardCards.normalizeLayout(layout);
+      currentDeclaredCards = declared.mode === 'cards' ? declared.cards : null;
+      var metricKeys = window.DashboardCards.requestKeys(layout);
+      currentDashboardMetricKeys = new Set(metricKeys.concat(metricKeys.map(function (key) { return key.split('.').pop(); })));
       currentDashboardType = type;
       setBannerForDashboard(dashboard);
+      setStory(dashboard);
       setActiveDashboardBreadcrumb(dashboard);
       renderMetrics([], null, type);
 
@@ -906,7 +2040,7 @@
       var tileKeys = DashboardTiles.cardRequestKeys(layout);
       if (tileKeys) cardParams.metric_keys = tileKeys;
       var metricResponse = await api.getDashboardMetricCards(cardParams);
-      if (myToken !== dashboardLoadToken) return;
+      if (!cardLoads.isLatest(myLoad)) return;
       var normalized = normalizeCardResponse(metricResponse);
       allDashboardMetrics = normalized.metrics.filter(function (metric) {
         if (currentDashboardMetricKeys.size === 0) return true;
@@ -914,10 +2048,12 @@
         var shortKey = String(key || '').split('.').pop();
         return currentDashboardMetricKeys.has(key) || currentDashboardMetricKeys.has(shortKey);
       });
+      cardLoads.finish(myLoad, allDashboardMetrics.length);
+      animateNextRender = true;
       currentSummary = null;
       renderMetrics(allDashboardMetrics, currentSummary, type);
     } catch (err) {
-      if (myToken !== dashboardLoadToken) return;
+      if (!cardLoads.fail(myLoad)) return;
       console.error('[DashboardDetail] Failed to load dashboard:', err);
       allDashboardMetrics = [];
       currentSummary = null;
@@ -945,13 +2081,29 @@
 
   // Returns the default preset's promise: the first card load waits for it.
   function initPeriodControls() {
-    var initialPeriod = selectDashboardPeriodPreset('last7days', false);
+    // Coming back from a metric's page: keep the dates it was opened with.
+    var urlParams = getParams();
+    var backStart = urlParams.get('periodStart');
+    var backEnd = urlParams.get('periodEnd');
+    var initialPeriod;
+    if (window.DashboardPeriod.isPlainDay(backStart) && window.DashboardPeriod.isPlainDay(backEnd) && backStart <= backEnd) {
+      var startNode = el('dashboardPeriodStart');
+      var endNode = el('dashboardPeriodEnd');
+      if (startNode) startNode.value = backStart;
+      if (endNode) endNode.value = backEnd;
+      currentPeriodIsPreset = false;
+      readPeriodControls();
+      initialPeriod = Promise.resolve();
+    } else {
+      initialPeriod = selectDashboardPeriodPreset('last7days', false);
+    }
 
     var presets = el('dashboardPeriodPresets');
     if (presets) {
       presets.addEventListener('click', function (event) {
         var btn = event.target.closest('lex-btn[data-dashboard-preset]');
         if (!btn) return;
+        setPeriodPanelOpen(false);
         selectDashboardPeriodPreset(btn.getAttribute('data-dashboard-preset'), true);
       });
     }
@@ -960,6 +2112,7 @@
       var start = el('dashboardPeriodStart');
       var end = el('dashboardPeriodEnd');
       // A manual edit to the start/end inputs is a custom range, not a preset.
+      periodPickToken += 1;
       currentPeriodIsPreset = false;
       if (start && end && start.value && end.value) {
         updateCompareByOptions(start.value, end.value, null);
@@ -974,6 +2127,7 @@
     if (startInput) startInput.addEventListener('lex-change', handlePeriodChange);
     if (endInput) endInput.addEventListener('lex-change', handlePeriodChange);
     if (compare) compare.addEventListener('lex-change', handlePeriodChange);
+    initPeriodPanel();
     return initialPeriod;
   }
 
@@ -988,11 +2142,10 @@
     }
 
     var initialPeriod = initPeriodControls();
+    // "Finish your setup" when some case or appointment types are not mapped.
+    if (window.LanaSetupBanner) window.LanaSetupBanner.mount('lanaSetupBanner');
 
     content.addEventListener('click', function (event) {
-      if (event.target.closest('#openReportingBtn')) {
-        Lex.Nav.go('admin/reports-list.html');
-      }
 
       if (event.target.closest('#editDashboardBtn') && currentDashboardId) {
         Lex.Nav.go('admin/dashboard-builder.html?id=' + encodeURIComponent(currentDashboardId));
@@ -1006,6 +2159,20 @@
       var reportBtn = event.target.closest('[data-report-link]');
       if (reportBtn) {
         Lex.Nav.go(reportBtn.getAttribute('data-report-link'));
+      }
+
+      var variantBtn = event.target.closest('[data-dashboard-variant]');
+      if (variantBtn) {
+        var pick = variantBtn.getAttribute('data-dashboard-variant').split('|');
+        variantPicks[pick[0]] = Number(pick[1]);
+        renderMetrics(allDashboardMetrics, currentSummary, currentDashboardType);
+        return;
+      }
+
+      var stateAction = event.target.closest('[data-data-state-action]');
+      if (stateAction) {
+        Lex.Nav.go(stateAction.getAttribute('data-data-state-action'));
+        return;
       }
 
       var metricDetailBtn = event.target.closest('[data-metric-detail-link]');

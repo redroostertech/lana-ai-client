@@ -71,3 +71,10 @@ describe('the library table fits the page (CSS)', () => {
     expect(minWidth).toBeLessThanOrEqual(1070);
   });
 });
+
+test('All dashboards has its trail: Insights / All dashboards, Insights a link', () => {
+  const html = read('admin/dashboard-library.html');
+  expect(html).toContain('<lex-breadcrumb id="dashboardLibraryBreadcrumb"');
+  expect(html).toContain('js/shared/insights-breadcrumbs.js');
+  expect(read('js/admin/dashboard-library.js')).toContain('InsightsBreadcrumbs.dashboardLibrary()');
+});

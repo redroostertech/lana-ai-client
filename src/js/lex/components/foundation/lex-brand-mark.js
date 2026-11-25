@@ -10,8 +10,9 @@
    spinner (loading), and the app banners' orbit (Agents), flow (Automate) and chart
    (Insights). The dark variant plays inside [data-lex-theme="dark"], or always with
    variant="dark" (a dark panel on a light page); variant="light" forces light.
-   With Reduce Motion nothing moves: looping animations show their first frame and
-   success its finished state. Without a label the mark is decorative (aria-hidden).
+   once plays a looping animation a single time (a page header on load).
+   With Reduce Motion nothing moves: looping and once animations show their first
+   frame and success its finished state. Without a label the mark is decorative (aria-hidden).
    Event: lex-brand-mark-finished (success, once it holds).
    Needs: js/vendor/lottie_light.min.js and js/lex/brand/lex-brand-animations.js.
 */
@@ -28,7 +29,8 @@
         animation: { type: String, default: 'idle' },
         size:      { type: Number, default: 72 },
         label:     { type: String, default: '' },
-        variant:   { type: String, default: 'auto' }
+        variant:   { type: String, default: 'auto' },
+        once:      { type: Boolean, default: false }
       };
     }
 
@@ -62,7 +64,7 @@
       if (!files || !lottie) return;
       const dark = this.variant === 'dark'
         || (this.variant !== 'light' && Boolean(this.closest('[data-lex-theme="dark"]')));
-      const loops = LOOPS[this.animation] !== false;
+      const loops = LOOPS[this.animation] !== false && !this.once;
       const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const item = lottie.loadAnimation({
         container: host,
@@ -75,7 +77,7 @@
       this._item = item;
       if (reduce) {
         item.addEventListener('DOMLoaded', () => {
-          item.goToAndStop(loops ? 0 : item.totalFrames - 1, true);
+          item.goToAndStop(loops || this.once ? 0 : item.totalFrames - 1, true);
           if (!loops) this.emit('lex-brand-mark-finished');
         });
       } else if (!loops) {

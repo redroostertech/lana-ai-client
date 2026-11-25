@@ -1,0 +1,356 @@
+/**
+ * Metric detail view model (pure, no DOM).
+ *
+ * The friendly source records table (no internal ids, words for headers,
+ * dates as days, empty cells left for the page to show as a muted dash) and
+ * the one summary card (the value with its unit, the change against the
+ * prior period both ways, the prior period's days, a two-bar comparison).
+ * No regex (per Lex rules).
+ */
+(function (root, factory) {
+  var api = factory();
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (root) root.MetricDetailView = api;
+})(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : this), function () {
+  'use strict';
+
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  var LABELS = {
+    matter_name: 'Matter', client_name: 'Client', status: 'Status', stage: 'Stage', opened_at: 'Opened', closed_at: 'Closed',
+    days: 'Days in stage', due_date: 'Due', amount: 'Amount', created_at: 'Created', updated_at: 'Updated',
+  };
+  var LINK_IDS = ['workspace_id', 'matter_id'];
+
+  function endsWith(text, tail) {
+    return text.length >= tail.length && text.slice(-tail.length) === tail;
+  }
+
+  function isHex(ch) {
+    return (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
+  }
+
+  function isUuid(value) {
+    if (typeof value !== 'string' || value.length !== 36) return false;
+    for (var i = 0; i < 36; i += 1) {
+      var ch = value.charAt(i);
+      if (i === 8 || i === 13 || i === 18 || i === 23) { if (ch !== '-') return false; } else if (!isHex(ch)) return false;
+    }
+    return true;
+  }
+
+  function isEmpty(value) {
+    return value === null || value === undefined || value === '';
+  }
+
+  function isInternal(key, rows) {
+    var k = key.toLowerCase();
+    if (k === 'id' || k === 'uuid' || k === 'request_access' || k.charAt(0) === '_' || endsWith(k, '_key') || endsWith(k, '_id') || endsWith(k, '_uuid') || endsWith(k, '_ref')) return true;
+    var filled = rows.filter(function (row) { return !isEmpty(row[key]); });
+    return filled.length > 0 && filled.every(function (row) { return isUuid(row[key]); });
+  }
+
+  function isTimeKey(key) {
+    var k = key.toLowerCase();
+    return endsWith(k, '_time') || k === 'time' || endsWith(k, '_datetime');
+  }
+
+  function isDateKey(key) {
+    var k = key.toLowerCase();
+    return endsWith(k, '_at') || endsWith(k, '_date') || k === 'date' || endsWith(k, '_on');
+  }
+
+  function labelFor(key) {
+    if (LABELS[key]) return LABELS[key];
+    var k = key;
+    ['_at', '_date', '_on'].forEach(function (tail) { if (endsWith(k, tail) && k.length > tail.length) k = k.slice(0, -tail.length); });
+    var words = k.split('_').join(' ').trim();
+    return words ? words.charAt(0).toUpperCase() + words.slice(1) : key;
+  }
+
+  function dayText(value) {
+    var text = String(value);
+    if (text.length < 10 || text.charAt(4) !== '-' || text.charAt(7) !== '-') return text;
+    var month = Number(text.substring(5, 7));
+    var day = Number(text.substring(8, 10));
+    if (!(month >= 1 && month <= 12) || !(day >= 1)) return text;
+    return MONTHS[month - 1] + ' ' + day + ', ' + text.substring(0, 4);
+  }
+
+  function dateTimeText(value) {
+    var time = Date.parse(String(value));
+    if (!isFinite(time)) return String(value);
+    return new Date(time).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'UTC' });
+  }
+
+  var MONEY_WORDS = ['amount', 'value', 'fee', 'balance', 'total', 'price', 'revenue', 'cost'];
+
+  function isMoneyKey(key) {
+    var k = key.toLowerCase();
+    return MONEY_WORDS.some(function (word) { return k.indexOf(word) !== -1; });
+  }
+
+  function isNumeric(value) {
+    if (typeof value === 'number') return isFinite(value);
+    if (typeof value !== 'string' || !value.trim()) return false;
+    return isFinite(Number(value));
+  }
+
+  function isLower(ch) { return ch >= 'a' && ch <= 'z'; }
+  function isDigitCh(ch) { return ch >= '0' && ch <= '9'; }
+
+  // A code-like value: lower case letters, digits and underscores, with a letter.
+  function isSnake(value) {
+    if (typeof value !== 'string' || !value || value.length > 40) return false;
+    var letter = false;
+    for (var i = 0; i < value.length; i += 1) {
+      var ch = value.charAt(i);
+      if (isLower(ch)) letter = true;
+      else if (!isDigitCh(ch) && ch !== '_') return false;
+    }
+    return letter;
+  }
+
+  function typeOf(key, rows) {
+    if (isTimeKey(key)) return 'datetime';
+    if (isDateKey(key)) return 'date';
+    var filled = rows.filter(function (row) { return !isEmpty(row[key]); });
+    if (!filled.length) return 'text';
+    if (isMoneyKey(key) && filled.every(function (row) { return isNumeric(row[key]); })) return 'money';
+    if (filled.every(function (row) { return typeof row[key] === 'number'; })) return 'number';
+    if (filled.every(function (row) { return isSnake(row[key]); })) return 'enum';
+    return 'text';
+  }
+
+  function words(value) {
+    var text = String(value).split('_').join(' ').trim();
+    return text ? text.charAt(0).toUpperCase() + text.slice(1) : text;
+  }
+
+  // One formatter for the records table and the dashboard worklists.
+  function cellText(value, type, key) {
+    if (isEmpty(value)) return null;
+    if (type === 'date') return dayText(value);
+    if (type === 'datetime') return dateTimeText(value);
+    if (type === 'money') return Number(value).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+    if (type === 'number') return Number(value).toLocaleString('en-US', { maximumFractionDigits: 2 });
+    if (type === 'enum') {
+      var k = String(key || '').toLowerCase();
+      // A product or service the firm has not mapped yet (Settings > Mappings).
+      if (value === 'uncategorized' && (k.indexOf('product') !== -1 || k.indexOf('service') !== -1)) return 'Not mapped';
+      return words(value);
+    }
+    return String(value);
+  }
+
+  // Up to n columns for a short list: names, then dates, then amounts, then
+  // the rest. Columns the server chose are kept as they are, all of them.
+  function worklistColumns(columns, n) {
+    if (columns && columns.length && columns[0].fromServer) return columns;
+    function rank(col) {
+      var k = col.key.toLowerCase();
+      if (k === 'name' || k.slice(-5) === '_name') return 0;
+      if (col.type === 'date' || col.type === 'datetime') return 1;
+      if (col.type === 'money') return 2;
+      return 3;
+    }
+    return (columns || []).map(function (col, i) { return { col: col, i: i }; })
+      .sort(function (a, b) { return rank(a.col) - rank(b.col) || a.i - b.i; })
+      .slice(0, n || 4).map(function (entry) { return entry.col; });
+  }
+
+  function linkFor(row) {
+    for (var i = 0; i < LINK_IDS.length; i += 1) {
+      if (isUuid(row[LINK_IDS[i]])) return 'workspace-details.html?id=' + encodeURIComponent(row[LINK_IDS[i]]);
+    }
+    return null;
+  }
+
+  // A value through the column's labels (from the server), else formatted.
+  function formatCell(value, col) {
+    if (isEmpty(value)) return null;
+    if (col.labels && Object.prototype.hasOwnProperty.call(col.labels, String(value))) return String(col.labels[String(value)]);
+    return cellText(value, col.type, col.key);
+  }
+
+  // The server's row_columns ([{ field, header, format?, align?, labels? }]):
+  // only those columns, in that order, with their headers and formats.
+  var SERVER_FORMATS = { currency: 'money', date: 'date' };
+
+  function serverColumns(rowColumns, list) {
+    return rowColumns.filter(function (c) { return c && c.field; }).map(function (c) {
+      var type = SERVER_FORMATS[c.format] || typeOf(c.field, list);
+      return {
+        key: String(c.field),
+        label: c.header ? String(c.header) : labelFor(String(c.field)),
+        type: type,
+        align: c.align === 'right' || c.align === 'left' ? c.align : (type === 'money' || type === 'number' ? 'right' : 'left'),
+        labels: c.labels && typeof c.labels === 'object' ? c.labels : null,
+        fromServer: true,
+      };
+    });
+  }
+
+  /**
+   * { columns: [{ key, label, type, align, labels? }], rows: [{ cells: [{ key, text, href }] }] }
+   * rowColumns (the server's row_columns) wins when present; else the
+   * columns are worked out from the field names and values.
+   */
+  function recordsTable(rows, rowColumns) {
+    var list = (Array.isArray(rows) ? rows : []).filter(function (row) { return row && typeof row === 'object'; });
+    var keys = [];
+    list.forEach(function (row) { Object.keys(row).forEach(function (key) { if (keys.indexOf(key) === -1) keys.push(key); }); });
+    var columns = Array.isArray(rowColumns) && rowColumns.length ? serverColumns(rowColumns, list) : keys.filter(function (key) {
+      return !isInternal(key, list) && list.some(function (row) { return !isEmpty(row[key]); });
+    }).map(function (key) {
+      var type = typeOf(key, list);
+      return { key: key, label: labelFor(key), type: type, align: type === 'money' || type === 'number' ? 'right' : 'left' };
+    });
+    return {
+      columns: columns,
+      rows: list.map(function (row, index) {
+        var href = linkFor(row);
+        return {
+          id: 'row-' + index,
+          cells: columns.map(function (col) {
+            return { key: col.key, text: formatCell(row[col.key], col), href: col.key === 'matter_name' ? href : null };
+          }),
+        };
+      }),
+    };
+  }
+
+  function toNumber(value) {
+    if (value === null || value === undefined || value === '' || typeof value === 'boolean') return null;
+    var n = Number(value);
+    return isFinite(n) ? n : null;
+  }
+
+  function oneDecimal(n) {
+    return Number(Math.abs(n).toFixed(1)).toLocaleString('en-US', { maximumFractionDigits: 1 });
+  }
+
+  /** A value in the metric's format and unit ("301.7 days", "$5,389", "38.5%"). */
+  function formatValue(value, meta) {
+    var n = toNumber(value);
+    if (n === null) return null;
+    var format = String((meta && meta.format) || 'number').toLowerCase();
+    var unit = meta && meta.unit ? String(meta.unit) : '';
+    if (format === 'currency') return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+    if (format === 'percentage' || format === 'percent') return Number(n.toFixed(1)).toLocaleString('en-US', { maximumFractionDigits: 1 }) + '%';
+    if (format === 'integer' || format === 'count') return Math.round(n).toLocaleString('en-US');
+    if (format === 'days') unit = n === 1 ? 'day' : 'days';
+    var text = Number(n.toFixed(1)).toLocaleString('en-US', { maximumFractionDigits: 1 });
+    return unit ? text + ' ' + unit : text;
+  }
+
+  function changeText(abs, meta) {
+    var format = String((meta && meta.format) || 'number').toLowerCase();
+    var sign = abs > 0 ? '+' : (abs < 0 ? '-' : '');
+    if (format === 'currency') return sign + Math.abs(abs).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+    if (format === 'integer' || format === 'count') return sign + Math.round(Math.abs(abs)).toLocaleString('en-US');
+    if (format === 'percentage' || format === 'percent') return sign + Math.abs(abs).toFixed(1) + ' points';
+    var unit = format === 'days' ? 'days' : (meta && meta.unit ? String(meta.unit) : '');
+    return sign + Math.abs(abs).toFixed(1) + (unit ? ' ' + unit : '');
+  }
+
+  function dayBefore(iso) {
+    var time = Date.parse(String(iso).substring(0, 10) + 'T00:00:00Z');
+    return isFinite(time) ? new Date(time - 86400000).toISOString().substring(0, 10) : null;
+  }
+
+  /** The summary card: { value, direction, changeText, priorText, priorDays, bars }. */
+  function summary(payload) {
+    var current = (payload && payload.current) || {};
+    var meta = { format: current.format, unit: current.unit || (payload && payload.metric && payload.metric.unit) };
+    var value = toNumber(current.value_numeric !== undefined && current.value_numeric !== null ? current.value_numeric : current.value);
+    var cmp = payload && payload.comparison;
+    if (!cmp && payload && payload.movement) {
+      cmp = { previous_value: payload.movement.prior_value, percent_change: payload.movement.percent_change, direction: payload.movement.direction };
+    }
+    var prior = cmp ? toNumber(cmp.previous_value) : null;
+    // A null value means nothing was recorded for these dates: the calm
+    // words, and no change, prior or bars to compare against.
+    if (value === null) {
+      return { value: NO_DATA_TEXT, noData: true, direction: null, changeText: null, priorText: null, priorDays: null, bars: null };
+    }
+    var empty = { value: formatValue(value, meta), direction: null, changeText: null, priorText: null, priorDays: null, bars: null };
+    if (!cmp || prior === null) return empty;
+    var abs = toNumber(cmp.absolute_change);
+    if (abs === null) abs = value - prior;
+    var pct = toNumber(cmp.percent_change);
+    var direction = cmp.direction === 'up' || cmp.direction === 'down' ? cmp.direction : 'flat';
+    var words = direction === 'up' ? 'Up' : (direction === 'down' ? 'Down' : 'No change');
+    var change = words + (pct !== null && direction !== 'flat' ? ' ' + oneDecimal(pct) + '%' : '') + ', ' + changeText(abs, meta);
+    var period = cmp.previous_period;
+    var max = Math.max(Math.abs(value), Math.abs(prior));
+    return {
+      value: formatValue(value, meta),
+      direction: direction,
+      changeText: change,
+      priorText: 'vs ' + formatValue(prior, meta) + ' in the prior period',
+      priorDays: period && period.start && period.end ? { start: String(period.start).substring(0, 10), end: dayBefore(period.end) } : null,
+      bars: max > 0 ? { currentPct: Math.round((Math.abs(value) / max) * 1000) / 10, priorPct: Math.round((Math.abs(prior) / max) * 1000) / 10 } : null,
+    };
+  }
+
+  var NO_DATA_TEXT = 'No data for these dates';
+
+  // The period line: the backend's label, else the picked dates, else ''.
+  function periodText(period, start, end) {
+    if (period && period.label) return String(period.label);
+    return start && end ? dayRangeText({ start: String(start).substring(0, 10), end: String(end).substring(0, 10) }) : '';
+  }
+
+  function dayRangeText(days) {
+    if (!days || !days.start || !days.end) return '';
+    return dayText(days.start) + ' to ' + dayText(days.end);
+  }
+
+  // A records row for the table: raw values (so sorting works), plus the
+  // workspace link for the matter when the row carries one.
+  function recordsRow(row, index) {
+    var out = { _row_id: 'row-' + index, _href: linkFor(row || {}) };
+    Object.keys(row || {}).forEach(function (key) { out[key] = row[key]; });
+    return out;
+  }
+
+  // raw_data.rows_status from metric detail. Missing, or available: true,
+  // means the rows were read (even zero): null. available: false means the
+  // server could not read them, so say so calmly instead of "no records".
+  var UNAVAILABLE_TITLE = 'Records not available for this card';
+  var UNAVAILABLE_MESSAGE = 'LANA could not read the records behind this number.';
+
+  function rowsStatus(rawData) {
+    var status = rawData && rawData.rows_status;
+    if (!status || typeof status !== 'object' || status.available !== false) return null;
+    var message = typeof status.message === 'string' && status.message.trim() ? status.message.trim() : UNAVAILABLE_MESSAGE;
+    return { reason: status.reason || null, title: UNAVAILABLE_TITLE, message: message };
+  }
+
+  var HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+
+  function escapeText(value) {
+    return String(value).split('').map(function (ch) { return HTML_ESCAPES[ch] || ch; }).join('');
+  }
+
+  // The calm note shown in place of a records table.
+  function unavailableHtml(status) {
+    return '<div class="records-unavailable"><p class="records-unavailable__title">' + escapeText(status.title) + '</p>'
+      + '<p class="records-unavailable__text">' + escapeText(status.message) + '</p></div>';
+  }
+
+  return {
+    dayRangeText: dayRangeText,
+    cellText: cellText,
+    formatCell: formatCell,
+    worklistColumns: worklistColumns,
+    recordsRow: recordsRow,
+    recordsTable: recordsTable,
+    formatValue: formatValue,
+    summary: summary,
+    periodText: periodText,
+    isUuid: isUuid,
+    rowsStatus: rowsStatus,
+    unavailableHtml: unavailableHtml,
+  };
+});
