@@ -4087,3 +4087,30 @@ button.dash-lines__label:hover,
   border-color: currentColor;
   color: inherit;
 }
+
+/* metadata.second_line: a muted line under the main value (cards and
+   metric detail), for example a cohort rate under a conversion rate. */
+.dash-metric-card__second-line,
+.metric-summary__second-line {
+  margin: 0.125rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--lex-text-tertiary);
+  overflow-wrap: anywhere;
+}
+
+.metric-summary__second-line[hidden] {
+  display: none;
+}
+
+.dash-metric-card--hero .dash-metric-card__second-line {
+  color: inherit;
+  opacity: 0.8;
+}
+
+/* A bar row with the server's words instead of a number ("Too few to rate"). */
+.mini-cols__value--note,
+.mini-bars__value--note {
+  fill: var(--lex-text-tertiary);
+  color: var(--lex-text-tertiary);
+  font-style: italic;
+}

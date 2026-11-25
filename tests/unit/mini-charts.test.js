@@ -320,3 +320,25 @@ test('a muted (Not mapped) column is styled apart and opens its own link', () =>
   expect(html).toContain('mini-cols__group mini-cols__group--muted');
   expect(html).toContain('data-metric-detail-link="settings-v2.html#mappings"');
 });
+
+describe('server labels in place of bars', () => {
+  const fmtPct = (n) => (n === null ? 'n/a' : n + '%');
+  test('columns show "Too few to rate" in muted text and no bar, never a 0 bar', () => {
+    const model = View.listBars([{ label: 'Referral', value: 40 }, { label: 'Web', value: null, value_label: 'Too few to rate' }], 12);
+    const html = Charts.breakdownHtml(model, fmtPct, {});
+    const web = html.split('<g class="mini-cols__group').find((g) => g.includes('Web'));
+    expect(web).toContain('Too few to rate');
+    expect(web).toContain('mini-cols__value--note');
+    expect(web).not.toContain('<rect');
+    expect(web).not.toContain('n/a');
+  });
+  test('horizontal bars do the same', () => {
+    const rows = Array.from({ length: 13 }, (_, i) => ({ label: 'R' + i, value: i + 1 }));
+    rows[2] = { label: 'Thin', value: null, value_label: 'Too few to rate' };
+    const model = View.listBars(rows, 8);
+    const html = Charts.breakdownHtml(model, fmtPct, {});
+    const thin = html.split('<li class="mini-bars__row').find((li) => li.includes('Thin'));
+    expect(thin).toContain('Too few to rate');
+    expect(thin).not.toContain('mini-bars__fill');
+  });
+});

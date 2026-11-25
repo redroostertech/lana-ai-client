@@ -935,3 +935,23 @@ describe('rate and average lists show per-item values only', () => {
     expect(p.exports.formatMetricCardValue(Object.assign({}, rate, { row_format: null, format: 'table', metadata: { aggregation: 'average' } }))).toBe('');
   });
 });
+
+describe('metadata.second_line under the main value', () => {
+  const rate = { metric_key: 'legal_firm.sales_intake.firm_conversion_rate', title: 'Firm Conversion Rate', value: 42, formatted_value: '42%', format: 'percentage',
+    data_state: 'ok', period: 'Jan 1, 2026 - Jan 31, 2026', metadata: { second_line: 'Cohort rate 31%' } };
+  test('a tile shows the muted second line right under its value', () => {
+    const html = page().exports.renderMetricCard(rate);
+    expect(html).toContain('<p class="dash-metric-card__second-line">Cohort rate 31%</p>');
+    expect(html.indexOf('dash-metric-card__value')).toBeLessThan(html.indexOf('dash-metric-card__second-line'));
+  });
+  test('a declared card shows it too, and nothing without it', async () => {
+    const declared = require(path.join(__dirname, '../fixtures/dashboard/declared-layouts.json'));
+    const cards = declared.cards_synthetic.map((c) => (c.metric_key.endsWith('payroll_clients_needed') ? Object.assign({}, c, { metadata: { second_line: { label: 'Cohort rate', formatted_value: '31%' } } }) : c));
+    const layout = { cards: [{ id: 'n', kind: 'number', metric_key: 'finance.payroll_clients_needed' }, { id: 'm', kind: 'number', metric_key: 'case_volume.active_cases_total' }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: cards }) });
+    await p.exports.loadDashboardById('d1');
+    const articles = p.nodes.dashboardMetricGrid.innerHTML.split('<article ').slice(1);
+    expect(articles.find((a) => a.includes('Payroll Clients Needed'))).toContain('Cohort rate 31%');
+    expect(articles.find((a) => a.includes('Total Active Cases'))).not.toContain('dash-metric-card__second-line');
+  });
+});

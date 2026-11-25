@@ -93,6 +93,29 @@
     return 'Item ' + (index + 1);
   }
 
+  var VALUE_LABEL_KEYS = ['value_label', 'display_value', 'formatted_value'];
+
+  function rowValueLabel(row) {
+    for (var i = 0; i < VALUE_LABEL_KEYS.length; i += 1) {
+      var text = row[VALUE_LABEL_KEYS[i]];
+      if (typeof text === 'string' && text.trim() !== '') return text.trim();
+    }
+    return null;
+  }
+
+  // metadata.second_line (for example a cohort rate under the main rate):
+  // plain text, or { text } or { label, formatted_value | value }. '' if none.
+  function secondLine(item) {
+    if (!item || typeof item !== 'object') return '';
+    var meta = item.metadata || (item.current && item.current.metadata) || null;
+    var line = meta && meta.second_line;
+    if (line === null || line === undefined) return '';
+    if (typeof line !== 'object') return String(line).trim();
+    if (line.text) return String(line.text).trim();
+    var value = line.formatted_value !== undefined && line.formatted_value !== null ? line.formatted_value : line.value;
+    return [line.label, value].filter(function (part) { return part !== null && part !== undefined && String(part).trim() !== ''; }).join(' ').trim();
+  }
+
   function pctOf(value, max) {
     return value !== null && value > 0 && max > 0 ? round1((value / max) * 100) : 0;
   }
@@ -114,11 +137,15 @@
       // Records whose source value is not mapped yet (Settings > Mappings).
       var muted = !!(row && typeof row === 'object' && (row.not_mapped === true || row.service_key === 'not_mapped' || row.key === 'not_mapped'));
       var isObject = row && typeof row === 'object';
+      var value = isObject ? toNumber(row[actualVsNeeded ? ACTUAL_KEY : VALUE_KEY]) : toNumber(row);
       return {
         label: muted ? 'Not mapped' : rowLabel(row, index),
-        value: isObject ? toNumber(row[actualVsNeeded ? ACTUAL_KEY : VALUE_KEY]) : toNumber(row),
+        value: value,
         second: isObject && actualVsNeeded ? toNumber(row[NEEDED_KEY]) : null,
         muted: muted,
+        // No number but the server's own words ("Too few to rate"): show
+        // them in place of the bar, never a 0 bar.
+        valueLabel: isObject && value === null ? rowValueLabel(row) : null,
       };
     });
     var paired = parsed.some(function (row) { return row.second !== null; });
@@ -128,7 +155,7 @@
       if (row.second !== null && row.second > max) max = row.second;
     });
     var rows = parsed.slice(0, cap).map(function (row) {
-      return {
+      var out = {
         label: row.label,
         value: row.value,
         second: row.second,
@@ -136,6 +163,8 @@
         secondPct: row.second === null ? null : pctOf(row.second, max),
         muted: row.muted,
       };
+      if (row.valueLabel) out.valueLabel = row.valueLabel;
+      return out;
     });
     return {
       empty: false,
@@ -315,6 +344,7 @@
   }
 
   return {
+    secondLine: secondLine,
     listHasNoTotal: listHasNoTotal,
     listBars: listBars,
     listValueFormat: listValueFormat,

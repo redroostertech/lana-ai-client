@@ -230,6 +230,13 @@
   function renderSummary(payload, snapshots) {
     var summary = view().summary(payload);
     setText('metricSummaryValue', summary.value);
+    // metadata.second_line (for example a cohort rate): a muted line under the value.
+    var second = el('metricSummarySecondLine');
+    if (second) {
+      var secondText = window.MetricCardView ? window.MetricCardView.secondLine(payload) : '';
+      second.textContent = secondText;
+      second.hidden = !secondText;
+    }
     var valueNode = el('metricSummaryValue');
     if (valueNode) valueNode.className = 'metric-summary__value' + (summary.noData ? ' metric-summary__value--empty' : '');
     var chip = el('metricSummaryChange');

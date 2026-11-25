@@ -58,6 +58,12 @@
         + '</div>'
       : '';
     var rows = model.rows.map(function (row) {
+      // The server's words instead of a number: no bar.
+      if (row.valueLabel) {
+        return '<li class="mini-bars__row mini-bars__row--note">'
+          + '<div class="mini-bars__head"><span class="mini-bars__label">' + escapeHtml(row.label) + '</span>'
+          + '<span class="mini-bars__value mini-bars__value--note">' + escapeHtml(row.valueLabel) + '</span></div></li>';
+      }
       var valueText = row.second !== null
         ? format(row.value) + ' of ' + format(row.second)
         : format(row.value);
@@ -130,6 +136,13 @@
       + '</g>';
     var groups = model.rows.map(function (row, i) {
       var center = slot * (i + 0.5);
+      // The server's words instead of a number ("Too few to rate"): no column.
+      if (row.valueLabel) {
+        return '<g class="mini-cols__group mini-cols__group--note"' + linkFor(row) + '><title>' + escapeHtml(row.label + ': ' + row.valueLabel) + '</title>'
+          + '<text class="mini-cols__value mini-cols__value--note" x="' + round1(center) + '" y="' + (PLOT_BOTTOM - 4) + '" text-anchor="middle">' + escapeHtml(shortLabel(row.valueLabel, maxChars)) + '</text>'
+          + '<text class="mini-cols__label" x="' + round1(center) + '" y="114" text-anchor="middle">' + escapeHtml(shortLabel(row.label, maxChars)) + '</text>'
+          + '</g>';
+      }
       var hasSecond = row.second !== null;
       var bars;
       var valueText = hasSecond ? format(row.value) + ' of ' + format(row.second) : format(row.value);

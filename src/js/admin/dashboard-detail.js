@@ -872,9 +872,16 @@
     return '<li class="dash-lines__item">' + labelHtml + '<span class="dash-lines__value">' + valueHtml + '</span></li>';
   }
 
+  // metadata.second_line (for example a cohort rate): a muted line under the value.
+  function secondLineHtml(metric) {
+    var text = window.MetricCardView.secondLine(metric);
+    return text ? '<p class="dash-metric-card__second-line">' + escapeHtml(text) + '</p>' : '';
+  }
+
   function valueBlock(metric) {
     return '<div class="dash-metric-card__result">'
       + '<div class="dash-metric-card__value">' + escapeHtml(formatMetricCardValue(metric)) + '</div>'
+      + secondLineHtml(metric)
       + deltaHtml(metric) + '</div>';
   }
 
@@ -1527,6 +1534,7 @@
       + cardTop(metric, cardId, true)
       + '<div class="dash-metric-card__result">'
       + '<div class="dash-metric-card__value"' + countUp + '>' + escapeHtml(value) + '</div>'
+      + secondLineHtml(metric)
       + deltaHtml(metric)
       + '</div>'
       + '<div class="mini-spark-slot" data-sparkline-key="' + escapeHtml(cardId) + '"></div>'

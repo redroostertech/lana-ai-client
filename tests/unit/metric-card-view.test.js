@@ -242,3 +242,25 @@ describe('listHasNoTotal: rate and average lists are never summed', () => {
     expect(View.listHasNoTotal({ value: 3, formatted_value: null })).toBe(false);
   });
 });
+
+describe('second line and "Too few to rate" rows', () => {
+  test('secondLine reads metadata.second_line as text or { label, formatted_value }', () => {
+    expect(View.secondLine({ metadata: { second_line: 'Cohort rate 31%' } })).toBe('Cohort rate 31%');
+    expect(View.secondLine({ metadata: { second_line: { label: 'Cohort rate', formatted_value: '31%' } } })).toBe('Cohort rate 31%');
+    expect(View.secondLine({ metadata: { second_line: { text: 'Cohort rate: 31% of this cohort became clients' } } })).toBe('Cohort rate: 31% of this cohort became clients');
+    expect(View.secondLine({ metadata: {} })).toBe('');
+    expect(View.secondLine({ current: { metadata: { second_line: 'From detail' } } })).toBe('From detail');
+    expect(View.secondLine(null)).toBe('');
+  });
+  test('a row with no number but a server label keeps the label and draws no bar', () => {
+    const model = View.listBars([{ label: 'Referral', value: 40 }, { label: 'Web', value: null, value_label: 'Too few to rate' }], 12);
+    expect(model.rows[1]).toMatchObject({ label: 'Web', value: null, pct: 0, valueLabel: 'Too few to rate' });
+    expect(model.rows[0].valueLabel).toBeUndefined();
+  });
+  test('display_value works the same; a real 0 is still a bar value', () => {
+    const model = View.listBars([{ label: 'A', value: null, display_value: 'Too few to rate' }, { label: 'B', value: 0 }], 12);
+    expect(model.rows[0].valueLabel).toBe('Too few to rate');
+    expect(model.rows[1]).toMatchObject({ value: 0 });
+    expect(model.rows[1].valueLabel).toBeUndefined();
+  });
+});
