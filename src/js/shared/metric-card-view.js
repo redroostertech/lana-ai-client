@@ -101,16 +101,19 @@
   }
 
   // metadata.second_line (for example a cohort rate under the main rate):
-  // plain text, or { text } or { label, formatted_value | value }. '' if none.
+  // { label, value (0 to 100 or null), format: 'percentage', numerator,
+  // denominator }. Cards carry it on card.metadata (absent when there is
+  // none); metric detail on current.metadata. Formatted here ("Cohort rate
+  // 42%"); a null value, or any other shape, shows nothing.
   function secondLine(item) {
     if (!item || typeof item !== 'object') return '';
-    var meta = item.metadata || (item.current && item.current.metadata) || null;
-    var line = meta && meta.second_line;
-    if (line === null || line === undefined) return '';
-    if (typeof line !== 'object') return String(line).trim();
-    if (line.text) return String(line.text).trim();
-    var value = line.formatted_value !== undefined && line.formatted_value !== null ? line.formatted_value : line.value;
-    return [line.label, value].filter(function (part) { return part !== null && part !== undefined && String(part).trim() !== ''; }).join(' ').trim();
+    var holder = item.current && typeof item.current === 'object' ? item.current : item;
+    var line = holder.metadata && holder.metadata.second_line;
+    if (!line || typeof line !== 'object') return '';
+    var value = toNumber(line.value);
+    if (value === null) return '';
+    var text = round1(value) + (line.format === 'percentage' ? '%' : '');
+    return line.label ? String(line.label).trim() + ' ' + text : text;
   }
 
   function pctOf(value, max) {

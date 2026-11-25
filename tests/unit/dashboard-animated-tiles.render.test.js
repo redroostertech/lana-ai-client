@@ -938,7 +938,7 @@ describe('rate and average lists show per-item values only', () => {
 
 describe('metadata.second_line under the main value', () => {
   const rate = { metric_key: 'legal_firm.sales_intake.firm_conversion_rate', title: 'Firm Conversion Rate', value: 42, formatted_value: '42%', format: 'percentage',
-    data_state: 'ok', period: 'Jan 1, 2026 - Jan 31, 2026', metadata: { second_line: 'Cohort rate 31%' } };
+    data_state: 'ok', period: 'Jan 1, 2026 - Jan 31, 2026', metadata: { second_line: { label: 'Cohort rate', value: 31, format: 'percentage', numerator: 31, denominator: 100 } } };
   test('a tile shows the muted second line right under its value', () => {
     const html = page().exports.renderMetricCard(rate);
     expect(html).toContain('<p class="dash-metric-card__second-line">Cohort rate 31%</p>');
@@ -946,7 +946,7 @@ describe('metadata.second_line under the main value', () => {
   });
   test('a declared card shows it too, and nothing without it', async () => {
     const declared = require(path.join(__dirname, '../fixtures/dashboard/declared-layouts.json'));
-    const cards = declared.cards_synthetic.map((c) => (c.metric_key.endsWith('payroll_clients_needed') ? Object.assign({}, c, { metadata: { second_line: { label: 'Cohort rate', formatted_value: '31%' } } }) : c));
+    const cards = declared.cards_synthetic.map((c) => (c.metric_key.endsWith('payroll_clients_needed') ? Object.assign({}, c, { metadata: { second_line: { label: 'Cohort rate', value: 31, format: 'percentage', numerator: 31, denominator: 100 } } }) : c));
     const layout = { cards: [{ id: 'n', kind: 'number', metric_key: 'finance.payroll_clients_needed' }, { id: 'm', kind: 'number', metric_key: 'case_volume.active_cases_total' }] };
     const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: cards }) });
     await p.exports.loadDashboardById('d1');

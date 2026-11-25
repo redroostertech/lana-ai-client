@@ -267,7 +267,7 @@ test('metric detail shows the hidden-comparison message in place of the change',
 });
 
 test('metric detail shows metadata.second_line as a muted line under the value', async () => {
-  const p = await page('?metric_key=matters_opened', { ...payload, current: { value: 42, format: 'integer', metadata: { second_line: 'Cohort rate 31%' } } });
+  const p = await page('?metric_key=matters_opened', { ...payload, current: { value: 42, format: 'integer', metadata: { second_line: { label: 'Cohort rate', value: 31, format: 'percentage', numerator: 31, denominator: 100 } } } });
   expect(p.nodes.metricSummarySecondLine.hidden).toBe(false);
   expect(p.nodes.metricSummarySecondLine.textContent).toBe('Cohort rate 31%');
   const none = await page('?metric_key=matters_opened', payload);

@@ -244,13 +244,21 @@ describe('listHasNoTotal: rate and average lists are never summed', () => {
 });
 
 describe('second line and "Too few to rate" rows', () => {
-  test('secondLine reads metadata.second_line as text or { label, formatted_value }', () => {
-    expect(View.secondLine({ metadata: { second_line: 'Cohort rate 31%' } })).toBe('Cohort rate 31%');
-    expect(View.secondLine({ metadata: { second_line: { label: 'Cohort rate', formatted_value: '31%' } } })).toBe('Cohort rate 31%');
-    expect(View.secondLine({ metadata: { second_line: { text: 'Cohort rate: 31% of this cohort became clients' } } })).toBe('Cohort rate: 31% of this cohort became clients');
+  const line = (value) => ({ label: 'Cohort rate', value, format: 'percentage', numerator: 21, denominator: 50 });
+  test('secondLine formats { label, value (0 to 100), format: percentage } on the client', () => {
+    expect(View.secondLine({ metadata: { second_line: line(42) } })).toBe('Cohort rate 42%');
+    expect(View.secondLine({ metadata: { second_line: line(33.333) } })).toBe('Cohort rate 33.3%');
+    expect(View.secondLine({ metadata: { second_line: line(0) } })).toBe('Cohort rate 0%');
+  });
+  test('a null value, no second_line key, or any other shape shows nothing', () => {
+    expect(View.secondLine({ metadata: { second_line: line(null) } })).toBe('');
     expect(View.secondLine({ metadata: {} })).toBe('');
-    expect(View.secondLine({ current: { metadata: { second_line: 'From detail' } } })).toBe('From detail');
+    expect(View.secondLine({ metadata: { second_line: 'Cohort rate 31%' } })).toBe('');
     expect(View.secondLine(null)).toBe('');
+  });
+  test('metric detail reads current.metadata.second_line only', () => {
+    expect(View.secondLine({ current: { metadata: { second_line: line(42) } } })).toBe('Cohort rate 42%');
+    expect(View.secondLine({ current: { value: 1 }, metadata: { second_line: line(42) } }, 'detail')).toBe('');
   });
   test('a row with no number but a server label keeps the label and draws no bar', () => {
     const model = View.listBars([{ label: 'Referral', value: 40 }, { label: 'Web', value: null, value_label: 'Too few to rate' }], 12);
