@@ -890,3 +890,32 @@ describe('comparison_hidden on dashboard cards', () => {
     expect(text(html)).not.toContain('vs previous period');
   });
 });
+
+describe('not_mapped and metadata.mapping_coverage', () => {
+  const declared = require(path.join(__dirname, '../fixtures/dashboard/declared-layouts.json'));
+  test('coverage under metadata (with unlinked) still gives the caveat and link', async () => {
+    const cards = declared.cards_synthetic.map((c) => (c.metric_key.endsWith('closed_cases_by_service_offering')
+      ? Object.assign({}, c, { metadata: Object.assign({}, c.metadata, { mapping_coverage: { mapped: 8, not_mapped: 42, unlinked: 5 } }) }) : c));
+    const layout = { cards: [{ id: 'b', kind: 'breakdown', metric_key: 'case_volume.closed_cases_by_service_offering' }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: cards }) });
+    await p.exports.loadDashboardById('d1');
+    const html = p.nodes.dashboardMetricGrid.innerHTML;
+    expect(text(html)).toContain('42 matters are not mapped to a service yet');
+    expect(html).toContain('data-metric-detail-link="settings-v2.html#mappings"');
+    expect(text(html)).not.toContain('NaN');
+  });
+  test('only unlinked records: no caveat and nothing breaks', async () => {
+    const cards = declared.cards_synthetic.map((c) => (c.metric_key.endsWith('closed_cases_by_service_offering')
+      ? Object.assign({}, c, { metadata: { mapping_coverage: { mapped: 8, not_mapped: 0, unlinked: 5 } } }) : c));
+    const layout = { cards: [{ id: 'b', kind: 'breakdown', metric_key: 'case_volume.closed_cases_by_service_offering' }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: cards }) });
+    await p.exports.loadDashboardById('d1');
+    expect(p.nodes.dashboardMetricGrid.innerHTML).not.toContain('dash-card__caveat');
+  });
+  test('a not_mapped card shows the server reason in the calm state', () => {
+    const html = page().exports.renderMetricCard(Object.assign({}, card('average_case_value'), { value: null, data_state: 'not_mapped',
+      data_state_reason: '12 of your matter types are not linked to a LANA service yet, so this number would be incomplete.' }));
+    expect(html).toContain('lex-data-state--calm');
+    expect(text(html)).toContain('12 of your matter types are not linked to a LANA service yet, so this number would be incomplete.');
+  });
+});

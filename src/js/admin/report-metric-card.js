@@ -45,8 +45,9 @@
   }
 
   // States that read the same calm way as on dashboards: no data source,
-  // and no data for these dates. Other states keep the plain Reports titles.
-  var CALM_STATES = { no_data_source: true, no_data: true };
+  // no data for these dates, and not mapped yet. Other states keep the
+  // plain Reports titles.
+  var CALM_STATES = { no_data_source: true, no_data: true, not_mapped: true };
 
   function renderState(metric, ctx) {
     var item = metric;

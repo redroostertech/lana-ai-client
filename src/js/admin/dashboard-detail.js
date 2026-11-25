@@ -1262,7 +1262,11 @@
     var model = window.SettingsMappingsModel;
     if (!model) return '';
     for (var i = 0; i < metrics.length; i += 1) {
-      var text = metrics[i] ? model.coverageCaveat(metrics[i].mapping_coverage) : null;
+      // The server sends mapping_coverage on the card or under metadata
+      // ({ mapped, not_mapped, unlinked }); the caveat counts not_mapped.
+      var metric = metrics[i];
+      var coverage = metric ? (metric.mapping_coverage || (metric.metadata && metric.metadata.mapping_coverage) || null) : null;
+      var text = coverage ? model.coverageCaveat(coverage) : null;
       if (text) {
         return '<p class="dash-card__caveat">' + escapeHtml(text) + '. <a href="#" class="dash-card__caveat-link" data-metric-detail-link="'
           + escapeHtml(MAPPINGS_PAGE) + '">Map them</a></p>';

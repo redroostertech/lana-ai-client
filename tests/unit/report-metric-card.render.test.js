@@ -210,3 +210,9 @@ describe('comparison_hidden on report tiles', () => {
     expect(text(html)).not.toContain('0%');
   });
 });
+
+test('a not_mapped report tile is calm and shows the server reason', () => {
+  const html = win.ReportMetricCard.render({ key: 'n', name: 'New Cases', data_state: 'not_mapped', data_state_reason: 'Some matter types are not linked yet.' }, ctx);
+  expect(html).toContain('lex-data-state--calm');
+  expect(text(html)).toContain('Some matter types are not linked yet.');
+});
