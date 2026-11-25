@@ -1183,7 +1183,11 @@
     }
     if (o.unit && visual !== 'gauge') {
       var text = formatMetricCardValue(entry.metric);
-      if (text.toLowerCase().indexOf(o.unit.toLowerCase()) === -1) extra += '<p class="dash-metric-card__unit">' + escapeHtml(o.unit) + '</p>';
+      // The server's text already carries its unit, singular or plural
+      // ("1 case", "3 cases"): only add the layout unit when neither form is there.
+      var unitWord = o.unit.toLowerCase();
+      var singular = unitWord.length > 1 && unitWord.charAt(unitWord.length - 1) === 's' ? unitWord.slice(0, -1) : unitWord;
+      if (String(text).toLowerCase().indexOf(singular) === -1) extra += '<p class="dash-metric-card__unit">' + escapeHtml(o.unit) + '</p>';
     }
     if (o.benchmark) extra += '<p class="dash-metric-card__benchmark">Benchmark: ' + escapeHtml(o.benchmark) + '</p>';
     if (o.badge_key) extra += '<div class="dash-chips">' + chipHtml(o.badge_key, window.DashboardCards.metricFor(declaredIndex, o.badge_key)) + '</div>';

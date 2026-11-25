@@ -243,3 +243,13 @@ test('summary: a hidden comparison gives its message and no change, prior or bar
   expect(s).toMatchObject({ value: '12', changeText: null, priorText: null, bars: null, hiddenText: 'No comparison while the source is behind.' });
   expect(V.summary({ current: { value: 12 } }).hiddenText).toBeFalsy();
 });
+
+describe('units come from the server, singular included', () => {
+  test('the server formatted value wins ("1 case"), never "1 cases"', () => {
+    expect(V.summary({ current: { value: 1, unit: 'cases', formatted_value: '1 case' } }).value).toBe('1 case');
+  });
+  test('a server unit is used exactly as sent, with no client plural', () => {
+    expect(V.summary({ current: { value: 1, unit: 'case' } }).value).toBe('1 case');
+    expect(V.formatValue(1, { unit: 'case' })).toBe('1 case');
+  });
+});

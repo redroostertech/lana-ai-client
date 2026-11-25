@@ -263,12 +263,15 @@
     var current = (payload && payload.current) || {};
     var meta = { format: current.format, unit: current.unit || (payload && payload.metric && payload.metric.unit) };
     var value = toNumber(current.value_numeric !== undefined && current.value_numeric !== null ? current.value_numeric : current.value);
+    // The server's own text wins: it owns the units, singular included ("1 case").
+    var mainText = value !== null && typeof current.formatted_value === 'string' && current.formatted_value.trim() !== ''
+      ? current.formatted_value.trim() : formatValue(value, meta);
     // The server withheld the comparison (comparison_hidden): its message
     // goes in place of the change, and there is nothing to compare.
     var hidden = (payload && payload.comparison_hidden) || current.comparison_hidden || null;
     if (hidden && typeof hidden === 'object' && value !== null) {
       var shared = typeof globalThis !== 'undefined' && globalThis.DataState ? globalThis.DataState : null;
-      return { value: formatValue(value, meta), direction: null, changeText: null, priorText: null, priorDays: null, bars: null,
+      return { value: mainText, direction: null, changeText: null, priorText: null, priorDays: null, bars: null,
         hiddenText: shared ? shared.comparisonHiddenText({ comparison_hidden: hidden }) : String(hidden.message || 'No comparison for these dates.') };
     }
     var cmp = payload && payload.comparison;
@@ -281,7 +284,7 @@
     if (value === null) {
       return { value: NO_DATA_TEXT, noData: true, direction: null, changeText: null, priorText: null, priorDays: null, bars: null };
     }
-    var empty = { value: formatValue(value, meta), direction: null, changeText: null, priorText: null, priorDays: null, bars: null };
+    var empty = { value: mainText, direction: null, changeText: null, priorText: null, priorDays: null, bars: null };
     if (!cmp || prior === null) return empty;
     var abs = toNumber(cmp.absolute_change);
     if (abs === null) abs = value - prior;
@@ -292,7 +295,7 @@
     var period = cmp.previous_period;
     var max = Math.max(Math.abs(value), Math.abs(prior));
     return {
-      value: formatValue(value, meta),
+      value: mainText,
       direction: direction,
       changeText: change,
       priorText: 'vs ' + formatValue(prior, meta) + ' in the prior period',

@@ -955,3 +955,17 @@ describe('metadata.second_line under the main value', () => {
     expect(articles.find((a) => a.includes('Total Active Cases'))).not.toContain('dash-metric-card__second-line');
   });
 });
+
+describe('singular units from the server', () => {
+  const declared = require(path.join(__dirname, '../fixtures/dashboard/declared-layouts.json'));
+  test('a card whose value already says "1 case" gets no extra "cases" unit line', async () => {
+    const cards = declared.cards_synthetic.map((c) => (c.metric_key.endsWith('payroll_clients_needed') ? Object.assign({}, c, { value: 1, formatted_value: '1 case' }) : c));
+    const layout = { cards: [{ id: 'n', kind: 'number', metric_key: 'finance.payroll_clients_needed', visual: 'stat', visual_options: { unit: 'cases' } }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: cards }) });
+    await p.exports.loadDashboardById('d1');
+    const html = p.nodes.dashboardMetricGrid.innerHTML;
+    expect(text(html)).toContain('1 case');
+    expect(html).not.toContain('dash-metric-card__unit');
+    expect(text(html)).not.toContain('1 cases');
+  });
+});
