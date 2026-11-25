@@ -164,7 +164,8 @@
   // goes where the comparison would be, never a 0% or a dash.
   var HIDDEN_COMPARISON = {
     source_stale: 'No comparison: the data source has not synced recently.',
-    insufficient_history: 'No comparison yet: there is not enough history.'
+    insufficient_history: 'No comparison yet: there is not enough history.',
+    records_end: 'No comparison: the records stop before these dates.'
   };
 
   function comparisonHiddenText(item) {
