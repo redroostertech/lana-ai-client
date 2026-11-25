@@ -4014,7 +4014,7 @@ button.dash-lines__label:hover,
 
 /* Calm states hug their content (no tall dashed box); the card's spare
    height sits below them. On the hero the state is one compact row:
-   mark, title, one line of reason, link. */
+   mark, then title, reason (wrapped in full) and link. */
 .dash-bento .dash-metric-card > .lex-data-state {
   flex: 0 0 auto;
 }
@@ -4034,10 +4034,7 @@ button.dash-lines__label:hover,
 }
 
 .dash-metric-card--hero .lex-data-state--calm .lex-data-state__reason {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 1;
-  overflow: hidden;
+  flex-basis: 100%;
   margin: 0;
 }
 
