@@ -82,3 +82,34 @@ test('the router descriptor for the report page loads chart points too', () => {
   const entry = pages.slice(pages.indexOf("'admin/report.html': {"), pages.indexOf("'js/admin/report.js'", pages.indexOf("'admin/report.html': {")));
   expect(entry).toContain("'js/shared/chart-points.js'");
 });
+
+describe('module reports: over-time and bar charts keep gaps', () => {
+  const report = read('js/admin/report.js');
+  test('time_series, trend_chart and line_chart visualizations draw through the gap-keeping renderer', () => {
+    const trend = report.slice(report.indexOf('function renderTrendChart'), report.indexOf('function renderComparisonChart'));
+    expect(trend).toContain('renderTimeSeriesChartForVisualization(canvasId, data.timeSeries, viz.metrics)');
+    expect(trend).toContain('new TimeSeriesRenderer(');
+    ["case 'time_series':", "case 'trend_chart':", "case 'line_chart': return renderTrendChart("].forEach((s) => expect(report).toContain(s));
+  });
+  test('a module timeSeries with an empty average bucket keeps the gap', () => {
+    const source = read('js/visualizations/renderers/time-series-renderer.js')
+      .split('\n').filter((line) => !line.startsWith('import ')).join('\n')
+      .replace('export class TimeSeriesRenderer', 'class TimeSeriesRenderer') + '\nthis.TimeSeriesRenderer = TimeSeriesRenderer;';
+    const context = { console, ChartPoints: P, ChartTheme: new Proxy({}, { get: () => new Proxy(() => ['#000'], { get: () => () => '#000', apply: () => ['#000'] }) }), sampleData: (d) => d, keyToLabel: (k) => k, destroyChart: () => {}, document: {} };
+    context.window = context;
+    context.globalThis = context;
+    vm.runInNewContext(source, context);
+    const moduleSeries = [
+      { date: '2026-09-01', metrics: [{ key: 'average_fee', value: 4200 }, { key: 'conversion_rate', value: 31.5 }] },
+      { date: '2026-10-01', metrics: [{ key: 'average_fee', value: null }, { key: 'conversion_rate', value: null }] },
+      { date: '2026-11-01', metrics: [{ key: 'average_fee', value: 3900 }, { key: 'conversion_rate', value: 0 }] },
+    ];
+    const datasets = new context.TimeSeriesRenderer('c', moduleSeries, ['average_fee', 'conversion_rate'])._buildDatasets();
+    expect(datasets.map((d) => d.data)).toEqual([[4200, null, 3900], [31.5, null, 0]]);
+    expect(datasets.every((d) => d.spanGaps === false)).toBe(true);
+  });
+  test('module horizontal bar charts keep a null bucket as no bar', () => {
+    expect(report).toContain('values: chartData.map(function (d) { return window.ChartPoints.value(d.value); })');
+    expect(report).not.toContain('return d.value || 0;');
+  });
+});

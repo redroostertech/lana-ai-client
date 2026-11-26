@@ -1975,7 +1975,8 @@
 
     var renderer = new BarChartRenderer(containerDiv, {
       labels: chartData.map(function (d) { return d.label || 'Unknown'; }),
-      values: chartData.map(function (d) { return d.value || 0; })
+      // A null bucket (an empty average or rate) draws no bar, never a 0.
+      values: chartData.map(function (d) { return window.ChartPoints.value(d.value); })
     }, {
       title: viz.title, description: viz.description, orientation: 'horizontal',
       metricName: metric.name, unit: metric.unit,
