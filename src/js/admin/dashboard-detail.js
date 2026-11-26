@@ -1041,7 +1041,7 @@
       var model = window.MetricCardView.listBars(first.metric.value, 1000);
       var fmt = formatList(first.metric);
       return model.rows.map(function (row) {
-        return { label: row.label, value: row.value, key: first.key, waiting: false, text: fmt(row.value) };
+        return { label: row.label, value: row.value, key: first.key, waiting: false, text: fmt(row.value), partial: !!row.partial };
       });
     }
     var groupRows = window.DashboardCards.groupRows(def, declaredIndex);
@@ -1071,7 +1071,8 @@
       empty: !shown.length,
       rows: shown.map(function (row) {
         var second = row.second === undefined ? null : row.second;
-        return { label: row.label, value: row.value, second: second, pct: pct(row.value), secondPct: second === null ? null : pct(second), key: row.key };
+        return { label: row.label, value: row.value, second: second, pct: pct(row.value), secondPct: second === null ? null : pct(second), key: row.key,
+          partial: !!row.partial };
       }),
       paired: paired,
       seriesLabels: paired ? (labels && labels.length === 2 ? labels : ['Actual', 'Needed']) : [],

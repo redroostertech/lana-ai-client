@@ -175,3 +175,9 @@ test('pairedSeries pairs by service_key when rows carry it, labelled by service_
     [{ service_key: 'estate_planning', service_label: 'Estate planning', value: 6 }, { service_key: 'guardianship', service_label: 'Guardianship', value: 2 }]);
   expect(rows).toEqual([{ label: 'Estate Planning', value: 21, second: 6 }, { label: 'Guardianship', value: null, second: 2 }]);
 });
+
+test('pairedSeries keeps partial when either side of a bucket is partial', () => {
+  const rows = V.pairedSeries([{ label: 'Q4', value: 2, partial: true }, { label: 'Q3', value: 4 }], [{ label: 'Q4', value: 5 }]);
+  expect(rows[0].partial).toBe(true);
+  expect(rows[1].partial).toBeUndefined();
+});

@@ -873,3 +873,15 @@
 .mini-cols__group--muted .mini-cols__value {
   fill: var(--lex-text-tertiary);
 }
+
+/* A bucket the picked dates cut short (partial: true): a lighter bar and
+   a quiet "(partial)". */
+.mini-cols__bar--partial,
+.mini-bars__fill--partial {
+  opacity: 0.45;
+}
+
+.mini-bars__partial {
+  font-weight: 400;
+  color: var(--lex-text-tertiary);
+}

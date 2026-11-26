@@ -67,12 +67,15 @@
       var valueText = row.second !== null
         ? format(row.value) + ' of ' + format(row.second)
         : format(row.value);
-      var bars = '<rect class="mini-bars__fill" x="0" y="0" width="' + row.pct + '" height="6"></rect>';
+      // A bucket the picked dates cut short: a lighter bar and "(partial)".
+      var partialCls = row.partial ? ' mini-bars__fill--partial' : '';
+      var bars = '<rect class="mini-bars__fill' + partialCls + '" x="0" y="0" width="' + row.pct + '" height="6"></rect>';
       if (row.second !== null) {
-        bars += '<rect class="mini-bars__fill mini-bars__fill--second" x="0" y="8" width="' + row.secondPct + '" height="6"></rect>';
+        bars += '<rect class="mini-bars__fill mini-bars__fill--second' + partialCls + '" x="0" y="8" width="' + row.secondPct + '" height="6"></rect>';
       }
-      return '<li class="mini-bars__row">'
-        + '<div class="mini-bars__head"><span class="mini-bars__label">' + escapeHtml(row.label) + '</span>'
+      return '<li class="mini-bars__row' + (row.partial ? ' mini-bars__row--partial' : '') + '">'
+        + '<div class="mini-bars__head"><span class="mini-bars__label">' + escapeHtml(row.label)
+        + (row.partial ? ' <span class="mini-bars__partial">(partial)</span>' : '') + '</span>'
         + '<span class="mini-bars__value">' + escapeHtml(valueText) + '</span></div>'
         + '<svg class="mini-bars__track' + (model.paired ? ' mini-bars__track--paired' : '') + '" viewBox="0 0 100 ' + height + '" preserveAspectRatio="none" aria-hidden="true" focusable="false">'
         + bars + '</svg></li>';
@@ -145,18 +148,20 @@
       }
       var hasSecond = row.second !== null;
       var bars;
+      var barCls = 'mini-cols__bar' + (row.partial ? ' mini-cols__bar--partial' : '');
       var valueText = hasSecond ? format(row.value) + ' of ' + format(row.second) : format(row.value);
       var top = Math.max(row.pct, hasSecond ? row.secondPct : 0);
       if (hasSecond) {
         var w = Math.min(slot * 0.3, 22);
-        bars = column('mini-cols__bar', center - w - 1.5, w, row.pct)
-          + column('mini-cols__bar mini-cols__bar--second', center + 1.5, w, row.secondPct);
+        bars = column(barCls, center - w - 1.5, w, row.pct)
+          + column(barCls + ' mini-cols__bar--second', center + 1.5, w, row.secondPct);
       } else {
         var width = Math.min(slot * 0.5, 36);
-        bars = column('mini-cols__bar', center - width / 2, width, row.pct);
+        bars = column(barCls, center - width / 2, width, row.pct);
       }
       var valueY = round1(PLOT_BOTTOM - (top / 100) * PLOT_H - 4);
-      return '<g class="mini-cols__group' + (row.muted ? ' mini-cols__group--muted' : '') + '"' + linkFor(row) + '><title>' + escapeHtml(row.label + ': ' + valueText) + '</title>'
+      return '<g class="mini-cols__group' + (row.partial ? ' mini-cols__group--partial' : '') + (row.muted ? ' mini-cols__group--muted' : '') + '"' + linkFor(row)
+        + '><title>' + escapeHtml(row.label + (row.partial ? ' (partial)' : '') + ': ' + valueText) + '</title>'
         + bars
         + '<text class="mini-cols__value" x="' + round1(center) + '" y="' + valueY + '" text-anchor="middle">' + escapeHtml(format(row.value === null && hasSecond ? row.second : row.value)) + '</text>'
         + '<text class="mini-cols__label" x="' + round1(center) + '" y="114" text-anchor="middle">' + escapeHtml(shortLabel(row.label, maxChars)) + '</text>'

@@ -228,11 +228,14 @@
     (first || []).forEach(function (row) {
       at[pairKey(row)] = rows.length;
       rows.push({ label: listLabel(row), value: toNumber(row && row.value), second: null });
+      if (row && row.partial === true) rows[rows.length - 1].partial = true;
     });
     (second || []).forEach(function (row) {
       var key = pairKey(row);
       if (at[key] === undefined) { at[key] = rows.length; rows.push({ label: listLabel(row), value: null, second: null }); }
       rows[at[key]].second = toNumber(row && row.value);
+      // A bucket the picked dates cut short on either side is partial.
+      if (row && row.partial === true) rows[at[key]].partial = true;
     });
     return rows;
   }

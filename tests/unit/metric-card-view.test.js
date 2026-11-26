@@ -280,3 +280,9 @@ test('team rows: conversion_rate null with status insufficient_data and value_la
   ], 12);
   expect(model.rows[1]).toMatchObject({ label: 'Blake Ross', value: null, pct: 0, valueLabel: 'Too few to rate' });
 });
+
+test('a bucket cut by the picked dates keeps partial: true', () => {
+  const model = View.listBars([{ label: 'Q3', value: 4 }, { label: 'Q4', value: 2, partial: true }], 12);
+  expect(model.rows[1].partial).toBe(true);
+  expect(model.rows[0].partial).toBeUndefined();
+});

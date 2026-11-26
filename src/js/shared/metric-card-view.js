@@ -146,6 +146,8 @@
         // No number but the server's value_label ("Too few to rate"): show
         // it in place of the bar, never a 0 bar.
         valueLabel: isObject && value === null ? rowValueLabel(row) : null,
+        // A bucket the picked dates cut short (partial: true).
+        partial: !!(isObject && row.partial === true),
       };
     });
     var paired = parsed.some(function (row) { return row.second !== null; });
@@ -164,6 +166,7 @@
         muted: row.muted,
       };
       if (row.valueLabel) out.valueLabel = row.valueLabel;
+      if (row.partial) out.partial = true;
       return out;
     });
     return {

@@ -342,3 +342,24 @@ describe('server labels in place of bars', () => {
     expect(thin).not.toContain('mini-bars__fill');
   });
 });
+
+describe('partial buckets are marked quietly', () => {
+  test('columns: a lighter bar and "(partial)" in the tooltip', () => {
+    const model = View.listBars([{ label: 'Q3', value: 4 }, { label: 'Q4', value: 2, partial: true }], 12);
+    const html = Charts.breakdownHtml(model, fmt, {});
+    const q4 = html.split('<g class="mini-cols__group').find((g) => g.includes('Q4'));
+    expect(q4.startsWith(' mini-cols__group--partial')).toBe(true);
+    expect(q4).toContain('<title>Q4 (partial): 2</title>');
+    expect(q4).toContain('mini-cols__bar mini-cols__bar--partial');
+    const q3 = html.split('<g class="mini-cols__group').find((g) => g.includes('Q3'));
+    expect(q3).not.toContain('partial');
+  });
+  test('horizontal bars: a lighter bar and "(partial)" after the label', () => {
+    const rows = Array.from({ length: 13 }, (_, i) => ({ label: 'R' + i, value: i + 1 }));
+    rows[0] = { label: 'This week', value: 3, partial: true };
+    const html = Charts.breakdownHtml(View.listBars(rows, 8), fmt, {});
+    const row = html.split('<li class="mini-bars__row').find((li) => li.includes('This week'));
+    expect(row).toContain('mini-bars__partial">(partial)</span>');
+    expect(row).toContain('mini-bars__fill mini-bars__fill--partial');
+  });
+});
