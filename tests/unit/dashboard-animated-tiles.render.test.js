@@ -1010,3 +1010,20 @@ describe('team conversion: unassigned decided records', () => {
     expect(q.nodes.dashboardMetricGrid.innerHTML).not.toContain('Not assigned to anyone');
   });
 });
+
+describe('one card with engine_error', () => {
+  const declared = require(path.join(__dirname, '../fixtures/dashboard/declared-layouts.json'));
+  test.each(['cash_this_month', 'active_cases_total', 'gross_revenue_total'])('%s: that card shows its calm state with the reason; every other card still renders', async (broken) => {
+    const cards = declared.cards_synthetic.map((c) => (c.metric_key.endsWith(broken)
+      ? Object.assign({}, c, { value: null, formatted_value: null, data_state: 'engine_error', data_state_reason: 'LANA could not work this number out for these dates. It will try again on the next refresh.' }) : c));
+    const layout = declared.layouts['Owner Overview'];
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'Owner Overview', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: cards }),
+      getMetricDetail: jest.fn().mockResolvedValue({ data: { snapshots: [] } }) });
+    await p.exports.loadDashboardById('d1');
+    const html = p.nodes.dashboardMetricGrid.innerHTML;
+    expect(text(html)).toContain('LANA could not work this number out for these dates.');
+    expect(html).toContain('lex-data-state--calm');
+    expect(html).not.toContain('$0');
+    ['Gross Revenue', 'Target Revenue', 'Overdue Expected Cash', 'Total Active Cases', 'Cash Coming In'].forEach((title) => expect(text(html)).toContain(title));
+  });
+});
