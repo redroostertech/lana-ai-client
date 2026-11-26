@@ -187,7 +187,8 @@
 
   // rowColumns: the server's row_columns (headers, formats, labels), which
   // win over the inferred columns when present.
-  function renderRawData(sourceRows, rowColumns) {
+  // emptyCopy: the server's empty-state words for 0 rows (else the generic text).
+  function renderRawData(sourceRows, rowColumns, emptyCopy) {
     var table = el('metricRawDataTable');
     if (!table || typeof table.setData !== 'function') return;
     var shared = tables();
@@ -211,7 +212,7 @@
     var order = el('metricRawDataSortOrder');
     if (order) order.dataset.order = defaultDir;
     var empty = function () {
-      setEmptyText(table, 'No records for these dates', 'No matching records. Try a different search or clear the filters.');
+      setEmptyText(table, emptyCopy || 'No records for these dates', 'No matching records. Try a different search or clear the filters.');
     };
     if (!toolbars.raw) {
       toolbars.raw = shared.bindClientToolbar(table, {
@@ -566,7 +567,8 @@
       var rowsStatus = view().rowsStatus(payload.raw_data);
       renderRowsStatus(rowsStatus);
       if (!rowsStatus) {
-        renderRawData(payload.raw_data && payload.raw_data.rows ? payload.raw_data.rows : [], payload.row_columns);
+        renderRawData(payload.raw_data && payload.raw_data.rows ? payload.raw_data.rows : [], payload.row_columns,
+          view().emptyRecordsText(payload, 'No records for these dates'));
         renderRawDataTotal(payload.raw_data);
       }
     } catch (err) {

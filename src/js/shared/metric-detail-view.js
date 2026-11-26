@@ -320,6 +320,33 @@
     return start && end ? dayRangeText({ start: String(start).substring(0, 10), end: String(end).substring(0, 10) }) : '';
   }
 
+  // The definition's empty-state words for a card or detail with 0 rows:
+  // emptyState / empty_state (text, or { title, message }) on raw_data, the
+  // payload, its metadata, the metric or the metric's drilldown definition.
+  // The generic fallback otherwise.
+  var EMPTY_KEYS = ['emptyState', 'empty_state'];
+
+  function emptyWords(value) {
+    if (typeof value === 'string') return value.trim();
+    if (!value || typeof value !== 'object') return '';
+    if (typeof value.message === 'string' && value.message.trim()) return value.message.trim();
+    return typeof value.title === 'string' ? value.title.trim() : '';
+  }
+
+  function emptyRecordsText(payload, fallback) {
+    var p = payload && typeof payload === 'object' ? payload : {};
+    var holders = [p.raw_data, p, p.metadata, p.metric, p.metric && p.metric.drilldown, p.definition, p.definition && p.definition.drilldown];
+    for (var i = 0; i < holders.length; i += 1) {
+      var holder = holders[i];
+      if (!holder || typeof holder !== 'object') continue;
+      for (var k = 0; k < EMPTY_KEYS.length; k += 1) {
+        var text = emptyWords(holder[EMPTY_KEYS[k]]);
+        if (text) return text;
+      }
+    }
+    return fallback || '';
+  }
+
   function dayRangeText(days) {
     if (!days || !days.start || !days.end) return '';
     return dayText(days.start) + ' to ' + dayText(days.end);
@@ -367,6 +394,7 @@
     recordsTable: recordsTable,
     formatValue: formatValue,
     summary: summary,
+    emptyRecordsText: emptyRecordsText,
     periodText: periodText,
     isUuid: isUuid,
     rowsStatus: rowsStatus,

@@ -969,3 +969,20 @@ describe('singular units from the server', () => {
     expect(text(html)).not.toContain('1 cases');
   });
 });
+
+describe('empty worklists use the server empty-state words', () => {
+  function slot() {
+    const label = { textContent: 'View all' };
+    const card = { querySelector: (sel) => (sel === '.dash-card__records span' ? label : null) };
+    const attrs = { 'data-worklist-key': 'k', 'data-rows-visual': 'worklist', 'data-rows-fallback': 'worklist', 'data-rows-sort': '' };
+    return { innerHTML: '', parentNode: card, nextElementSibling: null, classList: { remove() {} }, getAttribute: (n) => attrs[n], insertAdjacentHTML() {} };
+  }
+  test('0 rows with server words shows them; without, the generic text', () => {
+    const s = slot();
+    page().exports.drawRows(s, [], null, [], null, 'No open bills have a due date in the next 7 days.');
+    expect(s.innerHTML).toBe('<p class="dash-worklist__empty">No open bills have a due date in the next 7 days.</p>');
+    const g = slot();
+    page().exports.drawRows(g, [], null, [], null, '');
+    expect(g.innerHTML).toBe('<p class="dash-worklist__empty">No records right now.</p>');
+  });
+});
