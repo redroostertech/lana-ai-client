@@ -1281,6 +1281,16 @@
 
   // "42 matters are not mapped to a service yet" with a link, from the
   // first metric on the card that reports mapping_coverage.
+  // Muted lines above a card's footer: the mapping caveat, and decided
+  // records nobody owns (metadata.unassigned on Team Member Conversion).
+  function cardNotesHtml(metrics) {
+    var unassigned = '';
+    for (var i = 0; i < metrics.length && !unassigned; i += 1) {
+      unassigned = metrics[i] ? window.MetricCardView.unassignedNote(metrics[i]) : '';
+    }
+    return coverageHtml(metrics) + (unassigned ? '<p class="dash-card__note">' + escapeHtml(unassigned) + '</p>' : '');
+  }
+
   function coverageHtml(metrics) {
     var model = window.SettingsMappingsModel;
     if (!model) return '';
@@ -1303,7 +1313,7 @@
       if (!cardInfoByKey[key]) cardInfoByKey[key] = item.resolved;
     });
     var note = item.resolved.def.options && item.resolved.def.options.note;
-    var html = appendToCard(renderDeclaredVisual(item), coverageHtml(item.resolved.metrics.map(function (entry) { return entry.metric; })));
+    var html = appendToCard(renderDeclaredVisual(item), cardNotesHtml(item.resolved.metrics.map(function (entry) { return entry.metric; })));
     // The card's note: one muted line above the footer.
     return note ? appendToCard(html, '<p class="dash-card__note">' + escapeHtml(note) + '</p>') : html;
   }
@@ -1845,7 +1855,7 @@
       // cards collect in one strip at the bottom.
       var split = window.DashboardCards.splitWaiting(filteredMetrics);
       grid.innerHTML = withSpans(window.DashboardLayout.buildLayout(split.shown)).map(function (item) {
-        return appendToCard(renderMetricCard(item.card, item), coverageHtml([item.card]));
+        return appendToCard(renderMetricCard(item.card, item), cardNotesHtml([item.card]));
       }).join('') + renderWaitingStrip(split.waiting.map(function (metric) { return renderMetricCard(metric); }));
     }
     if (animateNextRender && grid.querySelectorAll) {

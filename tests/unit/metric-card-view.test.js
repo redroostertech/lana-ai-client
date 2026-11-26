@@ -286,3 +286,16 @@ test('a bucket cut by the picked dates keeps partial: true', () => {
   expect(model.rows[1].partial).toBe(true);
   expect(model.rows[0].partial).toBeUndefined();
 });
+
+describe('unassignedNote: decided records nobody owns', () => {
+  test('decided > 0 gives "Not assigned to anyone: 3 won, 2 lost"', () => {
+    expect(View.unassignedNote({ metadata: { unassigned: { won: 3, lost: 2, decided: 5 } } })).toBe('Not assigned to anyone: 3 won, 2 lost');
+    expect(View.unassignedNote({ metadata: { unassigned: { won: 1, lost: 0, decided: 1 } } })).toBe('Not assigned to anyone: 1 won, 0 lost');
+  });
+  test('nothing when decided is 0, missing, or there is no unassigned block', () => {
+    expect(View.unassignedNote({ metadata: { unassigned: { won: 0, lost: 0, decided: 0 } } })).toBe('');
+    expect(View.unassignedNote({ metadata: { unassigned: { won: 2 } } })).toBe('');
+    expect(View.unassignedNote({ metadata: {} })).toBe('');
+    expect(View.unassignedNote(null)).toBe('');
+  });
+});

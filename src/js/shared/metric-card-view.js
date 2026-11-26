@@ -346,7 +346,18 @@
     return 1 - Math.pow(1 - p, 3);
   }
 
+  // metadata.unassigned = { won, lost, decided } (Team Member Conversion):
+  // decided records nobody owns, as a muted footnote; '' when none.
+  function unassignedNote(card) {
+    var u = card && card.metadata && card.metadata.unassigned;
+    if (!u || typeof u !== 'object' || !(toNumber(u.decided) > 0)) return '';
+    var won = toNumber(u.won) || 0;
+    var lost = toNumber(u.lost) || 0;
+    return 'Not assigned to anyone: ' + won.toLocaleString('en-US') + ' won, ' + lost.toLocaleString('en-US') + ' lost';
+  }
+
   return {
+    unassignedNote: unassignedNote,
     secondLine: secondLine,
     listHasNoTotal: listHasNoTotal,
     listBars: listBars,

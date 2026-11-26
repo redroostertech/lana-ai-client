@@ -986,3 +986,27 @@ describe('empty worklists use the server empty-state words', () => {
     expect(g.innerHTML).toBe('<p class="dash-worklist__empty">No records right now.</p>');
   });
 });
+
+describe('team conversion: unassigned decided records', () => {
+  const team = { metric_key: 'legal_firm.sales_intake.team_member_conversion_rate', title: 'Team Member Conversion', format: 'table', row_format: 'percentage',
+    formatted_value: null, data_state: 'ok', period: 'Jan 1, 2026 - Jan 31, 2026',
+    value: [{ attorney_name: 'Avery Stone', conversion_rate: 40 }], metadata: { unassigned: { won: 3, lost: 2, decided: 5 } } };
+  test('a muted footnote above the footer when decided > 0', async () => {
+    const layout = { metric_keys: [team.metric_key] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [team] }) });
+    await p.exports.loadDashboardById('d1');
+    const html = p.nodes.dashboardMetricGrid.innerHTML;
+    expect(html).toContain('<p class="dash-card__note">Not assigned to anyone: 3 won, 2 lost</p>');
+    expect(html.indexOf('Not assigned to anyone')).toBeLessThan(html.lastIndexOf('dash-card__footer'));
+  });
+  test('a declared card shows it too; none when nothing was decided', async () => {
+    const layout = { cards: [{ id: 't', kind: 'breakdown', metric_key: 'sales_intake.team_member_conversion_rate' }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [team] }) });
+    await p.exports.loadDashboardById('d1');
+    expect(text(p.nodes.dashboardMetricGrid.innerHTML)).toContain('Not assigned to anyone: 3 won, 2 lost');
+    const none = Object.assign({}, team, { metadata: { unassigned: { won: 0, lost: 0, decided: 0 } } });
+    const q = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [none] }) });
+    await q.exports.loadDashboardById('d1');
+    expect(q.nodes.dashboardMetricGrid.innerHTML).not.toContain('Not assigned to anyone');
+  });
+});
