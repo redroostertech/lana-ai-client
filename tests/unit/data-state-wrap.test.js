@@ -37,3 +37,19 @@ test('no stylesheet clamps or truncates the reason', () => {
     ['line-clamp', 'text-overflow: ellipsis', 'white-space: nowrap', 'max-height'].forEach((bad) => expect(rules).not.toContain(bad));
   });
 });
+
+describe('long freshness labels (several sources) wrap without breaking the card footer', () => {
+  test('the badge wraps and breaks long words', () => {
+    const rules = rulesFor(read('css/components.css'), '.lex-freshness').join(';');
+    expect(rules).toContain('white-space: normal');
+    expect(rules).toContain('overflow-wrap: anywhere');
+    expect(rules).toContain('max-width: 100%');
+  });
+  test('the footer wraps onto a second line and the period can shrink', () => {
+    const css = read('css/admin/insights-dashboard.css');
+    const footer = rulesFor(css, '.dash-card__footer').join(';');
+    expect(footer).toContain('flex-wrap: wrap');
+    expect(rulesFor(css, '.dash-card__footer .dash-metric-card__period').join(';')).toContain('min-width: 0');
+    expect(rulesFor(css, '.dash-metric-card__period .lex-freshness').join(';')).not.toContain('nowrap');
+  });
+});
