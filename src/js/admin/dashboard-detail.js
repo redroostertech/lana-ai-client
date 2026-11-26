@@ -1384,9 +1384,8 @@
   // codes, dates as days, amounts as money (right-aligned).
   // rowColumns: the server's row_columns for these rows (headers, formats,
   // labels), which win over the inferred columns when present.
-  // emptyText: the server's empty-state words for 0 rows, else the generic text.
-  function worklistHtml(rows, rowColumns, emptyText) {
-    if (!rows.length) return '<p class="dash-worklist__empty">' + escapeHtml(emptyText || 'No records right now.') + '</p>';
+  function worklistHtml(rows, rowColumns) {
+    if (!rows.length) return '<p class="dash-worklist__empty">No records right now.</p>';
     var view = window.MetricDetailView;
     var table = view.recordsTable(rows, rowColumns);
     var columns = view.worklistColumns(table.columns, 4);
@@ -1420,7 +1419,7 @@
   // when the card did not already show one of its own.
   // rowsStatus: MetricDetailView.rowsStatus of the payload; when the server
   // could not read the rows, show the calm note instead of an empty list.
-  function drawRows(slot, rows, rowColumns, caveats, rowsStatus, emptyText) {
+  function drawRows(slot, rows, rowColumns, caveats, rowsStatus) {
     slot.classList.remove('mini-spark-slot--loading');
     var key = slot.getAttribute('data-worklist-key');
     var visual = slot.getAttribute('data-rows-visual') || 'worklist';
@@ -1440,7 +1439,7 @@
       slot.innerHTML = template.innerHTML;
     } else if (rows) {
       var sort = choice.sort || slot.getAttribute('data-rows-sort');
-      slot.innerHTML = worklistHtml(window.CardVisuals.sortRows(rows, sort), rowColumns, emptyText);
+      slot.innerHTML = worklistHtml(window.CardVisuals.sortRows(rows, sort), rowColumns);
     } else {
       slot.innerHTML = '';
     }
@@ -1470,7 +1469,6 @@
             columns: payload && Array.isArray(payload.row_columns) ? payload.row_columns : null,
             caveats: lineage && Array.isArray(lineage.caveats) ? lineage.caveats : [],
             rowsStatus: window.MetricDetailView.rowsStatus(payload && payload.raw_data),
-            emptyText: window.MetricDetailView.emptyRecordsText(payload, ''),
           };
         }).catch(function () { return null; });
       }
@@ -1478,9 +1476,7 @@
         // The card's own row_columns answer first; metric detail's otherwise.
         var metric = declaredIndex ? window.DashboardCards.metricFor(declaredIndex, key) : null;
         var columns = metric && Array.isArray(metric.row_columns) ? metric.row_columns : (result && result.columns);
-        // The card's own empty-state words first, else metric detail's.
-        var emptyText = (metric && window.MetricDetailView.emptyRecordsText(metric, '')) || (result ? result.emptyText : '');
-        drawRows(slot, result ? result.rows : null, columns, result ? result.caveats : [], result ? result.rowsStatus : null, emptyText);
+        drawRows(slot, result ? result.rows : null, columns, result ? result.caveats : [], result ? result.rowsStatus : null);
       });
     });
   }

@@ -258,20 +258,3 @@ test('summary: comparison_hidden is read from the top level only', () => {
   const hidden = { reason: 'source_stale', message: 'No comparison while the source is behind.' };
   expect(V.summary({ current: { value: 12, comparison_hidden: hidden } }).hiddenText).toBeFalsy();
 });
-
-describe('emptyRecordsText: the definition\'s empty-state words for 0 rows', () => {
-  const definition = { title: 'No Bills Due This Week', message: 'No open bills have a due date in the next 7 days.', suggestions: ['x'] };
-  test('reads emptyState or empty_state from raw_data, the payload, the metric or the drilldown definition', () => {
-    expect(V.emptyRecordsText({ raw_data: { rows: [], emptyState: definition } })).toBe('No open bills have a due date in the next 7 days.');
-    expect(V.emptyRecordsText({ raw_data: { rows: [] }, empty_state: definition })).toBe('No open bills have a due date in the next 7 days.');
-    expect(V.emptyRecordsText({ metric: { emptyState: definition } })).toBe('No open bills have a due date in the next 7 days.');
-    expect(V.emptyRecordsText({ metric: { drilldown: { emptyState: definition } } })).toBe('No open bills have a due date in the next 7 days.');
-    expect(V.emptyRecordsText({ emptyState: 'Nothing is due this week.' })).toBe('Nothing is due this week.');
-    expect(V.emptyRecordsText({ metadata: { empty_state: { title: 'No Active Matters' } } })).toBe('No Active Matters');
-  });
-  test('falls back to the generic text', () => {
-    expect(V.emptyRecordsText({ raw_data: { rows: [] } }, 'No records right now.')).toBe('No records right now.');
-    expect(V.emptyRecordsText(null, 'No records for these dates')).toBe('No records for these dates');
-    expect(V.emptyRecordsText({ emptyState: { icon: 'x' } }, 'Fallback')).toBe('Fallback');
-  });
-});

@@ -1506,6 +1506,27 @@ createModalStructure() {
    * Rows keep the record's raw values; formatting happens in the renderers.
    * Pure, for unit tests.
    */
+  /**
+   * The table's empty text. A search or filter with no match keeps the
+   * filter wording; otherwise the definition's empty state from the execute
+   * response (data.empty_state { title, message }, sent only with 0 rows),
+   * then data.data_state_reason, then the generic text.
+   */
+  static emptyText(data, filtered) {
+    if (filtered) return 'No matching records. Try a different search or clear the filters.';
+    const empty = data && data.empty_state && typeof data.empty_state === 'object' ? data.empty_state : null;
+    const clean = (value) => (typeof value === 'string' ? value.trim() : '');
+    const title = empty ? clean(empty.title) : '';
+    const message = empty ? clean(empty.message) : '';
+    if (title && message) {
+      const last = title.charAt(title.length - 1);
+      return title + (last === '.' || last === '!' || last === '?' ? ' ' : '. ') + message;
+    }
+    if (title || message) return title || message;
+    const reason = data ? clean(data.data_state_reason) : '';
+    return reason || 'No data found';
+  }
+
   static tableRows(rows, page, pageSize) {
     const offset = (Math.max(1, Number(page) || 1) - 1) * (Number(pageSize) || 20);
     return (rows || []).map((row, index) => Object.assign({}, row, {
@@ -1674,9 +1695,7 @@ createModalStructure() {
       page: this.currentPage,
       limit: this.pageSize
     });
-    table.emptyText = filtered
-      ? 'No matching records. Try a different search or clear the filters.'
-      : 'No data found';
+    table.emptyText = DrilldownRenderer.emptyText(this.currentData, filtered);
     table.hidden = false;
     table.setServerData(DrilldownRenderer.tableRows(rows, this.currentPage, this.pageSize), {
       page: Number(pagination.page) || this.currentPage,
