@@ -1408,3 +1408,17 @@ describe('as-of dashboards keep worklists as lists', () => {
     expect(html).not.toContain('See the report');
   });
 });
+
+describe('month bars: records with no date', () => {
+  test('a muted note under the bars opens the records with no month', async () => {
+    const card = { metric_key: 'legal_firm.sales_intake.open_deals_by_month', title: 'Open Deals', format: 'currency', data_state: 'ok', period: 'Nov 2026', value: 12000, formatted_value: '$12,000',
+      metadata: { unit: 'deals', by_month: [{ month: '2026-10', label: 'Oct', count: 2, value: 7500 }], by_month_unplaced: { label: 'No date recorded', count: 3, value: 4500 } } };
+    const layout = { cards: [{ id: 'm', kind: 'number', visual: 'month_bars', value_format: 'currency', metric_key: 'sales_intake.open_deals_by_month' }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [Object.assign({ value_format: 'currency' }, card)] }) });
+    await p.exports.loadDashboardById('d1');
+    const html = p.nodes.dashboardMetricGrid.innerHTML.split('&amp;').join('&');
+    expect(text(html)).toContain('3 with no date recorded ($4,500)');
+    const note = html.split('dash-month-note').slice(1).join('');
+    expect(note).toContain('raw_filter%5Bmonth%5D=(empty)');
+  });
+});

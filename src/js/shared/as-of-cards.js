@@ -130,6 +130,27 @@
     return item.label + ': ' + parts.join(' \u00b7 ');
   }
 
+  // Records with no grouping date (metadata.by_month_unplaced): a note under
+  // the bars, so bars plus the note add up to the headline. It opens the
+  // records with a blank month (the backend's "(empty)" filter).
+  var UNPLACED_FILTER = '(empty)';
+
+  function unplacedOf(card) {
+    var u = metaOf(card).by_month_unplaced;
+    if (!u || typeof u !== 'object') return null;
+    var count = numberOrNull(u.count);
+    if (!count) return null;
+    return { label: u.label ? String(u.label) : 'No date recorded', count: count, value: numberOrNull(u.value) };
+  }
+
+  /** "3 with no date recorded ($4,500)"; '' when there are none. */
+  function unplacedNote(card, formatValue) {
+    var u = unplacedOf(card);
+    if (!u) return '';
+    var words = u.label.charAt(0).toLowerCase() + u.label.slice(1);
+    return u.count.toLocaleString('en-US') + ' with ' + words + (u.value !== null ? ' (' + formatValue(u.value) + ')' : '');
+  }
+
   /** The word for the count (metadata.unit, for example "deals"). */
   function monthUnit(card) {
     var unit = metaOf(card).unit;
@@ -205,6 +226,8 @@
   }
 
   return {
+    UNPLACED_FILTER: UNPLACED_FILTER,
+    unplacedNote: unplacedNote,
     periodLabel: periodLabel,
     linkOf: linkOf,
     isLinkCard: isLinkCard,

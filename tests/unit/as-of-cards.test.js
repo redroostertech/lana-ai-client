@@ -109,3 +109,18 @@ describe('the server period label', () => {
     expect(AsOf.periodLabel({})).toBe('');
   });
 });
+
+describe('records with no grouping date (metadata.by_month_unplaced)', () => {
+  const money = (n) => '$' + n.toLocaleString('en-US');
+  test('a muted note: the count, with the amount when there is one', () => {
+    const card = (u) => ({ metadata: { by_month_unplaced: u } });
+    expect(AsOf.unplacedNote(card({ label: 'No date recorded', count: 3 }), money)).toBe('3 with no date recorded');
+    expect(AsOf.unplacedNote(card({ label: 'No date recorded', count: 3, value: 4500 }), money)).toBe('3 with no date recorded ($4,500)');
+    expect(AsOf.unplacedNote(card({ count: 1 }), money)).toBe('1 with no date recorded');
+    expect(AsOf.unplacedNote(card({ label: 'No date recorded', count: 0 }), money)).toBe('');
+    expect(AsOf.unplacedNote({}, money)).toBe('');
+  });
+  test('the note opens the records with no month (the "(empty)" filter)', () => {
+    expect(AsOf.UNPLACED_FILTER).toBe('(empty)');
+  });
+});

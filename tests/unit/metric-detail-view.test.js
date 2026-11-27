@@ -358,3 +358,8 @@ describe('records filters from the link (raw_filter[col]=value)', () => {
     expect(V.linkFilterText('owner_name', 'Taylor Vance')).toBe('Owner name: Taylor Vance');
   });
 });
+
+test('a month filter of "(empty)" reads No date recorded', () => {
+  const V2 = require('../../src/js/shared/metric-detail-view.js');
+  expect(V2.linkFilterText('month', '(empty)')).toBe('Month: No date recorded');
+});

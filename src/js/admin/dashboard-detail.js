@@ -1437,11 +1437,18 @@
         linkHref: recordsHref(entry.key, (function () { var f = {}; f[window.AsOfCards.MONTH_FIELD] = item.month; return f; })()) };
     });
     var subtitle = window.AsOfCards.monthSubtitle(metric);
+    var unplacedFilter = {};
+    unplacedFilter[window.AsOfCards.MONTH_FIELD] = window.AsOfCards.UNPLACED_FILTER;
+    var unplaced = window.AsOfCards.unplacedNote(metric, formatWith(cardFormat));
+    var unplacedHtml = unplaced
+      ? '<p class="dash-month-note"><button type="button" class="dash-month-note__link" data-metric-detail-link="' + escapeHtml(recordsHref(entry.key, unplacedFilter)) + '">' + escapeHtml(unplaced) + '</button></p>'
+      : '';
     return '<article class="' + cardClass(accentClass(def, 'dash-metric-card--chart'), layoutItem) + '">'
       + declaredTop(def, entry.key, metric, true, null, recordsHref(entry.key))
       + valueBlock(metric)
       + (subtitle ? '<p class="dash-metric-card__subtitle">' + escapeHtml(subtitle) + '</p>' : '')
       + '<div class="dash-metric-card__chart">' + window.MiniCharts.columnsHtml({ rows: rows, paired: false, seriesLabels: [], allLabels: true }, plainNumber, {}) + '</div>'
+      + unplacedHtml
       + cardFooter(metric, entry.key)
       + '</article>';
   }

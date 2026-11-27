@@ -4321,3 +4321,24 @@ button.dash-lines__label:hover,
   margin-top: auto;
   padding-top: 0.75rem;
 }
+
+/* Month bars: records with no date to group them by. */
+.dash-month-note {
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  color: var(--lex-text-secondary);
+}
+
+.dash-month-note__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.dash-month-note__link:hover,
+.dash-month-note__link:focus-visible {
+  text-decoration: underline;
+}
