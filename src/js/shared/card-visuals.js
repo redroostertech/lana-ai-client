@@ -194,6 +194,29 @@
     });
   }
 
+  /**
+   * The rows a card shows: zero and empty rows hidden (they stay in the
+   * details), sorted by value unless the server already sorted them, the
+   * top `limit`; hidden counts the rest. Waiting rows stay.
+   */
+  function topRows(rows, limit) {
+    var shown = (rows || []).filter(function (row) {
+      if (row.waiting) return true;
+      var n = toNumber(row.value);
+      return n !== null && n !== 0;
+    });
+    var sortedDesc = shown.every(function (row, i) {
+      return i === 0 || row.waiting || shown[i - 1].waiting || toNumber(shown[i - 1].value) >= toNumber(row.value);
+    });
+    var ordered = sortedDesc ? shown : shown.slice().sort(function (a, b) {
+      var av = a.waiting ? -Infinity : toNumber(a.value);
+      var bv = b.waiting ? -Infinity : toNumber(b.value);
+      return bv - av;
+    });
+    var cap = limit > 0 ? limit : 8;
+    return { rows: ordered.slice(0, cap), hidden: Math.max(0, ordered.length - cap) };
+  }
+
   function stackedModel(rows) {
     var model = donutModel(rows);
     if (!model) return null;
@@ -303,6 +326,7 @@
   }
 
   return {
+    topRows: topRows,
     shortLabels: shortLabels,
     VOCABULARY: VOCABULARY,
     visualFor: visualFor,

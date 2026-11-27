@@ -1079,3 +1079,29 @@ describe('card headline and callouts', () => {
     expect(line).toContain('Deals with an amount 80%');
   });
 });
+
+describe('long breakdowns: top 8 and "And N more in the details"', () => {
+  const pipeline = Array.from({ length: 83 }, (_, i) => ({ pipeline: 'Pipeline ' + (i % 3), stage: 'Stage ' + i, stage_position: i,
+    open_count: i < 10 ? 2 : 0, no_amount_count: 0, value: i < 10 ? (i + 1) * 1000 : 0 }));
+  const card = { metric_key: 'legal_firm.sales_intake.open_pipeline_by_stage', title: 'Open Deals by Stage', format: 'distribution', data_state: 'ok',
+    period: 'Nov 1, 2026 - Nov 30, 2026', value: pipeline };
+  async function render(visual) {
+    const layout = { cards: [{ id: 'p', kind: 'breakdown', metric_key: 'sales_intake.open_pipeline_by_stage', visual }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [card] }) });
+    await p.exports.loadDashboardById('d1');
+    return p.nodes.dashboardMetricGrid.innerHTML;
+  }
+  test('ranked bars: 8 rows by value, zero rows hidden, the rest counted', async () => {
+    const html = await render('ranked_bars');
+    expect(html.split('<li class="mini-rank__row"').length - 1).toBe(8);
+    expect(html).toContain('Stage 9 (Pipeline 0)');
+    expect(html).not.toContain('Stage 1 (Pipeline 1)<');
+    expect(html).toContain('And 2 more in the details');
+    expect(html).not.toContain('Stage 50');
+  });
+  test('columns: the same, drawn as bars with the count', async () => {
+    const html = await render('columns');
+    expect(html).toContain('And 2 more in the details');
+    expect(html).not.toContain('Stage 50');
+  });
+});

@@ -186,3 +186,15 @@ test('pairedSeries labels rows the same generic way (no "Item N", stage with pip
   const rows = V.pairedSeries([{ source: 'Referral', value: 2 }, { pipeline: 'Estate Planning', stage: 'Lead', value: 3 }], []);
   expect(rows.map((r) => r.label)).toEqual(['Referral', 'Lead (Estate Planning)']);
 });
+
+describe('topRows: the top 8 for the card, zero rows hidden', () => {
+  test('sorted by value unless the server already sorted them; zeros and empties hidden; the rest counted', () => {
+    const rows = [{ label: 'a', value: 0 }, { label: 'b', value: 5 }, { label: 'c', value: 9 }, { label: 'd', value: null }, { label: 'e', value: 1 }];
+    expect(V.topRows(rows, 2)).toEqual({ rows: [{ label: 'c', value: 9 }, { label: 'b', value: 5 }], hidden: 1 });
+    const sorted = [{ label: 'x', value: 9 }, { label: 'y', value: 9 }, { label: 'z', value: 1 }];
+    expect(V.topRows(sorted, 8)).toEqual({ rows: sorted, hidden: 0 });
+  });
+  test('waiting rows stay', () => {
+    expect(V.topRows([{ label: 'w', value: null, waiting: true }], 8).rows).toHaveLength(1);
+  });
+});

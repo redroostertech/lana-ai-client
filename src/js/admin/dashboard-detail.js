@@ -833,8 +833,17 @@
     var formatBar = unit === 'number' ? plainNumber : function (n) {
       return n === null ? window.DataState.EMPTY_VALUE : formatMetricCardValue({ value: n, format: unit === 'percent' ? 'percentage' : unit });
     };
-    // More than 12 rows read better as horizontal bars (8 shown, the rest counted).
-    if (bars.hiddenCount > 0) bars = window.MetricCardView.listBars(metric.value, 8);
+    if (!metric.value.some(isPeriodRow) && !bars.paired && !bars.neededPending) {
+      // A breakdown of categories: zero rows hidden (they stay in the
+      // details), then the top 8 by value, the rest counted.
+      var full = window.MetricCardView.listBars(metric.value, 100000);
+      var top = window.CardVisuals.topRows(full.rows, CARD_ROW_LIMIT);
+      bars = Object.assign({}, full, { rows: top.rows, hiddenCount: top.hidden, empty: !top.rows.length });
+      if (bars.empty) return window.DataState.render(EMPTY_LIST_STATE, { calm: true });
+    } else if (bars.hiddenCount > 0) {
+      // More than 12 rows read better as horizontal bars (8 shown, the rest counted).
+      bars = window.MetricCardView.listBars(metric.value, 8);
+    }
     // Each column opens the records; a "Not mapped" column opens Mappings.
     var listKey = metric.metric_key || metric.key;
     bars.rows.forEach(function (row) {
@@ -1050,9 +1059,13 @@
     if (resolved.metrics.length === 1 && first.metric && Array.isArray(first.metric.value)) {
       var model = window.MetricCardView.listBars(first.metric.value, 1000);
       var fmt = formatList(first.metric);
-      return model.rows.map(function (row) {
-        return { label: row.label, value: row.value, key: first.key, waiting: false, text: fmt(row.value), partial: !!row.partial };
+      var listRows = model.rows.map(function (row) {
+        return { label: row.label, value: row.value, key: first.key, waiting: false, text: fmt(row.value), partial: !!row.partial, ref: row.ref || null };
       });
+      // A breakdown of categories (not a series over dates) shows its top
+      // rows only (seriesChartHtml).
+      listRows.categories = !first.metric.value.some(isPeriodRow);
+      return listRows;
     }
     var groupRows = window.DashboardCards.groupRows(def, declaredIndex);
     var labels = window.CardVisuals.shortLabels(groupRows.map(function (row) { return row.label; }));
@@ -1060,6 +1073,18 @@
       return { label: labels[i], value: row.value, key: row.key, waiting: row.waiting, metric: row.metric,
         text: row.waiting ? '' : formatMetricCardValue(row.metric), conversionPct: row.conversionPct, pct: row.pct };
     });
+  }
+
+  var PERIOD_FIELDS = ['period_start', 'week_start', 'month_start', 'period', 'week', 'month', 'date', 'day'];
+
+  function isPeriodRow(row) {
+    return !!(row && typeof row === 'object' && PERIOD_FIELDS.some(function (key) { return row[key] !== undefined && row[key] !== null && row[key] !== ''; }));
+  }
+
+  var CARD_ROW_LIMIT = 8;
+
+  function moreHtml(hidden) {
+    return hidden > 0 ? '<p class="mini-bars__more">And ' + hidden + ' more in the details</p>' : '';
   }
 
   function waitingTitle(row) {
@@ -1114,9 +1139,11 @@
       });
     }
     if (visual === 'ranked_bars') {
-      return window.MiniCharts.rankedHtml(window.CardVisuals.rankedModel(rows), {
+      // Many rows: the top 8 by value, zero rows hidden, the rest counted.
+      var rankedTop = rows.categories ? window.CardVisuals.topRows(rows, CARD_ROW_LIMIT) : { rows: rows, hidden: 0 };
+      return window.MiniCharts.rankedHtml(window.CardVisuals.rankedModel(rankedTop.rows), {
         format: textOf, href: recordsHref, initials: resolved.def.options.initials, waitingLabel: waitingTitle,
-      });
+      }) + moreHtml(rankedTop.hidden);
     }
     if (visual === 'stacked_bar') {
       var labels = resolved.def.options.series_labels;
@@ -1128,8 +1155,11 @@
     if (visual === 'funnel') {
       return window.MiniCharts.groupHtml(rows, { funnel: true, format: textOf, href: recordsHref, waitingLabel: waitingTitle });
     }
-    // columns and paired_columns
-    var model = seriesColumnsModel(rows, resolved.def.options.series_labels);
+    // columns and paired_columns; a breakdown of many categories shows its
+    // top 8 (drawn as bars with "And N more in the details").
+    var columnTop = rows.categories ? window.CardVisuals.topRows(rows, CARD_ROW_LIMIT) : { rows: rows, hidden: 0 };
+    var model = seriesColumnsModel(columnTop.rows, resolved.def.options.series_labels);
+    model.hiddenCount = columnTop.hidden;
     if (model.empty) return window.DataState.render(EMPTY_LIST_STATE, { calm: true });
     return window.MiniCharts.breakdownHtml(model, function (n) { return byValue[n] !== undefined ? byValue[n] : plainNumber(n); }, { href: recordsHref });
   }
