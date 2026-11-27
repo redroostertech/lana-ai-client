@@ -1425,21 +1425,24 @@
     if (!months) return metric && !Array.isArray(metric.value) ? heroOrStat(resolved, layoutItem, 'stat') : seriesCard(resolved, layoutItem, 'columns');
     var cardFormat = metric.value_format || (metric.metadata && metric.metadata.value_format) || '';
     var unit = window.AsOfCards.monthUnit(metric);
-    var heights = months.map(function (item) { return item.value !== null ? item.value : (item.count || 0); });
+    // An average card: bars are the averages (never a count), and nothing
+    // is summed; the headline is the server's value.
+    var average = window.AsOfCards.isAverage(metric);
+    var heights = months.map(function (item) { return item.value !== null ? item.value : (average ? 0 : (item.count || 0)); });
     var max = Math.max.apply(null, heights.concat([0]));
     var rows = months.map(function (item, i) {
       var money = formatWith(item.format || cardFormat);
       var height = heights[i];
       return { label: item.label, value: height, second: null, secondPct: 0,
         pct: height > 0 && max > 0 ? Math.round((height / max) * 1000) / 10 : 0,
-        valueText: item.value !== null ? money(item.value) : plainNumber(item.count),
-        tip: window.AsOfCards.monthTip(item, money, unit),
+        valueText: item.value !== null ? money(item.value) : (average ? window.DataState.EMPTY_VALUE : plainNumber(item.count)),
+        tip: window.AsOfCards.monthTip(item, money, unit, average),
         linkHref: recordsHref(entry.key, (function () { var f = {}; f[window.AsOfCards.MONTH_FIELD] = item.month; return f; })()) };
     });
     var subtitle = window.AsOfCards.monthSubtitle(metric);
     var unplacedFilter = {};
     unplacedFilter[window.AsOfCards.MONTH_FIELD] = window.AsOfCards.UNPLACED_FILTER;
-    var unplaced = window.AsOfCards.unplacedNote(metric, formatWith(cardFormat));
+    var unplaced = window.AsOfCards.unplacedNote(metric, formatWith(cardFormat), average);
     var unplacedHtml = unplaced
       ? '<p class="dash-month-note"><button type="button" class="dash-month-note__link" data-metric-detail-link="' + escapeHtml(recordsHref(entry.key, unplacedFilter)) + '">' + escapeHtml(unplaced) + '</button></p>'
       : '';

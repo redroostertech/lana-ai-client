@@ -133,3 +133,22 @@ describe('records with no grouping date (metadata.by_month_unplaced)', () => {
     expect(AsOf.UNPLACED_FILTER).toBe('(empty)');
   });
 });
+
+describe('average cards', () => {
+  const days = (n) => n + ' days';
+  test('an average is known by its aggregation, its format or value_count on the months', () => {
+    expect(AsOf.isAverage({ metadata: { aggregation: 'average' } })).toBe(true);
+    expect(AsOf.isAverage({ format: 'average_days' })).toBe(true);
+    expect(AsOf.isAverage({ metadata: { by_month: [{ month: '2026-10', value: 42, value_count: 18 }] } })).toBe(true);
+    expect(AsOf.isAverage({ metadata: { by_month: [{ month: '2026-10', value: 42, count: 18 }] } })).toBe(false);
+  });
+  test('the tooltip says "Avg 42 days · 18 records"', () => {
+    const item = AsOf.byMonth({ metadata: { by_month: [{ month: '2026-10', label: 'Oct', value: 42, value_count: 18 }] } })[0];
+    expect(item.valueCount).toBe(18);
+    expect(AsOf.monthTip(item, days, 'deals', true)).toBe('Oct: Avg 42 days · 18 records');
+    expect(AsOf.monthTip({ label: 'Oct', value: 42, valueCount: 1, count: null }, days, '', true)).toBe('Oct: Avg 42 days · 1 record');
+  });
+  test('the no-date note gives the average, not a total', () => {
+    expect(AsOf.unplacedNote({ metadata: { by_month_unplaced: { label: 'No date recorded', count: 3, value: 30 } } }, days, true)).toBe('3 with no date recorded (avg 30 days)');
+  });
+});

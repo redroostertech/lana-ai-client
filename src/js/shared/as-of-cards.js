@@ -97,6 +97,8 @@
     var items = list.filter(function (item) { return item && typeof item === 'object' && item.month; }).map(function (item) {
       var month = String(item.month);
       return { month: month, label: item.label ? String(item.label) : month, count: numberOrNull(item.count), value: numberOrNull(item.value),
+        // On an average card: the records behind each average.
+        valueCount: numberOrNull(item.value_count),
         format: item.format ? String(item.format) : '' };
     });
     if (!items.length) return null;
@@ -124,8 +126,38 @@
     return Number(count).toLocaleString('en-US') + ' ' + word;
   }
 
-  /** "Oct: 12 deals · $45,000" (formatValue formats the amount). */
-  function monthTip(item, formatValue, unit) {
+  var AVERAGE_WORDS = ['average', 'avg', 'mean'];
+
+  function mentionsAverage(text) {
+    var t = String(text || '').toLowerCase();
+    return AVERAGE_WORDS.some(function (word) { return t.indexOf(word) !== -1; });
+  }
+
+  /**
+   * True for a card of averages (never summed): its aggregation or format
+   * says so, or its months carry value_count.
+   */
+  function isAverage(card) {
+    if (!card || typeof card !== 'object') return false;
+    var meta = metaOf(card);
+    if (AVERAGE_WORDS.indexOf(String(meta.aggregation || '').toLowerCase()) !== -1) return true;
+    var format = card.format && typeof card.format === 'object' ? card.format.type || card.format.style : card.format;
+    if (mentionsAverage(format) || mentionsAverage(card.value_format || meta.value_format)) return true;
+    return Array.isArray(meta.by_month) && meta.by_month.some(function (item) { return item && numberOrNull(item.value_count) !== null; });
+  }
+
+  /**
+   * "Oct: 12 deals · $45,000" (formatValue formats the amount); on an
+   * average card "Oct: Avg 42 days · 18 records".
+   */
+  function monthTip(item, formatValue, unit, average) {
+    if (average) {
+      var behind = item.valueCount !== null && item.valueCount !== undefined ? item.valueCount : item.count;
+      var avgParts = [];
+      if (item.value !== null && item.value !== undefined) avgParts.push('Avg ' + formatValue(item.value));
+      if (behind !== null && behind !== undefined) avgParts.push(countWords(behind, 'records'));
+      return item.label + ': ' + avgParts.join(' \u00b7 ');
+    }
     var parts = [];
     if (item.count !== null && item.count !== undefined) parts.push(countWords(item.count, unit));
     if (item.value !== null && item.value !== undefined) parts.push(formatValue(item.value));
@@ -146,11 +178,11 @@
   }
 
   /** "3 with no date recorded ($4,500)"; '' when there are none. */
-  function unplacedNote(card, formatValue) {
+  function unplacedNote(card, formatValue, average) {
     var u = unplacedOf(card);
     if (!u) return '';
     var words = u.label.charAt(0).toLowerCase() + u.label.slice(1);
-    return u.count.toLocaleString('en-US') + ' with ' + words + (u.value !== null ? ' (' + formatValue(u.value) + ')' : '');
+    return u.count.toLocaleString('en-US') + ' with ' + words + (u.value !== null ? ' (' + (average ? 'avg ' : '') + formatValue(u.value) + ')' : '');
   }
 
   /** The word for the count (metadata.unit, for example "deals"). */
@@ -239,6 +271,7 @@
     isMonthCard: isMonthCard,
     monthSubtitle: monthSubtitle,
     monthTip: monthTip,
+    isAverage: isAverage,
     monthUnit: monthUnit,
     isAsOf: isAsOf,
     isPlainDay: isPlainDay,

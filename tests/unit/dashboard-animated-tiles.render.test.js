@@ -1422,3 +1422,18 @@ describe('month bars: records with no date', () => {
     expect(note).toContain('raw_filter%5Bmonth%5D=(empty)');
   });
 });
+
+describe('month bars on an average card', () => {
+  test('bars are the averages, the tooltip names the records, and the headline is the server value, never a sum', async () => {
+    const card = { metric_key: 'legal_firm.sales_intake.avg_days_open_by_month', title: 'Average Days Open', format: 'number', data_state: 'ok', period: 'Nov 2026',
+      value: 40, formatted_value: '40', metadata: { aggregation: 'average', by_month: [
+        { month: '2026-10', label: 'Oct', value: 42, value_count: 18 }, { month: '2026-11', label: 'Nov', value: 30, value_count: 2 }] } };
+    const layout = { cards: [{ id: 'a', kind: 'number', visual: 'month_bars', metric_key: 'sales_intake.avg_days_open_by_month' }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [card] }) });
+    await p.exports.loadDashboardById('d1');
+    const html = p.nodes.dashboardMetricGrid.innerHTML;
+    expect(html).toContain('<title>Oct: Avg 42 · 18 records</title>');
+    expect(html.split('dash-metric-card__value')[1]).toContain('>40<');
+    expect(text(html)).not.toContain('72');
+  });
+});
