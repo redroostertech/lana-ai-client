@@ -147,8 +147,8 @@
   }
 
   /**
-   * "Oct: 12 deals · $45,000" (formatValue formats the amount); on an
-   * average card "Oct: Avg 42 days · 18 records".
+   * "October 2026 · 12 deals · $45,000" (formatValue formats the amount);
+   * on an average card "October 2026 · Avg 42 days · 18 records".
    */
   function monthTip(item, formatValue, unit, average) {
     if (average) {
@@ -156,12 +156,12 @@
       var avgParts = [];
       if (item.value !== null && item.value !== undefined) avgParts.push('Avg ' + formatValue(item.value));
       if (behind !== null && behind !== undefined) avgParts.push(countWords(behind, 'records'));
-      return item.label + ': ' + avgParts.join(' \u00b7 ');
+      return [item.label].concat(avgParts).join(' \u00b7 ');
     }
     var parts = [];
     if (item.count !== null && item.count !== undefined) parts.push(countWords(item.count, unit));
     if (item.value !== null && item.value !== undefined) parts.push(formatValue(item.value));
-    return item.label + ': ' + parts.join(' \u00b7 ');
+    return [item.label].concat(parts).join(' \u00b7 ');
   }
 
   // Records with no grouping date (metadata.by_month_unplaced): a note under

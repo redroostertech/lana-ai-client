@@ -75,7 +75,8 @@ describe('tiles', () => {
     expect(money).toContain('$84,250');
     expect(money).toContain('$31,001');
     const closed = text(page().exports.renderMetricCard(card('closed_cases_by_service_offering')));
-    expect(closed).toContain('Estate Planning: 6');
+    expect(closed).toContain('Estate Planning');
+    expect(page().exports.renderMetricCard(card('closed_cases_by_service_offering'))).toContain('data-tip="Estate Planning · 6"');
     expect(closed).not.toContain('$');
   });
 
@@ -1205,7 +1206,7 @@ describe('team appointments from metadata.by_person', () => {
     expect(text(html)).toContain('No show');
     expect(text(html)).not.toContain('Consultation');
     expect(html).toContain('data-record-ref="person|p-1|u-9"');
-    expect(html).toContain('<title>Avery Stone: 29 of 30</title>');
+    expect(html).toContain('data-tip="Avery Stone · Held 29 · No show 30"');
   });
   test('ranked bars rank people by total', async () => {
     const html = await render('ranked_bars', { series: ['held', 'no_show', 'cancelled'] });
@@ -1320,7 +1321,7 @@ describe('monthly bars (metadata.by_month)', () => {
     expect(text(html)).toContain('By month created');
     expect(html.indexOf('>Older<')).toBeLessThan(html.indexOf('>Oct<'));
     expect(html.indexOf('>Oct<')).toBeLessThan(html.indexOf('>Nov<'));
-    expect(html).toContain('<title>Oct: 12 deals · $45,000</title>');
+    expect(html).toContain('data-tip="Oct · 12 deals · $45,000"');
   });
   test('a bar opens the records for that month; the title opens all of them', async () => {
     const html = unescape(await render(monthCard(), { visual: 'month_bars' }));
@@ -1334,7 +1335,7 @@ describe('monthly bars (metadata.by_month)', () => {
     const counts = monthCard({ group_by_month_of: 'unknown_rule', by_month: [{ month: '2026-10', label: 'Oct', count: 4 }, { month: '2026-11', label: 'Nov', count: 2 }] });
     const html = await render(counts, {});
     expect(html).toContain('mini-cols');
-    expect(html).toContain('<title>Oct: 4 deals</title>');
+    expect(html).toContain('data-tip="Oct · 4 deals"');
     expect(text(html)).not.toContain('By month');
   });
   test('a worklist card stays a list, even with by_month', async () => {
@@ -1432,7 +1433,7 @@ describe('month bars on an average card', () => {
     const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [card] }) });
     await p.exports.loadDashboardById('d1');
     const html = p.nodes.dashboardMetricGrid.innerHTML;
-    expect(html).toContain('<title>Oct: Avg 42 · 18 records</title>');
+    expect(html).toContain('data-tip="Oct · Avg 42 · 18 records"');
     expect(html.split('dash-metric-card__value')[1]).toContain('>40<');
     expect(text(html)).not.toContain('72');
   });
@@ -1495,7 +1496,7 @@ describe('Still Open live check: formats and empty months', () => {
       metadata: { unit: 'deals', by_month: [{ month: '2026-10', label: 'October 2026', count: 3, value: 7508521 }] } };
     const html = await render(card, { visual: 'month_bars' });
     expect(html.split('dash-metric-card__value')[1]).toContain('$7,508,521');
-    expect(html).toContain('<title>October 2026: 3 deals · $7,508,521</title>');
+    expect(html).toContain('data-tip="October 2026 · 3 deals · $7,508,521"');
     expect(html).toContain('>Oct<');
   });
   test('a forward cash card with all-zero months shows the empty line, not a row of 0s', async () => {
@@ -1505,4 +1506,29 @@ describe('Still Open live check: formats and empty months', () => {
     expect(text(html)).toContain('Nothing due in these months');
     expect(html).not.toContain('mini-cols__value');
   });
+});
+
+describe('axes on dashboard charts', () => {
+  test('month bars carry a money axis; by-person and list columns a count axis', async () => {
+    const card = { metric_key: 'legal_firm.sales_intake.open_deals_by_month', title: 'Open Deals', data_state: 'ok', value: 2400000, value_format: 'currency',
+      metadata: { unit: 'deals', by_month: [{ month: '2026-10', label: 'October 2026', count: 3, value: 2100000 }, { month: '2026-11', label: 'November 2026', count: 1, value: 300000 }] } };
+    const layout = { cards: [{ id: 'm', kind: 'headline', visual: 'month_bars', metric_key: 'sales_intake.open_deals_by_month' }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [card] }) });
+    await p.exports.loadDashboardById('d1');
+    const html = p.nodes.dashboardMetricGrid.innerHTML;
+    expect(html).toContain('dash-metric-card--hero');
+    expect(html).toContain('class="mini-cols__axis"');
+    expect(html).toContain('>$1M<');
+  });
+  test('a list breakdown uses the list format on its axis', () => {
+    const revenue = Object.assign({}, card('gross_revenue_by_service_offering'), { value: sample.currency_breakdown_rows_synthetic });
+    const html = page().exports.renderMetricCard(revenue);
+    expect(html).toContain('class="mini-cols__axis"');
+    expect(html.split('class="mini-cols__tick"').slice(1).map((p) => p.split('>')[1].split('<')[0])[1]).toContain('$');
+  });
+});
+
+test('the page binds the chart tooltips once on its content', () => {
+  const src = fs.readFileSync(path.join(__dirname, '../../src/js/admin/dashboard-detail.js'), 'utf8');
+  expect(src).toContain('window.MiniCharts.bindTips(content);');
 });

@@ -908,7 +908,9 @@
         + (action ? ' <button type="button" class="lex-data-state__action" data-data-state-action="' + escapeHtml(action.href) + '">' + escapeHtml(action.label) + '</button>' : '')
         + '</p>'
       : '';
-    return '<div class="dash-metric-card__chart">' + window.MiniCharts.breakdownHtml(bars, formatBar, { href: recordsHref }) + pendingNote + '</div>';
+    // The y axis reads the list's value format (money, percent or a count).
+    var axisKind = window.MetricCardView.listValueFormat(metric);
+    return '<div class="dash-metric-card__chart">' + window.MiniCharts.breakdownHtml(bars, formatBar, { href: recordsHref, axis: axisKind }) + pendingNote + '</div>';
   }
 
   // ── Declared cards (layout.cards; js/shared/dashboard-cards.js) ──────
@@ -1438,6 +1440,9 @@
     var heights = months.map(function (item) { return item.value !== null ? item.value : (average ? 0 : (item.count || 0)); });
     var max = Math.max.apply(null, heights.concat([0]));
     var ticks = window.AsOfCards.monthTicks(months);
+    // The y axis: the amounts' format (or an average's unit), else counts.
+    var hasAmounts = months.some(function (item) { return item.value !== null; });
+    var monthAxis = hasAmounts ? (months.filter(function (item) { return item.format; }).map(function (item) { return item.format; })[0] || cardFormat || 'number') : 'number';
     var rows = months.map(function (item, i) {
       var money = formatWith(item.format || cardFormat);
       var height = heights[i];
@@ -1461,7 +1466,7 @@
       + (subtitle ? '<p class="dash-metric-card__subtitle">' + escapeHtml(subtitle) + '</p>' : '')
       // All-zero months: one line, not a row of 0s.
       + (max > 0
-        ? '<div class="dash-metric-card__chart">' + window.MiniCharts.columnsHtml({ rows: rows, paired: false, seriesLabels: [], allLabels: true }, plainNumber, {}) + '</div>'
+        ? '<div class="dash-metric-card__chart">' + window.MiniCharts.columnsHtml({ rows: rows, paired: false, seriesLabels: [], allLabels: true }, plainNumber, { axis: monthAxis }) + '</div>'
         : '<p class="dash-month-empty">' + escapeHtml(window.AsOfCards.monthEmptyText(metric)) + '</p>')
       + unplacedHtml
       + cardFooter(metric, entry.key)
@@ -2646,6 +2651,8 @@
       window.LanaRecordPanel.bindRows(content, function () { return { start: currentPeriod.start, end: currentPeriod.end }; }, worklistRowFor,
         function (el) { var slot = el.closest('[data-worklist-key]'); return slot ? slot._permissions : null; });
     }
+    // Every column chart shows its value on hover and keyboard focus.
+    if (window.MiniCharts && window.MiniCharts.bindTips) window.MiniCharts.bindTips(content);
     // Fixes made on a worklist row: update the row now, refetch soon.
     if (window.DataFixes) window.DataFixes.bind(content, { onSaved: onFixSaved });
 

@@ -70,9 +70,9 @@ describe('monthly bars (metadata.by_month)', () => {
   });
   test('the tooltip gives the count and the amount', () => {
     const money = (n) => '$' + n.toLocaleString('en-US');
-    expect(AsOf.monthTip({ label: 'Oct', count: 12, value: 45000 }, money, 'deals')).toBe('Oct: 12 deals · $45,000');
-    expect(AsOf.monthTip({ label: 'Oct', count: 1, value: null }, money, 'deals')).toBe('Oct: 1 deal');
-    expect(AsOf.monthTip({ label: 'Oct', count: 4, value: null }, money, '')).toBe('Oct: 4 records');
+    expect(AsOf.monthTip({ label: 'Oct', count: 12, value: 45000 }, money, 'deals')).toBe('Oct · 12 deals · $45,000');
+    expect(AsOf.monthTip({ label: 'Oct', count: 1, value: null }, money, 'deals')).toBe('Oct · 1 deal');
+    expect(AsOf.monthTip({ label: 'Oct', count: 4, value: null }, money, '')).toBe('Oct · 4 records');
   });
   test('a month card: visual month_bars, or by_month with no visual', () => {
     const withMonths = card([{ month: '2026-10', label: 'Oct', count: 1 }]);
@@ -145,8 +145,8 @@ describe('average cards', () => {
   test('the tooltip says "Avg 42 days · 18 records"', () => {
     const item = AsOf.byMonth({ metadata: { by_month: [{ month: '2026-10', label: 'Oct', value: 42, value_count: 18 }] } })[0];
     expect(item.valueCount).toBe(18);
-    expect(AsOf.monthTip(item, days, 'deals', true)).toBe('Oct: Avg 42 days · 18 records');
-    expect(AsOf.monthTip({ label: 'Oct', value: 42, valueCount: 1, count: null }, days, '', true)).toBe('Oct: Avg 42 days · 1 record');
+    expect(AsOf.monthTip(item, days, 'deals', true)).toBe('Oct · Avg 42 days · 18 records');
+    expect(AsOf.monthTip({ label: 'Oct', value: 42, valueCount: 1, count: null }, days, '', true)).toBe('Oct · Avg 42 days · 1 record');
   });
   test('the no-date note gives the average, not a total', () => {
     expect(AsOf.unplacedNote({ metadata: { by_month_unplaced: { label: 'No date recorded', count: 3, value: 30 } } }, days, true)).toBe('3 with no date recorded (avg 30 days)');

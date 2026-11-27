@@ -3142,6 +3142,31 @@ button.dash-lines__label:hover,
   fill: var(--lex-text-on-evergreen);
 }
 
+/* Axes on the green hero card: light lines and ticks. */
+.dash-metric-card--hero .mini-cols__axis .mini-cols__gridline {
+  stroke: rgba(255, 255, 255, 0.22);
+}
+
+.dash-metric-card--hero .mini-cols__axis .mini-cols__yline,
+.dash-metric-card--hero .mini-cols__axis .mini-cols__baseline,
+.dash-metric-card--hero .mini-cols__baseline {
+  stroke: rgba(255, 255, 255, 0.45);
+}
+
+.dash-metric-card--hero .mini-cols__tick {
+  fill: rgba(255, 255, 255, 0.78);
+}
+
+.dash-metric-card--hero .mini-cols__group:hover .mini-cols__hit,
+.dash-metric-card--hero .mini-cols__group:focus-visible .mini-cols__hit {
+  fill: rgba(255, 255, 255, 0.12);
+}
+
+.dash-metric-card--hero .dash-metric-card__subtitle {
+  color: var(--lex-text-on-evergreen);
+  opacity: 0.85;
+}
+
 /* ══ Metric detail: summary, about, toolbar ═════════════════════════════ */
 .metric-summary {
   display: grid;

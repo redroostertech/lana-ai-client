@@ -165,6 +165,109 @@
       + '" height="' + height + '" rx="' + radius + '"></rect>';
   }
 
+  // ── Axis ──────────────────────────────────────────────────────
+  var AXIS_W = 34;
+  var VALUE_CHAR_W = 5.2;
+  var DOT = ' · ';
+
+  function firmCurrency() {
+    var utils = typeof window !== 'undefined' && window.Lex && window.Lex.Utils;
+    var code = utils && typeof utils.getFirmCurrency === 'function' ? utils.getFirmCurrency() : '';
+    return code ? String(code) : 'USD';
+  }
+
+  // A step of 1, 2, 2.5 or 5 times a power of ten: about three steps to the top.
+  function niceStep(max) {
+    var raw = max / 3;
+    var power = Math.pow(10, Math.floor(Math.log(raw) / Math.LN10));
+    var steps = [1, 2, 2.5, 5, 10];
+    for (var k = 0; k < steps.length; k += 1) {
+      if (steps[k] * power >= raw) return steps[k] * power;
+    }
+    return 10 * power;
+  }
+
+  /** Ticks from 0 to the first step at or above max: [0, s, 2s, 3s(, 4s)]. */
+  function axisTicks(max, wholeNumbers) {
+    if (!(max > 0)) return [];
+    var step = niceStep(max);
+    if (wholeNumbers && step < 1) step = 1;
+    var top = Math.ceil(max / step - 1e-9) * step;
+    var out = [];
+    for (var v = 0; v <= top + step / 1000; v += step) out.push(Math.round(v * 1000) / 1000);
+    return out;
+  }
+
+  /**
+   * A tick's words: money in short form ("$2M", "$500K"), percent, counts
+   * ("1,000"), or a number with its unit ("20 days").
+   */
+  function axisTickText(value, kind) {
+    var k = String(kind || 'number').toLowerCase();
+    // The base reads "0" on every axis.
+    if (value === 0) return '0';
+    if (k === 'currency' || k === 'currency_breakdown') {
+      try {
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: firmCurrency(), notation: 'compact', maximumFractionDigits: 1 }).format(value);
+      } catch (_) {
+        return firmCurrency() + ' ' + value;
+      }
+    }
+    if (k === 'percent' || k === 'percentage') return round1(value) + '%';
+    var number = value >= 100000
+      ? new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(value)
+      : value.toLocaleString('en-US', { maximumFractionDigits: 1 });
+    if (k === 'number' || k === 'integer' || k === 'count' || k === 'table') return number;
+    return number + ' ' + k;
+  }
+
+  function dataMaxOf(rows) {
+    var max = 0;
+    var take = function (v) { var n = Number(v); if (v !== null && v !== undefined && isFinite(n) && n > max) max = n; };
+    rows.forEach(function (row) {
+      if (Array.isArray(row.values)) row.values.forEach(take);
+      else { take(row.value); take(row.second); }
+    });
+    return max;
+  }
+
+  // The bars' own scale (pct of the largest bar) against the axis top.
+  function axisScale(rows, axisTop) {
+    var max = 0;
+    var pctMax = 0;
+    rows.forEach(function (row) {
+      if (Array.isArray(row.values)) {
+        row.values.forEach(function (v, k) { if (Number(v) > max) { max = Number(v); pctMax = (row.pcts || [])[k] || 0; } });
+      } else {
+        if (Number(row.value) > max) { max = Number(row.value); pctMax = row.pct; }
+        if (row.second !== null && Number(row.second) > max) { max = Number(row.second); pctMax = row.secondPct; }
+      }
+    });
+    // pct 100 stands for the largest value; the axis top may be higher.
+    return max > 0 && pctMax > 0 && axisTop > 0 ? (max / axisTop) * (100 / pctMax) : 1;
+  }
+
+  // The tooltip words for a column: the full label, then its value(s).
+  function tipText(row, model, format) {
+    if (row.tip) return row.tip;
+    var labels = model.seriesLabels || [];
+    if (model.grouped && Array.isArray(row.values)) {
+      return row.label + DOT + row.values.map(function (v, k) { return (labels[k] ? labels[k] + ' ' : '') + format(v); }).join(DOT);
+    }
+    if (row.valueLabel) return row.label + DOT + row.valueLabel;
+    var name = row.label + (row.partial ? ' (partial)' : '');
+    if (row.second !== null && row.second !== undefined) {
+      if (labels.length > 1) return name + DOT + labels[0] + ' ' + format(row.value) + DOT + labels[1] + ' ' + format(row.second);
+      return name + DOT + format(row.value) + ' of ' + format(row.second);
+    }
+    return name + DOT + (row.valueText !== undefined ? row.valueText : format(row.value));
+  }
+
+  // A column's hover and focus attributes; tabindex once only.
+  function tipAttrs(text, link) {
+    return ' data-tip="' + escapeHtml(text) + '" aria-label="' + escapeHtml(text) + '"' + (link.indexOf('tabindex') === -1 ? ' tabindex="0"' : '');
+  }
+
   function columnsHtml(model, format, opts) {
     var linkFor = function (row) {
       if (row.ref) return recordAttr(row.ref);
@@ -173,7 +276,15 @@
       return opts && typeof opts.href === 'function' && row.key ? ' data-metric-detail-link="' + escapeHtml(opts.href(row.key)) + '"' : '';
     };
     var n = model.rows.length;
-    var slot = BOX_W / n;
+    // The y axis: opts.axis names the value kind ('currency', 'number',
+    // 'percent' or a unit such as 'days'); false turns it off.
+    var axisKind = opts && opts.axis !== undefined ? opts.axis : 'number';
+    var ticks = axisKind === false ? [] : axisTicks(dataMaxOf(model.rows), ['number', 'integer', 'count', 'table'].indexOf(String(axisKind)) !== -1);
+    var axisOn = ticks.length > 1;
+    var axisTop = axisOn ? ticks[ticks.length - 1] : 0;
+    var scale = axisOn ? axisScale(model.rows, axisTop) : 1;
+    var left = axisOn ? AXIS_W : 0;
+    var slot = (BOX_W - left) / n;
     var maxChars = Math.max(4, Math.floor(slot / 4.8));
     // A long series over days: no value text over each column (the tooltip
     // keeps it), and a date label on every few columns only.
@@ -189,57 +300,128 @@
       var widest = model.rows.reduce(function (w, row) { return Math.max(w, String(row.tick || row.label).length); }, 1);
       labelEvery = Math.max(1, Math.ceil((widest * TICK_CHAR_W + 1) / slot));
     }
-    var grid = '<g class="mini-cols__grid">'
-      + '<line x1="0" x2="' + BOX_W + '" y1="' + PLOT_TOP + '" y2="' + PLOT_TOP + '"></line>'
-      + '<line x1="0" x2="' + BOX_W + '" y1="' + (PLOT_TOP + PLOT_H / 2) + '" y2="' + (PLOT_TOP + PLOT_H / 2) + '"></line>'
-      + '<line class="mini-cols__base" x1="0" x2="' + BOX_W + '" y1="' + PLOT_BOTTOM + '" y2="' + PLOT_BOTTOM + '"></line>'
-      + '</g>';
+    var yOf = function (v) { return round1(PLOT_BOTTOM - (v / axisTop) * PLOT_H); };
+    var grid = axisOn
+      ? '<g class="mini-cols__axis">'
+        + ticks.map(function (t) {
+          var y = yOf(t);
+          return (t > 0 ? '<line class="mini-cols__gridline" x1="' + left + '" x2="' + BOX_W + '" y1="' + y + '" y2="' + y + '"></line>' : '')
+            + '<text class="mini-cols__tick" x="' + (left - 4) + '" y="' + round1(y + 2.5) + '" text-anchor="end">' + escapeHtml(axisTickText(t, axisKind)) + '</text>';
+        }).join('')
+        + '<line class="mini-cols__yline" x1="' + left + '" x2="' + left + '" y1="' + PLOT_TOP + '" y2="' + PLOT_BOTTOM + '"></line>'
+        + '<line class="mini-cols__baseline" x1="' + left + '" x2="' + BOX_W + '" y1="' + PLOT_BOTTOM + '" y2="' + PLOT_BOTTOM + '"></line>'
+        + '</g>'
+      : '<g class="mini-cols__grid">'
+        + '<line class="mini-cols__baseline" x1="0" x2="' + BOX_W + '" y1="' + PLOT_BOTTOM + '" y2="' + PLOT_BOTTOM + '"></line>'
+        + '</g>';
+    var tickFor = function (row) {
+      return model.allLabels ? String(row.tick || row.label) : (dateTick(row.label) || (sparseLabels ? dayTick(row.label) : shortLabel(row.label, maxChars)));
+    };
+    // An invisible column the full plot height: a 1 px bar can still be hovered.
+    var hit = function (center) {
+      return '<rect class="mini-cols__hit" x="' + round1(center - slot / 2) + '" y="' + (PLOT_TOP - 4) + '" width="' + round1(slot) + '" height="' + (PLOT_BOTTOM - PLOT_TOP + 4) + '"></rect>';
+    };
     var groups = model.rows.map(function (row, i) {
-      var center = slot * (i + 0.5);
-      // Grouped columns: up to 3 series side by side, values in the tooltip.
+      var center = left + slot * (i + 0.5);
+      var link = linkFor(row);
+      var attrs = link + tipAttrs(tipText(row, model, format), link);
+      // Grouped columns: up to 3 series side by side.
       if (model.grouped && Array.isArray(row.values)) {
-        var n = row.values.length;
-        var bw = Math.min((slot * 0.8) / n, 14);
-        var start = center - (n * bw + (n - 1) * 2) / 2;
-        var labels = model.seriesLabels || [];
-        var tip = row.label + ': ' + row.values.map(function (v, k) { return (labels[k] || '') + ' ' + format(v); }).join(', ');
-        return '<g class="mini-cols__group"' + linkFor(row) + '><title>' + escapeHtml(tip) + '</title>'
-          + row.values.map(function (v, k) { return column('mini-cols__bar mini-cols__bar--s' + k, start + k * (bw + 2), bw, (row.pcts || [])[k] || 0); }).join('')
+        var count = row.values.length;
+        var bw = Math.min((slot * 0.8) / count, 14);
+        var start = center - (count * bw + (count - 1) * 2) / 2;
+        return '<g class="mini-cols__group"' + attrs + '>' + hit(center)
+          + row.values.map(function (v, k) { return column('mini-cols__bar mini-cols__bar--s' + k, start + k * (bw + 2), bw, ((row.pcts || [])[k] || 0) * scale); }).join('')
           + '<text class="mini-cols__label" x="' + round1(center) + '" y="114" text-anchor="middle">' + escapeHtml(shortLabel(row.label, maxChars)) + '</text>'
           + '</g>';
       }
       // The server's words instead of a number ("Too few to rate"): no column.
       if (row.valueLabel) {
-        return '<g class="mini-cols__group mini-cols__group--note"' + linkFor(row) + '><title>' + escapeHtml(row.label + ': ' + row.valueLabel) + '</title>'
+        return '<g class="mini-cols__group mini-cols__group--note"' + attrs + '>' + hit(center)
           + '<text class="mini-cols__value mini-cols__value--note" x="' + round1(center) + '" y="' + (PLOT_BOTTOM - 4) + '" text-anchor="middle">' + escapeHtml(shortLabel(row.valueLabel, maxChars)) + '</text>'
           + '<text class="mini-cols__label" x="' + round1(center) + '" y="114" text-anchor="middle">' + escapeHtml(shortLabel(row.label, maxChars)) + '</text>'
           + '</g>';
       }
-      var hasSecond = row.second !== null;
+      var hasSecond = row.second !== null && row.second !== undefined;
       var bars;
       var barCls = 'mini-cols__bar' + (row.partial ? ' mini-cols__bar--partial' : '');
-      var valueText = hasSecond ? format(row.value) + ' of ' + format(row.second) : format(row.value);
-      var top = Math.max(row.pct, hasSecond ? row.secondPct : 0);
+      var pct = row.pct * scale;
+      var secondPct = hasSecond ? row.secondPct * scale : 0;
+      var top = Math.max(pct, secondPct);
       if (hasSecond) {
         var w = Math.min(slot * 0.3, 22);
-        bars = column(barCls, center - w - 1.5, w, row.pct)
-          + column(barCls + ' mini-cols__bar--second', center + 1.5, w, row.secondPct);
+        bars = column(barCls, center - w - 1.5, w, pct)
+          + column(barCls + ' mini-cols__bar--second', center + 1.5, w, secondPct);
       } else {
         var width = Math.min(slot * 0.5, 36);
-        bars = column(barCls, center - width / 2, width, row.pct);
+        bars = column(barCls, center - width / 2, width, pct);
       }
       var valueY = round1(PLOT_BOTTOM - (top / 100) * PLOT_H - 4);
-      return '<g class="mini-cols__group' + (row.partial ? ' mini-cols__group--partial' : '') + (row.muted ? ' mini-cols__group--muted' : '') + '"' + linkFor(row)
-        // row.tip: the caller's own tooltip; row.valueText: its own column text.
-        + '><title>' + escapeHtml(row.tip || (row.label + (row.partial ? ' (partial)' : '') + ': ' + valueText)) + '</title>'
+      // The value over the column only when it fits its slot; hover keeps it.
+      var shown = row.valueText !== undefined ? row.valueText : format(row.value === null && hasSecond ? row.second : row.value);
+      var fits = !dense && String(shown).length * VALUE_CHAR_W <= slot;
+      return '<g class="mini-cols__group' + (row.partial ? ' mini-cols__group--partial' : '') + (row.muted ? ' mini-cols__group--muted' : '') + '"' + attrs + '>'
+        + hit(center)
         + bars
-        + (dense ? '' : '<text class="mini-cols__value" x="' + round1(center) + '" y="' + valueY + '" text-anchor="middle">' + escapeHtml(row.valueText !== undefined ? row.valueText : format(row.value === null && hasSecond ? row.second : row.value)) + '</text>')
-        + (i % labelEvery === 0 ? '<text class="mini-cols__label" x="' + round1(center) + '" y="114" text-anchor="middle">' + escapeHtml(model.allLabels ? String(row.tick || row.label) : (dateTick(row.label) || (sparseLabels ? dayTick(row.label) : shortLabel(row.label, maxChars)))) + '</text>' : '')
+        + (fits ? '<text class="mini-cols__value" x="' + round1(center) + '" y="' + valueY + '" text-anchor="middle">' + escapeHtml(shown) + '</text>' : '')
+        + (i % labelEvery === 0 ? '<text class="mini-cols__label" x="' + round1(center) + '" y="114" text-anchor="middle">' + escapeHtml(tickFor(row)) + '</text>' : '')
         + '</g>';
     }).join('');
     return '<div class="mini-cols">' + legendHtml(model)
-      + '<svg class="mini-cols__svg' + (smallTicks ? ' mini-cols__svg--small-ticks' : '') + '" viewBox="0 0 ' + BOX_W + ' 120" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Breakdown chart" focusable="false">'
+      + '<svg class="mini-cols__svg' + (smallTicks ? ' mini-cols__svg--small-ticks' : '') + '" viewBox="0 0 ' + BOX_W + ' 120" preserveAspectRatio="xMidYMid meet" role="group" aria-label="Breakdown chart" focusable="false">'
       + grid + groups + '</svg></div>';
+  }
+
+  // ── Hover and focus tooltip ────────────────────────────────────
+  // One small box per chart (.mini-tip) shows a column's data-tip on
+  // hover or keyboard focus. Bound once per root (delegated).
+  function bindTips(root) {
+    if (!root || root._miniTipsBound || typeof root.addEventListener !== 'function') return;
+    root._miniTipsBound = true;
+    var targetOf = function (event) {
+      return event.target && event.target.closest ? event.target.closest('[data-tip]') : null;
+    };
+    var tipFor = function (wrap) {
+      var holder = wrap || root;
+      var tip = holder.querySelector('.mini-tip');
+      if (!tip) {
+        tip = holder.ownerDocument.createElement('div');
+        tip.className = 'mini-tip';
+        tip.setAttribute('role', 'tooltip');
+        tip.hidden = true;
+        holder.appendChild(tip);
+      }
+      return tip;
+    };
+    var show = function (event) {
+      var target = targetOf(event);
+      if (!target) return;
+      var wrap = target.closest('.mini-cols');
+      var tip = tipFor(wrap);
+      tip.textContent = target.getAttribute('data-tip');
+      tip.hidden = false;
+      if (wrap && typeof target.getBoundingClientRect === 'function') {
+        var box = target.getBoundingClientRect();
+        var frame = wrap.getBoundingClientRect();
+        var width = tip.offsetWidth || 0;
+        var x = box.left + box.width / 2 - frame.left;
+        var half = width / 2;
+        x = Math.max(half, Math.min(frame.width - half, x));
+        tip.style.setProperty('--mini-tip-x', round1(x) + 'px');
+        tip.style.setProperty('--mini-tip-y', round1(Math.max(0, box.top - frame.top)) + 'px');
+      }
+    };
+    var hide = function (event) {
+      var target = targetOf(event);
+      if (!target) return;
+      var wrap = target.closest('.mini-cols');
+      var tip = (wrap || root).querySelector('.mini-tip');
+      if (tip) tip.hidden = true;
+    };
+    root.addEventListener('mouseover', show);
+    root.addEventListener('focusin', show);
+    root.addEventListener('mouseout', hide);
+    root.addEventListener('focusout', hide);
   }
 
   /**
@@ -539,6 +721,9 @@
     barsHtml: barsHtml,
     breakdownHtml: breakdownHtml,
     columnsHtml: columnsHtml,
+    bindTips: bindTips,
+    axisTicks: axisTicks,
+    axisTickText: axisTickText,
     dateTick: dateTick,
     gaugeHtml: gaugeHtml,
     donutHtml: donutHtml,
