@@ -8,6 +8,8 @@
 
   var ENDPOINT = '/api/v1/document-types';
   var labels = Object.create(null);
+  // The server's types in its order, for pickers.
+  var ordered = [];
   var loading = null;
 
   /**
@@ -23,13 +25,16 @@
 
   function setLabels(list) {
     var next = Object.create(null);
+    var order = [];
     (Array.isArray(list) ? list : []).forEach(function (entry) {
       if (!entry || typeof entry.key !== 'string' || typeof entry.label !== 'string') return;
       var key = entry.key.trim();
       var label = entry.label.trim();
+      if (key && label && !next[key]) order.push(key);
       if (key && label) next[key] = label;
     });
     labels = next;
+    ordered = order;
   }
 
   /**
@@ -67,7 +72,22 @@
     return labels[key] || humanizeKey(key);
   }
 
-  var api = { load: load, documentTypeLabel: documentTypeLabel, humanizeKey: humanizeKey };
+  /**
+   * Options for a Document Type picker: Auto-detect, then every type the
+   * server returned, plus the stored type when the list lacks it. null
+   * before the list arrives (the page keeps its own options).
+   * @param {string} [current]
+   * @returns {Array<{value:string,label:string}>|null}
+   */
+  function pickerOptions(current) {
+    if (!ordered.length) return null;
+    var options = [{ value: '', label: 'Auto-detect' }].concat(ordered.map(function (key) { return { value: key, label: labels[key] }; }));
+    var stored = current === null || current === undefined ? '' : String(current).trim();
+    if (stored && !labels[stored]) options.push({ value: stored, label: humanizeKey(stored) });
+    return options;
+  }
+
+  var api = { load: load, documentTypeLabel: documentTypeLabel, humanizeKey: humanizeKey, pickerOptions: pickerOptions };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.LanaDocumentTypeNames = api;
 })(typeof window !== 'undefined' ? window : null);

@@ -5635,7 +5635,7 @@
     }
 
     // Edit mode fields
-    document.getElementById('metaDocType').value = metadata.document_type || '';
+    fillDocumentTypePicker(metadata.document_type || '');
     document.getElementById('metaTags').value = metadata.tags || '';
     document.getElementById('metaNotes').value = metadata.notes || '';
 
@@ -6009,6 +6009,21 @@
   window.viewFvDocxTemplate = viewFvDocxTemplate;
 
   // =========================================================================
+  // The Document Type picker lists the types the server returns
+  // (GET /api/v1/document-types); its own options stay until they arrive.
+  function fillDocumentTypePicker(current) {
+    var picker = document.getElementById('metaDocType');
+    if (!picker) return;
+    picker.value = current;
+    if (typeof LanaDocumentTypeNames === 'undefined' || !LanaDocumentTypeNames.pickerOptions) return;
+    LanaDocumentTypeNames.load().then(function () {
+      var options = LanaDocumentTypeNames.pickerOptions(current);
+      if (!options) return;
+      picker.options = options;
+      picker.value = current;
+    });
+  }
+
   // Insights: document enrichment panel
   // =========================================================================
 

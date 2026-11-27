@@ -74,3 +74,8 @@ describe('signed letter review in the Insights panel', () => {
     }
   });
 });
+
+test('the Document Type picker is filled from the server list (no hard-coded types once it arrives)', () => {
+  expect(pageJs).toContain('fillDocumentTypePicker(metadata.document_type || \'\');');
+  expect(pageJs).toContain('LanaDocumentTypeNames.pickerOptions(current)');
+});
