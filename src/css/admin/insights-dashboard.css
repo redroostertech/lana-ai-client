@@ -4374,3 +4374,67 @@ button.dash-lines__label:hover,
   font-size: 0.8125rem;
   color: var(--lex-text-secondary);
 }
+
+/* ══ Masonry (DashboardLayout.masonryPlan): Pinterest-style columns ═══════
+   Each chapter's cards flow into columns; a card keeps its own height and
+   is never stretched to a neighbour's. DOM order is column by column. */
+#dashboardMetricGrid.dash-bento {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.dash-masonry,
+.dash-masonry__col {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+.dash-masonry__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.25rem;
+}
+
+.dash-masonry__col {
+  flex: 1 1 0;
+}
+
+/* Two small numbers side by side in one column (one column on phones). */
+.dash-masonry__unit--pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 1.25rem;
+}
+
+.dash-masonry--cols-1 .dash-masonry__unit--pair {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.dash-masonry__unit > .dash-metric-card {
+  height: auto;
+}
+
+/* Charts keep one fixed plot height, reserved before the bars animate in,
+   so nothing jumps and no card stretches to fill a row. */
+.dash-masonry .dash-metric-card__chart {
+  flex: 0 0 auto;
+}
+
+.dash-bento .dash-masonry .dash-metric-card__chart .mini-cols__svg {
+  flex: 0 0 auto;
+  height: 10rem;
+  min-height: 10rem;
+}
+
+@container dash-detail (max-width: 559px) {
+  #dashboardMetricGrid.dash-bento,
+  .dash-masonry,
+  .dash-masonry__col,
+  .dash-masonry__row {
+    gap: 1rem;
+  }
+}

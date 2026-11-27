@@ -141,3 +141,37 @@ describe('packRows: every row adds up to the column count, no empty cells', () =
     expect(Layout.packRows([it('kpi', 1), it('chart', 2), it('chart', 2)], 4).map((p) => p.row)).toEqual([0, 0, 1]);
   });
 });
+
+describe('masonry: cards flow into the shortest column, never stretched to a neighbour', () => {
+  const L = require('../../src/js/shared/dashboard-layout.js');
+  test('column count: 1 on phones, 2 on desktop, 3 only on very wide screens', () => {
+    expect(L.masonryColumns(350)).toBe(1);
+    expect(L.masonryColumns(1000)).toBe(2);
+    expect(L.masonryColumns(1290)).toBe(2);
+    expect(L.masonryColumns(1700)).toBe(3);
+    expect(L.masonryColumns(0)).toBe(2);
+  });
+  test('units: two small numbers in a row share one unit; a full-width card stands alone', () => {
+    const units = L.masonryUnits([{ span: 2 }, { span: 1 }, { span: 1 }, { span: 1 }, { span: 2, full: true }, { span: 1 }]);
+    expect(units).toEqual([
+      { items: [0], full: false }, { items: [1, 2], full: false }, { items: [3], full: false }, { items: [4], full: true }, { items: [5], full: false }]);
+    // A chapter with one card: it spans all columns.
+    expect(L.masonryUnits([{ span: 2 }])).toEqual([{ items: [0], full: true }]);
+  });
+  test('each unit takes the shortest column (leftmost on a tie), in reading order', () => {
+    // Heights: a short stat, a tall worklist, then three charts.
+    const plan = L.masonryPlan([{ height: 150 }, { height: 600 }, { height: 300 }, { height: 300 }, { height: 300 }], 2);
+    expect(plan).toEqual([{ full: false, columns: [[0, 2, 3], [1, 4]] }]);
+  });
+  test('a full-width unit ends the columns above it; the next ones start new columns', () => {
+    const plan = L.masonryPlan([{ height: 100 }, { height: 200 }, { height: 50, full: true }, { height: 100 }], 2);
+    expect(plan).toEqual([{ full: false, columns: [[0], [1]] }, { full: true, unit: 2 }, { full: false, columns: [[3], []] }]);
+  });
+  test('one column keeps the reading order', () => {
+    expect(L.masonryPlan([{ height: 500 }, { height: 10 }, { height: 10 }], 1)).toEqual([{ full: false, columns: [[0, 1, 2]] }]);
+  });
+  test('estimated heights by kind, so the first paint is already close', () => {
+    expect(L.estimateHeight({ role: 'kpi' })).toBeLessThan(L.estimateHeight({ role: 'chart' }));
+    expect(L.estimateHeight({ role: 'hero' })).toBeGreaterThan(0);
+  });
+});

@@ -321,7 +321,12 @@ describe('declared cards (layout.cards from the trim spec)', () => {
     const articles = articlesOf(html.split('dash-waiting-strip')[0]);
     expect(articles[0]).toContain('dash-metric-card--hero');
     expect(articles[0]).toContain('Gross Revenue');
-    expect(articles.map((a) => (a.split('dash-metric-card__title">')[1] || '').split('<')[0])).toEqual([
+    // Masonry: the DOM is column by column; the reading order (each unit's
+    // data-masonry-unit) is still the declared order.
+    const units = html.split('dash-waiting-strip')[0].split('data-masonry-unit="').slice(1)
+      .map((part) => ({ k: Number(part.split('"')[0]), titles: articlesOf(part.split('data-masonry-unit="')[0]).map((a) => (a.split('dash-metric-card__title">')[1] || '').split('<')[0]) }))
+      .sort((x, y) => x.k - y.k);
+    expect([].concat(...units.map((u) => u.titles))).toEqual([
       'Gross Revenue', 'Target Revenue', 'Cash This Month', 'Gross Revenue by Service Offering', 'Cash Coming In',
       'Overdue Expected Cash', 'New vs Closed Cases', 'Actual vs Needed Service Offerings', 'Total Active Cases',
     ]);
@@ -1531,4 +1536,40 @@ describe('axes on dashboard charts', () => {
 test('the page binds the chart tooltips once on its content', () => {
   const src = fs.readFileSync(path.join(__dirname, '../../src/js/admin/dashboard-detail.js'), 'utf8');
   expect(src).toContain('window.MiniCharts.bindTips(content);');
+});
+
+describe('masonry: cards flow into columns per chapter, never stretched', () => {
+  const stat = (key, value) => ({ metric_key: 'legal_firm.x.' + key, title: key, data_state: 'ok', value, format: 'number' });
+  const list = (key) => ({ metric_key: 'legal_firm.x.' + key, title: key, data_state: 'ok', format: 'number', value: [{ service_label: 'A', value: 3 }, { service_label: 'B', value: 1 }] });
+  async function render(layout, cards) {
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: cards }) });
+    await p.exports.loadDashboardById('d1');
+    return p.nodes.dashboardMetricGrid.innerHTML;
+  }
+  test('each chapter is its own masonry: columns of cards, chapters as breaks, two small numbers share a unit', async () => {
+    const layout = { chapters: [{ id: 'one', title: 'Pipeline' }, { id: 'two', title: 'Follow up' }], cards: [
+      { id: 'a', chapter: 'one', kind: 'number', metric_key: 'x.s1' }, { id: 'b', chapter: 'one', kind: 'number', metric_key: 'x.s2' },
+      { id: 'c', chapter: 'one', kind: 'breakdown', metric_key: 'x.l1' }, { id: 'd', chapter: 'one', kind: 'breakdown', metric_key: 'x.l2' },
+      { id: 'e', chapter: 'two', kind: 'breakdown', metric_key: 'x.l3' }] };
+    const html = await render(layout, [stat('s1', 4), stat('s2', 5), list('l1'), list('l2'), list('l3')]);
+    expect(html.split('class="dash-masonry').length - 1).toBeGreaterThanOrEqual(2);
+    expect(html).toContain('dash-masonry__col');
+    expect(html).toContain('dash-masonry__unit--pair');
+    // The second chapter's only card spans all columns.
+    const second = html.split('>Follow up<')[1];
+    expect(second).toContain('dash-masonry__full');
+    expect(html.indexOf('>Pipeline<')).toBeLessThan(html.indexOf('>Follow up<'));
+  });
+  test('a card marked full width spans all columns', async () => {
+    const layout = { cards: [{ id: 'a', kind: 'breakdown', metric_key: 'x.l1' }, { id: 'b', kind: 'breakdown', metric_key: 'x.l2', full_width: true }, { id: 'c', kind: 'breakdown', metric_key: 'x.l3' }] };
+    const html = await render(layout, [list('l1'), list('l2'), list('l3')]);
+    const full = html.split('dash-masonry__full')[1].split('dash-masonry__row')[0];
+    expect(full).toContain('x.l2');
+  });
+});
+
+test('the page re-flows the masonry on resize and after worklist rows arrive', () => {
+  const src = fs.readFileSync(path.join(__dirname, '../../src/js/admin/dashboard-detail.js'), 'utf8');
+  expect(src).toContain('relayoutMasonry(grid)');
+  expect(src).toContain('new ResizeObserver(');
 });

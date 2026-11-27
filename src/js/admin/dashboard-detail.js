@@ -1530,6 +1530,80 @@
     });
   }
 
+  // ── Masonry (DashboardLayout.masonryPlan) ──────────────────────
+  // Each chapter's cards flow into columns: a card takes the shortest
+  // column and keeps its own height. The first paint uses estimated
+  // heights; relayoutMasonry measures and re-flows once it is on screen.
+  function masonryHtml(items, renderItem, columns) {
+    var units = window.DashboardLayout.masonryUnits(items.map(function (item) { return { span: item.span, full: item.full }; }));
+    var unitHtml = units.map(function (unit, k) {
+      return '<div class="dash-masonry__unit' + (unit.items.length > 1 ? ' dash-masonry__unit--pair' : '') + '" data-masonry-unit="' + k + '">'
+        + unit.items.map(function (i) { return renderItem(items[i]); }).join('') + '</div>';
+    });
+    var plan = window.DashboardLayout.masonryPlan(units.map(function (unit) {
+      return { full: unit.full, height: Math.max.apply(null, unit.items.map(function (i) { return window.DashboardLayout.estimateHeight(items[i]); })) };
+    }), columns);
+    return '<div class="dash-masonry dash-masonry--cols-' + columns + '" data-masonry data-masonry-plan="' + escapeHtml(JSON.stringify(plan)) + '">'
+      + masonryBlocksHtml(plan, unitHtml) + '</div>';
+  }
+
+  function masonryBlocksHtml(plan, unitHtml) {
+    return plan.map(function (block) {
+      if (block.full) return '<div class="dash-masonry__full">' + unitHtml[block.unit] + '</div>';
+      return '<div class="dash-masonry__row">' + block.columns.map(function (col) {
+        return '<div class="dash-masonry__col">' + col.map(function (k) { return unitHtml[k]; }).join('') + '</div>';
+      }).join('') + '</div>';
+    }).join('');
+  }
+
+  function masonryColumnsFor(grid) {
+    return window.DashboardLayout.masonryColumns(grid && grid.clientWidth);
+  }
+
+  // Measures every unit and moves it to its column when the plan changed
+  // (a different width, or real heights unlike the estimates).
+  function relayoutMasonry(grid) {
+    if (!grid || typeof grid.querySelectorAll !== 'function') return;
+    var columns = masonryColumnsFor(grid);
+    Array.prototype.forEach.call(grid.querySelectorAll('[data-masonry]'), function (section) {
+      var units = Array.prototype.slice.call(section.querySelectorAll('[data-masonry-unit]'))
+        .filter(function (unit) { return unit.parentNode && unit.parentNode.closest && unit.parentNode.closest('[data-masonry]') === section; })
+        .sort(function (a, b) { return Number(a.getAttribute('data-masonry-unit')) - Number(b.getAttribute('data-masonry-unit')); });
+      if (!units.length) return;
+      var current = JSON.parse(section.getAttribute('data-masonry-plan') || '[]');
+      var plan = window.DashboardLayout.masonryPlan(units.map(function (unit, k) {
+        var full = current.some(function (block) { return block.full && block.unit === k; });
+        return { full: full, height: unit.offsetHeight };
+      }), columns);
+      var text = JSON.stringify(plan);
+      if (text === section.getAttribute('data-masonry-plan')) return;
+      var doc = section.ownerDocument;
+      var fragment = doc.createDocumentFragment();
+      plan.forEach(function (block) {
+        if (block.full) {
+          var full = doc.createElement('div');
+          full.className = 'dash-masonry__full';
+          full.appendChild(units[block.unit]);
+          fragment.appendChild(full);
+          return;
+        }
+        var row = doc.createElement('div');
+        row.className = 'dash-masonry__row';
+        block.columns.forEach(function (col) {
+          var column = doc.createElement('div');
+          column.className = 'dash-masonry__col';
+          col.forEach(function (k) { column.appendChild(units[k]); });
+          row.appendChild(column);
+        });
+        fragment.appendChild(row);
+      });
+      section.innerHTML = '';
+      section.appendChild(fragment);
+      section.setAttribute('data-masonry-plan', text);
+      section.className = 'dash-masonry dash-masonry--cols-' + columns;
+    });
+  }
+
   // The declared card behind each info button (any of its keys), for the
   // "How this card works" panel.
   var cardInfoByKey = {};
@@ -1784,6 +1858,19 @@
     if (Array.isArray(caveats) && caveats.length && card && !card.querySelector('.dash-card__note') && slot.insertAdjacentHTML) {
       (template || slot).insertAdjacentHTML('afterend', '<p class="dash-card__note">' + escapeHtml(caveats[0]) + '</p>');
     }
+    // The rows changed this card's height: re-flow the columns once.
+    scheduleMasonry();
+  }
+
+  var masonryPending = false;
+
+  function scheduleMasonry() {
+    if (masonryPending || typeof requestAnimationFrame !== 'function') return;
+    masonryPending = true;
+    requestAnimationFrame(function () {
+      masonryPending = false;
+      relayoutMasonry(el('dashboardMetricGrid'));
+    });
   }
 
   function queueWorklists(grid) {
@@ -2176,10 +2263,15 @@
       renderingDeclared = true;
       try {
         // Chapters: a quiet label row before each chapter's first card.
+        // Each chapter is its own masonry (chapters stay section breaks).
+        var columns = masonryColumnsFor(grid);
         grid.innerHTML = plan.sections.map(function (section) {
+          var items = withSpans(section.items).map(function (item) {
+            return Object.assign({}, item, { full: !!(item.resolved.def.options && item.resolved.def.options.full_width) });
+          });
           return (section.label ? '<div class="dash-chapter" role="heading" aria-level="2">' + escapeHtml(section.label) + '</div>' : '')
             + (section.label && section.intro ? '<p class="dash-chapter__intro">' + escapeHtml(section.intro) + '</p>' : '')
-            + withSpans(section.items).map(renderDeclaredCard).join('');
+            + masonryHtml(items, renderDeclaredCard, columns);
         }).join('') + renderWaitingStrip(plan.waiting.map(renderDeclaredWaitingCard));
       } finally {
         renderingDeclared = false;
@@ -2189,9 +2281,9 @@
       // (js/shared/dashboard-layout.js owns the order and sizes); waiting
       // cards collect in one strip at the bottom.
       var split = window.DashboardCards.splitWaiting(filteredMetrics);
-      grid.innerHTML = withSpans(window.DashboardLayout.buildLayout(split.shown)).map(function (item) {
+      grid.innerHTML = masonryHtml(withSpans(window.DashboardLayout.buildLayout(split.shown)), function (item) {
         return appendToCard(renderMetricCard(item.card, item), cardNotesHtml([item.card]));
-      }).join('') + renderWaitingStrip(split.waiting.map(function (metric) { return renderMetricCard(metric); }));
+      }, masonryColumnsFor(grid)) + renderWaitingStrip(split.waiting.map(function (metric) { return renderMetricCard(metric); }));
     }
     if (animateNextRender && grid.querySelectorAll) {
       Array.prototype.forEach.call(grid.querySelectorAll('[data-count-up]'), function (node) {
@@ -2199,6 +2291,8 @@
       });
     }
     animateNextRender = false;
+    // Real heights: re-flow the columns before the first paint.
+    relayoutMasonry(grid);
     queueSparklines(grid);
     queueWorklists(grid);
   }
@@ -2653,6 +2747,15 @@
     }
     // Every column chart shows its value on hover and keyboard focus.
     if (window.MiniCharts && window.MiniCharts.bindTips) window.MiniCharts.bindTips(content);
+    // The masonry re-flows when the grid's width changes.
+    var masonryGrid = el('dashboardMetricGrid');
+    if (masonryGrid && typeof ResizeObserver === 'function') {
+      var masonryFrame = 0;
+      new ResizeObserver(function () {
+        if (masonryFrame) return;
+        masonryFrame = requestAnimationFrame(function () { masonryFrame = 0; relayoutMasonry(masonryGrid); });
+      }).observe(masonryGrid);
+    }
     // Fixes made on a worklist row: update the row now, refetch soon.
     if (window.DataFixes) window.DataFixes.bind(content, { onSaved: onFixSaved });
 

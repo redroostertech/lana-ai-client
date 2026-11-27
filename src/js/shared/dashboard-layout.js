@@ -139,6 +139,86 @@
     return placed.map(function (entry) { return { item: entry.item, span: entry.span, row: entry.row }; });
   }
 
+  // ── Masonry (Pinterest style) ─────────────────────────────────
+  // Cards flow into columns; each takes the shortest column, so no card is
+  // stretched to a neighbour's height. Reading order is the server's order,
+  // filled left to right, top to bottom, shortest column first.
+  var MASONRY_PHONE = 560;
+  var MASONRY_WIDE = 1600;
+
+  /** Columns for a grid this wide: 1 on phones, 3 on very wide screens, else 2. */
+  function masonryColumns(width) {
+    var w = Number(width) || 0;
+    if (!w) return 2;
+    if (w < MASONRY_PHONE) return 1;
+    return w >= MASONRY_WIDE ? 3 : 2;
+  }
+
+  /**
+   * Units to place: two small numbers in a row (span 1) share one unit;
+   * a full-width card (item.full, or the only card) stands alone.
+   * @param {Array<{span, full}>} items in reading order
+   * @returns {Array<{items: number[], full: boolean}>}
+   */
+  function masonryUnits(items) {
+    var list = items || [];
+    if (list.length === 1) return [{ items: [0], full: true }];
+    var units = [];
+    var pending = null;
+    list.forEach(function (item, index) {
+      var small = !item.full && (item.span || 1) === 1;
+      if (small && pending) {
+        pending.items.push(index);
+        pending = null;
+        return;
+      }
+      var unit = { items: [index], full: !!item.full };
+      units.push(unit);
+      pending = small ? unit : null;
+    });
+    return units;
+  }
+
+  /**
+   * Which column each unit goes in: [{ full: false, columns: [[unit...]] }
+   * | { full: true, unit }]. A full-width unit ends the columns above it.
+   * @param {Array<{height, full}>} units in reading order
+   * @param {number} columns
+   */
+  function masonryPlan(units, columns) {
+    var count = Math.max(1, columns || 1);
+    var blocks = [];
+    var block = null;
+    var heights = [];
+    function open() {
+      block = { full: false, columns: [] };
+      heights = [];
+      for (var c = 0; c < count; c += 1) { block.columns.push([]); heights.push(0); }
+      blocks.push(block);
+    }
+    (units || []).forEach(function (unit, index) {
+      if (unit.full) {
+        blocks.push({ full: true, unit: index });
+        block = null;
+        return;
+      }
+      if (!block) open();
+      var shortest = 0;
+      for (var c = 1; c < count; c += 1) if (heights[c] < heights[shortest]) shortest = c;
+      block.columns[shortest].push(index);
+      heights[shortest] += Math.max(0, Number(unit.height) || 0);
+    });
+    return blocks;
+  }
+
+  // A first guess at a card's height by its kind, so the first paint is
+  // already close; the page measures and adjusts once after render.
+  var ESTIMATES = { kpi: 190, hero: 420, chart: 400, wide: 260, support: 190 };
+
+  function estimateHeight(item) {
+    return ESTIMATES[item && item.role] || ESTIMATES.chart;
+  }
+
   function partOfDay(now) {
     var hour = now.getHours();
     if (hour < 12) return 'morning';
@@ -166,6 +246,10 @@
   }
 
   return {
+    masonryColumns: masonryColumns,
+    masonryUnits: masonryUnits,
+    masonryPlan: masonryPlan,
+    estimateHeight: estimateHeight,
     packRows: packRows,
     KPI_BAND: KPI_BAND,
     cardShape: cardShape,

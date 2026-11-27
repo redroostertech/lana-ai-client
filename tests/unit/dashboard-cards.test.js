@@ -401,3 +401,11 @@ test('visual_options carry value_key, value_format, rows (a dotted path) and gro
   expect(card.options).toMatchObject({ rows: 'metadata.by_person', group_by: 'person', value_key: 'open_count', value_format: 'number',
     series: ['held', 'no_show', 'cancelled'], series_labels: ['Held', 'No-show', 'Cancelled'] });
 });
+
+test('a card the layout marks full width keeps the flag (full_width: true or width: full)', () => {
+  const cards = Cards.normalizeLayout({ cards: [
+    { id: 'a', kind: 'worklist', metric_key: 'a.b', full_width: true },
+    { id: 'b', kind: 'breakdown', metric_key: 'a.c', visual_options: { width: 'full' } },
+    { id: 'c', kind: 'number', metric_key: 'a.d' }] }).cards;
+  expect(cards.map((c) => c.options.full_width)).toEqual([true, true, false]);
+});

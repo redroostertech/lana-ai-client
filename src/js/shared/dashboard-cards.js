@@ -71,6 +71,9 @@
       options: Object.assign(cardOptions(Object.assign({}, raw, raw.visual_options && typeof raw.visual_options === 'object' ? raw.visual_options : {})), {
         // Only visual_options.note is shown; the spec's card note is internal.
         note: raw.visual_options && raw.visual_options.note ? String(raw.visual_options.note) : '',
+        // A card the layout marks full width spans every masonry column.
+        full_width: raw.full_width === true || raw.width === 'full'
+          || !!(raw.visual_options && (raw.visual_options.full_width === true || raw.visual_options.width === 'full')),
       }),
     };
   }
