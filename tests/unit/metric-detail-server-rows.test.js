@@ -31,6 +31,10 @@ describe('rowsRequestParams: the table query as raw_* params', () => {
       .toEqual({ rawQ: 'smith', rawSortBy: 'decided_on', rawSortDir: 'desc', rawLimit: 20, rawOffset: 40,
         rawFilters: { outcome: 'won', source: 'truth', decided_on_from: '2026-11-01', decided_on_to: '2026-11-15' } });
   });
+  test('several picked values go as a comma list meaning "any of"; values with a comma are skipped', () => {
+    expect(V.rowsRequestParams({ page: 1, limit: 20, filters: { outcome: { operator: 'in', value: ['won', 'lost', 'a,b', '(empty)'] } } }).rawFilters)
+      .toEqual({ outcome: 'won,lost,(empty)' });
+  });
   test('nothing picked: just the page', () => {
     expect(V.rowsRequestParams({ page: 1, limit: 20 })).toEqual({ rawLimit: 20, rawOffset: 0 });
   });
@@ -45,9 +49,12 @@ describe('words around the server rows', () => {
     expect(V.truncatedText({ truncated: true, total: 5000, source_total: 12345 })).toBe('Showing the first 5,000 of 12,345 records.');
     expect(V.truncatedText({ truncated: false })).toBe('');
   });
-  test('facets become column filter options with counts', () => {
-    expect(V.facetFilterOptions({ outcome: [{ value: 'won', count: 9 }, { value: 'lost', count: 3 }], empty: [] }))
-      .toEqual({ outcome: { options: [{ value: 'won', label: 'Won (9)' }, { value: 'lost', label: 'Lost (3)' }] } });
+  test('facets become column filter options; counts are over all rows ("in all"), blanks offer "(empty)"', () => {
+    expect(V.facetFilterOptions({ outcome: [{ value: 'won', count: 9 }, { value: 'lost', count: 3 }, { value: null, count: 2 }], empty: [] }))
+      .toEqual({ outcome: { options: [{ value: 'won', label: 'Won (9 in all)' }, { value: 'lost', label: 'Lost (3 in all)' }, { value: '(empty)', label: '(empty) (2 in all)' }] } });
+  });
+  test('values with a comma cannot travel in a comma list, so they are not offered', () => {
+    expect(V.facetFilterOptions({ source: [{ value: 'Smith, Jones', count: 1 }, { value: 'Web', count: 2 }] }).source.options.map((o) => o.value)).toEqual(['Web']);
   });
   test('a pinned conflict outside the search says so', () => {
     expect(V.rowNotes({ conflict: { fields: [] }, matches_query: false }).outsideSearch).toBe(true);

@@ -339,7 +339,17 @@
     var filters = {};
     Object.keys(q.filters || {}).forEach(function (col) {
       var f = q.filters[col];
-      var value = f && typeof f === 'object' ? (Array.isArray(f.value) ? f.value[0] : f.value) : f;
+      var value = f && typeof f === 'object' ? f.value : f;
+      // Several picks go as a comma list meaning "any of"; a value with a
+      // comma in it cannot travel that way, so it is skipped.
+      if (Array.isArray(value)) {
+        var picks = value.map(String).filter(function (v) { return v !== '' && v.indexOf(',') === -1; });
+        if (picks.length > 1 || (picks.length === 1 && picks[0].indexOf('..') === -1)) {
+          if (picks.length) filters[col] = picks.join(',');
+          return;
+        }
+        value = picks[0];
+      }
       if (value === undefined || value === null || value === '') return;
       var text = String(value);
       var dots = text.indexOf('..');
@@ -376,15 +386,25 @@
     return 'Showing the first ' + shown.toLocaleString('en-US') + ' of ' + all.toLocaleString('en-US') + ' records.';
   }
 
-  /** facets { col: [{ value, count }] } as lex-table column filter options. */
+  /**
+   * facets { col: [{ value, count }] } as lex-table column filter options
+   * (pick several). Counts are over all rows, not the search, so they read
+   * "(9 in all)". Blank values become "(empty)". A value with a comma is
+   * not offered, since picks travel as a comma list.
+   */
+  var EMPTY_FACET = '(empty)';
+
   function facetFilterOptions(facets) {
     var out = {};
     Object.keys(facets || {}).forEach(function (col) {
       var list = Array.isArray(facets[col]) ? facets[col] : [];
-      var options = list.filter(function (f) { return f && !isEmpty(f.value); }).map(function (f) {
+      var countText = function (f) { return f.count !== undefined && f.count !== null ? ' (' + Number(f.count).toLocaleString('en-US') + ' in all)' : ''; };
+      var options = list.filter(function (f) { return f && !isEmpty(f.value) && String(f.value).indexOf(',') === -1; }).map(function (f) {
         var label = typeof f.value === 'string' ? words(f.value) : String(f.value);
-        return { value: String(f.value), label: label + (f.count !== undefined && f.count !== null ? ' (' + Number(f.count).toLocaleString('en-US') + ')' : '') };
+        return { value: String(f.value), label: label + countText(f) };
       });
+      var blank = list.filter(function (f) { return f && isEmpty(f.value); })[0];
+      if (blank) options.push({ value: EMPTY_FACET, label: EMPTY_FACET + countText(blank) });
       if (options.length) out[col] = { options: options };
     });
     return out;

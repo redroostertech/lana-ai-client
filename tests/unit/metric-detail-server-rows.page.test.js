@@ -54,7 +54,7 @@ test('server rows: server paging, facets as filters, and the count line', async 
   const table = nodes.metricRawDataTable;
   expect(table.attrs['server-paging']).toBe('');
   expect(table.setServerData).toHaveBeenCalledWith(expect.any(Array), { page: 1, limit: 20, total: 2 });
-  expect(table.setColumnFilterOptions).toHaveBeenCalledWith({ outcome: { options: [{ value: 'won', label: 'Won (9)' }] } });
+  expect(table.setColumnFilterOptions).toHaveBeenCalledWith({ outcome: { options: [{ value: 'won', label: 'Won (9 in all)' }] } });
   expect(nodes.metricRawDataCount.textContent).toBe('Showing 2 of 2 (of 340)');
   expect(table.renderers._notes(null, rows[0])).toContain('Conflict, outside your search');
 });
@@ -104,4 +104,19 @@ test('without the server fields the table keeps filtering in the browser', async
   const { nodes } = await page(jest.fn().mockResolvedValue({ data: Object.assign({}, payload, { raw_data: { rows, total: 2, has_more: false } }) }));
   expect(nodes.metricRawDataTable.attrs['server-paging']).toBeUndefined();
   expect(nodes.metricRawDataTable.setServerData).not.toHaveBeenCalled();
+});
+
+test('an unknown sort column (400) says so calmly and goes back to the default order', async () => {
+  let n = 0;
+  const getMetricDetail = jest.fn(() => {
+    n += 1;
+    if (n === 2) return Promise.reject(Object.assign(new Error('x'), { status: 400, data: { error: { details: { allowed: { sort: ['decided_on'] } } } } }));
+    return Promise.resolve({ data: payload });
+  });
+  const { nodes } = await page(getMetricDetail);
+  nodes.metricRawDataTable.fire('lex-query-change', { page: 1, limit: 20, sortBy: 'nope', sortDir: 'asc' });
+  await settle();
+  expect(getMetricDetail.mock.calls[2][1].rawSortBy).toBeUndefined();
+  expect(nodes.metricRawDataSortNote.textContent).toBe('That column cannot be sorted here, so the records are in their usual order.');
+  expect(nodes.metricRawDataSortNote.hidden).toBe(false);
 });

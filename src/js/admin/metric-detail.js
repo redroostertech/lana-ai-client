@@ -326,7 +326,12 @@
       var q = event.detail || {};
       rowsQuery.page = Number(q.page) || 1;
       if (q.limit) rowsQuery.limit = Number(q.limit) || rowsQuery.limit;
-      if (q.sortBy) { rowsQuery.sortBy = q.sortBy; rowsQuery.sortDir = q.sortDir === 'asc' ? 'asc' : 'desc'; }
+      if (q.sortBy) {
+        rowsQuery.sortBy = q.sortBy;
+        rowsQuery.sortDir = q.sortDir === 'asc' ? 'asc' : 'desc';
+        var sortNote = el('metricRawDataSortNote');
+        if (sortNote) { sortNote.textContent = ''; sortNote.hidden = true; }
+      }
       if (q.filters) rowsQuery.filters = q.filters;
       fetchServerRows();
     });
@@ -354,8 +359,19 @@
       var payload = response && response.data ? response.data : response;
       currentRows = payload && payload.raw_data && Array.isArray(payload.raw_data.rows) ? payload.raw_data.rows : [];
       renderServerRows(payload || {});
-    }, function () {
+    }, function (err) {
       if (token !== rowsToken) return;
+      // An unknown sort column (400): say so calmly and use the usual order.
+      if (err && err.status === 400 && rowsQuery.sortBy) {
+        rowsQuery.sortBy = '';
+        var note = el('metricRawDataSortNote');
+        if (note) {
+          note.textContent = 'That column cannot be sorted here, so the records are in their usual order.';
+          note.hidden = false;
+        }
+        fetchServerRows();
+        return;
+      }
       var node = el('metricRawDataCount');
       if (node) node.textContent = 'Could not load the records. Try again.';
     });
