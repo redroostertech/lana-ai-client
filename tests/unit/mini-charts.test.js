@@ -398,3 +398,16 @@ test('compact date columns: short day labels that fit, never an ellipsis', () =>
   expect(labels.every((l) => l.indexOf('...') === -1 && l.indexOf('…') === -1)).toBe(true);
   expect(labels.some((l) => l.startsWith('Nov '))).toBe(true);
 });
+
+test('grouped columns draw up to 3 series per row with a legend', () => {
+  const model = { empty: false, grouped: true, seriesLabels: ['Held', 'No-show', 'Cancelled'], hiddenCount: 0,
+    rows: [{ label: 'Avery Stone', values: [29, 30, 8], pcts: [96.7, 100, 26.7] }, { label: 'Blake Ross', values: [10, 1, 1], pcts: [33.3, 3.3, 3.3] }] };
+  const html = Charts.breakdownHtml(model, String, {});
+  expect(html).toContain('>Held<');
+  expect(html).toContain('>No-show<');
+  expect(html).toContain('>Cancelled<');
+  const avery = html.split('<g class="mini-cols__group').find((g) => g.includes('Avery'));
+  expect(avery.split('<rect').length - 1).toBe(3);
+  expect(avery).toContain('mini-cols__bar--s2');
+  expect(avery).toContain('<title>Avery Stone: Held 29, No-show 30, Cancelled 8</title>');
+});

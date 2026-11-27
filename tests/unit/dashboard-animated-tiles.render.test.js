@@ -1199,7 +1199,7 @@ describe('team appointments from metadata.by_person', () => {
     return p.nodes.dashboardMetricGrid.innerHTML;
   }
   test('paired columns per person from the declared series (held, no show), each person clickable', async () => {
-    const html = await render('paired_columns', { series: ['held', 'no_show', 'cancelled'] });
+    const html = await render('paired_columns', { series: ['held', 'no_show'] });
     expect(text(html)).toContain('Held');
     expect(text(html)).toContain('No show');
     expect(text(html)).not.toContain('Consultation');
@@ -1235,5 +1235,32 @@ describe('live recheck: inferred values, value_key, rows path and the stat fallb
     const html = await render(card, { visual: 'ranked_bars', visual_options: { value_key: 'open_value', value_format: 'currency' } });
     expect(text(html)).toContain('$9,000');
     expect(html.indexOf('Taylor Vance')).toBeLessThan(html.indexOf('Casey Lee'));
+  });
+  test('team appointments: rows from visual_options.rows draw grouped columns with the declared labels', async () => {
+    const card = { metric_key: 'legal_firm.sales_intake.team_appointments_by_meeting_type', title: 'Team Appointments', format: 'number', data_state: 'ok', period: 'Nov 2026', value: 208,
+      metadata: { by_person: [
+        { person: { object: 'person', id: 'p-1', label: 'Avery Stone' }, label: 'Avery Stone', held: 29, no_show: 30, cancelled: 8, total: 68 },
+        { person: { object: 'person', id: 'p-2', label: 'Blake Ross' }, label: 'Blake Ross', held: 10, no_show: 1, cancelled: 1, total: 12 }] } };
+    const html = await render(card, { visual: 'paired_columns', visual_options: { rows: 'metadata.by_person', series: ['held', 'no_show', 'cancelled'], group_by: 'person', series_labels: ['Held', 'No-show', 'Cancelled'] } });
+    expect(text(html)).toContain('No-show');
+    expect(text(html)).toContain('Cancelled');
+    expect(html).toContain('mini-cols__bar--s2');
+    expect(html).toContain('data-record-ref="person|p-1|"');
+  });
+  test('series and labels sent in card metadata draw grouped columns when the layout declares none', async () => {
+    const card = { metric_key: 'legal_firm.sales_intake.team_appointments_by_meeting_type', title: 'Team Appointments', format: 'number', data_state: 'ok', period: 'Nov 2026', value: 208,
+      metadata: { group_by: 'person', series: ['held', 'no_show', 'cancelled'], series_labels: ['Held', 'No-show', 'Cancelled'], by_person: [
+        { person: { object: 'person', id: 'p-1', label: 'Avery Stone' }, label: 'Avery Stone', held: 29, no_show: 30, cancelled: 8, total: 68 }] } };
+    const html = await render(card, { visual: 'paired_columns' });
+    expect(text(html)).toContain('No-show');
+    expect(html).toContain('mini-cols__bar--s2');
+  });
+  test('with the path empty and a single number, the card is a stat, not a one-bar chart', async () => {
+    const card = { metric_key: 'legal_firm.sales_intake.team_appointments_by_meeting_type', title: 'Team Appointments', format: 'number', data_state: 'ok', period: 'Nov 2026', value: 208, formatted_value: '208' };
+    const html = await render(card, { visual: 'paired_columns', visual_options: { rows: 'metadata.by_person', series: ['held', 'no_show', 'cancelled'], unit: 'meetings' } });
+    expect(html).not.toContain('mini-cols');
+    expect(html).toContain('dash-metric-card__value');
+    expect(text(html)).toContain('208');
+    expect(text(html)).toContain('meetings');
   });
 });

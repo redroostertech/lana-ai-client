@@ -891,3 +891,16 @@
   font-size: 0.75rem;
   color: var(--lex-text-tertiary);
 }
+
+/* Grouped columns: up to three series. */
+.mini-cols__bar--s1,
+.mini-bars__key--s1::before {
+  fill: var(--lex-chart-color-6);
+  background: var(--lex-chart-color-6);
+}
+
+.mini-cols__bar--s2,
+.mini-bars__key--s2::before {
+  fill: var(--lex-chart-color-3);
+  background: var(--lex-chart-color-3);
+}

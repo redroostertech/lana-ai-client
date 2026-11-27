@@ -108,6 +108,11 @@
   }
 
   function legendHtml(model) {
+    if (model.grouped) {
+      return '<div class="mini-bars__legend" aria-hidden="true">' + (model.seriesLabels || []).map(function (label, i) {
+        return '<span class="mini-bars__key mini-bars__key--s' + i + '">' + escapeHtml(label) + '</span>';
+      }).join('') + '</div>';
+    }
     return model.paired
       ? '<div class="mini-bars__legend" aria-hidden="true">'
         + '<span class="mini-bars__key">' + escapeHtml(model.seriesLabels[0]) + '</span>'
@@ -153,6 +158,18 @@
       + '</g>';
     var groups = model.rows.map(function (row, i) {
       var center = slot * (i + 0.5);
+      // Grouped columns: up to 3 series side by side, values in the tooltip.
+      if (model.grouped && Array.isArray(row.values)) {
+        var n = row.values.length;
+        var bw = Math.min((slot * 0.8) / n, 14);
+        var start = center - (n * bw + (n - 1) * 2) / 2;
+        var labels = model.seriesLabels || [];
+        var tip = row.label + ': ' + row.values.map(function (v, k) { return (labels[k] || '') + ' ' + format(v); }).join(', ');
+        return '<g class="mini-cols__group"' + linkFor(row) + '><title>' + escapeHtml(tip) + '</title>'
+          + row.values.map(function (v, k) { return column('mini-cols__bar mini-cols__bar--s' + k, start + k * (bw + 2), bw, (row.pcts || [])[k] || 0); }).join('')
+          + '<text class="mini-cols__label" x="' + round1(center) + '" y="114" text-anchor="middle">' + escapeHtml(shortLabel(row.label, maxChars)) + '</text>'
+          + '</g>';
+      }
       // The server's words instead of a number ("Too few to rate"): no column.
       if (row.valueLabel) {
         return '<g class="mini-cols__group mini-cols__group--note"' + linkFor(row) + '><title>' + escapeHtml(row.label + ': ' + row.valueLabel) + '</title>'
@@ -193,6 +210,7 @@
   function breakdownHtml(model, formatValue, opts) {
     if (!model || model.empty) return '';
     var format = typeof formatValue === 'function' ? formatValue : function (n) { return String(n); };
+    if (model.grouped) return columnsHtml(model, format, opts);
     // A series over dates (model.series) stays columns up to two months of days.
     if (model.series && !model.hiddenCount && model.rows.length <= SERIES_COLUMN_LIMIT) return columnsHtml(model, format, opts);
     if (model.hiddenCount > 0 || model.rows.length > COLUMN_LIMIT) return barsHtml(model, format);

@@ -1066,15 +1066,22 @@
   // scalar metric. Each row knows the metric its records live under.
   // metadata.by_person [{ person: { object, id, user_id, label }, label, held,
   // no_show, cancelled, no_outcome, total, show_rate }], or null.
-  function byPersonOf(metric) {
-    var list = metric && metric.metadata && Array.isArray(metric.metadata.by_person) ? metric.metadata.by_person : null;
-    return list && list.length ? list : null;
+  function byPersonOf(metric, def) {
+    // visual_options.rows: a dotted path on the card (metadata.by_person).
+    var path = def && def.options && def.options.rows ? def.options.rows : 'metadata.by_person';
+    var list = metric;
+    path.split('.').forEach(function (part) { list = list && typeof list === 'object' ? list[part] : null; });
+    return Array.isArray(list) && list.length ? list : null;
   }
 
   // One row per person: ranked bars rank by total; columns pair the first two
   // declared series (default held and no_show). Never a rate.
-  function byPersonRows(list, def, visual, key) {
-    var series = def.options.series && def.options.series.length ? def.options.series : ['held', 'no_show'];
+  function byPersonRows(list, def, visual, key, metric) {
+    // Series come from the layout, else from the card's metadata.
+    var meta = metric && metric.metadata && typeof metric.metadata === 'object' ? metric.metadata : {};
+    var metaSeries = Array.isArray(meta.series) ? meta.series.map(String) : [];
+    var fromLayout = !!(def.options.series && def.options.series.length);
+    var series = fromLayout ? def.options.series : (metaSeries.length ? metaSeries : ['held', 'no_show']);
     var count = function (value) { return value === null || value === undefined || value === '' || !isFinite(Number(value)) ? null : Number(value); };
     var rows = list.map(function (p) {
       var person = p.person && typeof p.person === 'object' ? p.person : null;
@@ -1083,22 +1090,27 @@
       var label = String(p.label || (person && person.label) || 'Unassigned');
       var row = visual === 'ranked_bars'
         ? { label: label, value: count(p.total), second: null }
-        : { label: label, value: count(p[series[0]]), second: series[1] ? count(p[series[1]]) : null };
+        : { label: label, value: count(p[series[0]]), second: series[1] ? count(p[series[1]]) : null,
+          values: series.slice(0, 3).map(function (field) { return count(p[field]); }) };
       return Object.assign(row, { key: key, waiting: false, ref: ref, text: plainNumber(row.value) });
     });
     rows.categories = true;
-    rows.seriesLabels = visual === 'ranked_bars' ? [] : series.slice(0, 2).map(function (field) {
+    var declaredLabels = fromLayout ? (def.options.series_labels || []) : (Array.isArray(meta.series_labels) ? meta.series_labels.map(String) : []);
+    rows.seriesLabels = visual === 'ranked_bars' ? [] : series.slice(0, 3).map(function (field, i) {
+      if (declaredLabels[i]) return declaredLabels[i];
       var text = String(field).split('_').join(' ');
       return text.charAt(0).toUpperCase() + text.slice(1);
     });
+    // Three series draw as grouped columns.
+    rows.grouped = visual !== 'ranked_bars' && series.length > 2;
     return rows;
   }
 
   function seriesOf(resolved, visual) {
     var def = resolved.def;
     var first = resolved.metrics[0];
-    var people = resolved.metrics.length === 1 ? byPersonOf(first.metric) : null;
-    if (people) return byPersonRows(people, def, visual, first.key);
+    var people = resolved.metrics.length === 1 ? byPersonOf(first.metric, def) : null;
+    if (people) return byPersonRows(people, def, visual, first.key, first.metric);
     if (resolved.metrics.length === 1 && first.metric && Array.isArray(first.metric.value)) {
       // visual_options.value_key: a row field to rank by, with its own
       // value_format (a plain number when none is given).
@@ -1122,6 +1134,23 @@
       return { label: labels[i], value: row.value, key: row.key, waiting: row.waiting, metric: row.metric,
         text: row.waiting ? '' : formatMetricCardValue(row.metric), conversionPct: row.conversionPct, pct: row.pct };
     });
+  }
+
+  // Grouped columns (up to 3 series per row), on one scale.
+  function groupedModel(rows) {
+    var max = 0;
+    rows.forEach(function (row) { (row.values || []).forEach(function (v) { if (v !== null && v > max) max = v; }); });
+    var shown = rows.filter(function (row) { return (row.values || []).some(function (v) { return v !== null && v > 0; }); }).slice(0, CARD_ROW_LIMIT);
+    return {
+      empty: !shown.length,
+      grouped: true,
+      seriesLabels: rows.seriesLabels,
+      hiddenCount: 0,
+      rows: shown.map(function (row) {
+        return { label: row.label, values: row.values, key: row.key, ref: row.ref || null,
+          pcts: row.values.map(function (v) { return v !== null && v > 0 && max > 0 ? Math.round((v / max) * 1000) / 10 : 0; }) };
+      }),
+    };
   }
 
   var PERIOD_FIELDS = ['period_start', 'week_start', 'month_start', 'period', 'week', 'month', 'date', 'day'];
@@ -1206,6 +1235,7 @@
     }
     // columns and paired_columns; a breakdown of many categories shows its
     // top 8 (drawn as bars with "And N more in the details").
+    if (rows.grouped) return window.MiniCharts.breakdownHtml(groupedModel(rows), plainNumber, { href: recordsHref });
     var columnTop = rows.categories ? window.CardVisuals.topRows(rows, CARD_ROW_LIMIT) : { rows: rows, hidden: 0 };
     var model = seriesColumnsModel(columnTop.rows, rows.seriesLabels && rows.seriesLabels.length ? rows.seriesLabels : resolved.def.options.series_labels);
     model.hiddenCount = columnTop.hidden;
@@ -1217,6 +1247,12 @@
 
   function seriesCard(resolved, layoutItem, visual) {
     var def = resolved.def;
+    // One number and no rows to draw (the rows path is empty): a stat, not a
+    // chart with one bar.
+    var only = resolved.metrics.length === 1 ? resolved.metrics[0].metric : null;
+    if (only && !window.DashboardCards.isWaiting(only) && !Array.isArray(only.value) && !byPersonOf(only, def)) {
+      return heroOrStat(resolved, layoutItem, 'stat');
+    }
     var firstOk = resolved.metrics.filter(function (entry) { return !entry.waiting; })[0];
     var single = resolved.metrics.length === 1;
     return '<article class="' + cardClass(accentClass(def, 'dash-metric-card--chart'), layoutItem) + '">'
@@ -1229,8 +1265,9 @@
   // Two list metrics side by side by label (new and closed by service).
   function renderPairedColumns(resolved, layoutItem) {
     var def = resolved.def;
-    // A per-person rollup (metadata.by_person) draws paired columns per person.
-    if (resolved.metrics.length === 1 && byPersonOf(resolved.metrics[0].metric)) return seriesCard(resolved, layoutItem, 'paired_columns');
+    // A per-person rollup (visual_options.rows, else metadata.by_person) draws
+    // paired or grouped columns per person.
+    if (resolved.metrics.length === 1 && byPersonOf(resolved.metrics[0].metric, def)) return seriesCard(resolved, layoutItem, 'paired_columns');
     // The two lists: metric_keys_override (the spec), else the card's own
     // keys when both are list metrics (the saved dashboards).
     var listKeys = def.options.metric_keys_override.length ? def.options.metric_keys_override : def.keys;
