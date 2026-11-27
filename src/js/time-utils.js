@@ -386,6 +386,11 @@
   // reports pass the firm's zone (Lex.Utils.getFirmTimezone), so the days are
   // the firm's whatever zone the person is in; the backend bounds them in the
   // same zone.
+  // "All time": the API takes plain days and reports reject an empty
+  // periodStart, so All time starts on a fixed early day, before any firm's
+  // records.
+  var ALL_TIME_START = '2000-01-01';
+
   function reportPresetDays(preset, timeZone, now) {
     var today = dayInTimeZone(now === undefined ? nowDate() : now, timeZone);
     var y = Number(today.slice(0, 4));
@@ -395,6 +400,9 @@
     var monday = plainDay(y, m, d - ((plainDayOfWeek(today) + 6) % 7));
     switch (preset) {
       case 'today': return { start: today, end: today };
+      case 'allTime': return { start: ALL_TIME_START, end: today };
+      // Plain days only: the last 24 hours always fall in yesterday and today.
+      case 'last24hours': return { start: plainDay(y, m, d - 1), end: today };
       case 'yesterday': return { start: plainDay(y, m, d - 1), end: plainDay(y, m, d - 1) };
       case 'todayAndYesterday': return { start: plainDay(y, m, d - 1), end: today };
       case 'thisWeek': return { start: monday, end: today };
@@ -495,6 +503,7 @@
     startOfDayInTimeZone: startOfDayInTimeZone,
     instantFromWallClock: instantFromWallClock,
     reportPresetDays: reportPresetDays,
+    ALL_TIME_START: ALL_TIME_START,
     toIsoInstant: toIsoInstant,
     toLocalDateInputValue: toLocalDateInputValue,
     toLocalDatetimeInputValue: toLocalDatetimeInputValue,

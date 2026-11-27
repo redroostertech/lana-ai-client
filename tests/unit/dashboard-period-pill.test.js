@@ -61,7 +61,7 @@ test('Escape and a click outside close it; a click inside keeps it open', () => 
 test('a quick pick closes the panel', () => {
   const w = boot();
   w.document.getElementById('dashboardPeriodToggle').click();
-  w.document.querySelector('[data-dashboard-preset="lastMonth"]').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  w.document.querySelector('[data-dashboard-preset="last30days"]').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
   expect(w.document.getElementById('dashboardPeriodPanel').hidden).toBe(true);
 });
 
