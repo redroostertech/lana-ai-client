@@ -53,23 +53,32 @@
     }
     if (m.linked.length) {
       parts.push(section('Linked accounts', '<ul class="rp-list">' + m.linked.map(function (a) {
-        return '<li><strong>' + escapeHtml(a.connector) + '</strong> ' + escapeHtml(a.name)
+        return '<li>' + (a.connection ? '<strong>' + escapeHtml(a.connection) + '</strong> ' : '') + escapeHtml(a.name)
+          + (a.email ? ' <span class="rp-muted">' + escapeHtml(a.email) + '</span>' : '')
           + (a.matchedBy ? ' <span class="rp-muted">' + escapeHtml(a.matchedBy) + '</span>' : '') + '</li>';
       }).join('') + '</ul>'));
     }
     if (m.activity.length) {
-      parts.push(section('Activity for these dates', factsHtml(m.activity.map(function (a) { return { label: a.label, text: a.text }; }))));
+      parts.push(section(m.activityTitle, factsHtml(m.activity.map(function (a) { return { label: a.label, text: a.text }; }))
+        + (m.activityNote ? '<p class="rp-muted rp-note">' + escapeHtml(m.activityNote) + '</p>' : '')));
     }
     if (m.timeline.length) {
       parts.push(section('Timeline', '<ol class="rp-timeline">' + m.timeline.map(function (e) {
+        var people = e.others.map(function (o) { return refButton(o.ref, o.label); }).join(', ');
+        var refs = e.refs.map(function (r) { return refButton(r.ref, r.label); }).join(' ');
         return '<li><span class="rp-when">' + escapeHtml(e.when) + '</span> <span class="rp-event">' + escapeHtml(e.text) + '</span>'
-          + (e.actor ? ' <span class="rp-muted">by</span> ' + refButton(e.actor.ref, e.actor.label) : '') + '</li>';
+          + (e.actor ? ' <span class="rp-muted">by</span> ' + refButton(e.actor.ref, e.actor.label) : '')
+          + (e.byOwner ? ' <span class="rp-owner">Owner</span>' : '')
+          + (people ? ' <span class="rp-muted">with</span> ' + people : '')
+          + (refs ? ' ' + refs : '')
+          + (e.detail ? '<span class="rp-muted rp-detail">' + escapeHtml(e.detail) + '</span>' : '') + '</li>';
       }).join('') + '</ol>'));
     }
     if (m.contributors.length) {
       parts.push(section('Who worked on it', '<ul class="rp-list rp-contributors">' + m.contributors.map(function (c) {
         return '<li>' + refButton(c.ref, c.label) + (c.owner ? ' <span class="rp-owner">Owner</span>' : '')
-          + (c.did ? ' <span class="rp-muted">' + escapeHtml(c.did) + '</span>' : '') + '</li>';
+          + (c.follower ? ' <span class="rp-owner rp-follower">Follower</span>' : '')
+          + c.did.map(function (d) { return ' <span class="rp-pill">' + escapeHtml(d) + '</span>'; }).join('') + '</li>';
       }).join('') + '</ul>'));
     }
     if (m.links.length) {

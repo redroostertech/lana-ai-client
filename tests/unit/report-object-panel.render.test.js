@@ -118,3 +118,24 @@ test('a deal opened from a row with fix hints shows "Fix in LANA" when the perso
   await settle();
   expect(opened2[0].querySelector('.rp-fix')).toBeNull();
 });
+
+test('final contract: activity dates and note, null activity, timeline details and people, contributor pills, owner and follower', async () => {
+  const { w, opened } = boot();
+  w.LanaRecordPanel.open({ object: 'person', id: 'p-1' }, {});
+  await settle();
+  const person = opened[0];
+  expect(person.textContent).toContain('Activity for Nov 1, 2026 to Nov 30, 2026');
+  expect(person.textContent).toContain('Not available yet');
+  expect(person.querySelector('.rp-note').textContent).toBe('Messages show once message history has synced.');
+  expect(person.textContent).toContain('Leadly (Main office)');
+  expect(person.textContent).toContain('avery@leadly.example');
+  w.LanaRecordPanel.open({ object: 'deal', id: 'd-1' }, {});
+  await settle();
+  const deal = opened[0];
+  expect(deal.querySelector('.rp-detail').textContent).toBe('Referred by a past client');
+  expect(deal.textContent).toContain('Not recorded');
+  const items = deal.querySelectorAll('.rp-timeline li');
+  expect(items[1].querySelectorAll('[data-record-ref]').length).toBe(3);
+  expect(deal.querySelectorAll('.rp-pill')).toHaveLength(3);
+  expect(deal.querySelector('.rp-follower').textContent).toBe('Follower');
+});

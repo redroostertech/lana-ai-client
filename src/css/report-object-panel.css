@@ -176,3 +176,24 @@
   padding-top: 0;
   border-top: 0;
 }
+
+/* Final contract details: what a contributor did as pills, a timeline
+   event's detail on its own muted line, and the activity note. */
+.rp-pill {
+  display: inline-block;
+  margin: 0.125rem 0.25rem 0 0;
+  padding: 0 0.5rem;
+  border: 1px solid var(--lex-border-default);
+  border-radius: 999px;
+  color: var(--lex-text-secondary);
+  font-size: 0.75rem;
+}
+
+.rp-detail {
+  display: block;
+  margin: 0.125rem 0 0 6.5rem;
+}
+
+.rp-note {
+  margin: 0;
+}

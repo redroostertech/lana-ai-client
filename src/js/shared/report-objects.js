@@ -175,7 +175,7 @@
   // ── The panel model ─────────────────────────────────────────────────
   var ACCOUNT_ROWS = [
     ['role', 'Role', 'text'], ['title', 'Title', 'text'], ['invited_at', 'Invited', 'datetime'],
-    ['created_at', 'Account created', 'datetime'], ['activated_at', 'Activated', 'datetime'], ['last_signed_in_at', 'Last signed in', 'datetime'],
+    ['account_created_at', 'Account created', 'datetime'], ['activated_at', 'Activated', 'datetime'], ['last_signed_in_at', 'Last signed in', 'datetime'],
   ];
   var NOT_YET = { activated_at: 'Not yet', last_signed_in_at: 'Not yet' };
 
@@ -191,40 +191,50 @@
     return { state: str(account.state) || 'No LANA account', rows: rows, hasUser: !!account.user_id };
   }
 
+  // linked_accounts [{ connection_name, display_name, email, matched_by, ... }]
   function linkedModel(list) {
     return (Array.isArray(list) ? list : []).filter(function (a) { return a && typeof a === 'object'; }).map(function (a) {
       return {
-        connector: str(a.connector),
+        connection: str(a.connection_name),
         name: str(a.display_name) || str(a.external_user_id),
+        email: str(a.email),
         matchedBy: str(a.matched_by) ? 'Matched by ' + str(a.matched_by).split('_').join(' ') : '',
       };
     });
   }
 
+  // activity [{ label, value, format }]: a null value (for example messages
+  // before message history syncs) is "Not available yet", never 0.
   function activityModel(activity) {
-    if (Array.isArray(activity)) {
-      return activity.filter(function (a) { return a && str(a.label) && !isSecretKey(a.label); }).map(function (a) {
-        return { label: str(a.label), text: formatFact(a.value, a.format || 'number') || '0' };
-      });
-    }
-    if (activity && typeof activity === 'object') {
-      return Object.keys(activity).filter(function (k) { return !isSecretKey(k) && typeof activity[k] !== 'object'; }).map(function (k) {
-        return { label: words(k), text: formatFact(activity[k], 'number') || '0' };
-      });
-    }
-    return [];
+    return (Array.isArray(activity) ? activity : []).filter(function (a) { return a && str(a.label) && !isSecretKey(a.label); }).map(function (a) {
+      var text = a.value === null || a.value === undefined ? '' : formatFact(a.value, a.format || 'number');
+      return { label: str(a.label), text: text || 'Not available yet' };
+    });
   }
 
-  function actorModel(actor, fallbackName) {
-    if (actor && typeof actor === 'object') {
-      return { label: str(actor.label || actor.name) || 'Someone', ref: cleanRef(actor) };
-    }
-    var name = str(actor) || str(fallbackName);
+  function activityTitle(period) {
+    if (!period || typeof period !== 'object' || !period.period_start || !period.period_end) return 'Activity for these dates';
+    return 'Activity for ' + dayText(str(period.period_start).substring(0, 10)) + ' to ' + dayText(str(period.period_end).substring(0, 10));
+  }
+
+  // The timeline actor: actor { object, id, user_id, label } (clickable),
+  // else actor_label; actor_kind 'not_recorded' says so.
+  function actorModel(event) {
+    if (event.actor && typeof event.actor === 'object') return { label: str(event.actor.label) || 'Someone', ref: cleanRef(event.actor) };
+    if (event.actor_kind === 'not_recorded') return { label: 'Not recorded', ref: null };
+    var name = str(event.actor_label);
     return name ? { label: name, ref: null } : null;
   }
 
+  function refLinks(list) {
+    return (Array.isArray(list) ? list : []).map(function (r) {
+      var ref = cleanRef(r);
+      return ref ? { label: str(r.label) || OBJECT_LABELS[ref.object] || words(ref.object), ref: ref } : null;
+    }).filter(Boolean);
+  }
+
   function eventTime(event) {
-    return str(event.at || event.occurred_at || event.date || event.when);
+    return str(event.occurred_at);
   }
 
   function timelineModel(list) {
@@ -238,21 +248,28 @@
         var at = eventTime(e);
         return {
           when: at ? dayText(at.substring(0, 10)) : '',
-          text: str(e.label || e.text || e.event),
-          actor: actorModel(e.actor, e.actor_name),
+          text: str(e.label),
+          actor: actorModel(e),
+          byOwner: e.by_owner === true,
+          detail: str(e.detail),
+          others: refLinks(e.other_people),
+          refs: refLinks(e.refs),
         };
       })
       .filter(function (e) { return e.text; });
   }
 
+  // contributors [{ person: { object, id, user_id, label }, did: [{ label, count }], is_owner, is_follower }]
   function contributorsModel(list) {
-    return (Array.isArray(list) ? list : []).filter(function (c) { return c && typeof c === 'object'; }).map(function (c) {
-      var person = c.person && typeof c.person === 'object' ? c.person : c;
+    return (Array.isArray(list) ? list : []).filter(function (c) { return c && typeof c === 'object' && c.person && typeof c.person === 'object'; }).map(function (c) {
       return {
-        label: str(person.label || person.name) || 'Someone',
-        ref: cleanRef({ object: person.object || 'person', id: person.id, user_id: person.user_id }),
-        did: str(c.did || c.role || c.contribution),
-        owner: c.owner === true || c.is_owner === true,
+        label: str(c.person.label) || 'Someone',
+        ref: cleanRef(c.person),
+        did: (Array.isArray(c.did) ? c.did : []).filter(function (d) { return d && str(d.label); }).map(function (d) {
+          return d.count === null || d.count === undefined ? str(d.label) : str(d.label) + ': ' + Number(d.count).toLocaleString('en-US');
+        }),
+        owner: c.is_owner === true,
+        follower: c.is_follower === true,
       };
     });
   }
@@ -275,8 +292,10 @@
       title: str(d.title) || OBJECT_LABELS[object] || 'Record',
       facts: factList(d.facts),
       account: object === 'person' ? accountModel(d.lana_account || {}) : null,
-      linked: linkedModel(d.linked_accounts || d.linked_crm_accounts),
+      linked: linkedModel(d.linked_accounts),
       activity: activityModel(d.activity),
+      activityTitle: activityTitle(d.activity_period),
+      activityNote: str(d.activity_note),
       timeline: timelineModel(d.timeline),
       contributors: contributorsModel(d.contributors),
       links: linksModel(d.links),

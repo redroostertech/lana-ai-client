@@ -37,7 +37,7 @@ describe('secrets never render', () => {
 });
 
 describe('panelModel: one shape for every object', () => {
-  test('a person: facts, LANA account (allowlisted), linked accounts, activity, links', () => {
+  test('a person: facts, LANA account (allowlisted), linked accounts, activity with its dates and note, links', () => {
     const m = R.panelModel(samples.person);
     expect(m.title).toBe('Avery Stone');
     expect(m.kind).toBe('Person');
@@ -48,21 +48,35 @@ describe('panelModel: one shape for every object', () => {
     expect(m.account.rows.map((r) => r[0])).toEqual(['Role', 'Title', 'Invited', 'Account created', 'Activated', 'Last signed in']);
     expect(m.account.rows.find((r) => r[0] === 'Activated')[1]).toBe('Not yet');
     expect(JSON.stringify(m)).not.toContain('never-show');
-    expect(m.linked).toEqual([{ connector: 'Leadly', name: 'Avery S.', matchedBy: 'Matched by email' }]);
-    expect(m.activity.map((a) => [a.label, a.text])).toEqual([['Meetings held', '12'], ['Meetings missed', '1'], ['Deals owned', '4']]);
+    expect(m.linked).toEqual([
+      { connection: 'Leadly (Main office)', name: 'Avery S.', email: 'avery@leadly.example', matchedBy: 'Matched by email' },
+      { connection: 'ActionStep', name: 'Avery Stone', email: '', matchedBy: 'Matched by name' },
+    ]);
+    expect(m.activity.map((a) => [a.label, a.text])).toEqual([['Meetings held', '12'], ['Meetings missed', '1'], ['Messages sent', 'Not available yet'], ['Deals owned', '4']]);
+    expect(m.activityTitle).toBe('Activity for Nov 1, 2026 to Nov 30, 2026');
+    expect(m.activityNote).toBe('Messages show once message history has synced.');
     expect(m.links).toEqual([{ label: 'Smith Estate Plan', ref: { object: 'deal', id: 'd-1' }, kind: 'Deal' }]);
   });
 
-  test('a deal: formatted facts, timeline in time order with actors, contributors with the owner marked', () => {
+  test('a deal: formatted facts, timeline in time order with actors, details and other people, contributors with what they did', () => {
     const m = R.panelModel(Object.assign({}, samples.deal, { timeline: samples.deal.timeline.slice().reverse() }));
     expect(m.facts.map((f) => [f.label, f.text])).toEqual([['Amount', '$4,500'], ['Stage', 'Won'], ['Won on', 'Nov 3, 2026'], ['Win rate', '42.5%']]);
     expect(m.timeline.map((t) => t.text)).toEqual(['Lead came in from Referral', 'Consultation held', 'Marked as won']);
-    expect(m.timeline[0]).toMatchObject({ when: 'Oct 1, 2026', actor: { label: 'Blake Ross', ref: { object: 'person', id: 'p-2' } } });
-    expect(m.timeline[2].actor).toEqual({ label: 'System', ref: null });
+    expect(m.timeline[0]).toMatchObject({ when: 'Oct 1, 2026', actor: { label: 'Jordan Smith', ref: null }, detail: 'Referred by a past client',
+      refs: [{ label: 'Contact', ref: { object: 'contact', id: 'c-1' } }] });
+    expect(m.timeline[1]).toMatchObject({ actor: { label: 'Avery Stone', ref: { object: 'person', id: 'p-1', user_id: 'u-9' } }, byOwner: true,
+      others: [{ label: 'Blake Ross', ref: { object: 'person', id: 'p-2' } }] });
+    expect(m.timeline[2].actor).toEqual({ label: 'Not recorded', ref: null });
     expect(m.contributors).toEqual([
-      { label: 'Avery Stone', ref: { object: 'person', id: 'p-1' }, did: 'Held the consultation', owner: true },
-      { label: 'Blake Ross', ref: { object: 'person', id: 'p-2' }, did: 'Booked the consultation', owner: false },
+      { label: 'Avery Stone', ref: { object: 'person', id: 'p-1', user_id: 'u-9' }, did: ['Held meetings: 2', 'Booked meetings: 1'], owner: true, follower: false },
+      { label: 'Blake Ross', ref: { object: 'person', id: 'p-2' }, did: ['Booked meetings: 3'], owner: false, follower: true },
     ]);
+  });
+
+  test('restricted records: whatever comes renders; missing fields are skipped, never blank', () => {
+    const m = R.panelModel(samples.restricted_deal);
+    expect(m.title).toBe('J. S. Estate');
+    expect(m.facts.map((f) => f.label)).toEqual(['Amount']);
   });
 
   test('any other object renders the same way', () => {
