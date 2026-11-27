@@ -3919,6 +3919,18 @@ class ApiClient {
     return this.post('/api/v1/modules/metric-snapshots/capture', data);
   }
 
+  // ── Report objects: the record side panel ──
+  // GET /api/v1/report-objects/:object/:id?periodStart&periodEnd -> one shape
+  // for every object (person, deal, contact, appointment, message, form_fill,
+  // survey_fill). period = { start, end } plain firm days, optional.
+  async getReportObject(object, id, period) {
+    const query = new URLSearchParams();
+    if (period && period.start) query.set('periodStart', period.start);
+    if (period && period.end) query.set('periodEnd', period.end);
+    const suffix = query.toString() ? '?' + query.toString() : '';
+    return this.get('/api/v1/report-objects/' + encodeURIComponent(object) + '/' + encodeURIComponent(id) + suffix);
+  }
+
   // ── Mappings (Settings > Mappings): source values to governed keys ──
   // GET /api/v1/mappings/summary -> per vocabulary { mapped_records, unmapped_records, unmapped_values }
   // options.quietStatuses: statuses the caller handles itself (setup-banner.js).

@@ -93,6 +93,19 @@
     return 'Item ' + (index + 1);
   }
 
+  function firstRef(row) {
+    var refs = Array.isArray(row.refs) ? row.refs : [];
+    for (var i = 0; i < refs.length; i += 1) {
+      var r = refs[i];
+      if (r && r.object && r.id !== null && r.id !== undefined && r.id !== '') {
+        var out = { object: String(r.object), id: String(r.id) };
+        if (r.user_id !== null && r.user_id !== undefined && r.user_id !== '') out.user_id = String(r.user_id);
+        return out;
+      }
+    }
+    return null;
+  }
+
   // A row the server could not rate (status insufficient_data, rate null)
   // carries value_label, for example "Too few to rate".
   function rowValueLabel(row) {
@@ -148,6 +161,8 @@
         valueLabel: isObject && value === null ? rowValueLabel(row) : null,
         // A bucket the picked dates cut short (partial: true).
         partial: !!(isObject && row.partial === true),
+        // The object this row is (refs[0]): opens the record panel.
+        ref: isObject ? firstRef(row) : null,
       };
     });
     var paired = parsed.some(function (row) { return row.second !== null; });
@@ -167,6 +182,7 @@
       };
       if (row.valueLabel) out.valueLabel = row.valueLabel;
       if (row.partial) out.partial = true;
+      if (row.ref) out.ref = row.ref;
       return out;
     });
     return {

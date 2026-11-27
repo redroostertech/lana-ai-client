@@ -73,7 +73,7 @@
       if (row.second !== null) {
         bars += '<rect class="mini-bars__fill mini-bars__fill--second' + partialCls + '" x="0" y="8" width="' + row.secondPct + '" height="6"></rect>';
       }
-      return '<li class="mini-bars__row' + (row.partial ? ' mini-bars__row--partial' : '') + '">'
+      return '<li class="mini-bars__row' + (row.partial ? ' mini-bars__row--partial' : '') + '"' + recordAttr(row.ref) + '>'
         + '<div class="mini-bars__head"><span class="mini-bars__label">' + escapeHtml(row.label)
         + (row.partial ? ' <span class="mini-bars__partial">(partial)</span>' : '') + '</span>'
         + '<span class="mini-bars__value">' + escapeHtml(valueText) + '</span></div>'
@@ -125,6 +125,7 @@
 
   function columnsHtml(model, format, opts) {
     var linkFor = function (row) {
+      if (row.ref) return recordAttr(row.ref);
       // A "Not mapped" column opens its own page (Settings > Mappings).
       if (row.linkHref) return ' data-metric-detail-link="' + escapeHtml(row.linkHref) + '"';
       return opts && typeof opts.href === 'function' && row.key ? ' data-metric-detail-link="' + escapeHtml(opts.href(row.key)) + '"' : '';
@@ -181,6 +182,14 @@
     var format = typeof formatValue === 'function' ? formatValue : function (n) { return String(n); };
     if (model.hiddenCount > 0 || model.rows.length > COLUMN_LIMIT) return barsHtml(model, format);
     return columnsHtml(model, format, opts);
+  }
+
+  // A row that is a data object (row.ref) opens the record panel
+  // (js/shared/report-object-panel.js) instead of the metric.
+  function recordAttr(ref) {
+    if (!ref || !ref.object || ref.id === undefined || ref.id === null) return '';
+    var value = [ref.object, ref.id, ref.user_id || ''].map(function (part) { return encodeURIComponent(String(part)); }).join('|');
+    return ' data-record-ref="' + escapeHtml(value) + '" tabindex="0" role="button"';
   }
 
   function linkAttr(href) {

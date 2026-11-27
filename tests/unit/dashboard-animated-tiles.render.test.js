@@ -1029,3 +1029,10 @@ describe('layout.chapters on the dashboard', () => {
     expect(html.indexOf('Gross Revenue')).toBeLessThan(html.indexOf('Total Active Cases'));
   });
 });
+
+test('worklist rows with refs open the record panel by click or keyboard', () => {
+  const html = page().exports.worklistHtml([{ client_name: 'Jordan Smith', amount: 4500, refs: [{ object: 'deal', id: 'd-1' }] }, { client_name: 'No ref', amount: 1 }]);
+  const rows = html.split('<tr').slice(2);
+  expect(rows[0]).toContain(' class="dash-worklist__row" data-record-ref="deal|d-1|" tabindex="0"');
+  expect(rows[1]).not.toContain('data-record-ref');
+});

@@ -1,0 +1,94 @@
+'use strict';
+
+/**
+ * Report objects (js/shared/report-objects.js): the side panel's model for
+ * any data object a row points to (GET /api/v1/report-objects/:object/:id,
+ * one shape for every object). Only allowlisted fields render; anything
+ * that looks like a secret never does.
+ */
+
+const path = require('path');
+const R = require(path.join(__dirname, '../../src/js/shared/report-objects.js'));
+const samples = require(path.join(__dirname, '../fixtures/report-objects/samples.json'));
+
+describe('refs on rows', () => {
+  test('row.refs in order; person refs keep user_id', () => {
+    const row = { refs: [{ object: 'deal', id: 'd-1' }, { object: 'person', id: 'p-1', user_id: 'u-9' }, { object: 'deal' }, null] };
+    expect(R.refsOf(row)).toEqual([{ object: 'deal', id: 'd-1' }, { object: 'person', id: 'p-1', user_id: 'u-9' }]);
+    expect(R.primaryRef(row)).toEqual({ object: 'deal', id: 'd-1' });
+  });
+  test('no refs: nothing to open', () => {
+    expect(R.refsOf({ record_id: 'x' })).toEqual([]);
+    expect(R.primaryRef({})).toBe(null);
+    expect(R.primaryRef(null)).toBe(null);
+  });
+  test('a ref travels as one attribute value and back', () => {
+    const ref = { object: 'person', id: 'p 1', user_id: 'u-9' };
+    expect(R.parseRef(R.refAttr(ref))).toEqual(ref);
+    expect(R.parseRef('nonsense')).toBe(null);
+  });
+});
+
+describe('secrets never render', () => {
+  test('keys and labels that look like secrets are dropped', () => {
+    ['password', 'Password hash', 'reset_token', 'api_key', 'client_secret', 'hash', 'refresh token', 'apiKey'].forEach((k) => expect(R.isSecretKey(k)).toBe(true));
+    ['email', 'Amount', 'monkey business', 'role', 'Last signed in'].forEach((k) => expect(R.isSecretKey(k)).toBe(false));
+  });
+});
+
+describe('panelModel: one shape for every object', () => {
+  test('a person: facts, LANA account (allowlisted), linked accounts, activity, links', () => {
+    const m = R.panelModel(samples.person);
+    expect(m.title).toBe('Avery Stone');
+    expect(m.kind).toBe('Person');
+    expect(m.facts.map((f) => [f.label, f.text])).toEqual([['Email', 'avery@example.test'], ['Phone', '+1 555 0100'], ['Role', 'Attorney']]);
+    expect(m.facts[0].href).toBe('mailto:avery@example.test');
+    expect(m.facts[1].href).toBe('tel:+15550100');
+    expect(m.account.state).toBe('Invited, not signed in yet');
+    expect(m.account.rows.map((r) => r[0])).toEqual(['Role', 'Title', 'Invited', 'Account created', 'Activated', 'Last signed in']);
+    expect(m.account.rows.find((r) => r[0] === 'Activated')[1]).toBe('Not yet');
+    expect(JSON.stringify(m)).not.toContain('never-show');
+    expect(m.linked).toEqual([{ connector: 'Leadly', name: 'Avery S.', matchedBy: 'Matched by email' }]);
+    expect(m.activity.map((a) => [a.label, a.text])).toEqual([['Meetings held', '12'], ['Meetings missed', '1'], ['Deals owned', '4']]);
+    expect(m.links).toEqual([{ label: 'Smith Estate Plan', ref: { object: 'deal', id: 'd-1' }, kind: 'Deal' }]);
+  });
+
+  test('a deal: formatted facts, timeline in time order with actors, contributors with the owner marked', () => {
+    const m = R.panelModel(Object.assign({}, samples.deal, { timeline: samples.deal.timeline.slice().reverse() }));
+    expect(m.facts.map((f) => [f.label, f.text])).toEqual([['Amount', '$4,500'], ['Stage', 'Won'], ['Won on', 'Nov 3, 2026'], ['Win rate', '42.5%']]);
+    expect(m.timeline.map((t) => t.text)).toEqual(['Lead came in from Referral', 'Consultation held', 'Marked as won']);
+    expect(m.timeline[0]).toMatchObject({ when: 'Oct 1, 2026', actor: { label: 'Blake Ross', ref: { object: 'person', id: 'p-2' } } });
+    expect(m.timeline[2].actor).toEqual({ label: 'System', ref: null });
+    expect(m.contributors).toEqual([
+      { label: 'Avery Stone', ref: { object: 'person', id: 'p-1' }, did: 'Held the consultation', owner: true },
+      { label: 'Blake Ross', ref: { object: 'person', id: 'p-2' }, did: 'Booked the consultation', owner: false },
+    ]);
+  });
+
+  test('any other object renders the same way', () => {
+    const m = R.panelModel(samples.contact);
+    expect(m).toMatchObject({ title: 'Jordan Smith', kind: 'Contact', account: null, timeline: [], contributors: [] });
+    expect(m.facts.map((f) => f.label)).toEqual(['Email', 'Source']);
+  });
+
+  test('every format reads plainly', () => {
+    expect(R.formatFact(null, 'text')).toBe('');
+    expect(R.formatFact(1234.5, 'number')).toBe('1,234.5');
+    expect(R.formatFact('2026-11-03T15:30:00Z', 'datetime')).toContain('Nov 3, 2026');
+    expect(R.formatFact('in_review', 'status')).toBe('In review');
+    expect(R.formatFact(true, 'text')).toBe('Yes');
+  });
+});
+
+describe('when the record cannot load', () => {
+  test('calm words by status', () => {
+    expect(R.errorText({ status: 404 })).toBe('Not found, or you don\'t have access to this record.');
+    expect(R.errorText({ status: 403 })).toBe('You don\'t have access to this record.');
+    expect(R.errorText({ status: 400 })).toBe('This kind of record can\'t be shown here.');
+    expect(R.errorText({ status: 500 })).toBe('This record could not load. Try again in a moment.');
+  });
+  test('the row\'s own fields stand in, without refs, internal keys or secrets', () => {
+    const m = R.rowModel({ refs: [{ object: 'deal', id: 'd-1' }], record_id: 'r', client_name: 'Jordan Smith', amount: 4500, password: 'x', _row_id: 'row-1', deal_id: 'd-1' });
+    expect(m.facts.map((f) => [f.label, f.text])).toEqual([['Client', 'Jordan Smith'], ['Amount', '4500']]);
+  });
+});

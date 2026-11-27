@@ -513,6 +513,9 @@
         'js/shared/dashboard-tiles.js',
         'js/shared/chart-points.js',
         'js/admin/report-builder.js',
+        'js/lex/components/foundation/lex-drawer.js',
+        'js/shared/report-objects.js',
+        'js/shared/report-object-panel.js',
         'js/admin/reports-list.model.js',
         'js/shared/title-switcher.js',
         'js/admin/report.js'
@@ -521,7 +524,8 @@
         'insights/raw-data-viewer.css',
         'css/title-switcher.css',
         'css/detail-page.css',
-        'css/admin/report.css'
+        'css/admin/report.css',
+        'css/report-object-panel.css'
       ]
     },
 
@@ -585,6 +589,9 @@
         'js/settings-mappings.model.js',
         'js/shared/setup-banner.js',
         'js/shared/metric-detail-view.js',
+        'js/lex/components/foundation/lex-drawer.js',
+        'js/shared/report-objects.js',
+        'js/shared/report-object-panel.js',
         'js/shared/title-switcher.js',
         'js/admin/dashboard-detail.js'
       ],
@@ -594,7 +601,8 @@
         'css/detail-page.css',
         'css/lex-motion.css',
         'css/mini-charts.css',
-        'css/setup-banner.css'
+        'css/setup-banner.css',
+        'css/report-object-panel.css'
       ]
     },
 
@@ -617,11 +625,15 @@
         'js/shared/metric-detail-view.js',
         'js/shared/lineage-view.js',
         'js/shared/insights-breadcrumbs.js',
+        'js/lex/components/foundation/lex-drawer.js',
+        'js/shared/report-objects.js',
+        'js/shared/report-object-panel.js',
         'js/admin/metric-detail.js'
       ],
       stylesheets: [
         'css/admin/insights-dashboard.css',
-        'css/mini-charts.css'
+        'css/mini-charts.css',
+        'css/report-object-panel.css'
       ]
     },
 

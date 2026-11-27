@@ -207,7 +207,18 @@ createModalStructure() {
       });
       table.addEventListener('row-click', (e) => {
         const row = e.detail && e.detail.row;
-        if (row) this.showRawData(row._raw || row);
+        if (!row) return;
+        // A row that is a data object (refs) opens the record panel;
+        // other rows show their raw fields as before.
+        const raw = row._raw || row;
+        const objects = typeof window !== 'undefined' ? window.ReportObjects : null;
+        const ref = objects ? objects.primaryRef(raw) : null;
+        if (ref && window.LanaRecordPanel) {
+          const config = this.currentConfig || {};
+          window.LanaRecordPanel.open(ref, { period: { start: config.periodStart || '', end: config.periodEnd || '' }, row: raw });
+          return;
+        }
+        this.showRawData(raw);
       });
       // Buttons inside cells: lex-table's row-click ignores them.
       table.addEventListener('click', (e) => {

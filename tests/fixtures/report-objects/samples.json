@@ -1,0 +1,47 @@
+{
+  "_note": "Synthetic GET /api/v1/report-objects/:object/:id payloads following the confirmed contract: { object, id, title, facts: [{label, value, format}], timeline?, links: [{object, id, label}] }; person adds lana_account, linked accounts and activity; deal adds timeline and contributors. Field names inside those additions are guesses until the server sample arrives.",
+  "person": {
+    "object": "person", "id": "p-1", "title": "Avery Stone",
+    "facts": [
+      { "label": "Email", "value": "avery@example.test", "format": "email" },
+      { "label": "Phone", "value": "+1 555 0100", "format": "phone" },
+      { "label": "Password hash", "value": "abc123", "format": "text" },
+      { "label": "Role", "value": "Attorney", "format": "text" }
+    ],
+    "lana_account": { "state": "Invited, not signed in yet", "user_id": "u-9", "role": "Member", "title": "Associate", "invited_at": "2026-10-02T15:04:00Z",
+      "created_at": "2026-10-02T15:04:00Z", "activated_at": null, "last_signed_in_at": null, "password": "never-show", "reset_token": "never-show" },
+    "linked_accounts": [
+      { "connector": "Leadly", "external_user_id": "ld-77", "display_name": "Avery S.", "matched_by": "email", "api_key": "never-show" }
+    ],
+    "activity": [
+      { "label": "Meetings held", "value": 12, "format": "number" },
+      { "label": "Meetings missed", "value": 1, "format": "number" },
+      { "label": "Deals owned", "value": 4, "format": "number" }
+    ],
+    "links": [{ "object": "deal", "id": "d-1", "label": "Smith Estate Plan" }]
+  },
+  "deal": {
+    "object": "deal", "id": "d-1", "title": "Smith Estate Plan",
+    "facts": [
+      { "label": "Amount", "value": 4500, "format": "currency" },
+      { "label": "Stage", "value": "won", "format": "status" },
+      { "label": "Won on", "value": "2026-11-03", "format": "date" },
+      { "label": "Win rate", "value": 42.5, "format": "percent" }
+    ],
+    "timeline": [
+      { "at": "2026-10-01T14:00:00Z", "label": "Lead came in from Referral", "actor": { "object": "person", "id": "p-2", "label": "Blake Ross" } },
+      { "at": "2026-10-05T16:30:00Z", "label": "Consultation held", "actor": { "object": "person", "id": "p-1", "label": "Avery Stone" } },
+      { "at": "2026-11-03T10:00:00Z", "label": "Marked as won", "actor": { "label": "System" } }
+    ],
+    "contributors": [
+      { "object": "person", "id": "p-1", "label": "Avery Stone", "did": "Held the consultation", "owner": true },
+      { "object": "person", "id": "p-2", "label": "Blake Ross", "did": "Booked the consultation", "owner": false }
+    ],
+    "links": [{ "object": "contact", "id": "c-1", "label": "Jordan Smith" }]
+  },
+  "contact": {
+    "object": "contact", "id": "c-1", "title": "Jordan Smith",
+    "facts": [{ "label": "Email", "value": "jordan@example.test", "format": "email" }, { "label": "Source", "value": "Referral", "format": "text" }],
+    "links": [{ "object": "deal", "id": "d-1", "label": "Smith Estate Plan" }]
+  }
+}

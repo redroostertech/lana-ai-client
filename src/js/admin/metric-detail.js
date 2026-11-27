@@ -221,6 +221,14 @@
         counts: ['metricRawDataCount', 'metricRawDataSectionCount']
       }, { noun: ['record', 'records'], defaultSort: defaultSort });
       table.addEventListener('lex-filter-change', empty);
+      // A record row opens the record panel (js/shared/report-object-panel.js).
+      table.addEventListener('row-click', function (event) {
+        var row = event.detail && event.detail.row;
+        var ref = row && window.ReportObjects ? window.ReportObjects.primaryRef(row) : null;
+        if (!ref || !window.LanaRecordPanel) return;
+        var qp = params();
+        window.LanaRecordPanel.open(ref, { period: { start: qp.get('periodStart') || '', end: qp.get('periodEnd') || '' }, row: row });
+      });
     }
     empty();
     table.setData((Array.isArray(sourceRows) ? sourceRows : []).map(view().recordsRow));

@@ -1395,7 +1395,10 @@
       return '<th scope="col"' + (col.align === 'right' ? ' class="dash-worklist__num"' : '') + '>' + escapeHtml(col.label) + '</th>';
     }).join('') + '</tr>';
     var body = table.rows.slice(0, 5).map(function (row, index) {
-      return '<tr>' + columns.map(function (col) {
+      // A row that is a data object opens the record panel (click or Enter).
+      var ref = window.ReportObjects ? window.ReportObjects.primaryRef(rows[index]) : null;
+      var open = ref ? ' class="dash-worklist__row" data-record-ref="' + escapeHtml(window.ReportObjects.refAttr(ref)) + '" tabindex="0"' : '';
+      return '<tr' + open + '>' + columns.map(function (col) {
         var source = rows[index][col.key];
         var text = view.formatCell(source, col);
         if (text === null) return '<td class="dash-worklist__muted">-</td>';
@@ -2283,6 +2286,11 @@
         closeMetricModal();
       }
     });
+
+    // Every data object (worklist rows, bars with refs) opens the record panel.
+    if (window.LanaRecordPanel) {
+      window.LanaRecordPanel.bindRows(content, function () { return { start: currentPeriod.start, end: currentPeriod.end }; });
+    }
 
     var params = getParams();
     var id = params.get('id');

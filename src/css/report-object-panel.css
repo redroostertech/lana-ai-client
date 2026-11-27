@@ -1,0 +1,136 @@
+/* The record side panel (js/shared/report-object-panel.js) inside lex-drawer,
+   and rows that open it. Lex tokens only; light and dark. */
+
+.rp {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  color: var(--lex-text-primary);
+  font-size: 0.875rem;
+}
+
+.rp-back {
+  align-self: flex-start;
+  padding: 0.25rem 0.625rem;
+  border: 1px solid var(--lex-border-default);
+  border-radius: 999px;
+  background: var(--lex-bg-primary);
+  color: var(--lex-text-secondary);
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.rp-kind {
+  margin: 0;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lex-text-tertiary);
+}
+
+.rp-facts {
+  display: grid;
+  grid-template-columns: minmax(8rem, 0.8fr) minmax(0, 1.4fr);
+  gap: 0.5rem 1rem;
+  margin: 0;
+}
+
+.rp-fact {
+  display: contents;
+}
+
+.rp-fact dt {
+  color: var(--lex-text-secondary);
+}
+
+.rp-fact dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.rp-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--lex-border-subtle);
+}
+
+.rp-section__title {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.rp-state {
+  margin: 0;
+  font-weight: 600;
+}
+
+.rp-list,
+.rp-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rp-when,
+.rp-muted {
+  color: var(--lex-text-tertiary);
+  font-size: 0.8125rem;
+}
+
+.rp-when {
+  display: inline-block;
+  min-width: 6.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.rp-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--lex-text-link, var(--lex-text-primary));
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.rp-link:focus-visible,
+.rp-back:focus-visible,
+[data-record-ref]:focus-visible {
+  outline: 2px solid var(--lex-focus-ring, var(--lex-text-primary));
+  outline-offset: 2px;
+}
+
+.rp-owner {
+  padding: 0 0.375rem;
+  border-radius: 999px;
+  background: var(--lex-bg-secondary);
+  color: var(--lex-text-secondary);
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.rp-error,
+.rp-loading {
+  margin: 0;
+  color: var(--lex-text-secondary);
+}
+
+/* Rows that open the panel. */
+.dash-worklist__row,
+.mini-bars__row[data-record-ref],
+.mini-cols__group[data-record-ref] {
+  cursor: pointer;
+}
+
+.dash-worklist__row:hover td {
+  background: var(--lex-bg-secondary);
+}
