@@ -383,3 +383,15 @@ describe('second_line formats by its own format', () => {
     } finally { delete global.Lex; }
   });
 });
+
+describe('listValueFormat: a value format the server sends for distribution rows', () => {
+  test('value_format on the card or in metadata, or the value column in row_columns', () => {
+    expect(View.listValueFormat({ format: 'distribution', value_format: 'currency' })).toBe('currency');
+    expect(View.listValueFormat({ format: 'distribution', metadata: { value_format: 'currency' } })).toBe('currency');
+    expect(View.listValueFormat({ format: 'distribution', metadata: { value_format: 'percentage' } })).toBe('percent');
+    expect(View.listValueFormat({ format: 'distribution', row_columns: [{ field: 'stage', header: 'Stage' }, { field: 'value', header: 'Value', format: 'currency' }] })).toBe('currency');
+  });
+  test('without a hint, never guessed from field names', () => {
+    expect(View.listValueFormat({ format: 'distribution', value: [{ stage: 'Lead', value: 73000, no_amount_count: 4 }] })).toBe('number');
+  });
+});

@@ -1105,3 +1105,12 @@ describe('long breakdowns: top 8 and "And N more in the details"', () => {
     expect(html).not.toContain('Stage 50');
   });
 });
+
+test('a distribution with a declared value format shows money; without one, plain numbers', async () => {
+  const value = [{ age_band: 'Under 30 days', open_count: 79, no_amount_count: 10, value: 314350 }, { age_band: '30 to 60 days', open_count: 5, no_amount_count: 1, value: 2000 }];
+  const make = (extra) => Object.assign({ metric_key: 'legal_firm.sales_intake.open_pipeline_by_age', title: 'Open Pipeline by Age', format: 'distribution', data_state: 'ok', period: 'Nov 2026', value }, extra);
+  const html = page().exports.renderMetricCard(make({ metadata: { value_format: 'currency' } }));
+  expect(text(html)).toContain('$314,350');
+  expect(text(page().exports.renderMetricCard(make({})))).toContain('314,350');
+  expect(text(page().exports.renderMetricCard(make({})))).not.toContain('$314,350');
+});

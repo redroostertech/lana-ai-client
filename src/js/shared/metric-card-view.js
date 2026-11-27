@@ -268,9 +268,24 @@
   var ROW_FORMATS = { currency: 'currency', integer: 'number', percentage: 'percent' };
   var LIST_VALUE_FORMATS = { currency_breakdown: 'currency', table: 'number' };
 
+  var VALUE_FORMATS = { currency: 'currency', integer: 'number', number: 'number', percentage: 'percent', percent: 'percent' };
+
+  // A value format the server sends for the rows' value: value_format on
+  // the card or in metadata, or the value column's format in row_columns.
+  // Never guessed from field names.
+  function declaredValueFormat(card) {
+    var meta = card.metadata && typeof card.metadata === 'object' ? card.metadata : {};
+    var direct = card.value_format || meta.value_format;
+    if (typeof direct === 'string' && VALUE_FORMATS[direct.toLowerCase()]) return VALUE_FORMATS[direct.toLowerCase()];
+    var column = (Array.isArray(card.row_columns) ? card.row_columns : []).filter(function (c) { return c && c.field === 'value' && c.format; })[0];
+    return column && VALUE_FORMATS[String(column.format).toLowerCase()] ? VALUE_FORMATS[String(column.format).toLowerCase()] : null;
+  }
+
   function listValueFormat(card) {
     var rowFormat = card && typeof card.row_format === 'string' ? ROW_FORMATS[card.row_format.toLowerCase()] : null;
     if (rowFormat) return rowFormat;
+    var declared = card ? declaredValueFormat(card) : null;
+    if (declared) return declared;
     var format = card && card.format;
     if (format && typeof format === 'object') format = format.type || format.style;
     return LIST_VALUE_FORMATS[String(format || '').toLowerCase()] || 'number';
