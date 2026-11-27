@@ -453,3 +453,16 @@ describe('access and kind fields are statuses; raw enums are hidden', () => {
     expect(rows.map((r) => [r.label, r.status || ''])).toEqual([['Jordan Reese', 'Linked to LANA'], ['Taylor Vance', ''], ['Casey Lee', '']]);
   });
 });
+
+test('a value inferred from a count field is marked, so card money formats do not apply', () => {
+  const model = View.listBars([{ owner_name: 'Taylor Vance', open_count: 266 }], 12);
+  expect(model.rows[0].value).toBe(266);
+  expect(model.inferred).toBe(true);
+  expect(View.listBars([{ owner_name: 'A', value: 5 }], 12).inferred).toBe(false);
+});
+
+test('integer is a known format: a whole number, never currency', () => {
+  expect(View.listValueFormat({ row_format: 'integer', value: [] })).toBe('number');
+  expect(View.listValueFormat({ row_format: 'INTEGER', value_format: 'currency', value: [] })).toBe('number');
+  expect(View.secondLine({ metadata: { second_line: { label: 'Open deals', value: 266.4, format: 'integer' } } })).toBe('Open deals 266');
+});

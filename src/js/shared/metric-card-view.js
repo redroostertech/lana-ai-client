@@ -173,8 +173,12 @@
   }
 
   /** A row's value: row.value when it has one, else its first count field (never a rate). */
+  function hasOwn(row, key) {
+    return Object.prototype.hasOwnProperty.call(row, key);
+  }
+
   function rowValue(row, key) {
-    if (Object.prototype.hasOwnProperty.call(row, key)) return toNumber(row[key]);
+    if (hasOwn(row, key)) return toNumber(row[key]);
     var keys = Object.keys(row);
     for (var i = 0; i < keys.length; i += 1) {
       if (typeof row[keys[i]] === 'number' && isCountKey(keys[i])) return toNumber(row[keys[i]]);
@@ -256,6 +260,7 @@
     var kind = String(format || '').toLowerCase();
     if (kind === 'currency') return value.toLocaleString('en-US', { style: 'currency', currency: firmCurrency(), maximumFractionDigits: 0 });
     if (kind === 'percentage' || kind === 'percent') return round1(value) + '%';
+    if (kind === 'integer' || kind === 'count') return Math.round(value).toLocaleString('en-US');
     return value.toLocaleString('en-US', { maximumFractionDigits: 1 });
   }
 
@@ -293,6 +298,9 @@
         valueLabel: isObject && value === null ? rowValueLabel(row) : null,
         // A bucket the picked dates cut short (partial: true).
         partial: !!(isObject && row.partial === true),
+        // The value came from a count field, not row.value: card formats
+        // (row_format, value_format) describe value, so they do not apply.
+        inferred: !!(isObject && !actualVsNeeded && !hasOwn(row, VALUE_KEY) && value !== null),
         // The object this row is (refs[0]): opens the record panel.
         ref: isObject ? firstRef(row) : null,
       };
@@ -320,6 +328,7 @@
     });
     return {
       empty: false,
+      inferred: parsed.some(function (row) { return row.inferred; }),
       rows: rows,
       paired: paired,
       neededPending: actualVsNeeded && !paired,
@@ -333,10 +342,10 @@
   // integer | percentage) when it sends one, else the card format:
   // currency_breakdown is dollars, table (and the *_count fields) are plain
   // numbers. Returns 'currency' | 'number' | 'percent'.
-  var ROW_FORMATS = { currency: 'currency', integer: 'number', percentage: 'percent' };
+  var ROW_FORMATS = { currency: 'currency', integer: 'number', count: 'number', number: 'number', percentage: 'percent', percent: 'percent' };
   var LIST_VALUE_FORMATS = { currency_breakdown: 'currency', table: 'number' };
 
-  var VALUE_FORMATS = { currency: 'currency', integer: 'number', number: 'number', percentage: 'percent', percent: 'percent' };
+  var VALUE_FORMATS = { currency: 'currency', integer: 'number', count: 'number', number: 'number', percentage: 'percent', percent: 'percent' };
 
   // A value format the server sends for the rows' value: value_format on
   // the card or in metadata, or the value column's format in row_columns.

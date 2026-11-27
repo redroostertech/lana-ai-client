@@ -64,6 +64,7 @@
     if (format === 'percent' || format === 'percentage') {
       return numeric.toFixed(1) + '%';
     }
+    if (format === 'integer' || format === 'count') return Math.round(numeric).toLocaleString('en-US');
     return formatNumber(numeric);
   }
 

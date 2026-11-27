@@ -94,6 +94,12 @@
       series_labels: Array.isArray(raw.series_labels) ? raw.series_labels.map(String) : [],
       // Declared series fields (for example held, no_show, cancelled).
       series: Array.isArray(raw.series) ? raw.series.map(String) : [],
+      // A dotted path on the card to the rows to draw (metadata.by_person),
+      // what they group by, and a row field to rank by with its format.
+      rows: raw.rows ? String(raw.rows) : '',
+      group_by: raw.group_by ? String(raw.group_by) : '',
+      value_key: raw.value_key ? String(raw.value_key) : '',
+      value_format: raw.value_format ? String(raw.value_format) : '',
       accent: ACCENTS[raw.accent] ? raw.accent : null,
       sort: raw.sort ? String(raw.sort) : '',
       unit: raw.unit ? String(raw.unit) : '',

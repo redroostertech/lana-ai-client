@@ -394,3 +394,10 @@ describe('chapters from the layout (layout.chapters)', () => {
     expect(plan.sections[0].intro).toBe('');
   });
 });
+
+test('visual_options carry value_key, value_format, rows (a dotted path) and group_by', () => {
+  const card = Cards.normalizeLayout({ cards: [{ id: 't', kind: 'breakdown', metric_key: 'a.b', visual_options: {
+    rows: 'metadata.by_person', series: ['held', 'no_show', 'cancelled'], group_by: 'person', series_labels: ['Held', 'No-show', 'Cancelled'], value_key: 'open_count', value_format: 'number' } }] }).cards[0];
+  expect(card.options).toMatchObject({ rows: 'metadata.by_person', group_by: 'person', value_key: 'open_count', value_format: 'number',
+    series: ['held', 'no_show', 'cancelled'], series_labels: ['Held', 'No-show', 'Cancelled'] });
+});

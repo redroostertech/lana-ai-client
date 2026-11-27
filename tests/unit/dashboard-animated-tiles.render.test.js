@@ -1213,3 +1213,27 @@ describe('team appointments from metadata.by_person', () => {
     expect(html).toContain('data-record-ref="person|p-2|"');
   });
 });
+
+describe('live recheck: inferred values, value_key, rows path and the stat fallback', () => {
+  async function render(card, layoutCard) {
+    const layout = { cards: [Object.assign({ id: 'x', kind: 'breakdown', metric_key: card.metric_key.split('.').slice(1).join('.') }, layoutCard)] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [card] }) });
+    await p.exports.loadDashboardById('d1');
+    return p.nodes.dashboardMetricGrid.innerHTML;
+  }
+  test('deals by owner: 266 open deals inferred from a count never reads "$266"', async () => {
+    const card = { metric_key: 'legal_firm.sales_intake.deals_by_owner', title: 'Deals by Owner', format: 'distribution', row_format: 'currency', data_state: 'ok', period: 'Nov 2026',
+      value: [{ owner_name: 'Taylor Vance', owner_kind: 'owner', open_count: 266 }, { owner_name: 'Casey Lee', owner_kind: 'not_on_team', open_count: 12 }] };
+    const html = await render(card, { visual: 'ranked_bars' });
+    expect(text(html)).toContain('266');
+    expect(html).not.toContain('$266');
+    expect(text(html)).not.toContain('not_on_team');
+  });
+  test('visual_options.value_key ranks by that field, with value_format when given', async () => {
+    const card = { metric_key: 'legal_firm.sales_intake.deals_by_owner', title: 'Deals by Owner', format: 'distribution', data_state: 'ok', period: 'Nov 2026',
+      value: [{ owner_name: 'Taylor Vance', open_count: 2, open_value: 9000 }, { owner_name: 'Casey Lee', open_count: 5, open_value: 1000 }] };
+    const html = await render(card, { visual: 'ranked_bars', visual_options: { value_key: 'open_value', value_format: 'currency' } });
+    expect(text(html)).toContain('$9,000');
+    expect(html.indexOf('Taylor Vance')).toBeLessThan(html.indexOf('Casey Lee'));
+  });
+});

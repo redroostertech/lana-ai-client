@@ -1049,6 +1049,12 @@
     return (extra || '') + (accent ? ' dash-accent dash-accent--' + accent : '');
   }
 
+  function formatWith(format) {
+    var kind = String(format || '').toLowerCase();
+    if (!kind || kind === 'number' || kind === 'integer') return plainNumber;
+    return function (n) { return n === null ? window.DataState.EMPTY_VALUE : formatMetricCardValue({ value: n, format: kind === 'percent' ? 'percentage' : kind }); };
+  }
+
   function formatList(metric) {
     var unit = window.MetricCardView.listValueFormat(metric);
     return unit === 'number' ? plainNumber : function (n) {
@@ -1094,8 +1100,14 @@
     var people = resolved.metrics.length === 1 ? byPersonOf(first.metric) : null;
     if (people) return byPersonRows(people, def, visual, first.key);
     if (resolved.metrics.length === 1 && first.metric && Array.isArray(first.metric.value)) {
-      var model = window.MetricCardView.listBars(first.metric.value, 1000);
-      var fmt = formatList(first.metric);
+      // visual_options.value_key: a row field to rank by, with its own
+      // value_format (a plain number when none is given).
+      var valueKey = def.options.value_key;
+      var source = valueKey ? first.metric.value.map(function (r) { return r && typeof r === 'object' ? Object.assign({}, r, { value: r[valueKey] }) : r; }) : first.metric.value;
+      var model = window.MetricCardView.listBars(source, 1000);
+      // A value inferred from a count field is a plain number: card formats
+      // describe value only.
+      var fmt = valueKey ? formatWith(def.options.value_format) : (model.inferred ? plainNumber : formatList(first.metric));
       var listRows = model.rows.map(function (row) {
         return { label: row.label, value: row.value, key: first.key, waiting: false, text: fmt(row.value), partial: !!row.partial, ref: row.ref || null, status: row.status || '' };
       });
