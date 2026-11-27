@@ -38,14 +38,23 @@ describe('monthly bars (metadata.by_month)', () => {
     expect(AsOf.byMonth(card([]))).toBeNull();
     expect(AsOf.byMonth({ metadata: {} })).toBeNull();
   });
-  test('at most 13 bars: Older plus the newest 12 months', () => {
-    const months = Array.from({ length: 20 }, (_, i) => ({ month: '2025-' + String((i % 12) + 1).padStart(2, '0'), label: 'M' + i, count: i }));
-    const many = months.map((m, i) => Object.assign({}, m, { month: (2024 + Math.floor(i / 12)) + '-' + String((i % 12) + 1).padStart(2, '0') }));
+  test('up to 24 bars, in order: Older plus the newest months', () => {
+    const month = (i) => (2024 + Math.floor(i / 12)) + '-' + String((i % 12) + 1).padStart(2, '0');
+    const many = Array.from({ length: 30 }, (_, i) => ({ month: month(i), label: 'M' + i, count: i }));
     const rows = AsOf.byMonth(card([{ month: 'older', label: 'Older', count: 1 }].concat(many)));
-    expect(rows.length).toBe(13);
+    expect(rows.length).toBe(24);
     expect(rows[0].month).toBe('older');
-    expect(rows[12].month).toBe('2025-08');
-    expect(AsOf.byMonth(card(many)).length).toBe(13);
+    expect(rows[1].month).toBe(month(7));
+    expect(rows[23].month).toBe(month(29));
+    expect(AsOf.byMonth(card(many)).length).toBe(24);
+  });
+  test('future months (next billing) are all drawn, from the as-of month on, never cut at 13', () => {
+    const month = (i) => (2026 + Math.floor((10 + i) / 12)) + '-' + String(((10 + i) % 12) + 1).padStart(2, '0');
+    const forward = Array.from({ length: 18 }, (_, i) => ({ month: month(i), label: 'F' + i, count: 1, value: 100 }));
+    const rows = AsOf.byMonth(card(forward.slice().reverse()));
+    expect(rows.length).toBe(18);
+    expect(rows[0].month).toBe('2026-11');
+    expect(rows[17].month).toBe(month(17));
   });
   test('the subtitle names what the months count; anything else shows none', () => {
     const words = (of) => AsOf.monthSubtitle({ metadata: { group_by_month_of: of } });

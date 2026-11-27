@@ -411,3 +411,13 @@ test('grouped columns draw up to 3 series per row with a legend', () => {
   expect(avery).toContain('mini-cols__bar--s2');
   expect(avery).toContain('<title>Avery Stone: Held 29, No-show 30, Cancelled 8</title>');
 });
+
+test('month columns: every label up to 13, then every few, never cut to a day tick', () => {
+  const rows = (n) => Array.from({ length: n }, (_, i) => ({ label: 'Mon' + i, value: i + 1, pct: 50, second: null, secondPct: 0 }));
+  const labels = (html) => html.split('class="mini-cols__label"').length - 1;
+  expect(labels(Charts.columnsHtml({ rows: rows(13), paired: false, seriesLabels: [], allLabels: true }, String, {}))).toBe(13);
+  const wide = Charts.columnsHtml({ rows: rows(24), paired: false, seriesLabels: [], allLabels: true }, String, {});
+  expect(labels(wide)).toBeLessThan(24);
+  expect(labels(wide)).toBeGreaterThan(5);
+  expect(wide).toContain('>Mon0<');
+});

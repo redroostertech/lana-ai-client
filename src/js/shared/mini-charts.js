@@ -150,9 +150,13 @@
     // A long series over days: no value text over each column (the tooltip
     // keeps it), and a date label on every few columns only.
     var dense = n > COLUMN_LIMIT;
-    // model.allLabels (month bars): every column keeps its own label.
+    // model.allLabels (month bars): every column keeps its own label up to
+    // 13, then every few; never a day tick.
+    var MONTH_LABEL_LIMIT = 13;
     var sparseLabels = dense && !model.allLabels;
-    var labelEvery = sparseLabels ? Math.ceil(n / 6) : 1;
+    var labelEvery = sparseLabels ? Math.ceil(n / 6) : (model.allLabels && n > MONTH_LABEL_LIMIT ? Math.ceil(n / 8) : 1);
+    // A label shown on every few columns may use their room.
+    if (model.allLabels && labelEvery > 1) maxChars = Math.max(4, Math.floor((slot * labelEvery) / 4.8));
     var grid = '<g class="mini-cols__grid">'
       + '<line x1="0" x2="' + BOX_W + '" y1="' + PLOT_TOP + '" y2="' + PLOT_TOP + '"></line>'
       + '<line x1="0" x2="' + BOX_W + '" y1="' + (PLOT_TOP + PLOT_H / 2) + '" y2="' + (PLOT_TOP + PLOT_H / 2) + '"></line>'

@@ -61,7 +61,9 @@
 
   // ── Monthly bars (metadata.by_month) ─────────────────────────────
   var OLDER = 'older';
-  var MONTH_BAR_LIMIT = 13;
+  // Every month in order, up to 24 (cards with future months, such as next
+  // billing, run past the end month).
+  var MONTH_BAR_LIMIT = 24;
   // The record field a bar filters the records by (raw_filter[month]).
   var MONTH_FIELD = 'month';
   var MONTH_SUBTITLES = {
@@ -86,7 +88,7 @@
 
   /**
    * The card's months: [{ month, label, count, value, format }], "Older"
-   * first, then oldest to newest, at most 13 (Older plus the newest 12).
+   * first, then oldest to newest, at most 24 (Older plus the newest).
    * null when there are none.
    */
   function byMonth(card) {
