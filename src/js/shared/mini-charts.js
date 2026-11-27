@@ -265,6 +265,8 @@
         + (row.ref
           ? '<button type="button" class="mini-rank__label"' + recordAttr(row.ref).split(' tabindex="0" role="button"').join('') + '>' + escapeHtml(row.label) + '</button>'
           : '<button type="button" class="mini-rank__label"' + linkAttr(row.key && o.href ? o.href(row.key) : '') + ' title="See the records">' + escapeHtml(row.label) + '</button>')
+        // A role or status (row.status) as a muted suffix; initials come from the name only.
+        + (row.status ? ' <span class="mini-rank__status">' + escapeHtml(row.status) + '</span>' : '')
         + value + '</div>'
         + (row.waiting ? '' : '<svg class="mini-rank__track" viewBox="0 0 100 6" preserveAspectRatio="none" aria-hidden="true" focusable="false"><rect class="mini-rank__fill" x="0" y="0" width="' + row.pct + '" height="6"></rect></svg>')
         + '</div></li>';

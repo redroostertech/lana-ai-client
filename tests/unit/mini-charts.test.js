@@ -380,3 +380,11 @@ describe('a daily series draws as compact columns', () => {
     expect(html).toContain('<title>Oct 2, 2026: 1</title>');
   });
 });
+
+test('ranked bars: initials from the name only, status as a muted suffix', () => {
+  const html = Charts.rankedHtml([{ label: 'Taylor Vance', status: 'owner', value: 3, pct: 100 }, { label: 'Unassigned', value: 2, pct: 50 }], { initials: true, format: (r) => String(r.value) });
+  expect(html).toContain('>TV<');
+  expect(html).toContain('Taylor Vance</button> <span class="mini-rank__status">owner</span>');
+  expect(html).toContain('>U<');
+});
+

@@ -1065,7 +1065,7 @@
       var model = window.MetricCardView.listBars(first.metric.value, 1000);
       var fmt = formatList(first.metric);
       var listRows = model.rows.map(function (row) {
-        return { label: row.label, value: row.value, key: first.key, waiting: false, text: fmt(row.value), partial: !!row.partial, ref: row.ref || null };
+        return { label: row.label, value: row.value, key: first.key, waiting: false, text: fmt(row.value), partial: !!row.partial, ref: row.ref || null, status: row.status || '' };
       });
       // A breakdown of categories (not a series over dates) shows its top
       // rows only (seriesChartHtml).

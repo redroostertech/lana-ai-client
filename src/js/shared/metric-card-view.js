@@ -102,9 +102,25 @@
     return true;
   }
 
-  // The plain text fields that are not ids or dates, in order.
+  // A role or status field (role, status, state, *_role, *_status, *_state):
+  // shown as a muted suffix, never joined into the label.
+  function isStatusKey(key) {
+    var k = String(key).toLowerCase();
+    if (k === 'role' || k === 'status' || k === 'state') return true;
+    return ['_role', '_status', '_state'].some(function (tail) { return k.length > tail.length && k.slice(-tail.length) === tail; });
+  }
+
+  // The plain text fields that are not ids, dates or statuses, in order.
   function textFields(row) {
-    return Object.keys(row).filter(function (key) { return !isIdOrDateKey(key) && looksLikeWords(row[key]); });
+    return Object.keys(row).filter(function (key) { return !isIdOrDateKey(key) && !isStatusKey(key) && looksLikeWords(row[key]); });
+  }
+
+  /** A row's role or status, unless it only repeats the label. */
+  function rowStatus(row, label) {
+    if (!row || typeof row !== 'object') return '';
+    var key = Object.keys(row).filter(function (k) { return isStatusKey(k) && looksLikeWords(row[k]); })[0];
+    var text = key ? String(row[key]).trim() : '';
+    return text && text.toLowerCase() !== String(label || '').trim().toLowerCase() ? text : '';
   }
 
   /**
@@ -262,8 +278,10 @@
       var muted = !!(row && typeof row === 'object' && (row.not_mapped === true || row.service_key === 'not_mapped' || row.key === 'not_mapped'));
       var isObject = row && typeof row === 'object';
       var value = isObject ? (actualVsNeeded ? toNumber(row[ACTUAL_KEY]) : rowValue(row, VALUE_KEY)) : toNumber(row);
+      var label = muted ? 'Not mapped' : rowLabel(row, index);
       return {
-        label: muted ? 'Not mapped' : rowLabel(row, index),
+        label: label,
+        status: isObject ? rowStatus(row, label) : '',
         value: value,
         second: isObject && actualVsNeeded ? toNumber(row[NEEDED_KEY]) : null,
         muted: muted,
@@ -294,6 +312,7 @@
       if (row.valueLabel) out.valueLabel = row.valueLabel;
       if (row.partial) out.partial = true;
       if (row.ref) out.ref = row.ref;
+      if (row.status) out.status = row.status;
       return out;
     });
     return {

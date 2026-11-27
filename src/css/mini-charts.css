@@ -885,3 +885,9 @@
   font-weight: 400;
   color: var(--lex-text-tertiary);
 }
+
+/* A ranked row's role or status after the name. */
+.mini-rank__status {
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+}

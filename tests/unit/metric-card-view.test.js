@@ -425,3 +425,16 @@ describe('second_line does not repeat a number its label already says', () => {
   });
 });
 
+describe('name plus a role or status: the name alone, status as a muted suffix', () => {
+  test('rowLabel uses the name; rowStatus gives the status unless it repeats the name', () => {
+    const owner = { owner_name: 'Taylor Vance', role: 'owner', value: 3 };
+    const unassigned = { owner_name: 'Unassigned', status: 'unassigned', value: 2 };
+    const linked = { team_member: 'Jordan Reese', link_status: 'Linked to LANA', value: 5 };
+    expect(View.listBars([owner, unassigned, linked], 12).rows.map((r) => [r.label, r.status || ''])).toEqual([
+      ['Taylor Vance', 'owner'], ['Unassigned', ''], ['Jordan Reese', 'Linked to LANA'],
+    ]);
+  });
+  test('the cross-tab still reads "Member · Meeting type"', () => {
+    expect(View.listBars([{ team_member: 'Avery Stone', meeting_type: 'Consultation', appointments: 3 }], 12).rows[0].label).toBe('Avery Stone · Consultation');
+  });
+});
