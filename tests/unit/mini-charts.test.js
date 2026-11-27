@@ -412,12 +412,35 @@ test('grouped columns draw up to 3 series per row with a legend', () => {
   expect(avery).toContain('<title>Avery Stone: Held 29, No-show 30, Cancelled 8</title>');
 });
 
-test('month columns: every label up to 13, then every few, never cut to a day tick', () => {
-  const rows = (n) => Array.from({ length: n }, (_, i) => ({ label: 'Mon' + i, value: i + 1, pct: 50, second: null, secondPct: 0 }));
+test('month columns: short ticks, every one when they fit, every few when not, never an ellipsis; the tooltip keeps the full label', () => {
+  const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const rows = (n) => Array.from({ length: n }, (_, i) => ({ label: names[i % 12] + ' ' + (2025 + Math.floor(i / 12)), tick: i === 0 ? 'Older' : names[i % 12],
+    value: i + 1, pct: 50, second: null, secondPct: 0, tip: 'Full ' + i }));
   const labels = (html) => html.split('class="mini-cols__label"').length - 1;
-  expect(labels(Charts.columnsHtml({ rows: rows(13), paired: false, seriesLabels: [], allLabels: true }, String, {}))).toBe(13);
+  const thirteen = Charts.columnsHtml({ rows: rows(13), paired: false, seriesLabels: [], allLabels: true }, String, {});
+  expect(labels(thirteen)).toBe(13);
+  expect(thirteen).toContain('>Older<');
+  expect(thirteen).toContain('>Feb<');
+  expect(thirteen).not.toContain('...');
+  expect(thirteen).toContain('<title>Full 1</title>');
   const wide = Charts.columnsHtml({ rows: rows(24), paired: false, seriesLabels: [], allLabels: true }, String, {});
   expect(labels(wide)).toBeLessThan(24);
   expect(labels(wide)).toBeGreaterThan(5);
-  expect(wide).toContain('>Mon0<');
+  expect(wide).not.toContain('...');
+});
+
+test('date axes: monthly labels read as three letters, days as "Oct 29", never cut with an ellipsis', () => {
+  const series = (labels) => ({ rows: labels.map((label, i) => ({ label, value: i + 1, pct: 50, second: null, secondPct: 0 })), paired: false, seriesLabels: [], series: true });
+  const months = Charts.columnsHtml(series(['September 2026', 'October 2026', 'November 2026', 'December 2026', 'January 2027', 'February 2027', 'March 2027', 'April 2027', 'May 2027', 'June 2027']), String, {});
+  expect(months).toContain('>Sep<');
+  expect(months).toContain('>Jan<');
+  expect(months).not.toContain('...');
+  expect(months).toContain('<title>January 2027: 5</title>');
+  const shortMonths = Charts.columnsHtml(series(['Oct 2026', 'Nov 2026', '2026-12']), String, {});
+  expect(shortMonths).toContain('>Oct<');
+  expect(shortMonths).toContain('>Dec<');
+  const days = Charts.columnsHtml(series(['Oct 29, 2026', 'Oct 30, 2026', 'Oct 31, 2026']), String, {});
+  expect(days).toContain('>Oct 29<');
+  expect(days).not.toContain('...');
+  expect(Charts.dateTick('Estate Planning')).toBeNull();
 });

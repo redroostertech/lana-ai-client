@@ -129,6 +129,34 @@
     return comma > 0 && comma <= 6 ? text.substring(0, comma) : text;
   }
 
+  var MONTH_ABBR = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  var MONTH_TICKS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  function isYear(text) {
+    return text.length === 4 && !isNaN(Number(text));
+  }
+
+  /**
+   * A date axis tick, or null when the label is not a date: a month
+   * ("October 2026", "Oct 2026", "2026-10") reads "Oct"; a day ("Oct 29,
+   * 2026") reads "Oct 29". Never cut with an ellipsis.
+   */
+  function dateTick(label) {
+    var text = String(label || '').trim();
+    var dash = text.split('-');
+    if (text.length === 7 && dash.length === 2 && isYear(dash[0])) {
+      var n = Number(dash[1]);
+      return n >= 1 && n <= 12 ? MONTH_TICKS[n - 1] : null;
+    }
+    var words = text.split(' ');
+    var month = words.length ? MONTH_ABBR.indexOf(words[0].substring(0, 3).toLowerCase()) : -1;
+    if (month === -1) return null;
+    if (words.length === 2 && isYear(words[1])) return MONTH_TICKS[month];
+    var comma = text.indexOf(', ');
+    if (words.length === 3 && comma > 0 && comma <= 9 && isYear(words[2])) return text.substring(0, comma);
+    return null;
+  }
+
   function column(cls, x, width, pct) {
     var height = round1((pct / 100) * PLOT_H);
     if (height <= 0) return '';
@@ -150,13 +178,17 @@
     // A long series over days: no value text over each column (the tooltip
     // keeps it), and a date label on every few columns only.
     var dense = n > COLUMN_LIMIT;
-    // model.allLabels (month bars): every column keeps its own label up to
-    // 13, then every few; never a day tick.
-    var MONTH_LABEL_LIMIT = 13;
+    // model.allLabels (month bars): each column's short tick (row.tick),
+    // never cut; only when even those do not fit is every few shown.
+    // More than 12 month bars use smaller ticks (mini-cols__svg--small-ticks).
+    var smallTicks = !!model.allLabels && n > COLUMN_LIMIT;
+    var TICK_CHAR_W = smallTicks ? 3.6 : 4.4;
     var sparseLabels = dense && !model.allLabels;
-    var labelEvery = sparseLabels ? Math.ceil(n / 6) : (model.allLabels && n > MONTH_LABEL_LIMIT ? Math.ceil(n / 8) : 1);
-    // A label shown on every few columns may use their room.
-    if (model.allLabels && labelEvery > 1) maxChars = Math.max(4, Math.floor((slot * labelEvery) / 4.8));
+    var labelEvery = sparseLabels ? Math.ceil(n / 6) : 1;
+    if (model.allLabels) {
+      var widest = model.rows.reduce(function (w, row) { return Math.max(w, String(row.tick || row.label).length); }, 1);
+      labelEvery = Math.max(1, Math.ceil((widest * TICK_CHAR_W + 1) / slot));
+    }
     var grid = '<g class="mini-cols__grid">'
       + '<line x1="0" x2="' + BOX_W + '" y1="' + PLOT_TOP + '" y2="' + PLOT_TOP + '"></line>'
       + '<line x1="0" x2="' + BOX_W + '" y1="' + (PLOT_TOP + PLOT_H / 2) + '" y2="' + (PLOT_TOP + PLOT_H / 2) + '"></line>'
@@ -202,11 +234,11 @@
         + '><title>' + escapeHtml(row.tip || (row.label + (row.partial ? ' (partial)' : '') + ': ' + valueText)) + '</title>'
         + bars
         + (dense ? '' : '<text class="mini-cols__value" x="' + round1(center) + '" y="' + valueY + '" text-anchor="middle">' + escapeHtml(row.valueText !== undefined ? row.valueText : format(row.value === null && hasSecond ? row.second : row.value)) + '</text>')
-        + (i % labelEvery === 0 ? '<text class="mini-cols__label" x="' + round1(center) + '" y="114" text-anchor="middle">' + escapeHtml(sparseLabels ? dayTick(row.label) : shortLabel(row.label, maxChars)) + '</text>' : '')
+        + (i % labelEvery === 0 ? '<text class="mini-cols__label" x="' + round1(center) + '" y="114" text-anchor="middle">' + escapeHtml(model.allLabels ? String(row.tick || row.label) : (dateTick(row.label) || (sparseLabels ? dayTick(row.label) : shortLabel(row.label, maxChars)))) + '</text>' : '')
         + '</g>';
     }).join('');
     return '<div class="mini-cols">' + legendHtml(model)
-      + '<svg class="mini-cols__svg" viewBox="0 0 ' + BOX_W + ' 120" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Breakdown chart" focusable="false">'
+      + '<svg class="mini-cols__svg' + (smallTicks ? ' mini-cols__svg--small-ticks' : '') + '" viewBox="0 0 ' + BOX_W + ' 120" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Breakdown chart" focusable="false">'
       + grid + groups + '</svg></div>';
   }
 
@@ -507,6 +539,7 @@
     barsHtml: barsHtml,
     breakdownHtml: breakdownHtml,
     columnsHtml: columnsHtml,
+    dateTick: dateTick,
     gaugeHtml: gaugeHtml,
     donutHtml: donutHtml,
     rankedHtml: rankedHtml,

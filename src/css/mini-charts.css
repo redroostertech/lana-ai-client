@@ -904,3 +904,8 @@
   fill: var(--lex-chart-color-3);
   background: var(--lex-chart-color-3);
 }
+
+/* Month bars past 12 columns: smaller ticks so each short month still fits. */
+.mini-cols__svg--small-ticks .mini-cols__label {
+  font-size: 7px;
+}

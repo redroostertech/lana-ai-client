@@ -152,3 +152,12 @@ describe('average cards', () => {
     expect(AsOf.unplacedNote({ metadata: { by_month_unplaced: { label: 'No date recorded', count: 3, value: 30 } } }, days, true)).toBe('3 with no date recorded (avg 30 days)');
   });
 });
+
+describe('month ticks that fit', () => {
+  test('"Older", then the three-letter month, never a year on the axis', () => {
+    const months = [{ month: 'older', label: 'Older' }, { month: '2025-12', label: 'December 2025' }, { month: '2026-01', label: 'January 2026' }, { month: '2026-02', label: 'February 2026' }];
+    expect(AsOf.monthTicks(months)).toEqual(['Older', 'Dec', 'Jan', 'Feb']);
+    expect(AsOf.monthTicks([{ month: '2026-03', label: 'March 2026' }, { month: '2026-04', label: 'April 2026' }])).toEqual(['Mar', 'Apr']);
+    expect(AsOf.monthTicks([{ month: 'odd', label: 'Something' }])).toEqual(['Something']);
+  });
+});

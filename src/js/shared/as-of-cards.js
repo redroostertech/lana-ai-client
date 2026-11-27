@@ -185,6 +185,22 @@
     return u.count.toLocaleString('en-US') + ' with ' + words + (u.value !== null ? ' (' + (average ? 'avg ' : '') + formatValue(u.value) + ')' : '');
   }
 
+  var MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  /**
+   * Ticks under the bars: "Older", then the three-letter month ("Oct"),
+   * never a year on the axis. The full label ("October 2026") stays in the
+   * tooltip.
+   */
+  function monthTicks(items) {
+    return (Array.isArray(items) ? items : []).map(function (item) {
+      if (item.month === OLDER) return 'Older';
+      var parts = String(item.month).split('-');
+      var m = parts.length === 2 && parts[0].length === 4 ? Number(parts[1]) : NaN;
+      return m >= 1 && m <= 12 ? MONTH_SHORT[m - 1] : item.label;
+    });
+  }
+
   /** The word for the count (metadata.unit, for example "deals"). */
   function monthUnit(card) {
     var unit = metaOf(card).unit;
@@ -271,6 +287,7 @@
     isMonthCard: isMonthCard,
     monthSubtitle: monthSubtitle,
     monthTip: monthTip,
+    monthTicks: monthTicks,
     isAverage: isAverage,
     monthUnit: monthUnit,
     isAsOf: isAsOf,
