@@ -116,6 +116,14 @@
       : '';
   }
 
+  // A date tick on compact columns: "Oct 29, 2026" reads "Oct 29", never
+  // cut with an ellipsis.
+  function dayTick(label) {
+    var text = String(label || '');
+    var comma = text.indexOf(', ');
+    return comma > 0 && comma <= 6 ? text.substring(0, comma) : text;
+  }
+
   function column(cls, x, width, pct) {
     var height = round1((pct / 100) * PLOT_H);
     if (height <= 0) return '';
@@ -138,7 +146,6 @@
     // keeps it), and a date label on every few columns only.
     var dense = n > COLUMN_LIMIT;
     var labelEvery = dense ? Math.ceil(n / 6) : 1;
-    if (dense) maxChars = Math.max(maxChars, 7);
     var grid = '<g class="mini-cols__grid">'
       + '<line x1="0" x2="' + BOX_W + '" y1="' + PLOT_TOP + '" y2="' + PLOT_TOP + '"></line>'
       + '<line x1="0" x2="' + BOX_W + '" y1="' + (PLOT_TOP + PLOT_H / 2) + '" y2="' + (PLOT_TOP + PLOT_H / 2) + '"></line>'
@@ -171,7 +178,7 @@
         + '><title>' + escapeHtml(row.label + (row.partial ? ' (partial)' : '') + ': ' + valueText) + '</title>'
         + bars
         + (dense ? '' : '<text class="mini-cols__value" x="' + round1(center) + '" y="' + valueY + '" text-anchor="middle">' + escapeHtml(format(row.value === null && hasSecond ? row.second : row.value)) + '</text>')
-        + (i % labelEvery === 0 ? '<text class="mini-cols__label" x="' + round1(center) + '" y="114" text-anchor="middle">' + escapeHtml(shortLabel(row.label, maxChars)) + '</text>' : '')
+        + (i % labelEvery === 0 ? '<text class="mini-cols__label" x="' + round1(center) + '" y="114" text-anchor="middle">' + escapeHtml(dense ? dayTick(row.label) : shortLabel(row.label, maxChars)) + '</text>' : '')
         + '</g>';
     }).join('');
     return '<div class="mini-cols">' + legendHtml(model)

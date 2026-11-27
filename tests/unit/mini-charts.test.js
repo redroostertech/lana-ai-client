@@ -388,3 +388,13 @@ test('ranked bars: initials from the name only, status as a muted suffix', () =>
   expect(html).toContain('>U<');
 });
 
+test('compact date columns: short day labels that fit, never an ellipsis', () => {
+  const days = Array.from({ length: 30 }, (_, i) => ({ period_start: new Date(Date.UTC(2026, 9, 29) + i * 86400000).toISOString().slice(0, 10), value: 1 }));
+  const model = View.listBars(days, 62);
+  model.series = true;
+  const html = Charts.breakdownHtml(model, String, {});
+  const labels = html.split('class="mini-cols__label"').slice(1).map((p) => p.split('>')[1].split('<')[0]);
+  expect(labels[0]).toBe('Oct 29');
+  expect(labels.every((l) => l.indexOf('...') === -1 && l.indexOf('…') === -1)).toBe(true);
+  expect(labels.some((l) => l.startsWith('Nov '))).toBe(true);
+});
