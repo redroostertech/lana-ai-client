@@ -140,3 +140,16 @@ describe('wiring', () => {
     expect(read(rel)).toContain('LanaDocumentTypeNames.load(');
   });
 });
+
+describe('pickerOptions: the Document Type picker lists what the server returns', () => {
+  test('before the list arrives there are no options, so the page keeps its own', () => {
+    expect(freshModule().pickerOptions('')).toBeNull();
+  });
+  test('Auto-detect, then every server type in its order, plus the stored type when the list lacks it', async () => {
+    const names = freshModule();
+    await names.load(apiReturning({ data: [{ key: 'contract', label: 'Contract' }, { key: 'signed_engagement_letter', label: 'Signed engagement letter' }] }));
+    expect(names.pickerOptions('')).toEqual([{ value: '', label: 'Auto-detect' }, { value: 'contract', label: 'Contract' }, { value: 'signed_engagement_letter', label: 'Signed engagement letter' }]);
+    expect(names.pickerOptions('police_report').slice(-1)[0]).toEqual({ value: 'police_report', label: 'Police report' });
+    expect(names.pickerOptions('contract').length).toBe(3);
+  });
+});

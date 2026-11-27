@@ -39,3 +39,16 @@ test('without rawLimit the source rows are requested as before', async () => {
   await api.getMetricDetail('a.b', { periodStart: '2026-01-01' });
   expect(api.request.mock.calls[0][1]).not.toContain('raw_limit');
 });
+
+test('an as-of request sends asOf alone: never periodStart, periodEnd or the comparison', async () => {
+  const api = loadApi();
+  await api.getMetricDetail('a.b', { asOf: '2026-11-27', periodStart: '2026-01-01', periodEnd: '2026-11-27', compareBy: 'monthly', compareToPrevious: true, rawLimit: 20, rawFilters: { month: '2026-10' } });
+  const url = api.request.mock.calls[0][1];
+  expect(url).toContain('asOf=2026-11-27');
+  expect(url).not.toContain('periodStart');
+  expect(url).not.toContain('periodEnd');
+  expect(url).not.toContain('compareBy');
+  expect(url).not.toContain('compareToPrevious');
+  expect(url).toContain('raw_limit=20');
+  expect(url).toContain('raw_filter%5Bmonth%5D=2026-10');
+});

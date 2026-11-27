@@ -75,13 +75,77 @@
     return null;
   }
 
+  function hasText(value) {
+    return value !== null && value !== undefined && typeof value !== 'object' && String(value).trim() !== '';
+  }
+
+  // Category fields a breakdown row names itself by (after label and name).
+  var CATEGORY_KEYS = ['source', 'stage', 'age_band', 'service', 'owner_name', 'category', 'bucket', 'type'];
+  var ID_TAILS = ['_id', '_key', '_ref', '_uuid', '_at', '_date', '_on', '_time'];
+
+  function isIdOrDateKey(key) {
+    var k = String(key).toLowerCase();
+    if (k === 'id' || k === 'uuid' || k === 'key' || k === 'date' || k === 'time' || k.indexOf('date') !== -1) return true;
+    for (var i = 0; i < ID_TAILS.length; i += 1) {
+      if (k.length > ID_TAILS[i].length && k.slice(-ID_TAILS[i].length) === ID_TAILS[i]) return true;
+    }
+    return false;
+  }
+
+  function looksLikeWords(value) {
+    if (typeof value !== 'string') return false;
+    var text = value.trim();
+    if (!text || toNumber(text) !== null) return false;
+    // A day ("2026-01-05...") or an id-like token with no spaces is not a label.
+    if (text.length >= 10 && text.charAt(4) === '-' && text.charAt(7) === '-') return false;
+    if (text.length >= 32 && text.indexOf(' ') === -1 && text.split('-').length >= 5) return false;
+    return true;
+  }
+
+  // A role or status field (role, status, state, *_role, *_status, *_state):
+  // shown as a muted suffix, never joined into the label.
+  function isStatusKey(key) {
+    var k = String(key).toLowerCase();
+    if (k === 'role' || k === 'status' || k === 'state' || k === 'access' || k === 'kind') return true;
+    return ['_role', '_status', '_state', '_access', '_kind'].some(function (tail) { return k.length > tail.length && k.slice(-tail.length) === tail; });
+  }
+
+  // The plain text fields that are not ids, dates or statuses, in order.
+  function textFields(row) {
+    return Object.keys(row).filter(function (key) { return !isIdOrDateKey(key) && !isStatusKey(key) && looksLikeWords(row[key]); });
+  }
+
+  /** A row's role or status, unless it only repeats the label. */
+  function rowStatus(row, label) {
+    if (!row || typeof row !== 'object') return '';
+    var key = Object.keys(row).filter(function (k) { return isStatusKey(k) && looksLikeWords(row[k]); })[0];
+    var text = key ? String(row[key]).trim() : '';
+    // Only human text shows (a space or a capital letter); raw enums such
+    // as "owner" or "not_on_team" are hidden.
+    var human = text.indexOf(' ') !== -1 || text !== text.toLowerCase();
+    return text && human && text.toLowerCase() !== String(label || '').trim().toLowerCase() ? text : '';
+  }
+
+  /**
+   * A breakdown row's label: label or name first, then "Stage (Pipeline)",
+   * a known category field, any *_name or *_label field, the period fields,
+   * then the first plain text field. "Item N" only when the row has no words.
+   */
   function rowLabel(row, index) {
     if (row === null || row === undefined) return 'Item ' + (index + 1);
     if (typeof row !== 'object') return String(row);
-    if (row.service_label === undefined || row.service_label === null || row.service_label === '') {
-      var named = nameField(row);
-      if (named) return String(row[named]);
+    var first = ['service_label', 'label', 'name', 'title', 'display_name'];
+    for (var f = 0; f < first.length; f += 1) {
+      if (hasText(row[first[f]])) return String(row[first[f]]);
     }
+    if (hasText(row.stage) && hasText(row.pipeline)) return String(row.stage) + ' (' + String(row.pipeline) + ')';
+    for (var c = 0; c < CATEGORY_KEYS.length; c += 1) {
+      if (hasText(row[CATEGORY_KEYS[c]])) return String(row[CATEGORY_KEYS[c]]);
+    }
+    var named = nameField(row);
+    if (named) return String(row[named]);
+    var labelled = Object.keys(row).filter(function (k) { return k.length > 6 && k.slice(-6) === '_label' && hasText(row[k]); })[0];
+    if (labelled) return String(row[labelled]);
     for (var i = 0; i < LABEL_KEYS.length; i += 1) {
       var key = LABEL_KEYS[i];
       var value = row[key];
@@ -90,7 +154,114 @@
       if (key === 'key' || key === 'id' || key.slice(-4) === '_key') return sentenceCase(text);
       return dayLabel(text);
     }
-    return 'Item ' + (index + 1);
+    // A cross-tab row (member by meeting type): the first two words fields.
+    var texts = textFields(row);
+    if (texts.length >= 2) return String(row[texts[0]]) + ' · ' + String(row[texts[1]]);
+    return texts.length ? String(row[texts[0]]) : 'Item ' + (index + 1);
+  }
+
+  // Count fields: numbers that are not ids, dates, positions or rates.
+  var NOT_COUNT_WORDS = ['rate', 'pct', 'percent', 'ratio', 'average', 'avg', 'mean', 'position', 'order', 'rank', 'share'];
+
+  function isCountKey(key) {
+    var k = String(key).toLowerCase();
+    if (isIdOrDateKey(k)) return false;
+    for (var i = 0; i < NOT_COUNT_WORDS.length; i += 1) {
+      if (k.indexOf(NOT_COUNT_WORDS[i]) !== -1) return false;
+    }
+    return true;
+  }
+
+  /** A row's value: row.value when it has one, else its first count field (never a rate). */
+  function hasOwn(row, key) {
+    return Object.prototype.hasOwnProperty.call(row, key);
+  }
+
+  function rowValue(row, key) {
+    if (hasOwn(row, key)) return toNumber(row[key]);
+    var keys = Object.keys(row);
+    for (var i = 0; i < keys.length; i += 1) {
+      if (typeof row[keys[i]] === 'number' && isCountKey(keys[i])) return toNumber(row[keys[i]]);
+    }
+    return null;
+  }
+
+  function firstRef(row) {
+    var refs = Array.isArray(row.refs) ? row.refs : [];
+    for (var i = 0; i < refs.length; i += 1) {
+      var r = refs[i];
+      if (r && r.object && r.id !== null && r.id !== undefined && r.id !== '') {
+        var out = { object: String(r.object), id: String(r.id) };
+        if (r.user_id !== null && r.user_id !== undefined && r.user_id !== '') out.user_id = String(r.user_id);
+        return out;
+      }
+    }
+    return null;
+  }
+
+  // A row the server could not rate (status insufficient_data, rate null)
+  // carries value_label, for example "Too few to rate".
+  function rowValueLabel(row) {
+    var text = row.value_label;
+    return typeof text === 'string' && text.trim() !== '' ? text.trim() : null;
+  }
+
+  // metadata.second_line (for example a cohort rate under the main rate):
+  // { label, value (0 to 100 or null), format: 'percentage', numerator,
+  // denominator }. Cards carry it on card.metadata (absent when there is
+  // none); metric detail on current.metadata. Formatted here ("Cohort rate
+  // 42%"); a null value, or any other shape, shows nothing.
+  function secondLine(item) {
+    if (!item || typeof item !== 'object') return '';
+    var holder = item.current && typeof item.current === 'object' ? item.current : item;
+    var line = holder.metadata && holder.metadata.second_line;
+    if (!line || typeof line !== 'object') return '';
+    var value = toNumber(line.value);
+    if (value === null) return '';
+    var text = formatByKind(value, line.format);
+    var label = line.label ? String(line.label).trim() : '';
+    // A label that already says the number ("4 of 47 deals ... no amount")
+    // is not followed by it again.
+    var plain = text.split(',').join('');
+    var formatted = toNumber(plain) === null;
+    if (label && ((formatted && label.indexOf(text) !== -1) || hasWholeNumber(label, plain) || hasWholeNumber(label, String(value)))) return label;
+    return label ? label + ' ' + text : text;
+  }
+
+  // True when the label holds the number as a whole word ("4 of 47", not "40").
+  function hasWholeNumber(label, value) {
+    var target = String(value);
+    var token = '';
+    var found = false;
+    var text = label + ' ';
+    for (var i = 0; i < text.length && !found; i += 1) {
+      var ch = text.charAt(i);
+      var isPart = (ch >= '0' && ch <= '9') || ch === '.' || ch === ',' || (ch.toLowerCase() !== ch.toUpperCase());
+      if (isPart) { token += ch; continue; }
+      if (token) {
+        var clean = token.split(',').join('');
+        if (clean.charAt(clean.length - 1) === '.') clean = clean.slice(0, -1);
+        found = clean === target;
+      }
+      token = '';
+    }
+    return found;
+  }
+
+  function firmCurrency() {
+    var host = typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : {});
+    var utils = host.Lex && host.Lex.Utils;
+    return utils && typeof utils.getFirmCurrency === 'function' ? utils.getFirmCurrency() : 'USD';
+  }
+
+  // A value by its format: currency (the firm's currency), percentage, or
+  // a grouped number.
+  function formatByKind(value, format) {
+    var kind = String(format || '').toLowerCase();
+    if (kind === 'currency') return value.toLocaleString('en-US', { style: 'currency', currency: firmCurrency(), maximumFractionDigits: 0 });
+    if (kind === 'percentage' || kind === 'percent') return round1(value) + '%';
+    if (kind === 'integer' || kind === 'count') return Math.round(value).toLocaleString('en-US');
+    return value.toLocaleString('en-US', { maximumFractionDigits: 1 });
   }
 
   function pctOf(value, max) {
@@ -114,11 +285,24 @@
       // Records whose source value is not mapped yet (Settings > Mappings).
       var muted = !!(row && typeof row === 'object' && (row.not_mapped === true || row.service_key === 'not_mapped' || row.key === 'not_mapped'));
       var isObject = row && typeof row === 'object';
+      var value = isObject ? (actualVsNeeded ? toNumber(row[ACTUAL_KEY]) : rowValue(row, VALUE_KEY)) : toNumber(row);
+      var label = muted ? 'Not mapped' : rowLabel(row, index);
       return {
-        label: muted ? 'Not mapped' : rowLabel(row, index),
-        value: isObject ? toNumber(row[actualVsNeeded ? ACTUAL_KEY : VALUE_KEY]) : toNumber(row),
+        label: label,
+        status: isObject ? rowStatus(row, label) : '',
+        value: value,
         second: isObject && actualVsNeeded ? toNumber(row[NEEDED_KEY]) : null,
         muted: muted,
+        // No number but the server's value_label ("Too few to rate"): show
+        // it in place of the bar, never a 0 bar.
+        valueLabel: isObject && value === null ? rowValueLabel(row) : null,
+        // A bucket the picked dates cut short (partial: true).
+        partial: !!(isObject && row.partial === true),
+        // The value came from a count field, not row.value: card formats
+        // (row_format, value_format) describe value, so they do not apply.
+        inferred: !!(isObject && !actualVsNeeded && !hasOwn(row, VALUE_KEY) && value !== null),
+        // The object this row is (refs[0]): opens the record panel.
+        ref: isObject ? firstRef(row) : null,
       };
     });
     var paired = parsed.some(function (row) { return row.second !== null; });
@@ -128,7 +312,7 @@
       if (row.second !== null && row.second > max) max = row.second;
     });
     var rows = parsed.slice(0, cap).map(function (row) {
-      return {
+      var out = {
         label: row.label,
         value: row.value,
         second: row.second,
@@ -136,9 +320,15 @@
         secondPct: row.second === null ? null : pctOf(row.second, max),
         muted: row.muted,
       };
+      if (row.valueLabel) out.valueLabel = row.valueLabel;
+      if (row.partial) out.partial = true;
+      if (row.ref) out.ref = row.ref;
+      if (row.status) out.status = row.status;
+      return out;
     });
     return {
       empty: false,
+      inferred: parsed.some(function (row) { return row.inferred; }),
       rows: rows,
       paired: paired,
       neededPending: actualVsNeeded && !paired,
@@ -152,15 +342,45 @@
   // integer | percentage) when it sends one, else the card format:
   // currency_breakdown is dollars, table (and the *_count fields) are plain
   // numbers. Returns 'currency' | 'number' | 'percent'.
-  var ROW_FORMATS = { currency: 'currency', integer: 'number', percentage: 'percent' };
+  var ROW_FORMATS = { currency: 'currency', integer: 'number', count: 'number', number: 'number', percentage: 'percent', percent: 'percent' };
   var LIST_VALUE_FORMATS = { currency_breakdown: 'currency', table: 'number' };
+
+  var VALUE_FORMATS = { currency: 'currency', integer: 'number', count: 'number', number: 'number', percentage: 'percent', percent: 'percent' };
+
+  // A value format the server sends for the rows' value: value_format on
+  // the card or in metadata, or the value column's format in row_columns.
+  // Never guessed from field names.
+  function declaredValueFormat(card) {
+    var meta = card.metadata && typeof card.metadata === 'object' ? card.metadata : {};
+    var direct = card.value_format || meta.value_format;
+    if (typeof direct === 'string' && VALUE_FORMATS[direct.toLowerCase()]) return VALUE_FORMATS[direct.toLowerCase()];
+    var column = (Array.isArray(card.row_columns) ? card.row_columns : []).filter(function (c) { return c && c.field === 'value' && c.format; })[0];
+    return column && VALUE_FORMATS[String(column.format).toLowerCase()] ? VALUE_FORMATS[String(column.format).toLowerCase()] : null;
+  }
 
   function listValueFormat(card) {
     var rowFormat = card && typeof card.row_format === 'string' ? ROW_FORMATS[card.row_format.toLowerCase()] : null;
     if (rowFormat) return rowFormat;
+    var declared = card ? declaredValueFormat(card) : null;
+    if (declared) return declared;
     var format = card && card.format;
     if (format && typeof format === 'object') format = format.type || format.style;
     return LIST_VALUE_FORMATS[String(format || '').toLowerCase()] || 'number';
+  }
+
+  // A list whose items are rates or averages has no meaningful sum: the
+  // server says so with formatted_value null, a percentage format, or
+  // metadata.aggregation average | rate. Show the items only, no total.
+  var NO_TOTAL_AGGREGATIONS = { average: true, avg: true, mean: true, rate: true, ratio: true, percentage: true };
+
+  function listHasNoTotal(card) {
+    if (!card || !Array.isArray(card.value)) return false;
+    if (Object.prototype.hasOwnProperty.call(card, 'formatted_value') && card.formatted_value === null) return true;
+    if (listValueFormat(card) === 'percent') return true;
+    var format = card.format && typeof card.format === 'object' ? card.format.type || card.format.style : card.format;
+    if (String(format || '').toLowerCase().indexOf('percent') === 0) return true;
+    var aggregation = card.metadata && card.metadata.aggregation;
+    return !!(aggregation && NO_TOTAL_AGGREGATIONS[String(aggregation).toLowerCase()]);
   }
 
   // ── Comparison arrow ──────────────────────────────────────────
@@ -216,6 +436,42 @@
 
   // ── Sparkline ─────────────────────────────────────────────────
   // Stored history only: fewer than two numbers draws nothing (never a fake line).
+  // ── Long series ───────────────────────────────────────────────
+  // All time can mean thousands of daily points. More than a year of points
+  // is drawn by week, more than three years by month. Counts and money are
+  // summed per bucket; rates, averages and anything else are never summed:
+  // the bucket's last value is drawn.
+  var SUMMED_FORMATS = { currency: true, currency_breakdown: true, integer: true, number: true, count: true };
+
+  function bucketStart(day, grain) {
+    if (grain === 'month') return day.substring(0, 8) + '01';
+    var date = new Date(day + 'T00:00:00Z');
+    if (!isFinite(date.getTime())) return day;
+    var back = (date.getUTCDay() + 6) % 7;
+    return new Date(date.getTime() - back * 86400000).toISOString().substring(0, 10);
+  }
+
+  function bucketSnapshots(snapshots, format) {
+    if (!Array.isArray(snapshots) || snapshots.length <= 366) return snapshots;
+    var grain = snapshots.length > 366 * 3 ? 'month' : 'week';
+    var fmt = format && typeof format === 'object' ? (format.type || format.style) : format;
+    var sum = SUMMED_FORMATS[String(fmt || '').toLowerCase()] === true;
+    var sorted = snapshots.filter(Boolean).map(function (s) {
+      var raw = s.value_numeric !== undefined ? s.value_numeric : s.value;
+      return { day: String(s.period_start || s.captured_at || '').substring(0, 10), v: toNumber(raw) };
+    }).filter(function (p) { return p.day.length === 10 && p.v !== null; })
+      .sort(function (a, b) { return a.day < b.day ? -1 : (a.day > b.day ? 1 : 0); });
+    var out = [];
+    var at = {};
+    sorted.forEach(function (p) {
+      var key = bucketStart(p.day, grain);
+      if (at[key] === undefined) { at[key] = out.length; out.push({ period_start: key, value_numeric: sum ? 0 : p.v }); }
+      var bucket = out[at[key]];
+      bucket.value_numeric = sum ? round1(bucket.value_numeric + p.v) : p.v;
+    });
+    return out;
+  }
+
   function sparkline(snapshots, width, height) {
     if (!Array.isArray(snapshots)) return null;
     var w = width > 0 ? width : 100;
@@ -299,7 +555,50 @@
     return 1 - Math.pow(1 - p, 3);
   }
 
+  // metadata.headline (one sentence) and metadata.callouts shown under a
+  // card. A callout is plain text or { kind, rule, text, metric_key } (the
+  // server's shape); only its text shows, anything without text is ignored.
+  function cardText(card) {
+    var meta = card && card.metadata && typeof card.metadata === 'object' ? card.metadata : {};
+    var clean = function (value) {
+      if (value && typeof value === 'object') value = value.text;
+      return typeof value === 'string' ? value.trim() : '';
+    };
+    return {
+      headline: clean(meta.headline),
+      callouts: (Array.isArray(meta.callouts) ? meta.callouts : []).map(clean).filter(Boolean),
+    };
+  }
+
+  // second_line.link = { metric_key }: the list the second line opens (for
+  // example deal data completeness opening Deals Missing an Amount).
+  function secondLineLink(item) {
+    if (!item || typeof item !== 'object') return null;
+    var holder = item.current && typeof item.current === 'object' ? item.current : item;
+    var line = holder.metadata && holder.metadata.second_line;
+    var link = line && typeof line === 'object' && line.link && typeof line.link === 'object' ? line.link : null;
+    var metricKey = link && typeof link.metric_key === 'string' ? link.metric_key.trim() : '';
+    return metricKey ? { metricKey: metricKey } : null;
+  }
+
+  // metadata.unassigned = { won, lost, decided } (Team Member Conversion):
+  // decided records nobody owns, as a muted footnote; '' when none.
+  function unassignedNote(card) {
+    var u = card && card.metadata && card.metadata.unassigned;
+    if (!u || typeof u !== 'object' || !(toNumber(u.decided) > 0)) return '';
+    var won = toNumber(u.won) || 0;
+    var lost = toNumber(u.lost) || 0;
+    return 'Not assigned to anyone: ' + won.toLocaleString('en-US') + ' won, ' + lost.toLocaleString('en-US') + ' lost';
+  }
+
   return {
+    rowLabel: rowLabel,
+    bucketSnapshots: bucketSnapshots,
+    cardText: cardText,
+    secondLineLink: secondLineLink,
+    unassignedNote: unassignedNote,
+    secondLine: secondLine,
+    listHasNoTotal: listHasNoTotal,
     listBars: listBars,
     listValueFormat: listValueFormat,
     comparisonArrow: comparisonArrow,

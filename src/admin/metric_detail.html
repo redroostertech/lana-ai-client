@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="../css/components.css">
   <link rel="stylesheet" href="../css/tailwind-output.css">
   <link rel="stylesheet" href="../css/admin/insights-dashboard.css">
+  <link rel="stylesheet" href="../css/report-object-panel.css">
   <link rel="stylesheet" href="../css/mini-charts.css">
   <script src="../js/tailwind-loader.js"></script>
   <link rel="stylesheet" href="../css/lex-chat.css">
@@ -47,11 +48,13 @@
           <div class="metric-summary__main">
             <h2 id="metricTitle" class="metric-summary__title">Metric</h2>
             <div id="metricSummaryValue" class="metric-summary__value">-</div>
+            <p id="metricSummarySecondLine" class="metric-summary__second-line" hidden></p>
             <div class="metric-summary__change-row">
               <span id="metricSummaryChange" class="metric-summary__chip" hidden></span>
               <span id="metricSummaryPrior" class="metric-summary__prior"></span>
             </div>
             <p id="metricPeriodLine" class="metric-summary__period">For <span id="metricPeriod"></span></p>
+            <div id="metricFreshness" class="metric-summary__freshness" hidden></div>
           </div>
           <div id="metricSummaryVisual" class="metric-summary__visual" aria-hidden="true"></div>
         </section>
@@ -114,9 +117,15 @@
               <h2>The records behind this number</h2>
               <p id="metricRawDataHelp" class="metric-detail-tab-help">One row per record counted for these dates.</p>
               <p id="metricRawDataTotalNote" class="metric-detail-tab-help" hidden></p>
+              <p id="metricRawDataBasis" class="metric-detail-tab-help" hidden></p>
+              <p id="metricRawDataAsOf" class="metric-detail-tab-help" hidden></p>
             </div>
             <span id="metricRawDataSectionCount" class="metric-detail-toolbar__count" aria-live="polite"></span>
           </div>
+          <p id="metricRawDataConflicts" class="metric-record-conflicts" role="status" hidden></p>
+          <p id="metricRawDataSortNote" class="metric-detail-tab-help" role="status" hidden></p>
+          <!-- Filters the link opened the records with (a month bar), each removable. -->
+          <div id="metricRawDataLinkFilters" class="metric-link-filters" hidden></div>
           <div id="metricRawDataUnavailable" hidden></div>
           <div id="metricRawDataToolbar" class="metric-detail-toolbar" role="search" aria-label="Search source records">
             <lex-input id="metricRawDataSearch" class="metric-detail-toolbar__search" placeholder="Search records..." clearable="true" leading-icon="search"></lex-input>
@@ -187,6 +196,11 @@
   <script src="../js/shared/metric-card-view.js"></script>
   <script src="../js/shared/mini-charts.js"></script>
   <script src="../js/shared/metric-detail-view.js"></script>
+  <script src="../js/shared/dashboard-period.js"></script>
+  <script src="../js/lex/components/foundation/lex-drawer.js"></script>
+  <script src="../js/shared/report-objects.js"></script>
+  <script src="../js/shared/data-fixes.js"></script>
+  <script src="../js/shared/report-object-panel.js"></script>
   <script src="../js/shared/lineage-view.js"></script>
   <script src="../js/shared/insights-breadcrumbs.js"></script>
   <script src="../js/admin/metric-detail.js"></script>

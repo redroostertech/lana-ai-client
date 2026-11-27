@@ -1,0 +1,286 @@
+{
+ "_note": "GET /api/v1/report-objects/:object/:id payloads in the backend's final contract shapes (synthetic values).",
+ "person": {
+  "object": "person",
+  "id": "p-1",
+  "title": "Avery Stone",
+  "facts": [
+   {
+    "label": "Email",
+    "value": "avery@example.test",
+    "format": "email"
+   },
+   {
+    "label": "Phone",
+    "value": "+1 555 0100",
+    "format": "phone"
+   },
+   {
+    "label": "Password hash",
+    "value": "abc123",
+    "format": "text"
+   },
+   {
+    "label": "Role",
+    "value": "Attorney",
+    "format": "text"
+   }
+  ],
+  "lana_account": {
+   "state": "Invited, not signed in yet",
+   "user_id": "u-9",
+   "role": "Member",
+   "title": "Associate",
+   "invited_at": "2026-10-02T15:04:00Z",
+   "account_created_at": "2026-10-02T15:04:00Z",
+   "activated_at": null,
+   "last_signed_in_at": null,
+   "password": "never-show",
+   "reset_token": "never-show"
+  },
+  "linked_accounts": [
+   {
+    "person_id": "p-1",
+    "connector_id": "leadly",
+    "connection_id": "conn-7",
+    "connection_name": "Leadly (Main office)",
+    "external_user_id": "ld-77",
+    "display_name": "Avery S.",
+    "email": "avery@leadly.example",
+    "linked_to_lana": true,
+    "matched_by": "email",
+    "matched_at": "2026-10-03T12:00:00Z",
+    "api_key": "never-show"
+   },
+   {
+    "person_id": "p-1",
+    "connector_id": "actionstep",
+    "connection_id": "conn-2",
+    "connection_name": "ActionStep",
+    "external_user_id": "as-5",
+    "display_name": "Avery Stone",
+    "email": null,
+    "linked_to_lana": true,
+    "matched_by": "name",
+    "matched_at": "2026-10-03T12:00:00Z"
+   }
+  ],
+  "activity": [
+   {
+    "label": "Meetings held",
+    "value": 12,
+    "format": "number"
+   },
+   {
+    "label": "Meetings missed",
+    "value": 1,
+    "format": "number"
+   },
+   {
+    "label": "Messages sent",
+    "value": null,
+    "format": "number"
+   },
+   {
+    "label": "Deals owned",
+    "value": 4,
+    "format": "number"
+   }
+  ],
+  "links": [
+   {
+    "object": "deal",
+    "id": "d-1",
+    "label": "Smith Estate Plan"
+   }
+  ],
+  "activity_period": {
+   "period_start": "2026-11-01",
+   "period_end": "2026-11-30"
+  },
+  "activity_note": "Messages show once message history has synced."
+ },
+ "deal": {
+  "object": "deal",
+  "id": "d-1",
+  "title": "Smith Estate Plan",
+  "facts": [
+   {
+    "label": "Amount",
+    "value": 4500,
+    "format": "currency"
+   },
+   {
+    "label": "Stage",
+    "value": "won",
+    "format": "status"
+   },
+   {
+    "label": "Won on",
+    "value": "2026-11-03",
+    "format": "date"
+   },
+   {
+    "label": "Win rate",
+    "value": 42.5,
+    "format": "percent"
+   }
+  ],
+  "timeline": [
+   {
+    "occurred_at": "2026-10-01T14:00:00Z",
+    "label": "Lead came in from Referral",
+    "event_kind": "lead_created",
+    "actor": null,
+    "actor_kind": "client",
+    "actor_label": "Jordan Smith",
+    "by_owner": false,
+    "detail": "Referred by a past client",
+    "other_people": [],
+    "refs": [
+     {
+      "object": "contact",
+      "id": "c-1"
+     }
+    ]
+   },
+   {
+    "occurred_at": "2026-10-05T16:30:00Z",
+    "label": "Consultation held",
+    "event_kind": "meeting_held",
+    "actor": {
+     "object": "person",
+     "id": "p-1",
+     "user_id": "u-9",
+     "label": "Avery Stone"
+    },
+    "actor_kind": "team",
+    "actor_label": "Avery Stone",
+    "by_owner": true,
+    "detail": null,
+    "other_people": [
+     {
+      "object": "person",
+      "id": "p-2",
+      "user_id": null,
+      "label": "Blake Ross"
+     }
+    ],
+    "refs": [
+     {
+      "object": "appointment",
+      "id": "ap-3"
+     }
+    ]
+   },
+   {
+    "occurred_at": "2026-11-03T10:00:00Z",
+    "label": "Marked as won",
+    "event_kind": "stage_change",
+    "actor": null,
+    "actor_kind": "not_recorded",
+    "actor_label": null,
+    "by_owner": false,
+    "detail": null,
+    "other_people": [],
+    "refs": []
+   }
+  ],
+  "contributors": [
+   {
+    "person": {
+     "object": "person",
+     "id": "p-1",
+     "user_id": "u-9",
+     "label": "Avery Stone"
+    },
+    "did": [
+     {
+      "label": "Held meetings",
+      "count": 2
+     },
+     {
+      "label": "Booked meetings",
+      "count": 1
+     }
+    ],
+    "is_owner": true,
+    "is_follower": false,
+    "lana_access": true,
+    "refs": []
+   },
+   {
+    "person": {
+     "object": "person",
+     "id": "p-2",
+     "user_id": null,
+     "label": "Blake Ross"
+    },
+    "did": [
+     {
+      "label": "Booked meetings",
+      "count": 3
+     }
+    ],
+    "is_owner": false,
+    "is_follower": true,
+    "lana_access": false,
+    "refs": []
+   }
+  ],
+  "links": [
+   {
+    "object": "contact",
+    "id": "c-1",
+    "label": "Jordan Smith"
+   }
+  ]
+ },
+ "contact": {
+  "object": "contact",
+  "id": "c-1",
+  "title": "Jordan Smith",
+  "facts": [
+   {
+    "label": "Email",
+    "value": "jordan@example.test",
+    "format": "email"
+   },
+   {
+    "label": "Source",
+    "value": "Referral",
+    "format": "text"
+   }
+  ],
+  "links": [
+   {
+    "object": "deal",
+    "id": "d-1",
+    "label": "Smith Estate Plan"
+   }
+  ]
+ },
+ "restricted_deal": {
+  "object": "deal",
+  "id": "d-9",
+  "title": "J. S. Estate",
+  "facts": [
+   {
+    "label": "Amount",
+    "value": 4500,
+    "format": "currency"
+   },
+   {
+    "label": "Email",
+    "value": null,
+    "format": "email"
+   },
+   {
+    "label": "Phone",
+    "value": "",
+    "format": "phone"
+   }
+  ],
+  "links": []
+ }
+}

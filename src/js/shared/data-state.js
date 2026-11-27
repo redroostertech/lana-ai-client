@@ -101,12 +101,15 @@
     }
     var calmTitle = calm ? CALM_TITLES[state] : null;
     var notMapped = state === 'not_mapped';
+    // Settings > Mappings is for admins and org admins only.
+    var auth = global.Lex && global.Lex.Auth;
+    var canMap = !!(auth && typeof auth.isAdmin === 'function' && auth.isAdmin());
     return {
       state: state,
       title: calmTitle || TITLES[state],
       reason: item.data_state_reason || (notMapped ? 'Map your case types to see this number.' : (state === 'no_data' ? NO_DATA_REASON : '')),
       waiting: !!calmTitle,
-      action: notMapped && calm ? { label: 'Open Mappings', href: MAPPINGS_PAGE } : null
+      action: notMapped && calm && canMap ? { label: 'Open Mappings', href: MAPPINGS_PAGE } : null
     };
   }
 
@@ -131,6 +134,55 @@
       + '</div></div>';
   }
 
+  // ── Freshness ──────────────────────────────────────────────────
+  // item.freshness = { stale, as_of, systems, label } or null. A small calm
+  // badge only when the server says the data is stale, in its own words.
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  function dayText(value) {
+    var text = String(value || '');
+    if (text.length < 10 || text.charAt(4) !== '-' || text.charAt(7) !== '-') return '';
+    var month = Number(text.substring(5, 7));
+    var day = Number(text.substring(8, 10));
+    if (!(month >= 1 && month <= 12) || !(day >= 1 && day <= 31)) return '';
+    return MONTHS[month - 1] + ' ' + day + ', ' + text.substring(0, 4);
+  }
+
+  function freshnessText(item) {
+    var freshness = item && item.freshness;
+    if (!freshness || typeof freshness !== 'object' || freshness.stale !== true) return '';
+    if (freshness.label) return String(freshness.label);
+    var day = dayText(freshness.as_of);
+    return day ? 'Data as of ' + day : 'Data may be out of date';
+  }
+
+  function freshnessBadge(item) {
+    var text = freshnessText(item);
+    return text ? '<span class="lex-freshness" title="' + escapeHtml(text) + '">' + escapeHtml(text) + '</span>' : '';
+  }
+
+  // ── Hidden comparison ──────────────────────────────────────────
+  // item.comparison_hidden = { reason, message, as_of, systems }: the server
+  // withheld the comparison (comparison and prior are null). Its message
+  // goes where the comparison would be, never a 0% or a dash.
+  var HIDDEN_COMPARISON = {
+    source_stale: 'No comparison: the data source has not synced recently.',
+    insufficient_history: 'No comparison yet: there is not enough history.',
+    records_end: 'No comparison: the records stop before these dates.'
+  };
+
+  function comparisonHiddenText(item) {
+    var hidden = item && item.comparison_hidden;
+    if (!hidden || typeof hidden !== 'object') return '';
+    if (hidden.message) return String(hidden.message);
+    return HIDDEN_COMPARISON[hidden.reason] || 'No comparison for these dates.';
+  }
+
+  function comparisonNote(item) {
+    var text = comparisonHiddenText(item);
+    return text ? '<p class="lex-comparison-hidden">' + escapeHtml(text) + '</p>' : '';
+  }
+
   // Display label for a backend enum value ("monthly" -> "Monthly",
   // "in_review" -> "In review").
   function label(value) {
@@ -138,5 +190,5 @@
     return text ? text.charAt(0).toUpperCase() + text.slice(1) : EMPTY_VALUE;
   }
 
-  global.DataState = { EMPTY_VALUE: EMPTY_VALUE, TITLES: TITLES, isProblem: isProblem, fromApiError: fromApiError, view: view, goalAction: goalAction, render: render, label: label, escapeHtml: escapeHtml };
+  global.DataState = { EMPTY_VALUE: EMPTY_VALUE, comparisonHiddenText: comparisonHiddenText, comparisonNote: comparisonNote, freshnessText: freshnessText, freshnessBadge: freshnessBadge, TITLES: TITLES, isProblem: isProblem, fromApiError: fromApiError, view: view, goalAction: goalAction, render: render, label: label, escapeHtml: escapeHtml };
 })(window);

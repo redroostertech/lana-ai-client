@@ -9,6 +9,13 @@
 (function () {
   'use strict';
 
+  // The firm's currency (Lex.Utils.getFirmCurrency, from /auth/me), else USD.
+  function firmCurrency() {
+    var host = typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : {});
+    var utils = host.Lex && host.Lex.Utils;
+    return utils && typeof utils.getFirmCurrency === 'function' ? utils.getFirmCurrency() : 'USD';
+  }
+
   // Shared with the other Reports page (reports-list.model.js).
   var ReportsList = window.ReportsList;
 
@@ -99,7 +106,7 @@
     if (value === null || value === undefined) return EMPTY;
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: firmCurrency(),
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     }).format(value);
@@ -277,22 +284,9 @@
     if (currentDataSources.length === 0) {
       list.innerHTML = '<p class="text-sm text-gray-500 text-center py-4">No data sources found</p>';
     } else {
-      currentDataSources.forEach(function (connector) {
-        var connectorCard = document.createElement('div');
-        connectorCard.className = 'flex items-center gap-3 p-3 border border-gray-200 rounded-lg bg-white hover:bg-gray-50 transition-colors';
-        connectorCard.innerHTML = '<div class="flex-shrink-0">' +
-          '<svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>' +
-          '</svg></div>' +
-          '<div class="flex-1 min-w-0">' +
-          '<p class="text-sm font-medium text-gray-900 truncate">' + (connector.name || connector.connectorType) + '</p>' +
-          '<p class="text-xs text-gray-500">' + (connector.connectorType || '') + '</p>' +
-          '</div>' +
-          '<div class="flex-shrink-0">' +
-          '<span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Active</span>' +
-          '</div>';
-        list.appendChild(connectorCard);
-      });
+      // Each source leads with what it holds (its entities), then its name
+      // and its last sync (ReportBuilder.dataSourceHtml).
+      list.innerHTML = currentDataSources.map(function (source) { return window.ReportBuilder.dataSourceHtml(source); }).join('');
     }
 
     modal.classList.remove('hidden');
@@ -546,15 +540,16 @@
 
     var sortedData = metric.current.slice().sort(function (a, b) { return (b.count || 0) - (a.count || 0); });
     var labels = sortedData.map(function (item) { return item.label || 'Unknown'; });
-    var counts = sortedData.map(function (item) { return item.count || 0; });
-    var percentages = sortedData.map(function (item) { return parseFloat(item.value) || 0; });
+    // Gaps stay gaps (js/shared/chart-points.js): no bar, no made-up 0%.
+    var counts = sortedData.map(function (item) { return window.ChartPoints.value(item.count); });
+    var percentages = sortedData.map(function (item) { return window.ChartPoints.value(item.value); });
 
     var backgroundColors = labels.map(function (_, i) {
       var intensity = 1 - (i / labels.length) * 0.5;
       return 'rgba(99, 102, 241, ' + intensity + ')';
     });
 
-    var maxCount = Math.max.apply(null, counts);
+    var maxCount = Math.max.apply(null, counts.map(function (n) { return n || 0; }));
 
     var chart = new Chart(ctx, {
       type: 'bar',
@@ -579,8 +574,8 @@
             callbacks: {
               label: function (context) {
                 var count = context.parsed.x || 0;
-                var percentage = percentages[context.dataIndex] || 0;
-                return count + ' leads (' + percentage + '%)';
+                var percentage = percentages[context.dataIndex];
+                return count + ' leads' + (percentage === null ? '' : ' (' + percentage + '%)');
               }
             }
           }
@@ -1510,8 +1505,9 @@
         data: {
           labels: metrics.map(function (m) { return m.name; }),
           datasets: [
-            { label: 'Current Period', data: metrics.map(function (m) { return parseFloat(m.current) || 0; }), backgroundColor: '#3b82f6', borderColor: '#2563eb', borderWidth: 1 },
-            { label: 'Prior Period', data: metrics.map(function (m) { return parseFloat(m.prior) || 0; }), backgroundColor: '#9ca3af', borderColor: '#6b7280', borderWidth: 1 }
+            // A null value draws no bar (js/shared/chart-points.js); a real 0 stays 0.
+            { label: 'Current Period', data: metrics.map(function (m) { return window.ChartPoints.value(m.current); }), backgroundColor: '#3b82f6', borderColor: '#2563eb', borderWidth: 1 },
+            { label: 'Prior Period', data: metrics.map(function (m) { return window.ChartPoints.value(m.prior); }), backgroundColor: '#9ca3af', borderColor: '#6b7280', borderWidth: 1 }
           ]
         },
         options: {
@@ -1979,7 +1975,8 @@
 
     var renderer = new BarChartRenderer(containerDiv, {
       labels: chartData.map(function (d) { return d.label || 'Unknown'; }),
-      values: chartData.map(function (d) { return d.value || 0; })
+      // A null bucket (an empty average or rate) draws no bar, never a 0.
+      values: chartData.map(function (d) { return window.ChartPoints.value(d.value); })
     }, {
       title: viz.title, description: viz.description, orientation: 'horizontal',
       metricName: metric.name, unit: metric.unit,
@@ -2294,14 +2291,14 @@
               distributionSeries = groups.map(function (g, i) {
                 return {
                   label: g,
-                  data: rows.map(function (r) { return (r.touch_type === g) ? (parseFloat(r.count) || parseFloat(r.value) || 0) : 0; }),
+                  data: rows.map(function (r) { return (r.touch_type === g) ? window.ChartPoints.firstValue(r.count, r.value) : null; }),
                   backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#ef4444'][i % 4]
                 };
               });
             } else {
               distributionSeries = [{
                 label: soleMetric.unit || 'count',
-                data: rows.map(function (r) { return parseFloat(r.count) || parseFloat(r.value) || 0; }),
+                data: rows.map(function (r) { return window.ChartPoints.firstValue(r.count, r.value); }),
                 backgroundColor: '#6366f1'
               }];
             }
@@ -2335,7 +2332,8 @@
         : (viz.series || []).map(function (serie) {
             return {
               label: serie.label,
-              data: rows.map(function (row) { return parseFloat(row[serie.field]) || 0; }),
+              // Null (for example CAC or ROMS with no spend) draws no bar.
+              data: rows.map(function (row) { return window.ChartPoints.value(row[serie.field]); }),
               backgroundColor: serie.color, borderColor: serie.color, borderWidth: 1
             };
           });

@@ -131,7 +131,7 @@ describe('breakdownHtml: columns for up to 12 rows, horizontal bars beyond', () 
     expect(html.split('class="mini-cols__bar"').length - 1).toBe(2);
     expect(html).toContain('rx="');
     expect(html).toContain('>6</text>');
-    expect(html).toContain('<title>Estate Planning: 6</title>');
+    expect(html).toContain('data-tip="Estate Planning · 6"');
     expect(html).toContain('mini-cols__grid');
     expect(html).not.toContain('style=');
   });
@@ -144,7 +144,7 @@ describe('breakdownHtml: columns for up to 12 rows, horizontal bars beyond', () 
 
   test('long labels are shortened to fit, the full label stays in the tooltip', () => {
     const html = Charts.breakdownHtml(View.listBars(rows(12).map((r) => Object.assign(r, { service_label: 'A very long service offering name' })), 12), fmt);
-    expect(html).toContain('<title>A very long service offering name: 1</title>');
+    expect(html).toContain('data-tip="A very long service offering name · 1"');
     expect(html).toContain('...</text>');
   });
 
@@ -158,8 +158,8 @@ describe('breakdownHtml: columns for up to 12 rows, horizontal bars beyond', () 
     const html = Charts.breakdownHtml(View.listBars([{ service_label: 'A', actual_count: 4, needed_count: 8 }, { service_label: 'B', actual_count: 2, needed_count: null }], 12), fmt);
     expect(html.split('mini-cols__bar--second').length - 1).toBe(1);
     expect(html).toContain('mini-bars__legend');
-    expect(html).toContain('<title>A: 4 of 8</title>');
-    expect(html).toContain('<title>B: 2</title>');
+    expect(html).toContain('data-tip="A · Actual 4 · Needed 8"');
+    expect(html).toContain('data-tip="B · 2"');
   });
 
   test('an empty model draws nothing', () => {
@@ -319,4 +319,210 @@ test('a muted (Not mapped) column is styled apart and opens its own link', () =>
   const html = Charts.breakdownHtml(model, fmt, { href: () => 'detail' });
   expect(html).toContain('mini-cols__group mini-cols__group--muted');
   expect(html).toContain('data-metric-detail-link="settings-v2.html#mappings"');
+});
+
+describe('server labels in place of bars', () => {
+  const fmtPct = (n) => (n === null ? 'n/a' : n + '%');
+  test('columns show "Too few to rate" in muted text and no bar, never a 0 bar', () => {
+    const model = View.listBars([{ label: 'Referral', value: 40 }, { label: 'Web', value: null, value_label: 'Too few to rate' }], 12);
+    const html = Charts.breakdownHtml(model, fmtPct, {});
+    const web = html.split('<g class="mini-cols__group').find((g) => g.includes('Web'));
+    expect(web).toContain('Too few to rate');
+    expect(web).toContain('mini-cols__value--note');
+    expect(web).not.toContain('class="mini-cols__bar');
+    expect(web).not.toContain('n/a');
+  });
+  test('horizontal bars do the same', () => {
+    const rows = Array.from({ length: 13 }, (_, i) => ({ label: 'R' + i, value: i + 1 }));
+    rows[2] = { label: 'Thin', value: null, value_label: 'Too few to rate' };
+    const model = View.listBars(rows, 8);
+    const html = Charts.breakdownHtml(model, fmtPct, {});
+    const thin = html.split('<li class="mini-bars__row').find((li) => li.includes('Thin'));
+    expect(thin).toContain('Too few to rate');
+    expect(thin).not.toContain('mini-bars__fill');
+  });
+});
+
+describe('partial buckets are marked quietly', () => {
+  test('columns: a lighter bar and "(partial)" in the tooltip', () => {
+    const model = View.listBars([{ label: 'Q3', value: 4 }, { label: 'Q4', value: 2, partial: true }], 12);
+    const html = Charts.breakdownHtml(model, fmt, {});
+    const q4 = html.split('<g class="mini-cols__group').find((g) => g.includes('Q4'));
+    expect(q4.startsWith(' mini-cols__group--partial')).toBe(true);
+    expect(q4).toContain('data-tip="Q4 (partial) · 2"');
+    expect(q4).toContain('mini-cols__bar mini-cols__bar--partial');
+    const q3 = html.split('<g class="mini-cols__group').find((g) => g.includes('Q3'));
+    expect(q3).not.toContain('partial');
+  });
+  test('horizontal bars: a lighter bar and "(partial)" after the label', () => {
+    const rows = Array.from({ length: 13 }, (_, i) => ({ label: 'R' + i, value: i + 1 }));
+    rows[0] = { label: 'This week', value: 3, partial: true };
+    const html = Charts.breakdownHtml(View.listBars(rows, 8), fmt, {});
+    const row = html.split('<li class="mini-bars__row').find((li) => li.includes('This week'));
+    expect(row).toContain('mini-bars__partial">(partial)</span>');
+    expect(row).toContain('mini-bars__fill mini-bars__fill--partial');
+  });
+});
+
+describe('a daily series draws as compact columns', () => {
+  const days = Array.from({ length: 30 }, (_, i) => ({ period_start: '2026-10-' + String(i + 1).padStart(2, '0'), value: i % 4 }));
+  test('30 days: every day a column, a few date labels, no value text crowding, no blank list', () => {
+    const model = View.listBars(days, 62);
+    model.series = true;
+    const html = Charts.breakdownHtml(model, String, {});
+    expect(html).toContain('class="mini-cols');
+    expect(html).not.toContain('mini-bars');
+    expect(html.split('<g class="mini-cols__group').length - 1).toBe(30);
+    const labels = html.split('class="mini-cols__label"').length - 1;
+    expect(labels).toBeGreaterThan(3);
+    expect(labels).toBeLessThan(10);
+    expect(html.split('class="mini-cols__value"').length - 1).toBe(0);
+    expect(html).toContain('data-tip="Oct 2, 2026 · 1"');
+  });
+});
+
+test('ranked bars: initials from the name only, status as a muted suffix', () => {
+  const html = Charts.rankedHtml([{ label: 'Taylor Vance', status: 'Owner', value: 3, pct: 100 }, { label: 'Unassigned', value: 2, pct: 50 }], { initials: true, format: (r) => String(r.value) });
+  expect(html).toContain('>TV<');
+  expect(html).toContain('Taylor Vance</button> <span class="mini-rank__status">Owner</span>');
+  expect(html).toContain('>U<');
+});
+
+test('compact date columns: short day labels that fit, never an ellipsis', () => {
+  const days = Array.from({ length: 30 }, (_, i) => ({ period_start: new Date(Date.UTC(2026, 9, 29) + i * 86400000).toISOString().slice(0, 10), value: 1 }));
+  const model = View.listBars(days, 62);
+  model.series = true;
+  const html = Charts.breakdownHtml(model, String, {});
+  const labels = html.split('class="mini-cols__label"').slice(1).map((p) => p.split('>')[1].split('<')[0]);
+  expect(labels[0]).toBe('Oct 29');
+  expect(labels.every((l) => l.indexOf('...') === -1 && l.indexOf('…') === -1)).toBe(true);
+  expect(labels.some((l) => l.startsWith('Nov '))).toBe(true);
+});
+
+test('grouped columns draw up to 3 series per row with a legend', () => {
+  const model = { empty: false, grouped: true, seriesLabels: ['Held', 'No-show', 'Cancelled'], hiddenCount: 0,
+    rows: [{ label: 'Avery Stone', values: [29, 30, 8], pcts: [96.7, 100, 26.7] }, { label: 'Blake Ross', values: [10, 1, 1], pcts: [33.3, 3.3, 3.3] }] };
+  const html = Charts.breakdownHtml(model, String, {});
+  expect(html).toContain('>Held<');
+  expect(html).toContain('>No-show<');
+  expect(html).toContain('>Cancelled<');
+  const avery = html.split('<g class="mini-cols__group').find((g) => g.includes('Avery'));
+  expect(avery.split('class="mini-cols__bar ').length - 1).toBe(3);
+  expect(avery).toContain('mini-cols__bar--s2');
+  expect(avery).toContain('data-tip="Avery Stone · Held 29 · No-show 30 · Cancelled 8"');
+});
+
+test('month columns: short ticks, every one when they fit, every few when not, never an ellipsis; the tooltip keeps the full label', () => {
+  const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const rows = (n) => Array.from({ length: n }, (_, i) => ({ label: names[i % 12] + ' ' + (2025 + Math.floor(i / 12)), tick: i === 0 ? 'Older' : names[i % 12],
+    value: i + 1, pct: 50, second: null, secondPct: 0, tip: 'Full ' + i }));
+  const labels = (html) => html.split('class="mini-cols__label"').length - 1;
+  const thirteen = Charts.columnsHtml({ rows: rows(13), paired: false, seriesLabels: [], allLabels: true }, String, {});
+  expect(labels(thirteen)).toBe(13);
+  expect(thirteen).toContain('>Older<');
+  expect(thirteen).toContain('>Feb<');
+  expect(thirteen).not.toContain('...');
+  expect(thirteen).toContain('data-tip="Full 1"');
+  const wide = Charts.columnsHtml({ rows: rows(24), paired: false, seriesLabels: [], allLabels: true }, String, {});
+  expect(labels(wide)).toBeLessThan(24);
+  expect(labels(wide)).toBeGreaterThan(5);
+  expect(wide).not.toContain('...');
+});
+
+test('date axes: monthly labels read as three letters, days as "Oct 29", never cut with an ellipsis', () => {
+  const series = (labels) => ({ rows: labels.map((label, i) => ({ label, value: i + 1, pct: 50, second: null, secondPct: 0 })), paired: false, seriesLabels: [], series: true });
+  const months = Charts.columnsHtml(series(['September 2026', 'October 2026', 'November 2026', 'December 2026', 'January 2027', 'February 2027', 'March 2027', 'April 2027', 'May 2027', 'June 2027']), String, {});
+  expect(months).toContain('>Sep<');
+  expect(months).toContain('>Jan<');
+  expect(months).not.toContain('...');
+  expect(months).toContain('data-tip="January 2027 · 5"');
+  const shortMonths = Charts.columnsHtml(series(['Oct 2026', 'Nov 2026', '2026-12']), String, {});
+  expect(shortMonths).toContain('>Oct<');
+  expect(shortMonths).toContain('>Dec<');
+  const days = Charts.columnsHtml(series(['Oct 29, 2026', 'Oct 30, 2026', 'Oct 31, 2026']), String, {});
+  expect(days).toContain('>Oct 29<');
+  expect(days).not.toContain('...');
+  expect(Charts.dateTick('Estate Planning')).toBeNull();
+});
+
+describe('column charts: y axis, x baseline, and a value on hover or focus', () => {
+  const col = (label, value, max) => ({ label, value, pct: Math.round((value / max) * 1000) / 10, second: null, secondPct: 0 });
+  const ticks = (html) => html.split('class="mini-cols__tick"').slice(1).map((p) => p.split('>')[1].split('<')[0]);
+  test('a thin y axis with 3 to 4 ticks from 0, gridlines only at the ticks, counts like "1,000"', () => {
+    const html = Charts.columnsHtml({ rows: [col('A', 42, 42), col('B', 18, 42)], paired: false, seriesLabels: [] }, String, { axis: 'number' });
+    expect(html).toContain('class="mini-cols__axis"');
+    expect(ticks(html)).toEqual(['0', '20', '40', '60']);
+    expect(html.split('class="mini-cols__gridline"').length - 1).toBe(3);
+    expect(html).toContain('class="mini-cols__baseline"');
+    const big = Charts.columnsHtml({ rows: [col('A', 2600, 2600)], paired: false, seriesLabels: [] }, String, { axis: 'number' });
+    expect(ticks(big)).toContain('1,000');
+  });
+  test('money ticks in short form, averages with their unit', () => {
+    const money = Charts.columnsHtml({ rows: [col('A', 2100000, 2100000), col('B', 120000, 2100000)], paired: false, seriesLabels: [] }, String, { axis: 'currency' });
+    expect(ticks(money)).toEqual(['0', '$1M', '$2M', '$3M']);
+    const small = Charts.columnsHtml({ rows: [col('A', 1400000, 1400000)], paired: false, seriesLabels: [] }, String, { axis: 'currency' });
+    expect(ticks(small)).toContain('$500K');
+    const days = Charts.columnsHtml({ rows: [col('A', 53, 53)], paired: false, seriesLabels: [] }, String, { axis: 'days' });
+    expect(ticks(days)).toContain('20 days');
+  });
+  test('bars are drawn against the axis top, not the largest bar', () => {
+    const html = Charts.columnsHtml({ rows: [col('A', 42, 42)], paired: false, seriesLabels: [] }, String, { axis: 'number' });
+    // 42 of an axis to 60 on an 86-unit plot.
+    expect(html).toContain('height="60.2"');
+  });
+  test('every column is a hover and focus target with its full words, even a 1 px bar', () => {
+    const html = Charts.columnsHtml({ rows: [col('October 2026', 400, 400), Object.assign(col('November 2026', 1, 400), { tip: 'November 2026 · 1 matter' })], paired: false, seriesLabels: [] }, String, { axis: 'number' });
+    expect(html).not.toContain('<title>');
+    expect(html).toContain('data-tip="November 2026 · 1 matter"');
+    expect(html).toContain('aria-label="November 2026 · 1 matter"');
+    const nov = html.split('<g class="mini-cols__group').find((g) => g.includes('November 2026'));
+    expect(nov).toContain('tabindex="0"');
+    expect(nov).toContain('class="mini-cols__hit"');
+    expect(nov.split('class="mini-cols__hit"')[1]).toContain('height="90"');
+  });
+  test('value text over a column only when it fits; hover keeps the value', () => {
+    const many = Array.from({ length: 13 }, (_, i) => col('M' + i, 1900000, 1900000));
+    const html = Charts.columnsHtml({ rows: many, paired: false, seriesLabels: [], allLabels: true }, (n) => '$' + n.toLocaleString('en-US'), { axis: 'currency' });
+    expect(html).not.toContain('class="mini-cols__value"');
+    const few = Charts.columnsHtml({ rows: [col('A', 42, 42), col('B', 18, 42)], paired: false, seriesLabels: [] }, String, { axis: 'number' });
+    expect(few).toContain('>42</text>');
+  });
+  test('no axis when every value is 0 or the caller turns it off', () => {
+    expect(Charts.columnsHtml({ rows: [col('A', 0, 1)], paired: false, seriesLabels: [] }, String, { axis: 'number' })).not.toContain('mini-cols__axis');
+    expect(Charts.columnsHtml({ rows: [col('A', 5, 5)], paired: false, seriesLabels: [] }, String, { axis: false })).not.toContain('mini-cols__axis');
+  });
+});
+
+describe('bindTips: the hover and focus tooltip', () => {
+  const { JSDOM } = require('jsdom');
+  test('hovering or focusing a column shows its words; leaving hides them', () => {
+    const dom = new JSDOM('<!doctype html><body><div id="root"><div class="mini-cols"><svg><g class="mini-cols__group" tabindex="0" data-tip="October 2026 · 12 deals"><rect></rect></g></svg></div></div></body>');
+    const w = dom.window;
+    const root = w.document.getElementById('root');
+    Charts.bindTips(root);
+    const group = root.querySelector('.mini-cols__group');
+    group.dispatchEvent(new w.MouseEvent('mouseover', { bubbles: true }));
+    const tip = root.querySelector('.mini-tip');
+    expect(tip.textContent).toBe('October 2026 · 12 deals');
+    expect(tip.hidden).toBe(false);
+    expect(tip.getAttribute('role')).toBe('tooltip');
+    group.dispatchEvent(new w.MouseEvent('mouseout', { bubbles: true }));
+    expect(tip.hidden).toBe(true);
+    group.dispatchEvent(new w.FocusEvent('focusin', { bubbles: true }));
+    expect(tip.hidden).toBe(false);
+    group.dispatchEvent(new w.FocusEvent('focusout', { bubbles: true }));
+    expect(tip.hidden).toBe(true);
+    // Binding twice adds no second set of listeners.
+    Charts.bindTips(root);
+    expect(root.querySelectorAll('.mini-tip').length).toBe(1);
+  });
+});
+
+test('axis and tooltip styles: light axis on the hero card, tokens for dark mode, a tooltip box', () => {
+  const fs = require('fs');
+  const css = fs.readFileSync(path.join(__dirname, '../../src/css/mini-charts.css'), 'utf8');
+  const dash = fs.readFileSync(path.join(__dirname, '../../src/css/admin/insights-dashboard.css'), 'utf8');
+  for (const cls of ['.mini-cols__axis', '.mini-cols__tick', '.mini-cols__gridline', '.mini-cols__hit', '.mini-tip']) expect(css).toContain(cls + ' {');
+  expect(dash).toContain('.dash-metric-card--hero .mini-cols__axis');
+  expect(dash).toContain('.dash-metric-card--hero .mini-cols__tick');
 });

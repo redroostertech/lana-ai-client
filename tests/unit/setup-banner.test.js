@@ -10,9 +10,9 @@ const fs = require('fs');
 const path = require('path');
 const sample = require(path.join(__dirname, '../fixtures/mappings/mappings-sample.json'));
 
-function load(summaryResult) {
+function load(summaryResult, admin = true) {
   const node = { hidden: true, innerHTML: '' };
-  const window = { api: { getMappingSummary: jest.fn(() => summaryResult) } };
+  const window = { api: { getMappingSummary: jest.fn(() => summaryResult) }, Lex: { Auth: { isAdmin: () => admin } } };
   const document = { getElementById: (id) => (id === 'lanaSetupBanner' ? node : null) };
   for (const rel of ['js/settings-mappings.model.js', 'js/shared/setup-banner.js']) {
     new Function('window', 'document', fs.readFileSync(path.join(__dirname, '../../src', rel), 'utf8'))(window, document);
@@ -71,4 +71,12 @@ describe('feature off or failing: hidden, quiet, one request', () => {
     await window.LanaSetupBanner.summary();
     expect(window.api.getMappingSummary.mock.calls[0][0].quietStatuses).toEqual(expect.arrayContaining([404, 422, 500]));
   });
+});
+
+test('only admins and org admins see the banner; others get no banner and no request', async () => {
+  const { window, node } = load(Promise.resolve({ data: sample.summary }), false);
+  await window.LanaSetupBanner.mount('lanaSetupBanner');
+  expect(node.hidden).toBe(true);
+  expect(node.innerHTML).toBe('');
+  expect(window.api.getMappingSummary).not.toHaveBeenCalled();
 });

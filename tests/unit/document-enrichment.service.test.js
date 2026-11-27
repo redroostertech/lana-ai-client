@@ -149,3 +149,145 @@ describe('document enrichment api wrappers', () => {
     ]);
   });
 });
+
+describe('signed engagement letter: fees, payment steps and signing', () => {
+  const base = { enabled: true, enrichment: { id: 'enr-9', status: 'completed', classification: { document_type: 'signed_engagement_letter', confidence: 0.9 } } };
+  const sug = (id, kind, proposed, source, extra) => Object.assign({ id, target_kind: kind, status: 'suggested', proposed, evidence: { quote: 'Total fee: $4,500.' }, source }, extra);
+  const payload = Object.assign({}, base, { suggestions: [
+    sug('f1', 'fee', { field: 'total_fee', value: 4500, format: 'currency' }, { kind: 'read_from_document', confidence: 0.92 }),
+    sug('f2', 'fee', { field: 'initial_maintenance_year', value: 2027, format: 'number' }, { kind: 'matches_draft', confidence: 0.9 }),
+    sug('f3', 'fee', { field: 'plan_type', value: 'Revocable trust', format: 'text' }, { kind: 'from_draft_not_read', confidence: 0.4 }),
+    sug('p1', 'payment', { payment_type: 'deposit', amount: 1500, due_date: '2026-12-01', due_date_basis: 'on_date', due_date_basis_label: 'On the date set', estimated: false }, { kind: 'read_from_document', confidence: 0.8 }),
+    sug('p2', 'payment', { payment_type: 'final', amount: 1000, due_date: null, due_date_basis: 'plan_signing', due_date_basis_label: 'When the estate plan is signed', estimated: true }, { kind: 'matches_draft', confidence: 0.7 }),
+    sug('s1', 'engagement_signed', { signed_on: '2026-11-20' }, { kind: 'read_from_document', confidence: 0.95 }),
+    sug('c1', 'contact', { displayName: 'Avery Stone' }, { confidence: 0.9 }),
+  ] });
+
+  test('the view model labels each field, step and signing in plain words, with the source', () => {
+    const vm = enrichment.viewModel(payload);
+    const byId = Object.fromEntries(vm.suggestions.open.map((r) => [r.id, r]));
+    expect(byId.f1).toMatchObject({ reviewGroup: 'fee', title: 'Total fee', detail: '$4,500', verb: 'Save fee', sourceNote: '', evidence: 'Total fee: $4,500.', confidence: 'High confidence' });
+    expect(byId.f2).toMatchObject({ title: 'First maintenance year', detail: '2027', sourceNote: 'Matches the draft letter', evidence: '' });
+    expect(byId.f3).toMatchObject({ title: 'Plan type', detail: 'Revocable trust', sourceNote: 'From the draft; not found in the signed copy', sourceWarning: true });
+    expect(byId.p1).toMatchObject({ reviewGroup: 'payment', title: 'Deposit', detail: '$1,500 · Due Dec 1, 2026', verb: 'Save payment step' });
+    expect(byId.p2).toMatchObject({ title: 'Final payment', detail: '$1,000 · When the estate plan is signed · Estimated' });
+    expect(byId.s1).toMatchObject({ reviewGroup: 'engagement_signed', title: 'Engagement signed', detail: 'Signed Nov 20, 2026', verb: 'Mark signed' });
+    expect(byId.f1.editors).toEqual([{ name: 'value', label: 'Total fee', format: 'currency', value: '4500' }]);
+    expect(byId.p1.editors).toEqual([{ name: 'amount', label: 'Amount', format: 'currency', value: '1500' }, { name: 'due_date', label: 'Due date', format: 'date', value: '2026-12-01' }]);
+    expect(byId.s1.editors).toEqual([{ name: 'signed_on', label: 'Signed on', format: 'date', value: '2026-11-20' }]);
+    expect(byId.c1.reviewGroup).toBe('');
+  });
+
+  test('the panel shows Fees, Payment steps and Engagement signed, each editable before saving; the draft-only warning stands out', () => {
+    const html = enrichment.renderPanelHtml(enrichment.viewModel(payload));
+    expect(html.indexOf('>Fees<')).toBeGreaterThan(-1);
+    expect(html.indexOf('>Payment steps<')).toBeGreaterThan(-1);
+    expect(html).toContain('>Engagement signed<');
+    expect(html).toContain('data-enrichment-override="value" data-override-format="currency"');
+    expect(html).toContain('type="number"');
+    expect(html).toContain('data-enrichment-override="due_date" data-override-format="date"');
+    expect(html).toContain('type="date"');
+    expect(html).toContain('data-target-kind="payment"');
+    expect(html).toContain('>Save fee</lex-btn>');
+    expect(html).toContain('>Mark signed</lex-btn>');
+    expect(html).toContain('class="file-viewer-insights__source file-viewer-insights__source--warning" role="note">From the draft; not found in the signed copy');
+    expect(html).toContain('Matches the draft letter');
+    // The contact stays in the general Suggestions list.
+    expect(html).toContain('>Suggestions <');
+  });
+
+  test('edited values become the accept overrides: numbers for money, a day or null for dates, text as typed', () => {
+    expect(enrichment.readOverrides([{ name: 'value', format: 'currency', value: '$4,750.50' }])).toEqual({ value: 4750.5 });
+    expect(enrichment.readOverrides([{ name: 'amount', format: 'currency', value: '1500' }, { name: 'due_date', format: 'date', value: '' }])).toEqual({ amount: 1500, due_date: null });
+    expect(enrichment.readOverrides([{ name: 'value', format: 'text', value: ' Revocable trust ' }])).toEqual({ value: 'Revocable trust' });
+    expect(enrichment.readOverrides([{ name: 'value', format: 'number', value: 'abc' }])).toEqual({ value: null });
+  });
+
+  test('the edited inputs of one item are read from the page; a payment sends its basis and estimate', () => {
+    const vm = enrichment.viewModel(payload);
+    const rowOf = (id) => vm.suggestions.open.find((r) => r.id === id);
+    const itemWith = (amount, due) => {
+      const inputs = [{ attrs: { 'data-enrichment-override': 'amount', 'data-override-format': 'currency' }, value: amount },
+        { attrs: { 'data-enrichment-override': 'due_date', 'data-override-format': 'date' }, value: due }];
+      inputs.forEach((i) => { i.getAttribute = (k) => i.attrs[k]; });
+      return { querySelectorAll: (sel) => (sel === '[data-enrichment-override]' ? inputs : []) };
+    };
+    // No date set: the server's basis and estimate go back as they were.
+    expect(enrichment.collectOverrides(itemWith('1000', ''), rowOf('p2'))).toEqual({ amount: 1000, due_date: null, due_date_basis: 'plan_signing', estimated: true });
+    // The person sets a date: on_date, and no longer estimated.
+    expect(enrichment.collectOverrides(itemWith('1000', '2027-01-15'), rowOf('p2'))).toEqual({ amount: 1000, due_date: '2027-01-15', due_date_basis: 'on_date', estimated: false });
+    // The server's own date, unchanged: its basis and estimate go back as they were.
+    expect(enrichment.collectOverrides(itemWith('1500', '2026-12-01'), rowOf('p1'))).toEqual({ amount: 1500, due_date: '2026-12-01', due_date_basis: 'on_date', estimated: false });
+    const estimatedDate = enrichment.viewModel(Object.assign({}, base, { suggestions: [{ id: 'p9', target_kind: 'payment', status: 'suggested',
+      proposed: { payment_type: 'payment_2', amount: 800, due_date: '2027-02-01', due_date_basis: 'months_after_signing', due_date_basis_label: 'Two months after signing', estimated: true },
+      source: { kind: 'matches_draft', confidence: 0.6 }, evidence: null }] })).suggestions.open[0];
+    expect(enrichment.collectOverrides(itemWith('800', '2027-02-01'), estimatedDate)).toEqual({ amount: 800, due_date: '2027-02-01', due_date_basis: 'months_after_signing', estimated: true });
+    // A changed date is fixed by the person.
+    expect(enrichment.collectOverrides(itemWith('800', '2027-03-01'), estimatedDate)).toEqual({ amount: 800, due_date: '2027-03-01', due_date_basis: 'on_date', estimated: false });
+    expect(enrichment.collectOverrides(null)).toEqual({});
+  });
+
+  test('fields are read from suggestion.proposed only', () => {
+    const vm = enrichment.viewModel(Object.assign({}, base, { suggestions: [{ id: 'x', target_kind: 'fee', status: 'suggested', field: 'total_fee', value: 9, format: 'currency', source: { kind: 'matches_draft' } }] }));
+    expect(vm.suggestions.open[0]).toMatchObject({ title: 'Fee', detail: '' });
+  });
+
+  test('accept sends overrides, and overwrite: true when the person chose to replace', async () => {
+    const api = makeApi();
+    await enrichment.accept(api, 'M-1', 'D-1', 'f1', { value: 4500 }, { overwrite: true });
+    expect(api.calls[0].payload).toEqual({ overrides: { value: 4500 }, overwrite: true });
+  });
+
+  test("a 409 VALUE_CONFLICT gives each field: the saved value with who set it, and this letter's value", () => {
+    const vm = enrichment.viewModel(payload);
+    const fee = vm.suggestions.open.find((r) => r.id === 'f1');
+    const step = vm.suggestions.open.find((r) => r.id === 'p1');
+    const conflict = (conflicts) => Object.assign(new Error('Conflict'), { status: 409, code: 'VALUE_CONFLICT', data: { error: { code: 'VALUE_CONFLICT', details: { conflicts } } } });
+    expect(enrichment.conflictOf(conflict([{ field: 'value', current_value: 5000, current_source: 'person', current_set_by_name: 'Avery Stone', current_set_at: '2026-11-02T15:00:00Z', incoming_value: 4500 }]), fee))
+      .toEqual({ items: [{ label: '', current: '$5,000 (by Avery Stone on Nov 2, 2026)', incoming: '$4,500' }] });
+    expect(enrichment.conflictOf(conflict([
+      { field: 'amount', current_value: 1200, current_source: 'synced', incoming_value: 1500 },
+      { field: 'due_date', current_value: '2026-11-30', current_source: 'lana', incoming_value: '2026-12-01' }]), step))
+      .toEqual({ items: [
+        { label: 'Amount', current: '$1,200 (from your connected system)', incoming: '$1,500' },
+        { label: 'Due date', current: 'Nov 30, 2026 (set by LANA)', incoming: 'Dec 1, 2026' }] });
+    expect(enrichment.conflictOf(Object.assign(new Error('x'), { status: 409, code: 'OTHER', data: {} }), fee)).toBeNull();
+    expect(enrichment.conflictOf(Object.assign(new Error('x'), { status: 500 }), fee)).toBeNull();
+  });
+
+  test('a conflict shows both values with "Replace with this" and "Keep the current value"', () => {
+    const vm = enrichment.viewModel(payload);
+    const html = enrichment.renderPanelHtml(vm, { conflicts: { f1: { items: [{ label: '', current: '$5,000 (by Avery Stone on Nov 2, 2026)', incoming: '$4,500' }] } } });
+    const item = html.split('data-suggestion-id="f1"').slice(1).join('data-suggestion-id="f1"').split('</li>')[0];
+    expect(item).toContain('Already saved: $5,000 (by Avery Stone on Nov 2, 2026)');
+    expect(item).toContain('This letter: $4,500');
+    expect(item).toContain('data-enrichment-action="overwrite"');
+    expect(item).toContain('>Replace with this</lex-btn>');
+    expect(item).toContain('data-enrichment-action="keep"');
+    expect(item).toContain('>Keep the current value</lex-btn>');
+  });
+
+  test('the page saves notes per kind and wires the conflict actions', () => {
+    const notes = enrichment.acceptedNote;
+    expect(notes('fee')).toBe('Fee saved.');
+    expect(notes('payment')).toBe('Payment step saved.');
+    expect(notes('engagement_signed')).toBe('Marked signed.');
+    expect(notes('contact', 'contact')).toBe('Contact added.');
+    expect(notes('deadline', 'calendar_event')).toBe('Deadline added to the calendar.');
+    expect(notes('other', '')).toBe('Suggestion accepted.');
+  });
+});
+
+describe('fee and payment amounts use the firm currency, with cents only when there are some', () => {
+  afterEach(() => { delete global.Lex; });
+  const fee = (value) => enrichment.viewModel({ enabled: true, enrichment: { id: 'e', status: 'completed' },
+    suggestions: [{ id: 'f', target_kind: 'fee', status: 'suggested', proposed: { field: 'total_fee', value, format: 'currency' }, source: { kind: 'matches_draft' } }] }).suggestions.open[0].detail;
+  test('the firm currency from Lex.Utils.getFirmCurrency', () => {
+    global.Lex = { Utils: { getFirmCurrency: () => 'GBP' } };
+    expect(fee(4500)).toBe('\u00a34,500');
+  });
+  test('USD when there is no firm currency; cents kept when the amount has them', () => {
+    expect(fee(4500)).toBe('$4,500');
+    expect(fee(4500.5)).toBe('$4,500.50');
+  });
+});

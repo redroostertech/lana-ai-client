@@ -33,12 +33,18 @@ test('blank values use the shared empty token', () => {
   expect(exports.formatPercentage(null)).toBe(EMPTY);
 });
 
-test('a tile with no current or prior value shows the empty token, never N/A', () => {
+test('a tile with no current or prior value is the calm "No data for these dates", never N/A or the empty token', () => {
   const { exports, window } = page();
   const html = exports.renderMetricCardBody({ key: 'c', name: 'Count', type: 'count', current: null, prior: null, data_state: 'ok' });
-  expect(text(html)).toContain('Current Period ' + window.DataState.EMPTY_VALUE);
-  expect(text(html)).toContain('Prior Period ' + window.DataState.EMPTY_VALUE);
+  expect(text(html)).toContain('No data for these dates');
+  expect(text(html)).not.toContain('Current Period ' + window.DataState.EMPTY_VALUE);
   expect(html).not.toContain('N/A');
+});
+
+test('a tile with a current value and no prior still shows the empty token for prior', () => {
+  const { exports, window } = page();
+  const html = exports.renderMetricCardBody({ key: 'c', name: 'Count', type: 'count', current: 3, prior: null, data_state: 'ok' });
+  expect(text(html)).toContain('Prior Period ' + window.DataState.EMPTY_VALUE);
 });
 
 describe('tile buttons run through one delegated listener', () => {

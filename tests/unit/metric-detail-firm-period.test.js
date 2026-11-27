@@ -244,3 +244,60 @@ describe('records the server could not read (raw_data.rows_status)', () => {
     expect(p.nodes.metricRawDataTable.hidden).toBe(false);
   });
 });
+
+describe('freshness on metric detail', () => {
+  test('stale data (data.lineage.freshness) shows the server label as a badge by the period', async () => {
+    const p = await page('?metric_key=matters_opened', { ...payload,
+      lineage: { sources: [], formula: { kind: 'count', plain: 'x' }, freshness: { stale: true, label: 'Data from ActionStep API as of Aug 10, 2026' } } });
+    expect(p.nodes.metricFreshness.hidden).toBe(false);
+    expect(p.nodes.metricFreshness.innerHTML).toContain('Data from ActionStep API as of Aug 10, 2026');
+  });
+  test('freshness anywhere but data.lineage.freshness is not read', async () => {
+    const stale = { stale: true, label: 'Old' };
+    const p = await page('?metric_key=matters_opened', { ...payload, freshness: stale, current: { value: 4, freshness: stale } });
+    expect(p.nodes.metricFreshness.hidden).toBe(true);
+    expect(p.nodes.metricFreshness.innerHTML).toBe('');
+  });
+});
+
+test('metric detail shows the hidden-comparison message in place of the change', async () => {
+  const p = await page('?metric_key=matters_opened', { ...payload, current: { value: 4, format: 'integer' }, movement: null, comparison: null,
+    comparison_hidden: { reason: 'insufficient_history', message: 'No comparison yet: there is not enough history.' } });
+  expect(p.nodes.metricSummaryChange.hidden).toBe(true);
+  expect(p.nodes.metricSummaryPrior.textContent).toBe('No comparison yet: there is not enough history.');
+  expect(p.nodes.metricSummaryVisual.innerHTML).toBe('');
+});
+
+test('metric detail shows metadata.second_line as a muted line under the value', async () => {
+  const p = await page('?metric_key=matters_opened', { ...payload, current: { value: 42, format: 'integer', metadata: { second_line: { label: 'Cohort rate', value: 31, format: 'percentage', numerator: 31, denominator: 100 } } } });
+  expect(p.nodes.metricSummarySecondLine.hidden).toBe(false);
+  expect(p.nodes.metricSummarySecondLine.textContent).toBe('Cohort rate 31%');
+  const none = await page('?metric_key=matters_opened', payload);
+  expect(none.nodes.metricSummarySecondLine.hidden).toBe(true);
+});
+
+describe('records table: notes, header and server order', () => {
+  const rows = [{ record_id: 'r-1', row_date: '2026-11-20', row_reason: 'Won on Nov 20 with no amount.', client_name: 'Jordan Smith', amount: null,
+    conflict: { fields: [{ standard_key: 'amount', lana_value: 4500, new_source_value: 3000 }] } }];
+  test('the Notes column shows the reason, a conflict badge with both values, and the fixed mark', async () => {
+    const p = await page('?metric_key=matters_opened', { ...payload, as_of: '2026-11-24', raw_data: { rows, rows_basis: { label: 'Deals won between Nov 1 and Nov 30, 2026' },
+      conflicts: { count: 1, message: '1 record disagrees with what your CRM says now.' }, pinned_count: 1, corrected_count: 0 } });
+    const table = p.nodes.metricRawDataTable;
+    expect(table.attrs.columns).toBe('row_date,client_name,_notes');
+    const notes = table.renderers._notes(null, rows[0]);
+    expect(notes).toContain('Won on Nov 20 with no amount.');
+    expect(notes).toContain('<span class="metric-record-badge metric-record-badge--conflict">Conflict</span>');
+    expect(notes).toContain('Amount: LANA $4,500, source $3,000');
+    expect(table.renderers._notes(null, { fixed_in_lana: { fields: ['amount'] } })).toContain('<span class="metric-record-badge metric-record-badge--fixed">Fixed in LANA</span>');
+    expect(p.nodes.metricRawDataAsOf.textContent).toBe('As of Nov 24, 2026');
+    expect(p.nodes.metricRawDataBasis.textContent).toBe('Deals won between Nov 1 and Nov 30, 2026');
+    expect(p.nodes.metricRawDataConflicts.hidden).toBe(false);
+    expect(p.nodes.metricRawDataConflicts.textContent).toBe('1 record disagrees with what your CRM says now. 1 shown first.');
+  });
+});
+
+test('a conflict in the Notes cell names its source', async () => {
+  const rows = [{ record_id: 'r-1', row_date: '2026-11-20', client_name: 'A', conflict: { source_name: 'ActionStep', fields: [{ standard_key: 'amount', lana_value: 4500, new_source_value: 3000 }] } }];
+  const p = await page('?metric_key=matters_opened', { ...payload, raw_data: { rows } });
+  expect(p.nodes.metricRawDataTable.renderers._notes(null, rows[0])).toContain('Amount: LANA $4,500, ActionStep $3,000');
+});

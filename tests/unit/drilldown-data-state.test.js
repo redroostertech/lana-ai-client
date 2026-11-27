@@ -86,3 +86,25 @@ describe('fetchData', () => {
     expect(r.render).not.toHaveBeenCalled();
   });
 });
+
+describe('empty drilldown lists use the definition empty state', () => {
+  test('data.empty_state: title and message', () => {
+    expect(DrilldownRenderer.emptyText({ rows: [], empty_state: { title: 'No Bills Due This Week', message: 'No open bills have a due date in the next 7 days.' } }, false))
+      .toBe('No Bills Due This Week. No open bills have a due date in the next 7 days.');
+    expect(DrilldownRenderer.emptyText({ empty_state: { title: 'No Active Matters', message: null } }, false)).toBe('No Active Matters');
+    expect(DrilldownRenderer.emptyText({ empty_state: { title: null, message: 'No matters found for this time period.' } }, false)).toBe('No matters found for this time period.');
+    expect(DrilldownRenderer.emptyText({ empty_state: { title: 'Nothing due!', message: 'All paid.' } }, false)).toBe('Nothing due! All paid.');
+  });
+  test('falls back to data.data_state_reason, then the generic text', () => {
+    expect(DrilldownRenderer.emptyText({ rows: [], data_state_reason: 'There are no records for these dates.' }, false)).toBe('There are no records for these dates.');
+    expect(DrilldownRenderer.emptyText({ empty_state: { title: null, message: null }, data_state_reason: 'Reason' }, false)).toBe('Reason');
+    expect(DrilldownRenderer.emptyText({ rows: [] }, false)).toBe('No data found');
+    expect(DrilldownRenderer.emptyText(null, false)).toBe('No data found');
+  });
+  test('a search or filter with no match keeps the filter wording', () => {
+    expect(DrilldownRenderer.emptyText({ empty_state: { title: 'X', message: 'Y' } }, true)).toBe('No matching records. Try a different search or clear the filters.');
+  });
+  test('the table empty text comes from it', () => {
+    expect(fs.readFileSync(path.join(__dirname, '../../src/js/drilldown-renderer.js'), 'utf8')).toContain('table.emptyText = DrilldownRenderer.emptyText(this.currentData, filtered);');
+  });
+});

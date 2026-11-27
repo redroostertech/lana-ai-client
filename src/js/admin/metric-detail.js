@@ -3,6 +3,13 @@
 (function () {
   'use strict';
 
+  // The firm's currency (Lex.Utils.getFirmCurrency, from /auth/me), else USD.
+  function firmCurrency() {
+    var host = typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : {});
+    var utils = host.Lex && host.Lex.Utils;
+    return utils && typeof utils.getFirmCurrency === 'function' ? utils.getFirmCurrency() : 'USD';
+  }
+
   function el(id) { return document.getElementById(id); }
 
   // Blank stats and cells use the shared empty token (js/shared/data-state.js).
@@ -52,11 +59,12 @@
     if (!isFinite(numeric)) return value == null ? EMPTY : String(value);
     if (numeric === 0) return EMPTY;
     if (format === 'currency') {
-      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(numeric);
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: firmCurrency(), maximumFractionDigits: 0 }).format(numeric);
     }
     if (format === 'percent' || format === 'percentage') {
       return numeric.toFixed(1) + '%';
     }
+    if (format === 'integer' || format === 'count') return Math.round(numeric).toLocaleString('en-US');
     return formatNumber(numeric);
   }
 
@@ -122,9 +130,39 @@
   // row carries one (js/shared/metric-detail-view.js).
   var MUTED_DASH = '<span class="metric-detail-muted">-</span>';
 
+  // The Notes cell: the row's reason, a conflict badge with both values,
+  // and a "Fixed in LANA" mark (MetricDetailView.rowNotes).
+  function notesHtml(row) {
+    var notes = view().rowNotes(row);
+    var parts = [];
+    if (notes.conflict) {
+      // A pinned conflict that does not match the search or filters is muted.
+      parts.push((notes.outsideSearch
+        ? '<span class="metric-record-badge metric-record-badge--outside">Conflict, outside your search</span> '
+        : '<span class="metric-record-badge metric-record-badge--conflict">Conflict</span> ')
+        + notes.conflict.fields.map(function (f) {
+          return '<span class="metric-record-conflict">' + escapeHtml(f.label + ': LANA ' + (f.lana || 'blank') + ', ' + (f.sourceName || 'source') + ' ' + (f.source || 'blank')) + '</span>';
+        }).join(' '));
+    }
+    if (notes.fixed) parts.push('<span class="metric-record-badge metric-record-badge--fixed">Fixed in LANA</span>');
+    if (notes.reason) parts.push('<span class="metric-record-reason">' + escapeHtml(notes.reason) + '</span>');
+    // Fix data in LANA, when the row has hints and the person may use them.
+    var fix = window.DataFixes ? window.DataFixes.controlsHtml(row, currentPermissions) : '';
+    if (fix) parts.push(fix);
+    return parts.length ? '<span class="metric-record-notes">' + parts.join(' ') + '</span>' : MUTED_DASH;
+  }
+
+  // The signed-in person's { can_correct, can_resolve_conflicts } from the
+  // metric detail response.
+  var currentPermissions = null;
+
   function recordRenderers(columns) {
     var renderers = {};
     columns.forEach(function (col) {
+      if (col.type === 'notes') {
+        renderers[col.key] = function (value, row) { return notesHtml(row); };
+        return;
+      }
       renderers[col.key] = function (value, row) {
         var text = view().formatCell(value, col);
         if (text === null) return MUTED_DASH;
@@ -196,9 +234,12 @@
       if (range) filterMap[col.key] = range;
     });
     table.setColumnFilterOptions(filterMap);
-    var sortOptions = model.columns.map(function (col) { return { value: col.key, label: col.label }; });
+    var sortOptions = model.columns.filter(function (col) { return col.type !== 'notes'; }).map(function (col) { return { value: col.key, label: col.label }; });
     var firstDate = model.columns.filter(function (c) { return c.type === 'date' || c.type === 'datetime'; })[0];
-    var defaultSort = firstDate ? firstDate.key : (model.columns[0] ? model.columns[0].key : '');
+    // Rows the server already sorted (newest first, conflicts pinned on top)
+    // keep its order.
+    var serverOrder = view().keepsServerOrder(sourceRows);
+    var defaultSort = serverOrder ? '' : (firstDate ? firstDate.key : (model.columns[0] ? model.columns[0].key : ''));
     var defaultDir = firstDate ? 'desc' : 'asc';
     setSelectOptions('metricRawDataSort', sortOptions, defaultSort);
     var order = el('metricRawDataSortOrder');
@@ -214,6 +255,7 @@
         counts: ['metricRawDataCount', 'metricRawDataSectionCount']
       }, { noun: ['record', 'records'], defaultSort: defaultSort });
       table.addEventListener('lex-filter-change', empty);
+      bindRecordRows(table);
     }
     empty();
     table.setData((Array.isArray(sourceRows) ? sourceRows : []).map(view().recordsRow));
@@ -225,11 +267,165 @@
     toolbars.raw.updateCount();
   }
 
+  // A record row opens the record panel (js/shared/report-object-panel.js),
+  // and its fix controls work (js/shared/data-fixes.js). Bound once.
+  function bindRecordRows(table) {
+    if (table._recordRowsBound) return;
+    table._recordRowsBound = true;
+    table.addEventListener('row-click', function (event) {
+      var row = event.detail && event.detail.row;
+      var ref = row && window.ReportObjects ? window.ReportObjects.primaryRef(row) : null;
+      if (!ref || !window.LanaRecordPanel) return;
+      var qp = params();
+      window.LanaRecordPanel.open(ref, { period: { start: qp.get('periodStart') || '', end: qp.get('periodEnd') || '' }, row: row,
+        permissions: currentPermissions, onSaved: onFixSaved });
+    });
+    if (window.DataFixes) window.DataFixes.bind(table, { onSaved: onFixSaved });
+  }
+
+  // ── Records on the server (search, sort, filters, paging) ──────────
+  // When metric detail's raw_data carries filtered_total, facets, sort or
+  // filters, the table asks the server: search waits about 300 ms, and an
+  // answer to an older query is ignored.
+  var rowsQuery = { search: '', sortBy: '', sortDir: 'desc', filters: {}, page: 1, limit: 20 };
+  // Filters from the link (raw_filter[col]=value), kept beside the table's
+  // own filters until their chip is removed.
+  var linkFilters = {};
+
+  function withLinkFilters(request) {
+    var merged = Object.assign({}, linkFilters, request.rawFilters || {});
+    if (Object.keys(merged).length) request.rawFilters = merged;
+    else delete request.rawFilters;
+    return request;
+  }
+
+  function renderLinkFilters() {
+    var box = el('metricRawDataLinkFilters');
+    if (!box) return;
+    var cols = Object.keys(linkFilters);
+    box.innerHTML = cols.map(function (col) {
+      var words = view().linkFilterText(col, linkFilters[col]);
+      return '<button type="button" class="metric-link-filters__chip" data-remove-link-filter="' + escapeHtml(col) + '" aria-label="Remove the filter ' + escapeHtml(words) + '">'
+        + '<span>' + escapeHtml(words) + '</span><span class="metric-link-filters__x" aria-hidden="true">\u00d7</span></button>';
+    }).join('');
+    box.hidden = !cols.length;
+    if (box._linkFiltersBound) return;
+    box._linkFiltersBound = true;
+    box.addEventListener('click', function (event) {
+      var chip = event.target && event.target.closest ? event.target.closest('[data-remove-link-filter]') : null;
+      if (!chip) return;
+      var col = chip.getAttribute('data-remove-link-filter');
+      delete linkFilters[col];
+      var change = {};
+      change['raw_filter[' + col + ']'] = null;
+      if (Lex.Nav && Lex.Nav.updateParams) Lex.Nav.updateParams(change);
+      renderLinkFilters();
+      rowsQuery.page = 1;
+      fetchServerRows();
+    });
+  }
+  var rowsToken = 0;
+  var searchTimer = null;
+  var lastDetail = null;
+
+  function renderServerRows(payload) {
+    var table = el('metricRawDataTable');
+    if (!table || typeof table.setServerData !== 'function') return;
+    var raw = payload.raw_data || {};
+    var rows = Array.isArray(raw.rows) ? raw.rows : [];
+    var model = view().recordsTable(rows, payload.row_columns);
+    if (model.columns.length) {
+      table.setAttribute('columns', model.columns.map(function (c) { return c.key; }).join(','));
+      table.setAttribute('labels', model.columns.map(function (c) { return c.label; }).join(','));
+    }
+    table.setCellRenderers(recordRenderers(model.columns));
+    table.setAttribute('server-paging', '');
+    table.setColumnFilterOptions(view().facetFilterOptions(raw.facets));
+    table.setServerData(rows.map(view().recordsRow), { page: rowsQuery.page, limit: rowsQuery.limit, total: Number(raw.filtered_total) || rows.length });
+    var count = view().rowsCountText(raw, rows.length);
+    ['metricRawDataCount', 'metricRawDataSectionCount'].forEach(function (id) {
+      var node = el(id);
+      if (node) node.textContent = count;
+    });
+    var truncated = el('metricRawDataTotalNote');
+    if (truncated) {
+      truncated.textContent = view().truncatedText(raw);
+      truncated.hidden = !truncated.textContent;
+    }
+    bindServerRows(table);
+    bindRecordRows(table);
+  }
+
+  function bindServerRows(table) {
+    if (table._serverRowsBound) return;
+    table._serverRowsBound = true;
+    table.addEventListener('lex-query-change', function (event) {
+      var q = event.detail || {};
+      rowsQuery.page = Number(q.page) || 1;
+      if (q.limit) rowsQuery.limit = Number(q.limit) || rowsQuery.limit;
+      if (q.sortBy) {
+        rowsQuery.sortBy = q.sortBy;
+        rowsQuery.sortDir = q.sortDir === 'asc' ? 'asc' : 'desc';
+        var sortNote = el('metricRawDataSortNote');
+        if (sortNote) { sortNote.textContent = ''; sortNote.hidden = true; }
+      }
+      if (q.filters) rowsQuery.filters = q.filters;
+      fetchServerRows();
+    });
+    var search = el('metricRawDataSearch');
+    if (search) {
+      search.addEventListener('lex-input', function (event) {
+        var value = event.detail && event.detail.value !== undefined ? String(event.detail.value) : '';
+        if (searchTimer) clearTimeout(searchTimer);
+        searchTimer = setTimeout(function () {
+          searchTimer = null;
+          rowsQuery.search = value;
+          rowsQuery.page = 1;
+          fetchServerRows();
+        }, 300);
+      });
+    }
+  }
+
+  function fetchServerRows() {
+    if (!lastDetail) return;
+    var token = ++rowsToken;
+    var request = withLinkFilters(Object.assign({}, lastDetail.periodParams, view().rowsRequestParams(rowsQuery)));
+    api.getMetricDetail(lastDetail.metricKey, request).then(function (response) {
+      if (token !== rowsToken) return;
+      var payload = response && response.data ? response.data : response;
+      currentRows = payload && payload.raw_data && Array.isArray(payload.raw_data.rows) ? payload.raw_data.rows : [];
+      renderServerRows(payload || {});
+    }, function (err) {
+      if (token !== rowsToken) return;
+      // An unknown sort column (400): say so calmly and use the usual order.
+      if (err && err.status === 400 && rowsQuery.sortBy) {
+        rowsQuery.sortBy = '';
+        var note = el('metricRawDataSortNote');
+        if (note) {
+          note.textContent = 'That column cannot be sorted here, so the records are in their usual order.';
+          note.hidden = false;
+        }
+        fetchServerRows();
+        return;
+      }
+      var node = el('metricRawDataCount');
+      if (node) node.textContent = 'Could not load the records. Try again.';
+    });
+  }
+
   // The summary card: value with its unit, the change both ways, the prior
   // period's days, and a small comparison (or the trend when history exists).
   function renderSummary(payload, snapshots) {
     var summary = view().summary(payload);
     setText('metricSummaryValue', summary.value);
+    // metadata.second_line (for example a cohort rate): a muted line under the value.
+    var second = el('metricSummarySecondLine');
+    if (second) {
+      var secondText = window.MetricCardView ? window.MetricCardView.secondLine(payload) : '';
+      second.textContent = secondText;
+      second.hidden = !secondText;
+    }
     var valueNode = el('metricSummaryValue');
     if (valueNode) valueNode.className = 'metric-summary__value' + (summary.noData ? ' metric-summary__value--empty' : '');
     var chip = el('metricSummaryChange');
@@ -241,7 +437,7 @@
     var prior = el('metricSummaryPrior');
     if (prior) {
       var days = view().dayRangeText(summary.priorDays);
-      prior.textContent = summary.priorText ? summary.priorText + (days ? ' (' + days + ')' : '') : '';
+      prior.textContent = summary.hiddenText || (summary.priorText ? summary.priorText + (days ? ' (' + days + ')' : '') : '');
     }
     var visual = el('metricSummaryVisual');
     if (!visual) return;
@@ -261,9 +457,9 @@
   }
 
   // History shows only with at least two stored values; otherwise nothing.
-  function renderHistory(snapshots) {
+  function renderHistory(snapshots, drawn) {
     var section = el('metricHistorySection');
-    var line = window.MetricCardView ? window.MetricCardView.sparkline(snapshots, 100, 24) : null;
+    var line = window.MetricCardView ? window.MetricCardView.sparkline(drawn || snapshots, 100, 24) : null;
     if (section) section.hidden = !line;
     var chart = el('metricHistoryChart');
     if (chart) chart.innerHTML = line && window.MiniCharts ? window.MiniCharts.sparklineSvg(line) : '';
@@ -276,7 +472,7 @@
   function metricHref(key) {
     var qp = params();
     var parts = ['metric_key=' + encodeURIComponent(key)];
-    ['periodStart', 'periodEnd', 'compareBy', 'from', 'dashboardId'].forEach(function (name) {
+    ['asOf', 'periodStart', 'periodEnd', 'compareBy', 'from', 'dashboardId'].forEach(function (name) {
       if (qp.get(name)) parts.push(name + '=' + encodeURIComponent(qp.get(name)));
     });
     return 'admin/metric_detail.html?' + parts.join('&');
@@ -368,7 +564,8 @@
     inputs.forEach(function (input) {
       if (!input.metric_key || inputValues[input.metric_key] !== undefined) return;
       inputValues[input.metric_key] = '';
-      api.getMetricDetail(input.metric_key, { periodStart: qp.get('periodStart') || undefined, periodEnd: qp.get('periodEnd') || undefined, rawLimit: 0 })
+      api.getMetricDetail(input.metric_key, qp.get('asOf') ? { asOf: qp.get('asOf'), rawLimit: 0 }
+        : { periodStart: qp.get('periodStart') || undefined, periodEnd: qp.get('periodEnd') || undefined, rawLimit: 0 })
         .then(function (response) {
           var payload = response && response.data ? response.data : response;
           var current = (payload && payload.current) || {};
@@ -438,6 +635,36 @@
     if (status && total) total.hidden = true;
   }
 
+  // Above the records: "As of <day>", the server's basis label, and the
+  // conflicts summary (MetricDetailView.recordsHeader).
+  // After a fix: update the row in place right away, then reload once the
+  // server has re-normalized (refresh.expected_within_seconds).
+  var currentRows = [];
+  var currentRowColumns = null;
+  var fixTimer = null;
+
+  function onFixSaved(info) {
+    var row = currentRows.filter(function (r) { return r && String((r.edit && r.edit.record_id) || r.record_id) === String(info.dataId); })[0];
+    if (row && info.record && window.DataFixes) {
+      window.DataFixes.applyRecord(row, info.record);
+      try { renderRawData(currentRows, currentRowColumns); } catch (err) { /* the reload below redraws it */ }
+    }
+    // Refetch only when the server queued a refresh.
+    if (info.delayMs === null || info.delayMs === undefined) return;
+    if (fixTimer) clearTimeout(fixTimer);
+    fixTimer = setTimeout(function () { fixTimer = null; loadMetricDetail(); }, info.delayMs);
+  }
+
+  function renderRecordsHeader(payload) {
+    var header = view().recordsHeader(payload);
+    [['metricRawDataAsOf', header.asOf], ['metricRawDataBasis', header.basis], ['metricRawDataConflicts', header.conflicts]].forEach(function (pair) {
+      var node = el(pair[0]);
+      if (!node) return;
+      node.textContent = pair[1];
+      node.hidden = !pair[1];
+    });
+  }
+
   function renderRawDataTotal(rawData) {
     var note = el('metricRawDataTotalNote');
     if (!note) return;
@@ -496,14 +723,26 @@
     var periodStart = qp.get('periodStart');
     var periodEnd = qp.get('periodEnd');
     var compareBy = qp.get('compareBy');
-    if (periodStart) periodParams.periodStart = periodStart;
-    if (periodEnd) periodParams.periodEnd = periodEnd;
-    if (compareBy) periodParams.compareBy = compareBy;
+    // An as-of card (from an as-of report): asOf alone, never a range.
+    var asOf = qp.get('asOf');
+    if (asOf) {
+      periodParams.asOf = asOf;
+    } else {
+      if (periodStart) periodParams.periodStart = periodStart;
+      if (periodEnd) periodParams.periodEnd = periodEnd;
+      if (compareBy) periodParams.compareBy = compareBy;
+      // All time has nothing before it to compare against.
+      if (window.DashboardPeriod && window.DashboardPeriod.isAllTime({ start: periodStart, end: periodEnd })) periodParams.compareToPrevious = false;
+    }
+
+    linkFilters = view().urlFilters(qp);
+    renderLinkFilters();
 
     try {
       var hasPeriod = Object.keys(periodParams).length > 0;
-      var response = await (hasPeriod
-        ? api.getMetricDetail(metricKey, periodParams)
+      var hasLinkFilters = Object.keys(linkFilters).length > 0;
+      var response = await (hasPeriod || hasLinkFilters
+        ? api.getMetricDetail(metricKey, withLinkFilters(Object.assign({}, periodParams)))
         : api.getMetricDetail(metricKey));
       var payload = response && response.data ? response.data : response;
       var metric = payload.metric || {};
@@ -530,23 +769,44 @@
       showBlock('metricBusinessLogicBlock', 'metricBusinessLogic', metric.businessLogic || current.businessLogic || '');
       // The backend names the period in the firm's days (data.period.label).
       // The backend's label, else the picked dates; no line at all otherwise.
-      var periodWords = view().periodText(payload.period, qp.get('periodStart'), qp.get('periodEnd'));
+      var periodWords = view().periodText(payload.period, qp.get('periodStart'), qp.get('periodEnd'), asOf);
+      // A small calm badge when the server says the data is stale
+      // (data.lineage.freshness on metric detail).
+      var freshness = el('metricFreshness');
+      if (freshness) {
+        freshness.innerHTML = window.DataState.freshnessBadge({ freshness: (payload.lineage && payload.lineage.freshness) || null });
+        freshness.hidden = !freshness.innerHTML;
+      }
       var periodLine = el('metricPeriodLine');
       if (periodLine) periodLine.hidden = !periodWords;
       var periodNode = el('metricPeriod');
       if (periodNode) periodNode.textContent = periodWords;
 
       var snapshots = payload.snapshots || [];
-      renderSummary(payload, snapshots);
+      // A long daily series (All time) is drawn by week or month; the
+      // snapshot table keeps every row.
+      var drawn = window.MetricCardView ? window.MetricCardView.bucketSnapshots(snapshots, current.format) : snapshots;
+      renderSummary(payload, drawn);
       renderDataUsed(payload.lineage,
         view().summary(payload).value || '', metric.calculation || current.calculation || '');
-      renderHistory(snapshots);
+      renderHistory(snapshots, drawn);
       // Records the server could not read get the calm note, not a table.
       var rowsStatus = view().rowsStatus(payload.raw_data);
       renderRowsStatus(rowsStatus);
       if (!rowsStatus) {
-        renderRawData(payload.raw_data && payload.raw_data.rows ? payload.raw_data.rows : [], payload.row_columns);
-        renderRawDataTotal(payload.raw_data);
+        currentPermissions = window.DataFixes ? window.DataFixes.permissionsOf(payload) : (payload.permissions || null);
+        currentRows = payload.raw_data && Array.isArray(payload.raw_data.rows) ? payload.raw_data.rows : [];
+        currentRowColumns = payload.row_columns;
+        renderRecordsHeader(payload);
+        lastDetail = { metricKey: metricKey, periodParams: periodParams };
+        if (view().isServerRows(payload.raw_data)) {
+          var sort = payload.raw_data.sort || {};
+          if (!rowsQuery.sortBy && sort.by) { rowsQuery.sortBy = String(sort.by); rowsQuery.sortDir = sort.dir === 'asc' ? 'asc' : 'desc'; }
+          renderServerRows(payload);
+        } else {
+          renderRawData(payload.raw_data && payload.raw_data.rows ? payload.raw_data.rows : [], payload.row_columns);
+          renderRawDataTotal(payload.raw_data);
+        }
       }
     } catch (err) {
       console.error('[MetricDetail] Failed to load metric detail:', err);

@@ -13,7 +13,8 @@ const TODAY = '2026-11-24';
 describe('visualFor', () => {
   test('the saved visual wins when it is one of the vocabulary', () => {
     expect(V.visualFor({ kind: 'group', visual: 'donut' })).toBe('donut');
-    expect(V.VOCABULARY).toHaveLength(15);
+    expect(V.VOCABULARY).toHaveLength(17);
+    expect(V.visualFor({ kind: 'number', visual: 'month_bars' })).toBe('month_bars');
   });
   test('without one (or an unknown one), the kind decides', () => {
     expect([['headline'], ['number'], ['goal'], ['breakdown'], ['pair'], ['worklist']].map(([kind]) => V.visualFor({ kind })))
@@ -174,4 +175,27 @@ test('pairedSeries pairs by service_key when rows carry it, labelled by service_
     [{ service_key: 'estate_planning', service_label: 'Estate Planning', value: 21 }],
     [{ service_key: 'estate_planning', service_label: 'Estate planning', value: 6 }, { service_key: 'guardianship', service_label: 'Guardianship', value: 2 }]);
   expect(rows).toEqual([{ label: 'Estate Planning', value: 21, second: 6 }, { label: 'Guardianship', value: null, second: 2 }]);
+});
+
+test('pairedSeries keeps partial when either side of a bucket is partial', () => {
+  const rows = V.pairedSeries([{ label: 'Q4', value: 2, partial: true }, { label: 'Q3', value: 4 }], [{ label: 'Q4', value: 5 }]);
+  expect(rows[0].partial).toBe(true);
+  expect(rows[1].partial).toBeUndefined();
+});
+
+test('pairedSeries labels rows the same generic way (no "Item N", stage with pipeline)', () => {
+  const rows = V.pairedSeries([{ source: 'Referral', value: 2 }, { pipeline: 'Estate Planning', stage: 'Lead', value: 3 }], []);
+  expect(rows.map((r) => r.label)).toEqual(['Referral', 'Lead (Estate Planning)']);
+});
+
+describe('topRows: the top 8 for the card, zero rows hidden', () => {
+  test('sorted by value unless the server already sorted them; zeros and empties hidden; the rest counted', () => {
+    const rows = [{ label: 'a', value: 0 }, { label: 'b', value: 5 }, { label: 'c', value: 9 }, { label: 'd', value: null }, { label: 'e', value: 1 }];
+    expect(V.topRows(rows, 2)).toEqual({ rows: [{ label: 'c', value: 9 }, { label: 'b', value: 5 }], hidden: 1 });
+    const sorted = [{ label: 'x', value: 9 }, { label: 'y', value: 9 }, { label: 'z', value: 1 }];
+    expect(V.topRows(sorted, 8)).toEqual({ rows: sorted, hidden: 0 });
+  });
+  test('waiting rows stay', () => {
+    expect(V.topRows([{ label: 'w', value: null, waiting: true }], 8).rows).toHaveLength(1);
+  });
 });

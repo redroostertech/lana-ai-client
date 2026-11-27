@@ -6,6 +6,13 @@
 (function (global) {
   'use strict';
 
+  // The firm's currency (Lex.Utils.getFirmCurrency, from /auth/me), else USD.
+  function firmCurrency() {
+    var host = typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : {});
+    var utils = host.Lex && host.Lex.Utils;
+    return utils && typeof utils.getFirmCurrency === 'function' ? utils.getFirmCurrency() : 'USD';
+  }
+
   var EMPTY = global.DataState.EMPTY_VALUE;
   var esc = global.DataState.escapeHtml;
 
@@ -44,16 +51,39 @@
     return 'data-metric-drilldown="' + kind + '" data-metric-key="' + esc(metric.key) + '" data-metric-name="' + esc(metric.name) + '"';
   }
 
+  // States that read the same calm way as on dashboards: no data source,
+  // no data for these dates, and not mapped yet. Other states keep the
+  // plain Reports titles.
+  var CALM_STATES = { no_data_source: true, no_data: true, not_mapped: true };
+
   function renderState(metric, ctx) {
+    var item = metric;
+    var calm = CALM_STATES[metric.data_state] === true;
+    // An ok tile with no number goes through the shared no-data state
+    // (DataState reads an ok item with value null as no_data).
+    if (isEmptyTile(metric)) {
+      item = Object.assign({}, metric, { data_state: 'ok', value: null });
+      calm = true;
+    }
     return '<div data-metric-card class="report-tile bg-white rounded-xl shadow-sm border border-gray-200">' +
-      '<div class="mb-4"><h3 class="report-tile__title font-medium text-gray-500 uppercase tracking-wide">' + esc(metric.name) + '</h3></div>' +
-      global.DataState.render(metric) +
+      '<div class="mb-4"><h3 class="report-tile__title font-medium text-gray-500 uppercase tracking-wide">' + esc(metric.name) + '</h3>' +
+      global.DataState.freshnessBadge(metric) + '</div>' +
+      global.DataState.render(item, calm ? { calm: true } : undefined) +
       footer(ctx, '') + '</div>';
+  }
+
+  // Ok (or no state sent) with no current value and no server-formatted
+  // value: nothing was recorded for these dates. A real 0 is a value.
+  function isEmptyTile(metric) {
+    var ok = !metric.data_state || metric.data_state === 'ok';
+    var empty = metric.current === null || metric.current === undefined;
+    var formatted = metric.formattedCurrent !== null && metric.formattedCurrent !== undefined && metric.formattedCurrent !== '';
+    return ok && empty && !formatted;
   }
 
   function render(metric, ctx) {
     ctx = ctx || {};
-    if (global.DataState.isProblem(metric)) return renderState(metric, ctx);
+    if (global.DataState.isProblem(metric) || isEmptyTile(metric)) return renderState(metric, ctx);
     var ReportingGoalComparisonMapper = global.ReportingGoalComparisonMapper;
     // Resolve the metric's display type from its format (object { type } or a
     // string) or the legacy type/unit fields, so values render by type
@@ -66,7 +96,7 @@
 
     var fmtCurrency = function (value) {
       if (value === null || value === undefined || isNaN(value)) return EMPTY;
-      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: firmCurrency(), minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
     };
 
     // Prior and Target now flow from the backend-provided goal/comparison blocks
@@ -173,21 +203,27 @@
       pctToGoalCell = '<span class="text-gray-400">' + EMPTY + '</span>';
     }
 
+    var hiddenNote = global.DataState.comparisonNote(metric);
     return '<div data-metric-card class="report-tile bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">' +
       // Header: title (auto-fit, up to 2 lines, 14px -> 10px)
       '<div class="mb-4"><div class="flex items-start justify-between gap-2">' +
       '<h3 data-fit-text="14:10:2" class="report-tile__title font-medium text-gray-500 uppercase tracking-wide flex-1 min-w-0">' + esc(metric.name) + '</h3>' +
-      '</div></div>' +
+      '</div>' +
+      // A small calm badge when the server says the data is stale.
+      global.DataState.freshnessBadge(metric) + '</div>' +
       // Current period value (auto-fit, 1 line, 30px -> 14px)
       '<div class="mb-4"><div class="flex items-center justify-between mb-1"><p class="text-xs text-gray-500">Current Period</p></div>' +
       '<p data-fit-text="30:14:1" class="report-tile__value font-bold text-gray-900">' + currentValue + '</p></div>' +
-      // Row 1: Prior Period | % Change (bottom border doubles as the divider).
-      '<div class="grid grid-cols-2 gap-4 text-sm mb-4 pb-4 border-b border-gray-100">' +
-      '<div><p class="text-xs text-gray-500 mb-1">Prior Period</p>' +
-      '<p data-fit-text="16:11:1" class="report-tile__cell report-tile__cell--fit font-semibold text-gray-700">' + priorValue + '</p></div>' +
-      '<div><p class="text-xs text-gray-500 mb-1">% Change</p>' +
-      '<p class="report-tile__cell font-semibold">' + pctChangeCell + '</p></div>' +
-      '</div>' +
+      // Row 1: Prior Period | % Change (bottom border doubles as the divider),
+      // or the server's message when it withheld the comparison.
+      (hiddenNote
+        ? '<div class="text-sm mb-4 pb-4 border-b border-gray-100">' + hiddenNote + '</div>'
+        : '<div class="grid grid-cols-2 gap-4 text-sm mb-4 pb-4 border-b border-gray-100">' +
+          '<div><p class="text-xs text-gray-500 mb-1">Prior Period</p>' +
+          '<p data-fit-text="16:11:1" class="report-tile__cell report-tile__cell--fit font-semibold text-gray-700">' + priorValue + '</p></div>' +
+          '<div><p class="text-xs text-gray-500 mb-1">% Change</p>' +
+          '<p class="report-tile__cell font-semibold">' + pctChangeCell + '</p></div>' +
+          '</div>') +
       // Row 2: Goal(s) | Percent to Goal.
       '<div class="grid grid-cols-2 gap-4 text-sm">' +
       '<div><p class="text-xs text-gray-500 mb-1">Goal(s)</p>' +

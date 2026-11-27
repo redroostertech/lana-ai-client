@@ -40,8 +40,21 @@
     return pending;
   }
 
+  // Settings > Mappings is for admins and org admins (Lex.Auth.isAdmin, the
+  // same check the other admin-only settings use).
+  function canManageMappings() {
+    var auth = global.Lex && global.Lex.Auth;
+    return !!(auth && typeof auth.isAdmin === 'function' && auth.isAdmin());
+  }
+
   async function draw(node) {
     if (!node) return;
+    // Nobody else sees the banner, and the summary is not asked for.
+    if (!canManageMappings()) {
+      node.hidden = true;
+      node.innerHTML = '';
+      return;
+    }
     var result = await summary();
     var text = result.available ? global.SettingsMappingsModel.bannerText(result.summary) : null;
     node.hidden = !text;
@@ -77,5 +90,5 @@
     });
   }
 
-  global.LanaSetupBanner = { mount: mount, refresh: refresh, summary: summary };
+  global.LanaSetupBanner = { mount: mount, refresh: refresh, summary: summary, canManageMappings: canManageMappings };
 })(window);

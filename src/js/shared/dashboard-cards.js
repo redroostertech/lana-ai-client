@@ -71,6 +71,9 @@
       options: Object.assign(cardOptions(Object.assign({}, raw, raw.visual_options && typeof raw.visual_options === 'object' ? raw.visual_options : {})), {
         // Only visual_options.note is shown; the spec's card note is internal.
         note: raw.visual_options && raw.visual_options.note ? String(raw.visual_options.note) : '',
+        // A card the layout marks full width spans every masonry column.
+        full_width: raw.full_width === true || raw.width === 'full'
+          || !!(raw.visual_options && (raw.visual_options.full_width === true || raw.visual_options.width === 'full')),
       }),
     };
   }
@@ -92,6 +95,14 @@
       centre_key: raw.centre_key ? normalizeKey(raw.centre_key) : '',
       badge_key: raw.badge_key ? normalizeKey(raw.badge_key) : '',
       series_labels: Array.isArray(raw.series_labels) ? raw.series_labels.map(String) : [],
+      // Declared series fields (for example held, no_show, cancelled).
+      series: Array.isArray(raw.series) ? raw.series.map(String) : [],
+      // A dotted path on the card to the rows to draw (metadata.by_person),
+      // what they group by, and a row field to rank by with its format.
+      rows: raw.rows ? String(raw.rows) : '',
+      group_by: raw.group_by ? String(raw.group_by) : '',
+      value_key: raw.value_key ? String(raw.value_key) : '',
+      value_format: raw.value_format ? String(raw.value_format) : '',
       accent: ACCENTS[raw.accent] ? raw.accent : null,
       sort: raw.sort ? String(raw.sort) : '',
       unit: raw.unit ? String(raw.unit) : '',
@@ -107,9 +118,23 @@
   }
 
   /** { mode: 'cards', cards } when layout.cards declares any usable card, else { mode: 'keys', cards: [] }. */
+  // layout.chapters = [{ id, title, intro }]: the dashboard's own chapters,
+  // in order. Entries without an id are dropped.
+  function normalizeChapters(list) {
+    var seen = {};
+    return (Array.isArray(list) ? list : []).filter(function (c) {
+      if (!c || typeof c !== 'object' || !c.id || seen[c.id]) return false;
+      seen[c.id] = true;
+      return true;
+    }).map(function (c) {
+      return { id: String(c.id), title: c.title ? String(c.title) : chapterLabel(String(c.id)), intro: c.intro ? String(c.intro) : '' };
+    });
+  }
+
   function normalizeLayout(layout) {
     var cards = layout && Array.isArray(layout.cards) ? layout.cards.map(normalizeCard).filter(Boolean) : [];
-    return cards.length ? { mode: 'cards', cards: cards } : { mode: 'keys', cards: [] };
+    var chapters = normalizeChapters(layout && layout.chapters);
+    return cards.length ? { mode: 'cards', cards: cards, chapters: chapters } : { mode: 'keys', cards: [] };
   }
 
   /** The flat union of keys the card request sends. */
@@ -243,7 +268,13 @@
     return words ? words.charAt(0).toUpperCase() + words.slice(1) : '';
   }
 
-  function planDeclared(resolved) {
+  /**
+   * chapters (optional, from layout.chapters): sections follow that order
+   * with each chapter's title and intro, whatever the card count; a card in
+   * no declared chapter goes in a last section without a label; empty
+   * chapters are hidden. Without chapters, the fixed chapters as before.
+   */
+  function planDeclared(resolved, chapters) {
     var items = [];
     var waiting = [];
     (resolved || []).forEach(function (entry) {
@@ -256,15 +287,24 @@
     // Chapters (card.chapter): a label row before each chapter's first card,
     // only when the dashboard has 6 or more cards and some card names one.
     // A chapter whose cards are all waiting has nothing here, so it is skipped.
-    var chaptered = (resolved || []).length >= CHAPTER_MIN_CARDS && items.some(function (item) { return item.resolved.def.chapter; });
+    var declaredChapters = Array.isArray(chapters) ? chapters.filter(function (c) { return c && c.id; }) : [];
+    var chaptered = declaredChapters.length > 0
+      || ((resolved || []).length >= CHAPTER_MIN_CARDS && items.some(function (item) { return item.resolved.def.chapter; }));
     var sections = [];
-    if (chaptered) {
+    if (declaredChapters.length) {
+      var byId = {};
+      declaredChapters.forEach(function (c) { byId[c.id] = { chapter: c.id, label: c.title || chapterLabel(c.id), intro: c.intro || '', items: [] }; });
+      var rest = { chapter: '', label: '', intro: '', items: [] };
+      items.forEach(function (item) { (byId[item.resolved.def.chapter] || rest).items.push(item); });
+      declaredChapters.forEach(function (c) { if (byId[c.id].items.length) sections.push(byId[c.id]); });
+      if (rest.items.length) sections.push(rest);
+    } else if (chaptered) {
       var at = {};
       items.forEach(function (item) {
         var chapter = item.resolved.def.chapter || '';
         if (at[chapter] === undefined) {
           at[chapter] = sections.length;
-          sections.push({ chapter: chapter, label: chapter ? chapterLabel(chapter) : '', items: [] });
+          sections.push({ chapter: chapter, label: chapter ? chapterLabel(chapter) : '', intro: '', items: [] });
         }
         sections[at[chapter]].items.push(item);
       });

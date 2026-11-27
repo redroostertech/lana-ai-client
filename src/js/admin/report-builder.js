@@ -64,11 +64,23 @@
     return { body: { name: name.slice(0, 255), description: choice.description || '', config: config } };
   }
 
-  // The execute body for a saved report. A metric-rows report reads the
-  // chosen period (plain days, the firm's days); other kinds run as before.
+  // "YYYY-MM-DD" (no regex, per Lex rules).
+  function isPlainDay(value) {
+    if (typeof value !== 'string' || value.length !== 10) return false;
+    var parts = value.split('-');
+    if (parts.length !== 3 || parts[0].length !== 4 || parts[1].length !== 2 || parts[2].length !== 2) return false;
+    return parts.every(function (part) {
+      return part.split('').every(function (ch) { return ch >= '0' && ch <= '9'; });
+    });
+  }
+
+  // The execute body for any saved report: the chosen period as plain firm
+  // days (end inclusive, as in the picker), which the server maps to
+  // periodStart/periodEnd. No period at all unless both days are set.
   function runReportBody(report, periodDays) {
+    void report;
     var body = { filters: {}, bypass_cache: false };
-    if (report && report.metric_rows_key && periodDays && periodDays.start && periodDays.end) {
+    if (periodDays && isPlainDay(periodDays.start) && isPlainDay(periodDays.end)) {
       body.period = { start: periodDays.start, end: periodDays.end };
     }
     return body;
@@ -91,7 +103,59 @@
     });
   }
 
+  // ── Report data sources ─────────────────────────────────────────────
+  // dataSources[] = { id, name, connectorType, entities[], lastSuccessfulSyncAt }.
+  // A row leads with what the source holds (its entities), then its name
+  // and when it last synced.
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  function sourceWords(value) {
+    var text = String(value === null || value === undefined ? '' : value).split('_').join(' ').trim();
+    return text ? text.charAt(0).toUpperCase() + text.slice(1) : '';
+  }
+
+  function dayText(value) {
+    var text = String(value || '');
+    if (text.length < 10 || text.charAt(4) !== '-' || text.charAt(7) !== '-') return '';
+    var month = Number(text.substring(5, 7));
+    var day = Number(text.substring(8, 10));
+    if (!(month >= 1 && month <= 12) || !(day >= 1 && day <= 31)) return '';
+    return MONTHS[month - 1] + ' ' + day + ', ' + text.substring(0, 4);
+  }
+
+  function entityText(entity) {
+    if (entity && typeof entity === 'object') return sourceWords(entity.label || entity.name || entity.entity || entity.type || '');
+    return sourceWords(entity);
+  }
+
+  function dataSourceView(source) {
+    var s = source || {};
+    var name = String(s.name || sourceWords(s.connectorType) || '');
+    var entities = (Array.isArray(s.entities) ? s.entities : []).map(entityText).filter(Boolean);
+    var day = dayText(s.lastSuccessfulSyncAt);
+    return {
+      lead: entities.length ? entities.join(', ') : name,
+      name: entities.length ? name : '',
+      lastSync: day ? 'Last synced ' + day : 'Not synced yet',
+    };
+  }
+
+  function esc(value) {
+    return String(value === null || value === undefined ? '' : value)
+      .split('&').join('&amp;').split('<').join('&lt;').split('>').join('&gt;').split('"').join('&quot;').split("'").join('&#39;');
+  }
+
+  function dataSourceHtml(source) {
+    var v = dataSourceView(source);
+    return '<div class="report-source">'
+      + '<p class="report-source__lead">' + esc(v.lead) + '</p>'
+      + '<p class="report-source__meta">' + (v.name ? esc(v.name) + ' · ' : '') + esc(v.lastSync) + '</p>'
+      + '</div>';
+  }
+
   var moduleApi = {
+    dataSourceView: dataSourceView,
+    dataSourceHtml: dataSourceHtml,
     KINDS: KINDS,
     catalogMetricOptions: catalogMetricOptions,
     catalogReportDefinition: catalogReportDefinition,

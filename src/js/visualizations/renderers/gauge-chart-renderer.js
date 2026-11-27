@@ -37,6 +37,12 @@
 import { escapeHtml, destroyChart } from '../chart-utils.js';
 import { ChartTheme } from '../chart-theme.js';
 
+// The firm's currency (Lex.Utils.getFirmCurrency, from /auth/me), else USD.
+function firmCurrency() {
+  const utils = globalThis.Lex && globalThis.Lex.Utils;
+  return utils && typeof utils.getFirmCurrency === 'function' ? utils.getFirmCurrency() : 'USD';
+}
+
 const DEFAULT_HEIGHT = 240;
 
 export class GaugeChartRenderer {
@@ -194,7 +200,7 @@ export class GaugeChartRenderer {
     if (format === 'currency') {
       return `${prefix}${new Intl.NumberFormat('en-US', {
         style: 'currency',
-        currency: 'USD',
+        currency: firmCurrency(),
         minimumFractionDigits: 0,
         maximumFractionDigits: decimals
       }).format(value)}${suffix}`;

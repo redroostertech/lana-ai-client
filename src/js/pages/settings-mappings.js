@@ -221,10 +221,23 @@
     });
   }
 
+  // Someone who is not an admin: no entry, and a direct link (#mappings)
+  // says calmly that only admins can manage mappings.
+  function syncAdminOnlyNote() {
+    var note = el('sv2-mappings-admin-only');
+    if (note) note.hidden = canEdit() || (window.location.hash || '') !== '#mappings';
+  }
+
   // Show the section only when the API answers; load it the first time.
   async function start() {
     if (!el('sv2-panel-mappings') || !window.api || typeof api.getMappingSummary !== 'function' || !window.LanaSetupBanner) return;
     state.canEdit = canEdit();
+    // Admins and org admins only: nobody else gets the section or a request.
+    if (!state.canEdit) {
+      syncAdminOnlyNote();
+      window.addEventListener('hashchange', syncAdminOnlyNote);
+      return;
+    }
     // One shared summary request (setup-banner.js): feature off or failing
     // leaves the nav item and panel hidden, with no retry.
     var result = await window.LanaSetupBanner.summary();

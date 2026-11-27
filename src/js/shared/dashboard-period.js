@@ -16,6 +16,13 @@
   'use strict';
 
   var DEFAULT_PRESET = 'last7days';
+  // All time starts here (LanaTime.ALL_TIME_START): such a range asks for
+  // no comparison.
+  var ALL_TIME_START = '2000-01-01';
+
+  function isAllTime(period) {
+    return !!(period && period.start === ALL_TIME_START);
+  }
 
   function isDigits(text) {
     if (!text) return false;
@@ -60,13 +67,25 @@
    */
   function metricDetailHref(metricKey, period, options) {
     var parts = ['metric_key=' + encodeURIComponent(metricKey || '')];
-    if (period && period.periodStart) parts.push('periodStart=' + encodeURIComponent(period.periodStart));
-    if (period && period.periodEnd) parts.push('periodEnd=' + encodeURIComponent(period.periodEnd));
-    if (period && period.compareBy) parts.push('compareBy=' + encodeURIComponent(period.compareBy));
+    if (period && period.asOf) {
+      // An as-of card: metric detail takes asOf alone, never a range.
+      parts.push('asOf=' + encodeURIComponent(period.asOf));
+    } else {
+      if (period && period.periodStart) parts.push('periodStart=' + encodeURIComponent(period.periodStart));
+      if (period && period.periodEnd) parts.push('periodEnd=' + encodeURIComponent(period.periodEnd));
+      if (period && period.compareBy) parts.push('compareBy=' + encodeURIComponent(period.compareBy));
+    }
     if (options && options.tab) parts.push('tab=' + encodeURIComponent(options.tab));
     // Where it was opened from, so its breadcrumbs and Back lead there.
     if (options && options.from) parts.push('from=' + encodeURIComponent(options.from));
     if (options && options.dashboardId) parts.push('dashboardId=' + encodeURIComponent(options.dashboardId));
+    // Records filters for the table to open with: raw_filter[col]=value.
+    var filters = options && options.filters && typeof options.filters === 'object' ? options.filters : {};
+    Object.keys(filters).forEach(function (col) {
+      if (filters[col] !== null && filters[col] !== undefined && filters[col] !== '') {
+        parts.push(encodeURIComponent('raw_filter[' + col + ']') + '=' + encodeURIComponent(filters[col]));
+      }
+    });
     return 'admin/metric_detail.html?' + parts.join('&');
   }
 
@@ -87,6 +106,7 @@
 
   return {
     DEFAULT_PRESET: DEFAULT_PRESET,
+    isAllTime: isAllTime,
     matchPreset: matchPreset,
     isPlainDay: isPlainDay,
     resolveRequestPeriod: resolveRequestPeriod,

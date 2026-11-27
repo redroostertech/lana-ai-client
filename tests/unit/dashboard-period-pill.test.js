@@ -61,7 +61,7 @@ test('Escape and a click outside close it; a click inside keeps it open', () => 
 test('a quick pick closes the panel', () => {
   const w = boot();
   w.document.getElementById('dashboardPeriodToggle').click();
-  w.document.querySelector('[data-dashboard-preset="lastMonth"]').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  w.document.querySelector('[data-dashboard-preset="last30days"]').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
   expect(w.document.getElementById('dashboardPeriodPanel').hidden).toBe(true);
 });
 
@@ -87,10 +87,10 @@ test('the date pill sits on the left under the title, before the counts; the pan
   expect(panel.slice(0, panel.indexOf('}'))).toContain('left: 0;');
 });
 
-test('a calm state hugs its content; on the hero it is one compact row', () => {
+test('a calm state hugs its content; on the hero it is a compact row whose reason wraps in full', () => {
   const css = fs.readFileSync(path.join(SRC, 'css/admin/insights-dashboard.css'), 'utf8');
   const tail = css.slice(css.lastIndexOf('/* Calm states hug their content'));
   expect(tail).toContain('.dash-bento .dash-metric-card > .lex-data-state {\n  flex: 0 0 auto;');
   expect(tail).toContain('.dash-metric-card--hero .lex-data-state--calm {');
-  expect(tail).toContain('-webkit-line-clamp: 1;');
+  expect(tail).not.toContain('-webkit-line-clamp');
 });

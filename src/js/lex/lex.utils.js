@@ -136,6 +136,24 @@
     return validTimezone(user.firm_timezone || user.firmTimezone) || SYSTEM_TIME_ZONE;
   }
 
+  // The firm's currency (user.default_currency from /auth/me, kept on the
+  // stored user like the firm time zone): a three-letter code, else USD.
+  function getFirmCurrency() {
+    var code = readStoredUser().default_currency;
+    if (typeof code !== 'string' || code.length !== 3) return 'USD';
+    code = code.toUpperCase();
+    for (var i = 0; i < 3; i += 1) {
+      var ch = code.charAt(i);
+      if (ch < 'A' || ch > 'Z') return 'USD';
+    }
+    try {
+      new Intl.NumberFormat('en-US', { style: 'currency', currency: code }).format(0);
+      return code;
+    } catch (_error) {
+      return 'USD';
+    }
+  }
+
   function timestampHasExplicitTimezone(value) {
     if (!value || typeof value !== 'string') return false;
     var timeIndex = value.indexOf('T');
@@ -535,6 +553,7 @@
     formatFileSize:     formatFileSize,
     getOrganizationTimezone: getOrganizationTimezone,
     getFirmTimezone: getFirmTimezone,
+    getFirmCurrency: getFirmCurrency,
     formatDate:         formatDate,
     formatDateTime:     formatDateTime,
     capitalizeFirst:    capitalizeFirst,

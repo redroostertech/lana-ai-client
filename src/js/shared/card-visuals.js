@@ -17,7 +17,7 @@
   'use strict';
 
   var VOCABULARY = ['hero', 'stat', 'gauge', 'ring', 'bullet', 'columns', 'ranked_bars', 'paired_columns', 'donut',
-    'stacked_bar', 'funnel', 'compare', 'worklist', 'timeline', 'aging'];
+    'stacked_bar', 'funnel', 'compare', 'worklist', 'timeline', 'aging', 'month_bars', 'link'];
   var BY_KIND = { headline: 'hero', number: 'stat', goal: 'ring', breakdown: 'columns', pair: 'compare', worklist: 'worklist' };
   var MS_PER_DAY = 86400000;
   var TIMELINE_DAYS = 14;
@@ -194,6 +194,29 @@
     });
   }
 
+  /**
+   * The rows a card shows: zero and empty rows hidden (they stay in the
+   * details), sorted by value unless the server already sorted them, the
+   * top `limit`; hidden counts the rest. Waiting rows stay.
+   */
+  function topRows(rows, limit) {
+    var shown = (rows || []).filter(function (row) {
+      if (row.waiting) return true;
+      var n = toNumber(row.value);
+      return n !== null && n !== 0;
+    });
+    var sortedDesc = shown.every(function (row, i) {
+      return i === 0 || row.waiting || shown[i - 1].waiting || toNumber(shown[i - 1].value) >= toNumber(row.value);
+    });
+    var ordered = sortedDesc ? shown : shown.slice().sort(function (a, b) {
+      var av = a.waiting ? -Infinity : toNumber(a.value);
+      var bv = b.waiting ? -Infinity : toNumber(b.value);
+      return bv - av;
+    });
+    var cap = limit > 0 ? limit : 8;
+    return { rows: ordered.slice(0, cap), hidden: Math.max(0, ordered.length - cap) };
+  }
+
   function stackedModel(rows) {
     var model = donutModel(rows);
     if (!model) return null;
@@ -208,7 +231,11 @@
     return { actualPct: round1((a / scale) * 100), goalPct: round1((g / scale) * 100), gap: round1(g - a), over: a >= g };
   }
 
+  // The same generic row label as list cards (MetricCardView.rowLabel).
   function listLabel(row) {
+    var view = (typeof window !== 'undefined' && window.MetricCardView)
+      || (typeof require === 'function' ? require('./metric-card-view.js') : null);
+    if (view && typeof view.rowLabel === 'function') return view.rowLabel(row, 0);
     var keys = ['service_label', 'label', 'name', 'title', 'service_key', 'key'];
     for (var i = 0; i < keys.length; i += 1) {
       if (row && row[keys[i]] !== null && row[keys[i]] !== undefined && row[keys[i]] !== '') return String(row[keys[i]]);
@@ -228,11 +255,14 @@
     (first || []).forEach(function (row) {
       at[pairKey(row)] = rows.length;
       rows.push({ label: listLabel(row), value: toNumber(row && row.value), second: null });
+      if (row && row.partial === true) rows[rows.length - 1].partial = true;
     });
     (second || []).forEach(function (row) {
       var key = pairKey(row);
       if (at[key] === undefined) { at[key] = rows.length; rows.push({ label: listLabel(row), value: null, second: null }); }
       rows[at[key]].second = toNumber(row && row.value);
+      // A bucket the picked dates cut short on either side is partial.
+      if (row && row.partial === true) rows[at[key]].partial = true;
     });
     return rows;
   }
@@ -296,6 +326,7 @@
   }
 
   return {
+    topRows: topRows,
     shortLabels: shortLabels,
     VOCABULARY: VOCABULARY,
     visualFor: visualFor,

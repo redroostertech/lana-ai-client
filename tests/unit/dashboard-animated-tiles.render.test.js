@@ -31,17 +31,18 @@ function node(value = '') {
   };
 }
 
-function page(api = {}, user = null) {
+function page(api = {}, user = null, search = '', admin = true) {
   let source = fs.readFileSync(path.join(__dirname, '../../src/js/admin/dashboard-detail.js'), 'utf8');
   const end = source.lastIndexOf('  init();');
   source = source.slice(0, end)
-    + '  window.testExports = { renderMetricCard, loadMetrics, loadDashboardById, readPeriodControls, setBanner, fetchSparkline, renderMetrics, openMetricModal, worklistHtml, drawRows, variantPicks, allMetrics: function () { return allDashboardMetrics; }, cardLoads: function () { return cardLoads; } };'
+    + '  window.testExports = { renderMetricCard, formatMetricCardValue, loadMetrics, loadDashboardById, readPeriodControls, setBanner, fetchSparkline, renderMetrics, openMetricModal, worklistHtml, drawRows, paintSparkline, cardPreviewRows, variantPicks, openReportTarget, detailPeriod, allMetrics: function () { return allDashboardMetrics; }, cardLoads: function () { return cardLoads; } };'
     + source.slice(end + '  init();'.length);
   const nodes = {};
   const document = { body: node(), addEventListener() {}, getElementById: (id) => (nodes[id] = nodes[id] || node()), querySelector: () => null, querySelectorAll: () => [] };
   const window = withDashboardScripts(withReportSharedScripts({ location: { search: '' }, setInterval() {}, addEventListener() {} }));
-  const LanaTime = { nowMs: () => 0, formatUtcDayRange: (a, b) => a + ' to ' + b, reportPresetDays: () => ({ start: '2026-01-01', end: '2026-01-31' }), MS_PER_DAY: 86400000 };
-  const Lex = { Utils: { getFirmTimezone: () => 'America/New_York' }, Nav: { getParams: () => new URLSearchParams('') } };
+  const LanaTime = { nowMs: () => 0, formatUtcDayRange: (a, b) => a + ' to ' + b, MS_PER_DAY: 86400000,
+    reportPresetDays: (preset, zone) => (preset === 'today' ? { start: zone === 'America/New_York' ? '2026-11-26' : '2026-11-27', end: '' } : { start: '2026-01-01', end: '2026-01-31' }) };
+  const Lex = { Auth: { isAdmin: () => admin }, Utils: { getFirmTimezone: () => 'America/New_York' }, Nav: { getParams: () => new URLSearchParams(search), updateParams: jest.fn() } };
   window.Lex = Lex;
   window.api = { user };
   // The dashboard switcher draws into the shell's title bar, which this test has no DOM for.
@@ -50,7 +51,7 @@ function page(api = {}, user = null) {
     setTimeout: jest.fn(), clearTimeout: jest.fn(), LanaTime, Lex, api: Object.assign({ listBIDashboards: jest.fn().mockResolvedValue({ data: [] }) }, api),
     DashboardTiles: window.DashboardTiles });
   window.testExports.readPeriodControls();
-  return { exports: window.testExports, nodes };
+  return { exports: window.testExports, nodes, today: '2026-11-26', Lex };
 }
 
 describe('tiles', () => {
@@ -74,7 +75,8 @@ describe('tiles', () => {
     expect(money).toContain('$84,250');
     expect(money).toContain('$31,001');
     const closed = text(page().exports.renderMetricCard(card('closed_cases_by_service_offering')));
-    expect(closed).toContain('Estate Planning: 6');
+    expect(closed).toContain('Estate Planning');
+    expect(page().exports.renderMetricCard(card('closed_cases_by_service_offering'))).toContain('data-tip="Estate Planning · 6"');
     expect(closed).not.toContain('$');
   });
 
@@ -319,7 +321,12 @@ describe('declared cards (layout.cards from the trim spec)', () => {
     const articles = articlesOf(html.split('dash-waiting-strip')[0]);
     expect(articles[0]).toContain('dash-metric-card--hero');
     expect(articles[0]).toContain('Gross Revenue');
-    expect(articles.map((a) => (a.split('dash-metric-card__title">')[1] || '').split('<')[0])).toEqual([
+    // Masonry: the DOM is column by column; the reading order (each unit's
+    // data-masonry-unit) is still the declared order.
+    const units = html.split('dash-waiting-strip')[0].split('data-masonry-unit="').slice(1)
+      .map((part) => ({ k: Number(part.split('"')[0]), titles: articlesOf(part.split('data-masonry-unit="')[0]).map((a) => (a.split('dash-metric-card__title">')[1] || '').split('<')[0]) }))
+      .sort((x, y) => x.k - y.k);
+    expect([].concat(...units.map((u) => u.titles))).toEqual([
       'Gross Revenue', 'Target Revenue', 'Cash This Month', 'Gross Revenue by Service Offering', 'Cash Coming In',
       'Overdue Expected Cash', 'New vs Closed Cases', 'Actual vs Needed Service Offerings', 'Total Active Cases',
     ]);
@@ -865,4 +872,704 @@ describe('every drilldown link from a declared card carries a full catalog key',
     expect(keys).not.toContain('legal_firm.finance.overdue_expected_cash');
     expect(keys).not.toContain('legal_firm.finance.cash_this_month');
   });
+});
+
+describe('freshness badge on dashboard cards', () => {
+  const stale = { stale: true, as_of: '2026-08-10', systems: ['ActionStep API'], label: 'Data from ActionStep API as of Aug 10, 2026' };
+  test('a stale card shows the server label in its footer, next to the period', () => {
+    const html = page().exports.renderMetricCard(Object.assign({}, card('average_case_value'), { freshness: stale }));
+    const footer = html.split('dash-card__footer')[1];
+    expect(footer).toContain('<span class="lex-freshness" title="Data from ActionStep API as of Aug 10, 2026">Data from ActionStep API as of Aug 10, 2026</span>');
+  });
+  test('fresh or missing freshness shows nothing', () => {
+    expect(page().exports.renderMetricCard(Object.assign({}, card('average_case_value'), { freshness: Object.assign({}, stale, { stale: false }) }))).not.toContain('lex-freshness');
+    expect(page().exports.renderMetricCard(Object.assign({}, card('average_case_value'), { freshness: null }))).not.toContain('lex-freshness');
+  });
+});
+
+describe('comparison_hidden on dashboard cards', () => {
+  const hidden = { reason: 'insufficient_history', message: 'No comparison yet: this firm has less than a year of history.', as_of: null, systems: [] };
+  test('the message replaces the change chip; never 0% or a dash', () => {
+    const html = page().exports.renderMetricCard(Object.assign({}, card('average_case_value'), { comparison: null, prior: null, comparison_hidden: hidden }));
+    expect(html).toContain('<p class="lex-comparison-hidden">No comparison yet: this firm has less than a year of history.</p>');
+    expect(html).not.toContain('mini-delta');
+    expect(text(html)).not.toContain('0%');
+    expect(text(html)).not.toContain('vs previous period');
+  });
+});
+
+describe('not_mapped and metadata.mapping_coverage', () => {
+  const declared = require(path.join(__dirname, '../fixtures/dashboard/declared-layouts.json'));
+  test('coverage under metadata (with unlinked) still gives the caveat and link', async () => {
+    const cards = declared.cards_synthetic.map((c) => (c.metric_key.endsWith('closed_cases_by_service_offering')
+      ? Object.assign({}, c, { metadata: Object.assign({}, c.metadata, { mapping_coverage: { mapped: 8, not_mapped: 42, unlinked: 5 } }) }) : c));
+    const layout = { cards: [{ id: 'b', kind: 'breakdown', metric_key: 'case_volume.closed_cases_by_service_offering' }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: cards }) });
+    await p.exports.loadDashboardById('d1');
+    const html = p.nodes.dashboardMetricGrid.innerHTML;
+    expect(text(html)).toContain('42 matters are not mapped to a service yet');
+    expect(html).toContain('data-metric-detail-link="settings-v2.html#mappings"');
+    expect(text(html)).not.toContain('NaN');
+  });
+  test('only unlinked records: no caveat and nothing breaks', async () => {
+    const cards = declared.cards_synthetic.map((c) => (c.metric_key.endsWith('closed_cases_by_service_offering')
+      ? Object.assign({}, c, { metadata: { mapping_coverage: { mapped: 8, not_mapped: 0, unlinked: 5 } } }) : c));
+    const layout = { cards: [{ id: 'b', kind: 'breakdown', metric_key: 'case_volume.closed_cases_by_service_offering' }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: cards }) });
+    await p.exports.loadDashboardById('d1');
+    expect(p.nodes.dashboardMetricGrid.innerHTML).not.toContain('dash-card__caveat');
+  });
+  test('a not_mapped card shows the server reason in the calm state', () => {
+    const html = page().exports.renderMetricCard(Object.assign({}, card('average_case_value'), { value: null, data_state: 'not_mapped',
+      data_state_reason: '12 of your matter types are not linked to a LANA service yet, so this number would be incomplete.' }));
+    expect(html).toContain('lex-data-state--calm');
+    expect(text(html)).toContain('12 of your matter types are not linked to a LANA service yet, so this number would be incomplete.');
+  });
+});
+
+describe('rate and average lists show per-item values only', () => {
+  const rate = { metric_key: 'legal_firm.sales_intake.conversion_rate_by_source', title: 'Conversion Rate by Source', format: 'table', row_format: 'percentage',
+    formatted_value: null, data_state: 'ok', period: 'Jan 1, 2026 - Jan 31, 2026', value: [{ source_name: 'Referral', value: 40 }, { source_name: 'Web', value: 60 }] };
+  test('the list card shows each rate and no summed total (never 100%)', () => {
+    const html = page().exports.renderMetricCard(rate);
+    expect(text(html)).toContain('40%');
+    expect(text(html)).toContain('60%');
+    expect(text(html)).not.toContain('100%');
+  });
+  test('the card value text is empty, never a sum of percents', () => {
+    const p = page();
+    expect(p.exports.formatMetricCardValue(rate)).toBe('');
+    expect(p.exports.formatMetricCardValue(Object.assign({}, rate, { row_format: null, format: 'table', metadata: { aggregation: 'average' } }))).toBe('');
+  });
+});
+
+describe('metadata.second_line under the main value', () => {
+  const rate = { metric_key: 'legal_firm.sales_intake.firm_conversion_rate', title: 'Firm Conversion Rate', value: 42, formatted_value: '42%', format: 'percentage',
+    data_state: 'ok', period: 'Jan 1, 2026 - Jan 31, 2026', metadata: { second_line: { label: 'Cohort rate', value: 31, format: 'percentage', numerator: 31, denominator: 100 } } };
+  test('a tile shows the muted second line right under its value', () => {
+    const html = page().exports.renderMetricCard(rate);
+    expect(html).toContain('<p class="dash-metric-card__second-line">Cohort rate 31%</p>');
+    expect(html.indexOf('dash-metric-card__value')).toBeLessThan(html.indexOf('dash-metric-card__second-line'));
+  });
+  test('a declared card shows it too, and nothing without it', async () => {
+    const declared = require(path.join(__dirname, '../fixtures/dashboard/declared-layouts.json'));
+    const cards = declared.cards_synthetic.map((c) => (c.metric_key.endsWith('payroll_clients_needed') ? Object.assign({}, c, { metadata: { second_line: { label: 'Cohort rate', value: 31, format: 'percentage', numerator: 31, denominator: 100 } } }) : c));
+    const layout = { cards: [{ id: 'n', kind: 'number', metric_key: 'finance.payroll_clients_needed' }, { id: 'm', kind: 'number', metric_key: 'case_volume.active_cases_total' }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: cards }) });
+    await p.exports.loadDashboardById('d1');
+    const articles = p.nodes.dashboardMetricGrid.innerHTML.split('<article ').slice(1);
+    expect(articles.find((a) => a.includes('Payroll Clients Needed'))).toContain('Cohort rate 31%');
+    expect(articles.find((a) => a.includes('Total Active Cases'))).not.toContain('dash-metric-card__second-line');
+  });
+});
+
+describe('singular units from the server', () => {
+  const declared = require(path.join(__dirname, '../fixtures/dashboard/declared-layouts.json'));
+  test('a card whose value already says "1 case" gets no extra "cases" unit line', async () => {
+    const cards = declared.cards_synthetic.map((c) => (c.metric_key.endsWith('payroll_clients_needed') ? Object.assign({}, c, { value: 1, formatted_value: '1 case' }) : c));
+    const layout = { cards: [{ id: 'n', kind: 'number', metric_key: 'finance.payroll_clients_needed', visual: 'stat', visual_options: { unit: 'cases' } }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: cards }) });
+    await p.exports.loadDashboardById('d1');
+    const html = p.nodes.dashboardMetricGrid.innerHTML;
+    expect(text(html)).toContain('1 case');
+    expect(html).not.toContain('dash-metric-card__unit');
+    expect(text(html)).not.toContain('1 cases');
+  });
+});
+
+describe('team conversion: unassigned decided records', () => {
+  const team = { metric_key: 'legal_firm.sales_intake.team_member_conversion_rate', title: 'Team Member Conversion', format: 'table', row_format: 'percentage',
+    formatted_value: null, data_state: 'ok', period: 'Jan 1, 2026 - Jan 31, 2026',
+    value: [{ attorney_name: 'Avery Stone', conversion_rate: 40 }], metadata: { unassigned: { won: 3, lost: 2, decided: 5 } } };
+  test('a muted footnote above the footer when decided > 0', async () => {
+    const layout = { metric_keys: [team.metric_key] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [team] }) });
+    await p.exports.loadDashboardById('d1');
+    const html = p.nodes.dashboardMetricGrid.innerHTML;
+    expect(html).toContain('<p class="dash-card__note">Not assigned to anyone: 3 won, 2 lost</p>');
+    expect(html.indexOf('Not assigned to anyone')).toBeLessThan(html.lastIndexOf('dash-card__footer'));
+  });
+  test('a declared card shows it too; none when nothing was decided', async () => {
+    const layout = { cards: [{ id: 't', kind: 'breakdown', metric_key: 'sales_intake.team_member_conversion_rate' }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [team] }) });
+    await p.exports.loadDashboardById('d1');
+    expect(text(p.nodes.dashboardMetricGrid.innerHTML)).toContain('Not assigned to anyone: 3 won, 2 lost');
+    const none = Object.assign({}, team, { metadata: { unassigned: { won: 0, lost: 0, decided: 0 } } });
+    const q = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [none] }) });
+    await q.exports.loadDashboardById('d1');
+    expect(q.nodes.dashboardMetricGrid.innerHTML).not.toContain('Not assigned to anyone');
+  });
+});
+
+describe('one card with engine_error', () => {
+  const declared = require(path.join(__dirname, '../fixtures/dashboard/declared-layouts.json'));
+  test.each(['cash_this_month', 'active_cases_total', 'gross_revenue_total'])('%s: that card shows its calm state with the reason; every other card still renders', async (broken) => {
+    const cards = declared.cards_synthetic.map((c) => (c.metric_key.endsWith(broken)
+      ? Object.assign({}, c, { value: null, formatted_value: null, data_state: 'engine_error', data_state_reason: 'LANA could not work this number out for these dates. It will try again on the next refresh.' }) : c));
+    const layout = declared.layouts['Owner Overview'];
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'Owner Overview', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: cards }),
+      getMetricDetail: jest.fn().mockResolvedValue({ data: { snapshots: [] } }) });
+    await p.exports.loadDashboardById('d1');
+    const html = p.nodes.dashboardMetricGrid.innerHTML;
+    expect(text(html)).toContain('LANA could not work this number out for these dates.');
+    expect(html).toContain('lex-data-state--calm');
+    expect(html).not.toContain('$0');
+    ['Gross Revenue', 'Target Revenue', 'Overdue Expected Cash', 'Total Active Cases', 'Cash Coming In'].forEach((title) => expect(text(html)).toContain(title));
+  });
+});
+
+describe('layout.chapters on the dashboard', () => {
+  const declared = require(path.join(__dirname, '../fixtures/dashboard/declared-layouts.json'));
+  test('each chapter shows its title and intro, in the declared order; empty ones are hidden', async () => {
+    const layout = {
+      chapters: [{ id: 'coming_in', title: 'Coming in', intro: 'New leads and where they came from.' }, { id: 'empty', title: 'Nothing here', intro: 'x' },
+        { id: 'team', title: 'Team', intro: 'Who is doing the work.' }],
+      cards: [{ id: 'a', kind: 'number', metric_key: 'case_volume.active_cases_total', chapter: 'team' },
+        { id: 'b', kind: 'number', metric_key: 'finance.gross_revenue_total', chapter: 'coming_in' }],
+    };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'Leads and Deals', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: declared.cards_synthetic }) });
+    await p.exports.loadDashboardById('d1');
+    const html = p.nodes.dashboardMetricGrid.innerHTML;
+    expect(html).toContain('<div class="dash-chapter" role="heading" aria-level="2">Coming in</div><p class="dash-chapter__intro">New leads and where they came from.</p>');
+    expect(html.indexOf('Coming in')).toBeLessThan(html.indexOf('>Team<'));
+    expect(html).not.toContain('Nothing here');
+    expect(html.indexOf('Gross Revenue')).toBeLessThan(html.indexOf('Total Active Cases'));
+  });
+});
+
+test('worklist rows with refs open the record panel by click or keyboard', () => {
+  const html = page().exports.worklistHtml([{ client_name: 'Jordan Smith', amount: 4500, refs: [{ object: 'deal', id: 'd-1' }] }, { client_name: 'No ref', amount: 1 }]);
+  const rows = html.split('<tr').slice(2);
+  expect(rows[0]).toContain(' class="dash-worklist__row" data-record-ref="deal|d-1|" data-row-index="0" tabindex="0"');
+  expect(rows[1]).not.toContain('data-record-ref');
+});
+
+describe('fix data in LANA on worklists', () => {
+  const row = { record_id: 'cd-1', client_name: 'Jordan Smith', won_on: '2026-11-20', refs: [{ object: 'deal', id: 'cd-1' }],
+    edit: { record_id: 'cd-1', field_key: 'monetaryValue', standard_key: 'amount', current_value: null, editable: true },
+    outcome_edit: { record_id: 'd-1', editable: true, current_status: 'open', current_decided_on: null, allowed_values: ['won', 'lost'] } };
+  test('rows with hints get their controls in a line under the row, only with can_correct', () => {
+    const html = page().exports.worklistHtml([row], null, { can_correct: true, can_resolve_conflicts: false });
+    expect(html).toContain('<tr class="dash-worklist__fix"><td colspan=');
+    expect(html).toContain('data-dfix-action="amount"');
+    expect(html).toContain('data-dfix-action="won"');
+    expect(page().exports.worklistHtml([row], null, { can_correct: false })).not.toContain('dfix');
+    expect(page().exports.worklistHtml([row], null, null)).not.toContain('dfix');
+  });
+});
+
+describe('card headline and callouts', () => {
+  const declared = require(path.join(__dirname, '../fixtures/dashboard/declared-layouts.json'));
+  const withText = (meta) => declared.cards_synthetic.map((c) => (c.metric_key.endsWith('payroll_clients_needed') ? Object.assign({}, c, { metadata: Object.assign({}, c.metadata, meta) }) : c));
+  async function render(meta) {
+    const layout = { cards: [{ id: 'n', kind: 'number', metric_key: 'finance.payroll_clients_needed' }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: withText(meta) }) });
+    await p.exports.loadDashboardById('d1');
+    return p.nodes.dashboardMetricGrid.innerHTML;
+  }
+  test('the headline and up to 3 callouts show muted under the card; the rest behind "Show more"', async () => {
+    const html = await render({ headline: 'You need 4 more clients this month.', callouts: ['One.', 'Two.', 'Three.', 'Four.', 'Five.'] });
+    expect(html).toContain('<p class="dash-card__headline">You need 4 more clients this month.</p>');
+    const shown = html.split('<ul class="dash-callouts">')[1].split('</ul>')[0];
+    expect(shown.split('<li').length - 1).toBe(3);
+    expect(html).toContain('<details class="dash-callouts__more"><summary>Show more</summary><ul class="dash-callouts"><li>Four.</li><li>Five.</li></ul></details>');
+    expect(html.indexOf('dash-callouts')).toBeLessThan(html.lastIndexOf('dash-card__footer'));
+  });
+  test('3 or fewer callouts: no Show more; none: nothing', async () => {
+    expect(await render({ callouts: ['One.'] })).not.toContain('Show more');
+    expect(await render({})).not.toContain('dash-callouts');
+  });
+  test('a second line with a link opens that list', async () => {
+    const html = await render({ second_line: { label: 'Deals with an amount', value: 80, format: 'percentage', link: { metric_key: 'legal_firm.sales_intake.deals_missing_amount' } } });
+    const line = html.split('dash-metric-card__second-line')[1];
+    expect(line).toContain('data-metric-detail-link="admin/metric_detail.html?metric_key=legal_firm.sales_intake.deals_missing_amount');
+    expect(line).toContain('Deals with an amount 80%');
+  });
+});
+
+describe('long breakdowns: top 8 and "And N more in the details"', () => {
+  const pipeline = Array.from({ length: 83 }, (_, i) => ({ pipeline: 'Pipeline ' + (i % 3), stage: 'Stage ' + i, stage_position: i,
+    open_count: i < 10 ? 2 : 0, no_amount_count: 0, value: i < 10 ? (i + 1) * 1000 : 0 }));
+  const card = { metric_key: 'legal_firm.sales_intake.open_pipeline_by_stage', title: 'Open Deals by Stage', format: 'distribution', data_state: 'ok',
+    period: 'Nov 1, 2026 - Nov 30, 2026', value: pipeline };
+  async function render(visual) {
+    const layout = { cards: [{ id: 'p', kind: 'breakdown', metric_key: 'sales_intake.open_pipeline_by_stage', visual }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [card] }) });
+    await p.exports.loadDashboardById('d1');
+    return p.nodes.dashboardMetricGrid.innerHTML;
+  }
+  test('ranked bars: 8 rows by value, zero rows hidden, the rest counted', async () => {
+    const html = await render('ranked_bars');
+    expect(html.split('<li class="mini-rank__row"').length - 1).toBe(8);
+    expect(html).toContain('Stage 9 (Pipeline 0)');
+    expect(html).not.toContain('Stage 1 (Pipeline 1)<');
+    expect(html).toContain('And 2 more in the details');
+    expect(html).not.toContain('Stage 50');
+  });
+  test('columns: the same, drawn as bars with the count', async () => {
+    const html = await render('columns');
+    expect(html).toContain('And 2 more in the details');
+    expect(html).not.toContain('Stage 50');
+  });
+});
+
+test('a distribution with a declared value format shows money; without one, plain numbers', async () => {
+  const value = [{ age_band: 'Under 30 days', open_count: 79, no_amount_count: 10, value: 314350 }, { age_band: '30 to 60 days', open_count: 5, no_amount_count: 1, value: 2000 }];
+  const make = (extra) => Object.assign({ metric_key: 'legal_firm.sales_intake.open_pipeline_by_age', title: 'Open Pipeline by Age', format: 'distribution', data_state: 'ok', period: 'Nov 2026', value }, extra);
+  const html = page().exports.renderMetricCard(make({ metadata: { value_format: 'currency' } }));
+  expect(text(html)).toContain('$314,350');
+  expect(text(page().exports.renderMetricCard(make({})))).toContain('314,350');
+  expect(text(page().exports.renderMetricCard(make({})))).not.toContain('$314,350');
+});
+
+test('Form Fills per day over 30 days: the Per day tab draws 30 columns, not a short list', async () => {
+  const days = Array.from({ length: 30 }, (_, i) => ({ period_start: '2026-10-' + String(i + 1).padStart(2, '0'), value: i % 3 }));
+  const weeks = [{ period_start: '2026-10-05', value: 6 }, { period_start: '2026-10-12', value: 4 }];
+  const cards = [
+    { metric_key: 'legal_firm.sales_intake.form_fills_per_day', title: 'Form Fills', format: 'distribution', data_state: 'ok', period: 'Oct 2026', value: days },
+    { metric_key: 'legal_firm.sales_intake.form_fills_per_week', title: 'Form Fills', format: 'distribution', data_state: 'ok', period: 'Oct 2026', value: weeks },
+  ];
+  const layout = { cards: [{ id: 'f', kind: 'breakdown', metric_key: 'sales_intake.form_fills_per_day', visual: 'columns',
+    variants: [{ label: 'Per day', metric_key: 'sales_intake.form_fills_per_day' }, { label: 'Per week', metric_key: 'sales_intake.form_fills_per_week' }] }] };
+  const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: cards }) });
+  await p.exports.loadDashboardById('d1');
+  const html = p.nodes.dashboardMetricGrid.innerHTML;
+  expect(html.split('<g class="mini-cols__group').length - 1).toBe(30);
+  expect(html).not.toContain('more in the details');
+  expect(html).not.toContain('mini-bars');
+});
+
+describe('a hero without history shrinks to its content', () => {
+  function slot(hero) {
+    const cardClasses = new Set(hero ? ['dash-metric-card', 'dash-metric-card--hero'] : ['dash-metric-card']);
+    const card = { classList: { add: (c) => cardClasses.add(c), remove: (c) => cardClasses.delete(c), contains: (c) => cardClasses.has(c) } };
+    return { cardClasses, innerHTML: '', classList: { remove() {} }, closest: (sel) => (sel === '.dash-metric-card' ? card : null) };
+  }
+  test('no sparkline data: the hero is marked to hug its content; with data it is not', () => {
+    const empty = slot(true);
+    page().exports.paintSparkline(empty, null);
+    expect(empty.cardClasses.has('dash-metric-card--no-spark')).toBe(true);
+    const drawn = slot(true);
+    page().exports.paintSparkline(drawn, { points: '0,1 100,2', last: { x: 100, y: 2 }, trend: 'up' });
+    expect(drawn.cardClasses.has('dash-metric-card--no-spark')).toBe(false);
+  });
+  test('the stylesheet lets that hero hug its content instead of stretching', () => {
+    const css = fs.readFileSync(path.join(__dirname, '../../src/css/admin/insights-dashboard.css'), 'utf8');
+    const rule = css.slice(css.indexOf('.dash-bento .dash-metric-card--hero.dash-metric-card--no-spark {'));
+    expect(rule.slice(0, rule.indexOf('}'))).toContain('align-self: start');
+  });
+});
+
+test('team appointments by meeting type (no value field): member · type labels, counts not n/a, members clickable', async () => {
+  const rows = [
+    { team_member: 'Avery Stone', meeting_type: 'Consultation', appointments: 68, held: 29, no_show: 30, cancelled: 8, no_outcome: 1, show_rate: 49.2, refs: [{ object: 'person', id: 'p-1', user_id: 'u-9' }] },
+    { team_member: 'Blake Ross', meeting_type: 'Signing', appointments: 12, held: 10, no_show: 1, cancelled: 1, no_outcome: 0, show_rate: 90.9, refs: [{ object: 'person', id: 'p-2', user_id: null }] },
+  ];
+  const card = { metric_key: 'legal_firm.sales_intake.team_appointments_by_meeting_type', title: 'Team Appointments', format: 'distribution', data_state: 'ok', period: 'Nov 2026', value: rows };
+  for (const visual of ['paired_columns', 'ranked_bars']) {
+    const layout = { cards: [{ id: 't', kind: 'breakdown', metric_key: 'sales_intake.team_appointments_by_meeting_type', visual }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [card] }) });
+    await p.exports.loadDashboardById('d1');
+    const html = p.nodes.dashboardMetricGrid.innerHTML;
+    expect([visual, text(html).includes('Avery Stone · Consultation')]).toEqual([visual, true]);
+    expect([visual, text(html).includes('68')]).toEqual([visual, true]);
+    expect([visual, html.includes('n/a')]).toEqual([visual, false]);
+    expect([visual, html.includes('data-record-ref="person|p-1|u-9"')]).toEqual([visual, true]);
+  }
+});
+
+describe('worklists fall back to the card preview rows', () => {
+  test('cardPreviewRows reads metadata.top, else metadata.rows', () => {
+    const p = page();
+    expect(p.exports.cardPreviewRows({ metadata: { top: [{ client_name: 'A' }], rows: [{ client_name: 'B' }] } })).toEqual([{ client_name: 'A' }]);
+    expect(p.exports.cardPreviewRows({ metadata: { rows: [{ client_name: 'B' }] } })).toEqual([{ client_name: 'B' }]);
+    expect(p.exports.cardPreviewRows({ metadata: {} })).toBe(null);
+    expect(p.exports.cardPreviewRows(null)).toBe(null);
+  });
+  test('the worklist uses them when metric detail sent no rows', () => {
+    expect(fs.readFileSync(path.join(__dirname, '../../src/js/admin/dashboard-detail.js'), 'utf8'))
+      .toContain('var rows = result && result.rows && result.rows.length ? result.rows : (cardPreviewRows(metric) || (result ? result.rows : null));');
+  });
+});
+
+describe('team appointments from metadata.by_person', () => {
+  const byPerson = [
+    { person: { object: 'person', id: 'p-1', user_id: 'u-9', label: 'Avery Stone' }, label: 'Avery Stone', held: 29, no_show: 30, cancelled: 8, no_outcome: 1, total: 68, show_rate: 49.2 },
+    { person: { object: 'person', id: 'p-2', user_id: null, label: 'Blake Ross' }, label: 'Blake Ross', held: 10, no_show: 1, cancelled: 1, no_outcome: 0, total: 12, show_rate: 90.9 },
+  ];
+  const card = { metric_key: 'legal_firm.sales_intake.team_appointments_by_meeting_type', title: 'Team Appointments', format: 'distribution', data_state: 'ok', period: 'Nov 2026',
+    value: [{ team_member: 'Avery Stone', meeting_type: 'Consultation', appointments: 68 }], metadata: { by_person: byPerson } };
+  async function render(visual, options) {
+    const layout = { cards: [{ id: 't', kind: 'breakdown', metric_key: 'sales_intake.team_appointments_by_meeting_type', visual, visual_options: options || {} }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [card] }) });
+    await p.exports.loadDashboardById('d1');
+    return p.nodes.dashboardMetricGrid.innerHTML;
+  }
+  test('paired columns per person from the declared series (held, no show), each person clickable', async () => {
+    const html = await render('paired_columns', { series: ['held', 'no_show'] });
+    expect(text(html)).toContain('Held');
+    expect(text(html)).toContain('No show');
+    expect(text(html)).not.toContain('Consultation');
+    expect(html).toContain('data-record-ref="person|p-1|u-9"');
+    expect(html).toContain('data-tip="Avery Stone · Held 29 · No show 30"');
+  });
+  test('ranked bars rank people by total', async () => {
+    const html = await render('ranked_bars', { series: ['held', 'no_show', 'cancelled'] });
+    expect(text(html)).toContain('Avery Stone');
+    expect(text(html)).toContain('68');
+    expect(html).toContain('data-record-ref="person|p-2|"');
+  });
+});
+
+describe('live recheck: inferred values, value_key, rows path and the stat fallback', () => {
+  async function render(card, layoutCard) {
+    const layout = { cards: [Object.assign({ id: 'x', kind: 'breakdown', metric_key: card.metric_key.split('.').slice(1).join('.') }, layoutCard)] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [card] }) });
+    await p.exports.loadDashboardById('d1');
+    return p.nodes.dashboardMetricGrid.innerHTML;
+  }
+  test('deals by owner: 266 open deals inferred from a count never reads "$266"', async () => {
+    const card = { metric_key: 'legal_firm.sales_intake.deals_by_owner', title: 'Deals by Owner', format: 'distribution', row_format: 'currency', data_state: 'ok', period: 'Nov 2026',
+      value: [{ owner_name: 'Taylor Vance', owner_kind: 'owner', open_count: 266 }, { owner_name: 'Casey Lee', owner_kind: 'not_on_team', open_count: 12 }] };
+    const html = await render(card, { visual: 'ranked_bars' });
+    expect(text(html)).toContain('266');
+    expect(html).not.toContain('$266');
+    expect(text(html)).not.toContain('not_on_team');
+  });
+  test('visual_options.value_key ranks by that field, with value_format when given', async () => {
+    const card = { metric_key: 'legal_firm.sales_intake.deals_by_owner', title: 'Deals by Owner', format: 'distribution', data_state: 'ok', period: 'Nov 2026',
+      value: [{ owner_name: 'Taylor Vance', open_count: 2, open_value: 9000 }, { owner_name: 'Casey Lee', open_count: 5, open_value: 1000 }] };
+    const html = await render(card, { visual: 'ranked_bars', visual_options: { value_key: 'open_value', value_format: 'currency' } });
+    expect(text(html)).toContain('$9,000');
+    expect(html.indexOf('Taylor Vance')).toBeLessThan(html.indexOf('Casey Lee'));
+  });
+  test('team appointments: rows from visual_options.rows draw grouped columns with the declared labels', async () => {
+    const card = { metric_key: 'legal_firm.sales_intake.team_appointments_by_meeting_type', title: 'Team Appointments', format: 'number', data_state: 'ok', period: 'Nov 2026', value: 208,
+      metadata: { by_person: [
+        { person: { object: 'person', id: 'p-1', label: 'Avery Stone' }, label: 'Avery Stone', held: 29, no_show: 30, cancelled: 8, total: 68 },
+        { person: { object: 'person', id: 'p-2', label: 'Blake Ross' }, label: 'Blake Ross', held: 10, no_show: 1, cancelled: 1, total: 12 }] } };
+    const html = await render(card, { visual: 'paired_columns', visual_options: { rows: 'metadata.by_person', series: ['held', 'no_show', 'cancelled'], group_by: 'person', series_labels: ['Held', 'No-show', 'Cancelled'] } });
+    expect(text(html)).toContain('No-show');
+    expect(text(html)).toContain('Cancelled');
+    expect(html).toContain('mini-cols__bar--s2');
+    expect(html).toContain('data-record-ref="person|p-1|"');
+  });
+  test('series and labels sent in card metadata draw grouped columns when the layout declares none', async () => {
+    const card = { metric_key: 'legal_firm.sales_intake.team_appointments_by_meeting_type', title: 'Team Appointments', format: 'number', data_state: 'ok', period: 'Nov 2026', value: 208,
+      metadata: { group_by: 'person', series: ['held', 'no_show', 'cancelled'], series_labels: ['Held', 'No-show', 'Cancelled'], by_person: [
+        { person: { object: 'person', id: 'p-1', label: 'Avery Stone' }, label: 'Avery Stone', held: 29, no_show: 30, cancelled: 8, total: 68 }] } };
+    const html = await render(card, { visual: 'paired_columns' });
+    expect(text(html)).toContain('No-show');
+    expect(html).toContain('mini-cols__bar--s2');
+  });
+  test('with the path empty and a single number, the card is a stat, not a one-bar chart', async () => {
+    const card = { metric_key: 'legal_firm.sales_intake.team_appointments_by_meeting_type', title: 'Team Appointments', format: 'number', data_state: 'ok', period: 'Nov 2026', value: 208, formatted_value: '208' };
+    const html = await render(card, { visual: 'paired_columns', visual_options: { rows: 'metadata.by_person', series: ['held', 'no_show', 'cancelled'], unit: 'meetings' } });
+    expect(html).not.toContain('mini-cols');
+    expect(html).toContain('dash-metric-card__value');
+    expect(text(html)).toContain('208');
+    expect(text(html)).toContain('meetings');
+  });
+});
+
+describe('as-of dashboards (period_mode as_of)', () => {
+  function asOfPage(search, layout) {
+    const getDashboardMetricCards = jest.fn().mockResolvedValue({ data: [] });
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'Still Open', layout: Object.assign({ period_mode: 'as_of', cards: [] }, layout) } }), getDashboardMetricCards }, null, search);
+    return { p, getDashboardMetricCards };
+  }
+  test('cards are fetched with periodEnd only, the as-of day from the link, and the header says "As of"', async () => {
+    const { p, getDashboardMetricCards } = asOfPage('?id=d1&asOf=2026-10-31');
+    await p.exports.loadDashboardById('d1');
+    const params = getDashboardMetricCards.mock.calls[0][0];
+    expect(params.periodEnd).toBe('2026-10-31');
+    expect(params.periodStart).toBeUndefined();
+    expect(params.compareToPrevious).toBeUndefined();
+    expect(p.nodes.dashboardPeriodLabel.textContent).toBe('As of Oct 31, 2026');
+    expect(p.nodes.dashboardPeriodRange.hidden).toBe(true);
+    expect(p.nodes.dashboardAsOfFields.hidden).toBe(false);
+    expect(p.nodes.dashboardAsOfDay.value).toBe('2026-10-31');
+  });
+  test('with no day in the link, the day is today in the firm time zone', async () => {
+    const { p, getDashboardMetricCards } = asOfPage('?id=d1');
+    await p.exports.loadDashboardById('d1');
+    expect(getDashboardMetricCards.mock.calls[0][0].periodEnd).toBe(p.today);
+  });
+  test('a range dashboard keeps the range picker and both dates', async () => {
+    const getDashboardMetricCards = jest.fn().mockResolvedValue({ data: [] });
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout: { cards: [] } } }), getDashboardMetricCards });
+    await p.exports.loadDashboardById('d1');
+    expect(getDashboardMetricCards.mock.calls[0][0].periodStart).toBe('2026-01-01');
+    expect(p.nodes.dashboardPeriodRange.hidden).toBe(false);
+    expect(p.nodes.dashboardAsOfFields.hidden).toBe(true);
+  });
+});
+
+describe('monthly bars (metadata.by_month)', () => {
+  const unescape = (s) => s.split('&amp;').join('&');
+  const byMonth = [
+    { month: '2026-11', label: 'Nov', count: 3, value: 7000, format: 'currency' },
+    { month: 'older', label: 'Older', count: 20, value: 30000, format: 'currency' },
+    { month: '2026-10', label: 'Oct', count: 12, value: 45000, format: 'currency' }];
+  const monthCard = (meta) => ({ metric_key: 'legal_firm.sales_intake.open_deals_by_month', title: 'Open Deals', format: 'currency', data_state: 'ok', period: 'Nov 2026',
+    value: 82000, formatted_value: '$82,000', metadata: Object.assign({ group_by_month_of: 'created', unit: 'deals', by_month: byMonth }, meta) });
+  async function render(card, layoutCard) {
+    const layout = { cards: [Object.assign({ id: 'm', kind: 'number', metric_key: 'sales_intake.open_deals_by_month' }, layoutCard)] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [card] }) });
+    await p.exports.loadDashboardById('d1');
+    return p.nodes.dashboardMetricGrid.innerHTML;
+  }
+  test('bars Older first, each with count and amount in its tooltip, under the headline and subtitle', async () => {
+    const html = await render(monthCard(), { visual: 'month_bars' });
+    expect(html).toContain('mini-cols');
+    expect(text(html)).toContain('$82,000');
+    expect(text(html)).toContain('By month created');
+    expect(html.indexOf('>Older<')).toBeLessThan(html.indexOf('>Oct<'));
+    expect(html.indexOf('>Oct<')).toBeLessThan(html.indexOf('>Nov<'));
+    expect(html).toContain('data-tip="Oct · 12 deals · $45,000"');
+  });
+  test('a bar opens the records for that month; the title opens all of them', async () => {
+    const html = unescape(await render(monthCard(), { visual: 'month_bars' }));
+    expect(html).toContain('raw_filter%5Bmonth%5D=2026-10');
+    expect(html).toContain('raw_filter%5Bmonth%5D=older');
+    const title = html.split('dash-metric-card__title').slice(1).join('').split('>')[0];
+    expect(title).toContain('data-metric-detail-link="admin/metric_detail.html?metric_key=legal_firm.sales_intake.open_deals_by_month');
+    expect(title).not.toContain('raw_filter');
+  });
+  test('with no visual on the layout, by_month still draws month bars; bars by count when there is no amount', async () => {
+    const counts = monthCard({ group_by_month_of: 'unknown_rule', by_month: [{ month: '2026-10', label: 'Oct', count: 4 }, { month: '2026-11', label: 'Nov', count: 2 }] });
+    const html = await render(counts, {});
+    expect(html).toContain('mini-cols');
+    expect(html).toContain('data-tip="Oct · 4 deals"');
+    expect(text(html)).not.toContain('By month');
+  });
+  test('a worklist card stays a list, even with by_month', async () => {
+    const html = await render(monthCard(), { kind: 'worklist', visual: 'worklist' });
+    expect(html).not.toContain('raw_filter');
+    expect(html).toContain('data-worklist-key');
+  });
+});
+
+describe('link cards', () => {
+  const linkCard = { metric_key: 'legal_firm.sales_intake.still_open_summary', title: 'Still Open', format: 'number', data_state: 'ok', period: 'Nov 2026', value: 4330,
+    metadata: { headline: 'Everything still open: $7.5M across 4,330 deals.', target: { slug: 'still-open', as_of: '2026-11-27' } } };
+  async function render(layoutCard, dashboards) {
+    const layout = { cards: [Object.assign({ id: 'l', kind: 'number', metric_key: 'sales_intake.still_open_summary' }, layoutCard)] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [linkCard] }),
+      listBIDashboards: jest.fn().mockResolvedValue({ data: dashboards || [{ id: 'd-open', name: 'Still Open', slug: 'still-open' }] }) });
+    await p.exports.loadDashboardById('d1');
+    return p;
+  }
+  test('shows the server headline and "See the report"', async () => {
+    const p = await render({ visual: 'link' });
+    const html = p.nodes.dashboardMetricGrid.innerHTML;
+    expect(text(html)).toContain('Everything still open: $7.5M across 4,330 deals.');
+    expect(text(html)).toContain('See the report');
+    expect(html).toContain('data-report-target="still-open"');
+    expect(html).not.toContain('mini-cols');
+  });
+  test('"See the report" finds the report by its slug and opens it as of this dashboard\'s end day', async () => {
+    const p = await render({ visual: 'link' });
+    const go = jest.fn();
+    p.Lex.Nav.go = go;
+    await p.exports.openReportTarget('still-open', '');
+    expect(go).toHaveBeenCalledWith('admin/dashboard-detail.html?id=d-open&asOf=2026-01-31');
+  });
+  test('a target the list does not have says so calmly', async () => {
+    const p = await render({ visual: 'link' }, []);
+    const go = jest.fn();
+    p.Lex.Nav.go = go;
+    const error = jest.fn();
+    p.Lex.Toast = { error };
+    await p.exports.openReportTarget('still-open', '');
+    expect(go).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith('Could not find that report.');
+  });
+  test('with no visual on the layout, a card with a target is still a link card', async () => {
+    const p = await render({});
+    expect(text(p.nodes.dashboardMetricGrid.innerHTML)).toContain('See the report');
+  });
+});
+
+describe('the server period label in the footer', () => {
+  test('lineage.period_rule replaces the plain dates when it says more', () => {
+    const rule = 'Deals created Oct 29 - Nov 27, 2026, still open on Nov 27, 2026';
+    const html = page().exports.renderMetricCard(Object.assign({}, card('new_cases_opened_by_service_offering'), { period: 'Oct 29 - Nov 27, 2026', lineage: { period_rule: rule } }));
+    const footer = html.split('dash-metric-card__period')[1].split('</div>')[0];
+    expect(text('<x' + footer)).toContain(rule);
+  });
+});
+
+describe('as-of dashboards keep worklists as lists', () => {
+  test('Next Most Likely to Close (no by_month) stays a list, not month bars or a link', async () => {
+    const worklist = { metric_key: 'legal_firm.sales_intake.next_most_likely_to_close', title: 'Next Most Likely to Close', format: 'table', data_state: 'ok', period: 'Nov 2026', value: 3, metadata: {} };
+    const getMetricDetail = jest.fn().mockResolvedValue({ data: { raw_data: { rows: [{ record_id: 'r-1', deal_name: 'Avery Plan' }] } } });
+    const layout = { period_mode: 'as_of', cards: [{ id: 'w', kind: 'worklist', visual: 'worklist', metric_key: 'sales_intake.next_most_likely_to_close' }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'Still Open', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [worklist] }), getMetricDetail },
+      null, '?id=d1&asOf=2026-11-27');
+    await p.exports.loadDashboardById('d1');
+    const html = p.nodes.dashboardMetricGrid.innerHTML;
+    expect(html).toContain('data-worklist-key');
+    expect(html).not.toContain('mini-cols');
+    expect(html).not.toContain('See the report');
+  });
+});
+
+describe('month bars: records with no date', () => {
+  test('a muted note under the bars opens the records with no month', async () => {
+    const card = { metric_key: 'legal_firm.sales_intake.open_deals_by_month', title: 'Open Deals', format: 'currency', data_state: 'ok', period: 'Nov 2026', value: 12000, formatted_value: '$12,000',
+      metadata: { unit: 'deals', by_month: [{ month: '2026-10', label: 'Oct', count: 2, value: 7500 }], by_month_unplaced: { label: 'No date recorded', count: 3, value: 4500 } } };
+    const layout = { cards: [{ id: 'm', kind: 'number', visual: 'month_bars', value_format: 'currency', metric_key: 'sales_intake.open_deals_by_month' }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [Object.assign({ value_format: 'currency' }, card)] }) });
+    await p.exports.loadDashboardById('d1');
+    const html = p.nodes.dashboardMetricGrid.innerHTML.split('&amp;').join('&');
+    expect(text(html)).toContain('3 with no date recorded ($4,500)');
+    const note = html.split('dash-month-note').slice(1).join('');
+    expect(note).toContain('raw_filter%5Bmonth%5D=(empty)');
+  });
+});
+
+describe('month bars on an average card', () => {
+  test('bars are the averages, the tooltip names the records, and the headline is the server value, never a sum', async () => {
+    const card = { metric_key: 'legal_firm.sales_intake.avg_days_open_by_month', title: 'Average Days Open', format: 'number', data_state: 'ok', period: 'Nov 2026',
+      value: 40, formatted_value: '40', metadata: { aggregation: 'average', by_month: [
+        { month: '2026-10', label: 'Oct', value: 42, value_count: 18 }, { month: '2026-11', label: 'Nov', value: 30, value_count: 2 }] } };
+    const layout = { cards: [{ id: 'a', kind: 'number', visual: 'month_bars', metric_key: 'sales_intake.avg_days_open_by_month' }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [card] }) });
+    await p.exports.loadDashboardById('d1');
+    const html = p.nodes.dashboardMetricGrid.innerHTML;
+    expect(html).toContain('data-tip="Oct · Avg 42 · 18 records"');
+    expect(html.split('dash-metric-card__value')[1]).toContain('>40<');
+    expect(text(html)).not.toContain('72');
+  });
+});
+
+describe('mappings links are for admins and org admins only', () => {
+  const declared = require(path.join(__dirname, '../fixtures/dashboard/declared-layouts.json'));
+  test('someone else sees the caveat words, but no link into Mappings and no Open Mappings action', async () => {
+    const cards = declared.cards_synthetic.map((c) => (c.metric_key.endsWith('closed_cases_by_service_offering')
+      ? Object.assign({}, c, { metadata: Object.assign({}, c.metadata, { mapping_coverage: { mapped: 8, not_mapped: 42, unlinked: 5 } }) }) : c));
+    const layout = { cards: [{ id: 'b', kind: 'breakdown', metric_key: 'case_volume.closed_cases_by_service_offering' }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: cards }) }, null, '', false);
+    await p.exports.loadDashboardById('d1');
+    const html = p.nodes.dashboardMetricGrid.innerHTML;
+    expect(text(html)).toContain('42 matters are not mapped to a service yet');
+    expect(html).not.toContain('settings-v2.html#mappings');
+    expect(text(html)).not.toContain('Map them');
+  });
+});
+
+describe('as-of dashboards link metric detail with asOf alone', () => {
+  test('"See the records", a bar and the no-date note link with asOf and no range; worklist rows ask with asOf; cards still periodEnd', async () => {
+    const card = { metric_key: 'legal_firm.sales_intake.open_deals_by_month', title: 'Open Deals', format: 'currency', data_state: 'ok', value: 12000, formatted_value: '$12,000',
+      metadata: { unit: 'deals', by_month: [{ month: '2026-10', label: 'Oct', count: 2, value: 7500 }], by_month_unplaced: { label: 'No date recorded', count: 3, value: 4500 } } };
+    const layout = { period_mode: 'as_of', cards: [{ id: 'm', kind: 'number', visual: 'month_bars', metric_key: 'sales_intake.open_deals_by_month' }] };
+    const getDashboardMetricCards = jest.fn().mockResolvedValue({ data: [card] });
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'Still Open', layout } }), getDashboardMetricCards }, null, '?id=d1&asOf=2026-11-27');
+    await p.exports.loadDashboardById('d1');
+    expect(getDashboardMetricCards.mock.calls[0][0].periodEnd).toBe('2026-11-27');
+    const html = p.nodes.dashboardMetricGrid.innerHTML.split('&amp;').join('&');
+    const links = html.split('data-metric-detail-link="').slice(1).map((part) => part.split('"')[0]).filter((l) => l.indexOf('metric_detail') !== -1);
+    expect(links.length).toBeGreaterThanOrEqual(3);
+    links.forEach((l) => {
+      expect(l).toContain('asOf=2026-11-27');
+      expect(l).not.toContain('periodStart');
+      expect(l).not.toContain('periodEnd');
+    });
+    expect(links.some((l) => l.indexOf('raw_filter%5Bmonth%5D=2026-10') !== -1)).toBe(true);
+    expect(links.some((l) => l.indexOf('raw_filter%5Bmonth%5D=(empty)') !== -1)).toBe(true);
+    expect(p.exports.detailPeriod()).toEqual({ asOf: '2026-11-27' });
+  });
+});
+
+describe('Still Open live check: formats and empty months', () => {
+  async function render(card, layoutCard) {
+    const layout = { cards: [Object.assign({ id: 'm', kind: 'number', metric_key: card.metric_key.split('.').slice(1).join('.') }, layoutCard)] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [card] }) });
+    await p.exports.loadDashboardById('d1');
+    return p.nodes.dashboardMetricGrid.innerHTML;
+  }
+  test('with no card format, the headline uses value_format or row_format', () => {
+    const fmt = page().exports.formatMetricCardValue;
+    expect(fmt({ value: 7508521, value_format: 'currency' })).toBe('$7,508,521');
+    expect(fmt({ value: 7508521, row_format: 'currency' })).toBe('$7,508,521');
+    expect(fmt({ value: 7508521, metadata: { value_format: 'currency' } })).toBe('$7,508,521');
+    expect(fmt({ value: 7508521, format: 'number', value_format: 'currency' })).not.toContain('$');
+  });
+  test('month bars: headline and tooltip use row_format when the card has no format', async () => {
+    const card = { metric_key: 'legal_firm.sales_intake.still_open_by_stage', title: 'Still Open by Stage', data_state: 'ok', value: 7508521, row_format: 'currency',
+      metadata: { unit: 'deals', by_month: [{ month: '2026-10', label: 'October 2026', count: 3, value: 7508521 }] } };
+    const html = await render(card, { visual: 'month_bars' });
+    expect(html.split('dash-metric-card__value')[1]).toContain('$7,508,521');
+    expect(html).toContain('data-tip="October 2026 · 3 deals · $7,508,521"');
+    expect(html).toContain('>Oct<');
+  });
+  test('a forward cash card with all-zero months shows the empty line, not a row of 0s', async () => {
+    const card = { metric_key: 'legal_firm.finance.cash_due_by_month', title: 'Cash Due', data_state: 'ok', value: 0, value_format: 'currency',
+      metadata: { group_by_month_of: 'next_billing', by_month: [{ month: '2026-12', label: 'Dec', count: 0, value: 0 }, { month: '2027-01', label: 'Jan', count: 0, value: 0 }] } };
+    const html = await render(card, { visual: 'month_bars' });
+    expect(text(html)).toContain('Nothing due in these months');
+    expect(html).not.toContain('mini-cols__value');
+  });
+});
+
+describe('axes on dashboard charts', () => {
+  test('month bars carry a money axis; by-person and list columns a count axis', async () => {
+    const card = { metric_key: 'legal_firm.sales_intake.open_deals_by_month', title: 'Open Deals', data_state: 'ok', value: 2400000, value_format: 'currency',
+      metadata: { unit: 'deals', by_month: [{ month: '2026-10', label: 'October 2026', count: 3, value: 2100000 }, { month: '2026-11', label: 'November 2026', count: 1, value: 300000 }] } };
+    const layout = { cards: [{ id: 'm', kind: 'headline', visual: 'month_bars', metric_key: 'sales_intake.open_deals_by_month' }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [card] }) });
+    await p.exports.loadDashboardById('d1');
+    const html = p.nodes.dashboardMetricGrid.innerHTML;
+    expect(html).toContain('dash-metric-card--hero');
+    expect(html).toContain('class="mini-cols__axis"');
+    expect(html).toContain('>$1M<');
+  });
+  test('a list breakdown uses the list format on its axis', () => {
+    const revenue = Object.assign({}, card('gross_revenue_by_service_offering'), { value: sample.currency_breakdown_rows_synthetic });
+    const html = page().exports.renderMetricCard(revenue);
+    expect(html).toContain('class="mini-cols__axis"');
+    expect(html.split('class="mini-cols__tick"').slice(1).map((p) => p.split('>')[1].split('<')[0])[1]).toContain('$');
+  });
+});
+
+test('the page binds the chart tooltips once on its content', () => {
+  const src = fs.readFileSync(path.join(__dirname, '../../src/js/admin/dashboard-detail.js'), 'utf8');
+  expect(src).toContain('window.MiniCharts.bindTips(content);');
+});
+
+describe('masonry: cards flow into columns per chapter, never stretched', () => {
+  const stat = (key, value) => ({ metric_key: 'legal_firm.x.' + key, title: key, data_state: 'ok', value, format: 'number' });
+  const list = (key) => ({ metric_key: 'legal_firm.x.' + key, title: key, data_state: 'ok', format: 'number', value: [{ service_label: 'A', value: 3 }, { service_label: 'B', value: 1 }] });
+  async function render(layout, cards) {
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: cards }) });
+    await p.exports.loadDashboardById('d1');
+    return p.nodes.dashboardMetricGrid.innerHTML;
+  }
+  test('each chapter is its own masonry: columns of cards, chapters as breaks, two small numbers share a unit', async () => {
+    const layout = { chapters: [{ id: 'one', title: 'Pipeline' }, { id: 'two', title: 'Follow up' }], cards: [
+      { id: 'a', chapter: 'one', kind: 'number', metric_key: 'x.s1' }, { id: 'b', chapter: 'one', kind: 'number', metric_key: 'x.s2' },
+      { id: 'c', chapter: 'one', kind: 'breakdown', metric_key: 'x.l1' }, { id: 'd', chapter: 'one', kind: 'breakdown', metric_key: 'x.l2' },
+      { id: 'e', chapter: 'two', kind: 'breakdown', metric_key: 'x.l3' }] };
+    const html = await render(layout, [stat('s1', 4), stat('s2', 5), list('l1'), list('l2'), list('l3')]);
+    expect(html.split('class="dash-masonry').length - 1).toBeGreaterThanOrEqual(2);
+    expect(html).toContain('dash-masonry__col');
+    expect(html).toContain('dash-masonry__unit--pair');
+    // The second chapter's only card spans all columns.
+    const second = html.split('>Follow up<')[1];
+    expect(second).toContain('dash-masonry__full');
+    expect(html.indexOf('>Pipeline<')).toBeLessThan(html.indexOf('>Follow up<'));
+  });
+  test('a card marked full width spans all columns', async () => {
+    const layout = { cards: [{ id: 'a', kind: 'breakdown', metric_key: 'x.l1' }, { id: 'b', kind: 'breakdown', metric_key: 'x.l2', full_width: true }, { id: 'c', kind: 'breakdown', metric_key: 'x.l3' }] };
+    const html = await render(layout, [list('l1'), list('l2'), list('l3')]);
+    const full = html.split('dash-masonry__full')[1].split('dash-masonry__row')[0];
+    expect(full).toContain('x.l2');
+  });
+});
+
+test('the page re-flows the masonry on resize and after worklist rows arrive', () => {
+  const src = fs.readFileSync(path.join(__dirname, '../../src/js/admin/dashboard-detail.js'), 'utf8');
+  expect(src).toContain('relayoutMasonry(grid)');
+  expect(src).toContain('new ResizeObserver(');
 });

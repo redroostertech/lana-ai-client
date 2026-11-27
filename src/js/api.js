@@ -1935,6 +1935,8 @@ class ApiClient {
       firm_timezone: profile.firm_timezone,
       // False when the firm never chose a zone (admins are asked to set one).
       firm_timezone_set: profile.firm_timezone_set,
+      // The firm's currency, "USD" when unset (Lex.Utils.getFirmCurrency).
+      default_currency: profile.default_currency || 'USD',
       // The person's own zone (users.time_zone), null when they have none;
       // read first by Lex.Utils.getOrganizationTimezone.
       timezone: profile.timezone || null,
@@ -3917,6 +3919,45 @@ class ApiClient {
     return this.post('/api/v1/modules/metric-snapshots/capture', data);
   }
 
+  // ── Report objects: the record side panel ──
+  // GET /api/v1/report-objects/:object/:id?periodStart&periodEnd -> one shape
+  // for every object (person, deal, contact, appointment, message, form_fill,
+  // survey_fill). period = { start, end } plain firm days, optional.
+  // options: { timeline_limit, timeline_offset } to page a long deal timeline
+  // (newest first; the response carries timeline_total).
+  async getReportObject(object, id, period, options) {
+    const query = new URLSearchParams();
+    if (period && period.start) query.set('periodStart', period.start);
+    if (period && period.end) query.set('periodEnd', period.end);
+    if (options && options.timeline_limit !== undefined) query.set('timeline_limit', String(options.timeline_limit));
+    if (options && options.timeline_offset !== undefined) query.set('timeline_offset', String(options.timeline_offset));
+    // Deal timeline filters: an event kind, and team or client.
+    if (options && options.timeline_event_kind) query.set('timeline_event_kind', String(options.timeline_event_kind));
+    if (options && options.timeline_actor) query.set('timeline_actor', String(options.timeline_actor));
+    const suffix = query.toString() ? '?' + query.toString() : '';
+    return this.get('/api/v1/report-objects/' + encodeURIComponent(object) + '/' + encodeURIComponent(id) + suffix);
+  }
+
+  // ── Fix data in LANA (fixes stay in LANA; syncs never undo them) ──
+  // POST { fields: [{ standard_key|field_key, value }], outcome?: { status, decided_on } }
+  // Responses: { record, refresh: { queued, expected_within_seconds } }.
+  async createCorrection(dataId, body) {
+    return this.post('/api/v1/connected-data/' + encodeURIComponent(dataId) + '/corrections', body || {});
+  }
+
+  async updateCorrection(dataId, annotationId, body) {
+    return this.put('/api/v1/connected-data/' + encodeURIComponent(dataId) + '/corrections/' + encodeURIComponent(annotationId), body || {});
+  }
+
+  async deleteCorrection(dataId, annotationId) {
+    return this.delete('/api/v1/connected-data/' + encodeURIComponent(dataId) + '/corrections/' + encodeURIComponent(annotationId));
+  }
+
+  // keep: 'lana' | 'source'
+  async resolveConflict(dataId, flagId, keep) {
+    return this.post('/api/v1/connected-data/' + encodeURIComponent(dataId) + '/conflicts/' + encodeURIComponent(flagId) + '/resolve', { keep: keep });
+  }
+
   // ── Mappings (Settings > Mappings): source values to governed keys ──
   // GET /api/v1/mappings/summary -> per vocabulary { mapped_records, unmapped_records, unmapped_values }
   // options.quietStatuses: statuses the caller handles itself (setup-banner.js).
@@ -3947,14 +3988,31 @@ class ApiClient {
   async getMetricDetail(metricKey, params = {}, options = {}) {
     let url = '/api/v1/modules/metric-detail/' + encodeURIComponent(metricKey);
     const queryParts = [];
-    if (params.periodStart) queryParts.push('periodStart=' + encodeURIComponent(params.periodStart));
-    if (params.periodEnd) queryParts.push('periodEnd=' + encodeURIComponent(params.periodEnd));
-    if (params.periodType) queryParts.push('periodType=' + encodeURIComponent(params.periodType));
-    if (params.compareBy) queryParts.push('compareBy=' + encodeURIComponent(params.compareBy));
-    if (params.compareToPrevious !== undefined) queryParts.push('compareToPrevious=' + encodeURIComponent(String(params.compareToPrevious)));
-    if (params.compareMode) queryParts.push('compareMode=' + encodeURIComponent(params.compareMode));
+    // An as-of card (an as-of report): asOf alone. Any range or comparison
+    // sent with it is a 400, so none is sent.
+    if (params.asOf) {
+      queryParts.push('asOf=' + encodeURIComponent(params.asOf));
+    } else {
+      if (params.periodStart) queryParts.push('periodStart=' + encodeURIComponent(params.periodStart));
+      if (params.periodEnd) queryParts.push('periodEnd=' + encodeURIComponent(params.periodEnd));
+      if (params.periodType) queryParts.push('periodType=' + encodeURIComponent(params.periodType));
+      if (params.compareBy) queryParts.push('compareBy=' + encodeURIComponent(params.compareBy));
+      if (params.compareToPrevious !== undefined) queryParts.push('compareToPrevious=' + encodeURIComponent(String(params.compareToPrevious)));
+      if (params.compareMode) queryParts.push('compareMode=' + encodeURIComponent(params.compareMode));
+    }
     // rawLimit caps the source rows; 0 skips them (a sparkline needs only the history).
     if (params.rawLimit !== undefined && params.rawLimit !== null) queryParts.push('raw_limit=' + encodeURIComponent(String(params.rawLimit)));
+    // Server-side rows: raw_offset pages; raw_q searches; raw_sort_by and
+    // raw_sort_dir sort; raw_filter[col] (and col_from / col_to) filter.
+    if (params.rawOffset !== undefined && params.rawOffset !== null) queryParts.push('raw_offset=' + encodeURIComponent(String(params.rawOffset)));
+    if (params.rawQ) queryParts.push('raw_q=' + encodeURIComponent(params.rawQ));
+    if (params.rawSortBy) queryParts.push('raw_sort_by=' + encodeURIComponent(params.rawSortBy));
+    if (params.rawSortDir) queryParts.push('raw_sort_dir=' + encodeURIComponent(params.rawSortDir));
+    if (params.rawFilters && typeof params.rawFilters === 'object') {
+      Object.keys(params.rawFilters).forEach((col) => {
+        queryParts.push(encodeURIComponent('raw_filter[' + col + ']') + '=' + encodeURIComponent(String(params.rawFilters[col])));
+      });
+    }
     if (queryParts.length > 0) url += '?' + queryParts.join('&');
     // options may carry { signal } so callers (e.g. the Metric Catalog "Run All"
     // batch runner) can cancel the in-flight request on a per-metric timeout.

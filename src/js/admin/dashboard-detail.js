@@ -3,6 +3,13 @@
 (function () {
   'use strict';
 
+  // The firm's currency (Lex.Utils.getFirmCurrency, from /auth/me), else USD.
+  function firmCurrency() {
+    var host = typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : {});
+    var utils = host.Lex && host.Lex.Utils;
+    return utils && typeof utils.getFirmCurrency === 'function' ? utils.getFirmCurrency() : 'USD';
+  }
+
   var VIEW_CONFIG = {
     owner: {
       title: 'Owner Performance',
@@ -61,6 +68,8 @@
   // compare against the previous equal-length window (METRIC_GOALS_DESIGN.md
   // section 11.2). Defaults true because the page boots on a preset.
   var currentPeriodIsPreset = true;
+  // An as-of report (layout.period_mode 'as_of'): one day, not a range.
+  var asOfMode = false;
 
   function el(id) { return document.getElementById(id); }
 
@@ -137,7 +146,34 @@
   // Always a full range: when the inputs are empty, half filled or not real
   // days, the default range is used and written back into the inputs, so
   // every card and link uses the window the page shows.
+  // The as-of day on screen (else the link's, else today), written back.
+  function readAsOfControls() {
+    var input = el('dashboardAsOfDay');
+    var day = window.AsOfCards.asOfDay(input ? input.value : '', '');
+    if (!day) day = window.AsOfCards.asOfDay(getParams().get('asOf'), firmToday());
+    if (input && input.value !== day) input.value = day;
+    currentPeriod = { start: '', end: day, compareBy: 'monthly', asOf: day, label: window.AsOfCards.headerLabel(day) };
+    var pill = el('dashboardPeriodLabel');
+    if (pill) pill.textContent = currentPeriod.label;
+    return currentPeriod;
+  }
+
+  // Switches the date picker between a range and one as-of day.
+  function setAsOfMode(on) {
+    asOfMode = !!on;
+    var range = el('dashboardPeriodRange');
+    var single = el('dashboardAsOfFields');
+    if (range) range.hidden = asOfMode;
+    if (single) single.hidden = !asOfMode;
+    if (!asOfMode) {
+      var input = el('dashboardAsOfDay');
+      if (input) input.value = '';
+    }
+    return readPeriodControls();
+  }
+
   function readPeriodControls() {
+    if (asOfMode) return readAsOfControls();
     var start = el('dashboardPeriodStart');
     var end = el('dashboardPeriodEnd');
     var compare = el('dashboardPeriodType');
@@ -246,6 +282,8 @@
   function getMetricCardRequestParams(type, limit) {
     var period = readPeriodControls();
     var params = { type: type, limit: limit };
+    // An as-of report: the end day only, nothing to compare against.
+    if (asOfMode) return Object.assign(params, window.AsOfCards.cardPeriod(period.end));
     // Plain days (inclusive end), always both: the backend bounds them in
     // the firm's zone.
     params.periodStart = period.start;
@@ -254,7 +292,8 @@
     // Period-over-period comparison: ask the metric layer to attach a
     // `comparison` block. Preset periods use the calendar mode, custom ranges
     // use the contiguous equal-length mode.
-    params.compareToPrevious = true;
+    // All time has nothing before it to compare against.
+    params.compareToPrevious = !window.DashboardPeriod.isAllTime(period);
     params.compareMode = (typeof MetricGoalComparison !== 'undefined')
       ? MetricGoalComparison.resolveCompareMode(currentPeriodIsPreset)
       : (currentPeriodIsPreset ? 'previous_calendar' : 'previous_period');
@@ -316,6 +355,8 @@
   var cardLoads = window.LoadState.createLoadTracker();
   // The saved dashboard's declared cards (layout.cards), or null.
   var currentDeclaredCards = null;
+  // The saved dashboard's own chapters (layout.chapters), or [].
+  var currentChapters = [];
   // The variant in view per declared card id (breakdown toggles).
   var variantPicks = {};
   // The text each tile showed last, so new dates count from the old number.
@@ -376,13 +417,17 @@
     var value = metric ? metric.value : null;
     var rawFormat = metric && metric.format;
     if (rawFormat && typeof rawFormat === 'object') rawFormat = rawFormat.type || rawFormat.style;
-    var format = String(rawFormat || 'number').toLowerCase();
     var metadata = (metric && metric.metadata) || {};
+    // No card format: the card's value_format, else its row_format.
+    if (!rawFormat && metric) rawFormat = metric.value_format || metadata.value_format || metric.row_format || '';
+    var format = String(rawFormat || 'number').toLowerCase();
     // A real 0 is a value; only a missing value shows the shared empty token.
     // No-data cases arrive as a data_state and render the state block.
     if (!hasValue(value)) return window.DataState.EMPTY_VALUE;
 
     if (Array.isArray(value)) {
+      // Rates and averages are never summed: the items stand alone.
+      if (window.MetricCardView && window.MetricCardView.listHasNoTotal(metric)) return '';
       var metadataTotal = Number(metadata.total);
       if (Number.isFinite(metadataTotal)) {
         return formatMetricCardValue({ value: metadataTotal, format: format });
@@ -421,7 +466,7 @@
     var numericValue = Number(value);
     if (Number.isFinite(numericValue)) {
       if (format === 'currency' || format === 'currency_breakdown') {
-        return numericValue.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+        return numericValue.toLocaleString('en-US', { style: 'currency', currency: firmCurrency(), maximumFractionDigits: 0 });
       }
       if (format === 'percentage' || format === 'percent') {
         return numericValue.toLocaleString('en-US', { maximumFractionDigits: 1 }) + '%';
@@ -741,10 +786,18 @@
     return (metric && (metric.metric_key || metric.key)) || key;
   }
 
-  function recordsHref(cardId) {
-    return window.DashboardPeriod.metricDetailHref(catalogKey(cardId), {
-      periodStart: currentPeriod.start, periodEnd: currentPeriod.end, compareBy: currentPeriod.compareBy,
-    }, currentDashboardId ? { from: 'dashboard', dashboardId: currentDashboardId } : {});
+  // The dates metric detail takes: asOf alone on an as-of report, else the
+  // picked range. (Card fetches stay periodEnd only: getMetricCardRequestParams.)
+  function detailPeriod() {
+    if (asOfMode) return { asOf: currentPeriod.end };
+    return { periodStart: currentPeriod.start, periodEnd: currentPeriod.end, compareBy: currentPeriod.compareBy };
+  }
+
+  // filters: records filters the table opens with ({ month: '2026-10' }).
+  function recordsHref(cardId, filters) {
+    var options = currentDashboardId ? { from: 'dashboard', dashboardId: currentDashboardId } : {};
+    if (filters) options.filters = filters;
+    return window.DashboardPeriod.metricDetailHref(catalogKey(cardId), detailPeriod(), options);
   }
 
   var RECORDS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
@@ -754,14 +807,18 @@
   // which takes the spare height), and a footer row [the picked period]
   // [See the records]. withRecords is kept for callers; the records link
   // lives in the footer (cardFooter).
-  function cardTop(metric, cardId, withRecords) {
+  // titleHref: the title opens that page (all of the card's records).
+  function cardTop(metric, cardId, withRecords, titleHref) {
     var records = '';
+    var titleText = escapeHtml(metric.title || metric.name || humanize(metric.metric_key) || 'Metric');
     // Declared cards (layout.cards) leave out the catalog section eyebrow.
     var eyebrow = renderingDeclared ? ''
       : '<div class="dash-metric-card__eyebrow">' + escapeHtml(getGroupLabel(metric, currentDashboardType)) + '</div>';
     return '<div class="dash-metric-card__top"><div class="dash-metric-card__label">'
       + eyebrow
-      + '<div class="dash-metric-card__title">' + escapeHtml(metric.title || metric.name || humanize(metric.metric_key) || 'Metric') + '</div>'
+      + (titleHref
+        ? '<button type="button" class="dash-metric-card__title dash-metric-card__title-link" data-metric-detail-link="' + escapeHtml(titleHref) + '">' + titleText + '</button>'
+        : '<div class="dash-metric-card__title">' + titleText + '</div>')
       + '</div>'
       + '<div class="dash-metric-card__tools">' + records
       + '<button class="dash-metric-card__info" type="button" aria-label="Metric details" data-metric-info="' + escapeHtml(cardId) + '">i</button>'
@@ -771,14 +828,21 @@
   // The change against the previous period: a chip with an arrow when the
   // server sent a percent, otherwise the older absolute row.
   function deltaHtml(metric) {
+    // The server withheld the comparison: its message, never a 0% or a dash.
+    var hidden = window.DataState.comparisonNote(metric);
+    if (hidden) return hidden;
     var arrow = window.MetricCardView.comparisonArrow(metric.comparison);
     if (arrow) return window.MiniCharts.deltaChip(arrow, 'vs previous period');
     return renderComparison(metric.comparison, metric.format);
   }
 
-  // Every card follows the picked dates, so the footer names the period.
+  // Every card follows the picked dates, so the footer names the period,
+  // plus a small calm badge when the server says the data is stale.
   function periodLine(metric) {
-    return '<div class="dash-metric-card__period">' + escapeHtml(metric.period || metric.period_label || currentPeriod.label || 'Current period') + '</div>';
+    // The server's own words for the dates, when they say more than a range.
+    var words = window.AsOfCards.periodLabel(metric) || metric.period || metric.period_label || currentPeriod.label || 'Current period';
+    return '<div class="dash-metric-card__period">' + escapeHtml(words)
+      + window.DataState.freshnessBadge(metric) + '</div>';
   }
 
   // The footer row: the period and the records link.
@@ -816,13 +880,27 @@
     var formatBar = unit === 'number' ? plainNumber : function (n) {
       return n === null ? window.DataState.EMPTY_VALUE : formatMetricCardValue({ value: n, format: unit === 'percent' ? 'percentage' : unit });
     };
-    // More than 12 rows read better as horizontal bars (8 shown, the rest counted).
-    if (bars.hiddenCount > 0) bars = window.MetricCardView.listBars(metric.value, 8);
+    if (!metric.value.some(isPeriodRow) && !bars.paired && !bars.neededPending) {
+      // A breakdown of categories: zero rows hidden (they stay in the
+      // details), then the top 8 by value, the rest counted.
+      var full = window.MetricCardView.listBars(metric.value, 100000);
+      var top = window.CardVisuals.topRows(full.rows, CARD_ROW_LIMIT);
+      bars = Object.assign({}, full, { rows: top.rows, hiddenCount: top.hidden, empty: !top.rows.length });
+      if (bars.empty) return window.DataState.render(EMPTY_LIST_STATE, { calm: true });
+    } else if (metric.value.some(isPeriodRow) && metric.value.length <= 62 && !bars.paired) {
+      // A series over dates (for example 30 days of form fills): every day a
+      // compact column, never a short list under an empty chart area.
+      bars = window.MetricCardView.listBars(metric.value, 62);
+      bars.series = true;
+    } else if (bars.hiddenCount > 0) {
+      // More than 12 rows read better as horizontal bars (8 shown, the rest counted).
+      bars = window.MetricCardView.listBars(metric.value, 8);
+    }
     // Each column opens the records; a "Not mapped" column opens Mappings.
     var listKey = metric.metric_key || metric.key;
     bars.rows.forEach(function (row) {
       row.key = listKey;
-      if (row.muted) row.linkHref = MAPPINGS_PAGE;
+      if (row.muted && canManageMappings()) row.linkHref = MAPPINGS_PAGE;
     });
     var action = bars.neededPending ? window.DataState.goalAction(metric) : null;
     var pendingNote = bars.neededPending
@@ -830,7 +908,9 @@
         + (action ? ' <button type="button" class="lex-data-state__action" data-data-state-action="' + escapeHtml(action.href) + '">' + escapeHtml(action.label) + '</button>' : '')
         + '</p>'
       : '';
-    return '<div class="dash-metric-card__chart">' + window.MiniCharts.breakdownHtml(bars, formatBar, { href: recordsHref }) + pendingNote + '</div>';
+    // The y axis reads the list's value format (money, percent or a count).
+    var axisKind = window.MetricCardView.listValueFormat(metric);
+    return '<div class="dash-metric-card__chart">' + window.MiniCharts.breakdownHtml(bars, formatBar, { href: recordsHref, axis: axisKind }) + pendingNote + '</div>';
   }
 
   // ── Declared cards (layout.cards; js/shared/dashboard-cards.js) ──────
@@ -845,10 +925,10 @@
     return (metric && (metric.title || metric.name)) || humanize(String(key || '').split('.').pop());
   }
 
-  function declaredTop(def, key, metric, withRecords, title) {
+  function declaredTop(def, key, metric, withRecords, title, titleHref) {
     if (metric) metricInfoById[key] = metric;
     var shown = Object.assign({}, metric || { metric_key: key }, { title: title || def.title || metricTitle(metric, key) });
-    return cardTop(shown, key, withRecords);
+    return cardTop(shown, key, withRecords, titleHref);
   }
 
   function waitingChip(metric) {
@@ -865,9 +945,23 @@
     return '<li class="dash-lines__item">' + labelHtml + '<span class="dash-lines__value">' + valueHtml + '</span></li>';
   }
 
+  // metadata.second_line (for example a cohort rate): a muted line under the value.
+  function secondLineHtml(metric) {
+    var text = window.MetricCardView.secondLine(metric);
+    if (!text) return '';
+    // The second line opens the list the server points it at (for example
+    // deal data completeness to Deals Missing an Amount).
+    var link = window.MetricCardView.secondLineLink(metric);
+    var href = link ? recordsHref(link.metricKey) : '';
+    return '<p class="dash-metric-card__second-line">'
+      + (href ? '<button type="button" class="dash-metric-card__second-link" data-metric-detail-link="' + escapeHtml(href) + '">' + escapeHtml(text) + '</button>' : escapeHtml(text))
+      + '</p>';
+  }
+
   function valueBlock(metric) {
     return '<div class="dash-metric-card__result">'
       + '<div class="dash-metric-card__value">' + escapeHtml(formatMetricCardValue(metric)) + '</div>'
+      + secondLineHtml(metric)
       + deltaHtml(metric) + '</div>';
   }
 
@@ -1004,6 +1098,12 @@
     return (extra || '') + (accent ? ' dash-accent dash-accent--' + accent : '');
   }
 
+  function formatWith(format) {
+    var kind = String(format || '').toLowerCase();
+    if (!kind || kind === 'number' || kind === 'integer') return plainNumber;
+    return function (n) { return n === null ? window.DataState.EMPTY_VALUE : formatMetricCardValue({ value: n, format: kind === 'percent' ? 'percentage' : kind }); };
+  }
+
   function formatList(metric) {
     var unit = window.MetricCardView.listValueFormat(metric);
     return unit === 'number' ? plainNumber : function (n) {
@@ -1013,15 +1113,69 @@
 
   // The card's series: the rows of its one list metric, or one row per
   // scalar metric. Each row knows the metric its records live under.
-  function seriesOf(resolved) {
+  // metadata.by_person [{ person: { object, id, user_id, label }, label, held,
+  // no_show, cancelled, no_outcome, total, show_rate }], or null.
+  function byPersonOf(metric, def) {
+    // visual_options.rows: a dotted path on the card (metadata.by_person).
+    var path = def && def.options && def.options.rows ? def.options.rows : 'metadata.by_person';
+    var list = metric;
+    path.split('.').forEach(function (part) { list = list && typeof list === 'object' ? list[part] : null; });
+    return Array.isArray(list) && list.length ? list : null;
+  }
+
+  // One row per person: ranked bars rank by total; columns pair the first two
+  // declared series (default held and no_show). Never a rate.
+  function byPersonRows(list, def, visual, key, metric) {
+    // Series come from the layout, else from the card's metadata.
+    var meta = metric && metric.metadata && typeof metric.metadata === 'object' ? metric.metadata : {};
+    var metaSeries = Array.isArray(meta.series) ? meta.series.map(String) : [];
+    var fromLayout = !!(def.options.series && def.options.series.length);
+    var series = fromLayout ? def.options.series : (metaSeries.length ? metaSeries : ['held', 'no_show']);
+    var count = function (value) { return value === null || value === undefined || value === '' || !isFinite(Number(value)) ? null : Number(value); };
+    var rows = list.map(function (p) {
+      var person = p.person && typeof p.person === 'object' ? p.person : null;
+      var ref = person && person.id ? { object: person.object || 'person', id: String(person.id) } : null;
+      if (ref && person.user_id) ref.user_id = String(person.user_id);
+      var label = String(p.label || (person && person.label) || 'Unassigned');
+      var row = visual === 'ranked_bars'
+        ? { label: label, value: count(p.total), second: null }
+        : { label: label, value: count(p[series[0]]), second: series[1] ? count(p[series[1]]) : null,
+          values: series.slice(0, 3).map(function (field) { return count(p[field]); }) };
+      return Object.assign(row, { key: key, waiting: false, ref: ref, text: plainNumber(row.value) });
+    });
+    rows.categories = true;
+    var declaredLabels = fromLayout ? (def.options.series_labels || []) : (Array.isArray(meta.series_labels) ? meta.series_labels.map(String) : []);
+    rows.seriesLabels = visual === 'ranked_bars' ? [] : series.slice(0, 3).map(function (field, i) {
+      if (declaredLabels[i]) return declaredLabels[i];
+      var text = String(field).split('_').join(' ');
+      return text.charAt(0).toUpperCase() + text.slice(1);
+    });
+    // Three series draw as grouped columns.
+    rows.grouped = visual !== 'ranked_bars' && series.length > 2;
+    return rows;
+  }
+
+  function seriesOf(resolved, visual) {
     var def = resolved.def;
     var first = resolved.metrics[0];
+    var people = resolved.metrics.length === 1 ? byPersonOf(first.metric, def) : null;
+    if (people) return byPersonRows(people, def, visual, first.key, first.metric);
     if (resolved.metrics.length === 1 && first.metric && Array.isArray(first.metric.value)) {
-      var model = window.MetricCardView.listBars(first.metric.value, 1000);
-      var fmt = formatList(first.metric);
-      return model.rows.map(function (row) {
-        return { label: row.label, value: row.value, key: first.key, waiting: false, text: fmt(row.value) };
+      // visual_options.value_key: a row field to rank by, with its own
+      // value_format (a plain number when none is given).
+      var valueKey = def.options.value_key;
+      var source = valueKey ? first.metric.value.map(function (r) { return r && typeof r === 'object' ? Object.assign({}, r, { value: r[valueKey] }) : r; }) : first.metric.value;
+      var model = window.MetricCardView.listBars(source, 1000);
+      // A value inferred from a count field is a plain number: card formats
+      // describe value only.
+      var fmt = valueKey ? formatWith(def.options.value_format) : (model.inferred ? plainNumber : formatList(first.metric));
+      var listRows = model.rows.map(function (row) {
+        return { label: row.label, value: row.value, key: first.key, waiting: false, text: fmt(row.value), partial: !!row.partial, ref: row.ref || null, status: row.status || '' };
       });
+      // A breakdown of categories (not a series over dates) shows its top
+      // rows only (seriesChartHtml).
+      listRows.categories = !first.metric.value.some(isPeriodRow);
+      return listRows;
     }
     var groupRows = window.DashboardCards.groupRows(def, declaredIndex);
     var labels = window.CardVisuals.shortLabels(groupRows.map(function (row) { return row.label; }));
@@ -1029,6 +1183,35 @@
       return { label: labels[i], value: row.value, key: row.key, waiting: row.waiting, metric: row.metric,
         text: row.waiting ? '' : formatMetricCardValue(row.metric), conversionPct: row.conversionPct, pct: row.pct };
     });
+  }
+
+  // Grouped columns (up to 3 series per row), on one scale.
+  function groupedModel(rows) {
+    var max = 0;
+    rows.forEach(function (row) { (row.values || []).forEach(function (v) { if (v !== null && v > max) max = v; }); });
+    var shown = rows.filter(function (row) { return (row.values || []).some(function (v) { return v !== null && v > 0; }); }).slice(0, CARD_ROW_LIMIT);
+    return {
+      empty: !shown.length,
+      grouped: true,
+      seriesLabels: rows.seriesLabels,
+      hiddenCount: 0,
+      rows: shown.map(function (row) {
+        return { label: row.label, values: row.values, key: row.key, ref: row.ref || null,
+          pcts: row.values.map(function (v) { return v !== null && v > 0 && max > 0 ? Math.round((v / max) * 1000) / 10 : 0; }) };
+      }),
+    };
+  }
+
+  var PERIOD_FIELDS = ['period_start', 'week_start', 'month_start', 'period', 'week', 'month', 'date', 'day'];
+
+  function isPeriodRow(row) {
+    return !!(row && typeof row === 'object' && PERIOD_FIELDS.some(function (key) { return row[key] !== undefined && row[key] !== null && row[key] !== ''; }));
+  }
+
+  var CARD_ROW_LIMIT = 8;
+
+  function moreHtml(hidden) {
+    return hidden > 0 ? '<p class="mini-bars__more">And ' + hidden + ' more in the details</p>' : '';
   }
 
   function waitingTitle(row) {
@@ -1050,7 +1233,8 @@
       empty: !shown.length,
       rows: shown.map(function (row) {
         var second = row.second === undefined ? null : row.second;
-        return { label: row.label, value: row.value, second: second, pct: pct(row.value), secondPct: second === null ? null : pct(second), key: row.key };
+        return { label: row.label, value: row.value, second: second, pct: pct(row.value), secondPct: second === null ? null : pct(second), key: row.key,
+          partial: !!row.partial, ref: row.ref || null };
       }),
       paired: paired,
       seriesLabels: paired ? (labels && labels.length === 2 ? labels : ['Actual', 'Needed']) : [],
@@ -1059,7 +1243,7 @@
   }
 
   function seriesChartHtml(resolved, visual) {
-    var rows = seriesOf(resolved);
+    var rows = seriesOf(resolved, visual);
     var textOf = function (row) { return row.text; };
     var byValue = {};
     rows.forEach(function (row) { byValue[row.value] = row.text; });
@@ -1070,8 +1254,10 @@
       if (!donut) return window.DataState.render(EMPTY_LIST_STATE, { calm: true });
       // The centre: the named total metric, else the sum in the series' unit.
       var first = resolved.metrics[0].metric;
-      var totalText = first && Array.isArray(first.value) ? formatList(first)(donut.total)
-        : formatMetricCardValue({ value: donut.total, format: first && first.format });
+      // No summed centre for rates or averages.
+      var totalText = first && window.MetricCardView.listHasNoTotal(first) ? ''
+        : (first && Array.isArray(first.value) ? formatList(first)(donut.total)
+          : formatMetricCardValue({ value: donut.total, format: first && first.format }));
       return window.MiniCharts.donutHtml(donut, {
         centre: centreMetric && !window.DashboardCards.isWaiting(centreMetric) ? formatMetricCardValue(centreMetric) : totalText,
         centreLabel: centreMetric ? metricTitle(centreMetric, centreKey) : 'Total',
@@ -1080,9 +1266,11 @@
       });
     }
     if (visual === 'ranked_bars') {
-      return window.MiniCharts.rankedHtml(window.CardVisuals.rankedModel(rows), {
+      // Many rows: the top 8 by value, zero rows hidden, the rest counted.
+      var rankedTop = rows.categories ? window.CardVisuals.topRows(rows, CARD_ROW_LIMIT) : { rows: rows, hidden: 0 };
+      return window.MiniCharts.rankedHtml(window.CardVisuals.rankedModel(rankedTop.rows), {
         format: textOf, href: recordsHref, initials: resolved.def.options.initials, waitingLabel: waitingTitle,
-      });
+      }) + moreHtml(rankedTop.hidden);
     }
     if (visual === 'stacked_bar') {
       var labels = resolved.def.options.series_labels;
@@ -1094,14 +1282,26 @@
     if (visual === 'funnel') {
       return window.MiniCharts.groupHtml(rows, { funnel: true, format: textOf, href: recordsHref, waitingLabel: waitingTitle });
     }
-    // columns and paired_columns
-    var model = seriesColumnsModel(rows, resolved.def.options.series_labels);
+    // columns and paired_columns; a breakdown of many categories shows its
+    // top 8 (drawn as bars with "And N more in the details").
+    if (rows.grouped) return window.MiniCharts.breakdownHtml(groupedModel(rows), plainNumber, { href: recordsHref });
+    var columnTop = rows.categories ? window.CardVisuals.topRows(rows, CARD_ROW_LIMIT) : { rows: rows, hidden: 0 };
+    var model = seriesColumnsModel(columnTop.rows, rows.seriesLabels && rows.seriesLabels.length ? rows.seriesLabels : resolved.def.options.series_labels);
+    model.hiddenCount = columnTop.hidden;
+    // A series over dates draws every point as a compact column.
+    if (rows.categories === false) model.series = true;
     if (model.empty) return window.DataState.render(EMPTY_LIST_STATE, { calm: true });
     return window.MiniCharts.breakdownHtml(model, function (n) { return byValue[n] !== undefined ? byValue[n] : plainNumber(n); }, { href: recordsHref });
   }
 
   function seriesCard(resolved, layoutItem, visual) {
     var def = resolved.def;
+    // One number and no rows to draw (the rows path is empty): a stat, not a
+    // chart with one bar.
+    var only = resolved.metrics.length === 1 ? resolved.metrics[0].metric : null;
+    if (only && !window.DashboardCards.isWaiting(only) && !Array.isArray(only.value) && !byPersonOf(only, def)) {
+      return heroOrStat(resolved, layoutItem, 'stat');
+    }
     var firstOk = resolved.metrics.filter(function (entry) { return !entry.waiting; })[0];
     var single = resolved.metrics.length === 1;
     return '<article class="' + cardClass(accentClass(def, 'dash-metric-card--chart'), layoutItem) + '">'
@@ -1114,6 +1314,9 @@
   // Two list metrics side by side by label (new and closed by service).
   function renderPairedColumns(resolved, layoutItem) {
     var def = resolved.def;
+    // A per-person rollup (visual_options.rows, else metadata.by_person) draws
+    // paired or grouped columns per person.
+    if (resolved.metrics.length === 1 && byPersonOf(resolved.metrics[0].metric, def)) return seriesCard(resolved, layoutItem, 'paired_columns');
     // The two lists: metric_keys_override (the spec), else the card's own
     // keys when both are list metrics (the saved dashboards).
     var listKeys = def.options.metric_keys_override.length ? def.options.metric_keys_override : def.keys;
@@ -1167,7 +1370,11 @@
     }
     if (o.unit && visual !== 'gauge') {
       var text = formatMetricCardValue(entry.metric);
-      if (text.toLowerCase().indexOf(o.unit.toLowerCase()) === -1) extra += '<p class="dash-metric-card__unit">' + escapeHtml(o.unit) + '</p>';
+      // The server's text already carries its unit, singular or plural
+      // ("1 case", "3 cases"): only add the layout unit when neither form is there.
+      var unitWord = o.unit.toLowerCase();
+      var singular = unitWord.length > 1 && unitWord.charAt(unitWord.length - 1) === 's' ? unitWord.slice(0, -1) : unitWord;
+      if (String(text).toLowerCase().indexOf(singular) === -1) extra += '<p class="dash-metric-card__unit">' + escapeHtml(o.unit) + '</p>';
     }
     if (o.benchmark) extra += '<p class="dash-metric-card__benchmark">Benchmark: ' + escapeHtml(o.benchmark) + '</p>';
     if (o.badge_key) extra += '<div class="dash-chips">' + chipHtml(o.badge_key, window.DashboardCards.metricFor(declaredIndex, o.badge_key)) + '</div>';
@@ -1185,6 +1392,85 @@
     }
     if (o.inner === 'gauge' && visual === 'hero') html = html.replace('dash-metric-card--hero', 'dash-metric-card--hero dash-metric-card--hero-gauge');
     return appendToCard(html, extra);
+  }
+
+  // A link card: the server's headline and "See the report", which opens
+  // the target report as of this dashboard's end day.
+  function renderLinkCard(resolved, layoutItem) {
+    var def = resolved.def;
+    var entry = resolved.metrics[0];
+    var link = window.AsOfCards.linkOf(entry.metric);
+    var headline = link.headline || formatMetricCardValue(entry.metric);
+    return '<article class="' + cardClass(accentClass(def, 'dash-metric-card--link'), layoutItem) + '">'
+      + declaredTop(def, entry.key, entry.metric, false)
+      + '<p class="dash-link-card__headline">' + escapeHtml(headline) + '</p>'
+      + '<div class="dash-link-card__actions"><lex-btn variant="secondary" size="sm" data-report-target="' + escapeHtml(link.slug) + '" data-report-dashboard="' + escapeHtml(link.dashboardId) + '">See the report</lex-btn></div>'
+      + '</article>';
+  }
+
+  // Opens a report by its id, or by its slug through the dashboard list.
+  async function openReportTarget(slug, dashboardId) {
+    var id = dashboardId;
+    if (!id && slug) {
+      await loadDashboardSwitcher();
+      var match = dashboardSwitcherItems.filter(function (item) { return item.slug === slug; })[0];
+      id = match ? match.id : '';
+    }
+    if (!id) {
+      if (window.Lex && Lex.Toast) Lex.Toast.error('Could not find that report.');
+      return;
+    }
+    Lex.Nav.go(window.AsOfCards.targetHref(id, currentPeriod.end));
+  }
+
+  // Month bars (metadata.by_month): the headline total, what the months
+  // count, and one bar per month ("Older" first). A bar opens that month's
+  // records; the title opens all of them.
+  function renderMonthBars(resolved, layoutItem) {
+    var def = resolved.def;
+    var entry = resolved.metrics[0];
+    var metric = entry.metric;
+    var months = metric ? window.AsOfCards.byMonth(metric) : null;
+    if (!months) return metric && !Array.isArray(metric.value) ? heroOrStat(resolved, layoutItem, 'stat') : seriesCard(resolved, layoutItem, 'columns');
+    var cardFormat = metric.value_format || (metric.metadata && metric.metadata.value_format) || metric.row_format || '';
+    var unit = window.AsOfCards.monthUnit(metric);
+    // An average card: bars are the averages (never a count), and nothing
+    // is summed; the headline is the server's value.
+    var average = window.AsOfCards.isAverage(metric);
+    var heights = months.map(function (item) { return item.value !== null ? item.value : (average ? 0 : (item.count || 0)); });
+    var max = Math.max.apply(null, heights.concat([0]));
+    var ticks = window.AsOfCards.monthTicks(months);
+    // The y axis: the amounts' format (or an average's unit), else counts.
+    var hasAmounts = months.some(function (item) { return item.value !== null; });
+    var monthAxis = hasAmounts ? (months.filter(function (item) { return item.format; }).map(function (item) { return item.format; })[0] || cardFormat || 'number') : 'number';
+    var rows = months.map(function (item, i) {
+      var money = formatWith(item.format || cardFormat);
+      var height = heights[i];
+      return { label: item.label, value: height, second: null, secondPct: 0,
+        pct: height > 0 && max > 0 ? Math.round((height / max) * 1000) / 10 : 0,
+        valueText: item.value !== null ? money(item.value) : (average ? window.DataState.EMPTY_VALUE : plainNumber(item.count)),
+        tick: ticks[i],
+        tip: window.AsOfCards.monthTip(item, money, unit, average),
+        linkHref: recordsHref(entry.key, (function () { var f = {}; f[window.AsOfCards.MONTH_FIELD] = item.month; return f; })()) };
+    });
+    var subtitle = window.AsOfCards.monthSubtitle(metric);
+    var unplacedFilter = {};
+    unplacedFilter[window.AsOfCards.MONTH_FIELD] = window.AsOfCards.UNPLACED_FILTER;
+    var unplaced = window.AsOfCards.unplacedNote(metric, formatWith(cardFormat), average);
+    var unplacedHtml = unplaced
+      ? '<p class="dash-month-note"><button type="button" class="dash-month-note__link" data-metric-detail-link="' + escapeHtml(recordsHref(entry.key, unplacedFilter)) + '">' + escapeHtml(unplaced) + '</button></p>'
+      : '';
+    return '<article class="' + cardClass(accentClass(def, 'dash-metric-card--chart'), layoutItem) + '">'
+      + declaredTop(def, entry.key, metric, true, null, recordsHref(entry.key))
+      + valueBlock(metric)
+      + (subtitle ? '<p class="dash-metric-card__subtitle">' + escapeHtml(subtitle) + '</p>' : '')
+      // All-zero months: one line, not a row of 0s.
+      + (max > 0
+        ? '<div class="dash-metric-card__chart">' + window.MiniCharts.columnsHtml({ rows: rows, paired: false, seriesLabels: [], allLabels: true }, plainNumber, { axis: monthAxis }) + '</div>'
+        : '<p class="dash-month-empty">' + escapeHtml(window.AsOfCards.monthEmptyText(metric)) + '</p>')
+      + unplacedHtml
+      + cardFooter(metric, entry.key)
+      + '</article>';
   }
 
   function renderBullet(resolved, layoutItem) {
@@ -1244,6 +1530,80 @@
     });
   }
 
+  // ── Masonry (DashboardLayout.masonryPlan) ──────────────────────
+  // Each chapter's cards flow into columns: a card takes the shortest
+  // column and keeps its own height. The first paint uses estimated
+  // heights; relayoutMasonry measures and re-flows once it is on screen.
+  function masonryHtml(items, renderItem, columns) {
+    var units = window.DashboardLayout.masonryUnits(items.map(function (item) { return { span: item.span, full: item.full }; }));
+    var unitHtml = units.map(function (unit, k) {
+      return '<div class="dash-masonry__unit' + (unit.items.length > 1 ? ' dash-masonry__unit--pair' : '') + '" data-masonry-unit="' + k + '">'
+        + unit.items.map(function (i) { return renderItem(items[i]); }).join('') + '</div>';
+    });
+    var plan = window.DashboardLayout.masonryPlan(units.map(function (unit) {
+      return { full: unit.full, height: Math.max.apply(null, unit.items.map(function (i) { return window.DashboardLayout.estimateHeight(items[i]); })) };
+    }), columns);
+    return '<div class="dash-masonry dash-masonry--cols-' + columns + '" data-masonry data-masonry-plan="' + escapeHtml(JSON.stringify(plan)) + '">'
+      + masonryBlocksHtml(plan, unitHtml) + '</div>';
+  }
+
+  function masonryBlocksHtml(plan, unitHtml) {
+    return plan.map(function (block) {
+      if (block.full) return '<div class="dash-masonry__full">' + unitHtml[block.unit] + '</div>';
+      return '<div class="dash-masonry__row">' + block.columns.map(function (col) {
+        return '<div class="dash-masonry__col">' + col.map(function (k) { return unitHtml[k]; }).join('') + '</div>';
+      }).join('') + '</div>';
+    }).join('');
+  }
+
+  function masonryColumnsFor(grid) {
+    return window.DashboardLayout.masonryColumns(grid && grid.clientWidth);
+  }
+
+  // Measures every unit and moves it to its column when the plan changed
+  // (a different width, or real heights unlike the estimates).
+  function relayoutMasonry(grid) {
+    if (!grid || typeof grid.querySelectorAll !== 'function') return;
+    var columns = masonryColumnsFor(grid);
+    Array.prototype.forEach.call(grid.querySelectorAll('[data-masonry]'), function (section) {
+      var units = Array.prototype.slice.call(section.querySelectorAll('[data-masonry-unit]'))
+        .filter(function (unit) { return unit.parentNode && unit.parentNode.closest && unit.parentNode.closest('[data-masonry]') === section; })
+        .sort(function (a, b) { return Number(a.getAttribute('data-masonry-unit')) - Number(b.getAttribute('data-masonry-unit')); });
+      if (!units.length) return;
+      var current = JSON.parse(section.getAttribute('data-masonry-plan') || '[]');
+      var plan = window.DashboardLayout.masonryPlan(units.map(function (unit, k) {
+        var full = current.some(function (block) { return block.full && block.unit === k; });
+        return { full: full, height: unit.offsetHeight };
+      }), columns);
+      var text = JSON.stringify(plan);
+      if (text === section.getAttribute('data-masonry-plan')) return;
+      var doc = section.ownerDocument;
+      var fragment = doc.createDocumentFragment();
+      plan.forEach(function (block) {
+        if (block.full) {
+          var full = doc.createElement('div');
+          full.className = 'dash-masonry__full';
+          full.appendChild(units[block.unit]);
+          fragment.appendChild(full);
+          return;
+        }
+        var row = doc.createElement('div');
+        row.className = 'dash-masonry__row';
+        block.columns.forEach(function (col) {
+          var column = doc.createElement('div');
+          column.className = 'dash-masonry__col';
+          col.forEach(function (k) { column.appendChild(units[k]); });
+          row.appendChild(column);
+        });
+        fragment.appendChild(row);
+      });
+      section.innerHTML = '';
+      section.appendChild(fragment);
+      section.setAttribute('data-masonry-plan', text);
+      section.className = 'dash-masonry dash-masonry--cols-' + columns;
+    });
+  }
+
   // The declared card behind each info button (any of its keys), for the
   // "How this card works" panel.
   var cardInfoByKey = {};
@@ -1251,16 +1611,46 @@
   // Settings > Mappings, where a firm maps its case and appointment types.
   var MAPPINGS_PAGE = 'settings-v2.html#mappings';
 
+  // Settings > Mappings is for admins and org admins (Lex.Auth.isAdmin);
+  // nobody else gets a link into it.
+  function canManageMappings() {
+    return !!(window.Lex && Lex.Auth && typeof Lex.Auth.isAdmin === 'function' && Lex.Auth.isAdmin());
+  }
+
   // "42 matters are not mapped to a service yet" with a link, from the
   // first metric on the card that reports mapping_coverage.
+  // Muted lines above a card's footer: the mapping caveat, and decided
+  // records nobody owns (metadata.unassigned on Team Member Conversion).
+  function cardNotesHtml(metrics) {
+    // The card's headline and callouts (metadata), from its first metric
+    // that has them: up to 3 callouts, the rest behind "Show more".
+    var text = { headline: '', callouts: [] };
+    for (var k = 0; k < metrics.length && !text.headline && !text.callouts.length; k += 1) {
+      if (metrics[k]) text = window.MetricCardView.cardText(metrics[k]);
+    }
+    var list = function (items) { return '<ul class="dash-callouts">' + items.map(function (c) { return '<li>' + escapeHtml(c) + '</li>'; }).join('') + '</ul>'; };
+    var textHtml = (text.headline ? '<p class="dash-card__headline">' + escapeHtml(text.headline) + '</p>' : '')
+      + (text.callouts.length ? list(text.callouts.slice(0, 3)) : '')
+      + (text.callouts.length > 3 ? '<details class="dash-callouts__more"><summary>Show more</summary>' + list(text.callouts.slice(3)) + '</details>' : '');
+    var unassigned = '';
+    for (var i = 0; i < metrics.length && !unassigned; i += 1) {
+      unassigned = metrics[i] ? window.MetricCardView.unassignedNote(metrics[i]) : '';
+    }
+    return textHtml + coverageHtml(metrics) + (unassigned ? '<p class="dash-card__note">' + escapeHtml(unassigned) + '</p>' : '');
+  }
+
   function coverageHtml(metrics) {
     var model = window.SettingsMappingsModel;
     if (!model) return '';
     for (var i = 0; i < metrics.length; i += 1) {
-      var text = metrics[i] ? model.coverageCaveat(metrics[i].mapping_coverage) : null;
+      // The server sends mapping_coverage on the card or under metadata
+      // ({ mapped, not_mapped, unlinked }); the caveat counts not_mapped.
+      var metric = metrics[i];
+      var coverage = metric ? (metric.mapping_coverage || (metric.metadata && metric.metadata.mapping_coverage) || null) : null;
+      var text = coverage ? model.coverageCaveat(coverage) : null;
       if (text) {
-        return '<p class="dash-card__caveat">' + escapeHtml(text) + '. <a href="#" class="dash-card__caveat-link" data-metric-detail-link="'
-          + escapeHtml(MAPPINGS_PAGE) + '">Map them</a></p>';
+        return '<p class="dash-card__caveat">' + escapeHtml(text) + '.' + (canManageMappings()
+          ? ' <a href="#" class="dash-card__caveat-link" data-metric-detail-link="' + escapeHtml(MAPPINGS_PAGE) + '">Map them</a>' : '') + '</p>';
       }
     }
     return '';
@@ -1271,7 +1661,7 @@
       if (!cardInfoByKey[key]) cardInfoByKey[key] = item.resolved;
     });
     var note = item.resolved.def.options && item.resolved.def.options.note;
-    var html = appendToCard(renderDeclaredVisual(item), coverageHtml(item.resolved.metrics.map(function (entry) { return entry.metric; })));
+    var html = appendToCard(renderDeclaredVisual(item), cardNotesHtml(item.resolved.metrics.map(function (entry) { return entry.metric; })));
     // The card's note: one muted line above the footer.
     return note ? appendToCard(html, '<p class="dash-card__note">' + escapeHtml(note) + '</p>') : html;
   }
@@ -1281,7 +1671,14 @@
     var def = resolved.def;
     var layoutItem = { role: item.role, span: item.span, span4: item.span4, span2: item.span2 };
     var visual = window.CardVisuals.visualFor(def);
+    // A card with metadata.by_month and no visual on the layout draws month
+    // bars; a worklist stays a list.
+    var firstMetric = resolved.metrics[0] && resolved.metrics[0].metric;
+    // A card that points at another report (metadata.target) is a link card.
+    if (resolved.state !== 'waiting' && window.AsOfCards.isLinkCard(def.visual, firstMetric) && window.AsOfCards.linkOf(firstMetric)) return renderLinkCard(resolved, layoutItem);
+    if (visual !== 'worklist' && resolved.state !== 'waiting' && window.AsOfCards.isMonthCard(def.visual, firstMetric)) visual = 'month_bars';
     switch (visual) {
+      case 'month_bars': return renderMonthBars(resolved, layoutItem);
       case 'hero':
       case 'stat':
       case 'gauge':
@@ -1342,7 +1739,10 @@
   // codes, dates as days, amounts as money (right-aligned).
   // rowColumns: the server's row_columns for these rows (headers, formats,
   // labels), which win over the inferred columns when present.
-  function worklistHtml(rows, rowColumns) {
+  // permissions: the signed-in person's { can_correct, can_resolve_conflicts }
+  // from the card or metric detail; rows with fix hints get their controls
+  // in a line under the row (js/shared/data-fixes.js).
+  function worklistHtml(rows, rowColumns, permissions) {
     if (!rows.length) return '<p class="dash-worklist__empty">No records right now.</p>';
     var view = window.MetricDetailView;
     var table = view.recordsTable(rows, rowColumns);
@@ -1351,15 +1751,63 @@
       return '<th scope="col"' + (col.align === 'right' ? ' class="dash-worklist__num"' : '') + '>' + escapeHtml(col.label) + '</th>';
     }).join('') + '</tr>';
     var body = table.rows.slice(0, 5).map(function (row, index) {
-      return '<tr>' + columns.map(function (col) {
+      // A row that is a data object opens the record panel (click or Enter).
+      var ref = window.ReportObjects ? window.ReportObjects.primaryRef(rows[index]) : null;
+      var open = ref ? ' class="dash-worklist__row" data-record-ref="' + escapeHtml(window.ReportObjects.refAttr(ref)) + '" data-row-index="' + index + '" tabindex="0"' : '';
+      var fix = window.DataFixes ? window.DataFixes.controlsHtml(rows[index], permissions) : '';
+      var fixRow = fix ? '<tr class="dash-worklist__fix"><td colspan="' + columns.length + '">' + fix + '</td></tr>' : '';
+      return '<tr' + open + '>' + columns.map(function (col) {
         var source = rows[index][col.key];
         var text = view.formatCell(source, col);
         if (text === null) return '<td class="dash-worklist__muted">-</td>';
         var dot = col.key === 'status' ? '<span class="dash-dot dash-dot--' + escapeHtml(String(source).toLowerCase()) + '" aria-hidden="true"></span>' : '';
         return '<td' + (col.align === 'right' ? ' class="dash-worklist__num"' : '') + '>' + dot + escapeHtml(text) + '</td>';
-      }).join('') + '</tr>';
+      }).join('') + '</tr>' + fixRow;
     }).join('');
     return '<table class="dash-worklist__table"><thead>' + head + '</thead><tbody>' + body + '</tbody></table>';
+  }
+
+  // A card's preview rows: metadata.top (Deals Missing an Amount) or
+  // metadata.rows (Data Conflicts), or null.
+  function cardPreviewRows(metric) {
+    var meta = metric && metric.metadata && typeof metric.metadata === 'object' ? metric.metadata : null;
+    if (!meta) return null;
+    if (Array.isArray(meta.top) && meta.top.length) return meta.top;
+    if (Array.isArray(meta.rows) && meta.rows.length) return meta.rows;
+    return null;
+  }
+
+  function worklistRowFor(el) {
+    var slot = el && el.closest ? el.closest('[data-worklist-key]') : null;
+    var index = el ? Number(el.getAttribute('data-row-index')) : NaN;
+    return slot && slot._rows && isFinite(index) ? slot._rows[index] || null : null;
+  }
+
+  // After a fix: the row updates in place right away, then the cards and
+  // worklists refetch once the server has re-normalized.
+  function onFixSaved(info) {
+    var slot = info.box && info.box.closest ? info.box.closest('[data-worklist-key]') : null;
+    if (slot && slot._rows) {
+      var row = slot._rows.filter(function (r) { return r && String((r.edit && r.edit.record_id) || r.record_id) === String(info.dataId); })[0];
+      if (row && info.record) {
+        window.DataFixes.applyRecord(row, info.record);
+        slot.innerHTML = worklistHtml(slot._rows, slot._columns, slot._permissions);
+      }
+      var status = slot.querySelector('.dfix[data-dfix-id="' + String(info.dataId).split('"').join('') + '"] [data-dfix-status]');
+      if (status) status.textContent = info.text || 'Saved.';
+    }
+    // Refetch only when the server queued a refresh.
+    if (info.delayMs !== null && info.delayMs !== undefined) scheduleRefresh(info.delayMs);
+  }
+
+  var refreshTimer = null;
+  function scheduleRefresh(delayMs) {
+    if (refreshTimer) clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(function () {
+      refreshTimer = null;
+      worklistCache = {};
+      reloadDashboardMetricsForCurrentPeriod();
+    }, delayMs);
   }
 
   function firmToday() {
@@ -1377,7 +1825,11 @@
   // when the card did not already show one of its own.
   // rowsStatus: MetricDetailView.rowsStatus of the payload; when the server
   // could not read the rows, show the calm note instead of an empty list.
-  function drawRows(slot, rows, rowColumns, caveats, rowsStatus) {
+  function drawRows(slot, rows, rowColumns, caveats, rowsStatus, permissions) {
+    // Kept for the record panel and for fixes that update a row in place.
+    slot._rows = rows || [];
+    slot._columns = rowColumns;
+    slot._permissions = permissions || null;
     slot.classList.remove('mini-spark-slot--loading');
     var key = slot.getAttribute('data-worklist-key');
     var visual = slot.getAttribute('data-rows-visual') || 'worklist';
@@ -1397,7 +1849,8 @@
       slot.innerHTML = template.innerHTML;
     } else if (rows) {
       var sort = choice.sort || slot.getAttribute('data-rows-sort');
-      slot.innerHTML = worklistHtml(window.CardVisuals.sortRows(rows, sort), rowColumns);
+      slot._rows = window.CardVisuals.sortRows(rows, sort);
+      slot.innerHTML = worklistHtml(slot._rows, rowColumns, permissions);
     } else {
       slot.innerHTML = '';
     }
@@ -1405,6 +1858,19 @@
     if (Array.isArray(caveats) && caveats.length && card && !card.querySelector('.dash-card__note') && slot.insertAdjacentHTML) {
       (template || slot).insertAdjacentHTML('afterend', '<p class="dash-card__note">' + escapeHtml(caveats[0]) + '</p>');
     }
+    // The rows changed this card's height: re-flow the columns once.
+    scheduleMasonry();
+  }
+
+  var masonryPending = false;
+
+  function scheduleMasonry() {
+    if (masonryPending || typeof requestAnimationFrame !== 'function') return;
+    masonryPending = true;
+    requestAnimationFrame(function () {
+      masonryPending = false;
+      relayoutMasonry(el('dashboardMetricGrid'));
+    });
   }
 
   function queueWorklists(grid) {
@@ -1416,9 +1882,7 @@
       var limit = visual === 'worklist' ? 5 : 25;
       var cacheKey = [key, limit, currentPeriod.start, currentPeriod.end].join('|');
       if (!worklistCache[cacheKey]) {
-        worklistCache[cacheKey] = api.getMetricDetail(catalogKey(key), {
-          periodStart: currentPeriod.start, periodEnd: currentPeriod.end, compareBy: currentPeriod.compareBy, rawLimit: limit,
-        }).then(function (response) {
+        worklistCache[cacheKey] = api.getMetricDetail(catalogKey(key), Object.assign(detailPeriod(), { rawLimit: limit })).then(function (response) {
           var payload = response && response.data ? response.data : response;
           var rows = payload && payload.raw_data && Array.isArray(payload.raw_data.rows) ? payload.raw_data.rows : [];
           var lineage = payload && payload.lineage;
@@ -1427,6 +1891,7 @@
             columns: payload && Array.isArray(payload.row_columns) ? payload.row_columns : null,
             caveats: lineage && Array.isArray(lineage.caveats) ? lineage.caveats : [],
             rowsStatus: window.MetricDetailView.rowsStatus(payload && payload.raw_data),
+            permissions: payload && payload.permissions ? payload.permissions : null,
           };
         }).catch(function () { return null; });
       }
@@ -1434,7 +1899,11 @@
         // The card's own row_columns answer first; metric detail's otherwise.
         var metric = declaredIndex ? window.DashboardCards.metricFor(declaredIndex, key) : null;
         var columns = metric && Array.isArray(metric.row_columns) ? metric.row_columns : (result && result.columns);
-        drawRows(slot, result ? result.rows : null, columns, result ? result.caveats : [], result ? result.rowsStatus : null);
+        // No rows from metric detail: the card's own preview rows
+        // (metadata.top, or metadata.rows on Data Conflicts).
+        var rows = result && result.rows && result.rows.length ? result.rows : (cardPreviewRows(metric) || (result ? result.rows : null));
+        drawRows(slot, rows, columns, result ? result.caveats : [], result ? result.rowsStatus : null,
+          (window.DataFixes && window.DataFixes.permissionsOf(metric)) || (result ? result.permissions : null));
       });
     });
   }
@@ -1514,6 +1983,7 @@
       + cardTop(metric, cardId, true)
       + '<div class="dash-metric-card__result">'
       + '<div class="dash-metric-card__value"' + countUp + '>' + escapeHtml(value) + '</div>'
+      + secondLineHtml(metric)
       + deltaHtml(metric)
       + '</div>'
       + '<div class="mini-spark-slot" data-sparkline-key="' + escapeHtml(cardId) + '"></div>'
@@ -1679,9 +2149,7 @@
       var cacheKey = [entry.key, currentPeriod.start, currentPeriod.end].join('|');
       if (lineageCache[cacheKey]) return;
       lineageCache[cacheKey] = { model: null };
-      api.getMetricDetail(catalogKey(entry.key), {
-        periodStart: currentPeriod.start, periodEnd: currentPeriod.end, compareBy: currentPeriod.compareBy, rawLimit: 0,
-      }).then(function (response) {
+      api.getMetricDetail(catalogKey(entry.key), Object.assign(detailPeriod(), { rawLimit: 0 })).then(function (response) {
         var payload = response && response.data ? response.data : response;
         lineageCache[cacheKey].model = window.LineageView.detailModel(payload && payload.lineage, Date.now());
         redraw();
@@ -1791,13 +2259,19 @@
     cardInfoByKey = {};
     if (currentDeclaredCards && unfiltered) {
       // The saved dashboard's own cards, in its order (dashboard-cards.js).
-      var plan = window.DashboardCards.planDeclared(window.DashboardCards.resolveCards(currentDeclaredCards, declaredIndex));
+      var plan = window.DashboardCards.planDeclared(window.DashboardCards.resolveCards(currentDeclaredCards, declaredIndex), currentChapters);
       renderingDeclared = true;
       try {
         // Chapters: a quiet label row before each chapter's first card.
+        // Each chapter is its own masonry (chapters stay section breaks).
+        var columns = masonryColumnsFor(grid);
         grid.innerHTML = plan.sections.map(function (section) {
+          var items = withSpans(section.items).map(function (item) {
+            return Object.assign({}, item, { full: !!(item.resolved.def.options && item.resolved.def.options.full_width) });
+          });
           return (section.label ? '<div class="dash-chapter" role="heading" aria-level="2">' + escapeHtml(section.label) + '</div>' : '')
-            + withSpans(section.items).map(renderDeclaredCard).join('');
+            + (section.label && section.intro ? '<p class="dash-chapter__intro">' + escapeHtml(section.intro) + '</p>' : '')
+            + masonryHtml(items, renderDeclaredCard, columns);
         }).join('') + renderWaitingStrip(plan.waiting.map(renderDeclaredWaitingCard));
       } finally {
         renderingDeclared = false;
@@ -1807,9 +2281,9 @@
       // (js/shared/dashboard-layout.js owns the order and sizes); waiting
       // cards collect in one strip at the bottom.
       var split = window.DashboardCards.splitWaiting(filteredMetrics);
-      grid.innerHTML = withSpans(window.DashboardLayout.buildLayout(split.shown)).map(function (item) {
-        return appendToCard(renderMetricCard(item.card, item), coverageHtml([item.card]));
-      }).join('') + renderWaitingStrip(split.waiting.map(function (metric) { return renderMetricCard(metric); }));
+      grid.innerHTML = masonryHtml(withSpans(window.DashboardLayout.buildLayout(split.shown)), function (item) {
+        return appendToCard(renderMetricCard(item.card, item), cardNotesHtml([item.card]));
+      }, masonryColumnsFor(grid)) + renderWaitingStrip(split.waiting.map(function (metric) { return renderMetricCard(metric); }));
     }
     if (animateNextRender && grid.querySelectorAll) {
       Array.prototype.forEach.call(grid.querySelectorAll('[data-count-up]'), function (node) {
@@ -1817,6 +2291,8 @@
       });
     }
     animateNextRender = false;
+    // Real heights: re-flow the columns before the first paint.
+    relayoutMasonry(grid);
     queueSparklines(grid);
     queueWorklists(grid);
   }
@@ -1837,7 +2313,14 @@
 
   function paintSparkline(slot, line) {
     slot.classList.remove('mini-spark-slot--loading');
-    slot.innerHTML = window.MiniCharts.sparklineSvg(line);
+    slot.innerHTML = line ? window.MiniCharts.sparklineSvg(line) : '';
+    // A hero with no history hugs its content instead of stretching into a
+    // big empty middle.
+    var card = slot.closest ? slot.closest('.dash-metric-card') : null;
+    if (card && card.classList && card.classList.contains('dash-metric-card--hero')) {
+      if (line) card.classList.remove('dash-metric-card--no-spark');
+      else card.classList.add('dash-metric-card--no-spark');
+    }
   }
 
   var sparklineObserver = null;
@@ -1886,11 +2369,12 @@
     var period = currentPeriod;
     var entry = { done: false, line: null };
     // The sparkline needs only the history: raw_limit=0 skips the source rows.
-    entry.promise = api.getMetricDetail(catalogKey(job.metricKey), {
-      periodStart: period.start, periodEnd: period.end, compareBy: period.compareBy, rawLimit: 0,
-    }).then(function (response) {
+    entry.promise = api.getMetricDetail(catalogKey(job.metricKey), Object.assign(asOfMode ? { asOf: period.end }
+      : { periodStart: period.start, periodEnd: period.end, compareBy: period.compareBy }, { rawLimit: 0 })).then(function (response) {
       var payload = response && response.data ? response.data : response;
-      entry.line = window.MetricCardView.sparkline(payload && payload.snapshots, 100, 24);
+      // A long daily series (All time) is drawn by week or month.
+      var metric = declaredIndex ? window.DashboardCards.metricFor(declaredIndex, job.metricKey) : null;
+      entry.line = window.MetricCardView.sparkline(window.MetricCardView.bucketSnapshots(payload && payload.snapshots, metric && metric.format), 100, 24);
     }).catch(function () {
       entry.line = null;
     }).then(function () {
@@ -2027,9 +2511,11 @@
       // otherwise its metric_keys as before.
       var declared = window.DashboardCards.normalizeLayout(layout);
       currentDeclaredCards = declared.mode === 'cards' ? declared.cards : null;
+      currentChapters = declared.chapters || [];
       var metricKeys = window.DashboardCards.requestKeys(layout);
       currentDashboardMetricKeys = new Set(metricKeys.concat(metricKeys.map(function (key) { return key.split('.').pop(); })));
       currentDashboardType = type;
+      setAsOfMode(window.AsOfCards.isAsOf(dashboard));
       setBannerForDashboard(dashboard);
       setStory(dashboard);
       setActiveDashboardBreadcrumb(dashboard);
@@ -2127,6 +2613,16 @@
     if (startInput) startInput.addEventListener('lex-change', handlePeriodChange);
     if (endInput) endInput.addEventListener('lex-change', handlePeriodChange);
     if (compare) compare.addEventListener('lex-change', handlePeriodChange);
+    // The as-of day: kept in the link (?asOf=) so it opens on that day.
+    var asOfInput = el('dashboardAsOfDay');
+    if (asOfInput) {
+      asOfInput.addEventListener('lex-change', function () {
+        if (!asOfMode) return;
+        readPeriodControls();
+        if (Lex.Nav && Lex.Nav.updateParams) Lex.Nav.updateParams({ asOf: currentPeriod.end });
+        reloadDashboardMetricsForCurrentPeriod();
+      });
+    }
     initPeriodPanel();
     return initialPeriod;
   }
@@ -2153,6 +2649,12 @@
 
       if (event.target.closest('#deleteDashboardBtn') && currentDashboardId) {
         deleteCurrentDashboard();
+        return;
+      }
+
+      var targetBtn = event.target.closest('[data-report-target]');
+      if (targetBtn) {
+        openReportTarget(targetBtn.getAttribute('data-report-target'), targetBtn.getAttribute('data-report-dashboard'));
         return;
       }
 
@@ -2236,6 +2738,26 @@
         closeMetricModal();
       }
     });
+
+    // Every data object (worklist rows, bars with refs) opens the record panel,
+    // with the row (and its fix hints) when it came from a worklist.
+    if (window.LanaRecordPanel) {
+      window.LanaRecordPanel.bindRows(content, function () { return { start: currentPeriod.start, end: currentPeriod.end }; }, worklistRowFor,
+        function (el) { var slot = el.closest('[data-worklist-key]'); return slot ? slot._permissions : null; });
+    }
+    // Every column chart shows its value on hover and keyboard focus.
+    if (window.MiniCharts && window.MiniCharts.bindTips) window.MiniCharts.bindTips(content);
+    // The masonry re-flows when the grid's width changes.
+    var masonryGrid = el('dashboardMetricGrid');
+    if (masonryGrid && typeof ResizeObserver === 'function') {
+      var masonryFrame = 0;
+      new ResizeObserver(function () {
+        if (masonryFrame) return;
+        masonryFrame = requestAnimationFrame(function () { masonryFrame = 0; relayoutMasonry(masonryGrid); });
+      }).observe(masonryGrid);
+    }
+    // Fixes made on a worklist row: update the row now, refetch soon.
+    if (window.DataFixes) window.DataFixes.bind(content, { onSaved: onFixSaved });
 
     var params = getParams();
     var id = params.get('id');

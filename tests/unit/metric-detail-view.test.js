@@ -237,3 +237,137 @@ test('periodText: the backend label, else the picked dates, else nothing', () =>
   expect(V.periodText(null, '2026-11-18', '2026-11-24')).toBe('Nov 18, 2026 to Nov 24, 2026');
   expect(V.periodText(null, null, null)).toBe('');
 });
+
+test('summary: a hidden comparison gives its message and no change, prior or bars', () => {
+  const s = V.summary({ current: { value: 12 }, comparison: null, comparison_hidden: { reason: 'source_stale', message: 'No comparison while the source is behind.' } });
+  expect(s).toMatchObject({ value: '12', changeText: null, priorText: null, bars: null, hiddenText: 'No comparison while the source is behind.' });
+  expect(V.summary({ current: { value: 12 } }).hiddenText).toBeFalsy();
+});
+
+describe('units come from the server, singular included', () => {
+  test('the server formatted value wins ("1 case"), never "1 cases"', () => {
+    expect(V.summary({ current: { value: 1, unit: 'cases', formatted_value: '1 case' } }).value).toBe('1 case');
+  });
+  test('a server unit is used exactly as sent, with no client plural', () => {
+    expect(V.summary({ current: { value: 1, unit: 'case' } }).value).toBe('1 case');
+    expect(V.formatValue(1, { unit: 'case' })).toBe('1 case');
+  });
+});
+
+test('summary: comparison_hidden is read from the top level only', () => {
+  const hidden = { reason: 'source_stale', message: 'No comparison while the source is behind.' };
+  expect(V.summary({ current: { value: 12, comparison_hidden: hidden } }).hiddenText).toBeFalsy();
+});
+
+describe('metric detail records: reasons, dates, conflicts and fixes', () => {
+  const conflictRow = {
+    record_id: 'r-1', row_date: '2026-11-20', row_reason: 'Won on Nov 20 with no amount.', client_name: 'Jordan Smith', amount: null,
+    refs: [{ object: 'deal', id: 'd-1' }],
+    conflict: { flag_annotation_id: 'f-1', detected_at: '2026-11-21T10:00:00Z', fields: [{ field_key: 'monetaryValue', standard_key: 'amount',
+      lana_value: 4500, previous_source_value: 4500, new_source_value: 3000, source_changed_at: '2026-11-21T09:00:00Z' }] },
+  };
+  const fixedRow = { record_id: 'r-2', row_date: '2026-11-18', row_reason: 'Won on Nov 18.', client_name: 'Casey Lee', amount: 2000, fixed_in_lana: { fields: ['amount'] } };
+
+  test('row_reason, conflict, fixed_in_lana and refs are not columns; a Notes column is added; row_date reads as Date', () => {
+    const t = V.recordsTable([conflictRow, fixedRow]);
+    expect(t.columns.map((c) => c.key)).toEqual(['row_date', 'client_name', 'amount', '_notes']);
+    expect(t.columns.find((c) => c.key === 'row_date').label).toBe('Date');
+    expect(t.columns[3]).toMatchObject({ key: '_notes', label: 'Notes', type: 'notes' });
+  });
+
+  test('server columns get the Notes column too, and no Notes without reasons', () => {
+    expect(V.recordsTable([conflictRow], [{ field: 'client_name', header: 'Client' }]).columns.map((c) => c.key)).toEqual(['client_name', '_notes']);
+    expect(V.recordsTable([{ client_name: 'A' }]).columns.map((c) => c.key)).toEqual(['client_name']);
+  });
+
+  test('rowNotes: the reason, the conflict with both values, and the fixed mark', () => {
+    expect(V.rowNotes(conflictRow)).toEqual({
+      reason: 'Won on Nov 20 with no amount.',
+      conflict: { fields: [{ label: 'Amount', lana: '$4,500', source: '$3,000', previous: '$4,500' }] },
+      outsideSearch: false,
+      fixed: null,
+    });
+    expect(V.rowNotes(fixedRow)).toEqual({ reason: 'Won on Nov 18.', conflict: null, outsideSearch: false, fixed: ['Amount'] });
+    expect(V.rowNotes({ a: 1 })).toEqual({ reason: '', conflict: null, outsideSearch: false, fixed: null });
+  });
+
+  test('the server order is kept when rows carry row_date or conflicts', () => {
+    expect(V.keepsServerOrder([conflictRow, fixedRow])).toBe(true);
+    expect(V.keepsServerOrder([{ client_name: 'A', due_date: '2026-01-01' }])).toBe(false);
+  });
+
+  test('records header: as of, the basis label and the conflicts summary', () => {
+    const payload = { as_of: '2026-11-24T08:00:00Z', raw_data: { rows: [], rows_basis: { basis: 'won_on', as_of: '2026-11-24', start_date: '2026-11-01', end_date: '2026-11-30', label: 'Deals won between Nov 1 and Nov 30, 2026' },
+      conflicts: { count: 3, message: '3 records disagree with what your CRM says now.' }, pinned_count: 3, corrected_count: 1 } };
+    expect(V.recordsHeader(payload)).toEqual({ asOf: 'As of Nov 24, 2026', basis: 'Deals won between Nov 1 and Nov 30, 2026',
+      conflicts: '3 records disagree with what your CRM says now. 3 shown first. 1 fixed in LANA.' });
+    expect(V.recordsHeader({ raw_data: { rows: [] } })).toEqual({ asOf: '', basis: '', conflicts: '' });
+    expect(V.recordsHeader({ raw_data: { conflicts: { count: 1 } } }).conflicts).toBe('1 record disagrees with its source.');
+  });
+});
+
+test('final contract: pinned_count and corrected_count are read from raw_data only; the conflict names its source', () => {
+  const header = V.recordsHeader({ raw_data: { conflicts: { count: 2, message: 'Two disagree.', pinned_count: 9 }, pinned_count: 2, corrected_count: 1 } });
+  expect(header.conflicts).toBe('Two disagree. 2 shown first. 1 fixed in LANA.');
+  expect(V.recordsHeader({ raw_data: { conflicts: { count: 2, message: 'Two disagree.', pinned_count: 9, corrected_count: 4 } } }).conflicts).toBe('Two disagree.');
+  const notes = V.rowNotes({ conflict: { source_name: 'ActionStep', fields: [{ standard_key: 'amount', lana_value: 4500, new_source_value: 3000 }] } });
+  expect(notes.conflict.fields[0].sourceName).toBe('ActionStep');
+});
+
+test('a Date column (row_date) that repeats another date column on every row is hidden', () => {
+  const rows = [
+    { deal_name: 'A', decided_on: '2026-11-20', row_date: '2026-11-20', row_reason: 'Won.' },
+    { deal_name: 'B', decided_on: '2026-11-18T00:00:00Z', row_date: '2026-11-18', row_reason: 'Won.' },
+  ];
+  expect(V.recordsTable(rows).columns.map((c) => c.key)).toEqual(['deal_name', 'decided_on', '_notes']);
+  expect(V.recordsTable(rows, [{ field: 'deal_name', header: 'Deal name' }, { field: 'decided_on', header: 'Decided', format: 'date' }, { field: 'row_date', header: 'Date', format: 'date' }])
+    .columns.map((c) => c.key)).toEqual(['deal_name', 'decided_on', '_notes']);
+  const differs = rows.map((r, i) => Object.assign({}, r, { decided_on: i ? '2026-11-01' : r.decided_on }));
+  expect(V.recordsTable(differs).columns.map((c) => c.key)).toEqual(['deal_name', 'decided_on', 'row_date', '_notes']);
+});
+
+test('days counts read "N days" (days_waiting, *_days, days)', () => {
+  const t = V.recordsTable([{ deal_name: 'A', days_waiting: 12 }, { deal_name: 'B', days_waiting: 1 }]);
+  expect(t.rows.map((r) => r.cells[1].text)).toEqual(['12 days', '1 day']);
+  expect(V.recordsTable([{ open_days: 3 }]).rows[0].cells[0].text).toBe('3 days');
+  expect(V.recordsTable([{ amount: 3 }]).rows[0].cells[0].text).toBe('$3');
+});
+
+test('backend row shapes: corrected_fields mark "Fixed in LANA", Data Conflicts rows show their conflict, and no array becomes a column', () => {
+  const missing = { record_id: 'cd-1', connector_id: 'conn-1', deal_name: 'Smith Plan', amount: 4000,
+    corrected_fields: [{ standard_key: 'amount', correction_id: 'cor-7' }], conflict_fields: [], edit: {}, outcome_edit: {} };
+  const conflict = { record_id: 'cd-2', deal_name: 'Lee Trust', source_name: 'ActionStep', flag_annotation_id: 'flag-3', detected_at: '2026-11-21',
+    fields: [{ standard_key: 'amount', lana_value: 4500, new_source_value: 3000 }], actions: { keep_lana: {}, use_source: {} } };
+  expect(V.rowNotes(missing).fixed).toEqual(['Amount']);
+  expect(V.rowNotes(conflict).conflict.fields[0]).toMatchObject({ label: 'Amount', lana: '$4,500', source: '$3,000', sourceName: 'ActionStep' });
+  const keys = V.recordsTable([missing, conflict]).columns.map((c) => c.key);
+  ['fields', 'actions', 'corrected_fields', 'conflict_fields', 'flag_annotation_id', 'edit', 'outcome_edit'].forEach((k) => expect(keys).not.toContain(k));
+  expect(keys).toContain('_notes');
+});
+
+describe('records filters from the link (raw_filter[col]=value)', () => {
+  const V = require('../../src/js/shared/metric-detail-view.js');
+  test('reads every raw_filter[col] in the link and nothing else', () => {
+    const qp = new URLSearchParams('?metric_key=a.b&raw_filter%5Bmonth%5D=2026-10&raw_filter%5Bstage%5D=Intake&raw_filter=x&raw_filter%5B%5D=y');
+    expect(V.urlFilters(qp)).toEqual({ month: '2026-10', stage: 'Intake' });
+    expect(V.urlFilters(new URLSearchParams(''))).toEqual({});
+  });
+  test('a chip names the column and the value in plain words', () => {
+    expect(V.linkFilterText('month', '2026-10')).toBe('Month: Oct 2026');
+    expect(V.linkFilterText('month', 'older')).toBe('Month: Older');
+    expect(V.linkFilterText('owner_name', 'Taylor Vance')).toBe('Owner name: Taylor Vance');
+  });
+});
+
+test('a month filter of "(empty)" reads No date recorded', () => {
+  const V2 = require('../../src/js/shared/metric-detail-view.js');
+  expect(V2.linkFilterText('month', '(empty)')).toBe('Month: No date recorded');
+});
+
+test('the month facet uses the month words: "Oct 2026", "Older", "No date recorded"', () => {
+  const V3 = require('../../src/js/shared/metric-detail-view.js');
+  const out = V3.facetFilterOptions({ month: [{ value: '2026-10', count: 4 }, { value: 'older', count: 2 }, { value: null, count: 3 }], stage: [{ value: 'intake', count: 1 }] });
+  expect(out.month.options).toEqual([
+    { value: '2026-10', label: 'Oct 2026 (4 in all)' }, { value: 'older', label: 'Older (2 in all)' }, { value: '(empty)', label: 'No date recorded (3 in all)' }]);
+  expect(out.stage.options[0].label).toBe('Intake (1 in all)');
+});

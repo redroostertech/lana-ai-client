@@ -10,8 +10,8 @@ const fs = require('fs');
 const path = require('path');
 const sample = require(path.join(__dirname, '../fixtures/dashboard/metric-cards-sample.json'));
 
-function load() {
-  const window = {};
+function load(admin = true) {
+  const window = { Lex: { Auth: { isAdmin: () => admin } } };
   new Function('window', fs.readFileSync(path.join(__dirname, '../../src/js/shared/data-state.js'), 'utf8'))(window);
   return window.DataState;
 }
@@ -113,4 +113,49 @@ describe('ok with no value (the server now sends null, not 0)', () => {
     expect(html).not.toContain('NaN');
     expect(html).not.toContain('$0');
   });
+});
+
+describe('freshness: a calm badge when the data is stale', () => {
+  const stale = { stale: true, as_of: '2026-08-10T00:00:00Z', systems: ['ActionStep API'], label: 'Data from ActionStep API as of Aug 10, 2026' };
+  test('stale shows the server label as a small badge', () => {
+    expect(load().freshnessBadge({ freshness: stale })).toBe(
+      '<span class="lex-freshness" title="Data from ActionStep API as of Aug 10, 2026">Data from ActionStep API as of Aug 10, 2026</span>');
+  });
+  test('nothing when freshness is null, missing or not stale', () => {
+    expect(load().freshnessBadge({ freshness: null })).toBe('');
+    expect(load().freshnessBadge({})).toBe('');
+    expect(load().freshnessBadge(null)).toBe('');
+    expect(load().freshnessBadge({ freshness: Object.assign({}, stale, { stale: false }) })).toBe('');
+  });
+  test('a stale result without a label still says how old it is, in plain words', () => {
+    expect(load().freshnessBadge({ freshness: { stale: true, as_of: '2026-08-10T12:00:00Z' } })).toContain('>Data as of Aug 10, 2026<');
+    expect(load().freshnessBadge({ freshness: { stale: true } })).toContain('>Data may be out of date<');
+  });
+  test('the label is escaped', () => {
+    expect(load().freshnessBadge({ freshness: { stale: true, label: '<b>x</b>' } })).toContain('&lt;b&gt;x&lt;/b&gt;');
+  });
+});
+
+describe('comparison_hidden: why there is no comparison', () => {
+  test('the server message, in place of a comparison', () => {
+    const item = { comparison: null, comparison_hidden: { reason: 'source_stale', message: 'No comparison while ActionStep is behind on syncing.', as_of: '2026-08-10', systems: ['ActionStep API'] } };
+    expect(load().comparisonHiddenText(item)).toBe('No comparison while ActionStep is behind on syncing.');
+    expect(load().comparisonNote(item)).toBe('<p class="lex-comparison-hidden">No comparison while ActionStep is behind on syncing.</p>');
+  });
+  test('plain words for each reason when the server sends no message', () => {
+    expect(load().comparisonHiddenText({ comparison_hidden: { reason: 'source_stale' } })).toBe('No comparison: the data source has not synced recently.');
+    expect(load().comparisonHiddenText({ comparison_hidden: { reason: 'insufficient_history' } })).toBe('No comparison yet: there is not enough history.');
+    expect(load().comparisonHiddenText({ comparison_hidden: { reason: 'other' } })).toBe('No comparison for these dates.');
+  });
+  test('nothing when the comparison is not hidden', () => {
+    expect(load().comparisonHiddenText({ comparison: { percent_change: 3 } })).toBe('');
+    expect(load().comparisonNote(null)).toBe('');
+  });
+});
+
+test('not mapped: only admins and org admins get the Open Mappings action', () => {
+  const item = { data_state: 'not_mapped', data_state_reason: '' };
+  expect(load(false).view(item, { calm: true }).action).toBeNull();
+  expect(load(false).render(item, { calm: true })).not.toContain('settings-v2.html#mappings');
+  expect(load(true).view(item, { calm: true }).action).toEqual({ label: 'Open Mappings', href: 'settings-v2.html#mappings' });
 });
