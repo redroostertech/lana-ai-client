@@ -4173,3 +4173,46 @@ button.dash-lines__label:hover,
 .metric-record-conflicts[hidden] {
   display: none;
 }
+
+/* Card text (metadata.headline and metadata.callouts): muted lines above
+   the footer, at most 3 callouts with the rest behind "Show more". */
+.dash-card__headline {
+  margin: 0.5rem 0 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--lex-text-secondary);
+}
+
+.dash-callouts {
+  margin: 0.25rem 0 0;
+  padding-left: 1rem;
+  font-size: 0.8125rem;
+  color: var(--lex-text-tertiary);
+}
+
+.dash-callouts li + li {
+  margin-top: 0.125rem;
+}
+
+.dash-callouts__more summary {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--lex-text-secondary);
+  cursor: pointer;
+}
+
+.dash-metric-card__second-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.dash-metric-card--hero .dash-card__headline,
+.dash-metric-card--hero .dash-callouts {
+  color: inherit;
+}

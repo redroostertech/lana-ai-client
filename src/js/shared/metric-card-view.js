@@ -362,6 +362,31 @@
     return 1 - Math.pow(1 - p, 3);
   }
 
+  // metadata.headline (one sentence) and metadata.callouts (plain
+  // sentences) shown under a card; anything that is not text is ignored.
+  function cardText(card) {
+    var meta = card && card.metadata && typeof card.metadata === 'object' ? card.metadata : {};
+    var clean = function (value) { return typeof value === 'string' ? value.trim() : ''; };
+    return {
+      headline: clean(meta.headline),
+      callouts: (Array.isArray(meta.callouts) ? meta.callouts : []).map(clean).filter(Boolean),
+    };
+  }
+
+  // Where the second line points, when the server gives it a link: a
+  // metric key (link.metric_key or metric_key) or a page (link.href or
+  // href). null when it has none.
+  function secondLineLink(item) {
+    if (!item || typeof item !== 'object') return null;
+    var holder = item.current && typeof item.current === 'object' ? item.current : item;
+    var line = holder.metadata && holder.metadata.second_line;
+    if (!line || typeof line !== 'object') return null;
+    var link = line.link && typeof line.link === 'object' ? line.link : line;
+    var metricKey = typeof link.metric_key === 'string' ? link.metric_key.trim() : '';
+    var href = typeof link.href === 'string' ? link.href.trim() : '';
+    return metricKey || href ? { metricKey: metricKey, href: metricKey ? '' : href } : null;
+  }
+
   // metadata.unassigned = { won, lost, decided } (Team Member Conversion):
   // decided records nobody owns, as a muted footnote; '' when none.
   function unassignedNote(card) {
@@ -373,6 +398,8 @@
   }
 
   return {
+    cardText: cardText,
+    secondLineLink: secondLineLink,
     unassignedNote: unassignedNote,
     secondLine: secondLine,
     listHasNoTotal: listHasNoTotal,

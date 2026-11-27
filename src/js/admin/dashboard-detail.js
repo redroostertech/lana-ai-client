@@ -884,7 +884,14 @@
   // metadata.second_line (for example a cohort rate): a muted line under the value.
   function secondLineHtml(metric) {
     var text = window.MetricCardView.secondLine(metric);
-    return text ? '<p class="dash-metric-card__second-line">' + escapeHtml(text) + '</p>' : '';
+    if (!text) return '';
+    // The second line opens the list the server points it at (for example
+    // deal data completeness to Deals Missing an Amount).
+    var link = window.MetricCardView.secondLineLink(metric);
+    var href = link ? (link.metricKey ? recordsHref(link.metricKey) : link.href) : '';
+    return '<p class="dash-metric-card__second-line">'
+      + (href ? '<button type="button" class="dash-metric-card__second-link" data-metric-detail-link="' + escapeHtml(href) + '">' + escapeHtml(text) + '</button>' : escapeHtml(text))
+      + '</p>';
   }
 
   function valueBlock(metric) {
@@ -1286,11 +1293,21 @@
   // Muted lines above a card's footer: the mapping caveat, and decided
   // records nobody owns (metadata.unassigned on Team Member Conversion).
   function cardNotesHtml(metrics) {
+    // The card's headline and callouts (metadata), from its first metric
+    // that has them: up to 3 callouts, the rest behind "Show more".
+    var text = { headline: '', callouts: [] };
+    for (var k = 0; k < metrics.length && !text.headline && !text.callouts.length; k += 1) {
+      if (metrics[k]) text = window.MetricCardView.cardText(metrics[k]);
+    }
+    var list = function (items) { return '<ul class="dash-callouts">' + items.map(function (c) { return '<li>' + escapeHtml(c) + '</li>'; }).join('') + '</ul>'; };
+    var textHtml = (text.headline ? '<p class="dash-card__headline">' + escapeHtml(text.headline) + '</p>' : '')
+      + (text.callouts.length ? list(text.callouts.slice(0, 3)) : '')
+      + (text.callouts.length > 3 ? '<details class="dash-callouts__more"><summary>Show more</summary>' + list(text.callouts.slice(3)) + '</details>' : '');
     var unassigned = '';
     for (var i = 0; i < metrics.length && !unassigned; i += 1) {
       unassigned = metrics[i] ? window.MetricCardView.unassignedNote(metrics[i]) : '';
     }
-    return coverageHtml(metrics) + (unassigned ? '<p class="dash-card__note">' + escapeHtml(unassigned) + '</p>' : '');
+    return textHtml + coverageHtml(metrics) + (unassigned ? '<p class="dash-card__note">' + escapeHtml(unassigned) + '</p>' : '');
   }
 
   function coverageHtml(metrics) {

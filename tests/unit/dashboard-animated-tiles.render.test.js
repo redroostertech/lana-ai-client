@@ -1050,3 +1050,32 @@ describe('fix data in LANA on worklists', () => {
     expect(page().exports.worklistHtml([row], null, null)).not.toContain('dfix');
   });
 });
+
+describe('card headline and callouts', () => {
+  const declared = require(path.join(__dirname, '../fixtures/dashboard/declared-layouts.json'));
+  const withText = (meta) => declared.cards_synthetic.map((c) => (c.metric_key.endsWith('payroll_clients_needed') ? Object.assign({}, c, { metadata: Object.assign({}, c.metadata, meta) }) : c));
+  async function render(meta) {
+    const layout = { cards: [{ id: 'n', kind: 'number', metric_key: 'finance.payroll_clients_needed' }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: withText(meta) }) });
+    await p.exports.loadDashboardById('d1');
+    return p.nodes.dashboardMetricGrid.innerHTML;
+  }
+  test('the headline and up to 3 callouts show muted under the card; the rest behind "Show more"', async () => {
+    const html = await render({ headline: 'You need 4 more clients this month.', callouts: ['One.', 'Two.', 'Three.', 'Four.', 'Five.'] });
+    expect(html).toContain('<p class="dash-card__headline">You need 4 more clients this month.</p>');
+    const shown = html.split('<ul class="dash-callouts">')[1].split('</ul>')[0];
+    expect(shown.split('<li').length - 1).toBe(3);
+    expect(html).toContain('<details class="dash-callouts__more"><summary>Show more</summary><ul class="dash-callouts"><li>Four.</li><li>Five.</li></ul></details>');
+    expect(html.indexOf('dash-callouts')).toBeLessThan(html.lastIndexOf('dash-card__footer'));
+  });
+  test('3 or fewer callouts: no Show more; none: nothing', async () => {
+    expect(await render({ callouts: ['One.'] })).not.toContain('Show more');
+    expect(await render({})).not.toContain('dash-callouts');
+  });
+  test('a second line with a link opens that list', async () => {
+    const html = await render({ second_line: { label: 'Deals with an amount', value: 80, format: 'percentage', link: { metric_key: 'legal_firm.sales_intake.deals_missing_amount' } } });
+    const line = html.split('dash-metric-card__second-line')[1];
+    expect(line).toContain('data-metric-detail-link="admin/metric_detail.html?metric_key=legal_firm.sales_intake.deals_missing_amount');
+    expect(line).toContain('Deals with an amount 80%');
+  });
+});

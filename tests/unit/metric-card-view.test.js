@@ -299,3 +299,20 @@ describe('unassignedNote: decided records nobody owns', () => {
     expect(View.unassignedNote(null)).toBe('');
   });
 });
+
+describe('card text: headline, callouts and the second line link', () => {
+  test('cardText reads metadata.headline and up to every callout, plain sentences only', () => {
+    expect(View.cardText({ metadata: { headline: 'Deals are closing faster.', callouts: ['One.', '', null, 'Two.', { text: 'x' }] } }))
+      .toEqual({ headline: 'Deals are closing faster.', callouts: ['One.', 'Two.'] });
+    expect(View.cardText({ metadata: {} })).toEqual({ headline: '', callouts: [] });
+    expect(View.cardText(null)).toEqual({ headline: '', callouts: [] });
+  });
+  test('secondLineLink: the metric or page the server points the second line at', () => {
+    const line = { label: 'Deals with an amount', value: 80, format: 'percentage' };
+    expect(View.secondLineLink({ metadata: { second_line: Object.assign({}, line, { link: { metric_key: 'legal_firm.sales_intake.deals_missing_amount' } }) } }))
+      .toEqual({ metricKey: 'legal_firm.sales_intake.deals_missing_amount', href: '' });
+    expect(View.secondLineLink({ metadata: { second_line: Object.assign({}, line, { metric_key: 'a.b.c' }) } })).toEqual({ metricKey: 'a.b.c', href: '' });
+    expect(View.secondLineLink({ metadata: { second_line: Object.assign({}, line, { href: 'admin/metric_detail.html?metric_key=a.b.c' }) } })).toEqual({ metricKey: '', href: 'admin/metric_detail.html?metric_key=a.b.c' });
+    expect(View.secondLineLink({ metadata: { second_line: line } })).toBe(null);
+  });
+});
