@@ -157,7 +157,9 @@
     if (!state.drawer || !state.drawer.isConnected) {
       state.stack = [];
       state.options = opts;
-      state.drawer = global.Lex.Drawer.open({ heading: '', width: 'lg', expandable: true });
+      // A heading from the start: lex-drawer only draws its header (with
+      // close and expand) when it opens with one.
+      state.drawer = global.Lex.Drawer.open({ heading: model().OBJECT_LABELS[clean.object] || 'Record', width: 'lg', expandable: true });
       bindDrawer(state.drawer);
     } else {
       if (opts.period) state.options.period = opts.period;

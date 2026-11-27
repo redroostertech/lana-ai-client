@@ -44,7 +44,8 @@ test('opens a wide, expandable drawer and loads the object for the page dates', 
   w.LanaRecordPanel.open({ object: 'deal', id: 'd-1' }, { period: { start: '2026-11-01', end: '2026-11-30' } });
   await settle();
   expect(opened).toHaveLength(1);
-  expect(opened[0].options).toMatchObject({ width: 'lg', expandable: true });
+  // A heading from the start, so lex-drawer draws its header (close and expand).
+  expect(opened[0].options).toMatchObject({ width: 'lg', expandable: true, heading: 'Deal' });
   expect(w.api.getReportObject).toHaveBeenCalledWith('deal', 'd-1', { start: '2026-11-01', end: '2026-11-30' });
   const panel = opened[0];
   expect(panel.heading).toBe('Smith Estate Plan');
