@@ -101,12 +101,15 @@
     }
     var calmTitle = calm ? CALM_TITLES[state] : null;
     var notMapped = state === 'not_mapped';
+    // Settings > Mappings is for admins and org admins only.
+    var auth = global.Lex && global.Lex.Auth;
+    var canMap = !!(auth && typeof auth.isAdmin === 'function' && auth.isAdmin());
     return {
       state: state,
       title: calmTitle || TITLES[state],
       reason: item.data_state_reason || (notMapped ? 'Map your case types to see this number.' : (state === 'no_data' ? NO_DATA_REASON : '')),
       waiting: !!calmTitle,
-      action: notMapped && calm ? { label: 'Open Mappings', href: MAPPINGS_PAGE } : null
+      action: notMapped && calm && canMap ? { label: 'Open Mappings', href: MAPPINGS_PAGE } : null
     };
   }
 

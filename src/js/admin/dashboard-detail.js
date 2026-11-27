@@ -893,7 +893,7 @@
     var listKey = metric.metric_key || metric.key;
     bars.rows.forEach(function (row) {
       row.key = listKey;
-      if (row.muted) row.linkHref = MAPPINGS_PAGE;
+      if (row.muted && canManageMappings()) row.linkHref = MAPPINGS_PAGE;
     });
     var action = bars.neededPending ? window.DataState.goalAction(metric) : null;
     var pendingNote = bars.neededPending
@@ -1520,6 +1520,12 @@
   // Settings > Mappings, where a firm maps its case and appointment types.
   var MAPPINGS_PAGE = 'settings-v2.html#mappings';
 
+  // Settings > Mappings is for admins and org admins (Lex.Auth.isAdmin);
+  // nobody else gets a link into it.
+  function canManageMappings() {
+    return !!(window.Lex && Lex.Auth && typeof Lex.Auth.isAdmin === 'function' && Lex.Auth.isAdmin());
+  }
+
   // "42 matters are not mapped to a service yet" with a link, from the
   // first metric on the card that reports mapping_coverage.
   // Muted lines above a card's footer: the mapping caveat, and decided
@@ -1552,8 +1558,8 @@
       var coverage = metric ? (metric.mapping_coverage || (metric.metadata && metric.metadata.mapping_coverage) || null) : null;
       var text = coverage ? model.coverageCaveat(coverage) : null;
       if (text) {
-        return '<p class="dash-card__caveat">' + escapeHtml(text) + '. <a href="#" class="dash-card__caveat-link" data-metric-detail-link="'
-          + escapeHtml(MAPPINGS_PAGE) + '">Map them</a></p>';
+        return '<p class="dash-card__caveat">' + escapeHtml(text) + '.' + (canManageMappings()
+          ? ' <a href="#" class="dash-card__caveat-link" data-metric-detail-link="' + escapeHtml(MAPPINGS_PAGE) + '">Map them</a>' : '') + '</p>';
       }
     }
     return '';

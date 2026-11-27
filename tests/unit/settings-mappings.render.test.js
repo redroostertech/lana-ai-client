@@ -17,11 +17,12 @@ const SRC = path.join(__dirname, '..', '..', 'src');
 const read = (rel) => fs.readFileSync(path.join(SRC, rel), 'utf8');
 const tick = () => new Promise((r) => setImmediate(r));
 
-async function boot({ admin = true, summary = Promise.resolve({ data: fixture.summary }) } = {}) {
+async function boot({ admin = true, summary = Promise.resolve({ data: fixture.summary }), hash = '' } = {}) {
   const html = read('settings-v2.html');
+  const adminOnly = html.slice(html.indexOf('<p id="sv2-mappings-admin-only"'), html.indexOf('</p>', html.indexOf('<p id="sv2-mappings-admin-only"')) + 4);
   const nav = html.slice(html.indexOf('<!-- Mappings: shown by'), html.indexOf('<button type="button" class="sv2-nav-item" role="tab" id="sv2-tab-usage"'));
   const panel = html.slice(html.indexOf('<div class="sv2-panel sv2-hidden" id="sv2-panel-mappings"'), html.indexOf('<!-- /sv2-panel-mappings -->'));
-  const dom = new JSDOM('<!doctype html><body><div id="lanaSetupBanner" hidden></div>' + nav + panel + '</div></body>', { runScripts: 'outside-only' });
+  const dom = new JSDOM('<!doctype html><body><div id="lanaSetupBanner" hidden></div>' + adminOnly + nav + panel + '</div></body>', { runScripts: 'outside-only', url: 'https://lana.test/settings-v2.html' + hash });
   const w = dom.window;
   const api = {
     getMappingSummary: jest.fn(() => summary),
@@ -83,12 +84,32 @@ test('a pick in one row, then Save, sends only that row; Clear deletes a mapping
   expect(api.deleteMapping).toHaveBeenCalledWith('matter_service', 'm4');
 });
 
-test('read-only for people who are not admins', async () => {
-  const { doc } = await boot({ admin: false });
-  expect(doc.getElementById('sv2-mappings-readonly').hidden).toBe(false);
-  expect(doc.getElementById('sv2-mappings-accept').hidden).toBe(true);
-  expect(rowsOf(doc)[0].querySelector('[data-mapping-key]').hasAttribute('disabled')).toBe(true);
-  expect(doc.querySelectorAll('[data-mapping-clear]').length).toBe(0);
+test('people who are not admins or org admins see no entry and no banner, and nothing is asked for', async () => {
+  const { doc, api } = await boot({ admin: false });
+  expect(doc.getElementById('sv2-tab-mappings').classList.contains('sv2-hidden')).toBe(true);
+  expect(doc.getElementById('sv2-panel-mappings').classList.contains('sv2-hidden')).toBe(true);
+  expect(doc.getElementById('lanaSetupBanner').hidden).toBe(true);
+  expect(doc.getElementById('sv2-mappings-admin-only').hidden).toBe(true);
+  expect(api.getMappingSummary).not.toHaveBeenCalled();
+  expect(api.getMappings).not.toHaveBeenCalled();
+});
+
+test('a direct link to Mappings for someone who is not an admin says calmly that only admins can manage them', async () => {
+  const { doc, w } = await boot({ admin: false, hash: '#mappings' });
+  const note = doc.getElementById('sv2-mappings-admin-only');
+  expect(note.hidden).toBe(false);
+  expect(note.textContent).toBe('Only admins can manage mappings.');
+  expect(doc.getElementById('sv2-tab-mappings').classList.contains('sv2-hidden')).toBe(true);
+  w.location.hash = '#profile';
+  w.dispatchEvent(new w.HashChangeEvent('hashchange'));
+  expect(note.hidden).toBe(true);
+});
+
+test('admins still see the section and can edit', async () => {
+  const { doc } = await boot({ admin: true, hash: '#mappings' });
+  expect(doc.getElementById('sv2-tab-mappings').classList.contains('sv2-hidden')).toBe(false);
+  expect(doc.getElementById('sv2-mappings-admin-only').hidden).toBe(true);
+  expect(doc.getElementById('sv2-mappings-accept').hidden).toBe(false);
 });
 
 test('the API is not there yet (404): the section and the banner stay hidden', async () => {

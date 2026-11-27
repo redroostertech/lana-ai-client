@@ -31,7 +31,7 @@ function node(value = '') {
   };
 }
 
-function page(api = {}, user = null, search = '') {
+function page(api = {}, user = null, search = '', admin = true) {
   let source = fs.readFileSync(path.join(__dirname, '../../src/js/admin/dashboard-detail.js'), 'utf8');
   const end = source.lastIndexOf('  init();');
   source = source.slice(0, end)
@@ -42,7 +42,7 @@ function page(api = {}, user = null, search = '') {
   const window = withDashboardScripts(withReportSharedScripts({ location: { search: '' }, setInterval() {}, addEventListener() {} }));
   const LanaTime = { nowMs: () => 0, formatUtcDayRange: (a, b) => a + ' to ' + b, MS_PER_DAY: 86400000,
     reportPresetDays: (preset, zone) => (preset === 'today' ? { start: zone === 'America/New_York' ? '2026-11-26' : '2026-11-27', end: '' } : { start: '2026-01-01', end: '2026-01-31' }) };
-  const Lex = { Utils: { getFirmTimezone: () => 'America/New_York' }, Nav: { getParams: () => new URLSearchParams(search), updateParams: jest.fn() } };
+  const Lex = { Auth: { isAdmin: () => admin }, Utils: { getFirmTimezone: () => 'America/New_York' }, Nav: { getParams: () => new URLSearchParams(search), updateParams: jest.fn() } };
   window.Lex = Lex;
   window.api = { user };
   // The dashboard switcher draws into the shell's title bar, which this test has no DOM for.
@@ -1435,5 +1435,20 @@ describe('month bars on an average card', () => {
     expect(html).toContain('<title>Oct: Avg 42 · 18 records</title>');
     expect(html.split('dash-metric-card__value')[1]).toContain('>40<');
     expect(text(html)).not.toContain('72');
+  });
+});
+
+describe('mappings links are for admins and org admins only', () => {
+  const declared = require(path.join(__dirname, '../fixtures/dashboard/declared-layouts.json'));
+  test('someone else sees the caveat words, but no link into Mappings and no Open Mappings action', async () => {
+    const cards = declared.cards_synthetic.map((c) => (c.metric_key.endsWith('closed_cases_by_service_offering')
+      ? Object.assign({}, c, { metadata: Object.assign({}, c.metadata, { mapping_coverage: { mapped: 8, not_mapped: 42, unlinked: 5 } }) }) : c));
+    const layout = { cards: [{ id: 'b', kind: 'breakdown', metric_key: 'case_volume.closed_cases_by_service_offering' }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: cards }) }, null, '', false);
+    await p.exports.loadDashboardById('d1');
+    const html = p.nodes.dashboardMetricGrid.innerHTML;
+    expect(text(html)).toContain('42 matters are not mapped to a service yet');
+    expect(html).not.toContain('settings-v2.html#mappings');
+    expect(text(html)).not.toContain('Map them');
   });
 });

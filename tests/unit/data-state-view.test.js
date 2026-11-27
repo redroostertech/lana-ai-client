@@ -10,8 +10,8 @@ const fs = require('fs');
 const path = require('path');
 const sample = require(path.join(__dirname, '../fixtures/dashboard/metric-cards-sample.json'));
 
-function load() {
-  const window = {};
+function load(admin = true) {
+  const window = { Lex: { Auth: { isAdmin: () => admin } } };
   new Function('window', fs.readFileSync(path.join(__dirname, '../../src/js/shared/data-state.js'), 'utf8'))(window);
   return window.DataState;
 }
@@ -151,4 +151,11 @@ describe('comparison_hidden: why there is no comparison', () => {
     expect(load().comparisonHiddenText({ comparison: { percent_change: 3 } })).toBe('');
     expect(load().comparisonNote(null)).toBe('');
   });
+});
+
+test('not mapped: only admins and org admins get the Open Mappings action', () => {
+  const item = { data_state: 'not_mapped', data_state_reason: '' };
+  expect(load(false).view(item, { calm: true }).action).toBeNull();
+  expect(load(false).render(item, { calm: true })).not.toContain('settings-v2.html#mappings');
+  expect(load(true).view(item, { calm: true }).action).toEqual({ label: 'Open Mappings', href: 'settings-v2.html#mappings' });
 });
