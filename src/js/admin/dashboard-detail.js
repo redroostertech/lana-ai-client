@@ -832,7 +832,9 @@
   // Every card follows the picked dates, so the footer names the period,
   // plus a small calm badge when the server says the data is stale.
   function periodLine(metric) {
-    return '<div class="dash-metric-card__period">' + escapeHtml(metric.period || metric.period_label || currentPeriod.label || 'Current period')
+    // The server's own words for the dates, when they say more than a range.
+    var words = window.AsOfCards.periodLabel(metric) || metric.period || metric.period_label || currentPeriod.label || 'Current period';
+    return '<div class="dash-metric-card__period">' + escapeHtml(words)
       + window.DataState.freshnessBadge(metric) + '</div>';
   }
 

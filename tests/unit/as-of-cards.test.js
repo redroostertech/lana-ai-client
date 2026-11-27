@@ -92,3 +92,20 @@ describe('link cards (metadata.target)', () => {
     expect(AsOf.targetHref('d 9', '')).toBe('admin/dashboard-detail.html?id=d%209');
   });
 });
+
+describe('the server period label', () => {
+  const rule = 'Deals created Oct 29 - Nov 27, 2026, still open on Nov 27, 2026';
+  test('a label that says more than a plain range is used, from period, period_label or lineage.period_rule', () => {
+    expect(AsOf.periodLabel({ period: rule })).toBe(rule);
+    expect(AsOf.periodLabel({ period_label: rule })).toBe(rule);
+    expect(AsOf.periodLabel({ lineage: { period_rule: rule } })).toBe(rule);
+    expect(AsOf.periodLabel({ period: 'Nov 2026', lineage: { period_rule: rule } })).toBe(rule);
+  });
+  test('a plain range is not', () => {
+    expect(AsOf.periodLabel({ period: 'Oct 29 - Nov 27, 2026' })).toBe('');
+    expect(AsOf.periodLabel({ period: 'Nov 2026' })).toBe('');
+    expect(AsOf.periodLabel({ period: 'September 1 to September 30, 2026' })).toBe('');
+    expect(AsOf.periodLabel({ period: { start: '2026-11-01' } })).toBe('');
+    expect(AsOf.periodLabel({})).toBe('');
+  });
+});

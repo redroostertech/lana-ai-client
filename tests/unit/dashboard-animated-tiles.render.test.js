@@ -1384,3 +1384,12 @@ describe('link cards', () => {
     expect(text(p.nodes.dashboardMetricGrid.innerHTML)).toContain('See the report');
   });
 });
+
+describe('the server period label in the footer', () => {
+  test('lineage.period_rule replaces the plain dates when it says more', () => {
+    const rule = 'Deals created Oct 29 - Nov 27, 2026, still open on Nov 27, 2026';
+    const html = page().exports.renderMetricCard(Object.assign({}, card('new_cases_opened_by_service_offering'), { period: 'Oct 29 - Nov 27, 2026', lineage: { period_rule: rule } }));
+    const footer = html.split('dash-metric-card__period')[1].split('</div>')[0];
+    expect(text('<x' + footer)).toContain(rule);
+  });
+});

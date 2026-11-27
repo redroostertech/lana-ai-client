@@ -165,7 +165,47 @@
     return 'admin/dashboard-detail.html?id=' + encodeURIComponent(dashboardId) + (isPlainDay(day) ? '&asOf=' + day : '');
   }
 
+  // ── The server's period label ───────────────────────────────────
+  var DATE_WORDS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'sept', 'oct', 'nov', 'dec',
+    'january', 'february', 'march', 'april', 'june', 'july', 'august', 'september', 'october', 'november', 'december', 'to'];
+  var TRIM_CHARS = ',.;:()';
+
+  function trimWord(word) {
+    var start = 0;
+    var end = word.length;
+    while (start < end && TRIM_CHARS.indexOf(word.charAt(start)) !== -1) start += 1;
+    while (end > start && TRIM_CHARS.indexOf(word.charAt(end - 1)) !== -1) end -= 1;
+    return word.slice(start, end);
+  }
+
+  // True when every word is a month, "to", a number or a dash.
+  function isPlainRange(text) {
+    return text.split(' ').every(function (raw) {
+      var word = trimWord(raw).toLowerCase();
+      if (!word || word === '-' || word === '\u2013') return true;
+      if (DATE_WORDS.indexOf(word) !== -1) return true;
+      return isDigits(word.split('-').join('').split('/').join(''));
+    });
+  }
+
+  /**
+   * The server's words for the card's dates ("Deals created Oct 29 - Nov 27,
+   * 2026, still open on Nov 27, 2026"), from lineage.period_rule,
+   * period_label or period, when they say more than a plain range; else ''.
+   */
+  function periodLabel(card) {
+    if (!card || typeof card !== 'object') return '';
+    var lineage = card.lineage && typeof card.lineage === 'object' ? card.lineage : {};
+    var options = [lineage.period_rule, card.period_label, card.period];
+    for (var i = 0; i < options.length; i += 1) {
+      var text = typeof options[i] === 'string' ? options[i].trim() : '';
+      if (text && !isPlainRange(text)) return text;
+    }
+    return '';
+  }
+
   return {
+    periodLabel: periodLabel,
     linkOf: linkOf,
     isLinkCard: isLinkCard,
     targetHref: targetHref,
