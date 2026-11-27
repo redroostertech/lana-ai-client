@@ -4119,3 +4119,11 @@ button.dash-lines__label:hover,
   color: var(--lex-text-tertiary);
   font-style: italic;
 }
+
+/* A declared chapter's intro (layout.chapters): one muted line under its title. */
+.dash-chapter__intro {
+  grid-column: 1 / -1;
+  margin: -0.5rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--lex-text-tertiary);
+}

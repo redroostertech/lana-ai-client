@@ -355,3 +355,42 @@ test('isWaiting: ok with value null waits, a real zero does not', () => {
   expect(Cards.isWaiting({ data_state: 'ok', value: 0 })).toBe(false);
   expect(Cards.isWaiting({ data_state: 'ok', value: [] })).toBe(false);
 });
+
+describe('chapters from the layout (layout.chapters)', () => {
+  const card = (id, kind, chapter, state) => ({ def: { id, kind, chapter: chapter || '' }, state: state || 'ok' });
+  const chapters = [
+    { id: 'coming_in', title: 'Coming in', intro: 'New leads and where they came from.' },
+    { id: 'booked_and_showed', title: 'Booked and showed', intro: 'Consultations booked and held.' },
+    { id: 'closing', title: 'Closing', intro: '' },
+    { id: 'team', title: 'Team', intro: 'Who is doing the work.' },
+  ];
+
+  test('normalizeLayout keeps the declared chapters in order', () => {
+    const layout = Cards.normalizeLayout({ chapters: chapters.concat([{ title: 'no id' }, null]), cards: [{ id: 'a', kind: 'number', metric_key: 'a.b', chapter: 'team' }] });
+    expect(layout.chapters.map((c) => c.id)).toEqual(['coming_in', 'booked_and_showed', 'closing', 'team']);
+    expect(layout.chapters[0]).toEqual({ id: 'coming_in', title: 'Coming in', intro: 'New leads and where they came from.' });
+    expect(Cards.normalizeLayout({ cards: [{ id: 'a', kind: 'number', metric_key: 'a.b' }] }).chapters).toEqual([]);
+  });
+
+  test('sections follow the declared order with title and intro; empty chapters are hidden', () => {
+    const plan = Cards.planDeclared([card('t', 'number', 'team'), card('c', 'breakdown', 'coming_in'), card('k', 'number', 'closing'), card('c2', 'number', 'coming_in')], chapters);
+    expect(plan.sections.map((s) => [s.chapter, s.label, s.intro, s.items.map((i) => i.resolved.def.id)])).toEqual([
+      ['coming_in', 'Coming in', 'New leads and where they came from.', ['c', 'c2']],
+      ['closing', 'Closing', '', ['k']],
+      ['team', 'Team', 'Who is doing the work.', ['t']],
+    ]);
+  });
+
+  test('declared chapters apply even with few cards; cards in no declared chapter go last', () => {
+    const plan = Cards.planDeclared([card('x', 'number', 'other'), card('c', 'number', 'coming_in')], chapters);
+    expect(plan.sections.map((s) => [s.chapter, s.items.map((i) => i.resolved.def.id)])).toEqual([['coming_in', ['c']], ['', ['x']]]);
+    expect(plan.items.map((i) => i.resolved.def.id)).toEqual(['c', 'x']);
+  });
+
+  test('without layout.chapters the fixed chapters still work as before', () => {
+    const plan = Cards.planDeclared([card('h', 'headline', 'now'), card('a', 'number', 'now'), card('b', 'number', 'attention'),
+      card('c', 'number', 'pace'), card('d', 'number', 'pace'), card('e', 'number', 'now')], []);
+    expect(plan.sections.map((s) => s.label)).toEqual(['Now', 'Needs attention', 'Pace']);
+    expect(plan.sections[0].intro).toBe('');
+  });
+});

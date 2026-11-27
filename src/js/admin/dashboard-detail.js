@@ -323,6 +323,8 @@
   var cardLoads = window.LoadState.createLoadTracker();
   // The saved dashboard's declared cards (layout.cards), or null.
   var currentDeclaredCards = null;
+  // The saved dashboard's own chapters (layout.chapters), or [].
+  var currentChapters = [];
   // The variant in view per declared card id (breakdown toggles).
   var variantPicks = {};
   // The text each tile showed last, so new dates count from the old number.
@@ -1834,12 +1836,13 @@
     cardInfoByKey = {};
     if (currentDeclaredCards && unfiltered) {
       // The saved dashboard's own cards, in its order (dashboard-cards.js).
-      var plan = window.DashboardCards.planDeclared(window.DashboardCards.resolveCards(currentDeclaredCards, declaredIndex));
+      var plan = window.DashboardCards.planDeclared(window.DashboardCards.resolveCards(currentDeclaredCards, declaredIndex), currentChapters);
       renderingDeclared = true;
       try {
         // Chapters: a quiet label row before each chapter's first card.
         grid.innerHTML = plan.sections.map(function (section) {
           return (section.label ? '<div class="dash-chapter" role="heading" aria-level="2">' + escapeHtml(section.label) + '</div>' : '')
+            + (section.label && section.intro ? '<p class="dash-chapter__intro">' + escapeHtml(section.intro) + '</p>' : '')
             + withSpans(section.items).map(renderDeclaredCard).join('');
         }).join('') + renderWaitingStrip(plan.waiting.map(renderDeclaredWaitingCard));
       } finally {
@@ -2070,6 +2073,7 @@
       // otherwise its metric_keys as before.
       var declared = window.DashboardCards.normalizeLayout(layout);
       currentDeclaredCards = declared.mode === 'cards' ? declared.cards : null;
+      currentChapters = declared.chapters || [];
       var metricKeys = window.DashboardCards.requestKeys(layout);
       currentDashboardMetricKeys = new Set(metricKeys.concat(metricKeys.map(function (key) { return key.split('.').pop(); })));
       currentDashboardType = type;

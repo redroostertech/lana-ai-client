@@ -1010,3 +1010,22 @@ describe('one card with engine_error', () => {
     ['Gross Revenue', 'Target Revenue', 'Overdue Expected Cash', 'Total Active Cases', 'Cash Coming In'].forEach((title) => expect(text(html)).toContain(title));
   });
 });
+
+describe('layout.chapters on the dashboard', () => {
+  const declared = require(path.join(__dirname, '../fixtures/dashboard/declared-layouts.json'));
+  test('each chapter shows its title and intro, in the declared order; empty ones are hidden', async () => {
+    const layout = {
+      chapters: [{ id: 'coming_in', title: 'Coming in', intro: 'New leads and where they came from.' }, { id: 'empty', title: 'Nothing here', intro: 'x' },
+        { id: 'team', title: 'Team', intro: 'Who is doing the work.' }],
+      cards: [{ id: 'a', kind: 'number', metric_key: 'case_volume.active_cases_total', chapter: 'team' },
+        { id: 'b', kind: 'number', metric_key: 'finance.gross_revenue_total', chapter: 'coming_in' }],
+    };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'Leads and Deals', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: declared.cards_synthetic }) });
+    await p.exports.loadDashboardById('d1');
+    const html = p.nodes.dashboardMetricGrid.innerHTML;
+    expect(html).toContain('<div class="dash-chapter" role="heading" aria-level="2">Coming in</div><p class="dash-chapter__intro">New leads and where they came from.</p>');
+    expect(html.indexOf('Coming in')).toBeLessThan(html.indexOf('>Team<'));
+    expect(html).not.toContain('Nothing here');
+    expect(html.indexOf('Gross Revenue')).toBeLessThan(html.indexOf('Total Active Cases'));
+  });
+});

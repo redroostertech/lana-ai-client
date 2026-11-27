@@ -107,9 +107,23 @@
   }
 
   /** { mode: 'cards', cards } when layout.cards declares any usable card, else { mode: 'keys', cards: [] }. */
+  // layout.chapters = [{ id, title, intro }]: the dashboard's own chapters,
+  // in order. Entries without an id are dropped.
+  function normalizeChapters(list) {
+    var seen = {};
+    return (Array.isArray(list) ? list : []).filter(function (c) {
+      if (!c || typeof c !== 'object' || !c.id || seen[c.id]) return false;
+      seen[c.id] = true;
+      return true;
+    }).map(function (c) {
+      return { id: String(c.id), title: c.title ? String(c.title) : chapterLabel(String(c.id)), intro: c.intro ? String(c.intro) : '' };
+    });
+  }
+
   function normalizeLayout(layout) {
     var cards = layout && Array.isArray(layout.cards) ? layout.cards.map(normalizeCard).filter(Boolean) : [];
-    return cards.length ? { mode: 'cards', cards: cards } : { mode: 'keys', cards: [] };
+    var chapters = normalizeChapters(layout && layout.chapters);
+    return cards.length ? { mode: 'cards', cards: cards, chapters: chapters } : { mode: 'keys', cards: [] };
   }
 
   /** The flat union of keys the card request sends. */
@@ -243,7 +257,13 @@
     return words ? words.charAt(0).toUpperCase() + words.slice(1) : '';
   }
 
-  function planDeclared(resolved) {
+  /**
+   * chapters (optional, from layout.chapters): sections follow that order
+   * with each chapter's title and intro, whatever the card count; a card in
+   * no declared chapter goes in a last section without a label; empty
+   * chapters are hidden. Without chapters, the fixed chapters as before.
+   */
+  function planDeclared(resolved, chapters) {
     var items = [];
     var waiting = [];
     (resolved || []).forEach(function (entry) {
@@ -256,15 +276,24 @@
     // Chapters (card.chapter): a label row before each chapter's first card,
     // only when the dashboard has 6 or more cards and some card names one.
     // A chapter whose cards are all waiting has nothing here, so it is skipped.
-    var chaptered = (resolved || []).length >= CHAPTER_MIN_CARDS && items.some(function (item) { return item.resolved.def.chapter; });
+    var declaredChapters = Array.isArray(chapters) ? chapters.filter(function (c) { return c && c.id; }) : [];
+    var chaptered = declaredChapters.length > 0
+      || ((resolved || []).length >= CHAPTER_MIN_CARDS && items.some(function (item) { return item.resolved.def.chapter; }));
     var sections = [];
-    if (chaptered) {
+    if (declaredChapters.length) {
+      var byId = {};
+      declaredChapters.forEach(function (c) { byId[c.id] = { chapter: c.id, label: c.title || chapterLabel(c.id), intro: c.intro || '', items: [] }; });
+      var rest = { chapter: '', label: '', intro: '', items: [] };
+      items.forEach(function (item) { (byId[item.resolved.def.chapter] || rest).items.push(item); });
+      declaredChapters.forEach(function (c) { if (byId[c.id].items.length) sections.push(byId[c.id]); });
+      if (rest.items.length) sections.push(rest);
+    } else if (chaptered) {
       var at = {};
       items.forEach(function (item) {
         var chapter = item.resolved.def.chapter || '';
         if (at[chapter] === undefined) {
           at[chapter] = sections.length;
-          sections.push({ chapter: chapter, label: chapter ? chapterLabel(chapter) : '', items: [] });
+          sections.push({ chapter: chapter, label: chapter ? chapterLabel(chapter) : '', intro: '', items: [] });
         }
         sections[at[chapter]].items.push(item);
       });
