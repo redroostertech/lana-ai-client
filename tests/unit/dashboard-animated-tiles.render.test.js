@@ -1498,4 +1498,11 @@ describe('Still Open live check: formats and empty months', () => {
     expect(html).toContain('<title>October 2026: 3 deals · $7,508,521</title>');
     expect(html).toContain('>Oct<');
   });
+  test('a forward cash card with all-zero months shows the empty line, not a row of 0s', async () => {
+    const card = { metric_key: 'legal_firm.finance.cash_due_by_month', title: 'Cash Due', data_state: 'ok', value: 0, value_format: 'currency',
+      metadata: { group_by_month_of: 'next_billing', by_month: [{ month: '2026-12', label: 'Dec', count: 0, value: 0 }, { month: '2027-01', label: 'Jan', count: 0, value: 0 }] } };
+    const html = await render(card, { visual: 'month_bars' });
+    expect(text(html)).toContain('Nothing due in these months');
+    expect(html).not.toContain('mini-cols__value');
+  });
 });

@@ -4342,3 +4342,10 @@ button.dash-lines__label:hover,
 .dash-month-note__link:focus-visible {
   text-decoration: underline;
 }
+
+/* Month bars with nothing in them: one calm line. */
+.dash-month-empty {
+  margin: 0.75rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--lex-text-secondary);
+}

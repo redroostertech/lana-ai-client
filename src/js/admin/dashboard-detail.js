@@ -1459,7 +1459,10 @@
       + declaredTop(def, entry.key, metric, true, null, recordsHref(entry.key))
       + valueBlock(metric)
       + (subtitle ? '<p class="dash-metric-card__subtitle">' + escapeHtml(subtitle) + '</p>' : '')
-      + '<div class="dash-metric-card__chart">' + window.MiniCharts.columnsHtml({ rows: rows, paired: false, seriesLabels: [], allLabels: true }, plainNumber, {}) + '</div>'
+      // All-zero months: one line, not a row of 0s.
+      + (max > 0
+        ? '<div class="dash-metric-card__chart">' + window.MiniCharts.columnsHtml({ rows: rows, paired: false, seriesLabels: [], allLabels: true }, plainNumber, {}) + '</div>'
+        : '<p class="dash-month-empty">' + escapeHtml(window.AsOfCards.monthEmptyText(metric)) + '</p>')
       + unplacedHtml
       + cardFooter(metric, entry.key)
       + '</article>';

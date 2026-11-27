@@ -201,6 +201,14 @@
     });
   }
 
+  // Forward-looking months (next billing, due) with nothing in them.
+  var FORWARD_RULES = { next_billing: true, due: true };
+
+  /** The line instead of all-zero bars. */
+  function monthEmptyText(card) {
+    return FORWARD_RULES[metaOf(card).group_by_month_of] ? 'Nothing due in these months' : 'Nothing in these months';
+  }
+
   /** The word for the count (metadata.unit, for example "deals"). */
   function monthUnit(card) {
     var unit = metaOf(card).unit;
@@ -288,6 +296,7 @@
     monthSubtitle: monthSubtitle,
     monthTip: monthTip,
     monthTicks: monthTicks,
+    monthEmptyText: monthEmptyText,
     isAverage: isAverage,
     monthUnit: monthUnit,
     isAsOf: isAsOf,
