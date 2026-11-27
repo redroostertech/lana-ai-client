@@ -4438,3 +4438,80 @@ button.dash-lines__label:hover,
     gap: 1rem;
   }
 }
+
+/* ══ Fluid card text: sized by the card's own width, not the viewport ═══
+   Each card (and the metric detail summary) is a size container; text
+   uses cqi within readable bounds. Headline numbers stay on one line and
+   shrink to fit; other text never drops below 11 px and long words wrap. */
+.dash-fluid .dash-metric-card,
+.metric-summary {
+  container-type: inline-size;
+}
+
+.dash-fluid .dash-metric-card--hero .dash-metric-card__value {
+  font-size: clamp(1.75rem, 13cqi, 3.5rem);
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.dash-fluid .dash-metric-card__value {
+  font-size: clamp(1.375rem, 11cqi, 2.25rem);
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.metric-summary .metric-summary__value {
+  font-size: clamp(1.5rem, 12cqi, 2.75rem);
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.dash-fluid .dash-metric-card__title {
+  font-size: clamp(0.75rem, 0.62rem + 0.7cqi, 0.9375rem);
+  overflow-wrap: anywhere;
+}
+
+.dash-fluid .dash-metric-card__second-line {
+  font-size: clamp(0.75rem, 0.62rem + 0.55cqi, 0.875rem);
+  overflow-wrap: anywhere;
+}
+
+.dash-fluid .dash-metric-card__subtitle {
+  font-size: clamp(0.75rem, 0.62rem + 0.5cqi, 0.8125rem);
+  overflow-wrap: anywhere;
+}
+
+.dash-fluid .dash-card__headline {
+  font-size: clamp(0.75rem, 0.62rem + 0.55cqi, 0.875rem);
+  overflow-wrap: anywhere;
+}
+
+.dash-fluid .dash-callouts {
+  font-size: clamp(0.75rem, 0.62rem + 0.55cqi, 0.875rem);
+  overflow-wrap: anywhere;
+}
+
+.dash-fluid .dash-card__note {
+  font-size: clamp(0.75rem, 0.62rem + 0.45cqi, 0.8125rem);
+  overflow-wrap: anywhere;
+}
+
+.dash-fluid .dash-card__footer {
+  font-size: clamp(0.75rem, 0.62rem + 0.45cqi, 0.8125rem);
+  overflow-wrap: anywhere;
+}
+
+.dash-fluid .dash-card__footer .dash-metric-card__period,
+.dash-fluid .dash-card__footer .dash-metric-card__link {
+  font-size: inherit;
+}
+
+.metric-summary .metric-summary__title {
+  font-size: clamp(0.8125rem, 0.7rem + 0.5cqi, 1rem);
+  overflow-wrap: anywhere;
+}
+
+.metric-summary .metric-summary__second-line {
+  font-size: clamp(0.75rem, 0.65rem + 0.4cqi, 0.875rem);
+  overflow-wrap: anywhere;
+}

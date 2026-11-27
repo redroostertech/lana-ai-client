@@ -231,8 +231,10 @@
   stroke-width: 1;
 }
 
+/* Fluid to the card: the SVG scales up on wide cards, so the tick's own
+   size eases off as the card grows (about 11 px on screen either way). */
 .mini-cols__tick {
-  font-size: 7.5px;
+  font-size: clamp(8.5px, calc(14px - 1cqi), 11.5px);
   fill: var(--lex-text-tertiary);
   font-variant-numeric: tabular-nums;
 }
