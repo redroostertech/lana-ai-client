@@ -175,8 +175,23 @@
     if (!line || typeof line !== 'object') return '';
     var value = toNumber(line.value);
     if (value === null) return '';
-    var text = round1(value) + (line.format === 'percentage' ? '%' : '');
+    var text = formatByKind(value, line.format);
     return line.label ? String(line.label).trim() + ' ' + text : text;
+  }
+
+  function firmCurrency() {
+    var host = typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : {});
+    var utils = host.Lex && host.Lex.Utils;
+    return utils && typeof utils.getFirmCurrency === 'function' ? utils.getFirmCurrency() : 'USD';
+  }
+
+  // A value by its format: currency (the firm's currency), percentage, or
+  // a grouped number.
+  function formatByKind(value, format) {
+    var kind = String(format || '').toLowerCase();
+    if (kind === 'currency') return value.toLocaleString('en-US', { style: 'currency', currency: firmCurrency(), maximumFractionDigits: 0 });
+    if (kind === 'percentage' || kind === 'percent') return round1(value) + '%';
+    return value.toLocaleString('en-US', { maximumFractionDigits: 1 });
   }
 
   function pctOf(value, max) {

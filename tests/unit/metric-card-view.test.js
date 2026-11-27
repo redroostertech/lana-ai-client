@@ -369,3 +369,17 @@ describe('rowLabel: never "Item N" when the row has words', () => {
     expect(label({ value: 1, count: 2 })).toBe('Item 1');
   });
 });
+
+describe('second_line formats by its own format', () => {
+  test('currency uses the firm currency, number is grouped, percentage keeps one decimal', () => {
+    expect(View.secondLine({ metadata: { second_line: { label: 'Weighted by win probability', value: 2540063.42, format: 'currency' } } })).toBe('Weighted by win probability $2,540,063');
+    expect(View.secondLine({ metadata: { second_line: { label: 'Open deals', value: 1234.5, format: 'number' } } })).toBe('Open deals 1,234.5');
+    expect(View.secondLine({ metadata: { second_line: { label: 'Cohort rate', value: 42.25, format: 'percentage' } } })).toBe('Cohort rate 42.3%');
+  });
+  test('the firm currency is used when the page has one', () => {
+    global.Lex = { Utils: { getFirmCurrency: () => 'EUR' } };
+    try {
+      expect(View.secondLine({ metadata: { second_line: { label: 'Weighted', value: 1000, format: 'currency' } } })).toBe('Weighted €1,000');
+    } finally { delete global.Lex; }
+  });
+});
