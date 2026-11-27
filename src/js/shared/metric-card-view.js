@@ -106,8 +106,8 @@
   // shown as a muted suffix, never joined into the label.
   function isStatusKey(key) {
     var k = String(key).toLowerCase();
-    if (k === 'role' || k === 'status' || k === 'state') return true;
-    return ['_role', '_status', '_state'].some(function (tail) { return k.length > tail.length && k.slice(-tail.length) === tail; });
+    if (k === 'role' || k === 'status' || k === 'state' || k === 'access' || k === 'kind') return true;
+    return ['_role', '_status', '_state', '_access', '_kind'].some(function (tail) { return k.length > tail.length && k.slice(-tail.length) === tail; });
   }
 
   // The plain text fields that are not ids, dates or statuses, in order.
@@ -120,7 +120,10 @@
     if (!row || typeof row !== 'object') return '';
     var key = Object.keys(row).filter(function (k) { return isStatusKey(k) && looksLikeWords(row[k]); })[0];
     var text = key ? String(row[key]).trim() : '';
-    return text && text.toLowerCase() !== String(label || '').trim().toLowerCase() ? text : '';
+    // Only human text shows (a space or a capital letter); raw enums such
+    // as "owner" or "not_on_team" are hidden.
+    var human = text.indexOf(' ') !== -1 || text !== text.toLowerCase();
+    return text && human && text.toLowerCase() !== String(label || '').trim().toLowerCase() ? text : '';
   }
 
   /**

@@ -431,7 +431,7 @@ describe('name plus a role or status: the name alone, status as a muted suffix',
     const unassigned = { owner_name: 'Unassigned', status: 'unassigned', value: 2 };
     const linked = { team_member: 'Jordan Reese', link_status: 'Linked to LANA', value: 5 };
     expect(View.listBars([owner, unassigned, linked], 12).rows.map((r) => [r.label, r.status || ''])).toEqual([
-      ['Taylor Vance', 'owner'], ['Unassigned', ''], ['Jordan Reese', 'Linked to LANA'],
+      ['Taylor Vance', ''], ['Unassigned', ''], ['Jordan Reese', 'Linked to LANA'],
     ]);
   });
   test('the cross-tab still reads "Member · Meeting type"', () => {
@@ -441,4 +441,15 @@ describe('name plus a role or status: the name alone, status as a muted suffix',
 
 test('row_format "currency" alone makes a distribution money', () => {
   expect(View.listValueFormat({ format: 'distribution', row_format: 'currency' })).toBe('currency');
+});
+
+describe('access and kind fields are statuses; raw enums are hidden', () => {
+  test('*_access and *_kind never join the label; only human text shows as the suffix', () => {
+    const rows = View.listBars([
+      { team_member: 'Jordan Reese', lana_access: 'Linked to LANA', value: 5 },
+      { owner_name: 'Taylor Vance', owner_kind: 'owner', value: 3 },
+      { owner_name: 'Casey Lee', owner_kind: 'not_on_team', value: 2 },
+    ], 12).rows;
+    expect(rows.map((r) => [r.label, r.status || ''])).toEqual([['Jordan Reese', 'Linked to LANA'], ['Taylor Vance', ''], ['Casey Lee', '']]);
+  });
 });
