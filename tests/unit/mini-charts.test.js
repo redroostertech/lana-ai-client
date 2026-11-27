@@ -363,3 +363,20 @@ describe('partial buckets are marked quietly', () => {
     expect(row).toContain('mini-bars__fill mini-bars__fill--partial');
   });
 });
+
+describe('a daily series draws as compact columns', () => {
+  const days = Array.from({ length: 30 }, (_, i) => ({ period_start: '2026-10-' + String(i + 1).padStart(2, '0'), value: i % 4 }));
+  test('30 days: every day a column, a few date labels, no value text crowding, no blank list', () => {
+    const model = View.listBars(days, 62);
+    model.series = true;
+    const html = Charts.breakdownHtml(model, String, {});
+    expect(html).toContain('class="mini-cols');
+    expect(html).not.toContain('mini-bars');
+    expect(html.split('<g class="mini-cols__group').length - 1).toBe(30);
+    const labels = html.split('class="mini-cols__label"').length - 1;
+    expect(labels).toBeGreaterThan(3);
+    expect(labels).toBeLessThan(10);
+    expect(html.split('class="mini-cols__value"').length - 1).toBe(0);
+    expect(html).toContain('<title>Oct 2, 2026: 1</title>');
+  });
+});

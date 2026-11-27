@@ -840,6 +840,11 @@
       var top = window.CardVisuals.topRows(full.rows, CARD_ROW_LIMIT);
       bars = Object.assign({}, full, { rows: top.rows, hiddenCount: top.hidden, empty: !top.rows.length });
       if (bars.empty) return window.DataState.render(EMPTY_LIST_STATE, { calm: true });
+    } else if (metric.value.some(isPeriodRow) && metric.value.length <= 62 && !bars.paired) {
+      // A series over dates (for example 30 days of form fills): every day a
+      // compact column, never a short list under an empty chart area.
+      bars = window.MetricCardView.listBars(metric.value, 62);
+      bars.series = true;
     } else if (bars.hiddenCount > 0) {
       // More than 12 rows read better as horizontal bars (8 shown, the rest counted).
       bars = window.MetricCardView.listBars(metric.value, 8);
@@ -1160,6 +1165,8 @@
     var columnTop = rows.categories ? window.CardVisuals.topRows(rows, CARD_ROW_LIMIT) : { rows: rows, hidden: 0 };
     var model = seriesColumnsModel(columnTop.rows, resolved.def.options.series_labels);
     model.hiddenCount = columnTop.hidden;
+    // A series over dates draws every point as a compact column.
+    if (rows.categories === false) model.series = true;
     if (model.empty) return window.DataState.render(EMPTY_LIST_STATE, { calm: true });
     return window.MiniCharts.breakdownHtml(model, function (n) { return byValue[n] !== undefined ? byValue[n] : plainNumber(n); }, { href: recordsHref });
   }

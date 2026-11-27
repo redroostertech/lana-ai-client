@@ -1114,3 +1114,20 @@ test('a distribution with a declared value format shows money; without one, plai
   expect(text(page().exports.renderMetricCard(make({})))).toContain('314,350');
   expect(text(page().exports.renderMetricCard(make({})))).not.toContain('$314,350');
 });
+
+test('Form Fills per day over 30 days: the Per day tab draws 30 columns, not a short list', async () => {
+  const days = Array.from({ length: 30 }, (_, i) => ({ period_start: '2026-10-' + String(i + 1).padStart(2, '0'), value: i % 3 }));
+  const weeks = [{ period_start: '2026-10-05', value: 6 }, { period_start: '2026-10-12', value: 4 }];
+  const cards = [
+    { metric_key: 'legal_firm.sales_intake.form_fills_per_day', title: 'Form Fills', format: 'distribution', data_state: 'ok', period: 'Oct 2026', value: days },
+    { metric_key: 'legal_firm.sales_intake.form_fills_per_week', title: 'Form Fills', format: 'distribution', data_state: 'ok', period: 'Oct 2026', value: weeks },
+  ];
+  const layout = { cards: [{ id: 'f', kind: 'breakdown', metric_key: 'sales_intake.form_fills_per_day', visual: 'columns',
+    variants: [{ label: 'Per day', metric_key: 'sales_intake.form_fills_per_day' }, { label: 'Per week', metric_key: 'sales_intake.form_fills_per_week' }] }] };
+  const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: cards }) });
+  await p.exports.loadDashboardById('d1');
+  const html = p.nodes.dashboardMetricGrid.innerHTML;
+  expect(html.split('<g class="mini-cols__group').length - 1).toBe(30);
+  expect(html).not.toContain('more in the details');
+  expect(html).not.toContain('mini-bars');
+});

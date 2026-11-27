@@ -92,6 +92,7 @@
   // box (value above each column, a short label below, light gridlines).
   // More rows than that read better as horizontal bars.
   var COLUMN_LIMIT = 12;
+  var SERIES_COLUMN_LIMIT = 62;
   var BOX_W = 300;
   var PLOT_TOP = 14;
   var PLOT_BOTTOM = 100;
@@ -133,6 +134,11 @@
     var n = model.rows.length;
     var slot = BOX_W / n;
     var maxChars = Math.max(4, Math.floor(slot / 4.8));
+    // A long series over days: no value text over each column (the tooltip
+    // keeps it), and a date label on every few columns only.
+    var dense = n > COLUMN_LIMIT;
+    var labelEvery = dense ? Math.ceil(n / 6) : 1;
+    if (dense) maxChars = Math.max(maxChars, 7);
     var grid = '<g class="mini-cols__grid">'
       + '<line x1="0" x2="' + BOX_W + '" y1="' + PLOT_TOP + '" y2="' + PLOT_TOP + '"></line>'
       + '<line x1="0" x2="' + BOX_W + '" y1="' + (PLOT_TOP + PLOT_H / 2) + '" y2="' + (PLOT_TOP + PLOT_H / 2) + '"></line>'
@@ -164,8 +170,8 @@
       return '<g class="mini-cols__group' + (row.partial ? ' mini-cols__group--partial' : '') + (row.muted ? ' mini-cols__group--muted' : '') + '"' + linkFor(row)
         + '><title>' + escapeHtml(row.label + (row.partial ? ' (partial)' : '') + ': ' + valueText) + '</title>'
         + bars
-        + '<text class="mini-cols__value" x="' + round1(center) + '" y="' + valueY + '" text-anchor="middle">' + escapeHtml(format(row.value === null && hasSecond ? row.second : row.value)) + '</text>'
-        + '<text class="mini-cols__label" x="' + round1(center) + '" y="114" text-anchor="middle">' + escapeHtml(shortLabel(row.label, maxChars)) + '</text>'
+        + (dense ? '' : '<text class="mini-cols__value" x="' + round1(center) + '" y="' + valueY + '" text-anchor="middle">' + escapeHtml(format(row.value === null && hasSecond ? row.second : row.value)) + '</text>')
+        + (i % labelEvery === 0 ? '<text class="mini-cols__label" x="' + round1(center) + '" y="114" text-anchor="middle">' + escapeHtml(shortLabel(row.label, maxChars)) + '</text>' : '')
         + '</g>';
     }).join('');
     return '<div class="mini-cols">' + legendHtml(model)
@@ -180,6 +186,8 @@
   function breakdownHtml(model, formatValue, opts) {
     if (!model || model.empty) return '';
     var format = typeof formatValue === 'function' ? formatValue : function (n) { return String(n); };
+    // A series over dates (model.series) stays columns up to two months of days.
+    if (model.series && !model.hiddenCount && model.rows.length <= SERIES_COLUMN_LIMIT) return columnsHtml(model, format, opts);
     if (model.hiddenCount > 0 || model.rows.length > COLUMN_LIMIT) return barsHtml(model, format);
     return columnsHtml(model, format, opts);
   }
