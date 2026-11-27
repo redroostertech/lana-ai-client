@@ -284,10 +284,11 @@ describe('metric detail records: reasons, dates, conflicts and fixes', () => {
     expect(V.rowNotes(conflictRow)).toEqual({
       reason: 'Won on Nov 20 with no amount.',
       conflict: { fields: [{ label: 'Amount', lana: '$4,500', source: '$3,000', previous: '$4,500' }] },
+      outsideSearch: false,
       fixed: null,
     });
-    expect(V.rowNotes(fixedRow)).toEqual({ reason: 'Won on Nov 18.', conflict: null, fixed: ['Amount'] });
-    expect(V.rowNotes({ a: 1 })).toEqual({ reason: '', conflict: null, fixed: null });
+    expect(V.rowNotes(fixedRow)).toEqual({ reason: 'Won on Nov 18.', conflict: null, outsideSearch: false, fixed: ['Amount'] });
+    expect(V.rowNotes({ a: 1 })).toEqual({ reason: '', conflict: null, outsideSearch: false, fixed: null });
   });
 
   test('the server order is kept when rows carry row_date or conflicts', () => {

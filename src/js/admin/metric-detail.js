@@ -135,7 +135,10 @@
     var notes = view().rowNotes(row);
     var parts = [];
     if (notes.conflict) {
-      parts.push('<span class="metric-record-badge metric-record-badge--conflict">Conflict</span> '
+      // A pinned conflict that does not match the search or filters is muted.
+      parts.push((notes.outsideSearch
+        ? '<span class="metric-record-badge metric-record-badge--outside">Conflict, outside your search</span> '
+        : '<span class="metric-record-badge metric-record-badge--conflict">Conflict</span> ')
         + notes.conflict.fields.map(function (f) {
           return '<span class="metric-record-conflict">' + escapeHtml(f.label + ': LANA ' + (f.lana || 'blank') + ', ' + (f.sourceName || 'source') + ' ' + (f.source || 'blank')) + '</span>';
         }).join(' '));
@@ -251,16 +254,7 @@
         counts: ['metricRawDataCount', 'metricRawDataSectionCount']
       }, { noun: ['record', 'records'], defaultSort: defaultSort });
       table.addEventListener('lex-filter-change', empty);
-      // A record row opens the record panel (js/shared/report-object-panel.js).
-      table.addEventListener('row-click', function (event) {
-        var row = event.detail && event.detail.row;
-        var ref = row && window.ReportObjects ? window.ReportObjects.primaryRef(row) : null;
-        if (!ref || !window.LanaRecordPanel) return;
-        var qp = params();
-        window.LanaRecordPanel.open(ref, { period: { start: qp.get('periodStart') || '', end: qp.get('periodEnd') || '' }, row: row,
-          permissions: currentPermissions, onSaved: onFixSaved });
-      });
-      if (window.DataFixes) window.DataFixes.bind(table, { onSaved: onFixSaved });
+      bindRecordRows(table);
     }
     empty();
     table.setData((Array.isArray(sourceRows) ? sourceRows : []).map(view().recordsRow));
@@ -270,6 +264,101 @@
       table.dataSource.setSort(defaultSort, defaultDir);
     }
     toolbars.raw.updateCount();
+  }
+
+  // A record row opens the record panel (js/shared/report-object-panel.js),
+  // and its fix controls work (js/shared/data-fixes.js). Bound once.
+  function bindRecordRows(table) {
+    if (table._recordRowsBound) return;
+    table._recordRowsBound = true;
+    table.addEventListener('row-click', function (event) {
+      var row = event.detail && event.detail.row;
+      var ref = row && window.ReportObjects ? window.ReportObjects.primaryRef(row) : null;
+      if (!ref || !window.LanaRecordPanel) return;
+      var qp = params();
+      window.LanaRecordPanel.open(ref, { period: { start: qp.get('periodStart') || '', end: qp.get('periodEnd') || '' }, row: row,
+        permissions: currentPermissions, onSaved: onFixSaved });
+    });
+    if (window.DataFixes) window.DataFixes.bind(table, { onSaved: onFixSaved });
+  }
+
+  // ── Records on the server (search, sort, filters, paging) ──────────
+  // When metric detail's raw_data carries filtered_total, facets, sort or
+  // filters, the table asks the server: search waits about 300 ms, and an
+  // answer to an older query is ignored.
+  var rowsQuery = { search: '', sortBy: '', sortDir: 'desc', filters: {}, page: 1, limit: 20 };
+  var rowsToken = 0;
+  var searchTimer = null;
+  var lastDetail = null;
+
+  function renderServerRows(payload) {
+    var table = el('metricRawDataTable');
+    if (!table || typeof table.setServerData !== 'function') return;
+    var raw = payload.raw_data || {};
+    var rows = Array.isArray(raw.rows) ? raw.rows : [];
+    var model = view().recordsTable(rows, payload.row_columns);
+    if (model.columns.length) {
+      table.setAttribute('columns', model.columns.map(function (c) { return c.key; }).join(','));
+      table.setAttribute('labels', model.columns.map(function (c) { return c.label; }).join(','));
+    }
+    table.setCellRenderers(recordRenderers(model.columns));
+    table.setAttribute('server-paging', '');
+    table.setColumnFilterOptions(view().facetFilterOptions(raw.facets));
+    table.setServerData(rows.map(view().recordsRow), { page: rowsQuery.page, limit: rowsQuery.limit, total: Number(raw.filtered_total) || rows.length });
+    var count = view().rowsCountText(raw, rows.length);
+    ['metricRawDataCount', 'metricRawDataSectionCount'].forEach(function (id) {
+      var node = el(id);
+      if (node) node.textContent = count;
+    });
+    var truncated = el('metricRawDataTotalNote');
+    if (truncated) {
+      truncated.textContent = view().truncatedText(raw);
+      truncated.hidden = !truncated.textContent;
+    }
+    bindServerRows(table);
+    bindRecordRows(table);
+  }
+
+  function bindServerRows(table) {
+    if (table._serverRowsBound) return;
+    table._serverRowsBound = true;
+    table.addEventListener('lex-query-change', function (event) {
+      var q = event.detail || {};
+      rowsQuery.page = Number(q.page) || 1;
+      if (q.limit) rowsQuery.limit = Number(q.limit) || rowsQuery.limit;
+      if (q.sortBy) { rowsQuery.sortBy = q.sortBy; rowsQuery.sortDir = q.sortDir === 'asc' ? 'asc' : 'desc'; }
+      if (q.filters) rowsQuery.filters = q.filters;
+      fetchServerRows();
+    });
+    var search = el('metricRawDataSearch');
+    if (search) {
+      search.addEventListener('lex-input', function (event) {
+        var value = event.detail && event.detail.value !== undefined ? String(event.detail.value) : '';
+        if (searchTimer) clearTimeout(searchTimer);
+        searchTimer = setTimeout(function () {
+          searchTimer = null;
+          rowsQuery.search = value;
+          rowsQuery.page = 1;
+          fetchServerRows();
+        }, 300);
+      });
+    }
+  }
+
+  function fetchServerRows() {
+    if (!lastDetail) return;
+    var token = ++rowsToken;
+    var request = Object.assign({}, lastDetail.periodParams, view().rowsRequestParams(rowsQuery));
+    api.getMetricDetail(lastDetail.metricKey, request).then(function (response) {
+      if (token !== rowsToken) return;
+      var payload = response && response.data ? response.data : response;
+      currentRows = payload && payload.raw_data && Array.isArray(payload.raw_data.rows) ? payload.raw_data.rows : [];
+      renderServerRows(payload || {});
+    }, function () {
+      if (token !== rowsToken) return;
+      var node = el('metricRawDataCount');
+      if (node) node.textContent = 'Could not load the records. Try again.';
+    });
   }
 
   // The summary card: value with its unit, the change both ways, the prior
@@ -645,8 +734,15 @@
         currentRows = payload.raw_data && Array.isArray(payload.raw_data.rows) ? payload.raw_data.rows : [];
         currentRowColumns = payload.row_columns;
         renderRecordsHeader(payload);
-        renderRawData(payload.raw_data && payload.raw_data.rows ? payload.raw_data.rows : [], payload.row_columns);
-        renderRawDataTotal(payload.raw_data);
+        lastDetail = { metricKey: metricKey, periodParams: periodParams };
+        if (view().isServerRows(payload.raw_data)) {
+          var sort = payload.raw_data.sort || {};
+          if (!rowsQuery.sortBy && sort.by) { rowsQuery.sortBy = String(sort.by); rowsQuery.sortDir = sort.dir === 'asc' ? 'asc' : 'desc'; }
+          renderServerRows(payload);
+        } else {
+          renderRawData(payload.raw_data && payload.raw_data.rows ? payload.raw_data.rows : [], payload.row_columns);
+          renderRawDataTotal(payload.raw_data);
+        }
       }
     } catch (err) {
       console.error('[MetricDetail] Failed to load metric detail:', err);

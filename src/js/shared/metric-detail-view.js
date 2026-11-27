@@ -291,8 +291,85 @@
     return {
       reason: typeof r.row_reason === 'string' ? r.row_reason.trim() : '',
       conflict: conflict,
+      // A pinned conflict that does not match the search or filters.
+      outsideSearch: !!(conflict && r.matches_query === false),
       fixed: fixedFields ? fixedFields.map(function (f) { return typeof f === 'object' ? fieldLabel(f) : (LABELS[f] || words(f)); }) : null,
     };
+  }
+
+  // ── Server-side rows (search, sort, filters, paging) ───────────────
+  /** The server handles the rows when raw_data carries filtered_total, facets, sort or filters. */
+  function isServerRows(raw) {
+    if (!raw || typeof raw !== 'object') return false;
+    return !!(raw.filtered_total !== undefined || (raw.facets && typeof raw.facets === 'object')
+      || (raw.sort && typeof raw.sort === 'object') || (raw.filters && typeof raw.filters === 'object'));
+  }
+
+  /**
+   * The table's query ({ search, sortBy, sortDir, filters, page, limit },
+   * filters as lex-table sends them) as getMetricDetail raw_* params. A
+   * picked value "from..to" is a range (col_from, col_to).
+   */
+  function rowsRequestParams(query) {
+    var q = query || {};
+    var limit = Number(q.limit) || 20;
+    var page = Number(q.page) || 1;
+    var out = {};
+    var search = typeof q.search === 'string' ? q.search.trim() : '';
+    if (search) out.rawQ = search;
+    if (q.sortBy) { out.rawSortBy = String(q.sortBy); out.rawSortDir = q.sortDir === 'asc' ? 'asc' : 'desc'; }
+    var filters = {};
+    Object.keys(q.filters || {}).forEach(function (col) {
+      var f = q.filters[col];
+      var value = f && typeof f === 'object' ? (Array.isArray(f.value) ? f.value[0] : f.value) : f;
+      if (value === undefined || value === null || value === '') return;
+      var text = String(value);
+      var dots = text.indexOf('..');
+      if (dots !== -1) {
+        if (text.substring(0, dots)) filters[col + '_from'] = text.substring(0, dots);
+        if (text.substring(dots + 2)) filters[col + '_to'] = text.substring(dots + 2);
+      } else {
+        filters[col] = text;
+      }
+    });
+    if (Object.keys(filters).length) out.rawFilters = filters;
+    out.rawLimit = limit;
+    out.rawOffset = (page - 1) * limit;
+    return out;
+  }
+
+  /** "Showing X of filtered_total (of total)". */
+  function rowsCountText(raw, shown) {
+    var r = raw || {};
+    var filtered = Number(r.filtered_total);
+    var total = Number(r.total);
+    var n = Number(shown) || 0;
+    if (!isFinite(filtered)) return '';
+    if (!isFinite(total) || total === filtered) return 'Showing ' + n.toLocaleString('en-US') + ' of ' + filtered.toLocaleString('en-US');
+    return 'Showing ' + n.toLocaleString('en-US') + ' of ' + filtered.toLocaleString('en-US') + ' (of ' + total.toLocaleString('en-US') + ')';
+  }
+
+  /** "Showing the first N of source_total records." when the server truncated the rows. */
+  function truncatedText(raw) {
+    if (!raw || raw.truncated !== true) return '';
+    var shown = Number(raw.total);
+    var all = Number(raw.source_total);
+    if (!isFinite(shown) || !isFinite(all)) return 'Showing the first records only.';
+    return 'Showing the first ' + shown.toLocaleString('en-US') + ' of ' + all.toLocaleString('en-US') + ' records.';
+  }
+
+  /** facets { col: [{ value, count }] } as lex-table column filter options. */
+  function facetFilterOptions(facets) {
+    var out = {};
+    Object.keys(facets || {}).forEach(function (col) {
+      var list = Array.isArray(facets[col]) ? facets[col] : [];
+      var options = list.filter(function (f) { return f && !isEmpty(f.value); }).map(function (f) {
+        var label = typeof f.value === 'string' ? words(f.value) : String(f.value);
+        return { value: String(f.value), label: label + (f.count !== undefined && f.count !== null ? ' (' + Number(f.count).toLocaleString('en-US') + ')' : '') };
+      });
+      if (options.length) out[col] = { options: options };
+    });
+    return out;
   }
 
   /** The server sorts rows (newest first, conflicts pinned on top) when they carry row_date or conflicts. */
@@ -465,6 +542,11 @@
     formatValue: formatValue,
     summary: summary,
     rowNotes: rowNotes,
+    isServerRows: isServerRows,
+    rowsRequestParams: rowsRequestParams,
+    rowsCountText: rowsCountText,
+    truncatedText: truncatedText,
+    facetFilterOptions: facetFilterOptions,
     keepsServerOrder: keepsServerOrder,
     recordsHeader: recordsHeader,
     periodText: periodText,

@@ -4241,3 +4241,10 @@ button.dash-lines__label:hover,
   max-width: 100%;
   overflow-x: auto;
 }
+
+/* A pinned conflict outside the search or filters: muted. */
+.metric-record-badge--outside {
+  background: var(--lex-bg-secondary);
+  color: var(--lex-text-tertiary);
+  font-weight: 600;
+}

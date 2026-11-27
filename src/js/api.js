@@ -3993,6 +3993,17 @@ class ApiClient {
     if (params.compareMode) queryParts.push('compareMode=' + encodeURIComponent(params.compareMode));
     // rawLimit caps the source rows; 0 skips them (a sparkline needs only the history).
     if (params.rawLimit !== undefined && params.rawLimit !== null) queryParts.push('raw_limit=' + encodeURIComponent(String(params.rawLimit)));
+    // Server-side rows: raw_offset pages; raw_q searches; raw_sort_by and
+    // raw_sort_dir sort; raw_filter[col] (and col_from / col_to) filter.
+    if (params.rawOffset !== undefined && params.rawOffset !== null) queryParts.push('raw_offset=' + encodeURIComponent(String(params.rawOffset)));
+    if (params.rawQ) queryParts.push('raw_q=' + encodeURIComponent(params.rawQ));
+    if (params.rawSortBy) queryParts.push('raw_sort_by=' + encodeURIComponent(params.rawSortBy));
+    if (params.rawSortDir) queryParts.push('raw_sort_dir=' + encodeURIComponent(params.rawSortDir));
+    if (params.rawFilters && typeof params.rawFilters === 'object') {
+      Object.keys(params.rawFilters).forEach((col) => {
+        queryParts.push(encodeURIComponent('raw_filter[' + col + ']') + '=' + encodeURIComponent(String(params.rawFilters[col])));
+      });
+    }
     if (queryParts.length > 0) url += '?' + queryParts.join('&');
     // options may carry { signal } so callers (e.g. the Metric Catalog "Run All"
     // batch runner) can cancel the in-flight request on a per-metric timeout.
