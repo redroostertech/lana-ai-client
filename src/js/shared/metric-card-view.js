@@ -398,11 +398,15 @@
     return 1 - Math.pow(1 - p, 3);
   }
 
-  // metadata.headline (one sentence) and metadata.callouts (plain
-  // sentences) shown under a card; anything that is not text is ignored.
+  // metadata.headline (one sentence) and metadata.callouts shown under a
+  // card. A callout is plain text or { kind, rule, text, metric_key } (the
+  // server's shape); only its text shows, anything without text is ignored.
   function cardText(card) {
     var meta = card && card.metadata && typeof card.metadata === 'object' ? card.metadata : {};
-    var clean = function (value) { return typeof value === 'string' ? value.trim() : ''; };
+    var clean = function (value) {
+      if (value && typeof value === 'object') value = value.text;
+      return typeof value === 'string' ? value.trim() : '';
+    };
     return {
       headline: clean(meta.headline),
       callouts: (Array.isArray(meta.callouts) ? meta.callouts : []).map(clean).filter(Boolean),

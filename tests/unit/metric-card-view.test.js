@@ -301,9 +301,9 @@ describe('unassignedNote: decided records nobody owns', () => {
 });
 
 describe('card text: headline, callouts and the second line link', () => {
-  test('cardText reads metadata.headline and up to every callout, plain sentences only', () => {
-    expect(View.cardText({ metadata: { headline: 'Deals are closing faster.', callouts: ['One.', '', null, 'Two.', { text: 'x' }] } }))
-      .toEqual({ headline: 'Deals are closing faster.', callouts: ['One.', 'Two.'] });
+  test('cardText reads metadata.headline and every callout (plain text or { kind, rule, text, metric_key })', () => {
+    expect(View.cardText({ metadata: { headline: 'Deals are closing faster.', callouts: ['One.', '', null, 'Two.', { kind: 'warning', rule: 'r1', text: 'Three.', metric_key: 'a.b' }, { text: '' }, { kind: 'x' }] } }))
+      .toEqual({ headline: 'Deals are closing faster.', callouts: ['One.', 'Two.', 'Three.'] });
     expect(View.cardText({ metadata: {} })).toEqual({ headline: '', callouts: [] });
     expect(View.cardText(null)).toEqual({ headline: '', callouts: [] });
   });
