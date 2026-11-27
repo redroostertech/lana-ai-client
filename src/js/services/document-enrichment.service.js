@@ -141,9 +141,30 @@
     return value !== null && value !== undefined && value !== '';
   }
 
+  function firmCurrency() {
+    if (typeof Lex !== 'undefined' && Lex.Utils && typeof Lex.Utils.getFirmCurrency === 'function') {
+      var code = Lex.Utils.getFirmCurrency();
+      if (code) return String(code);
+    }
+    return 'USD';
+  }
+
+  // A fee or payment amount in the firm's currency: "$4,500", with cents
+  // only when the amount has them ("$4,500.50").
+  function reviewMoney(value) {
+    var n = Number(value);
+    if (!Number.isFinite(n)) return String(value);
+    var digits = Math.round(n * 100) % 100 === 0 ? 0 : 2;
+    try {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: firmCurrency(), minimumFractionDigits: digits, maximumFractionDigits: digits }).format(n);
+    } catch (_) {
+      return firmCurrency() + ' ' + n.toFixed(digits);
+    }
+  }
+
   function valueText(value, format) {
     if (!present(value)) return '';
-    if (format === 'currency') return formatMoney({ value: value }) || String(value);
+    if (format === 'currency') return reviewMoney(value);
     if (format === 'date') return formatDay(value);
     if (format === 'number' && Number.isFinite(Number(value))) return String(Number(value));
     return String(value);

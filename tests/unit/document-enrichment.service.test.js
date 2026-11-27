@@ -166,11 +166,11 @@ describe('signed engagement letter: fees, payment steps and signing', () => {
   test('the view model labels each field, step and signing in plain words, with the source', () => {
     const vm = enrichment.viewModel(payload);
     const byId = Object.fromEntries(vm.suggestions.open.map((r) => [r.id, r]));
-    expect(byId.f1).toMatchObject({ reviewGroup: 'fee', title: 'Total fee', detail: '$4,500.00', verb: 'Save fee', sourceNote: '', evidence: 'Total fee: $4,500.', confidence: 'High confidence' });
+    expect(byId.f1).toMatchObject({ reviewGroup: 'fee', title: 'Total fee', detail: '$4,500', verb: 'Save fee', sourceNote: '', evidence: 'Total fee: $4,500.', confidence: 'High confidence' });
     expect(byId.f2).toMatchObject({ title: 'First maintenance year', detail: '2027', sourceNote: 'Matches the draft letter', evidence: '' });
     expect(byId.f3).toMatchObject({ title: 'Plan type', detail: 'Revocable trust', sourceNote: 'From the draft; not found in the signed copy', sourceWarning: true });
-    expect(byId.p1).toMatchObject({ reviewGroup: 'payment', title: 'Deposit', detail: '$1,500.00 · Due Dec 1, 2026', verb: 'Save payment step' });
-    expect(byId.p2).toMatchObject({ title: 'Final payment', detail: '$1,000.00 · Due when the plan is signed · Estimated' });
+    expect(byId.p1).toMatchObject({ reviewGroup: 'payment', title: 'Deposit', detail: '$1,500 · Due Dec 1, 2026', verb: 'Save payment step' });
+    expect(byId.p2).toMatchObject({ title: 'Final payment', detail: '$1,000 · Due when the plan is signed · Estimated' });
     expect(byId.s1).toMatchObject({ reviewGroup: 'engagement_signed', title: 'Engagement signed', detail: 'Signed Nov 20, 2026', verb: 'Mark signed' });
     expect(byId.f1.editors).toEqual([{ name: 'value', label: 'Total fee', format: 'currency', value: '4500' }]);
     expect(byId.p1.editors).toEqual([{ name: 'amount', label: 'Amount', format: 'currency', value: '1500' }, { name: 'due_date', label: 'Due date', format: 'date', value: '2026-12-01' }]);
@@ -223,18 +223,18 @@ describe('signed engagement letter: fees, payment steps and signing', () => {
     const fee = vm.suggestions.open.find((r) => r.id === 'f1');
     const step = vm.suggestions.open.find((r) => r.id === 'p1');
     const err = (data) => Object.assign(new Error('Conflict'), { status: 409, data });
-    expect(enrichment.conflictOf(err({ error: { code: 'CONFLICT', current_value: 5000, proposed_value: 4500 } }), fee)).toEqual({ current: '$5,000.00', proposed: '$4,500.00' });
+    expect(enrichment.conflictOf(err({ error: { code: 'CONFLICT', current_value: 5000, proposed_value: 4500 } }), fee)).toEqual({ current: '$5,000', proposed: '$4,500' });
     expect(enrichment.conflictOf(err({ existing: { amount: 1200, due_date: '2026-11-30' }, incoming: { amount: 1500, due_date: '2026-12-01' } }), step))
-      .toEqual({ current: '$1,200.00 · Due Nov 30, 2026', proposed: '$1,500.00 · Due Dec 1, 2026' });
+      .toEqual({ current: '$1,200 · Due Nov 30, 2026', proposed: '$1,500 · Due Dec 1, 2026' });
     expect(enrichment.conflictOf(Object.assign(new Error('x'), { status: 500 }), fee)).toBeNull();
   });
 
   test('a conflict shows both values with "Replace with this" and "Keep the current value"', () => {
     const vm = enrichment.viewModel(payload);
-    const html = enrichment.renderPanelHtml(vm, { conflicts: { f1: { current: '$5,000.00', proposed: '$4,500.00' } } });
+    const html = enrichment.renderPanelHtml(vm, { conflicts: { f1: { current: '$5,000', proposed: '$4,500' } } });
     const item = html.split('data-suggestion-id="f1"').slice(1).join('data-suggestion-id="f1"').split('</li>')[0];
-    expect(item).toContain('Already saved: $5,000.00');
-    expect(item).toContain('This letter: $4,500.00');
+    expect(item).toContain('Already saved: $5,000');
+    expect(item).toContain('This letter: $4,500');
     expect(item).toContain('data-enrichment-action="overwrite"');
     expect(item).toContain('>Replace with this</lex-btn>');
     expect(item).toContain('data-enrichment-action="keep"');
@@ -249,5 +249,19 @@ describe('signed engagement letter: fees, payment steps and signing', () => {
     expect(notes('contact', 'contact')).toBe('Contact added.');
     expect(notes('deadline', 'calendar_event')).toBe('Deadline added to the calendar.');
     expect(notes('other', '')).toBe('Suggestion accepted.');
+  });
+});
+
+describe('fee and payment amounts use the firm currency, with cents only when there are some', () => {
+  afterEach(() => { delete global.Lex; });
+  const fee = (value) => enrichment.viewModel({ enabled: true, enrichment: { id: 'e', status: 'completed' },
+    suggestions: [{ id: 'f', target_kind: 'fee', status: 'suggested', proposed: { field: 'total_fee', value, format: 'currency' }, source: { kind: 'matches_draft' } }] }).suggestions.open[0].detail;
+  test('the firm currency from Lex.Utils.getFirmCurrency', () => {
+    global.Lex = { Utils: { getFirmCurrency: () => 'GBP' } };
+    expect(fee(4500)).toBe('\u00a34,500');
+  });
+  test('USD when there is no firm currency; cents kept when the amount has them', () => {
+    expect(fee(4500)).toBe('$4,500');
+    expect(fee(4500.5)).toBe('$4,500.50');
   });
 });
