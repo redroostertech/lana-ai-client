@@ -17,7 +17,7 @@
   'use strict';
 
   var VOCABULARY = ['hero', 'stat', 'gauge', 'ring', 'bullet', 'columns', 'ranked_bars', 'paired_columns', 'donut',
-    'stacked_bar', 'funnel', 'compare', 'worklist', 'timeline', 'aging'];
+    'stacked_bar', 'funnel', 'compare', 'worklist', 'timeline', 'aging', 'month_bars'];
   var BY_KIND = { headline: 'hero', number: 'stat', goal: 'ring', breakdown: 'columns', pair: 'compare', worklist: 'worklist' };
   var MS_PER_DAY = 86400000;
   var TIMELINE_DAYS = 14;

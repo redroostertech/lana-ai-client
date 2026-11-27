@@ -26,3 +26,50 @@ describe('as-of date mode', () => {
     expect(AsOf.headerLabel('2026-11-27')).toBe('As of Nov 27, 2026');
   });
 });
+
+describe('monthly bars (metadata.by_month)', () => {
+  const card = (byMonth, extra) => ({ metadata: Object.assign({ by_month: byMonth }, extra) });
+  test('"Older" first, then oldest to newest; no rows is null', () => {
+    const rows = AsOf.byMonth(card([
+      { month: '2026-11', label: 'Nov', count: 3 }, { month: 'older', label: 'Older', count: 20 }, { month: '2026-10', label: 'Oct', count: 12, value: 45000 }]));
+    expect(rows.map((r) => r.month)).toEqual(['older', '2026-10', '2026-11']);
+    expect(rows[1]).toMatchObject({ label: 'Oct', count: 12, value: 45000 });
+    expect(rows[2].value).toBeNull();
+    expect(AsOf.byMonth(card([]))).toBeNull();
+    expect(AsOf.byMonth({ metadata: {} })).toBeNull();
+  });
+  test('at most 13 bars: Older plus the newest 12 months', () => {
+    const months = Array.from({ length: 20 }, (_, i) => ({ month: '2025-' + String((i % 12) + 1).padStart(2, '0'), label: 'M' + i, count: i }));
+    const many = months.map((m, i) => Object.assign({}, m, { month: (2024 + Math.floor(i / 12)) + '-' + String((i % 12) + 1).padStart(2, '0') }));
+    const rows = AsOf.byMonth(card([{ month: 'older', label: 'Older', count: 1 }].concat(many)));
+    expect(rows.length).toBe(13);
+    expect(rows[0].month).toBe('older');
+    expect(rows[12].month).toBe('2025-08');
+    expect(AsOf.byMonth(card(many)).length).toBe(13);
+  });
+  test('the subtitle names what the months count; anything else shows none', () => {
+    const words = (of) => AsOf.monthSubtitle({ metadata: { group_by_month_of: of } });
+    expect(words('created')).toBe('By month created');
+    expect(words('last_touch')).toBe('By month of last contact');
+    expect(words('latest_client_message')).toBe("By month of the client's latest message");
+    expect(words('opened')).toBe('By month the matter opened');
+    expect(words('detected')).toBe('By month found');
+    expect(words('next_billing')).toBe('By next billing month');
+    expect(words('due')).toBe('By month due');
+    expect(words('something_new')).toBe('');
+    expect(AsOf.monthSubtitle({})).toBe('');
+  });
+  test('the tooltip gives the count and the amount', () => {
+    const money = (n) => '$' + n.toLocaleString('en-US');
+    expect(AsOf.monthTip({ label: 'Oct', count: 12, value: 45000 }, money, 'deals')).toBe('Oct: 12 deals · $45,000');
+    expect(AsOf.monthTip({ label: 'Oct', count: 1, value: null }, money, 'deals')).toBe('Oct: 1 deal');
+    expect(AsOf.monthTip({ label: 'Oct', count: 4, value: null }, money, '')).toBe('Oct: 4 records');
+  });
+  test('a month card: visual month_bars, or by_month with no visual', () => {
+    const withMonths = card([{ month: '2026-10', label: 'Oct', count: 1 }]);
+    expect(AsOf.isMonthCard('month_bars', {})).toBe(true);
+    expect(AsOf.isMonthCard('', withMonths)).toBe(true);
+    expect(AsOf.isMonthCard('worklist', withMonths)).toBe(false);
+    expect(AsOf.isMonthCard('', {})).toBe(false);
+  });
+});

@@ -366,6 +366,40 @@
     return out;
   }
 
+  // ── Records filters from the link ──────────────────────────────
+  var LINK_FILTER_HEAD = 'raw_filter[';
+
+  /** Every raw_filter[col]=value in the link: { col: value }. */
+  function urlFilters(params) {
+    var out = {};
+    if (!params || typeof params.forEach !== 'function') return out;
+    params.forEach(function (value, key) {
+      var k = String(key);
+      if (k.indexOf(LINK_FILTER_HEAD) !== 0 || k.charAt(k.length - 1) !== ']') return;
+      var col = k.slice(LINK_FILTER_HEAD.length, -1);
+      if (col && value !== '') out[col] = String(value);
+    });
+    return out;
+  }
+
+  var MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  // "2026-10" reads "Oct 2026", "older" reads "Older"; anything else as sent.
+  function filterValueWords(value) {
+    var text = String(value);
+    if (text === 'older') return 'Older';
+    var parts = text.split('-');
+    var month = parts.length === 2 && parts[0].length === 4 && parts[1].length === 2 ? Number(parts[1]) : NaN;
+    if (month >= 1 && month <= 12 && isFinite(Number(parts[0]))) return MONTH_NAMES[month - 1] + ' ' + parts[0];
+    return text;
+  }
+
+  /** A link filter chip: "Month: Oct 2026". */
+  function linkFilterText(col, value) {
+    var name = String(col).split('_').join(' ');
+    return name.charAt(0).toUpperCase() + name.slice(1) + ': ' + filterValueWords(value);
+  }
+
   /** "Showing X of filtered_total (of total)". */
   function rowsCountText(raw, shown) {
     var r = raw || {};
@@ -582,6 +616,8 @@
     rowNotes: rowNotes,
     isServerRows: isServerRows,
     rowsRequestParams: rowsRequestParams,
+    urlFilters: urlFilters,
+    linkFilterText: linkFilterText,
     rowsCountText: rowsCountText,
     truncatedText: truncatedText,
     facetFilterOptions: facetFilterOptions,

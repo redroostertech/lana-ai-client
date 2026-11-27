@@ -344,3 +344,17 @@ test('backend row shapes: corrected_fields mark "Fixed in LANA", Data Conflicts 
   ['fields', 'actions', 'corrected_fields', 'conflict_fields', 'flag_annotation_id', 'edit', 'outcome_edit'].forEach((k) => expect(keys).not.toContain(k));
   expect(keys).toContain('_notes');
 });
+
+describe('records filters from the link (raw_filter[col]=value)', () => {
+  const V = require('../../src/js/shared/metric-detail-view.js');
+  test('reads every raw_filter[col] in the link and nothing else', () => {
+    const qp = new URLSearchParams('?metric_key=a.b&raw_filter%5Bmonth%5D=2026-10&raw_filter%5Bstage%5D=Intake&raw_filter=x&raw_filter%5B%5D=y');
+    expect(V.urlFilters(qp)).toEqual({ month: '2026-10', stage: 'Intake' });
+    expect(V.urlFilters(new URLSearchParams(''))).toEqual({});
+  });
+  test('a chip names the column and the value in plain words', () => {
+    expect(V.linkFilterText('month', '2026-10')).toBe('Month: Oct 2026');
+    expect(V.linkFilterText('month', 'older')).toBe('Month: Older');
+    expect(V.linkFilterText('owner_name', 'Taylor Vance')).toBe('Owner name: Taylor Vance');
+  });
+});

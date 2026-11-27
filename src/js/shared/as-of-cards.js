@@ -59,7 +59,90 @@
     return words ? 'As of ' + words : 'As of today';
   }
 
+  // ── Monthly bars (metadata.by_month) ─────────────────────────────
+  var OLDER = 'older';
+  var MONTH_BAR_LIMIT = 13;
+  // The record field a bar filters the records by (raw_filter[month]).
+  var MONTH_FIELD = 'month';
+  var MONTH_SUBTITLES = {
+    created: 'By month created',
+    last_touch: 'By month of last contact',
+    latest_client_message: "By month of the client's latest message",
+    opened: 'By month the matter opened',
+    detected: 'By month found',
+    next_billing: 'By next billing month',
+    due: 'By month due',
+  };
+
+  function metaOf(card) {
+    return card && card.metadata && typeof card.metadata === 'object' ? card.metadata : {};
+  }
+
+  function numberOrNull(value) {
+    if (value === null || value === undefined || value === '') return null;
+    var n = Number(value);
+    return isFinite(n) ? n : null;
+  }
+
+  /**
+   * The card's months: [{ month, label, count, value, format }], "Older"
+   * first, then oldest to newest, at most 13 (Older plus the newest 12).
+   * null when there are none.
+   */
+  function byMonth(card) {
+    var list = metaOf(card).by_month;
+    if (!Array.isArray(list)) return null;
+    var items = list.filter(function (item) { return item && typeof item === 'object' && item.month; }).map(function (item) {
+      var month = String(item.month);
+      return { month: month, label: item.label ? String(item.label) : month, count: numberOrNull(item.count), value: numberOrNull(item.value),
+        format: item.format ? String(item.format) : '' };
+    });
+    if (!items.length) return null;
+    var older = items.filter(function (item) { return item.month === OLDER; });
+    var months = items.filter(function (item) { return item.month !== OLDER; }).sort(function (a, b) { return a.month < b.month ? -1 : a.month > b.month ? 1 : 0; });
+    var room = MONTH_BAR_LIMIT - older.slice(0, 1).length;
+    return older.slice(0, 1).concat(months.slice(Math.max(0, months.length - room)));
+  }
+
+  /** A card that draws month bars: visual month_bars, or by_month with no visual. */
+  function isMonthCard(visual, card) {
+    if (visual === 'month_bars') return true;
+    return !visual && !!byMonth(card);
+  }
+
+  /** "By month created", from metadata.group_by_month_of; '' when unknown. */
+  function monthSubtitle(card) {
+    var of = metaOf(card).group_by_month_of;
+    return of && Object.prototype.hasOwnProperty.call(MONTH_SUBTITLES, of) ? MONTH_SUBTITLES[of] : '';
+  }
+
+  function countWords(count, unit) {
+    var word = unit ? String(unit) : 'records';
+    if (count === 1 && word.length > 1 && word.charAt(word.length - 1) === 's') word = word.slice(0, -1);
+    return Number(count).toLocaleString('en-US') + ' ' + word;
+  }
+
+  /** "Oct: 12 deals · $45,000" (formatValue formats the amount). */
+  function monthTip(item, formatValue, unit) {
+    var parts = [];
+    if (item.count !== null && item.count !== undefined) parts.push(countWords(item.count, unit));
+    if (item.value !== null && item.value !== undefined) parts.push(formatValue(item.value));
+    return item.label + ': ' + parts.join(' \u00b7 ');
+  }
+
+  /** The word for the count (metadata.unit, for example "deals"). */
+  function monthUnit(card) {
+    var unit = metaOf(card).unit;
+    return unit ? String(unit) : '';
+  }
+
   return {
+    MONTH_FIELD: MONTH_FIELD,
+    byMonth: byMonth,
+    isMonthCard: isMonthCard,
+    monthSubtitle: monthSubtitle,
+    monthTip: monthTip,
+    monthUnit: monthUnit,
     isAsOf: isAsOf,
     isPlainDay: isPlainDay,
     asOfDay: asOfDay,

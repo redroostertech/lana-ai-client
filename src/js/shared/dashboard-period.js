@@ -74,6 +74,13 @@
     // Where it was opened from, so its breadcrumbs and Back lead there.
     if (options && options.from) parts.push('from=' + encodeURIComponent(options.from));
     if (options && options.dashboardId) parts.push('dashboardId=' + encodeURIComponent(options.dashboardId));
+    // Records filters for the table to open with: raw_filter[col]=value.
+    var filters = options && options.filters && typeof options.filters === 'object' ? options.filters : {};
+    Object.keys(filters).forEach(function (col) {
+      if (filters[col] !== null && filters[col] !== undefined && filters[col] !== '') {
+        parts.push(encodeURIComponent('raw_filter[' + col + ']') + '=' + encodeURIComponent(filters[col]));
+      }
+    });
     return 'admin/metric_detail.html?' + parts.join('&');
   }
 

@@ -32,12 +32,12 @@ const rows = [
 const payload = { metric: { key: 'a.b', title: 'Won deals' }, current: { value: 2 }, snapshots: [],
   raw_data: { rows, total: 340, filtered_total: 2, has_more: false, facets: { outcome: [{ value: 'won', count: 9 }] }, sort: { by: 'decided_on', dir: 'desc' } } };
 
-async function page(getMetricDetail) {
+async function page(getMetricDetail, search = '?metric_key=a.b&periodStart=2026-11-01&periodEnd=2026-11-30') {
   const nodes = {};
   const document = { addEventListener() {}, getElementById: (id) => (nodes[id] = nodes[id] || node()), createElement: () => node(),
     querySelector: (sel) => (sel === 'lex-app' ? { backHref: '' } : null), querySelectorAll: () => [] };
   const api = { getMetricDetail: getMetricDetail || jest.fn().mockResolvedValue({ data: payload }) };
-  const Lex = { Auth: { isAdmin: () => true }, Nav: { getParams: () => new URLSearchParams('?metric_key=a.b&periodStart=2026-11-01&periodEnd=2026-11-30'), go: jest.fn() } };
+  const Lex = { Auth: { isAdmin: () => true }, Nav: { getParams: () => new URLSearchParams(search), go: jest.fn(), updateParams: jest.fn() } };
   const window = { location: { search: '' }, Lex, customElements: null };
   const context = vm.createContext({ window, document, console: { log() {}, error() {}, warn() {} }, Intl, URLSearchParams, Promise, setTimeout, clearTimeout, Lex, api });
   vm.runInContext(read('js/shared/data-state.js'), context);
@@ -46,7 +46,7 @@ async function page(getMetricDetail) {
   }
   vm.runInContext(read('js/admin/metric-detail.js'), context);
   await settle();
-  return { api, nodes };
+  return { api, nodes, Lex };
 }
 
 test('server rows: server paging, facets as filters, and the count line', async () => {
@@ -119,4 +119,33 @@ test('an unknown sort column (400) says so calmly and goes back to the default o
   expect(getMetricDetail.mock.calls[2][1].rawSortBy).toBeUndefined();
   expect(nodes.metricRawDataSortNote.textContent).toBe('That column cannot be sorted here, so the records are in their usual order.');
   expect(nodes.metricRawDataSortNote.hidden).toBe(false);
+});
+
+describe('a filter in the link (raw_filter[col]=value)', () => {
+  const link = '?metric_key=a.b&periodEnd=2026-11-27&raw_filter%5Bmonth%5D=2026-10';
+  test('the first request is filtered, and the filter shows as a removable chip', async () => {
+    const { api, nodes } = await page(undefined, link);
+    expect(api.getMetricDetail.mock.calls[0][1]).toEqual(expect.objectContaining({ periodEnd: '2026-11-27', rawFilters: { month: '2026-10' } }));
+    expect(api.getMetricDetail.mock.calls[0][1].periodStart).toBeUndefined();
+    const chips = nodes.metricRawDataLinkFilters;
+    expect(chips.hidden).toBe(false);
+    expect(chips.innerHTML).toContain('Month: Oct 2026');
+    expect(chips.innerHTML).toContain('data-remove-link-filter="month"');
+  });
+  test('a table filter keeps the link filter; removing the chip drops it', async () => {
+    const { api, nodes, Lex } = await page(undefined, link);
+    nodes.metricRawDataTable.fire('lex-query-change', { page: 1, limit: 20, filters: { outcome: { operator: 'in', value: ['won'] } } });
+    await settle();
+    expect(api.getMetricDetail).toHaveBeenLastCalledWith('a.b', expect.objectContaining({ rawFilters: { month: '2026-10', outcome: 'won' } }));
+    const chips = nodes.metricRawDataLinkFilters;
+    chips.listeners.click[0]({ target: { closest: (sel) => (sel === '[data-remove-link-filter]' ? { getAttribute: () => 'month' } : null) } });
+    await settle();
+    expect(api.getMetricDetail.mock.calls[api.getMetricDetail.mock.calls.length - 1][1].rawFilters).toEqual({ outcome: 'won' });
+    expect(chips.hidden).toBe(true);
+    expect(Lex.Nav.updateParams).toHaveBeenCalledWith({ 'raw_filter[month]': null });
+  });
+  test('"older" reads Older', async () => {
+    const { nodes } = await page(undefined, '?metric_key=a.b&periodEnd=2026-11-27&raw_filter%5Bmonth%5D=older');
+    expect(nodes.metricRawDataLinkFilters.innerHTML).toContain('Month: Older');
+  });
 });

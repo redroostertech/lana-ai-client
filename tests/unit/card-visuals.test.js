@@ -13,7 +13,8 @@ const TODAY = '2026-11-24';
 describe('visualFor', () => {
   test('the saved visual wins when it is one of the vocabulary', () => {
     expect(V.visualFor({ kind: 'group', visual: 'donut' })).toBe('donut');
-    expect(V.VOCABULARY).toHaveLength(15);
+    expect(V.VOCABULARY).toHaveLength(16);
+    expect(V.visualFor({ kind: 'number', visual: 'month_bars' })).toBe('month_bars');
   });
   test('without one (or an unknown one), the kind decides', () => {
     expect([['headline'], ['number'], ['goal'], ['breakdown'], ['pair'], ['worklist']].map(([kind]) => V.visualFor({ kind })))

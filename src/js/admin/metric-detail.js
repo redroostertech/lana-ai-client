@@ -288,6 +288,42 @@
   // filters, the table asks the server: search waits about 300 ms, and an
   // answer to an older query is ignored.
   var rowsQuery = { search: '', sortBy: '', sortDir: 'desc', filters: {}, page: 1, limit: 20 };
+  // Filters from the link (raw_filter[col]=value), kept beside the table's
+  // own filters until their chip is removed.
+  var linkFilters = {};
+
+  function withLinkFilters(request) {
+    var merged = Object.assign({}, linkFilters, request.rawFilters || {});
+    if (Object.keys(merged).length) request.rawFilters = merged;
+    else delete request.rawFilters;
+    return request;
+  }
+
+  function renderLinkFilters() {
+    var box = el('metricRawDataLinkFilters');
+    if (!box) return;
+    var cols = Object.keys(linkFilters);
+    box.innerHTML = cols.map(function (col) {
+      var words = view().linkFilterText(col, linkFilters[col]);
+      return '<button type="button" class="metric-link-filters__chip" data-remove-link-filter="' + escapeHtml(col) + '" aria-label="Remove the filter ' + escapeHtml(words) + '">'
+        + '<span>' + escapeHtml(words) + '</span><span class="metric-link-filters__x" aria-hidden="true">\u00d7</span></button>';
+    }).join('');
+    box.hidden = !cols.length;
+    if (box._linkFiltersBound) return;
+    box._linkFiltersBound = true;
+    box.addEventListener('click', function (event) {
+      var chip = event.target && event.target.closest ? event.target.closest('[data-remove-link-filter]') : null;
+      if (!chip) return;
+      var col = chip.getAttribute('data-remove-link-filter');
+      delete linkFilters[col];
+      var change = {};
+      change['raw_filter[' + col + ']'] = null;
+      if (Lex.Nav && Lex.Nav.updateParams) Lex.Nav.updateParams(change);
+      renderLinkFilters();
+      rowsQuery.page = 1;
+      fetchServerRows();
+    });
+  }
   var rowsToken = 0;
   var searchTimer = null;
   var lastDetail = null;
@@ -354,7 +390,7 @@
   function fetchServerRows() {
     if (!lastDetail) return;
     var token = ++rowsToken;
-    var request = Object.assign({}, lastDetail.periodParams, view().rowsRequestParams(rowsQuery));
+    var request = withLinkFilters(Object.assign({}, lastDetail.periodParams, view().rowsRequestParams(rowsQuery)));
     api.getMetricDetail(lastDetail.metricKey, request).then(function (response) {
       if (token !== rowsToken) return;
       var payload = response && response.data ? response.data : response;
@@ -692,10 +728,14 @@
     // All time has nothing before it to compare against.
     if (window.DashboardPeriod && window.DashboardPeriod.isAllTime({ start: periodStart, end: periodEnd })) periodParams.compareToPrevious = false;
 
+    linkFilters = view().urlFilters(qp);
+    renderLinkFilters();
+
     try {
       var hasPeriod = Object.keys(periodParams).length > 0;
-      var response = await (hasPeriod
-        ? api.getMetricDetail(metricKey, periodParams)
+      var hasLinkFilters = Object.keys(linkFilters).length > 0;
+      var response = await (hasPeriod || hasLinkFilters
+        ? api.getMetricDetail(metricKey, withLinkFilters(Object.assign({}, periodParams)))
         : api.getMetricDetail(metricKey));
       var payload = response && response.data ? response.data : response;
       var metric = payload.metric || {};

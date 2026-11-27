@@ -150,7 +150,9 @@
     // A long series over days: no value text over each column (the tooltip
     // keeps it), and a date label on every few columns only.
     var dense = n > COLUMN_LIMIT;
-    var labelEvery = dense ? Math.ceil(n / 6) : 1;
+    // model.allLabels (month bars): every column keeps its own label.
+    var sparseLabels = dense && !model.allLabels;
+    var labelEvery = sparseLabels ? Math.ceil(n / 6) : 1;
     var grid = '<g class="mini-cols__grid">'
       + '<line x1="0" x2="' + BOX_W + '" y1="' + PLOT_TOP + '" y2="' + PLOT_TOP + '"></line>'
       + '<line x1="0" x2="' + BOX_W + '" y1="' + (PLOT_TOP + PLOT_H / 2) + '" y2="' + (PLOT_TOP + PLOT_H / 2) + '"></line>'
@@ -192,10 +194,11 @@
       }
       var valueY = round1(PLOT_BOTTOM - (top / 100) * PLOT_H - 4);
       return '<g class="mini-cols__group' + (row.partial ? ' mini-cols__group--partial' : '') + (row.muted ? ' mini-cols__group--muted' : '') + '"' + linkFor(row)
-        + '><title>' + escapeHtml(row.label + (row.partial ? ' (partial)' : '') + ': ' + valueText) + '</title>'
+        // row.tip: the caller's own tooltip; row.valueText: its own column text.
+        + '><title>' + escapeHtml(row.tip || (row.label + (row.partial ? ' (partial)' : '') + ': ' + valueText)) + '</title>'
         + bars
-        + (dense ? '' : '<text class="mini-cols__value" x="' + round1(center) + '" y="' + valueY + '" text-anchor="middle">' + escapeHtml(format(row.value === null && hasSecond ? row.second : row.value)) + '</text>')
-        + (i % labelEvery === 0 ? '<text class="mini-cols__label" x="' + round1(center) + '" y="114" text-anchor="middle">' + escapeHtml(dense ? dayTick(row.label) : shortLabel(row.label, maxChars)) + '</text>' : '')
+        + (dense ? '' : '<text class="mini-cols__value" x="' + round1(center) + '" y="' + valueY + '" text-anchor="middle">' + escapeHtml(row.valueText !== undefined ? row.valueText : format(row.value === null && hasSecond ? row.second : row.value)) + '</text>')
+        + (i % labelEvery === 0 ? '<text class="mini-cols__label" x="' + round1(center) + '" y="114" text-anchor="middle">' + escapeHtml(sparseLabels ? dayTick(row.label) : shortLabel(row.label, maxChars)) + '</text>' : '')
         + '</g>';
     }).join('');
     return '<div class="mini-cols">' + legendHtml(model)
@@ -499,6 +502,7 @@
     sparklineSvg: sparklineSvg,
     barsHtml: barsHtml,
     breakdownHtml: breakdownHtml,
+    columnsHtml: columnsHtml,
     gaugeHtml: gaugeHtml,
     donutHtml: donutHtml,
     rankedHtml: rankedHtml,

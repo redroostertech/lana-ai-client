@@ -1298,3 +1298,48 @@ describe('as-of dashboards (period_mode as_of)', () => {
     expect(p.nodes.dashboardAsOfFields.hidden).toBe(true);
   });
 });
+
+describe('monthly bars (metadata.by_month)', () => {
+  const unescape = (s) => s.split('&amp;').join('&');
+  const byMonth = [
+    { month: '2026-11', label: 'Nov', count: 3, value: 7000, format: 'currency' },
+    { month: 'older', label: 'Older', count: 20, value: 30000, format: 'currency' },
+    { month: '2026-10', label: 'Oct', count: 12, value: 45000, format: 'currency' }];
+  const monthCard = (meta) => ({ metric_key: 'legal_firm.sales_intake.open_deals_by_month', title: 'Open Deals', format: 'currency', data_state: 'ok', period: 'Nov 2026',
+    value: 82000, formatted_value: '$82,000', metadata: Object.assign({ group_by_month_of: 'created', unit: 'deals', by_month: byMonth }, meta) });
+  async function render(card, layoutCard) {
+    const layout = { cards: [Object.assign({ id: 'm', kind: 'number', metric_key: 'sales_intake.open_deals_by_month' }, layoutCard)] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [card] }) });
+    await p.exports.loadDashboardById('d1');
+    return p.nodes.dashboardMetricGrid.innerHTML;
+  }
+  test('bars Older first, each with count and amount in its tooltip, under the headline and subtitle', async () => {
+    const html = await render(monthCard(), { visual: 'month_bars' });
+    expect(html).toContain('mini-cols');
+    expect(text(html)).toContain('$82,000');
+    expect(text(html)).toContain('By month created');
+    expect(html.indexOf('>Older<')).toBeLessThan(html.indexOf('>Oct<'));
+    expect(html.indexOf('>Oct<')).toBeLessThan(html.indexOf('>Nov<'));
+    expect(html).toContain('<title>Oct: 12 deals · $45,000</title>');
+  });
+  test('a bar opens the records for that month; the title opens all of them', async () => {
+    const html = unescape(await render(monthCard(), { visual: 'month_bars' }));
+    expect(html).toContain('raw_filter%5Bmonth%5D=2026-10');
+    expect(html).toContain('raw_filter%5Bmonth%5D=older');
+    const title = html.split('dash-metric-card__title').slice(1).join('').split('>')[0];
+    expect(title).toContain('data-metric-detail-link="admin/metric_detail.html?metric_key=legal_firm.sales_intake.open_deals_by_month');
+    expect(title).not.toContain('raw_filter');
+  });
+  test('with no visual on the layout, by_month still draws month bars; bars by count when there is no amount', async () => {
+    const counts = monthCard({ group_by_month_of: 'unknown_rule', by_month: [{ month: '2026-10', label: 'Oct', count: 4 }, { month: '2026-11', label: 'Nov', count: 2 }] });
+    const html = await render(counts, {});
+    expect(html).toContain('mini-cols');
+    expect(html).toContain('<title>Oct: 4 deals</title>');
+    expect(text(html)).not.toContain('By month');
+  });
+  test('a worklist card stays a list, even with by_month', async () => {
+    const html = await render(monthCard(), { kind: 'worklist', visual: 'worklist' });
+    expect(html).not.toContain('raw_filter');
+    expect(html).toContain('data-worklist-key');
+  });
+});

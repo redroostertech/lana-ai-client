@@ -784,10 +784,13 @@
     return (metric && (metric.metric_key || metric.key)) || key;
   }
 
-  function recordsHref(cardId) {
+  // filters: records filters the table opens with ({ month: '2026-10' }).
+  function recordsHref(cardId, filters) {
+    var options = currentDashboardId ? { from: 'dashboard', dashboardId: currentDashboardId } : {};
+    if (filters) options.filters = filters;
     return window.DashboardPeriod.metricDetailHref(catalogKey(cardId), {
       periodStart: currentPeriod.start, periodEnd: currentPeriod.end, compareBy: currentPeriod.compareBy,
-    }, currentDashboardId ? { from: 'dashboard', dashboardId: currentDashboardId } : {});
+    }, options);
   }
 
   var RECORDS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
@@ -797,14 +800,18 @@
   // which takes the spare height), and a footer row [the picked period]
   // [See the records]. withRecords is kept for callers; the records link
   // lives in the footer (cardFooter).
-  function cardTop(metric, cardId, withRecords) {
+  // titleHref: the title opens that page (all of the card's records).
+  function cardTop(metric, cardId, withRecords, titleHref) {
     var records = '';
+    var titleText = escapeHtml(metric.title || metric.name || humanize(metric.metric_key) || 'Metric');
     // Declared cards (layout.cards) leave out the catalog section eyebrow.
     var eyebrow = renderingDeclared ? ''
       : '<div class="dash-metric-card__eyebrow">' + escapeHtml(getGroupLabel(metric, currentDashboardType)) + '</div>';
     return '<div class="dash-metric-card__top"><div class="dash-metric-card__label">'
       + eyebrow
-      + '<div class="dash-metric-card__title">' + escapeHtml(metric.title || metric.name || humanize(metric.metric_key) || 'Metric') + '</div>'
+      + (titleHref
+        ? '<button type="button" class="dash-metric-card__title dash-metric-card__title-link" data-metric-detail-link="' + escapeHtml(titleHref) + '">' + titleText + '</button>'
+        : '<div class="dash-metric-card__title">' + titleText + '</div>')
       + '</div>'
       + '<div class="dash-metric-card__tools">' + records
       + '<button class="dash-metric-card__info" type="button" aria-label="Metric details" data-metric-info="' + escapeHtml(cardId) + '">i</button>'
@@ -907,10 +914,10 @@
     return (metric && (metric.title || metric.name)) || humanize(String(key || '').split('.').pop());
   }
 
-  function declaredTop(def, key, metric, withRecords, title) {
+  function declaredTop(def, key, metric, withRecords, title, titleHref) {
     if (metric) metricInfoById[key] = metric;
     var shown = Object.assign({}, metric || { metric_key: key }, { title: title || def.title || metricTitle(metric, key) });
-    return cardTop(shown, key, withRecords);
+    return cardTop(shown, key, withRecords, titleHref);
   }
 
   function waitingChip(metric) {
@@ -1376,6 +1383,38 @@
     return appendToCard(html, extra);
   }
 
+  // Month bars (metadata.by_month): the headline total, what the months
+  // count, and one bar per month ("Older" first). A bar opens that month's
+  // records; the title opens all of them.
+  function renderMonthBars(resolved, layoutItem) {
+    var def = resolved.def;
+    var entry = resolved.metrics[0];
+    var metric = entry.metric;
+    var months = metric ? window.AsOfCards.byMonth(metric) : null;
+    if (!months) return metric && !Array.isArray(metric.value) ? heroOrStat(resolved, layoutItem, 'stat') : seriesCard(resolved, layoutItem, 'columns');
+    var cardFormat = metric.value_format || (metric.metadata && metric.metadata.value_format) || '';
+    var unit = window.AsOfCards.monthUnit(metric);
+    var heights = months.map(function (item) { return item.value !== null ? item.value : (item.count || 0); });
+    var max = Math.max.apply(null, heights.concat([0]));
+    var rows = months.map(function (item, i) {
+      var money = formatWith(item.format || cardFormat);
+      var height = heights[i];
+      return { label: item.label, value: height, second: null, secondPct: 0,
+        pct: height > 0 && max > 0 ? Math.round((height / max) * 1000) / 10 : 0,
+        valueText: item.value !== null ? money(item.value) : plainNumber(item.count),
+        tip: window.AsOfCards.monthTip(item, money, unit),
+        linkHref: recordsHref(entry.key, (function () { var f = {}; f[window.AsOfCards.MONTH_FIELD] = item.month; return f; })()) };
+    });
+    var subtitle = window.AsOfCards.monthSubtitle(metric);
+    return '<article class="' + cardClass(accentClass(def, 'dash-metric-card--chart'), layoutItem) + '">'
+      + declaredTop(def, entry.key, metric, true, null, recordsHref(entry.key))
+      + valueBlock(metric)
+      + (subtitle ? '<p class="dash-metric-card__subtitle">' + escapeHtml(subtitle) + '</p>' : '')
+      + '<div class="dash-metric-card__chart">' + window.MiniCharts.columnsHtml({ rows: rows, paired: false, seriesLabels: [], allLabels: true }, plainNumber, {}) + '</div>'
+      + cardFooter(metric, entry.key)
+      + '</article>';
+  }
+
   function renderBullet(resolved, layoutItem) {
     var def = resolved.def;
     var first = resolved.metrics[0];
@@ -1494,7 +1533,12 @@
     var def = resolved.def;
     var layoutItem = { role: item.role, span: item.span, span4: item.span4, span2: item.span2 };
     var visual = window.CardVisuals.visualFor(def);
+    // A card with metadata.by_month and no visual on the layout draws month
+    // bars; a worklist stays a list.
+    var firstMetric = resolved.metrics[0] && resolved.metrics[0].metric;
+    if (visual !== 'worklist' && resolved.state !== 'waiting' && window.AsOfCards.isMonthCard(def.visual, firstMetric)) visual = 'month_bars';
     switch (visual) {
+      case 'month_bars': return renderMonthBars(resolved, layoutItem);
       case 'hero':
       case 'stat':
       case 'gauge':
