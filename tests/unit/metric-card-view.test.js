@@ -412,3 +412,16 @@ describe('cross-tab rows with no value field (team appointments by meeting type)
     expect(View.listBars([{ stage: 'Lead', stage_position: 3, open_count: 19 }], 12).rows[0].value).toBe(19);
   });
 });
+
+describe('second_line does not repeat a number its label already says', () => {
+  test('label with the raw number as a whole word, or the formatted value: no value appended', () => {
+    expect(View.secondLine({ metadata: { second_line: { label: '4 of 47 deals won in these dates have no amount', value: 4, format: 'number' } } }))
+      .toBe('4 of 47 deals won in these dates have no amount');
+    expect(View.secondLine({ metadata: { second_line: { label: 'Weighted $2,540,063', value: 2540063.42, format: 'currency' } } })).toBe('Weighted $2,540,063');
+  });
+  test('a number inside another number or word still gets the value', () => {
+    expect(View.secondLine({ metadata: { second_line: { label: 'Deals over 40 days', value: 4, format: 'number' } } })).toBe('Deals over 40 days 4');
+    expect(View.secondLine({ metadata: { second_line: { label: 'Cohort rate', value: 42, format: 'percentage' } } })).toBe('Cohort rate 42%');
+  });
+});
+

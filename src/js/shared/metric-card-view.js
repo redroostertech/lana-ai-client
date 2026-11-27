@@ -196,7 +196,33 @@
     var value = toNumber(line.value);
     if (value === null) return '';
     var text = formatByKind(value, line.format);
-    return line.label ? String(line.label).trim() + ' ' + text : text;
+    var label = line.label ? String(line.label).trim() : '';
+    // A label that already says the number ("4 of 47 deals ... no amount")
+    // is not followed by it again.
+    var plain = text.split(',').join('');
+    var formatted = toNumber(plain) === null;
+    if (label && ((formatted && label.indexOf(text) !== -1) || hasWholeNumber(label, plain) || hasWholeNumber(label, String(value)))) return label;
+    return label ? label + ' ' + text : text;
+  }
+
+  // True when the label holds the number as a whole word ("4 of 47", not "40").
+  function hasWholeNumber(label, value) {
+    var target = String(value);
+    var token = '';
+    var found = false;
+    var text = label + ' ';
+    for (var i = 0; i < text.length && !found; i += 1) {
+      var ch = text.charAt(i);
+      var isPart = (ch >= '0' && ch <= '9') || ch === '.' || ch === ',' || (ch.toLowerCase() !== ch.toUpperCase());
+      if (isPart) { token += ch; continue; }
+      if (token) {
+        var clean = token.split(',').join('');
+        if (clean.charAt(clean.length - 1) === '.') clean = clean.slice(0, -1);
+        found = clean === target;
+      }
+      token = '';
+    }
+    return found;
   }
 
   function firmCurrency() {
