@@ -1393,3 +1393,18 @@ describe('the server period label in the footer', () => {
     expect(text('<x' + footer)).toContain(rule);
   });
 });
+
+describe('as-of dashboards keep worklists as lists', () => {
+  test('Next Most Likely to Close (no by_month) stays a list, not month bars or a link', async () => {
+    const worklist = { metric_key: 'legal_firm.sales_intake.next_most_likely_to_close', title: 'Next Most Likely to Close', format: 'table', data_state: 'ok', period: 'Nov 2026', value: 3, metadata: {} };
+    const getMetricDetail = jest.fn().mockResolvedValue({ data: { raw_data: { rows: [{ record_id: 'r-1', deal_name: 'Avery Plan' }] } } });
+    const layout = { period_mode: 'as_of', cards: [{ id: 'w', kind: 'worklist', visual: 'worklist', metric_key: 'sales_intake.next_most_likely_to_close' }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'Still Open', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [worklist] }), getMetricDetail },
+      null, '?id=d1&asOf=2026-11-27');
+    await p.exports.loadDashboardById('d1');
+    const html = p.nodes.dashboardMetricGrid.innerHTML;
+    expect(html).toContain('data-worklist-key');
+    expect(html).not.toContain('mini-cols');
+    expect(html).not.toContain('See the report');
+  });
+});
