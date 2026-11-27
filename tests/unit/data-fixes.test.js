@@ -92,11 +92,12 @@ describe('after a save', () => {
     expect(F.savedText({ refresh: { queued: true, expected_within_seconds: 3 } })).toBe('Saved. Updating the numbers (about 5 seconds).');
     expect(F.savedText({ refresh: { queued: false } })).toBe('Saved.');
   });
-  test('permissions: on the card under metadata.editable (or metadata), or on metric detail', () => {
+  test('permissions: top level on the card (card.permissions) and on metric detail', () => {
     const can = { can_correct: true, can_resolve_conflicts: false };
-    expect(F.permissionsOf({ metadata: { editable: { permissions: can } } })).toEqual(can);
-    expect(F.permissionsOf({ metadata: { permissions: can } })).toEqual(can);
+    expect(F.permissionsOf({ metadata: { editable: true }, permissions: can })).toEqual(can);
     expect(F.permissionsOf({ permissions: can })).toEqual(can);
+    expect(F.permissionsOf({ metadata: { editable: { permissions: can } } })).toBe(null);
+    expect(F.permissionsOf({ metadata: { permissions: can } })).toBe(null);
     expect(F.permissionsOf({ metadata: {} })).toBe(null);
   });
   test('conflict actions name the source', () => {

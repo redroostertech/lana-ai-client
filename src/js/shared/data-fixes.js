@@ -155,13 +155,11 @@
     return 'Saved. Updating the numbers (about ' + Math.max(5, Math.round(seconds / 5) * 5) + ' seconds).';
   }
 
-  // Who may fix: on editable cards under metadata.editable.permissions (or
-  // metadata.permissions), on metric detail at the top level.
+  // Who may fix: top level on editable cards (card.permissions, set when
+  // card.metadata.editable is true) and on metric detail responses.
   function permissionsOf(item) {
     if (!item || typeof item !== 'object') return null;
-    var meta = item.metadata && typeof item.metadata === 'object' ? item.metadata : {};
-    var editable = meta.editable && typeof meta.editable === 'object' ? meta.editable : {};
-    var found = editable.permissions || meta.permissions || item.permissions;
+    var found = item.permissions;
     return found && typeof found === 'object' ? found : null;
   }
 
