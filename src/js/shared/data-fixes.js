@@ -248,9 +248,11 @@
     var parts = [];
     var mayCorrect = canCorrect(permissions, edit);
     if (mayCorrect) {
-      var current = edit.current_value === null || edit.current_value === undefined ? '' : String(edit.current_value);
-      parts.push('<div class="dfix__line"><lex-input size="sm" type="number" min="0" data-dfix-input="amount" aria-label="Amount" placeholder="Amount" value="'
-        + escapeHtml(current) + '"></lex-input>' + btn('amount', 'Save amount', 'primary') + '</div>');
+      // The input starts empty; the value as recorded (0 included) shows as a hint.
+      var recorded = edit.current_value === null || edit.current_value === undefined || edit.current_value === ''
+        ? '' : '<span class="dfix__recorded">Recorded: ' + escapeHtml(valueText(edit, edit.current_value)) + '</span>';
+      parts.push('<div class="dfix__line"><lex-input size="sm" type="number" min="0" data-dfix-input="amount" aria-label="Amount" placeholder="Amount" value=""></lex-input>'
+        + btn('amount', 'Save amount', 'primary') + recorded + '</div>');
       if (correctionIdFor(r, edit)) parts.push('<div class="dfix__line">' + btn('undo', 'Undo fix', 'ghost') + '</div>');
     }
     // Won / lost stands on its own: outcome_edit.editable plus can_correct.

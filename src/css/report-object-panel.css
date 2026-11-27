@@ -162,6 +162,12 @@
   overflow-wrap: anywhere;
 }
 
+.dfix__recorded {
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+  white-space: nowrap;
+}
+
 .dfix__status {
   margin: 0;
   font-size: 0.75rem;

@@ -245,6 +245,15 @@ describe('the exact backend shapes (967e7b7b3)', () => {
     actions: { keep_lana: { label: 'Keep LANA\'s value', method: 'POST', path: '/x', body: { keep: 'lana' } },
       use_source: { label: 'Use the value from ActionStep', method: 'POST', path: '/x', body: { keep: 'source' } } },
   };
+  test('amount input starts empty; the recorded value (0 too) shows as a hint', () => {
+    const zero = Object.assign({}, missing, { edit: Object.assign({}, missing.edit, { current_value: 0 }), corrected_fields: [] });
+    const html = F.controlsHtml(zero, can);
+    expect(html).toMatch(/data-dfix-input="amount"[^>]*value=""/);
+    expect(html).toContain('Recorded: $0');
+    expect(F.controlsHtml(missing, can)).toContain('Recorded: $4,000');
+    const none = Object.assign({}, missing, { edit: Object.assign({}, missing.edit, { current_value: null }) });
+    expect(F.controlsHtml(none, can)).not.toContain('Recorded:');
+  });
   test('Deals Missing an Amount: corrected_fields give the undo by correction_id; won and lost show', () => {
     const html = F.controlsHtml(missing, can);
     expect(html).toContain('data-dfix-correction="cor-7"');
