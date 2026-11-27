@@ -478,7 +478,8 @@
   /**
    * The overrides from one item's inline editors on the page. A payment
    * also sends due_date_basis and estimated: as the server sent them, or
-   * 'on_date' and not estimated once the person sets a date.
+   * 'on_date' and not estimated only when the person changed the date (an
+   * estimated date accepted as it is stays estimated).
    */
   function collectOverrides(item, row) {
     if (!item || typeof item.querySelectorAll !== 'function') return {};
@@ -487,9 +488,10 @@
     });
     var out = readOverrides(fields);
     if (row && row.payment) {
-      var dated = !!out.due_date;
-      out.due_date_basis = dated ? ON_DATE : row.payment.dueDateBasis;
-      out.estimated = dated ? false : row.payment.estimated;
+      var proposedDay = row.payment.dueDate ? String(row.payment.dueDate).slice(0, 10) : null;
+      var changed = (out.due_date || null) !== proposedDay;
+      out.due_date_basis = changed && out.due_date ? ON_DATE : row.payment.dueDateBasis;
+      out.estimated = changed && out.due_date ? false : row.payment.estimated;
     }
     return out;
   }

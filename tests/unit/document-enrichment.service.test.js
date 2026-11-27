@@ -216,7 +216,14 @@ describe('signed engagement letter: fees, payment steps and signing', () => {
     expect(enrichment.collectOverrides(itemWith('1000', ''), rowOf('p2'))).toEqual({ amount: 1000, due_date: null, due_date_basis: 'plan_signing', estimated: true });
     // The person sets a date: on_date, and no longer estimated.
     expect(enrichment.collectOverrides(itemWith('1000', '2027-01-15'), rowOf('p2'))).toEqual({ amount: 1000, due_date: '2027-01-15', due_date_basis: 'on_date', estimated: false });
+    // The server's own date, unchanged: its basis and estimate go back as they were.
     expect(enrichment.collectOverrides(itemWith('1500', '2026-12-01'), rowOf('p1'))).toEqual({ amount: 1500, due_date: '2026-12-01', due_date_basis: 'on_date', estimated: false });
+    const estimatedDate = enrichment.viewModel(Object.assign({}, base, { suggestions: [{ id: 'p9', target_kind: 'payment', status: 'suggested',
+      proposed: { payment_type: 'payment_2', amount: 800, due_date: '2027-02-01', due_date_basis: 'months_after_signing', due_date_basis_label: 'Two months after signing', estimated: true },
+      source: { kind: 'matches_draft', confidence: 0.6 }, evidence: null }] })).suggestions.open[0];
+    expect(enrichment.collectOverrides(itemWith('800', '2027-02-01'), estimatedDate)).toEqual({ amount: 800, due_date: '2027-02-01', due_date_basis: 'months_after_signing', estimated: true });
+    // A changed date is fixed by the person.
+    expect(enrichment.collectOverrides(itemWith('800', '2027-03-01'), estimatedDate)).toEqual({ amount: 800, due_date: '2027-03-01', due_date_basis: 'on_date', estimated: false });
     expect(enrichment.collectOverrides(null)).toEqual({});
   });
 
