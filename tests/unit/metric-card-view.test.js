@@ -317,3 +317,32 @@ describe('card text: headline, callouts and the second line link', () => {
   });
 
 });
+
+describe('bucketSnapshots: long daily series drawn by week or month', () => {
+  const daily = (n, value) => Array.from({ length: n }, (_, i) => {
+    const d = new Date(Date.UTC(2020, 0, 6 + i));
+    return { period_start: d.toISOString().slice(0, 10), value_numeric: value === undefined ? 1 : value };
+  });
+  test('short series are drawn as they are', () => {
+    const s = daily(30);
+    expect(View.bucketSnapshots(s, 'integer')).toBe(s);
+  });
+  test('more than a year of days: summed by week for counts and currency', () => {
+    const out = View.bucketSnapshots(daily(700), 'currency');
+    expect(out).toHaveLength(100);
+    expect(out[0]).toEqual({ period_start: '2020-01-06', value_numeric: 7 });
+    expect(View.bucketSnapshots(daily(700), 'number')[0].value_numeric).toBe(7);
+  });
+  test('many years of days (9,827 points): summed by month', () => {
+    const out = View.bucketSnapshots(daily(9827), 'integer');
+    expect(out.length).toBeLessThan(330);
+    expect(out[0].period_start).toBe('2020-01-01');
+    expect(out[0].value_numeric).toBe(26);
+  });
+  test('rates and averages are never summed: the last value of each bucket is drawn', () => {
+    const series = daily(700).map((p, i) => Object.assign({}, p, { value_numeric: i }));
+    const out = View.bucketSnapshots(series, 'percentage');
+    expect(out[0]).toEqual({ period_start: '2020-01-06', value_numeric: 6 });
+    expect(View.bucketSnapshots(series, 'average')[0].value_numeric).toBe(6);
+  });
+});

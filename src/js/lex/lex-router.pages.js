@@ -625,6 +625,7 @@
         'js/shared/metric-card-view.js',
         'js/shared/mini-charts.js',
         'js/shared/metric-detail-view.js',
+        'js/shared/dashboard-period.js',
         'js/shared/lineage-view.js',
         'js/shared/insights-breadcrumbs.js',
         'js/lex/components/foundation/lex-drawer.js',

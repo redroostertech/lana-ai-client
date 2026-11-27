@@ -16,6 +16,13 @@
   'use strict';
 
   var DEFAULT_PRESET = 'last7days';
+  // All time starts here (LanaTime.ALL_TIME_START): such a range asks for
+  // no comparison.
+  var ALL_TIME_START = '2000-01-01';
+
+  function isAllTime(period) {
+    return !!(period && period.start === ALL_TIME_START);
+  }
 
   function isDigits(text) {
     if (!text) return false;
@@ -87,6 +94,7 @@
 
   return {
     DEFAULT_PRESET: DEFAULT_PRESET,
+    isAllTime: isAllTime,
     matchPreset: matchPreset,
     isPlainDay: isPlainDay,
     resolveRequestPeriod: resolveRequestPeriod,

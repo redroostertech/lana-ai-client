@@ -38,3 +38,17 @@ test('All time runs from the fixed early day through today; Last 24 hrs is yeste
 test('the default stays Last 7 days', () => {
   expect(read('js/shared/dashboard-period.js')).toContain("var DEFAULT_PRESET = 'last7days';");
 });
+
+test('All time asks for no comparison (compareToPrevious=false); other picks still compare', () => {
+  const P = require(path.join(SRC, 'js/shared/dashboard-period.js'));
+  expect(P.isAllTime({ start: '2000-01-01', end: '2026-11-26' })).toBe(true);
+  expect(P.isAllTime({ start: '2026-10-28', end: '2026-11-26' })).toBe(false);
+  const page = read('js/admin/dashboard-detail.js');
+  expect(page).toContain('params.compareToPrevious = !window.DashboardPeriod.isAllTime(period);');
+  expect(read('js/admin/metric-detail.js')).toContain('if (window.DashboardPeriod && window.DashboardPeriod.isAllTime({ start: periodStart, end: periodEnd })) periodParams.compareToPrevious = false;');
+});
+
+test('long sparklines are bucketed before drawing on the dashboard and metric detail', () => {
+  expect(read('js/admin/dashboard-detail.js')).toContain('window.MetricCardView.bucketSnapshots(');
+  expect(read('js/admin/metric-detail.js')).toContain('window.MetricCardView.bucketSnapshots(');
+});

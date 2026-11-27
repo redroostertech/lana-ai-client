@@ -261,7 +261,8 @@
     // Period-over-period comparison: ask the metric layer to attach a
     // `comparison` block. Preset periods use the calendar mode, custom ranges
     // use the contiguous equal-length mode.
-    params.compareToPrevious = true;
+    // All time has nothing before it to compare against.
+    params.compareToPrevious = !window.DashboardPeriod.isAllTime(period);
     params.compareMode = (typeof MetricGoalComparison !== 'undefined')
       ? MetricGoalComparison.resolveCompareMode(currentPeriodIsPreset)
       : (currentPeriodIsPreset ? 'previous_calendar' : 'previous_period');
@@ -2001,7 +2002,9 @@
       periodStart: period.start, periodEnd: period.end, compareBy: period.compareBy, rawLimit: 0,
     }).then(function (response) {
       var payload = response && response.data ? response.data : response;
-      entry.line = window.MetricCardView.sparkline(payload && payload.snapshots, 100, 24);
+      // A long daily series (All time) is drawn by week or month.
+      var metric = declaredIndex ? window.DashboardCards.metricFor(declaredIndex, job.metricKey) : null;
+      entry.line = window.MetricCardView.sparkline(window.MetricCardView.bucketSnapshots(payload && payload.snapshots, metric && metric.format), 100, 24);
     }).catch(function () {
       entry.line = null;
     }).then(function () {

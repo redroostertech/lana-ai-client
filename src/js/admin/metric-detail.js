@@ -315,9 +315,9 @@
   }
 
   // History shows only with at least two stored values; otherwise nothing.
-  function renderHistory(snapshots) {
+  function renderHistory(snapshots, drawn) {
     var section = el('metricHistorySection');
-    var line = window.MetricCardView ? window.MetricCardView.sparkline(snapshots, 100, 24) : null;
+    var line = window.MetricCardView ? window.MetricCardView.sparkline(drawn || snapshots, 100, 24) : null;
     if (section) section.hidden = !line;
     var chart = el('metricHistoryChart');
     if (chart) chart.innerHTML = line && window.MiniCharts ? window.MiniCharts.sparklineSvg(line) : '';
@@ -583,6 +583,8 @@
     if (periodStart) periodParams.periodStart = periodStart;
     if (periodEnd) periodParams.periodEnd = periodEnd;
     if (compareBy) periodParams.compareBy = compareBy;
+    // All time has nothing before it to compare against.
+    if (window.DashboardPeriod && window.DashboardPeriod.isAllTime({ start: periodStart, end: periodEnd })) periodParams.compareToPrevious = false;
 
     try {
       var hasPeriod = Object.keys(periodParams).length > 0;
@@ -628,10 +630,13 @@
       if (periodNode) periodNode.textContent = periodWords;
 
       var snapshots = payload.snapshots || [];
-      renderSummary(payload, snapshots);
+      // A long daily series (All time) is drawn by week or month; the
+      // snapshot table keeps every row.
+      var drawn = window.MetricCardView ? window.MetricCardView.bucketSnapshots(snapshots, current.format) : snapshots;
+      renderSummary(payload, drawn);
       renderDataUsed(payload.lineage,
         view().summary(payload).value || '', metric.calculation || current.calculation || '');
-      renderHistory(snapshots);
+      renderHistory(snapshots, drawn);
       // Records the server could not read get the calm note, not a table.
       var rowsStatus = view().rowsStatus(payload.raw_data);
       renderRowsStatus(rowsStatus);

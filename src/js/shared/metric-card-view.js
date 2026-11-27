@@ -279,6 +279,42 @@
 
   // ── Sparkline ─────────────────────────────────────────────────
   // Stored history only: fewer than two numbers draws nothing (never a fake line).
+  // ── Long series ───────────────────────────────────────────────
+  // All time can mean thousands of daily points. More than a year of points
+  // is drawn by week, more than three years by month. Counts and money are
+  // summed per bucket; rates, averages and anything else are never summed:
+  // the bucket's last value is drawn.
+  var SUMMED_FORMATS = { currency: true, currency_breakdown: true, integer: true, number: true, count: true };
+
+  function bucketStart(day, grain) {
+    if (grain === 'month') return day.substring(0, 8) + '01';
+    var date = new Date(day + 'T00:00:00Z');
+    if (!isFinite(date.getTime())) return day;
+    var back = (date.getUTCDay() + 6) % 7;
+    return new Date(date.getTime() - back * 86400000).toISOString().substring(0, 10);
+  }
+
+  function bucketSnapshots(snapshots, format) {
+    if (!Array.isArray(snapshots) || snapshots.length <= 366) return snapshots;
+    var grain = snapshots.length > 366 * 3 ? 'month' : 'week';
+    var fmt = format && typeof format === 'object' ? (format.type || format.style) : format;
+    var sum = SUMMED_FORMATS[String(fmt || '').toLowerCase()] === true;
+    var sorted = snapshots.filter(Boolean).map(function (s) {
+      var raw = s.value_numeric !== undefined ? s.value_numeric : s.value;
+      return { day: String(s.period_start || s.captured_at || '').substring(0, 10), v: toNumber(raw) };
+    }).filter(function (p) { return p.day.length === 10 && p.v !== null; })
+      .sort(function (a, b) { return a.day < b.day ? -1 : (a.day > b.day ? 1 : 0); });
+    var out = [];
+    var at = {};
+    sorted.forEach(function (p) {
+      var key = bucketStart(p.day, grain);
+      if (at[key] === undefined) { at[key] = out.length; out.push({ period_start: key, value_numeric: sum ? 0 : p.v }); }
+      var bucket = out[at[key]];
+      bucket.value_numeric = sum ? round1(bucket.value_numeric + p.v) : p.v;
+    });
+    return out;
+  }
+
   function sparkline(snapshots, width, height) {
     if (!Array.isArray(snapshots)) return null;
     var w = width > 0 ? width : 100;
@@ -395,6 +431,7 @@
   }
 
   return {
+    bucketSnapshots: bucketSnapshots,
     cardText: cardText,
     secondLineLink: secondLineLink,
     unassignedNote: unassignedNote,
