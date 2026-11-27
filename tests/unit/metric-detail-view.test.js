@@ -332,3 +332,15 @@ test('days counts read "N days" (days_waiting, *_days, days)', () => {
   expect(V.recordsTable([{ open_days: 3 }]).rows[0].cells[0].text).toBe('3 days');
   expect(V.recordsTable([{ amount: 3 }]).rows[0].cells[0].text).toBe('$3');
 });
+
+test('backend row shapes: corrected_fields mark "Fixed in LANA", Data Conflicts rows show their conflict, and no array becomes a column', () => {
+  const missing = { record_id: 'cd-1', connector_id: 'conn-1', deal_name: 'Smith Plan', amount: 4000,
+    corrected_fields: [{ standard_key: 'amount', correction_id: 'cor-7' }], conflict_fields: [], edit: {}, outcome_edit: {} };
+  const conflict = { record_id: 'cd-2', deal_name: 'Lee Trust', source_name: 'ActionStep', flag_annotation_id: 'flag-3', detected_at: '2026-11-21',
+    fields: [{ standard_key: 'amount', lana_value: 4500, new_source_value: 3000 }], actions: { keep_lana: {}, use_source: {} } };
+  expect(V.rowNotes(missing).fixed).toEqual(['Amount']);
+  expect(V.rowNotes(conflict).conflict.fields[0]).toMatchObject({ label: 'Amount', lana: '$4,500', source: '$3,000', sourceName: 'ActionStep' });
+  const keys = V.recordsTable([missing, conflict]).columns.map((c) => c.key);
+  ['fields', 'actions', 'corrected_fields', 'conflict_fields', 'flag_annotation_id', 'edit', 'outcome_edit'].forEach((k) => expect(keys).not.toContain(k));
+  expect(keys).toContain('_notes');
+});

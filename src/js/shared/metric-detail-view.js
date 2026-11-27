@@ -28,7 +28,8 @@
   };
   // Row fields the server sends to describe a row, not to show as columns:
   // they go in the Notes column (or open the record panel).
-  var ROW_NOTE_KEYS = ['row_reason', 'conflict', 'fixed_in_lana', 'refs', 'edit', 'outcome_edit'];
+  var ROW_NOTE_KEYS = ['row_reason', 'conflict', 'fixed_in_lana', 'refs', 'edit', 'outcome_edit',
+    'corrected_fields', 'conflict_fields', 'fields', 'actions', 'flag_annotation_id', 'matches_query'];
   var LINK_IDS = ['workspace_id', 'matter_id'];
 
   function endsWith(text, tail) {
@@ -259,8 +260,23 @@
   }
 
   function hasNotes(row) {
-    return !!(row && ((typeof row.row_reason === 'string' && row.row_reason.trim()) || (row.conflict && typeof row.conflict === 'object')
-      || (row.fixed_in_lana && typeof row.fixed_in_lana === 'object')));
+    return !!(row && ((typeof row.row_reason === 'string' && row.row_reason.trim()) || conflictOfRow(row)
+      || correctedOfRow(row).length || (row.fixed_in_lana && typeof row.fixed_in_lana === 'object')
+      || (row.edit && typeof row.edit === 'object') || (row.outcome_edit && typeof row.outcome_edit === 'object')));
+  }
+
+  // A row's conflict in any shape the server sends (see DataFixes.conflictOf).
+  function conflictOfRow(row) {
+    var r = row || {};
+    if (r.conflict && typeof r.conflict === 'object') return r.conflict;
+    if (r.flag_annotation_id && Array.isArray(r.fields)) return { flag_annotation_id: r.flag_annotation_id, source_name: r.source_name || r.system || null, fields: r.fields };
+    if (Array.isArray(r.conflict_fields) && r.conflict_fields.length) return { source_name: r.source_name || null, fields: r.conflict_fields };
+    return null;
+  }
+
+  function correctedOfRow(row) {
+    if (row && Array.isArray(row.corrected_fields)) return row.corrected_fields;
+    return row && row.fixed_in_lana && Array.isArray(row.fixed_in_lana.fields) ? row.fixed_in_lana.fields : [];
   }
 
   function fieldLabel(field) {
@@ -279,15 +295,17 @@
   /** The Notes for one row: { reason, conflict: { fields: [{ label, lana, source, previous }] } | null, fixed: [labels] | null }. */
   function rowNotes(row) {
     var r = row || {};
-    var conflict = r.conflict && typeof r.conflict === 'object' && Array.isArray(r.conflict.fields)
-      ? { fields: r.conflict.fields.filter(function (f) { return f && typeof f === 'object'; }).map(function (f) {
+    var found = conflictOfRow(r);
+    var conflict = found && Array.isArray(found.fields)
+      ? { fields: found.fields.filter(function (f) { return f && typeof f === 'object'; }).map(function (f) {
         var out = { label: fieldLabel(f), lana: fieldValue(f, f.lana_value), source: fieldValue(f, f.new_source_value) };
-        if (r.conflict.source_name) out.sourceName = String(r.conflict.source_name);
+        if (found.source_name) out.sourceName = String(found.source_name);
         if (!isEmpty(f.previous_source_value)) out.previous = fieldValue(f, f.previous_source_value);
         return out;
       }) }
       : null;
-    var fixedFields = r.fixed_in_lana && typeof r.fixed_in_lana === 'object' && Array.isArray(r.fixed_in_lana.fields) ? r.fixed_in_lana.fields : null;
+    var correctedList = correctedOfRow(r);
+    var fixedFields = correctedList.length ? correctedList : null;
     return {
       reason: typeof r.row_reason === 'string' ? r.row_reason.trim() : '',
       conflict: conflict,

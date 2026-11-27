@@ -134,9 +134,12 @@
       row.edit.current_value = fields[row.edit.standard_key];
     }
     if (Array.isArray(record.corrected_fields)) {
-      if (record.corrected_fields.length) row.fixed_in_lana = { fields: record.corrected_fields.slice() };
+      // Rows in the server's shape keep corrected_fields; others fixed_in_lana.
+      if (Array.isArray(row.corrected_fields)) row.corrected_fields = record.corrected_fields.slice();
+      else if (record.corrected_fields.length) row.fixed_in_lana = { fields: record.corrected_fields.slice() };
       else delete row.fixed_in_lana;
     }
+    if (Array.isArray(record.conflict_fields) && Array.isArray(row.conflict_fields)) row.conflict_fields = record.conflict_fields.slice();
     if (Array.isArray(record.conflict_fields)) {
       if (!record.conflict_fields.length) delete row.conflict;
       else row.conflict = Object.assign({}, row.conflict || {}, record.conflict || {}, { fields: record.conflict_fields.slice() });
@@ -168,9 +171,28 @@
     return found && typeof found === 'object' ? found : null;
   }
 
-  // The fix on this field already in LANA (fixed_in_lana.fields), for PUT and DELETE.
+  // A row's conflict, whatever shape it comes in: row.conflict; a Data
+  // Conflicts row (flat flag_annotation_id, source_name, fields, actions);
+  // or conflict_fields on a deal row (badge only, no flag to settle).
+  function conflictOf(row) {
+    var r = row || {};
+    if (r.conflict && typeof r.conflict === 'object') return r.conflict;
+    if (r.flag_annotation_id && Array.isArray(r.fields)) {
+      return { flag_annotation_id: r.flag_annotation_id, source_name: r.source_name || r.system || null, fields: r.fields, actions: r.actions || null };
+    }
+    if (Array.isArray(r.conflict_fields) && r.conflict_fields.length) return { source_name: r.source_name || null, fields: r.conflict_fields };
+    return null;
+  }
+
+  // The fields already fixed in LANA: corrected_fields, or fixed_in_lana.fields.
+  function correctedFieldsOf(row) {
+    if (row && Array.isArray(row.corrected_fields)) return row.corrected_fields;
+    return row && row.fixed_in_lana && Array.isArray(row.fixed_in_lana.fields) ? row.fixed_in_lana.fields : [];
+  }
+
+  // The fix on this field already in LANA, for PUT and DELETE.
   function correctionIdFor(row, edit) {
-    var fields = row && row.fixed_in_lana && Array.isArray(row.fixed_in_lana.fields) ? row.fixed_in_lana.fields : [];
+    var fields = correctedFieldsOf(row);
     var match = fields.filter(function (f) {
       return f && typeof f === 'object' && f.correction_id && edit
         && ((edit.standard_key && f.standard_key === edit.standard_key) || (edit.field_key && f.field_key === edit.field_key));
@@ -179,13 +201,19 @@
   }
 
   function sourceName(row) {
-    var c = (row && row.conflict) || {};
+    var c = conflictOf(row) || {};
     return str(c.source_name);
   }
 
+  // The server's action labels when it sends them, else plain ones.
   function conflictLabels(row) {
+    var c = conflictOf(row) || {};
+    var actions = c.actions && typeof c.actions === 'object' ? c.actions : {};
     var name = sourceName(row);
-    return { keep: 'Keep LANA\'s value', use: 'Use ' + (name || 'the source') + '\'s value' };
+    return {
+      keep: str(actions.keep_lana && actions.keep_lana.label) || 'Keep LANA\'s value',
+      use: str(actions.use_source && actions.use_source.label) || 'Use ' + (name || 'the source') + '\'s value',
+    };
   }
 
   function valueText(field, value) {
@@ -199,7 +227,7 @@
   }
 
   function conflictLines(row) {
-    var c = row && row.conflict;
+    var c = conflictOf(row);
     var name = sourceName(row) || 'source';
     return (c && Array.isArray(c.fields) ? c.fields : []).filter(Boolean).map(function (f) {
       var label = f.standard_key === 'amount' ? 'Amount' : words(f.standard_key || f.field_key);
@@ -233,7 +261,8 @@
           + escapeHtml(str(outcome.current_decided_on)) + '"></lex-input>' + allowed.map(function (s) { return btn(s, OUTCOMES[s]); }).join('') + '</div>');
       }
     }
-    if (canResolve(permissions, r.conflict)) {
+    var conflict = conflictOf(r);
+    if (canResolve(permissions, conflict)) {
       var labels = conflictLabels(r);
       parts.push('<div class="dfix__conflict">' + conflictLines(r).map(function (line) { return '<p class="dfix__values">' + escapeHtml(line) + '</p>'; }).join('')
         + '<div class="dfix__line">' + btn('keep-lana', labels.keep, 'primary') + btn('use-source', labels.use) + '</div></div>');
@@ -245,7 +274,7 @@
       + (edit && edit.field_key ? ' data-dfix-field="' + escapeHtml(edit.field_key) + '"' : '')
       + (outcomeAllowed(outcome).length ? ' data-dfix-allowed="' + escapeHtml(outcomeAllowed(outcome).join(',')) + '"' : '')
       + (correctionIdFor(r, edit) ? ' data-dfix-correction="' + escapeHtml(correctionIdFor(r, edit)) + '"' : '')
-      + (r.conflict && r.conflict.flag_annotation_id ? ' data-dfix-flag="' + escapeHtml(r.conflict.flag_annotation_id) + '"' : '')
+      + (conflict && conflict.flag_annotation_id ? ' data-dfix-flag="' + escapeHtml(conflict.flag_annotation_id) + '"' : '')
       + '>' + parts.join('') + '<p class="dfix__status" data-dfix-status role="status" aria-live="polite"></p></div>';
   }
 
@@ -342,6 +371,7 @@
     applyRecord: applyRecord,
     refreshDelayMs: refreshDelayMs,
     savedText: savedText,
+    conflictOf: conflictOf,
     permissionsOf: permissionsOf,
     conflictLabels: conflictLabels,
     controlsHtml: controlsHtml,

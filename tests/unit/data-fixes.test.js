@@ -228,3 +228,42 @@ test('api.js methods for corrections and conflicts', async () => {
   await api.resolveConflict('cd-1', 'f-9', 'source');
   expect(api.post).toHaveBeenLastCalledWith('/api/v1/connected-data/cd-1/conflicts/f-9/resolve', { keep: 'source' });
 });
+
+describe('the exact backend shapes (967e7b7b3)', () => {
+  const can = { can_correct: true, can_resolve_conflicts: true };
+  const missing = {
+    record_id: 'cd-1', connector_id: 'conn-1', deal_name: 'Smith Plan', amount: 4000,
+    edit: { record_id: 'cd-1', field_key: 'monetaryValue', standard_key: 'amount', current_value: 4000, editable: true },
+    outcome_edit: { record_id: 'cd-1', editable: true, current_status: 'open', current_decided_on: null, allowed_values: ['won', 'lost'] },
+    corrected_fields: [{ field_key: 'monetaryValue', standard_key: 'amount', lana_value: 4000, corrected_at: '2026-11-20T10:00:00Z', correction_id: 'cor-7' }],
+    conflict_fields: [],
+  };
+  const dataConflict = {
+    record_id: 'cd-2', connector_id: 'conn-1', system: 'ActionStep', source_name: 'ActionStep', detected_at: '2026-11-21T10:00:00Z',
+    fields: [{ field_key: 'monetaryValue', standard_key: 'amount', lana_value: 4500, new_source_value: 3000, correction_id: 'cor-9' }],
+    flag_annotation_id: 'flag-3',
+    actions: { keep_lana: { label: 'Keep LANA\'s value', method: 'POST', path: '/x', body: { keep: 'lana' } },
+      use_source: { label: 'Use the value from ActionStep', method: 'POST', path: '/x', body: { keep: 'source' } } },
+  };
+  test('Deals Missing an Amount: corrected_fields give the undo by correction_id; won and lost show', () => {
+    const html = F.controlsHtml(missing, can);
+    expect(html).toContain('data-dfix-correction="cor-7"');
+    expect(html).toContain('data-dfix-action="undo"');
+    expect(html).toContain('data-dfix-action="won"');
+    expect(html).toContain('data-dfix-action="lost"');
+  });
+  test('Data Conflicts rows (flat fields, flag_annotation_id, actions) show both values and the server\'s action labels', () => {
+    const html = F.controlsHtml(dataConflict, can);
+    expect(html).toContain('data-dfix-flag="flag-3"');
+    expect(html).toContain('Amount: LANA $4,500, ActionStep $3,000');
+    expect(html).toContain('label="Keep LANA&#39;s value"');
+    expect(html).toContain('label="Use the value from ActionStep"');
+    expect(F.controlsHtml(dataConflict, { can_correct: true })).toBe('');
+  });
+  test('applyRecord keeps corrected_fields in the server shape on rows that use it', () => {
+    const row = JSON.parse(JSON.stringify(missing));
+    F.applyRecord(row, { fields: { amount: 5000 }, corrected_fields: [{ standard_key: 'amount', correction_id: 'cor-8' }], conflict_fields: [] });
+    expect(row.corrected_fields).toEqual([{ standard_key: 'amount', correction_id: 'cor-8' }]);
+    expect(F.controlsHtml(row, can)).toContain('data-dfix-correction="cor-8"');
+  });
+});
