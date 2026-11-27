@@ -109,3 +109,9 @@ test('metricDetailHref carries where it was opened from', () => {
   const qs = new URLSearchParams(metricDetailHref('a.b', { periodStart: '2026-01-01', periodEnd: '2026-01-31' }, { from: 'dashboard', dashboardId: 'd-1' }).split('?')[1]);
   expect([qs.get('from'), qs.get('dashboardId')]).toEqual(['dashboard', 'd-1']);
 });
+
+test('metricDetailHref: an as-of link carries asOf alone, no range', () => {
+  const { metricDetailHref: href } = require(path.join(__dirname, '../../src/js/shared/dashboard-period.js'));
+  const link = href('a.b', { asOf: '2026-11-27', periodStart: '', periodEnd: '2026-11-27', compareBy: 'monthly' }, { filters: { month: '2026-10' } });
+  expect(link).toBe('admin/metric_detail.html?metric_key=a.b&asOf=2026-11-27&raw_filter%5Bmonth%5D=2026-10');
+});

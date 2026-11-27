@@ -149,3 +149,19 @@ describe('a filter in the link (raw_filter[col]=value)', () => {
     expect(nodes.metricRawDataLinkFilters.innerHTML).toContain('Month: Older');
   });
 });
+
+describe('an as-of link (asOf=YYYY-MM-DD)', () => {
+  test('metric detail asks with asOf alone (plus the link filter) and the header says "As of"', async () => {
+    const { api, nodes } = await page(undefined, '?metric_key=a.b&asOf=2026-11-27&raw_filter%5Bmonth%5D=2026-10');
+    const first = api.getMetricDetail.mock.calls[0][1];
+    expect(first).toEqual(expect.objectContaining({ asOf: '2026-11-27', rawFilters: { month: '2026-10' } }));
+    expect(first.periodStart).toBeUndefined();
+    expect(first.periodEnd).toBeUndefined();
+    expect(nodes.metricPeriod.textContent).toBe('As of Nov 27, 2026');
+    nodes.metricRawDataTable.fire('lex-query-change', { page: 2, limit: 20 });
+    await settle();
+    const later = api.getMetricDetail.mock.calls[api.getMetricDetail.mock.calls.length - 1][1];
+    expect(later.asOf).toBe('2026-11-27');
+    expect(later.periodStart).toBeUndefined();
+  });
+});

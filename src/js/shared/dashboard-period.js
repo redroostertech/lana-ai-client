@@ -67,9 +67,14 @@
    */
   function metricDetailHref(metricKey, period, options) {
     var parts = ['metric_key=' + encodeURIComponent(metricKey || '')];
-    if (period && period.periodStart) parts.push('periodStart=' + encodeURIComponent(period.periodStart));
-    if (period && period.periodEnd) parts.push('periodEnd=' + encodeURIComponent(period.periodEnd));
-    if (period && period.compareBy) parts.push('compareBy=' + encodeURIComponent(period.compareBy));
+    if (period && period.asOf) {
+      // An as-of card: metric detail takes asOf alone, never a range.
+      parts.push('asOf=' + encodeURIComponent(period.asOf));
+    } else {
+      if (period && period.periodStart) parts.push('periodStart=' + encodeURIComponent(period.periodStart));
+      if (period && period.periodEnd) parts.push('periodEnd=' + encodeURIComponent(period.periodEnd));
+      if (period && period.compareBy) parts.push('compareBy=' + encodeURIComponent(period.compareBy));
+    }
     if (options && options.tab) parts.push('tab=' + encodeURIComponent(options.tab));
     // Where it was opened from, so its breadcrumbs and Back lead there.
     if (options && options.from) parts.push('from=' + encodeURIComponent(options.from));

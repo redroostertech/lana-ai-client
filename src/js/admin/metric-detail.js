@@ -472,7 +472,7 @@
   function metricHref(key) {
     var qp = params();
     var parts = ['metric_key=' + encodeURIComponent(key)];
-    ['periodStart', 'periodEnd', 'compareBy', 'from', 'dashboardId'].forEach(function (name) {
+    ['asOf', 'periodStart', 'periodEnd', 'compareBy', 'from', 'dashboardId'].forEach(function (name) {
       if (qp.get(name)) parts.push(name + '=' + encodeURIComponent(qp.get(name)));
     });
     return 'admin/metric_detail.html?' + parts.join('&');
@@ -564,7 +564,8 @@
     inputs.forEach(function (input) {
       if (!input.metric_key || inputValues[input.metric_key] !== undefined) return;
       inputValues[input.metric_key] = '';
-      api.getMetricDetail(input.metric_key, { periodStart: qp.get('periodStart') || undefined, periodEnd: qp.get('periodEnd') || undefined, rawLimit: 0 })
+      api.getMetricDetail(input.metric_key, qp.get('asOf') ? { asOf: qp.get('asOf'), rawLimit: 0 }
+        : { periodStart: qp.get('periodStart') || undefined, periodEnd: qp.get('periodEnd') || undefined, rawLimit: 0 })
         .then(function (response) {
           var payload = response && response.data ? response.data : response;
           var current = (payload && payload.current) || {};
@@ -722,11 +723,17 @@
     var periodStart = qp.get('periodStart');
     var periodEnd = qp.get('periodEnd');
     var compareBy = qp.get('compareBy');
-    if (periodStart) periodParams.periodStart = periodStart;
-    if (periodEnd) periodParams.periodEnd = periodEnd;
-    if (compareBy) periodParams.compareBy = compareBy;
-    // All time has nothing before it to compare against.
-    if (window.DashboardPeriod && window.DashboardPeriod.isAllTime({ start: periodStart, end: periodEnd })) periodParams.compareToPrevious = false;
+    // An as-of card (from an as-of report): asOf alone, never a range.
+    var asOf = qp.get('asOf');
+    if (asOf) {
+      periodParams.asOf = asOf;
+    } else {
+      if (periodStart) periodParams.periodStart = periodStart;
+      if (periodEnd) periodParams.periodEnd = periodEnd;
+      if (compareBy) periodParams.compareBy = compareBy;
+      // All time has nothing before it to compare against.
+      if (window.DashboardPeriod && window.DashboardPeriod.isAllTime({ start: periodStart, end: periodEnd })) periodParams.compareToPrevious = false;
+    }
 
     linkFilters = view().urlFilters(qp);
     renderLinkFilters();
@@ -762,7 +769,7 @@
       showBlock('metricBusinessLogicBlock', 'metricBusinessLogic', metric.businessLogic || current.businessLogic || '');
       // The backend names the period in the firm's days (data.period.label).
       // The backend's label, else the picked dates; no line at all otherwise.
-      var periodWords = view().periodText(payload.period, qp.get('periodStart'), qp.get('periodEnd'));
+      var periodWords = view().periodText(payload.period, qp.get('periodStart'), qp.get('periodEnd'), asOf);
       // A small calm badge when the server says the data is stale
       // (data.lineage.freshness on metric detail).
       var freshness = el('metricFreshness');

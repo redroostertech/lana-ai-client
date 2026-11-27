@@ -564,7 +564,9 @@
   var NO_DATA_TEXT = 'No data for these dates';
 
   // The period line: the backend's label, else the picked dates, else ''.
-  function periodText(period, start, end) {
+  function periodText(period, start, end, asOf) {
+    // An as-of card: "As of Nov 27, 2026".
+    if (asOf) return 'As of ' + dayText(String(asOf).substring(0, 10));
     if (period && period.label) return String(period.label);
     return start && end ? dayRangeText({ start: String(start).substring(0, 10), end: String(end).substring(0, 10) }) : '';
   }

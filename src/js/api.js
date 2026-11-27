@@ -3988,12 +3988,18 @@ class ApiClient {
   async getMetricDetail(metricKey, params = {}, options = {}) {
     let url = '/api/v1/modules/metric-detail/' + encodeURIComponent(metricKey);
     const queryParts = [];
-    if (params.periodStart) queryParts.push('periodStart=' + encodeURIComponent(params.periodStart));
-    if (params.periodEnd) queryParts.push('periodEnd=' + encodeURIComponent(params.periodEnd));
-    if (params.periodType) queryParts.push('periodType=' + encodeURIComponent(params.periodType));
-    if (params.compareBy) queryParts.push('compareBy=' + encodeURIComponent(params.compareBy));
-    if (params.compareToPrevious !== undefined) queryParts.push('compareToPrevious=' + encodeURIComponent(String(params.compareToPrevious)));
-    if (params.compareMode) queryParts.push('compareMode=' + encodeURIComponent(params.compareMode));
+    // An as-of card (an as-of report): asOf alone. Any range or comparison
+    // sent with it is a 400, so none is sent.
+    if (params.asOf) {
+      queryParts.push('asOf=' + encodeURIComponent(params.asOf));
+    } else {
+      if (params.periodStart) queryParts.push('periodStart=' + encodeURIComponent(params.periodStart));
+      if (params.periodEnd) queryParts.push('periodEnd=' + encodeURIComponent(params.periodEnd));
+      if (params.periodType) queryParts.push('periodType=' + encodeURIComponent(params.periodType));
+      if (params.compareBy) queryParts.push('compareBy=' + encodeURIComponent(params.compareBy));
+      if (params.compareToPrevious !== undefined) queryParts.push('compareToPrevious=' + encodeURIComponent(String(params.compareToPrevious)));
+      if (params.compareMode) queryParts.push('compareMode=' + encodeURIComponent(params.compareMode));
+    }
     // rawLimit caps the source rows; 0 skips them (a sparkline needs only the history).
     if (params.rawLimit !== undefined && params.rawLimit !== null) queryParts.push('raw_limit=' + encodeURIComponent(String(params.rawLimit)));
     // Server-side rows: raw_offset pages; raw_q searches; raw_sort_by and

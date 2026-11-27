@@ -35,7 +35,7 @@ function page(api = {}, user = null, search = '', admin = true) {
   let source = fs.readFileSync(path.join(__dirname, '../../src/js/admin/dashboard-detail.js'), 'utf8');
   const end = source.lastIndexOf('  init();');
   source = source.slice(0, end)
-    + '  window.testExports = { renderMetricCard, formatMetricCardValue, loadMetrics, loadDashboardById, readPeriodControls, setBanner, fetchSparkline, renderMetrics, openMetricModal, worklistHtml, drawRows, paintSparkline, cardPreviewRows, variantPicks, openReportTarget, allMetrics: function () { return allDashboardMetrics; }, cardLoads: function () { return cardLoads; } };'
+    + '  window.testExports = { renderMetricCard, formatMetricCardValue, loadMetrics, loadDashboardById, readPeriodControls, setBanner, fetchSparkline, renderMetrics, openMetricModal, worklistHtml, drawRows, paintSparkline, cardPreviewRows, variantPicks, openReportTarget, detailPeriod, allMetrics: function () { return allDashboardMetrics; }, cardLoads: function () { return cardLoads; } };'
     + source.slice(end + '  init();'.length);
   const nodes = {};
   const document = { body: node(), addEventListener() {}, getElementById: (id) => (nodes[id] = nodes[id] || node()), querySelector: () => null, querySelectorAll: () => [] };
@@ -1450,5 +1450,28 @@ describe('mappings links are for admins and org admins only', () => {
     expect(text(html)).toContain('42 matters are not mapped to a service yet');
     expect(html).not.toContain('settings-v2.html#mappings');
     expect(text(html)).not.toContain('Map them');
+  });
+});
+
+describe('as-of dashboards link metric detail with asOf alone', () => {
+  test('"See the records", a bar and the no-date note link with asOf and no range; worklist rows ask with asOf; cards still periodEnd', async () => {
+    const card = { metric_key: 'legal_firm.sales_intake.open_deals_by_month', title: 'Open Deals', format: 'currency', data_state: 'ok', value: 12000, formatted_value: '$12,000',
+      metadata: { unit: 'deals', by_month: [{ month: '2026-10', label: 'Oct', count: 2, value: 7500 }], by_month_unplaced: { label: 'No date recorded', count: 3, value: 4500 } } };
+    const layout = { period_mode: 'as_of', cards: [{ id: 'm', kind: 'number', visual: 'month_bars', metric_key: 'sales_intake.open_deals_by_month' }] };
+    const getDashboardMetricCards = jest.fn().mockResolvedValue({ data: [card] });
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'Still Open', layout } }), getDashboardMetricCards }, null, '?id=d1&asOf=2026-11-27');
+    await p.exports.loadDashboardById('d1');
+    expect(getDashboardMetricCards.mock.calls[0][0].periodEnd).toBe('2026-11-27');
+    const html = p.nodes.dashboardMetricGrid.innerHTML.split('&amp;').join('&');
+    const links = html.split('data-metric-detail-link="').slice(1).map((part) => part.split('"')[0]).filter((l) => l.indexOf('metric_detail') !== -1);
+    expect(links.length).toBeGreaterThanOrEqual(3);
+    links.forEach((l) => {
+      expect(l).toContain('asOf=2026-11-27');
+      expect(l).not.toContain('periodStart');
+      expect(l).not.toContain('periodEnd');
+    });
+    expect(links.some((l) => l.indexOf('raw_filter%5Bmonth%5D=2026-10') !== -1)).toBe(true);
+    expect(links.some((l) => l.indexOf('raw_filter%5Bmonth%5D=(empty)') !== -1)).toBe(true);
+    expect(p.exports.detailPeriod()).toEqual({ asOf: '2026-11-27' });
   });
 });

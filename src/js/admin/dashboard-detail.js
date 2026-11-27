@@ -784,13 +784,18 @@
     return (metric && (metric.metric_key || metric.key)) || key;
   }
 
+  // The dates metric detail takes: asOf alone on an as-of report, else the
+  // picked range. (Card fetches stay periodEnd only: getMetricCardRequestParams.)
+  function detailPeriod() {
+    if (asOfMode) return { asOf: currentPeriod.end };
+    return { periodStart: currentPeriod.start, periodEnd: currentPeriod.end, compareBy: currentPeriod.compareBy };
+  }
+
   // filters: records filters the table opens with ({ month: '2026-10' }).
   function recordsHref(cardId, filters) {
     var options = currentDashboardId ? { from: 'dashboard', dashboardId: currentDashboardId } : {};
     if (filters) options.filters = filters;
-    return window.DashboardPeriod.metricDetailHref(catalogKey(cardId), {
-      periodStart: currentPeriod.start, periodEnd: currentPeriod.end, compareBy: currentPeriod.compareBy,
-    }, options);
+    return window.DashboardPeriod.metricDetailHref(catalogKey(cardId), detailPeriod(), options);
   }
 
   var RECORDS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
@@ -1778,9 +1783,7 @@
       var limit = visual === 'worklist' ? 5 : 25;
       var cacheKey = [key, limit, currentPeriod.start, currentPeriod.end].join('|');
       if (!worklistCache[cacheKey]) {
-        worklistCache[cacheKey] = api.getMetricDetail(catalogKey(key), {
-          periodStart: currentPeriod.start, periodEnd: currentPeriod.end, compareBy: currentPeriod.compareBy, rawLimit: limit,
-        }).then(function (response) {
+        worklistCache[cacheKey] = api.getMetricDetail(catalogKey(key), Object.assign(detailPeriod(), { rawLimit: limit })).then(function (response) {
           var payload = response && response.data ? response.data : response;
           var rows = payload && payload.raw_data && Array.isArray(payload.raw_data.rows) ? payload.raw_data.rows : [];
           var lineage = payload && payload.lineage;
@@ -2047,9 +2050,7 @@
       var cacheKey = [entry.key, currentPeriod.start, currentPeriod.end].join('|');
       if (lineageCache[cacheKey]) return;
       lineageCache[cacheKey] = { model: null };
-      api.getMetricDetail(catalogKey(entry.key), {
-        periodStart: currentPeriod.start, periodEnd: currentPeriod.end, compareBy: currentPeriod.compareBy, rawLimit: 0,
-      }).then(function (response) {
+      api.getMetricDetail(catalogKey(entry.key), Object.assign(detailPeriod(), { rawLimit: 0 })).then(function (response) {
         var payload = response && response.data ? response.data : response;
         lineageCache[cacheKey].model = window.LineageView.detailModel(payload && payload.lineage, Date.now());
         redraw();
@@ -2262,9 +2263,8 @@
     var period = currentPeriod;
     var entry = { done: false, line: null };
     // The sparkline needs only the history: raw_limit=0 skips the source rows.
-    entry.promise = api.getMetricDetail(catalogKey(job.metricKey), {
-      periodStart: period.start, periodEnd: period.end, compareBy: period.compareBy, rawLimit: 0,
-    }).then(function (response) {
+    entry.promise = api.getMetricDetail(catalogKey(job.metricKey), Object.assign(asOfMode ? { asOf: period.end }
+      : { periodStart: period.start, periodEnd: period.end, compareBy: period.compareBy }, { rawLimit: 0 })).then(function (response) {
       var payload = response && response.data ? response.data : response;
       // A long daily series (All time) is drawn by week or month.
       var metric = declaredIndex ? window.DashboardCards.metricFor(declaredIndex, job.metricKey) : null;
