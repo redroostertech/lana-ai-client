@@ -304,3 +304,11 @@ describe('metric detail records: reasons, dates, conflicts and fixes', () => {
     expect(V.recordsHeader({ raw_data: { conflicts: { count: 1 } } }).conflicts).toBe('1 record disagrees with its source.');
   });
 });
+
+test('final contract: pinned_count and corrected_count are read from raw_data only; the conflict names its source', () => {
+  const header = V.recordsHeader({ raw_data: { conflicts: { count: 2, message: 'Two disagree.', pinned_count: 9 }, pinned_count: 2, corrected_count: 1 } });
+  expect(header.conflicts).toBe('Two disagree. 2 shown first. 1 fixed in LANA.');
+  expect(V.recordsHeader({ raw_data: { conflicts: { count: 2, message: 'Two disagree.', pinned_count: 9, corrected_count: 4 } } }).conflicts).toBe('Two disagree.');
+  const notes = V.rowNotes({ conflict: { source_name: 'ActionStep', fields: [{ standard_key: 'amount', lana_value: 4500, new_source_value: 3000 }] } });
+  expect(notes.conflict.fields[0].sourceName).toBe('ActionStep');
+});

@@ -137,7 +137,7 @@
     if (notes.conflict) {
       parts.push('<span class="metric-record-badge metric-record-badge--conflict">Conflict</span> '
         + notes.conflict.fields.map(function (f) {
-          return '<span class="metric-record-conflict">' + escapeHtml(f.label + ': LANA ' + (f.lana || 'blank') + ', source ' + (f.source || 'blank')) + '</span>';
+          return '<span class="metric-record-conflict">' + escapeHtml(f.label + ': LANA ' + (f.lana || 'blank') + ', ' + (f.sourceName || 'source') + ' ' + (f.source || 'blank')) + '</span>';
         }).join(' '));
     }
     if (notes.fixed) parts.push('<span class="metric-record-badge metric-record-badge--fixed">Fixed in LANA</span>');
@@ -506,6 +506,8 @@
       window.DataFixes.applyRecord(row, info.record);
       try { renderRawData(currentRows, currentRowColumns); } catch (err) { /* the reload below redraws it */ }
     }
+    // Refetch only when the server queued a refresh.
+    if (info.delayMs === null || info.delayMs === undefined) return;
     if (fixTimer) clearTimeout(fixTimer);
     fixTimer = setTimeout(function () { fixTimer = null; loadMetricDetail(); }, info.delayMs);
   }
@@ -634,7 +636,7 @@
       var rowsStatus = view().rowsStatus(payload.raw_data);
       renderRowsStatus(rowsStatus);
       if (!rowsStatus) {
-        currentPermissions = payload.permissions || null;
+        currentPermissions = window.DataFixes ? window.DataFixes.permissionsOf(payload) : (payload.permissions || null);
         currentRows = payload.raw_data && Array.isArray(payload.raw_data.rows) ? payload.raw_data.rows : [];
         currentRowColumns = payload.row_columns;
         renderRecordsHeader(payload);

@@ -1448,9 +1448,10 @@
         slot.innerHTML = worklistHtml(slot._rows, slot._columns, slot._permissions);
       }
       var status = slot.querySelector('.dfix[data-dfix-id="' + String(info.dataId).split('"').join('') + '"] [data-dfix-status]');
-      if (status) status.textContent = 'Saved. Updating...';
+      if (status) status.textContent = info.text || 'Saved.';
     }
-    scheduleRefresh(info.delayMs);
+    // Refetch only when the server queued a refresh.
+    if (info.delayMs !== null && info.delayMs !== undefined) scheduleRefresh(info.delayMs);
   }
 
   var refreshTimer = null;
@@ -1542,7 +1543,7 @@
         var metric = declaredIndex ? window.DashboardCards.metricFor(declaredIndex, key) : null;
         var columns = metric && Array.isArray(metric.row_columns) ? metric.row_columns : (result && result.columns);
         drawRows(slot, result ? result.rows : null, columns, result ? result.caveats : [], result ? result.rowsStatus : null,
-          (metric && metric.permissions) || (result ? result.permissions : null));
+          (window.DataFixes && window.DataFixes.permissionsOf(metric)) || (result ? result.permissions : null));
       });
     });
   }

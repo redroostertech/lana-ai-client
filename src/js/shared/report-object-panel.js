@@ -149,7 +149,7 @@
         var entry = current();
         if (entry && entry.row && info.record) global.DataFixes.applyRecord(entry.row, info.record);
         if (typeof state.options.onSaved === 'function') state.options.onSaved(info);
-        setTimeout(function () { if (current() === entry) load(); }, info.delayMs);
+        if (info.delayMs !== null && info.delayMs !== undefined) setTimeout(function () { if (current() === entry) load(); }, info.delayMs);
       } });
     }
     drawer.addEventListener('lex-close', function () {

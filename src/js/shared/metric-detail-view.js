@@ -257,6 +257,7 @@
     var conflict = r.conflict && typeof r.conflict === 'object' && Array.isArray(r.conflict.fields)
       ? { fields: r.conflict.fields.filter(function (f) { return f && typeof f === 'object'; }).map(function (f) {
         var out = { label: fieldLabel(f), lana: fieldValue(f, f.lana_value), source: fieldValue(f, f.new_source_value) };
+        if (r.conflict.source_name) out.sourceName = String(r.conflict.source_name);
         if (!isEmpty(f.previous_source_value)) out.previous = fieldValue(f, f.previous_source_value);
         return out;
       }) }
@@ -289,8 +290,8 @@
     if (c && Number(c.count) > 0) {
       conflicts = c.message ? String(c.message).trim()
         : (Number(c.count) === 1 ? '1 record disagrees with its source.' : plural(c.count, 'record', 'records') + ' disagree with their source.');
-      var pinned = Number(raw.pinned_count !== undefined ? raw.pinned_count : c.pinned_count) || 0;
-      var corrected = Number(raw.corrected_count !== undefined ? raw.corrected_count : c.corrected_count) || 0;
+      var pinned = Number(raw.pinned_count) || 0;
+      var corrected = Number(raw.corrected_count) || 0;
       if (pinned > 0) conflicts += ' ' + Number(pinned).toLocaleString('en-US') + ' shown first.';
       if (corrected > 0) conflicts += ' ' + Number(corrected).toLocaleString('en-US') + ' fixed in LANA.';
     }

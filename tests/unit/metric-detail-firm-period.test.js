@@ -295,3 +295,9 @@ describe('records table: notes, header and server order', () => {
     expect(p.nodes.metricRawDataConflicts.textContent).toBe('1 record disagrees with what your CRM says now. 1 shown first.');
   });
 });
+
+test('a conflict in the Notes cell names its source', async () => {
+  const rows = [{ record_id: 'r-1', row_date: '2026-11-20', client_name: 'A', conflict: { source_name: 'ActionStep', fields: [{ standard_key: 'amount', lana_value: 4500, new_source_value: 3000 }] } }];
+  const p = await page('?metric_key=matters_opened', { ...payload, raw_data: { rows } });
+  expect(p.nodes.metricRawDataTable.renderers._notes(null, rows[0])).toContain('Amount: LANA $4,500, ActionStep $3,000');
+});

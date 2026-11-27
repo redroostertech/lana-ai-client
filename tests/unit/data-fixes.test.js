@@ -25,8 +25,8 @@ const missingAmount = {
   outcome_edit: { status: 'open', decided_on: null, allowed: ['won', 'lost'] },
 };
 const conflicted = {
-  record_id: 'cd-2', client_name: 'Casey Lee', source_name: 'ActionStep',
-  conflict: { flag_annotation_id: 'f-9', detected_at: '2026-11-21T10:00:00Z', fields: [{ field_key: 'monetaryValue', standard_key: 'amount', lana_value: 4500, previous_source_value: 4500, new_source_value: 3000 }] },
+  record_id: 'cd-2', client_name: 'Casey Lee',
+  conflict: { flag_annotation_id: 'f-9', source_name: 'ActionStep', detected_at: '2026-11-21T10:00:00Z', fields: [{ field_key: 'monetaryValue', standard_key: 'amount', lana_value: 4500, previous_source_value: 4500, new_source_value: 3000 }] },
 };
 const can = { can_correct: true, can_resolve_conflicts: true };
 
@@ -52,33 +52,57 @@ describe('request bodies', () => {
     expect(F.amountBody(missingAmount.edit, '-5')).toBe(null);
   });
   test('won or lost with a day goes in one POST with outcome', () => {
-    expect(F.outcomeBody(missingAmount.outcome_edit, 'won', '2026-11-20')).toEqual({ fields: [], outcome: { status: 'won', decided_on: '2026-11-20' } });
+    expect(F.outcomeBody(missingAmount.outcome_edit, 'won', '2026-11-20')).toEqual({ outcome: { status: 'won', decided_on: '2026-11-20' } });
     expect(F.outcomeBody(missingAmount.outcome_edit, 'won', '')).toBe(null);
     expect(F.outcomeBody(missingAmount.outcome_edit, 'maybe', '2026-11-20')).toBe(null);
   });
-  test('a 400 lists the allowed values in plain words', () => {
-    expect(F.errorText({ status: 400, data: { error: { details: { allowed: ['won', 'lost'] } } } })).toBe('That value is not allowed. Allowed values: won, lost.');
-    expect(F.errorText({ status: 400, data: { allowed_values: ['USD'] } })).toBe('That value is not allowed. Allowed values: USD.');
+  test('a 400 lists the allowed values per field from error.details.allowed', () => {
+    const err = { status: 400, data: { error: { message: 'Validation failed', code: 'VALIDATION_ERROR',
+      details: { problems: ['status must be one of won, lost'], allowed: { status: ['won', 'lost'] } } } } };
+    expect(F.errorText(err)).toBe('That value is not allowed. Allowed for status: won, lost.');
+    expect(F.errorText({ status: 400, data: { error: { code: 'VALIDATION_ERROR', details: { allowed: { status: ['won'], currency: ['USD', 'CAD'] } } } } }))
+      .toBe('That value is not allowed. Allowed for status: won. Allowed for currency: USD, CAD.');
+    expect(F.errorText({ status: 400, data: { error: { code: 'VALIDATION_ERROR', details: { problems: ['x'] } } } })).toBe('That value is not allowed.');
     expect(F.errorText({ status: 403 })).toBe('You don\'t have permission to fix this record.');
     expect(F.errorText({ status: 500 })).toBe('Could not save. Try again in a moment.');
   });
 });
 
 describe('after a save', () => {
-  test('the row updates in place from the record the server returns', () => {
+  const corrected = { field_key: 'monetaryValue', standard_key: 'amount', lana_value: 4500, correction_id: 'cor-1' };
+  test('the row updates in place from record.fields; corrected and conflict fields are objects', () => {
     const row = JSON.parse(JSON.stringify(missingAmount));
-    F.applyRecord(row, { record_id: 'cd-1', object: 'deal', amount: 4500, status: 'won', won_on: '2026-11-20', corrected_fields: ['amount'], conflict_fields: [] });
-    expect(row).toMatchObject({ amount: 4500, status: 'won', won_on: '2026-11-20', fixed_in_lana: { fields: ['amount'] } });
+    F.applyRecord(row, { record_id: 'cd-1', object: 'deal', fields: { amount: 4500, status: 'won', won_on: '2026-11-20' }, decided_on: '2026-11-20',
+      corrected_fields: [corrected], conflict_fields: [] });
+    expect(row).toMatchObject({ amount: 4500, status: 'won', won_on: '2026-11-20', decided_on: '2026-11-20', fixed_in_lana: { fields: [corrected] } });
     expect(row.edit.current_value).toBe(4500);
     expect(row.conflict).toBeUndefined();
   });
-  test('the refetch waits expected_within_seconds', () => {
-    expect(F.refreshDelayMs({ refresh: { queued: true, expected_within_seconds: 4 } })).toBe(4000);
-    expect(F.refreshDelayMs({})).toBe(5000);
+  test('a record still in conflict keeps its conflict from the response', () => {
+    const row = JSON.parse(JSON.stringify(missingAmount));
+    const field = { standard_key: 'amount', lana_value: 4500, new_source_value: 3000, correction_id: 'cor-1' };
+    F.applyRecord(row, { fields: { amount: 4500 }, corrected_fields: [field], conflict_fields: [field], conflict: { flag_annotation_id: 'f-2', source_name: 'ActionStep' } });
+    expect(row.conflict).toEqual({ flag_annotation_id: 'f-2', source_name: 'ActionStep', fields: [field] });
+  });
+  test('the refetch waits expected_within_seconds, and is skipped when nothing was queued', () => {
+    expect(F.refreshDelayMs({ refresh: { queued: true, expected_within_seconds: 21 } })).toBe(21000);
+    expect(F.refreshDelayMs({ refresh: { queued: false, expected_within_seconds: 21 } })).toBe(null);
+    expect(F.refreshDelayMs({})).toBe(null);
+    expect(F.savedText({ refresh: { queued: true, expected_within_seconds: 21 } })).toBe('Saved. Updating the numbers (about 20 seconds).');
+    expect(F.savedText({ refresh: { queued: true, expected_within_seconds: 3 } })).toBe('Saved. Updating the numbers (about 5 seconds).');
+    expect(F.savedText({ refresh: { queued: false } })).toBe('Saved.');
+  });
+  test('permissions: on the card under metadata.editable (or metadata), or on metric detail', () => {
+    const can = { can_correct: true, can_resolve_conflicts: false };
+    expect(F.permissionsOf({ metadata: { editable: { permissions: can } } })).toEqual(can);
+    expect(F.permissionsOf({ metadata: { permissions: can } })).toEqual(can);
+    expect(F.permissionsOf({ permissions: can })).toEqual(can);
+    expect(F.permissionsOf({ metadata: {} })).toBe(null);
   });
   test('conflict actions name the source', () => {
     expect(F.conflictLabels(conflicted)).toEqual({ keep: 'Keep LANA\'s value', use: 'Use ActionStep\'s value' });
     expect(F.conflictLabels({ conflict: {} })).toEqual({ keep: 'Keep LANA\'s value', use: 'Use the source\'s value' });
+    expect(F.conflictLabels({ source_name: 'Guess', conflict: {} }).use).toBe('Use the source\'s value');
   });
 });
 
@@ -91,14 +115,15 @@ describe('controls in the page', () => {
     w.eval(read('js/shared/data-fixes.js'));
     return w;
   }
-  const saved = { record: { record_id: 'cd-1', amount: 4500, corrected_fields: ['amount'], conflict_fields: [] }, refresh: { queued: true, expected_within_seconds: 3 } };
+  const saved = { record: { record_id: 'cd-1', object: 'deal', fields: { amount: 4500 }, corrected_fields: [{ standard_key: 'amount', correction_id: 'cor-1' }], conflict_fields: [] },
+    refresh: { queued: true, views: ['deals'], expected_within_seconds: 21, basis: 'renormalize' } };
 
   test('nothing renders without permission or an editable row', () => {
     expect(F.controlsHtml(missingAmount, { can_correct: false })).toBe('');
     expect(F.controlsHtml(Object.assign({}, missingAmount, { edit: Object.assign({}, missingAmount.edit, { editable: false }), outcome_edit: null }), can)).toBe('');
   });
 
-  test('inline amount: Save posts the fix, shows "Saved. Updating...", and reports the record', async () => {
+  test('inline amount: Save posts the fix, says how long the numbers take, and reports the record', async () => {
     const api = { createCorrection: jest.fn(() => Promise.resolve({ data: saved })) };
     const w = boot(api);
     const host = w.document.getElementById('host');
@@ -109,8 +134,8 @@ describe('controls in the page', () => {
     host.querySelector('[data-dfix-action="amount"]').click();
     await settle();
     expect(api.createCorrection).toHaveBeenCalledWith('cd-1', { fields: [{ standard_key: 'amount', value: 4500 }] });
-    expect(host.querySelector('[data-dfix-status]').textContent).toBe('Saved. Updating...');
-    expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ dataId: 'cd-1', record: saved.record, delayMs: 3000 }));
+    expect(host.querySelector('[data-dfix-status]').textContent).toBe('Saved. Updating the numbers (about 20 seconds).');
+    expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ dataId: 'cd-1', record: saved.record, delayMs: 21000 }));
   });
 
   test('Mark as won needs a day, then sends one POST with the outcome', async () => {
@@ -126,11 +151,12 @@ describe('controls in the page', () => {
     host.querySelector('[data-dfix-input="decided_on"]').value = '2026-11-20';
     host.querySelector('[data-dfix-action="won"]').click();
     await settle();
-    expect(api.createCorrection).toHaveBeenCalledWith('cd-1', { fields: [], outcome: { status: 'won', decided_on: '2026-11-20' } });
+    expect(api.createCorrection).toHaveBeenCalledWith('cd-1', { outcome: { status: 'won', decided_on: '2026-11-20' } });
   });
 
   test('a 400 shows the allowed values', async () => {
-    const api = { createCorrection: jest.fn(() => Promise.reject(Object.assign(new Error('x'), { status: 400, data: { error: { details: { allowed: ['won', 'lost'] } } } }))) };
+    const api = { createCorrection: jest.fn(() => Promise.reject(Object.assign(new Error('x'), { status: 400,
+      data: { error: { message: 'Validation failed', code: 'VALIDATION_ERROR', details: { problems: ['bad status'], allowed: { status: ['won', 'lost'] } } } } }))) };
     const w = boot(api);
     const host = w.document.getElementById('host');
     host.innerHTML = F.controlsHtml(missingAmount, can);
@@ -138,7 +164,7 @@ describe('controls in the page', () => {
     host.querySelector('[data-dfix-input="amount"]').value = '10';
     host.querySelector('[data-dfix-action="amount"]').click();
     await settle();
-    expect(host.querySelector('[data-dfix-status]').textContent).toBe('That value is not allowed. Allowed values: won, lost.');
+    expect(host.querySelector('[data-dfix-status]').textContent).toBe('That value is not allowed. Allowed for status: won, lost.');
   });
 
   test('a conflict shows both values; using the source asks first, keeping LANA does not', async () => {
@@ -157,8 +183,8 @@ describe('controls in the page', () => {
     expect(api.resolveConflict).toHaveBeenCalledWith('cd-2', 'f-9', 'lana');
   });
 
-  test('a fix already in LANA can be changed (PUT) or undone (DELETE, after confirming)', async () => {
-    const row = Object.assign({}, missingAmount, { fixed_in_lana: { fields: ['amount'], annotation_id: 'a-5' } });
+  test('a fix already in LANA can be changed (PUT) or undone (DELETE, after confirming), by the field\'s correction_id', async () => {
+    const row = Object.assign({}, missingAmount, { fixed_in_lana: { fields: [{ field_key: 'monetaryValue', standard_key: 'amount', lana_value: 4000, correction_id: 'cor-5' }] } });
     const api = { updateCorrection: jest.fn(() => Promise.resolve({ data: saved })), deleteCorrection: jest.fn(() => Promise.resolve({ data: saved })) };
     const w = boot(api, true);
     const host = w.document.getElementById('host');
@@ -167,11 +193,11 @@ describe('controls in the page', () => {
     host.querySelector('[data-dfix-input="amount"]').value = '5000';
     host.querySelector('[data-dfix-action="amount"]').click();
     await settle();
-    expect(api.updateCorrection).toHaveBeenCalledWith('cd-1', 'a-5', { fields: [{ standard_key: 'amount', value: 5000 }] });
+    expect(api.updateCorrection).toHaveBeenCalledWith('cd-1', 'cor-5', { fields: [{ standard_key: 'amount', value: 5000 }] });
     host.querySelector('[data-dfix-action="undo"]').click();
     await settle();
     expect(w.Lex.Modal.confirmAsync).toHaveBeenCalled();
-    expect(api.deleteCorrection).toHaveBeenCalledWith('cd-1', 'a-5');
+    expect(api.deleteCorrection).toHaveBeenCalledWith('cd-1', 'cor-5');
   });
 });
 

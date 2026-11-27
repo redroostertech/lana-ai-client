@@ -71,3 +71,10 @@ test('pages wire fixes: worklists and the metric detail table bind DataFixes and
   expect(read('js/admin/metric-detail.js')).toContain('DataFixes.bind(table, { onSaved: onFixSaved })');
   expect(read('js/admin/metric-detail.js')).toContain('loadMetricDetail(); }, info.delayMs)');
 });
+
+test('a fix with nothing queued does not refetch; permissions come from DataFixes.permissionsOf', () => {
+  expect(read('js/admin/dashboard-detail.js')).toContain('if (info.delayMs !== null && info.delayMs !== undefined) scheduleRefresh(info.delayMs);');
+  expect(read('js/admin/dashboard-detail.js')).toContain('window.DataFixes.permissionsOf(metric)');
+  expect(read('js/admin/metric-detail.js')).toContain('window.DataFixes.permissionsOf(payload)');
+  expect(read('js/admin/metric-detail.js')).toContain('if (info.delayMs === null || info.delayMs === undefined) return;');
+});

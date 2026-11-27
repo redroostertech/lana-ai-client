@@ -5,16 +5,19 @@
    Driven only by the row's hints, never by the card:
      row.edit         { record_id, field_key, standard_key, current_value, editable }
      row.outcome_edit { status, decided_on, allowed }
-     row.conflict     { flag_annotation_id, fields: [{ field_key, standard_key, lana_value, new_source_value, ... }] }
-     row.fixed_in_lana { fields, annotation_id }
+     row.conflict     { flag_annotation_id, source_name, fields: [{ field_key, standard_key, lana_value, new_source_value, correction_id, ... }] }
+     row.fixed_in_lana { fields: [{ field_key, standard_key, correction_id, ... }] }
    and the signed-in person's permissions { can_correct, can_resolve_conflicts }
    from the card or metric detail response. Amount and outcome controls need
    can_correct and an editable row; conflict actions need can_resolve_conflicts.
 
    API (api.js): createCorrection, updateCorrection, deleteCorrection,
-   resolveConflict. Responses carry { record, refresh: { queued,
-   expected_within_seconds } }: the row updates in place right away and the
-   page refetches after that many seconds (onSaved).
+   resolveConflict. Responses carry { record: { record_id, object, fields,
+   decided_on, corrected_fields, conflict_fields, conflict? }, refresh:
+   { queued, views, expected_within_seconds, basis } }: the row updates in
+   place from record.fields right away and, when refresh.queued, the page
+   refetches after expected_within_seconds (onSaved). A change or undo uses
+   the field's correction_id.
 
    Usage: DataFixes.controlsHtml(row, permissions) in a row, then
    DataFixes.bind(container, { onSaved(info) }) once per container.
@@ -27,7 +30,6 @@
   'use strict';
 
   var OUTCOMES = { won: 'Mark as won', lost: 'Mark as lost' };
-  var DEFAULT_REFRESH_MS = 5000;
 
   function escapeHtml(value) {
     return String(value === null || value === undefined ? '' : value)
@@ -85,25 +87,28 @@
     return isFinite(Date.parse(t + 'T00:00:00Z'));
   }
 
+  // Outcome only: { outcome: { status, decided_on } }.
   function outcomeBody(outcomeEdit, status, day) {
     var allowed = outcomeEdit && Array.isArray(outcomeEdit.allowed) ? outcomeEdit.allowed : [];
     if (allowed.indexOf(status) === -1 || !isPlainDay(day)) return null;
-    return { fields: [], outcome: { status: status, decided_on: str(day) } };
+    return { outcome: { status: status, decided_on: str(day) } };
   }
 
-  function allowedValues(err) {
+  // 400: { error: { message, code: 'VALIDATION_ERROR', details: { problems, allowed: { field: [values] } } } }
+  function allowedText(err) {
     var data = (err && err.data) || {};
-    var nested = data.error && typeof data.error === 'object' ? data.error : {};
-    var details = nested.details || data.details || {};
-    var list = details.allowed || details.allowed_values || nested.allowed || nested.allowed_values || data.allowed || data.allowed_values;
-    return Array.isArray(list) ? list.map(str).filter(Boolean) : [];
+    var details = data.error && data.error.details && typeof data.error.details === 'object' ? data.error.details : {};
+    var allowed = details.allowed && typeof details.allowed === 'object' ? details.allowed : {};
+    return Object.keys(allowed).filter(function (field) { return Array.isArray(allowed[field]) && allowed[field].length; }).map(function (field) {
+      return 'Allowed for ' + field.split('_').join(' ') + ': ' + allowed[field].map(str).join(', ') + '.';
+    }).join(' ');
   }
 
   function errorText(err) {
     var status = err && (err.status || (err.response && err.response.status));
     if (status === 400) {
-      var allowed = allowedValues(err);
-      return allowed.length ? 'That value is not allowed. Allowed values: ' + allowed.join(', ') + '.' : 'That value is not allowed.';
+      var allowed = allowedText(err);
+      return allowed ? 'That value is not allowed. ' + allowed : 'That value is not allowed.';
     }
     if (status === 403) return 'You don\'t have permission to fix this record.';
     if (status === 404) return 'This record was not found. It may have been removed.';
@@ -112,34 +117,67 @@
   }
 
   // ── After a save ────────────────────────────────────────────────────
-  var RECORD_SKIP = { record_id: true, object: true, corrected_fields: true, conflict_fields: true };
-
-  /** Update a row in place from the server's record (effective fields). */
+  /** Update a row in place from the server's record: record.fields, decided_on, corrected and conflict fields. */
   function applyRecord(row, record) {
     if (!row || !record || typeof record !== 'object') return row;
-    Object.keys(record).forEach(function (key) {
-      if (!RECORD_SKIP[key] && (record[key] === null || typeof record[key] !== 'object')) row[key] = record[key];
+    var fields = record.fields && typeof record.fields === 'object' ? record.fields : {};
+    Object.keys(fields).forEach(function (key) {
+      if (fields[key] === null || typeof fields[key] !== 'object') row[key] = fields[key];
     });
-    if (row.edit && row.edit.standard_key && Object.prototype.hasOwnProperty.call(record, row.edit.standard_key)) {
-      row.edit.current_value = record[row.edit.standard_key];
+    if (record.decided_on !== undefined) row.decided_on = record.decided_on;
+    if (row.edit && row.edit.standard_key && Object.prototype.hasOwnProperty.call(fields, row.edit.standard_key)) {
+      row.edit.current_value = fields[row.edit.standard_key];
     }
     if (Array.isArray(record.corrected_fields)) {
-      if (record.corrected_fields.length) row.fixed_in_lana = Object.assign({}, row.fixed_in_lana || {}, { fields: record.corrected_fields.slice() });
+      if (record.corrected_fields.length) row.fixed_in_lana = { fields: record.corrected_fields.slice() };
       else delete row.fixed_in_lana;
     }
-    if (Array.isArray(record.conflict_fields) && !record.conflict_fields.length) delete row.conflict;
+    if (Array.isArray(record.conflict_fields)) {
+      if (!record.conflict_fields.length) delete row.conflict;
+      else row.conflict = Object.assign({}, row.conflict || {}, record.conflict || {}, { fields: record.conflict_fields.slice() });
+    }
     return row;
   }
 
+  // Milliseconds until the refetch, or null when nothing was queued.
   function refreshDelayMs(response) {
-    var seconds = response && response.refresh ? Number(response.refresh.expected_within_seconds) : NaN;
-    return isFinite(seconds) && seconds >= 0 ? Math.round(seconds * 1000) : DEFAULT_REFRESH_MS;
+    var refresh = response && response.refresh;
+    if (!refresh || refresh.queued !== true) return null;
+    var seconds = Number(refresh.expected_within_seconds);
+    return isFinite(seconds) && seconds >= 0 ? Math.round(seconds * 1000) : 0;
+  }
+
+  function savedText(response) {
+    var refresh = response && response.refresh;
+    if (!refresh || refresh.queued !== true) return 'Saved.';
+    var seconds = Number(refresh.expected_within_seconds);
+    if (!isFinite(seconds) || seconds <= 0) return 'Saved. Updating the numbers.';
+    return 'Saved. Updating the numbers (about ' + Math.max(5, Math.round(seconds / 5) * 5) + ' seconds).';
+  }
+
+  // Who may fix: on editable cards under metadata.editable.permissions (or
+  // metadata.permissions), on metric detail at the top level.
+  function permissionsOf(item) {
+    if (!item || typeof item !== 'object') return null;
+    var meta = item.metadata && typeof item.metadata === 'object' ? item.metadata : {};
+    var editable = meta.editable && typeof meta.editable === 'object' ? meta.editable : {};
+    var found = editable.permissions || meta.permissions || item.permissions;
+    return found && typeof found === 'object' ? found : null;
+  }
+
+  // The fix on this field already in LANA (fixed_in_lana.fields), for PUT and DELETE.
+  function correctionIdFor(row, edit) {
+    var fields = row && row.fixed_in_lana && Array.isArray(row.fixed_in_lana.fields) ? row.fixed_in_lana.fields : [];
+    var match = fields.filter(function (f) {
+      return f && typeof f === 'object' && f.correction_id && edit
+        && ((edit.standard_key && f.standard_key === edit.standard_key) || (edit.field_key && f.field_key === edit.field_key));
+    })[0];
+    return match ? str(match.correction_id) : '';
   }
 
   function sourceName(row) {
-    var r = row || {};
-    var c = r.conflict || {};
-    return str(c.source_name || c.connector_name || r.source_name || r.connector_name);
+    var c = (row && row.conflict) || {};
+    return str(c.source_name);
   }
 
   function conflictLabels(row) {
@@ -176,7 +214,6 @@
     var r = row || {};
     var edit = r.edit && typeof r.edit === 'object' ? r.edit : null;
     var outcome = r.outcome_edit && typeof r.outcome_edit === 'object' ? r.outcome_edit : null;
-    var fixed = r.fixed_in_lana && typeof r.fixed_in_lana === 'object' ? r.fixed_in_lana : null;
     var parts = [];
     var mayCorrect = canCorrect(permissions, edit);
     if (mayCorrect) {
@@ -188,7 +225,7 @@
         parts.push('<div class="dfix__line"><lex-input size="sm" type="date" data-dfix-input="decided_on" aria-label="Day it was decided" value="'
           + escapeHtml(str(outcome.decided_on)) + '"></lex-input>' + allowed.map(function (s) { return btn(s, OUTCOMES[s]); }).join('') + '</div>');
       }
-      if (fixed && fixed.annotation_id) parts.push('<div class="dfix__line">' + btn('undo', 'Undo fix', 'ghost') + '</div>');
+      if (correctionIdFor(r, edit)) parts.push('<div class="dfix__line">' + btn('undo', 'Undo fix', 'ghost') + '</div>');
     }
     if (canResolve(permissions, r.conflict)) {
       var labels = conflictLabels(r);
@@ -201,7 +238,7 @@
       + (edit && edit.standard_key ? ' data-dfix-standard="' + escapeHtml(edit.standard_key) + '"' : '')
       + (edit && edit.field_key ? ' data-dfix-field="' + escapeHtml(edit.field_key) + '"' : '')
       + (outcome && Array.isArray(outcome.allowed) ? ' data-dfix-allowed="' + escapeHtml(outcome.allowed.join(',')) + '"' : '')
-      + (fixed && fixed.annotation_id ? ' data-dfix-annotation="' + escapeHtml(fixed.annotation_id) + '"' : '')
+      + (correctionIdFor(r, edit) ? ' data-dfix-correction="' + escapeHtml(correctionIdFor(r, edit)) + '"' : '')
       + (r.conflict && r.conflict.flag_annotation_id ? ' data-dfix-flag="' + escapeHtml(r.conflict.flag_annotation_id) + '"' : '')
       + '>' + parts.join('') + '<p class="dfix__status" data-dfix-status role="status" aria-live="polite"></p></div>';
   }
@@ -245,7 +282,7 @@
   function run(box, action, opts) {
     var api = root.api || {};
     var dataId = box.getAttribute('data-dfix-id');
-    var annotation = box.getAttribute('data-dfix-annotation');
+    var correction = box.getAttribute('data-dfix-correction');
     var flag = box.getAttribute('data-dfix-flag');
     var edit = { standard_key: box.getAttribute('data-dfix-standard'), field_key: box.getAttribute('data-dfix-field') };
     var allowed = (box.getAttribute('data-dfix-allowed') || '').split(',').filter(Boolean);
@@ -255,16 +292,16 @@
     if (action === 'amount') {
       var body = amountBody(edit, inputValue(box, 'amount'));
       if (!body) { setStatus(box, 'Type an amount, like 4500.'); return; }
-      call = function () { return annotation ? api.updateCorrection(dataId, annotation, body) : api.createCorrection(dataId, body); };
+      call = function () { return correction ? api.updateCorrection(dataId, correction, body) : api.createCorrection(dataId, body); };
     } else if (action === 'won' || action === 'lost') {
       var day = inputValue(box, 'decided_on');
       if (!isPlainDay(day)) { setStatus(box, 'Pick the day it was decided.'); return; }
       var outcomeBodyValue = outcomeBody({ allowed: allowed }, action, day);
       if (!outcomeBodyValue) { setStatus(box, 'That outcome is not allowed here.'); return; }
       call = function () { return api.createCorrection(dataId, outcomeBodyValue); };
-    } else if (action === 'undo' && annotation) {
+    } else if (action === 'undo' && correction) {
       ask = ['Undo this fix?', 'LANA will show the value from your connected system again.'];
-      call = function () { return api.deleteCorrection(dataId, annotation); };
+      call = function () { return api.deleteCorrection(dataId, correction); };
     } else if (action === 'keep-lana' && flag) {
       call = function () { return api.resolveConflict(dataId, flag, 'lana'); };
     } else if (action === 'use-source' && flag) {
@@ -278,9 +315,9 @@
       setStatus(box, 'Saving...');
       return call().then(function (response) {
         var result = unwrap(response) || {};
-        setStatus(box, 'Saved. Updating...');
+        setStatus(box, savedText(result));
         if (typeof opts.onSaved === 'function') {
-          opts.onSaved({ dataId: dataId, action: action, record: result.record || null, delayMs: refreshDelayMs(result), box: box });
+          opts.onSaved({ dataId: dataId, action: action, record: result.record || null, delayMs: refreshDelayMs(result), text: savedText(result), box: box });
         }
       }, function (err) {
         setStatus(box, errorText(err));
@@ -298,6 +335,8 @@
     errorText: errorText,
     applyRecord: applyRecord,
     refreshDelayMs: refreshDelayMs,
+    savedText: savedText,
+    permissionsOf: permissionsOf,
     conflictLabels: conflictLabels,
     controlsHtml: controlsHtml,
     bind: bind,
