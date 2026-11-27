@@ -24,8 +24,11 @@
   var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   var LABELS = {
     matter_name: 'Matter', client_name: 'Client', status: 'Status', stage: 'Stage', opened_at: 'Opened', closed_at: 'Closed',
-    days: 'Days in stage', due_date: 'Due', amount: 'Amount', created_at: 'Created', updated_at: 'Updated',
+    days: 'Days in stage', due_date: 'Due', amount: 'Amount', created_at: 'Created', updated_at: 'Updated', row_date: 'Date',
   };
+  // Row fields the server sends to describe a row, not to show as columns:
+  // they go in the Notes column (or open the record panel).
+  var ROW_NOTE_KEYS = ['row_reason', 'conflict', 'fixed_in_lana', 'refs', 'edit', 'outcome_edit'];
   var LINK_IDS = ['workspace_id', 'matter_id'];
 
   function endsWith(text, tail) {
@@ -152,7 +155,9 @@
   // Up to n columns for a short list: names, then dates, then amounts, then
   // the rest. Columns the server chose are kept as they are, all of them.
   function worklistColumns(columns, n) {
-    if (columns && columns.length && columns[0].fromServer) return columns;
+    // The Notes column belongs to the full records table, not a short list.
+    columns = (columns || []).filter(function (col) { return col.type !== 'notes'; });
+    if (columns.length && columns[0].fromServer) return columns;
     function rank(col) {
       var k = col.key.toLowerCase();
       if (k === 'name' || k.slice(-5) === '_name') return 0;
@@ -207,11 +212,13 @@
     var keys = [];
     list.forEach(function (row) { Object.keys(row).forEach(function (key) { if (keys.indexOf(key) === -1) keys.push(key); }); });
     var columns = Array.isArray(rowColumns) && rowColumns.length ? serverColumns(rowColumns, list) : keys.filter(function (key) {
-      return !isInternal(key, list) && list.some(function (row) { return !isEmpty(row[key]); });
+      return ROW_NOTE_KEYS.indexOf(key) === -1 && !isInternal(key, list) && list.some(function (row) { return !isEmpty(row[key]); });
     }).map(function (key) {
       var type = typeOf(key, list);
       return { key: key, label: labelFor(key), type: type, align: type === 'money' || type === 'number' ? 'right' : 'left' };
     });
+    // The row's reason, conflict and "Fixed in LANA" mark in one Notes column.
+    if (list.some(hasNotes)) columns = columns.concat([{ key: '_notes', label: 'Notes', type: 'notes', align: 'left', fromServer: columns.length && columns[0].fromServer }]);
     return {
       columns: columns,
       rows: list.map(function (row, index) {
@@ -224,6 +231,70 @@
         };
       }),
     };
+  }
+
+  function hasNotes(row) {
+    return !!(row && ((typeof row.row_reason === 'string' && row.row_reason.trim()) || (row.conflict && typeof row.conflict === 'object')
+      || (row.fixed_in_lana && typeof row.fixed_in_lana === 'object')));
+  }
+
+  function fieldLabel(field) {
+    var key = (field && (field.standard_key || field.field_key)) || '';
+    return LABELS[key] || words(key);
+  }
+
+  function fieldValue(field, value) {
+    if (isEmpty(value)) return '';
+    var key = String((field && (field.standard_key || field.field_key)) || '');
+    if (key === 'amount' || key.indexOf('value') !== -1 || key.indexOf('amount') !== -1) return cellText(value, 'money', key) || String(value);
+    if (isDateKey(key) || key.indexOf('date') !== -1 || key.slice(-3) === '_on') return cellText(value, 'date', key) || String(value);
+    return typeof value === 'object' ? '' : String(value);
+  }
+
+  /** The Notes for one row: { reason, conflict: { fields: [{ label, lana, source, previous }] } | null, fixed: [labels] | null }. */
+  function rowNotes(row) {
+    var r = row || {};
+    var conflict = r.conflict && typeof r.conflict === 'object' && Array.isArray(r.conflict.fields)
+      ? { fields: r.conflict.fields.filter(function (f) { return f && typeof f === 'object'; }).map(function (f) {
+        var out = { label: fieldLabel(f), lana: fieldValue(f, f.lana_value), source: fieldValue(f, f.new_source_value) };
+        if (!isEmpty(f.previous_source_value)) out.previous = fieldValue(f, f.previous_source_value);
+        return out;
+      }) }
+      : null;
+    var fixedFields = r.fixed_in_lana && typeof r.fixed_in_lana === 'object' && Array.isArray(r.fixed_in_lana.fields) ? r.fixed_in_lana.fields : null;
+    return {
+      reason: typeof r.row_reason === 'string' ? r.row_reason.trim() : '',
+      conflict: conflict,
+      fixed: fixedFields ? fixedFields.map(function (f) { return typeof f === 'object' ? fieldLabel(f) : (LABELS[f] || words(f)); }) : null,
+    };
+  }
+
+  /** The server sorts rows (newest first, conflicts pinned on top) when they carry row_date or conflicts. */
+  function keepsServerOrder(rows) {
+    return (Array.isArray(rows) ? rows : []).some(function (row) { return row && (!isEmpty(row.row_date) || (row.conflict && typeof row.conflict === 'object')); });
+  }
+
+  function plural(n, one, many) {
+    return Number(n).toLocaleString('en-US') + ' ' + (Number(n) === 1 ? one : many);
+  }
+
+  /** The records header: { asOf: 'As of Nov 24, 2026', basis: rows_basis.label, conflicts: summary } ('' when absent). */
+  function recordsHeader(payload) {
+    var p = payload || {};
+    var raw = p.raw_data || {};
+    var asOf = !isEmpty(p.as_of) ? cellText(String(p.as_of).substring(0, 10), 'date', 'as_of') : '';
+    var basis = raw.rows_basis && typeof raw.rows_basis === 'object' && raw.rows_basis.label ? String(raw.rows_basis.label) : '';
+    var conflicts = '';
+    var c = raw.conflicts && typeof raw.conflicts === 'object' ? raw.conflicts : null;
+    if (c && Number(c.count) > 0) {
+      conflicts = c.message ? String(c.message).trim()
+        : (Number(c.count) === 1 ? '1 record disagrees with its source.' : plural(c.count, 'record', 'records') + ' disagree with their source.');
+      var pinned = Number(raw.pinned_count !== undefined ? raw.pinned_count : c.pinned_count) || 0;
+      var corrected = Number(raw.corrected_count !== undefined ? raw.corrected_count : c.corrected_count) || 0;
+      if (pinned > 0) conflicts += ' ' + Number(pinned).toLocaleString('en-US') + ' shown first.';
+      if (corrected > 0) conflicts += ' ' + Number(corrected).toLocaleString('en-US') + ' fixed in LANA.';
+    }
+    return { asOf: asOf ? 'As of ' + asOf : '', basis: basis, conflicts: conflicts };
   }
 
   function toNumber(value) {
@@ -367,6 +438,9 @@
     recordsTable: recordsTable,
     formatValue: formatValue,
     summary: summary,
+    rowNotes: rowNotes,
+    keepsServerOrder: keepsServerOrder,
+    recordsHeader: recordsHeader,
     periodText: periodText,
     isUuid: isUuid,
     rowsStatus: rowsStatus,

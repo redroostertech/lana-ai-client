@@ -4127,3 +4127,49 @@ button.dash-lines__label:hover,
   font-size: 0.8125rem;
   color: var(--lex-text-tertiary);
 }
+
+/* Metric detail records: the Notes cell (reason, conflict, fixed mark) and
+   the conflicts summary above the table. */
+.metric-record-notes {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+  white-space: normal;
+}
+
+.metric-record-reason,
+.metric-record-conflict {
+  color: var(--lex-text-secondary);
+  font-size: 0.8125rem;
+}
+
+.metric-record-badge {
+  padding: 0 0.4375rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.metric-record-badge--conflict {
+  background: var(--lex-status-warning-bg, var(--lex-bg-secondary));
+  color: var(--lex-status-warning-text, var(--lex-text-primary));
+}
+
+.metric-record-badge--fixed {
+  background: var(--lex-bg-secondary);
+  color: var(--lex-text-secondary);
+}
+
+.metric-record-conflicts {
+  margin: 0.75rem 0 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--lex-radius-md, 8px);
+  background: var(--lex-bg-secondary);
+  color: var(--lex-text-primary);
+  font-size: 0.8125rem;
+}
+
+.metric-record-conflicts[hidden] {
+  display: none;
+}

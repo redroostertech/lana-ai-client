@@ -275,3 +275,23 @@ test('metric detail shows metadata.second_line as a muted line under the value',
   const none = await page('?metric_key=matters_opened', payload);
   expect(none.nodes.metricSummarySecondLine.hidden).toBe(true);
 });
+
+describe('records table: notes, header and server order', () => {
+  const rows = [{ record_id: 'r-1', row_date: '2026-11-20', row_reason: 'Won on Nov 20 with no amount.', client_name: 'Jordan Smith', amount: null,
+    conflict: { fields: [{ standard_key: 'amount', lana_value: 4500, new_source_value: 3000 }] } }];
+  test('the Notes column shows the reason, a conflict badge with both values, and the fixed mark', async () => {
+    const p = await page('?metric_key=matters_opened', { ...payload, as_of: '2026-11-24', raw_data: { rows, rows_basis: { label: 'Deals won between Nov 1 and Nov 30, 2026' },
+      conflicts: { count: 1, message: '1 record disagrees with what your CRM says now.' }, pinned_count: 1, corrected_count: 0 } });
+    const table = p.nodes.metricRawDataTable;
+    expect(table.attrs.columns).toBe('row_date,client_name,_notes');
+    const notes = table.renderers._notes(null, rows[0]);
+    expect(notes).toContain('Won on Nov 20 with no amount.');
+    expect(notes).toContain('<span class="metric-record-badge metric-record-badge--conflict">Conflict</span>');
+    expect(notes).toContain('Amount: LANA $4,500, source $3,000');
+    expect(table.renderers._notes(null, { fixed_in_lana: { fields: ['amount'] } })).toContain('<span class="metric-record-badge metric-record-badge--fixed">Fixed in LANA</span>');
+    expect(p.nodes.metricRawDataAsOf.textContent).toBe('As of Nov 24, 2026');
+    expect(p.nodes.metricRawDataBasis.textContent).toBe('Deals won between Nov 1 and Nov 30, 2026');
+    expect(p.nodes.metricRawDataConflicts.hidden).toBe(false);
+    expect(p.nodes.metricRawDataConflicts.textContent).toBe('1 record disagrees with what your CRM says now. 1 shown first.');
+  });
+});

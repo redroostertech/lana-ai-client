@@ -129,9 +129,29 @@
   // row carries one (js/shared/metric-detail-view.js).
   var MUTED_DASH = '<span class="metric-detail-muted">-</span>';
 
+  // The Notes cell: the row's reason, a conflict badge with both values,
+  // and a "Fixed in LANA" mark (MetricDetailView.rowNotes).
+  function notesHtml(row) {
+    var notes = view().rowNotes(row);
+    var parts = [];
+    if (notes.conflict) {
+      parts.push('<span class="metric-record-badge metric-record-badge--conflict">Conflict</span> '
+        + notes.conflict.fields.map(function (f) {
+          return '<span class="metric-record-conflict">' + escapeHtml(f.label + ': LANA ' + (f.lana || 'blank') + ', source ' + (f.source || 'blank')) + '</span>';
+        }).join(' '));
+    }
+    if (notes.fixed) parts.push('<span class="metric-record-badge metric-record-badge--fixed">Fixed in LANA</span>');
+    if (notes.reason) parts.push('<span class="metric-record-reason">' + escapeHtml(notes.reason) + '</span>');
+    return parts.length ? '<span class="metric-record-notes">' + parts.join(' ') + '</span>' : MUTED_DASH;
+  }
+
   function recordRenderers(columns) {
     var renderers = {};
     columns.forEach(function (col) {
+      if (col.type === 'notes') {
+        renderers[col.key] = function (value, row) { return notesHtml(row); };
+        return;
+      }
       renderers[col.key] = function (value, row) {
         var text = view().formatCell(value, col);
         if (text === null) return MUTED_DASH;
@@ -203,9 +223,12 @@
       if (range) filterMap[col.key] = range;
     });
     table.setColumnFilterOptions(filterMap);
-    var sortOptions = model.columns.map(function (col) { return { value: col.key, label: col.label }; });
+    var sortOptions = model.columns.filter(function (col) { return col.type !== 'notes'; }).map(function (col) { return { value: col.key, label: col.label }; });
     var firstDate = model.columns.filter(function (c) { return c.type === 'date' || c.type === 'datetime'; })[0];
-    var defaultSort = firstDate ? firstDate.key : (model.columns[0] ? model.columns[0].key : '');
+    // Rows the server already sorted (newest first, conflicts pinned on top)
+    // keep its order.
+    var serverOrder = view().keepsServerOrder(sourceRows);
+    var defaultSort = serverOrder ? '' : (firstDate ? firstDate.key : (model.columns[0] ? model.columns[0].key : ''));
     var defaultDir = firstDate ? 'desc' : 'asc';
     setSelectOptions('metricRawDataSort', sortOptions, defaultSort);
     var order = el('metricRawDataSortOrder');
@@ -460,6 +483,18 @@
     if (status && total) total.hidden = true;
   }
 
+  // Above the records: "As of <day>", the server's basis label, and the
+  // conflicts summary (MetricDetailView.recordsHeader).
+  function renderRecordsHeader(payload) {
+    var header = view().recordsHeader(payload);
+    [['metricRawDataAsOf', header.asOf], ['metricRawDataBasis', header.basis], ['metricRawDataConflicts', header.conflicts]].forEach(function (pair) {
+      var node = el(pair[0]);
+      if (!node) return;
+      node.textContent = pair[1];
+      node.hidden = !pair[1];
+    });
+  }
+
   function renderRawDataTotal(rawData) {
     var note = el('metricRawDataTotalNote');
     if (!note) return;
@@ -574,6 +609,7 @@
       var rowsStatus = view().rowsStatus(payload.raw_data);
       renderRowsStatus(rowsStatus);
       if (!rowsStatus) {
+        renderRecordsHeader(payload);
         renderRawData(payload.raw_data && payload.raw_data.rows ? payload.raw_data.rows : [], payload.row_columns);
         renderRawDataTotal(payload.raw_data);
       }

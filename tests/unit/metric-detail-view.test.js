@@ -258,3 +258,49 @@ test('summary: comparison_hidden is read from the top level only', () => {
   const hidden = { reason: 'source_stale', message: 'No comparison while the source is behind.' };
   expect(V.summary({ current: { value: 12, comparison_hidden: hidden } }).hiddenText).toBeFalsy();
 });
+
+describe('metric detail records: reasons, dates, conflicts and fixes', () => {
+  const conflictRow = {
+    record_id: 'r-1', row_date: '2026-11-20', row_reason: 'Won on Nov 20 with no amount.', client_name: 'Jordan Smith', amount: null,
+    refs: [{ object: 'deal', id: 'd-1' }],
+    conflict: { flag_annotation_id: 'f-1', detected_at: '2026-11-21T10:00:00Z', fields: [{ field_key: 'monetaryValue', standard_key: 'amount',
+      lana_value: 4500, previous_source_value: 4500, new_source_value: 3000, source_changed_at: '2026-11-21T09:00:00Z' }] },
+  };
+  const fixedRow = { record_id: 'r-2', row_date: '2026-11-18', row_reason: 'Won on Nov 18.', client_name: 'Casey Lee', amount: 2000, fixed_in_lana: { fields: ['amount'] } };
+
+  test('row_reason, conflict, fixed_in_lana and refs are not columns; a Notes column is added; row_date reads as Date', () => {
+    const t = V.recordsTable([conflictRow, fixedRow]);
+    expect(t.columns.map((c) => c.key)).toEqual(['row_date', 'client_name', 'amount', '_notes']);
+    expect(t.columns.find((c) => c.key === 'row_date').label).toBe('Date');
+    expect(t.columns[3]).toMatchObject({ key: '_notes', label: 'Notes', type: 'notes' });
+  });
+
+  test('server columns get the Notes column too, and no Notes without reasons', () => {
+    expect(V.recordsTable([conflictRow], [{ field: 'client_name', header: 'Client' }]).columns.map((c) => c.key)).toEqual(['client_name', '_notes']);
+    expect(V.recordsTable([{ client_name: 'A' }]).columns.map((c) => c.key)).toEqual(['client_name']);
+  });
+
+  test('rowNotes: the reason, the conflict with both values, and the fixed mark', () => {
+    expect(V.rowNotes(conflictRow)).toEqual({
+      reason: 'Won on Nov 20 with no amount.',
+      conflict: { fields: [{ label: 'Amount', lana: '$4,500', source: '$3,000', previous: '$4,500' }] },
+      fixed: null,
+    });
+    expect(V.rowNotes(fixedRow)).toEqual({ reason: 'Won on Nov 18.', conflict: null, fixed: ['Amount'] });
+    expect(V.rowNotes({ a: 1 })).toEqual({ reason: '', conflict: null, fixed: null });
+  });
+
+  test('the server order is kept when rows carry row_date or conflicts', () => {
+    expect(V.keepsServerOrder([conflictRow, fixedRow])).toBe(true);
+    expect(V.keepsServerOrder([{ client_name: 'A', due_date: '2026-01-01' }])).toBe(false);
+  });
+
+  test('records header: as of, the basis label and the conflicts summary', () => {
+    const payload = { as_of: '2026-11-24T08:00:00Z', raw_data: { rows: [], rows_basis: { basis: 'won_on', as_of: '2026-11-24', start_date: '2026-11-01', end_date: '2026-11-30', label: 'Deals won between Nov 1 and Nov 30, 2026' },
+      conflicts: { count: 3, message: '3 records disagree with what your CRM says now.' }, pinned_count: 3, corrected_count: 1 } };
+    expect(V.recordsHeader(payload)).toEqual({ asOf: 'As of Nov 24, 2026', basis: 'Deals won between Nov 1 and Nov 30, 2026',
+      conflicts: '3 records disagree with what your CRM says now. 3 shown first. 1 fixed in LANA.' });
+    expect(V.recordsHeader({ raw_data: { rows: [] } })).toEqual({ asOf: '', basis: '', conflicts: '' });
+    expect(V.recordsHeader({ raw_data: { conflicts: { count: 1 } } }).conflicts).toBe('1 record disagrees with its source.');
+  });
+});
