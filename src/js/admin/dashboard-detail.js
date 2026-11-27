@@ -1469,6 +1469,16 @@
     return '<table class="dash-worklist__table"><thead>' + head + '</thead><tbody>' + body + '</tbody></table>';
   }
 
+  // A card's preview rows: metadata.top (Deals Missing an Amount) or
+  // metadata.rows (Data Conflicts), or null.
+  function cardPreviewRows(metric) {
+    var meta = metric && metric.metadata && typeof metric.metadata === 'object' ? metric.metadata : null;
+    if (!meta) return null;
+    if (Array.isArray(meta.top) && meta.top.length) return meta.top;
+    if (Array.isArray(meta.rows) && meta.rows.length) return meta.rows;
+    return null;
+  }
+
   function worklistRowFor(el) {
     var slot = el && el.closest ? el.closest('[data-worklist-key]') : null;
     var index = el ? Number(el.getAttribute('data-row-index')) : NaN;
@@ -1580,7 +1590,10 @@
         // The card's own row_columns answer first; metric detail's otherwise.
         var metric = declaredIndex ? window.DashboardCards.metricFor(declaredIndex, key) : null;
         var columns = metric && Array.isArray(metric.row_columns) ? metric.row_columns : (result && result.columns);
-        drawRows(slot, result ? result.rows : null, columns, result ? result.caveats : [], result ? result.rowsStatus : null,
+        // No rows from metric detail: the card's own preview rows
+        // (metadata.top, or metadata.rows on Data Conflicts).
+        var rows = result && result.rows && result.rows.length ? result.rows : (cardPreviewRows(metric) || (result ? result.rows : null));
+        drawRows(slot, rows, columns, result ? result.caveats : [], result ? result.rowsStatus : null,
           (window.DataFixes && window.DataFixes.permissionsOf(metric)) || (result ? result.permissions : null));
       });
     });

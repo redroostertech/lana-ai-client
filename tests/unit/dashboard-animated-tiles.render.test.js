@@ -35,7 +35,7 @@ function page(api = {}, user = null) {
   let source = fs.readFileSync(path.join(__dirname, '../../src/js/admin/dashboard-detail.js'), 'utf8');
   const end = source.lastIndexOf('  init();');
   source = source.slice(0, end)
-    + '  window.testExports = { renderMetricCard, formatMetricCardValue, loadMetrics, loadDashboardById, readPeriodControls, setBanner, fetchSparkline, renderMetrics, openMetricModal, worklistHtml, drawRows, paintSparkline, variantPicks, allMetrics: function () { return allDashboardMetrics; }, cardLoads: function () { return cardLoads; } };'
+    + '  window.testExports = { renderMetricCard, formatMetricCardValue, loadMetrics, loadDashboardById, readPeriodControls, setBanner, fetchSparkline, renderMetrics, openMetricModal, worklistHtml, drawRows, paintSparkline, cardPreviewRows, variantPicks, allMetrics: function () { return allDashboardMetrics; }, cardLoads: function () { return cardLoads; } };'
     + source.slice(end + '  init();'.length);
   const nodes = {};
   const document = { body: node(), addEventListener() {}, getElementById: (id) => (nodes[id] = nodes[id] || node()), querySelector: () => null, querySelectorAll: () => [] };
@@ -1169,4 +1169,18 @@ test('team appointments by meeting type (no value field): member · type labels,
     expect([visual, html.includes('n/a')]).toEqual([visual, false]);
     expect([visual, html.includes('data-record-ref="person|p-1|u-9"')]).toEqual([visual, true]);
   }
+});
+
+describe('worklists fall back to the card preview rows', () => {
+  test('cardPreviewRows reads metadata.top, else metadata.rows', () => {
+    const p = page();
+    expect(p.exports.cardPreviewRows({ metadata: { top: [{ client_name: 'A' }], rows: [{ client_name: 'B' }] } })).toEqual([{ client_name: 'A' }]);
+    expect(p.exports.cardPreviewRows({ metadata: { rows: [{ client_name: 'B' }] } })).toEqual([{ client_name: 'B' }]);
+    expect(p.exports.cardPreviewRows({ metadata: {} })).toBe(null);
+    expect(p.exports.cardPreviewRows(null)).toBe(null);
+  });
+  test('the worklist uses them when metric detail sent no rows', () => {
+    expect(fs.readFileSync(path.join(__dirname, '../../src/js/admin/dashboard-detail.js'), 'utf8'))
+      .toContain('var rows = result && result.rows && result.rows.length ? result.rows : (cardPreviewRows(metric) || (result ? result.rows : null));');
+  });
 });
