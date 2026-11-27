@@ -346,3 +346,26 @@ describe('bucketSnapshots: long daily series drawn by week or month', () => {
     expect(View.bucketSnapshots(series, 'average')[0].value_numeric).toBe(6);
   });
 });
+
+describe('rowLabel: never "Item N" when the row has words', () => {
+  const label = (row) => View.listBars([row], 12).rows[0].label;
+  test('leads by source, pipeline by age, owners and services read their own words', () => {
+    expect(label({ source: '1.1 Truth Talk', value: 30, leads: 30, qualified_leads: 12, spend: 500 })).toBe('1.1 Truth Talk');
+    expect(label({ age_band: 'Under 30 days', open_count: 79, no_amount_count: 10, value: 314350 })).toBe('Under 30 days');
+    expect(label({ owner_name: 'Avery Stone', value: 4 })).toBe('Avery Stone');
+    expect(label({ service: 'Probate', value: 2 })).toBe('Probate');
+    expect(label({ category: 'Referral', value: 2 })).toBe('Referral');
+    expect(label({ bucket: '31 to 60 days', value: 2 })).toBe('31 to 60 days');
+    expect(label({ stage_label: 'Consultation', value: 2 })).toBe('Consultation');
+  });
+  test('stage and pipeline together read "Stage (Pipeline)"', () => {
+    expect(label({ pipeline: '1. Estate Planning', stage: 'Lead', stage_position: 0, open_count: 19, no_amount_count: 4, value: 73000 })).toBe('Lead (1. Estate Planning)');
+  });
+  test('label or name still win; otherwise the first plain text field that is not an id or a date', () => {
+    expect(label({ name: 'Named', source: 'x', value: 1 })).toBe('Named');
+    expect(label({ record_id: 'abc', created_at: '2026-01-01', channel_text: 'Walk-in', value: 1 })).toBe('Walk-in');
+  });
+  test('"Item N" only when there are no words at all', () => {
+    expect(label({ value: 1, count: 2 })).toBe('Item 1');
+  });
+});

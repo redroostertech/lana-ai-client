@@ -208,7 +208,11 @@
     return { actualPct: round1((a / scale) * 100), goalPct: round1((g / scale) * 100), gap: round1(g - a), over: a >= g };
   }
 
+  // The same generic row label as list cards (MetricCardView.rowLabel).
   function listLabel(row) {
+    var view = (typeof window !== 'undefined' && window.MetricCardView)
+      || (typeof require === 'function' ? require('./metric-card-view.js') : null);
+    if (view && typeof view.rowLabel === 'function') return view.rowLabel(row, 0);
     var keys = ['service_label', 'label', 'name', 'title', 'service_key', 'key'];
     for (var i = 0; i < keys.length; i += 1) {
       if (row && row[keys[i]] !== null && row[keys[i]] !== undefined && row[keys[i]] !== '') return String(row[keys[i]]);

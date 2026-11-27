@@ -75,13 +75,62 @@
     return null;
   }
 
+  function hasText(value) {
+    return value !== null && value !== undefined && typeof value !== 'object' && String(value).trim() !== '';
+  }
+
+  // Category fields a breakdown row names itself by (after label and name).
+  var CATEGORY_KEYS = ['source', 'stage', 'age_band', 'service', 'owner_name', 'category', 'bucket', 'type'];
+  var ID_TAILS = ['_id', '_key', '_ref', '_uuid', '_at', '_date', '_on', '_time'];
+
+  function isIdOrDateKey(key) {
+    var k = String(key).toLowerCase();
+    if (k === 'id' || k === 'uuid' || k === 'key' || k === 'date' || k === 'time' || k.indexOf('date') !== -1) return true;
+    for (var i = 0; i < ID_TAILS.length; i += 1) {
+      if (k.length > ID_TAILS[i].length && k.slice(-ID_TAILS[i].length) === ID_TAILS[i]) return true;
+    }
+    return false;
+  }
+
+  function looksLikeWords(value) {
+    if (typeof value !== 'string') return false;
+    var text = value.trim();
+    if (!text || toNumber(text) !== null) return false;
+    // A day ("2026-01-05...") or an id-like token with no spaces is not a label.
+    if (text.length >= 10 && text.charAt(4) === '-' && text.charAt(7) === '-') return false;
+    if (text.length >= 32 && text.indexOf(' ') === -1 && text.split('-').length >= 5) return false;
+    return true;
+  }
+
+  // The first plain text field that is not an id or a date.
+  function firstTextField(row) {
+    var keys = Object.keys(row);
+    for (var i = 0; i < keys.length; i += 1) {
+      if (!isIdOrDateKey(keys[i]) && looksLikeWords(row[keys[i]])) return keys[i];
+    }
+    return null;
+  }
+
+  /**
+   * A breakdown row's label: label or name first, then "Stage (Pipeline)",
+   * a known category field, any *_name or *_label field, the period fields,
+   * then the first plain text field. "Item N" only when the row has no words.
+   */
   function rowLabel(row, index) {
     if (row === null || row === undefined) return 'Item ' + (index + 1);
     if (typeof row !== 'object') return String(row);
-    if (row.service_label === undefined || row.service_label === null || row.service_label === '') {
-      var named = nameField(row);
-      if (named) return String(row[named]);
+    var first = ['service_label', 'label', 'name', 'title', 'display_name'];
+    for (var f = 0; f < first.length; f += 1) {
+      if (hasText(row[first[f]])) return String(row[first[f]]);
     }
+    if (hasText(row.stage) && hasText(row.pipeline)) return String(row.stage) + ' (' + String(row.pipeline) + ')';
+    for (var c = 0; c < CATEGORY_KEYS.length; c += 1) {
+      if (hasText(row[CATEGORY_KEYS[c]])) return String(row[CATEGORY_KEYS[c]]);
+    }
+    var named = nameField(row);
+    if (named) return String(row[named]);
+    var labelled = Object.keys(row).filter(function (k) { return k.length > 6 && k.slice(-6) === '_label' && hasText(row[k]); })[0];
+    if (labelled) return String(row[labelled]);
     for (var i = 0; i < LABEL_KEYS.length; i += 1) {
       var key = LABEL_KEYS[i];
       var value = row[key];
@@ -90,7 +139,8 @@
       if (key === 'key' || key === 'id' || key.slice(-4) === '_key') return sentenceCase(text);
       return dayLabel(text);
     }
-    return 'Item ' + (index + 1);
+    var text = firstTextField(row);
+    return text ? String(row[text]) : 'Item ' + (index + 1);
   }
 
   function firstRef(row) {
@@ -435,6 +485,7 @@
   }
 
   return {
+    rowLabel: rowLabel,
     bucketSnapshots: bucketSnapshots,
     cardText: cardText,
     secondLineLink: secondLineLink,

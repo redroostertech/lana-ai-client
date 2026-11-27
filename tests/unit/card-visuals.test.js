@@ -181,3 +181,8 @@ test('pairedSeries keeps partial when either side of a bucket is partial', () =>
   expect(rows[0].partial).toBe(true);
   expect(rows[1].partial).toBeUndefined();
 });
+
+test('pairedSeries labels rows the same generic way (no "Item N", stage with pipeline)', () => {
+  const rows = V.pairedSeries([{ source: 'Referral', value: 2 }, { pipeline: 'Estate Planning', stage: 'Lead', value: 3 }], []);
+  expect(rows.map((r) => r.label)).toEqual(['Referral', 'Lead (Estate Planning)']);
+});
