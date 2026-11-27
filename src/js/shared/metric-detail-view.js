@@ -436,11 +436,12 @@
       var list = Array.isArray(facets[col]) ? facets[col] : [];
       var countText = function (f) { return f.count !== undefined && f.count !== null ? ' (' + Number(f.count).toLocaleString('en-US') + ' in all)' : ''; };
       var options = list.filter(function (f) { return f && !isEmpty(f.value) && String(f.value).indexOf(',') === -1; }).map(function (f) {
-        var label = typeof f.value === 'string' ? words(f.value) : String(f.value);
+        // A month column reads like the month bars ("Oct 2026", "Older").
+        var label = col === 'month' ? filterValueWords(f.value, col) : (typeof f.value === 'string' ? words(f.value) : String(f.value));
         return { value: String(f.value), label: label + countText(f) };
       });
       var blank = list.filter(function (f) { return f && isEmpty(f.value); })[0];
-      if (blank) options.push({ value: EMPTY_FACET, label: EMPTY_FACET + countText(blank) });
+      if (blank) options.push({ value: EMPTY_FACET, label: filterValueWords(EMPTY_FACET, col) + countText(blank) });
       if (options.length) out[col] = { options: options };
     });
     return out;

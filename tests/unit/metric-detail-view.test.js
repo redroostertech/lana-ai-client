@@ -363,3 +363,11 @@ test('a month filter of "(empty)" reads No date recorded', () => {
   const V2 = require('../../src/js/shared/metric-detail-view.js');
   expect(V2.linkFilterText('month', '(empty)')).toBe('Month: No date recorded');
 });
+
+test('the month facet uses the month words: "Oct 2026", "Older", "No date recorded"', () => {
+  const V3 = require('../../src/js/shared/metric-detail-view.js');
+  const out = V3.facetFilterOptions({ month: [{ value: '2026-10', count: 4 }, { value: 'older', count: 2 }, { value: null, count: 3 }], stage: [{ value: 'intake', count: 1 }] });
+  expect(out.month.options).toEqual([
+    { value: '2026-10', label: 'Oct 2026 (4 in all)' }, { value: 'older', label: 'Older (2 in all)' }, { value: '(empty)', label: 'No date recorded (3 in all)' }]);
+  expect(out.stage.options[0].label).toBe('Intake (1 in all)');
+});
