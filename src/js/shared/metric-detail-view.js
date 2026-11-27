@@ -136,13 +136,22 @@
     return text ? text.charAt(0).toUpperCase() + text.slice(1) : text;
   }
 
+  function isDaysKey(key) {
+    var k = String(key || '').toLowerCase();
+    return k === 'days' || k.indexOf('days_') === 0 || (k.length > 5 && k.slice(-5) === '_days');
+  }
+
   // One formatter for the records table and the dashboard worklists.
   function cellText(value, type, key) {
     if (isEmpty(value)) return null;
     if (type === 'date') return dayText(value);
     if (type === 'datetime') return dateTimeText(value);
     if (type === 'money') return Number(value).toLocaleString('en-US', { style: 'currency', currency: firmCurrency(), maximumFractionDigits: 0 });
-    if (type === 'number') return Number(value).toLocaleString('en-US', { maximumFractionDigits: 2 });
+    if (type === 'number') {
+      var number = Number(value).toLocaleString('en-US', { maximumFractionDigits: 2 });
+      // A count of days (days_waiting, open_days, days) reads "12 days".
+      return isDaysKey(key) ? number + (Number(value) === 1 ? ' day' : ' days') : number;
+    }
     if (type === 'enum') {
       var k = String(key || '').toLowerCase();
       // A product or service the firm has not mapped yet (Settings > Mappings).

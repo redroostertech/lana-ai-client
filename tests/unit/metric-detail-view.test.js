@@ -324,3 +324,10 @@ test('a Date column (row_date) that repeats another date column on every row is 
   const differs = rows.map((r, i) => Object.assign({}, r, { decided_on: i ? '2026-11-01' : r.decided_on }));
   expect(V.recordsTable(differs).columns.map((c) => c.key)).toEqual(['deal_name', 'decided_on', 'row_date', '_notes']);
 });
+
+test('days counts read "N days" (days_waiting, *_days, days)', () => {
+  const t = V.recordsTable([{ deal_name: 'A', days_waiting: 12 }, { deal_name: 'B', days_waiting: 1 }]);
+  expect(t.rows.map((r) => r.cells[1].text)).toEqual(['12 days', '1 day']);
+  expect(V.recordsTable([{ open_days: 3 }]).rows[0].cells[0].text).toBe('3 days');
+  expect(V.recordsTable([{ amount: 3 }]).rows[0].cells[0].text).toBe('$3');
+});

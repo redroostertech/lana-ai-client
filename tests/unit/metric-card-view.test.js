@@ -438,3 +438,7 @@ describe('name plus a role or status: the name alone, status as a muted suffix',
     expect(View.listBars([{ team_member: 'Avery Stone', meeting_type: 'Consultation', appointments: 3 }], 12).rows[0].label).toBe('Avery Stone · Consultation');
   });
 });
+
+test('row_format "currency" alone makes a distribution money', () => {
+  expect(View.listValueFormat({ format: 'distribution', row_format: 'currency' })).toBe('currency');
+});
