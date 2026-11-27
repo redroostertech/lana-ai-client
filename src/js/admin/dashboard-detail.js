@@ -1058,9 +1058,41 @@
 
   // The card's series: the rows of its one list metric, or one row per
   // scalar metric. Each row knows the metric its records live under.
-  function seriesOf(resolved) {
+  // metadata.by_person [{ person: { object, id, user_id, label }, label, held,
+  // no_show, cancelled, no_outcome, total, show_rate }], or null.
+  function byPersonOf(metric) {
+    var list = metric && metric.metadata && Array.isArray(metric.metadata.by_person) ? metric.metadata.by_person : null;
+    return list && list.length ? list : null;
+  }
+
+  // One row per person: ranked bars rank by total; columns pair the first two
+  // declared series (default held and no_show). Never a rate.
+  function byPersonRows(list, def, visual, key) {
+    var series = def.options.series && def.options.series.length ? def.options.series : ['held', 'no_show'];
+    var count = function (value) { return value === null || value === undefined || value === '' || !isFinite(Number(value)) ? null : Number(value); };
+    var rows = list.map(function (p) {
+      var person = p.person && typeof p.person === 'object' ? p.person : null;
+      var ref = person && person.id ? { object: person.object || 'person', id: String(person.id) } : null;
+      if (ref && person.user_id) ref.user_id = String(person.user_id);
+      var label = String(p.label || (person && person.label) || 'Unassigned');
+      var row = visual === 'ranked_bars'
+        ? { label: label, value: count(p.total), second: null }
+        : { label: label, value: count(p[series[0]]), second: series[1] ? count(p[series[1]]) : null };
+      return Object.assign(row, { key: key, waiting: false, ref: ref, text: plainNumber(row.value) });
+    });
+    rows.categories = true;
+    rows.seriesLabels = visual === 'ranked_bars' ? [] : series.slice(0, 2).map(function (field) {
+      var text = String(field).split('_').join(' ');
+      return text.charAt(0).toUpperCase() + text.slice(1);
+    });
+    return rows;
+  }
+
+  function seriesOf(resolved, visual) {
     var def = resolved.def;
     var first = resolved.metrics[0];
+    var people = resolved.metrics.length === 1 ? byPersonOf(first.metric) : null;
+    if (people) return byPersonRows(people, def, visual, first.key);
     if (resolved.metrics.length === 1 && first.metric && Array.isArray(first.metric.value)) {
       var model = window.MetricCardView.listBars(first.metric.value, 1000);
       var fmt = formatList(first.metric);
@@ -1121,7 +1153,7 @@
   }
 
   function seriesChartHtml(resolved, visual) {
-    var rows = seriesOf(resolved);
+    var rows = seriesOf(resolved, visual);
     var textOf = function (row) { return row.text; };
     var byValue = {};
     rows.forEach(function (row) { byValue[row.value] = row.text; });
@@ -1163,7 +1195,7 @@
     // columns and paired_columns; a breakdown of many categories shows its
     // top 8 (drawn as bars with "And N more in the details").
     var columnTop = rows.categories ? window.CardVisuals.topRows(rows, CARD_ROW_LIMIT) : { rows: rows, hidden: 0 };
-    var model = seriesColumnsModel(columnTop.rows, resolved.def.options.series_labels);
+    var model = seriesColumnsModel(columnTop.rows, rows.seriesLabels && rows.seriesLabels.length ? rows.seriesLabels : resolved.def.options.series_labels);
     model.hiddenCount = columnTop.hidden;
     // A series over dates draws every point as a compact column.
     if (rows.categories === false) model.series = true;
@@ -1185,6 +1217,8 @@
   // Two list metrics side by side by label (new and closed by service).
   function renderPairedColumns(resolved, layoutItem) {
     var def = resolved.def;
+    // A per-person rollup (metadata.by_person) draws paired columns per person.
+    if (resolved.metrics.length === 1 && byPersonOf(resolved.metrics[0].metric)) return seriesCard(resolved, layoutItem, 'paired_columns');
     // The two lists: metric_keys_override (the spec), else the card's own
     // keys when both are list metrics (the saved dashboards).
     var listKeys = def.options.metric_keys_override.length ? def.options.metric_keys_override : def.keys;

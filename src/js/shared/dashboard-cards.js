@@ -92,6 +92,8 @@
       centre_key: raw.centre_key ? normalizeKey(raw.centre_key) : '',
       badge_key: raw.badge_key ? normalizeKey(raw.badge_key) : '',
       series_labels: Array.isArray(raw.series_labels) ? raw.series_labels.map(String) : [],
+      // Declared series fields (for example held, no_show, cancelled).
+      series: Array.isArray(raw.series) ? raw.series.map(String) : [],
       accent: ACCENTS[raw.accent] ? raw.accent : null,
       sort: raw.sort ? String(raw.sort) : '',
       unit: raw.unit ? String(raw.unit) : '',

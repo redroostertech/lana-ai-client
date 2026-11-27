@@ -1184,3 +1184,32 @@ describe('worklists fall back to the card preview rows', () => {
       .toContain('var rows = result && result.rows && result.rows.length ? result.rows : (cardPreviewRows(metric) || (result ? result.rows : null));');
   });
 });
+
+describe('team appointments from metadata.by_person', () => {
+  const byPerson = [
+    { person: { object: 'person', id: 'p-1', user_id: 'u-9', label: 'Avery Stone' }, label: 'Avery Stone', held: 29, no_show: 30, cancelled: 8, no_outcome: 1, total: 68, show_rate: 49.2 },
+    { person: { object: 'person', id: 'p-2', user_id: null, label: 'Blake Ross' }, label: 'Blake Ross', held: 10, no_show: 1, cancelled: 1, no_outcome: 0, total: 12, show_rate: 90.9 },
+  ];
+  const card = { metric_key: 'legal_firm.sales_intake.team_appointments_by_meeting_type', title: 'Team Appointments', format: 'distribution', data_state: 'ok', period: 'Nov 2026',
+    value: [{ team_member: 'Avery Stone', meeting_type: 'Consultation', appointments: 68 }], metadata: { by_person: byPerson } };
+  async function render(visual, options) {
+    const layout = { cards: [{ id: 't', kind: 'breakdown', metric_key: 'sales_intake.team_appointments_by_meeting_type', visual, visual_options: options || {} }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [card] }) });
+    await p.exports.loadDashboardById('d1');
+    return p.nodes.dashboardMetricGrid.innerHTML;
+  }
+  test('paired columns per person from the declared series (held, no show), each person clickable', async () => {
+    const html = await render('paired_columns', { series: ['held', 'no_show', 'cancelled'] });
+    expect(text(html)).toContain('Held');
+    expect(text(html)).toContain('No show');
+    expect(text(html)).not.toContain('Consultation');
+    expect(html).toContain('data-record-ref="person|p-1|u-9"');
+    expect(html).toContain('<title>Avery Stone: 29 of 30</title>');
+  });
+  test('ranked bars rank people by total', async () => {
+    const html = await render('ranked_bars', { series: ['held', 'no_show', 'cancelled'] });
+    expect(text(html)).toContain('Avery Stone');
+    expect(text(html)).toContain('68');
+    expect(html).toContain('data-record-ref="person|p-2|"');
+  });
+});
