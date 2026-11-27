@@ -182,3 +182,49 @@ test('api.getReportObject sends timeline paging options', () => {
   expect(src).toContain("if (options && options.timeline_limit !== undefined) query.set('timeline_limit', String(options.timeline_limit));");
   expect(src).toContain("if (options && options.timeline_offset !== undefined) query.set('timeline_offset', String(options.timeline_offset));");
 });
+
+describe('deal timeline filters', () => {
+  const ev = (i, kind, actorKind) => ({ occurred_at: new Date(Date.UTC(2026, 9, 1) + i * 3600000).toISOString(), label: 'Event ' + i, event_kind: kind, actor: null, actor_kind: actorKind, actor_label: 'X', refs: [] });
+  const deal = { object: 'deal', id: 'd-1', title: 'Deal', facts: [], timeline_total: 3,
+    timeline: [ev(3, 'meeting_held', 'team'), ev(2, 'message_received', 'client'), ev(1, 'meeting_held', 'team')] };
+
+  test('chips for the event kinds present and for team or client, wired to the timeline params', async () => {
+    const getReportObject = jest.fn(() => Promise.resolve({ data: deal }));
+    const { w, opened } = boot(getReportObject);
+    w.LanaRecordPanel.open({ object: 'deal', id: 'd-1' }, { period: { start: '2026-10-01', end: '2026-10-31' } });
+    await settle();
+    const panel = opened[0];
+    const chips = Array.from(panel.querySelectorAll('.rp-chip')).map((c) => c.textContent);
+    expect(chips).toEqual(['All', 'Meeting held', 'Message received', 'By team', 'By client']);
+    panel.querySelector('[data-rp-kind="meeting_held"]').click();
+    await settle();
+    expect(getReportObject).toHaveBeenLastCalledWith('deal', 'd-1', { start: '2026-10-01', end: '2026-10-31' }, { timeline_event_kind: 'meeting_held', timeline_limit: 50 });
+    expect(panel.querySelector('[data-rp-kind="meeting_held"]').getAttribute('aria-pressed')).toBe('true');
+    panel.querySelector('[data-rp-actor="client"]').click();
+    await settle();
+    expect(getReportObject).toHaveBeenLastCalledWith('deal', 'd-1', { start: '2026-10-01', end: '2026-10-31' },
+      { timeline_event_kind: 'meeting_held', timeline_actor: 'client', timeline_limit: 50 });
+    panel.querySelector('[data-rp-kind=""]').click();
+    await settle();
+    expect(getReportObject).toHaveBeenLastCalledWith('deal', 'd-1', { start: '2026-10-01', end: '2026-10-31' }, { timeline_actor: 'client', timeline_limit: 50 });
+  });
+});
+
+test('api.getReportObject sends the timeline filters', () => {
+  const src = read('js/api.js');
+  expect(src).toContain("if (options && options.timeline_event_kind) query.set('timeline_event_kind', String(options.timeline_event_kind));");
+  expect(src).toContain("if (options && options.timeline_actor) query.set('timeline_actor', String(options.timeline_actor));");
+});
+
+test('a filter that matches nothing keeps its chips and says so', async () => {
+  const deal = { object: 'deal', id: 'd-1', title: 'Deal', facts: [], timeline_total: 1,
+    timeline: [{ occurred_at: '2026-10-01T00:00:00Z', label: 'Met', event_kind: 'meeting_held', actor_kind: 'team', actor_label: 'X', refs: [] }] };
+  const getReportObject = jest.fn((o, i, p, opts) => Promise.resolve({ data: opts && opts.timeline_actor ? Object.assign({}, deal, { timeline: [], timeline_total: 0 }) : deal }));
+  const { w, opened } = boot(getReportObject);
+  w.LanaRecordPanel.open({ object: 'deal', id: 'd-1' }, {});
+  await settle();
+  opened[0].querySelector('[data-rp-actor="client"]').click();
+  await settle();
+  expect(opened[0].querySelector('.rp-chips')).not.toBeNull();
+  expect(opened[0].textContent).toContain('No events match this filter.');
+});

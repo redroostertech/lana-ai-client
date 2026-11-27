@@ -277,6 +277,7 @@
           others: refLinks(e.other_people),
           refs: refs.slice(1),
           beforeDeal: e.before_deal === true,
+          kind: str(e.event_kind),
         };
       })
       .filter(function (e) { return e.text; });

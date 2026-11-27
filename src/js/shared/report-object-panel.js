@@ -62,8 +62,10 @@
       parts.push(section(m.activityTitle, factsHtml(m.activity.map(function (a) { return { label: a.label, text: a.text }; }))
         + (m.activityNote ? '<p class="rp-muted rp-note">' + escapeHtml(m.activityNote) + '</p>' : '')));
     }
-    if (m.timeline.length) {
-      parts.push(section('Timeline', timelineHtml(m)));
+    // A filter that matches nothing keeps the section, so its chips stay.
+    var filtered = current() && current().filter && (current().filter.kind || current().filter.actor);
+    if (m.timeline.length || filtered) {
+      parts.push(section('Timeline', timelineHtml(m) + (m.timeline.length ? '' : '<p class="rp-muted">No events match this filter.</p>')));
     }
     if (m.contributors.length) {
       parts.push(section('Who worked on it', '<ul class="rp-list rp-contributors">' + m.contributors.map(function (c) {
@@ -115,7 +117,54 @@
     if (!entry.showAll && total > TIMELINE_FIRST) more = '<button type="button" class="rp-back" data-rp-more>Show all ' + total + '</button>';
     else if (entry.showAll && m.timeline.length < total) more = '<button type="button" class="rp-back" data-rp-more>Show ' + Math.min(TIMELINE_PAGE, total - m.timeline.length) + ' more</button>';
     return (m.timelineNote ? '<p class="rp-muted rp-note">' + escapeHtml(m.timelineNote) + '</p>' : '')
+      + filterChipsHtml(entry)
       + '<ol class="rp-timeline">' + items + '</ol>' + more;
+  }
+
+  // Filter chips above a deal timeline: the event kinds present (from the
+  // unfiltered load) and By team / By client, sent as timeline_event_kind
+  // and timeline_actor.
+  function chip(attr, value, label, on) {
+    return '<button type="button" class="rp-chip" ' + attr + '="' + escapeHtml(value) + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + escapeHtml(label) + '</button>';
+  }
+
+  function filterChipsHtml(entry) {
+    var kinds = entry.kinds || [];
+    if (entry.ref.object !== 'deal' || (!kinds.length && !entry.filter)) return '';
+    var f = entry.filter || {};
+    var words = function (k) { var t = String(k).split('_').join(' '); return t.charAt(0).toUpperCase() + t.slice(1); };
+    return '<div class="rp-chips" role="group" aria-label="Filter the timeline">'
+      + chip('data-rp-kind', '', 'All', !f.kind)
+      + kinds.map(function (k) { return chip('data-rp-kind', k, words(k), f.kind === k); }).join('')
+      + chip('data-rp-actor', 'team', 'By team', f.actor === 'team')
+      + chip('data-rp-actor', 'client', 'By client', f.actor === 'client')
+      + '</div>';
+  }
+
+  function timelineOptions(entry, extra) {
+    var f = entry.filter || {};
+    var out = {};
+    if (f.kind) out.timeline_event_kind = f.kind;
+    if (f.actor) out.timeline_actor = f.actor;
+    return Object.assign(out, extra || {});
+  }
+
+  // A chip changes the filter and loads the first page again.
+  function applyFilter(change) {
+    var entry = current();
+    if (!entry || !entry.data) return;
+    var f = Object.assign({}, entry.filter || {}, change);
+    if (change.actor !== undefined && (entry.filter || {}).actor === change.actor) f.actor = '';
+    entry.filter = f;
+    entry.showAll = false;
+    var request = global.api.getReportObject(entry.ref.object, entry.ref.id, state.options.period || null, timelineOptions(entry, { timeline_limit: TIMELINE_PAGE }));
+    request.then(function (response) {
+      var data = response && response.data !== undefined ? response.data : response;
+      if (current() !== entry || !data) return;
+      entry.data.timeline = Array.isArray(data.timeline) ? data.timeline : [];
+      entry.data.timeline_total = data.timeline_total !== undefined ? data.timeline_total : entry.data.timeline.length;
+      redraw();
+    }, function () { /* keeps what was shown */ });
   }
 
   // Show every loaded event and fetch the next page when the server has more.
@@ -128,7 +177,7 @@
     redraw();
     if (loaded >= total || entry.loadingMore) return;
     entry.loadingMore = true;
-    global.api.getReportObject(entry.ref.object, entry.ref.id, state.options.period || null, { timeline_offset: loaded, timeline_limit: TIMELINE_PAGE })
+    global.api.getReportObject(entry.ref.object, entry.ref.id, state.options.period || null, timelineOptions(entry, { timeline_offset: loaded, timeline_limit: TIMELINE_PAGE }))
       .then(function (response) {
         var data = response && response.data !== undefined ? response.data : response;
         if (current() !== entry || !data) return;
@@ -176,6 +225,10 @@
     return request.then(function (response) {
       if (current() !== entry) return;
       entry.data = response && response.data !== undefined ? response.data : response;
+      // The event kinds present, from this unfiltered load, for the chips.
+      var seen = {};
+      entry.kinds = (entry.data && Array.isArray(entry.data.timeline) ? entry.data.timeline : []).map(function (e) { return e && e.event_kind; })
+        .filter(function (k) { if (!k || seen[k]) return false; seen[k] = true; return true; });
       redraw();
     }, function (err) {
       if (current() !== entry) return;
@@ -188,6 +241,10 @@
     drawer.addEventListener('click', function (event) {
       var target = event.target && event.target.closest ? event.target : null;
       if (!target) return;
+      var kindChip = target.closest('[data-rp-kind]');
+      if (kindChip) { applyFilter({ kind: kindChip.getAttribute('data-rp-kind') }); return; }
+      var actorChip = target.closest('[data-rp-actor]');
+      if (actorChip) { applyFilter({ actor: actorChip.getAttribute('data-rp-actor') }); return; }
       if (target.closest('[data-rp-more]')) {
         showMore();
         return;

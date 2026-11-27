@@ -3931,6 +3931,9 @@ class ApiClient {
     if (period && period.end) query.set('periodEnd', period.end);
     if (options && options.timeline_limit !== undefined) query.set('timeline_limit', String(options.timeline_limit));
     if (options && options.timeline_offset !== undefined) query.set('timeline_offset', String(options.timeline_offset));
+    // Deal timeline filters: an event kind, and team or client.
+    if (options && options.timeline_event_kind) query.set('timeline_event_kind', String(options.timeline_event_kind));
+    if (options && options.timeline_actor) query.set('timeline_actor', String(options.timeline_actor));
     const suffix = query.toString() ? '?' + query.toString() : '';
     return this.get('/api/v1/report-objects/' + encodeURIComponent(object) + '/' + encodeURIComponent(id) + suffix);
   }
