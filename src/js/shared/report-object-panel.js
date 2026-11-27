@@ -63,16 +63,7 @@
         + (m.activityNote ? '<p class="rp-muted rp-note">' + escapeHtml(m.activityNote) + '</p>' : '')));
     }
     if (m.timeline.length) {
-      parts.push(section('Timeline', '<ol class="rp-timeline">' + m.timeline.map(function (e) {
-        var people = e.others.map(function (o) { return refButton(o.ref, o.label); }).join(', ');
-        var refs = e.refs.map(function (r) { return refButton(r.ref, r.label); }).join(' ');
-        return '<li><span class="rp-when">' + escapeHtml(e.when) + '</span> <span class="rp-event">' + escapeHtml(e.text) + '</span>'
-          + (e.actor ? ' <span class="rp-muted">by</span> ' + refButton(e.actor.ref, e.actor.label) : '')
-          + (e.byOwner ? ' <span class="rp-owner">Owner</span>' : '')
-          + (people ? ' <span class="rp-muted">with</span> ' + people : '')
-          + (refs ? ' ' + refs : '')
-          + (e.detail ? '<span class="rp-muted rp-detail">' + escapeHtml(e.detail) + '</span>' : '') + '</li>';
-      }).join('') + '</ol>'));
+      parts.push(section('Timeline', timelineHtml(m)));
     }
     if (m.contributors.length) {
       parts.push(section('Who worked on it', '<ul class="rp-list rp-contributors">' + m.contributors.map(function (c) {
@@ -92,6 +83,71 @@
     var fix = entry && entry.row && global.DataFixes ? global.DataFixes.controlsHtml(entry.row, state.options.permissions || null) : '';
     if (fix) parts.push(section('Fix in LANA', '<p class="rp-muted">Your fix stays in LANA. Your connected system keeps its own value, and syncs never undo the fix.</p>' + fix, 'rp-fix'));
     return parts.join('');
+  }
+
+  // Newest first: the latest 10, then "Show all N"; more pages load with
+  // timeline_offset when the server has more than it sent.
+  var TIMELINE_FIRST = 10;
+  var TIMELINE_PAGE = 50;
+
+  function timelineHtml(m) {
+    var entry = current() || {};
+    var shown = entry.showAll ? m.timeline : m.timeline.slice(0, TIMELINE_FIRST);
+    var dividerDone = false;
+    var items = shown.map(function (e) {
+      var divider = '';
+      if (e.beforeDeal && !dividerDone) {
+        dividerDone = true;
+        divider = '<li class="rp-divider">Before this deal was created</li>';
+      }
+      var people = e.others.map(function (o) { return refButton(o.ref, o.label); }).join(', ');
+      var extra = e.refs.map(function (r) { return refButton(r.ref, r.label); }).join(', ');
+      var label = e.main ? refButton(e.main, e.text, 'rp-event') : '<span class="rp-event">' + escapeHtml(e.text) + '</span>';
+      return divider + '<li class="rp-event-row"><span class="rp-when">' + escapeHtml(e.when) + '</span> ' + label
+        + (e.actor ? ' <span class="rp-muted">by</span> ' + refButton(e.actor.ref, e.actor.label) : '')
+        + (e.byOwner ? ' <span class="rp-owner">Owner</span>' : '')
+        + (people ? ' <span class="rp-muted">with</span> ' + people : '')
+        + (e.detail ? '<span class="rp-muted rp-detail">' + escapeHtml(e.detail) + '</span>' : '')
+        + (extra ? '<span class="rp-muted rp-detail">Open: ' + extra + '</span>' : '') + '</li>';
+    }).join('');
+    var total = Math.max(m.timelineTotal || 0, m.timeline.length);
+    var more = '';
+    if (!entry.showAll && total > TIMELINE_FIRST) more = '<button type="button" class="rp-back" data-rp-more>Show all ' + total + '</button>';
+    else if (entry.showAll && m.timeline.length < total) more = '<button type="button" class="rp-back" data-rp-more>Show ' + Math.min(TIMELINE_PAGE, total - m.timeline.length) + ' more</button>';
+    return (m.timelineNote ? '<p class="rp-muted rp-note">' + escapeHtml(m.timelineNote) + '</p>' : '')
+      + '<ol class="rp-timeline">' + items + '</ol>' + more;
+  }
+
+  // Show every loaded event and fetch the next page when the server has more.
+  function showMore() {
+    var entry = current();
+    if (!entry || !entry.data) return;
+    entry.showAll = true;
+    var loaded = Array.isArray(entry.data.timeline) ? entry.data.timeline.length : 0;
+    var total = Number(entry.data.timeline_total) || loaded;
+    redraw();
+    if (loaded >= total || entry.loadingMore) return;
+    entry.loadingMore = true;
+    global.api.getReportObject(entry.ref.object, entry.ref.id, state.options.period || null, { timeline_offset: loaded, timeline_limit: TIMELINE_PAGE })
+      .then(function (response) {
+        var data = response && response.data !== undefined ? response.data : response;
+        if (current() !== entry || !data) return;
+        entry.data.timeline = (entry.data.timeline || []).concat(Array.isArray(data.timeline) ? data.timeline : []);
+        if (data.timeline_total !== undefined) entry.data.timeline_total = data.timeline_total;
+        redraw();
+      }, function () { /* the button stays to try again */ })
+      .then(function () { entry.loadingMore = false; });
+  }
+
+  function modelFor(entry) {
+    return model().panelModel(entry.data, { requestedEnd: state.options.period && state.options.period.end });
+  }
+
+  function redraw() {
+    var entry = current();
+    if (!entry || !entry.data) return;
+    entry.model = modelFor(entry);
+    draw('<p class="rp-kind">' + escapeHtml(entry.model.kind) + '</p>' + viewHtml(entry.model), entry.model.title);
   }
 
   function current() {
@@ -119,9 +175,8 @@
       : Promise.reject(new Error('No API'));
     return request.then(function (response) {
       if (current() !== entry) return;
-      var data = response && response.data !== undefined ? response.data : response;
-      entry.model = model().panelModel(data);
-      draw('<p class="rp-kind">' + escapeHtml(entry.model.kind) + '</p>' + viewHtml(entry.model), entry.model.title);
+      entry.data = response && response.data !== undefined ? response.data : response;
+      redraw();
     }, function (err) {
       if (current() !== entry) return;
       var fallback = model().rowModel(entry.row);
@@ -133,6 +188,10 @@
     drawer.addEventListener('click', function (event) {
       var target = event.target && event.target.closest ? event.target : null;
       if (!target) return;
+      if (target.closest('[data-rp-more]')) {
+        showMore();
+        return;
+      }
       if (target.closest('[data-rp-back]')) {
         state.stack.pop();
         load();

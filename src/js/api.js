@@ -3923,10 +3923,14 @@ class ApiClient {
   // GET /api/v1/report-objects/:object/:id?periodStart&periodEnd -> one shape
   // for every object (person, deal, contact, appointment, message, form_fill,
   // survey_fill). period = { start, end } plain firm days, optional.
-  async getReportObject(object, id, period) {
+  // options: { timeline_limit, timeline_offset } to page a long deal timeline
+  // (newest first; the response carries timeline_total).
+  async getReportObject(object, id, period, options) {
     const query = new URLSearchParams();
     if (period && period.start) query.set('periodStart', period.start);
     if (period && period.end) query.set('periodEnd', period.end);
+    if (options && options.timeline_limit !== undefined) query.set('timeline_limit', String(options.timeline_limit));
+    if (options && options.timeline_offset !== undefined) query.set('timeline_offset', String(options.timeline_offset));
     const suffix = query.toString() ? '?' + query.toString() : '';
     return this.get('/api/v1/report-objects/' + encodeURIComponent(object) + '/' + encodeURIComponent(id) + suffix);
   }

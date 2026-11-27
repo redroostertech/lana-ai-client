@@ -165,7 +165,7 @@
     return (Array.isArray(list) ? list : []).filter(function (f) {
       return f && typeof f === 'object' && str(f.label) && !isSecretKey(f.label);
     }).map(function (f) {
-      var fact = { label: str(f.label), text: formatFact(f.value, f.format) };
+      var fact = { label: str(f.label), text: formatFact(f.value, f.format), raw: f.value };
       var href = hrefFor(f.value, f.format);
       if (href) fact.href = href;
       return fact;
@@ -212,9 +212,19 @@
     });
   }
 
-  function activityTitle(period) {
+  function addDay(day, n) {
+    var t = Date.parse(day + 'T00:00:00Z');
+    return isFinite(t) ? new Date(t + n * 86400000).toISOString().substring(0, 10) : '';
+  }
+
+  // "Activity for <dates>". An end exactly one day after the requested end
+  // is an exclusive end: show the requested end.
+  function activityTitle(period, requestedEnd) {
     if (!period || typeof period !== 'object' || !period.period_start || !period.period_end) return 'Activity for these dates';
-    return 'Activity for ' + dayText(str(period.period_start).substring(0, 10)) + ' to ' + dayText(str(period.period_end).substring(0, 10));
+    var end = str(period.period_end).substring(0, 10);
+    var asked = str(requestedEnd).substring(0, 10);
+    if (asked && end === addDay(asked, 1)) end = asked;
+    return 'Activity for ' + dayText(str(period.period_start).substring(0, 10)) + ' to ' + dayText(end);
   }
 
   // The timeline actor: actor { object, id, user_id, label } (clickable),
@@ -237,26 +247,51 @@
     return str(event.occurred_at);
   }
 
-  function timelineModel(list) {
+  function sameRef(a, b) {
+    return !!(a && b && a.object === b.object && a.id === b.id);
+  }
+
+  /**
+   * Newest first. The event label links to its main ref; refs that point at
+   * the panel's own record or repeat the actor are dropped; the rest stay
+   * as a short "Open:" list. before_deal events are marked.
+   */
+  function timelineModel(list, self) {
     return (Array.isArray(list) ? list : []).filter(function (e) { return e && typeof e === 'object'; })
       .slice().sort(function (a, b) {
         var ta = Date.parse(eventTime(a));
         var tb = Date.parse(eventTime(b));
-        return (isFinite(ta) ? ta : 0) - (isFinite(tb) ? tb : 0);
+        return (isFinite(tb) ? tb : 0) - (isFinite(ta) ? ta : 0);
       })
       .map(function (e) {
         var at = eventTime(e);
+        var actor = actorModel(e);
+        var refs = refLinks(e.refs).filter(function (r) { return !sameRef(r.ref, self) && !(actor && sameRef(r.ref, actor.ref)); });
         return {
           when: at ? dayText(at.substring(0, 10)) : '',
           text: str(e.label),
-          actor: actorModel(e),
+          main: refs.length ? refs[0].ref : null,
+          actor: actor,
           byOwner: e.by_owner === true,
           detail: str(e.detail),
           others: refLinks(e.other_people),
-          refs: refLinks(e.refs),
+          refs: refs.slice(1),
+          beforeDeal: e.before_deal === true,
         };
       })
       .filter(function (e) { return e.text; });
+  }
+
+  // Facts that repeat the LANA account (same value as an account field)
+  // are left out when the account section shows.
+  function withoutAccountRepeats(facts, account) {
+    if (!account || typeof account !== 'object') return facts;
+    var values = Object.keys(account).filter(function (k) { return !isSecretKey(k) && account[k] !== null && typeof account[k] !== 'object'; })
+      .map(function (k) { return str(account[k]); }).filter(Boolean);
+    return facts.filter(function (f) {
+      var raw = str(f.raw);
+      return !raw || values.indexOf(raw) === -1;
+    });
   }
 
   // contributors [{ person: { object, id, user_id, label }, did: [{ label, count }], is_owner, is_follower }]
@@ -281,22 +316,31 @@
     }).filter(Boolean);
   }
 
-  /** The panel's view of a report object (any kind), allowlisted. */
-  function panelModel(data) {
+  /**
+   * The panel's view of a report object (any kind), allowlisted.
+   * options.requestedEnd: the end day the panel asked for.
+   */
+  function panelModel(data, options) {
     var d = data && typeof data === 'object' ? data : {};
+    var o = options || {};
     var object = str(d.object);
+    var account = object === 'person' ? accountModel(d.lana_account || {}) : null;
+    var facts = factList(d.facts);
+    if (object === 'person' && d.lana_account) facts = withoutAccountRepeats(facts, d.lana_account);
     return {
       object: object,
       id: str(d.id),
       kind: OBJECT_LABELS[object] || words(object) || 'Record',
       title: str(d.title) || OBJECT_LABELS[object] || 'Record',
-      facts: factList(d.facts),
-      account: object === 'person' ? accountModel(d.lana_account || {}) : null,
+      facts: facts.map(function (f) { var out = { label: f.label, text: f.text }; if (f.href) out.href = f.href; return out; }),
+      account: account,
       linked: linkedModel(d.linked_accounts),
       activity: activityModel(d.activity),
-      activityTitle: activityTitle(d.activity_period),
+      activityTitle: activityTitle(d.activity_period, o.requestedEnd),
       activityNote: str(d.activity_note),
-      timeline: timelineModel(d.timeline),
+      timeline: timelineModel(d.timeline, cleanRef({ object: object, id: d.id })),
+      timelineNote: str(d.timeline_note),
+      timelineTotal: isFinite(Number(d.timeline_total)) && d.timeline_total !== null ? Number(d.timeline_total) : (Array.isArray(d.timeline) ? d.timeline.length : 0),
       contributors: contributorsModel(d.contributors),
       links: linksModel(d.links),
     };

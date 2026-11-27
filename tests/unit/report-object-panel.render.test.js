@@ -139,3 +139,46 @@ test('final contract: activity dates and note, null activity, timeline details a
   expect(deal.querySelectorAll('.rp-pill')).toHaveLength(3);
   expect(deal.querySelector('.rp-follower').textContent).toBe('Follower');
 });
+
+describe('long deal timelines', () => {
+  const event = (i, extra) => Object.assign({ occurred_at: new Date(Date.UTC(2026, 9, 1) + i * 3600000).toISOString(), label: 'Event ' + i, actor: null, actor_kind: 'team', actor_label: 'Avery',
+    refs: [{ object: 'message', id: 'm-' + i }, { object: 'deal', id: 'd-1' }] }, extra || {});
+  const first = { object: 'deal', id: 'd-1', title: 'Long Deal', facts: [], timeline_total: 30, timeline_note: 'Some messages came before the deal was created.',
+    timeline: Array.from({ length: 25 }, (_, i) => event(29 - i)) };
+  const more = { object: 'deal', id: 'd-1', title: 'Long Deal', facts: [], timeline_total: 30,
+    timeline: Array.from({ length: 5 }, (_, i) => event(4 - i, i >= 3 ? { before_deal: true } : {})) };
+
+  test('newest 10 first, then "Show all N" pages with timeline_offset', async () => {
+    const getReportObject = jest.fn((object, id, period, options) => Promise.resolve({ data: options && options.timeline_offset ? more : first }));
+    const { w, opened } = boot(getReportObject);
+    w.LanaRecordPanel.open({ object: 'deal', id: 'd-1' }, { period: { start: '2026-10-01', end: '2026-10-31' } });
+    await settle();
+    const panel = opened[0];
+    expect(panel.querySelector('.rp-note').textContent).toBe('Some messages came before the deal was created.');
+    expect(panel.querySelectorAll('.rp-timeline li.rp-event-row')).toHaveLength(10);
+    expect(panel.querySelector('.rp-timeline li .rp-event').textContent).toBe('Event 29');
+    const show = panel.querySelector('[data-rp-more]');
+    expect(show.textContent).toBe('Show all 30');
+    show.click();
+    await settle();
+    expect(getReportObject).toHaveBeenLastCalledWith('deal', 'd-1', { start: '2026-10-01', end: '2026-10-31' }, { timeline_offset: 25, timeline_limit: 50 });
+    expect(panel.querySelectorAll('.rp-timeline li.rp-event-row')).toHaveLength(30);
+    expect(panel.querySelector('.rp-divider').textContent).toBe('Before this deal was created');
+    expect(panel.querySelector('[data-rp-more]')).toBeNull();
+  });
+
+  test('the event label is the link to its message; the deal itself is not listed', async () => {
+    const { w, opened } = boot(jest.fn(() => Promise.resolve({ data: first })));
+    w.LanaRecordPanel.open({ object: 'deal', id: 'd-1' }, {});
+    await settle();
+    const row = opened[0].querySelector('.rp-timeline li.rp-event-row');
+    expect(row.querySelector('.rp-event').getAttribute('data-record-ref')).toBe('message|m-29|');
+    expect(row.textContent).not.toContain('Deal');
+  });
+});
+
+test('api.getReportObject sends timeline paging options', () => {
+  const src = read('js/api.js');
+  expect(src).toContain("if (options && options.timeline_limit !== undefined) query.set('timeline_limit', String(options.timeline_limit));");
+  expect(src).toContain("if (options && options.timeline_offset !== undefined) query.set('timeline_offset', String(options.timeline_offset));");
+});

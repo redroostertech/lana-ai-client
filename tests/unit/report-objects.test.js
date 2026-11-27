@@ -58,15 +58,15 @@ describe('panelModel: one shape for every object', () => {
     expect(m.links).toEqual([{ label: 'Smith Estate Plan', ref: { object: 'deal', id: 'd-1' }, kind: 'Deal' }]);
   });
 
-  test('a deal: formatted facts, timeline in time order with actors, details and other people, contributors with what they did', () => {
+  test('a deal: formatted facts, timeline newest first with actors, details and other people, contributors with what they did', () => {
     const m = R.panelModel(Object.assign({}, samples.deal, { timeline: samples.deal.timeline.slice().reverse() }));
     expect(m.facts.map((f) => [f.label, f.text])).toEqual([['Amount', '$4,500'], ['Stage', 'Won'], ['Won on', 'Nov 3, 2026'], ['Win rate', '42.5%']]);
-    expect(m.timeline.map((t) => t.text)).toEqual(['Lead came in from Referral', 'Consultation held', 'Marked as won']);
-    expect(m.timeline[0]).toMatchObject({ when: 'Oct 1, 2026', actor: { label: 'Jordan Smith', ref: null }, detail: 'Referred by a past client',
-      refs: [{ label: 'Contact', ref: { object: 'contact', id: 'c-1' } }] });
+    expect(m.timeline.map((t) => t.text)).toEqual(['Marked as won', 'Consultation held', 'Lead came in from Referral']);
+    expect(m.timeline[2]).toMatchObject({ when: 'Oct 1, 2026', actor: { label: 'Jordan Smith', ref: null }, detail: 'Referred by a past client',
+      main: { object: 'contact', id: 'c-1' }, refs: [] });
     expect(m.timeline[1]).toMatchObject({ actor: { label: 'Avery Stone', ref: { object: 'person', id: 'p-1', user_id: 'u-9' } }, byOwner: true,
-      others: [{ label: 'Blake Ross', ref: { object: 'person', id: 'p-2' } }] });
-    expect(m.timeline[2].actor).toEqual({ label: 'Not recorded', ref: null });
+      others: [{ label: 'Blake Ross', ref: { object: 'person', id: 'p-2' } }], main: { object: 'appointment', id: 'ap-3' } });
+    expect(m.timeline[0].actor).toEqual({ label: 'Not recorded', ref: null });
     expect(m.contributors).toEqual([
       { label: 'Avery Stone', ref: { object: 'person', id: 'p-1', user_id: 'u-9' }, did: ['Held meetings: 2', 'Booked meetings: 1'], owner: true, follower: false },
       { label: 'Blake Ross', ref: { object: 'person', id: 'p-2' }, did: ['Booked meetings: 3'], owner: false, follower: true },
@@ -104,5 +104,43 @@ describe('when the record cannot load', () => {
   test('the row\'s own fields stand in, without refs, internal keys or secrets', () => {
     const m = R.rowModel({ refs: [{ object: 'deal', id: 'd-1' }], record_id: 'r', client_name: 'Jordan Smith', amount: 4500, password: 'x', _row_id: 'row-1', deal_id: 'd-1' });
     expect(m.facts.map((f) => [f.label, f.text])).toEqual([['Client', 'Jordan Smith'], ['Amount', '4500']]);
+  });
+});
+
+describe('live check: deal timeline, person facts, activity dates', () => {
+  const deal = {
+    object: 'deal', id: 'd-1', title: 'Smith Estate Plan', facts: [], timeline_total: 3, timeline_note: 'Some messages came before the deal was created.',
+    timeline: [
+      { occurred_at: '2026-09-20T10:00:00Z', label: 'Message received', actor: null, actor_kind: 'client', actor_label: 'Jordan Smith', before_deal: true,
+        refs: [{ object: 'message', id: 'm-1' }, { object: 'deal', id: 'd-1' }] },
+      { occurred_at: '2026-10-05T16:30:00Z', label: 'Consultation held', actor: { object: 'person', id: 'p-1', user_id: 'u-9', label: 'Avery Stone' }, actor_kind: 'team',
+        refs: [{ object: 'appointment', id: 'ap-3' }, { object: 'deal', id: 'd-1' }, { object: 'person', id: 'p-1' }, { object: 'form_fill', id: 'f-1' }, { object: 'contact', id: 'c-1' }] },
+      { occurred_at: '2026-11-03T10:00:00Z', label: 'Marked as won', actor: null, actor_kind: 'not_recorded', refs: [] },
+    ],
+  };
+  test('newest first; the label links to its main ref; refs to this deal or the actor are dropped; extras listed', () => {
+    const m = R.panelModel(deal);
+    expect(m.timeline.map((t) => t.text)).toEqual(['Marked as won', 'Consultation held', 'Message received']);
+    expect(m.timeline[1].main).toEqual({ object: 'appointment', id: 'ap-3' });
+    expect(m.timeline[1].refs.map((r) => r.label)).toEqual(['Form', 'Contact']);
+    expect(m.timeline[2].main).toEqual({ object: 'message', id: 'm-1' });
+    expect(m.timeline[2].refs).toEqual([]);
+    expect(m.timeline[2].beforeDeal).toBe(true);
+    expect(m.timelineNote).toBe('Some messages came before the deal was created.');
+    expect(m.timelineTotal).toBe(3);
+  });
+  test('person facts that repeat the LANA account are hidden when the account section shows', () => {
+    const person = { object: 'person', id: 'p-1', title: 'Avery Stone',
+      facts: [{ label: 'Email', value: 'a@x.test', format: 'email' }, { label: 'LANA account', value: 'Active', format: 'status' },
+        { label: 'LANA role', value: 'Admin', format: 'text' }, { label: 'Last signed in to LANA', value: '2026-11-20T15:00:00Z', format: 'datetime' }],
+      lana_account: { state: 'Active', user_id: 'u-1', role: 'Admin', last_signed_in_at: '2026-11-20T15:00:00Z' } };
+    expect(R.panelModel(person).facts.map((f) => f.label)).toEqual(['Email']);
+  });
+  test('activity_period end one day after the requested end is shown as the requested end; an inclusive end is kept', () => {
+    const data = { object: 'person', id: 'p', title: 'P', activity: [{ label: 'Meetings held', value: 1, format: 'number' }], activity_period: { period_start: '2026-10-29', period_end: '2026-11-28' } };
+    expect(R.panelModel(data, { requestedEnd: '2026-11-27' }).activityTitle).toBe('Activity for Oct 29, 2026 to Nov 27, 2026');
+    expect(R.panelModel(Object.assign({}, data, { activity_period: { period_start: '2026-10-29', period_end: '2026-11-27' } }), { requestedEnd: '2026-11-27' }).activityTitle)
+      .toBe('Activity for Oct 29, 2026 to Nov 27, 2026');
+    expect(R.panelModel(data, {}).activityTitle).toBe('Activity for Oct 29, 2026 to Nov 28, 2026');
   });
 });
