@@ -1040,7 +1040,7 @@ test('worklist rows with refs open the record panel by click or keyboard', () =>
 describe('fix data in LANA on worklists', () => {
   const row = { record_id: 'cd-1', client_name: 'Jordan Smith', won_on: '2026-11-20', refs: [{ object: 'deal', id: 'cd-1' }],
     edit: { record_id: 'cd-1', field_key: 'monetaryValue', standard_key: 'amount', current_value: null, editable: true },
-    outcome_edit: { status: 'open', decided_on: null, allowed: ['won', 'lost'] } };
+    outcome_edit: { record_id: 'd-1', editable: true, current_status: 'open', current_decided_on: null, allowed_values: ['won', 'lost'] } };
   test('rows with hints get their controls in a line under the row, only with can_correct', () => {
     const html = page().exports.worklistHtml([row], null, { can_correct: true, can_resolve_conflicts: false });
     expect(html).toContain('<tr class="dash-worklist__fix"><td colspan=');

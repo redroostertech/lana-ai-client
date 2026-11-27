@@ -108,7 +108,7 @@ test('rows wire up: a click or Enter on [data-record-ref] anywhere opens the pan
 
 test('a deal opened from a row with fix hints shows "Fix in LANA" when the person may correct', async () => {
   const { w, opened } = boot();
-  const row = { record_id: 'd-1', edit: { record_id: 'd-1', standard_key: 'amount', current_value: null, editable: true }, outcome_edit: { allowed: ['won', 'lost'] } };
+  const row = { record_id: 'd-1', edit: { record_id: 'd-1', standard_key: 'amount', current_value: null, editable: true }, outcome_edit: { record_id: 'd-1', editable: true, allowed_values: ['won', 'lost'] } };
   w.LanaRecordPanel.open({ object: 'deal', id: 'd-1' }, { row, permissions: { can_correct: true } });
   await settle();
   expect(opened[0].querySelector('.rp-fix')).not.toBeNull();

@@ -4,7 +4,7 @@
 
    Driven only by the row's hints, never by the card:
      row.edit         { record_id, field_key, standard_key, current_value, editable }
-     row.outcome_edit { status, decided_on, allowed }
+     row.outcome_edit { record_id, editable, current_status, current_decided_on, allowed_values }
      row.conflict     { flag_annotation_id, source_name, fields: [{ field_key, standard_key, lana_value, new_source_value, correction_id, ... }] }
      row.fixed_in_lana { fields: [{ field_key, standard_key, correction_id, ... }] }
    and the signed-in person's permissions { can_correct, can_resolve_conflicts }
@@ -87,9 +87,14 @@
     return isFinite(Date.parse(t + 'T00:00:00Z'));
   }
 
+  // outcome_edit.allowed_values: the statuses this deal may be set to.
+  function outcomeAllowed(outcomeEdit) {
+    return outcomeEdit && Array.isArray(outcomeEdit.allowed_values) ? outcomeEdit.allowed_values : [];
+  }
+
   // Outcome only: { outcome: { status, decided_on } }.
   function outcomeBody(outcomeEdit, status, day) {
-    var allowed = outcomeEdit && Array.isArray(outcomeEdit.allowed) ? outcomeEdit.allowed : [];
+    var allowed = outcomeAllowed(outcomeEdit);
     if (allowed.indexOf(status) === -1 || !isPlainDay(day)) return null;
     return { outcome: { status: status, decided_on: str(day) } };
   }
@@ -218,12 +223,15 @@
       var current = edit.current_value === null || edit.current_value === undefined ? '' : String(edit.current_value);
       parts.push('<div class="dfix__line"><lex-input size="sm" type="number" min="0" data-dfix-input="amount" aria-label="Amount" placeholder="Amount" value="'
         + escapeHtml(current) + '"></lex-input>' + btn('amount', 'Save amount', 'primary') + '</div>');
-      var allowed = outcome && Array.isArray(outcome.allowed) ? outcome.allowed.filter(function (s) { return OUTCOMES[s]; }) : [];
+      if (correctionIdFor(r, edit)) parts.push('<div class="dfix__line">' + btn('undo', 'Undo fix', 'ghost') + '</div>');
+    }
+    // Won / lost stands on its own: outcome_edit.editable plus can_correct.
+    if (canCorrect(permissions, outcome)) {
+      var allowed = outcomeAllowed(outcome).filter(function (s) { return OUTCOMES[s]; });
       if (allowed.length) {
         parts.push('<div class="dfix__line"><lex-input size="sm" type="date" data-dfix-input="decided_on" aria-label="Day it was decided" value="'
-          + escapeHtml(str(outcome.decided_on)) + '"></lex-input>' + allowed.map(function (s) { return btn(s, OUTCOMES[s]); }).join('') + '</div>');
+          + escapeHtml(str(outcome.current_decided_on)) + '"></lex-input>' + allowed.map(function (s) { return btn(s, OUTCOMES[s]); }).join('') + '</div>');
       }
-      if (correctionIdFor(r, edit)) parts.push('<div class="dfix__line">' + btn('undo', 'Undo fix', 'ghost') + '</div>');
     }
     if (canResolve(permissions, r.conflict)) {
       var labels = conflictLabels(r);
@@ -231,11 +239,11 @@
         + '<div class="dfix__line">' + btn('keep-lana', labels.keep, 'primary') + btn('use-source', labels.use) + '</div></div>');
     }
     if (!parts.length) return '';
-    var dataId = str((edit && edit.record_id) || r.record_id);
+    var dataId = str((edit && edit.record_id) || (outcome && outcome.record_id) || r.record_id);
     return '<div class="dfix" data-dfix-id="' + escapeHtml(dataId) + '"'
       + (edit && edit.standard_key ? ' data-dfix-standard="' + escapeHtml(edit.standard_key) + '"' : '')
       + (edit && edit.field_key ? ' data-dfix-field="' + escapeHtml(edit.field_key) + '"' : '')
-      + (outcome && Array.isArray(outcome.allowed) ? ' data-dfix-allowed="' + escapeHtml(outcome.allowed.join(',')) + '"' : '')
+      + (outcomeAllowed(outcome).length ? ' data-dfix-allowed="' + escapeHtml(outcomeAllowed(outcome).join(',')) + '"' : '')
       + (correctionIdFor(r, edit) ? ' data-dfix-correction="' + escapeHtml(correctionIdFor(r, edit)) + '"' : '')
       + (r.conflict && r.conflict.flag_annotation_id ? ' data-dfix-flag="' + escapeHtml(r.conflict.flag_annotation_id) + '"' : '')
       + '>' + parts.join('') + '<p class="dfix__status" data-dfix-status role="status" aria-live="polite"></p></div>';
@@ -294,7 +302,7 @@
     } else if (action === 'won' || action === 'lost') {
       var day = inputValue(box, 'decided_on');
       if (!isPlainDay(day)) { setStatus(box, 'Pick the day it was decided.'); return; }
-      var outcomeBodyValue = outcomeBody({ allowed: allowed }, action, day);
+      var outcomeBodyValue = outcomeBody({ allowed_values: allowed }, action, day);
       if (!outcomeBodyValue) { setStatus(box, 'That outcome is not allowed here.'); return; }
       call = function () { return api.createCorrection(dataId, outcomeBodyValue); };
     } else if (action === 'undo' && correction) {

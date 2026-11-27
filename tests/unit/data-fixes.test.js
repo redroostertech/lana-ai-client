@@ -22,7 +22,7 @@ const settle = async () => { for (let i = 0; i < 6; i += 1) await new Promise((r
 const missingAmount = {
   record_id: 'cd-1', client_name: 'Jordan Smith', refs: [{ object: 'deal', id: 'cd-1' }],
   edit: { record_id: 'cd-1', field_key: 'monetaryValue', standard_key: 'amount', current_value: null, editable: true },
-  outcome_edit: { status: 'open', decided_on: null, allowed: ['won', 'lost'] },
+  outcome_edit: { record_id: 'd-1', editable: true, current_status: 'open', current_decided_on: null, allowed_values: ['won', 'lost'] },
 };
 const conflicted = {
   record_id: 'cd-2', client_name: 'Casey Lee',
@@ -122,6 +122,11 @@ describe('controls in the page', () => {
   test('nothing renders without permission or an editable row', () => {
     expect(F.controlsHtml(missingAmount, { can_correct: false })).toBe('');
     expect(F.controlsHtml(Object.assign({}, missingAmount, { edit: Object.assign({}, missingAmount.edit, { editable: false }), outcome_edit: null }), can)).toBe('');
+    const outcomeOnly = F.controlsHtml(Object.assign({}, missingAmount, { edit: null }), can);
+    expect(outcomeOnly).toContain('data-dfix-action="won"');
+    expect(outcomeOnly).not.toContain('data-dfix-input="amount"');
+    expect(F.controlsHtml(Object.assign({}, missingAmount, { edit: null, outcome_edit: Object.assign({}, missingAmount.outcome_edit, { editable: false }) }), can)).toBe('');
+    expect(F.controlsHtml(Object.assign({}, missingAmount, { edit: null, outcome_edit: { editable: true, allowed: ['won'] } }), can)).toBe('');
   });
 
   test('inline amount: Save posts the fix, says how long the numbers take, and reports the record', async () => {
