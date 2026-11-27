@@ -312,3 +312,15 @@ test('final contract: pinned_count and corrected_count are read from raw_data on
   const notes = V.rowNotes({ conflict: { source_name: 'ActionStep', fields: [{ standard_key: 'amount', lana_value: 4500, new_source_value: 3000 }] } });
   expect(notes.conflict.fields[0].sourceName).toBe('ActionStep');
 });
+
+test('a Date column (row_date) that repeats another date column on every row is hidden', () => {
+  const rows = [
+    { deal_name: 'A', decided_on: '2026-11-20', row_date: '2026-11-20', row_reason: 'Won.' },
+    { deal_name: 'B', decided_on: '2026-11-18T00:00:00Z', row_date: '2026-11-18', row_reason: 'Won.' },
+  ];
+  expect(V.recordsTable(rows).columns.map((c) => c.key)).toEqual(['deal_name', 'decided_on', '_notes']);
+  expect(V.recordsTable(rows, [{ field: 'deal_name', header: 'Deal name' }, { field: 'decided_on', header: 'Decided', format: 'date' }, { field: 'row_date', header: 'Date', format: 'date' }])
+    .columns.map((c) => c.key)).toEqual(['deal_name', 'decided_on', '_notes']);
+  const differs = rows.map((r, i) => Object.assign({}, r, { decided_on: i ? '2026-11-01' : r.decided_on }));
+  expect(V.recordsTable(differs).columns.map((c) => c.key)).toEqual(['deal_name', 'decided_on', 'row_date', '_notes']);
+});

@@ -53,3 +53,19 @@ describe('long freshness labels (several sources) wrap without breaking the card
     expect(rulesFor(css, '.dash-metric-card__period .lex-freshness').join(';')).not.toContain('nowrap');
   });
 });
+
+describe('the metric detail records table scrolls inside its card, never the page', () => {
+  const css = read('css/admin/insights-dashboard.css');
+  test('the layout grid column can shrink below the table width', () => {
+    expect(rulesFor(css, '.metric-detail-layout').join(';')).toContain('grid-template-columns: minmax(0, 1fr)');
+    expect(rulesFor(css, '#metricSourcePanel').join(';')).toContain('min-width: 0');
+    const table = rulesFor(css, '#metricRawDataTable').join(';');
+    expect(table).toContain('max-width: 100%');
+    expect(table).toContain('overflow-x: auto');
+  });
+  test('the Notes cell wraps at about 280px', () => {
+    const notes = rulesFor(css, '.metric-record-notes').join(';');
+    expect(notes).toContain('white-space: normal');
+    expect(notes).toContain('max-width: 280px');
+  });
+});

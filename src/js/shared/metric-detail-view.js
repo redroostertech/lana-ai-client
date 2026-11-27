@@ -217,6 +217,9 @@
       var type = typeOf(key, list);
       return { key: key, label: labelFor(key), type: type, align: type === 'money' || type === 'number' ? 'right' : 'left' };
     });
+    // A Date column (row_date) that repeats another date column on every row
+    // says the same thing twice: hide it.
+    columns = withoutRepeatedRowDate(columns, list);
     // The row's reason, conflict and "Fixed in LANA" mark in one Notes column.
     if (list.some(hasNotes)) columns = columns.concat([{ key: '_notes', label: 'Notes', type: 'notes', align: 'left', fromServer: columns.length && columns[0].fromServer }]);
     return {
@@ -231,6 +234,19 @@
         };
       }),
     };
+  }
+
+  function dayPart(value) {
+    return isEmpty(value) ? '' : String(value).substring(0, 10);
+  }
+
+  function withoutRepeatedRowDate(columns, list) {
+    if (!list.length || !columns.some(function (c) { return c.key === 'row_date'; })) return columns;
+    var twin = columns.filter(function (c) {
+      return c.key !== 'row_date' && (c.type === 'date' || c.type === 'datetime')
+        && list.every(function (row) { return dayPart(row.row_date) !== '' && dayPart(row[c.key]) === dayPart(row.row_date); });
+    })[0];
+    return twin ? columns.filter(function (c) { return c.key !== 'row_date'; }) : columns;
   }
 
   function hasNotes(row) {

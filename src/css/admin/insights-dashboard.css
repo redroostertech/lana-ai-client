@@ -4135,6 +4135,8 @@ button.dash-lines__label:hover,
   flex-wrap: wrap;
   align-items: baseline;
   gap: 0.25rem 0.5rem;
+  min-width: 12rem;
+  max-width: 280px;
   white-space: normal;
 }
 
@@ -4221,4 +4223,21 @@ button.dash-lines__label:hover,
    stretching to the row with an empty middle. */
 .dash-bento .dash-metric-card--hero.dash-metric-card--no-spark {
   align-self: start;
+}
+
+/* The records table scrolls sideways inside its own card: the layout's
+   one grid column can shrink below the table's width, so a wide table
+   never pushes the page sideways under the left menu. */
+.metric-detail-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+#metricSourcePanel {
+  min-width: 0;
+}
+
+#metricRawDataTable {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
 }
