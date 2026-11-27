@@ -1152,3 +1152,21 @@ describe('a hero without history shrinks to its content', () => {
     expect(rule.slice(0, rule.indexOf('}'))).toContain('align-self: start');
   });
 });
+
+test('team appointments by meeting type (no value field): member · type labels, counts not n/a, members clickable', async () => {
+  const rows = [
+    { team_member: 'Avery Stone', meeting_type: 'Consultation', appointments: 68, held: 29, no_show: 30, cancelled: 8, no_outcome: 1, show_rate: 49.2, refs: [{ object: 'person', id: 'p-1', user_id: 'u-9' }] },
+    { team_member: 'Blake Ross', meeting_type: 'Signing', appointments: 12, held: 10, no_show: 1, cancelled: 1, no_outcome: 0, show_rate: 90.9, refs: [{ object: 'person', id: 'p-2', user_id: null }] },
+  ];
+  const card = { metric_key: 'legal_firm.sales_intake.team_appointments_by_meeting_type', title: 'Team Appointments', format: 'distribution', data_state: 'ok', period: 'Nov 2026', value: rows };
+  for (const visual of ['paired_columns', 'ranked_bars']) {
+    const layout = { cards: [{ id: 't', kind: 'breakdown', metric_key: 'sales_intake.team_appointments_by_meeting_type', visual }] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [card] }) });
+    await p.exports.loadDashboardById('d1');
+    const html = p.nodes.dashboardMetricGrid.innerHTML;
+    expect([visual, text(html).includes('Avery Stone · Consultation')]).toEqual([visual, true]);
+    expect([visual, text(html).includes('68')]).toEqual([visual, true]);
+    expect([visual, html.includes('n/a')]).toEqual([visual, false]);
+    expect([visual, html.includes('data-record-ref="person|p-1|u-9"')]).toEqual([visual, true]);
+  }
+});

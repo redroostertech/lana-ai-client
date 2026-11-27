@@ -262,7 +262,9 @@
         : '<span class="mini-rank__value">' + escapeHtml(o.format ? o.format(row) : String(row.value)) + '</span>';
       return '<li class="mini-rank__row">' + avatar
         + '<div class="mini-rank__body"><div class="mini-rank__head">'
-        + '<button type="button" class="mini-rank__label"' + linkAttr(row.key && o.href ? o.href(row.key) : '') + ' title="See the records">' + escapeHtml(row.label) + '</button>'
+        + (row.ref
+          ? '<button type="button" class="mini-rank__label"' + recordAttr(row.ref).split(' tabindex="0" role="button"').join('') + '>' + escapeHtml(row.label) + '</button>'
+          : '<button type="button" class="mini-rank__label"' + linkAttr(row.key && o.href ? o.href(row.key) : '') + ' title="See the records">' + escapeHtml(row.label) + '</button>')
         + value + '</div>'
         + (row.waiting ? '' : '<svg class="mini-rank__track" viewBox="0 0 100 6" preserveAspectRatio="none" aria-hidden="true" focusable="false"><rect class="mini-rank__fill" x="0" y="0" width="' + row.pct + '" height="6"></rect></svg>')
         + '</div></li>';

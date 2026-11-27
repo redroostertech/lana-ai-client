@@ -102,13 +102,9 @@
     return true;
   }
 
-  // The first plain text field that is not an id or a date.
-  function firstTextField(row) {
-    var keys = Object.keys(row);
-    for (var i = 0; i < keys.length; i += 1) {
-      if (!isIdOrDateKey(keys[i]) && looksLikeWords(row[keys[i]])) return keys[i];
-    }
-    return null;
+  // The plain text fields that are not ids or dates, in order.
+  function textFields(row) {
+    return Object.keys(row).filter(function (key) { return !isIdOrDateKey(key) && looksLikeWords(row[key]); });
   }
 
   /**
@@ -139,8 +135,32 @@
       if (key === 'key' || key === 'id' || key.slice(-4) === '_key') return sentenceCase(text);
       return dayLabel(text);
     }
-    var text = firstTextField(row);
-    return text ? String(row[text]) : 'Item ' + (index + 1);
+    // A cross-tab row (member by meeting type): the first two words fields.
+    var texts = textFields(row);
+    if (texts.length >= 2) return String(row[texts[0]]) + ' · ' + String(row[texts[1]]);
+    return texts.length ? String(row[texts[0]]) : 'Item ' + (index + 1);
+  }
+
+  // Count fields: numbers that are not ids, dates, positions or rates.
+  var NOT_COUNT_WORDS = ['rate', 'pct', 'percent', 'ratio', 'average', 'avg', 'mean', 'position', 'order', 'rank', 'share'];
+
+  function isCountKey(key) {
+    var k = String(key).toLowerCase();
+    if (isIdOrDateKey(k)) return false;
+    for (var i = 0; i < NOT_COUNT_WORDS.length; i += 1) {
+      if (k.indexOf(NOT_COUNT_WORDS[i]) !== -1) return false;
+    }
+    return true;
+  }
+
+  /** A row's value: row.value when it has one, else its first count field (never a rate). */
+  function rowValue(row, key) {
+    if (Object.prototype.hasOwnProperty.call(row, key)) return toNumber(row[key]);
+    var keys = Object.keys(row);
+    for (var i = 0; i < keys.length; i += 1) {
+      if (typeof row[keys[i]] === 'number' && isCountKey(keys[i])) return toNumber(row[keys[i]]);
+    }
+    return null;
   }
 
   function firstRef(row) {
@@ -215,7 +235,7 @@
       // Records whose source value is not mapped yet (Settings > Mappings).
       var muted = !!(row && typeof row === 'object' && (row.not_mapped === true || row.service_key === 'not_mapped' || row.key === 'not_mapped'));
       var isObject = row && typeof row === 'object';
-      var value = isObject ? toNumber(row[actualVsNeeded ? ACTUAL_KEY : VALUE_KEY]) : toNumber(row);
+      var value = isObject ? (actualVsNeeded ? toNumber(row[ACTUAL_KEY]) : rowValue(row, VALUE_KEY)) : toNumber(row);
       return {
         label: muted ? 'Not mapped' : rowLabel(row, index),
         value: value,

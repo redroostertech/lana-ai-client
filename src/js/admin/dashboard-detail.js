@@ -1112,7 +1112,7 @@
       rows: shown.map(function (row) {
         var second = row.second === undefined ? null : row.second;
         return { label: row.label, value: row.value, second: second, pct: pct(row.value), secondPct: second === null ? null : pct(second), key: row.key,
-          partial: !!row.partial };
+          partial: !!row.partial, ref: row.ref || null };
       }),
       paired: paired,
       seriesLabels: paired ? (labels && labels.length === 2 ? labels : ['Actual', 'Needed']) : [],

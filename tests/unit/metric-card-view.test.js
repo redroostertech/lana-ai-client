@@ -46,9 +46,10 @@ describe('listBars detects lists from the value shape', () => {
     expect(model.paired).toBe(false);
   });
 
-  test('only the server field names are read, never guesses', () => {
+  test('with no value field the first count field is used (never a rate or an id)', () => {
     const model = View.listBars([{ label: 'A', amount: 10, total: 4, count: 3 }]);
-    expect(model.rows[0].value).toBe(null);
+    expect(model.rows[0].value).toBe(10);
+    expect(View.listBars([{ label: 'A', rate: 0.5, record_id: 7 }]).rows[0].value).toBe(null);
   });
 
   test('actual against needed with needed set draws paired bars on one scale', () => {
@@ -393,5 +394,21 @@ describe('listValueFormat: a value format the server sends for distribution rows
   });
   test('without a hint, never guessed from field names', () => {
     expect(View.listValueFormat({ format: 'distribution', value: [{ stage: 'Lead', value: 73000, no_amount_count: 4 }] })).toBe('number');
+  });
+});
+
+describe('cross-tab rows with no value field (team appointments by meeting type)', () => {
+  const row = { team_member: 'Avery Stone', meeting_type: 'Consultation', appointments: 68, held: 29, no_show: 30, cancelled: 8, no_outcome: 1, show_rate: 49.2,
+    refs: [{ object: 'person', id: 'p-1', user_id: 'u-9' }] };
+  test('two category words read "Member · Type"; the value is the first count field, never a rate', () => {
+    const model = View.listBars([row], 12);
+    expect(model.rows[0]).toMatchObject({ label: 'Avery Stone · Consultation', value: 68, ref: { object: 'person', id: 'p-1', user_id: 'u-9' } });
+  });
+  test('a row with only rates has no value rather than a summed or guessed one', () => {
+    expect(View.listBars([{ team_member: 'A', show_rate: 49.2, conversion_pct: 10 }], 12).rows[0].value).toBe(null);
+  });
+  test('rows with a value field keep it; positions and ids are not counts', () => {
+    expect(View.listBars([{ stage: 'Lead', stage_position: 3, open_count: 19, value: 73000 }], 12).rows[0].value).toBe(73000);
+    expect(View.listBars([{ stage: 'Lead', stage_position: 3, open_count: 19 }], 12).rows[0].value).toBe(19);
   });
 });
