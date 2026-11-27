@@ -34,6 +34,7 @@ function boot(getReportObject) {
   } } };
   w.api = { getReportObject: getReportObject || jest.fn((object) => Promise.resolve({ data: samples[object] })) };
   w.eval(read('js/shared/report-objects.js'));
+  w.eval(read('js/shared/data-fixes.js'));
   w.eval(read('js/shared/report-object-panel.js'));
   return { w, opened };
 }
@@ -102,4 +103,17 @@ test('rows wire up: a click or Enter on [data-record-ref] anywhere opens the pan
   await settle();
   expect(opened).toHaveLength(1);
   expect(w.api.getReportObject).toHaveBeenCalledWith('person', 'p-1', { start: '2026-11-01', end: '2026-11-30' });
+});
+
+test('a deal opened from a row with fix hints shows "Fix in LANA" when the person may correct', async () => {
+  const { w, opened } = boot();
+  const row = { record_id: 'd-1', edit: { record_id: 'd-1', standard_key: 'amount', current_value: null, editable: true }, outcome_edit: { allowed: ['won', 'lost'] } };
+  w.LanaRecordPanel.open({ object: 'deal', id: 'd-1' }, { row, permissions: { can_correct: true } });
+  await settle();
+  expect(opened[0].querySelector('.rp-fix')).not.toBeNull();
+  expect(opened[0].querySelector('[data-dfix-action="amount"]')).not.toBeNull();
+  const { w: w2, opened: opened2 } = boot();
+  w2.LanaRecordPanel.open({ object: 'deal', id: 'd-1' }, { row, permissions: { can_correct: false } });
+  await settle();
+  expect(opened2[0].querySelector('.rp-fix')).toBeNull();
 });

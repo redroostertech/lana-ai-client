@@ -49,13 +49,13 @@ test('breakdown rows that carry refs open the record, not the metric', () => {
 test('the pages load the panel and the router entries match', () => {
   ['admin/dashboard-detail.html', 'admin/metric_detail.html', 'admin/report.html'].forEach((page) => {
     const html = read(page);
-    ['lex-drawer.js', 'shared/report-objects.js', 'shared/report-object-panel.js', 'report-object-panel.css'].forEach((s) => expect([page, html.includes(s)]).toEqual([page, true]));
+    ['lex-drawer.js', 'shared/report-objects.js', 'shared/data-fixes.js', 'shared/report-object-panel.js', 'report-object-panel.css'].forEach((s) => expect([page, html.includes(s)]).toEqual([page, true]));
   });
   const pages = read('js/lex/lex-router.pages.js');
   ['admin/dashboard-detail.html', 'admin/metric_detail.html', 'admin/report.html'].forEach((page) => {
     const start = pages.indexOf("'" + page + "': {");
     const entry = pages.slice(start, pages.indexOf('\n    },', start));
-    ['js/lex/components/foundation/lex-drawer.js', 'js/shared/report-objects.js', 'js/shared/report-object-panel.js', 'css/report-object-panel.css']
+    ['js/lex/components/foundation/lex-drawer.js', 'js/shared/report-objects.js', 'js/shared/data-fixes.js', 'js/shared/report-object-panel.js', 'css/report-object-panel.css']
       .forEach((s) => expect([page, entry.includes("'" + s + "'")]).toEqual([page, true]));
   });
 });
@@ -64,4 +64,10 @@ test('pages bind rows to the panel; metric detail and drilldown rows with refs o
   expect(read('js/admin/dashboard-detail.js')).toContain('LanaRecordPanel.bindRows(');
   expect(read('js/admin/metric-detail.js')).toContain('LanaRecordPanel.open(');
   expect(read('js/drilldown-renderer.js')).toContain('LanaRecordPanel.open(');
+});
+
+test('pages wire fixes: worklists and the metric detail table bind DataFixes and refetch after a save', () => {
+  expect(read('js/admin/dashboard-detail.js')).toContain('DataFixes.bind(content, { onSaved: onFixSaved })');
+  expect(read('js/admin/metric-detail.js')).toContain('DataFixes.bind(table, { onSaved: onFixSaved })');
+  expect(read('js/admin/metric-detail.js')).toContain('loadMetricDetail(); }, info.delayMs)');
 });

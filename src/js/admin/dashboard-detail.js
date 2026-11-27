@@ -1386,7 +1386,10 @@
   // codes, dates as days, amounts as money (right-aligned).
   // rowColumns: the server's row_columns for these rows (headers, formats,
   // labels), which win over the inferred columns when present.
-  function worklistHtml(rows, rowColumns) {
+  // permissions: the signed-in person's { can_correct, can_resolve_conflicts }
+  // from the card or metric detail; rows with fix hints get their controls
+  // in a line under the row (js/shared/data-fixes.js).
+  function worklistHtml(rows, rowColumns, permissions) {
     if (!rows.length) return '<p class="dash-worklist__empty">No records right now.</p>';
     var view = window.MetricDetailView;
     var table = view.recordsTable(rows, rowColumns);
@@ -1397,16 +1400,50 @@
     var body = table.rows.slice(0, 5).map(function (row, index) {
       // A row that is a data object opens the record panel (click or Enter).
       var ref = window.ReportObjects ? window.ReportObjects.primaryRef(rows[index]) : null;
-      var open = ref ? ' class="dash-worklist__row" data-record-ref="' + escapeHtml(window.ReportObjects.refAttr(ref)) + '" tabindex="0"' : '';
+      var open = ref ? ' class="dash-worklist__row" data-record-ref="' + escapeHtml(window.ReportObjects.refAttr(ref)) + '" data-row-index="' + index + '" tabindex="0"' : '';
+      var fix = window.DataFixes ? window.DataFixes.controlsHtml(rows[index], permissions) : '';
+      var fixRow = fix ? '<tr class="dash-worklist__fix"><td colspan="' + columns.length + '">' + fix + '</td></tr>' : '';
       return '<tr' + open + '>' + columns.map(function (col) {
         var source = rows[index][col.key];
         var text = view.formatCell(source, col);
         if (text === null) return '<td class="dash-worklist__muted">-</td>';
         var dot = col.key === 'status' ? '<span class="dash-dot dash-dot--' + escapeHtml(String(source).toLowerCase()) + '" aria-hidden="true"></span>' : '';
         return '<td' + (col.align === 'right' ? ' class="dash-worklist__num"' : '') + '>' + dot + escapeHtml(text) + '</td>';
-      }).join('') + '</tr>';
+      }).join('') + '</tr>' + fixRow;
     }).join('');
     return '<table class="dash-worklist__table"><thead>' + head + '</thead><tbody>' + body + '</tbody></table>';
+  }
+
+  function worklistRowFor(el) {
+    var slot = el && el.closest ? el.closest('[data-worklist-key]') : null;
+    var index = el ? Number(el.getAttribute('data-row-index')) : NaN;
+    return slot && slot._rows && isFinite(index) ? slot._rows[index] || null : null;
+  }
+
+  // After a fix: the row updates in place right away, then the cards and
+  // worklists refetch once the server has re-normalized.
+  function onFixSaved(info) {
+    var slot = info.box && info.box.closest ? info.box.closest('[data-worklist-key]') : null;
+    if (slot && slot._rows) {
+      var row = slot._rows.filter(function (r) { return r && String((r.edit && r.edit.record_id) || r.record_id) === String(info.dataId); })[0];
+      if (row && info.record) {
+        window.DataFixes.applyRecord(row, info.record);
+        slot.innerHTML = worklistHtml(slot._rows, slot._columns, slot._permissions);
+      }
+      var status = slot.querySelector('.dfix[data-dfix-id="' + String(info.dataId).split('"').join('') + '"] [data-dfix-status]');
+      if (status) status.textContent = 'Saved. Updating...';
+    }
+    scheduleRefresh(info.delayMs);
+  }
+
+  var refreshTimer = null;
+  function scheduleRefresh(delayMs) {
+    if (refreshTimer) clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(function () {
+      refreshTimer = null;
+      worklistCache = {};
+      reloadDashboardMetricsForCurrentPeriod();
+    }, delayMs);
   }
 
   function firmToday() {
@@ -1424,7 +1461,11 @@
   // when the card did not already show one of its own.
   // rowsStatus: MetricDetailView.rowsStatus of the payload; when the server
   // could not read the rows, show the calm note instead of an empty list.
-  function drawRows(slot, rows, rowColumns, caveats, rowsStatus) {
+  function drawRows(slot, rows, rowColumns, caveats, rowsStatus, permissions) {
+    // Kept for the record panel and for fixes that update a row in place.
+    slot._rows = rows || [];
+    slot._columns = rowColumns;
+    slot._permissions = permissions || null;
     slot.classList.remove('mini-spark-slot--loading');
     var key = slot.getAttribute('data-worklist-key');
     var visual = slot.getAttribute('data-rows-visual') || 'worklist';
@@ -1444,7 +1485,8 @@
       slot.innerHTML = template.innerHTML;
     } else if (rows) {
       var sort = choice.sort || slot.getAttribute('data-rows-sort');
-      slot.innerHTML = worklistHtml(window.CardVisuals.sortRows(rows, sort), rowColumns);
+      slot._rows = window.CardVisuals.sortRows(rows, sort);
+      slot.innerHTML = worklistHtml(slot._rows, rowColumns, permissions);
     } else {
       slot.innerHTML = '';
     }
@@ -1474,6 +1516,7 @@
             columns: payload && Array.isArray(payload.row_columns) ? payload.row_columns : null,
             caveats: lineage && Array.isArray(lineage.caveats) ? lineage.caveats : [],
             rowsStatus: window.MetricDetailView.rowsStatus(payload && payload.raw_data),
+            permissions: payload && payload.permissions ? payload.permissions : null,
           };
         }).catch(function () { return null; });
       }
@@ -1481,7 +1524,8 @@
         // The card's own row_columns answer first; metric detail's otherwise.
         var metric = declaredIndex ? window.DashboardCards.metricFor(declaredIndex, key) : null;
         var columns = metric && Array.isArray(metric.row_columns) ? metric.row_columns : (result && result.columns);
-        drawRows(slot, result ? result.rows : null, columns, result ? result.caveats : [], result ? result.rowsStatus : null);
+        drawRows(slot, result ? result.rows : null, columns, result ? result.caveats : [], result ? result.rowsStatus : null,
+          (metric && metric.permissions) || (result ? result.permissions : null));
       });
     });
   }
@@ -2287,10 +2331,14 @@
       }
     });
 
-    // Every data object (worklist rows, bars with refs) opens the record panel.
+    // Every data object (worklist rows, bars with refs) opens the record panel,
+    // with the row (and its fix hints) when it came from a worklist.
     if (window.LanaRecordPanel) {
-      window.LanaRecordPanel.bindRows(content, function () { return { start: currentPeriod.start, end: currentPeriod.end }; });
+      window.LanaRecordPanel.bindRows(content, function () { return { start: currentPeriod.start, end: currentPeriod.end }; }, worklistRowFor,
+        function (el) { var slot = el.closest('[data-worklist-key]'); return slot ? slot._permissions : null; });
     }
+    // Fixes made on a worklist row: update the row now, refetch soon.
+    if (window.DataFixes) window.DataFixes.bind(content, { onSaved: onFixSaved });
 
     var params = getParams();
     var id = params.get('id');

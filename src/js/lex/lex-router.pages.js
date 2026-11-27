@@ -515,6 +515,7 @@
         'js/admin/report-builder.js',
         'js/lex/components/foundation/lex-drawer.js',
         'js/shared/report-objects.js',
+        'js/shared/data-fixes.js',
         'js/shared/report-object-panel.js',
         'js/admin/reports-list.model.js',
         'js/shared/title-switcher.js',
@@ -591,6 +592,7 @@
         'js/shared/metric-detail-view.js',
         'js/lex/components/foundation/lex-drawer.js',
         'js/shared/report-objects.js',
+        'js/shared/data-fixes.js',
         'js/shared/report-object-panel.js',
         'js/shared/title-switcher.js',
         'js/admin/dashboard-detail.js'
@@ -627,6 +629,7 @@
         'js/shared/insights-breadcrumbs.js',
         'js/lex/components/foundation/lex-drawer.js',
         'js/shared/report-objects.js',
+        'js/shared/data-fixes.js',
         'js/shared/report-object-panel.js',
         'js/admin/metric-detail.js'
       ],

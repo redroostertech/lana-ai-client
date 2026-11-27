@@ -3931,6 +3931,26 @@ class ApiClient {
     return this.get('/api/v1/report-objects/' + encodeURIComponent(object) + '/' + encodeURIComponent(id) + suffix);
   }
 
+  // ── Fix data in LANA (fixes stay in LANA; syncs never undo them) ──
+  // POST { fields: [{ standard_key|field_key, value }], outcome?: { status, decided_on } }
+  // Responses: { record, refresh: { queued, expected_within_seconds } }.
+  async createCorrection(dataId, body) {
+    return this.post('/api/v1/connected-data/' + encodeURIComponent(dataId) + '/corrections', body || {});
+  }
+
+  async updateCorrection(dataId, annotationId, body) {
+    return this.put('/api/v1/connected-data/' + encodeURIComponent(dataId) + '/corrections/' + encodeURIComponent(annotationId), body || {});
+  }
+
+  async deleteCorrection(dataId, annotationId) {
+    return this.delete('/api/v1/connected-data/' + encodeURIComponent(dataId) + '/corrections/' + encodeURIComponent(annotationId));
+  }
+
+  // keep: 'lana' | 'source'
+  async resolveConflict(dataId, flagId, keep) {
+    return this.post('/api/v1/connected-data/' + encodeURIComponent(dataId) + '/conflicts/' + encodeURIComponent(flagId) + '/resolve', { keep: keep });
+  }
+
   // ── Mappings (Settings > Mappings): source values to governed keys ──
   // GET /api/v1/mappings/summary -> per vocabulary { mapped_records, unmapped_records, unmapped_values }
   // options.quietStatuses: statuses the caller handles itself (setup-banner.js).

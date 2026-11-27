@@ -1033,6 +1033,20 @@ describe('layout.chapters on the dashboard', () => {
 test('worklist rows with refs open the record panel by click or keyboard', () => {
   const html = page().exports.worklistHtml([{ client_name: 'Jordan Smith', amount: 4500, refs: [{ object: 'deal', id: 'd-1' }] }, { client_name: 'No ref', amount: 1 }]);
   const rows = html.split('<tr').slice(2);
-  expect(rows[0]).toContain(' class="dash-worklist__row" data-record-ref="deal|d-1|" tabindex="0"');
+  expect(rows[0]).toContain(' class="dash-worklist__row" data-record-ref="deal|d-1|" data-row-index="0" tabindex="0"');
   expect(rows[1]).not.toContain('data-record-ref');
+});
+
+describe('fix data in LANA on worklists', () => {
+  const row = { record_id: 'cd-1', client_name: 'Jordan Smith', won_on: '2026-11-20', refs: [{ object: 'deal', id: 'cd-1' }],
+    edit: { record_id: 'cd-1', field_key: 'monetaryValue', standard_key: 'amount', current_value: null, editable: true },
+    outcome_edit: { status: 'open', decided_on: null, allowed: ['won', 'lost'] } };
+  test('rows with hints get their controls in a line under the row, only with can_correct', () => {
+    const html = page().exports.worklistHtml([row], null, { can_correct: true, can_resolve_conflicts: false });
+    expect(html).toContain('<tr class="dash-worklist__fix"><td colspan=');
+    expect(html).toContain('data-dfix-action="amount"');
+    expect(html).toContain('data-dfix-action="won"');
+    expect(page().exports.worklistHtml([row], null, { can_correct: false })).not.toContain('dfix');
+    expect(page().exports.worklistHtml([row], null, null)).not.toContain('dfix');
+  });
 });

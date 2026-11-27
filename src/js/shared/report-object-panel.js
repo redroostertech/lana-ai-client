@@ -77,7 +77,11 @@
         return '<li>' + refButton(l.ref, l.label) + ' <span class="rp-muted">' + escapeHtml(l.kind) + '</span></li>';
       }).join('') + '</ul>'));
     }
-    if (typeof state.options.extraHtml === 'function') parts.push(state.options.extraHtml(m, current()) || '');
+    // Fix data in LANA: when the row behind this record carries fix hints
+    // and the person may use them (js/shared/data-fixes.js).
+    var entry = current();
+    var fix = entry && entry.row && global.DataFixes ? global.DataFixes.controlsHtml(entry.row, state.options.permissions || null) : '';
+    if (fix) parts.push(section('Fix in LANA', '<p class="rp-muted">Your fix stays in LANA. Your connected system keeps its own value, and syncs never undo the fix.</p>' + fix, 'rp-fix'));
     return parts.join('');
   }
 
@@ -131,6 +135,14 @@
         if (ref) { state.stack.push({ ref: ref, row: null }); load(); }
       }
     });
+    if (global.DataFixes) {
+      global.DataFixes.bind(drawer, { onSaved: function (info) {
+        var entry = current();
+        if (entry && entry.row && info.record) global.DataFixes.applyRecord(entry.row, info.record);
+        if (typeof state.options.onSaved === 'function') state.options.onSaved(info);
+        setTimeout(function () { if (current() === entry) load(); }, info.delayMs);
+      } });
+    }
     drawer.addEventListener('lex-close', function () {
       state.drawer = null;
       state.stack = [];
@@ -147,8 +159,9 @@
       state.options = opts;
       state.drawer = global.Lex.Drawer.open({ heading: '', width: 'lg', expandable: true });
       bindDrawer(state.drawer);
-    } else if (opts.period) {
-      state.options.period = opts.period;
+    } else {
+      if (opts.period) state.options.period = opts.period;
+      if (opts.permissions) state.options.permissions = opts.permissions;
     }
     state.stack.push({ ref: clean, row: opts.row || null });
     load();
@@ -160,7 +173,7 @@
    * click or Enter. getPeriod() gives the page's dates; getRow(el) can give
    * the row's own fields for the fallback.
    */
-  function bindRows(container, getPeriod, getRow) {
+  function bindRows(container, getPeriod, getRow, getPermissions) {
     if (!container || container._recordRowsBound) return;
     container._recordRowsBound = true;
     var handle = function (event) {
@@ -173,7 +186,11 @@
       var ref = model().parseRef(el.getAttribute('data-record-ref'));
       if (!ref) return;
       event.preventDefault();
-      open(ref, { period: typeof getPeriod === 'function' ? getPeriod() : null, row: typeof getRow === 'function' ? getRow(el) : null });
+      open(ref, {
+        period: typeof getPeriod === 'function' ? getPeriod() : null,
+        row: typeof getRow === 'function' ? getRow(el) : null,
+        permissions: typeof getPermissions === 'function' ? getPermissions(el) : null,
+      });
     };
     container.addEventListener('click', handle);
     container.addEventListener('keydown', function (event) {

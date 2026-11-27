@@ -142,8 +142,15 @@
     }
     if (notes.fixed) parts.push('<span class="metric-record-badge metric-record-badge--fixed">Fixed in LANA</span>');
     if (notes.reason) parts.push('<span class="metric-record-reason">' + escapeHtml(notes.reason) + '</span>');
+    // Fix data in LANA, when the row has hints and the person may use them.
+    var fix = window.DataFixes ? window.DataFixes.controlsHtml(row, currentPermissions) : '';
+    if (fix) parts.push(fix);
     return parts.length ? '<span class="metric-record-notes">' + parts.join(' ') + '</span>' : MUTED_DASH;
   }
+
+  // The signed-in person's { can_correct, can_resolve_conflicts } from the
+  // metric detail response.
+  var currentPermissions = null;
 
   function recordRenderers(columns) {
     var renderers = {};
@@ -250,8 +257,10 @@
         var ref = row && window.ReportObjects ? window.ReportObjects.primaryRef(row) : null;
         if (!ref || !window.LanaRecordPanel) return;
         var qp = params();
-        window.LanaRecordPanel.open(ref, { period: { start: qp.get('periodStart') || '', end: qp.get('periodEnd') || '' }, row: row });
+        window.LanaRecordPanel.open(ref, { period: { start: qp.get('periodStart') || '', end: qp.get('periodEnd') || '' }, row: row,
+          permissions: currentPermissions, onSaved: onFixSaved });
       });
+      if (window.DataFixes) window.DataFixes.bind(table, { onSaved: onFixSaved });
     }
     empty();
     table.setData((Array.isArray(sourceRows) ? sourceRows : []).map(view().recordsRow));
@@ -485,6 +494,22 @@
 
   // Above the records: "As of <day>", the server's basis label, and the
   // conflicts summary (MetricDetailView.recordsHeader).
+  // After a fix: update the row in place right away, then reload once the
+  // server has re-normalized (refresh.expected_within_seconds).
+  var currentRows = [];
+  var currentRowColumns = null;
+  var fixTimer = null;
+
+  function onFixSaved(info) {
+    var row = currentRows.filter(function (r) { return r && String((r.edit && r.edit.record_id) || r.record_id) === String(info.dataId); })[0];
+    if (row && info.record && window.DataFixes) {
+      window.DataFixes.applyRecord(row, info.record);
+      try { renderRawData(currentRows, currentRowColumns); } catch (err) { /* the reload below redraws it */ }
+    }
+    if (fixTimer) clearTimeout(fixTimer);
+    fixTimer = setTimeout(function () { fixTimer = null; loadMetricDetail(); }, info.delayMs);
+  }
+
   function renderRecordsHeader(payload) {
     var header = view().recordsHeader(payload);
     [['metricRawDataAsOf', header.asOf], ['metricRawDataBasis', header.basis], ['metricRawDataConflicts', header.conflicts]].forEach(function (pair) {
@@ -609,6 +634,9 @@
       var rowsStatus = view().rowsStatus(payload.raw_data);
       renderRowsStatus(rowsStatus);
       if (!rowsStatus) {
+        currentPermissions = payload.permissions || null;
+        currentRows = payload.raw_data && Array.isArray(payload.raw_data.rows) ? payload.raw_data.rows : [];
+        currentRowColumns = payload.row_columns;
         renderRecordsHeader(payload);
         renderRawData(payload.raw_data && payload.raw_data.rows ? payload.raw_data.rows : [], payload.row_columns);
         renderRawDataTotal(payload.raw_data);
