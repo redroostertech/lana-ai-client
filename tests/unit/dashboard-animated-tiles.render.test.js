@@ -35,7 +35,7 @@ function page(api = {}, user = null, search = '') {
   let source = fs.readFileSync(path.join(__dirname, '../../src/js/admin/dashboard-detail.js'), 'utf8');
   const end = source.lastIndexOf('  init();');
   source = source.slice(0, end)
-    + '  window.testExports = { renderMetricCard, formatMetricCardValue, loadMetrics, loadDashboardById, readPeriodControls, setBanner, fetchSparkline, renderMetrics, openMetricModal, worklistHtml, drawRows, paintSparkline, cardPreviewRows, variantPicks, allMetrics: function () { return allDashboardMetrics; }, cardLoads: function () { return cardLoads; } };'
+    + '  window.testExports = { renderMetricCard, formatMetricCardValue, loadMetrics, loadDashboardById, readPeriodControls, setBanner, fetchSparkline, renderMetrics, openMetricModal, worklistHtml, drawRows, paintSparkline, cardPreviewRows, variantPicks, openReportTarget, allMetrics: function () { return allDashboardMetrics; }, cardLoads: function () { return cardLoads; } };'
     + source.slice(end + '  init();'.length);
   const nodes = {};
   const document = { body: node(), addEventListener() {}, getElementById: (id) => (nodes[id] = nodes[id] || node()), querySelector: () => null, querySelectorAll: () => [] };
@@ -1341,5 +1341,46 @@ describe('monthly bars (metadata.by_month)', () => {
     const html = await render(monthCard(), { kind: 'worklist', visual: 'worklist' });
     expect(html).not.toContain('raw_filter');
     expect(html).toContain('data-worklist-key');
+  });
+});
+
+describe('link cards', () => {
+  const linkCard = { metric_key: 'legal_firm.sales_intake.still_open_summary', title: 'Still Open', format: 'number', data_state: 'ok', period: 'Nov 2026', value: 4330,
+    metadata: { headline: 'Everything still open: $7.5M across 4,330 deals.', target: { slug: 'still-open', as_of: '2026-11-27' } } };
+  async function render(layoutCard, dashboards) {
+    const layout = { cards: [Object.assign({ id: 'l', kind: 'number', metric_key: 'sales_intake.still_open_summary' }, layoutCard)] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [linkCard] }),
+      listBIDashboards: jest.fn().mockResolvedValue({ data: dashboards || [{ id: 'd-open', name: 'Still Open', slug: 'still-open' }] }) });
+    await p.exports.loadDashboardById('d1');
+    return p;
+  }
+  test('shows the server headline and "See the report"', async () => {
+    const p = await render({ visual: 'link' });
+    const html = p.nodes.dashboardMetricGrid.innerHTML;
+    expect(text(html)).toContain('Everything still open: $7.5M across 4,330 deals.');
+    expect(text(html)).toContain('See the report');
+    expect(html).toContain('data-report-target="still-open"');
+    expect(html).not.toContain('mini-cols');
+  });
+  test('"See the report" finds the report by its slug and opens it as of this dashboard\'s end day', async () => {
+    const p = await render({ visual: 'link' });
+    const go = jest.fn();
+    p.Lex.Nav.go = go;
+    await p.exports.openReportTarget('still-open', '');
+    expect(go).toHaveBeenCalledWith('admin/dashboard-detail.html?id=d-open&asOf=2026-01-31');
+  });
+  test('a target the list does not have says so calmly', async () => {
+    const p = await render({ visual: 'link' }, []);
+    const go = jest.fn();
+    p.Lex.Nav.go = go;
+    const error = jest.fn();
+    p.Lex.Toast = { error };
+    await p.exports.openReportTarget('still-open', '');
+    expect(go).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith('Could not find that report.');
+  });
+  test('with no visual on the layout, a card with a target is still a link card', async () => {
+    const p = await render({});
+    expect(text(p.nodes.dashboardMetricGrid.innerHTML)).toContain('See the report');
   });
 });

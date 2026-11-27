@@ -73,3 +73,22 @@ describe('monthly bars (metadata.by_month)', () => {
     expect(AsOf.isMonthCard('', {})).toBe(false);
   });
 });
+
+describe('link cards (metadata.target)', () => {
+  test('the headline and the target report, from metadata.target or metadata.link', () => {
+    expect(AsOf.linkOf({ metadata: { headline: 'Everything still open: $7.5M across 4,330 deals.', target: { slug: 'still-open', as_of: '2026-11-27' } } }))
+      .toEqual({ headline: 'Everything still open: $7.5M across 4,330 deals.', slug: 'still-open', dashboardId: '' });
+    expect(AsOf.linkOf({ metadata: { link: { headline: 'See more', target: { dashboard_id: 'd-9' } } } })).toEqual({ headline: 'See more', slug: '', dashboardId: 'd-9' });
+    expect(AsOf.linkOf({ metadata: { headline: 'No target' } })).toBeNull();
+    expect(AsOf.linkOf({})).toBeNull();
+  });
+  test('a card is a link card by visual link, or by a target with no visual', () => {
+    expect(AsOf.isLinkCard('link', {})).toBe(true);
+    expect(AsOf.isLinkCard('', { metadata: { target: { slug: 'still-open' } } })).toBe(true);
+    expect(AsOf.isLinkCard('stat', { metadata: { target: { slug: 'still-open' } } })).toBe(false);
+  });
+  test('the target opens on the day given', () => {
+    expect(AsOf.targetHref('d-9', '2026-11-27')).toBe('admin/dashboard-detail.html?id=d-9&asOf=2026-11-27');
+    expect(AsOf.targetHref('d 9', '')).toBe('admin/dashboard-detail.html?id=d%209');
+  });
+});

@@ -136,7 +136,39 @@
     return unit ? String(unit) : '';
   }
 
+  // ── Link cards (metadata { headline, target: { slug | dashboard_id } }) ──
+  function targetOf(card) {
+    var meta = metaOf(card);
+    var link = meta.link && typeof meta.link === 'object' ? meta.link : null;
+    var target = meta.target || (link && (link.target || link));
+    return target && typeof target === 'object' ? { target: target, headline: meta.headline || (link && link.headline) || '' } : null;
+  }
+
+  /** { headline, slug, dashboardId } for a card that points at a report, else null. */
+  function linkOf(card) {
+    var found = targetOf(card);
+    if (!found) return null;
+    var slug = found.target.slug ? String(found.target.slug) : '';
+    var dashboardId = found.target.dashboard_id ? String(found.target.dashboard_id) : '';
+    if (!slug && !dashboardId) return null;
+    return { headline: String(found.headline || ''), slug: slug, dashboardId: dashboardId };
+  }
+
+  /** A link card: visual link, or a target and no visual. */
+  function isLinkCard(visual, card) {
+    if (visual === 'link') return true;
+    return !visual && !!linkOf(card);
+  }
+
+  /** The report's page, opened as of a day. */
+  function targetHref(dashboardId, day) {
+    return 'admin/dashboard-detail.html?id=' + encodeURIComponent(dashboardId) + (isPlainDay(day) ? '&asOf=' + day : '');
+  }
+
   return {
+    linkOf: linkOf,
+    isLinkCard: isLinkCard,
+    targetHref: targetHref,
     MONTH_FIELD: MONTH_FIELD,
     byMonth: byMonth,
     isMonthCard: isMonthCard,

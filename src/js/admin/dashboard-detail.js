@@ -1383,6 +1383,35 @@
     return appendToCard(html, extra);
   }
 
+  // A link card: the server's headline and "See the report", which opens
+  // the target report as of this dashboard's end day.
+  function renderLinkCard(resolved, layoutItem) {
+    var def = resolved.def;
+    var entry = resolved.metrics[0];
+    var link = window.AsOfCards.linkOf(entry.metric);
+    var headline = link.headline || formatMetricCardValue(entry.metric);
+    return '<article class="' + cardClass(accentClass(def, 'dash-metric-card--link'), layoutItem) + '">'
+      + declaredTop(def, entry.key, entry.metric, false)
+      + '<p class="dash-link-card__headline">' + escapeHtml(headline) + '</p>'
+      + '<div class="dash-link-card__actions"><lex-btn variant="secondary" size="sm" data-report-target="' + escapeHtml(link.slug) + '" data-report-dashboard="' + escapeHtml(link.dashboardId) + '">See the report</lex-btn></div>'
+      + '</article>';
+  }
+
+  // Opens a report by its id, or by its slug through the dashboard list.
+  async function openReportTarget(slug, dashboardId) {
+    var id = dashboardId;
+    if (!id && slug) {
+      await loadDashboardSwitcher();
+      var match = dashboardSwitcherItems.filter(function (item) { return item.slug === slug; })[0];
+      id = match ? match.id : '';
+    }
+    if (!id) {
+      if (window.Lex && Lex.Toast) Lex.Toast.error('Could not find that report.');
+      return;
+    }
+    Lex.Nav.go(window.AsOfCards.targetHref(id, currentPeriod.end));
+  }
+
   // Month bars (metadata.by_month): the headline total, what the months
   // count, and one bar per month ("Older" first). A bar opens that month's
   // records; the title opens all of them.
@@ -1536,6 +1565,8 @@
     // A card with metadata.by_month and no visual on the layout draws month
     // bars; a worklist stays a list.
     var firstMetric = resolved.metrics[0] && resolved.metrics[0].metric;
+    // A card that points at another report (metadata.target) is a link card.
+    if (resolved.state !== 'waiting' && window.AsOfCards.isLinkCard(def.visual, firstMetric) && window.AsOfCards.linkOf(firstMetric)) return renderLinkCard(resolved, layoutItem);
     if (visual !== 'worklist' && resolved.state !== 'waiting' && window.AsOfCards.isMonthCard(def.visual, firstMetric)) visual = 'month_bars';
     switch (visual) {
       case 'month_bars': return renderMonthBars(resolved, layoutItem);
@@ -2494,6 +2525,12 @@
 
       if (event.target.closest('#deleteDashboardBtn') && currentDashboardId) {
         deleteCurrentDashboard();
+        return;
+      }
+
+      var targetBtn = event.target.closest('[data-report-target]');
+      if (targetBtn) {
+        openReportTarget(targetBtn.getAttribute('data-report-target'), targetBtn.getAttribute('data-report-dashboard'));
         return;
       }
 

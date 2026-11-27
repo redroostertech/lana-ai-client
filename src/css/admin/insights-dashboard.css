@@ -4307,3 +4307,17 @@ button.dash-lines__label:hover,
   line-height: 1;
   color: var(--lex-text-secondary);
 }
+
+/* A link card: the server's headline and "See the report". */
+.dash-link-card__headline {
+  margin: 0.5rem 0 0;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  color: var(--lex-text-primary, #111827);
+}
+
+.dash-link-card__actions {
+  display: flex;
+  margin-top: auto;
+  padding-top: 0.75rem;
+}
