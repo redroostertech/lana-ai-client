@@ -56,3 +56,21 @@ describe('metadata formatter reads the enrichment shape', () => {
     delete global.window;
   });
 });
+
+describe('signed letter review in the Insights panel', () => {
+  test('accept reads the edited values, a 409 keeps both values for the person, and Replace or Keep resolve it', () => {
+    expect(pageJs).toContain('service.collectOverrides(item)');
+    expect(pageJs).toContain('var conflict = service.conflictOf(error, row);');
+    expect(pageJs).toContain("state.enrichmentConflicts[suggestionId] = { overrides: overrides, conflict: conflict };");
+    expect(pageJs).toContain("action === 'overwrite'");
+    expect(pageJs).toContain('{ overwrite: true }');
+    expect(pageJs).toContain("action === 'keep'");
+    expect(pageJs).toContain('service.renderPanelHtml(vm, { conflicts: conflictTexts() })');
+    expect(pageJs).toContain('state.enrichmentConflicts = {};');
+  });
+  test('review styles exist', () => {
+    for (const cls of ['.file-viewer-insights__source--warning', '.file-viewer-insights__conflict', '.file-viewer-insights__editors']) {
+      expect(css).toContain(cls + ' {');
+    }
+  });
+});

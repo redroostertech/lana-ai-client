@@ -6025,9 +6025,20 @@
     return { matterId: getFileMatterId(file) || '', documentId: String(file.id) };
   }
 
+  // Accepts the server refused with a 409, by suggestion id:
+  // { overrides, conflict: { current, proposed } }.
+  state.enrichmentConflicts = {};
+
+  function conflictTexts() {
+    var out = {};
+    Object.keys(state.enrichmentConflicts || {}).forEach(function (id) { out[id] = state.enrichmentConflicts[id].conflict; });
+    return out;
+  }
+
   function resetEnrichmentPanel() {
     state.enrichment = null;
     state.enrichmentRerunFrom = null;
+    state.enrichmentConflicts = {};
     var rail = document.getElementById('reviewRail');
     if (rail) rail.classList.remove('file-viewer-review-rail--insights-only');
     var body = document.getElementById('reviewInsightsBody');
@@ -6041,7 +6052,7 @@
     var service = enrichmentService();
     if (!body || !service) return;
     var vm = service.viewModel(payload);
-    body.innerHTML = service.renderPanelHtml(vm);
+    body.innerHTML = service.renderPanelHtml(vm, { conflicts: conflictTexts() });
     state.enrichment = payload || null;
     // A document that cannot be reviewed (a PDF, an image) still has insights:
     // show the rail with this tab and keep the review workflow out of it.
@@ -6097,15 +6108,36 @@
     if (!service || !target) return;
     var action = button.getAttribute('data-enrichment-action');
     var suggestionId = button.getAttribute('data-suggestion-id');
+    var item = button.closest('li[data-suggestion-id]');
+    var targetKind = item ? item.getAttribute('data-target-kind') || '' : '';
     button.disabled = true;
     try {
       if (action === 'accept' && suggestionId) {
-        var accepted = await service.accept(api, target.matterId, target.documentId, suggestionId, {});
+        // Values the person edited inline (fees, payment steps, signing).
+        var overrides = service.collectOverrides(item);
+        var accepted;
+        try {
+          accepted = await service.accept(api, target.matterId, target.documentId, suggestionId, overrides);
+        } catch (error) {
+          var row = (service.viewModel(state.enrichment).suggestions.open || []).filter(function (r) { return r.id === suggestionId; })[0] || null;
+          var conflict = service.conflictOf(error, row);
+          if (!conflict) throw error;
+          // A value was saved before: show both and let the person choose.
+          state.enrichmentConflicts[suggestionId] = { overrides: overrides, conflict: conflict };
+          renderEnrichmentPanel(state.enrichment);
+          return;
+        }
         var created = accepted && accepted.suggestion ? accepted.suggestion.created_record_type : '';
-        notify(created === 'contact' ? 'Contact added.'
-          : created === 'matter_party' ? 'Party added to the matter.'
-            : created === 'calendar_event' ? 'Deadline added to the calendar.'
-              : 'Suggestion accepted.', 'success');
+        notify(service.acceptedNote(targetKind, created), 'success');
+      } else if (action === 'overwrite' && suggestionId) {
+        var pending = state.enrichmentConflicts[suggestionId] || { overrides: {} };
+        var replaced = await service.accept(api, target.matterId, target.documentId, suggestionId, pending.overrides, { overwrite: true });
+        delete state.enrichmentConflicts[suggestionId];
+        notify(service.acceptedNote(targetKind, replaced && replaced.suggestion ? replaced.suggestion.created_record_type : ''), 'success');
+      } else if (action === 'keep' && suggestionId) {
+        await service.dismiss(api, target.matterId, target.documentId, suggestionId, '');
+        delete state.enrichmentConflicts[suggestionId];
+        notify('Kept the current value.', 'success');
       } else if (action === 'dismiss' && suggestionId) {
         await service.dismiss(api, target.matterId, target.documentId, suggestionId, '');
         notify('Suggestion dismissed.', 'success');

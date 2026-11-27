@@ -1875,3 +1875,46 @@ html[data-lex-chrome="embedded"] lex-body {
   overflow: hidden;
   pointer-events: none;
 }
+
+/* Signed engagement letter review: where a value came from, inline editors, and a 409. */
+.file-viewer-insights__source {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--lex-text-secondary);
+}
+
+.file-viewer-insights__source--warning {
+  padding: 0.375rem 0.5rem;
+  border-radius: 0.375rem;
+  background: var(--lex-color-warning-50, #fffbeb);
+  color: var(--lex-color-warning-700, #b45309);
+  font-weight: 600;
+}
+
+.file-viewer-insights__editors {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.file-viewer-insights__conflict {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid var(--lex-color-warning-200, #fde68a);
+  border-radius: 0.375rem;
+  background: var(--lex-color-warning-50, #fffbeb);
+}
+
+.file-viewer-insights__conflict-lead {
+  margin: 0 0 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--lex-text-primary);
+}
+
+.file-viewer-insights__conflict-value {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--lex-text-secondary);
+}
