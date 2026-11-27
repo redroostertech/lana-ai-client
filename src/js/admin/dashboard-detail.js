@@ -417,8 +417,10 @@
     var value = metric ? metric.value : null;
     var rawFormat = metric && metric.format;
     if (rawFormat && typeof rawFormat === 'object') rawFormat = rawFormat.type || rawFormat.style;
-    var format = String(rawFormat || 'number').toLowerCase();
     var metadata = (metric && metric.metadata) || {};
+    // No card format: the card's value_format, else its row_format.
+    if (!rawFormat && metric) rawFormat = metric.value_format || metadata.value_format || metric.row_format || '';
+    var format = String(rawFormat || 'number').toLowerCase();
     // A real 0 is a value; only a missing value shows the shared empty token.
     // No-data cases arrive as a data_state and render the state block.
     if (!hasValue(value)) return window.DataState.EMPTY_VALUE;
@@ -1428,7 +1430,7 @@
     var metric = entry.metric;
     var months = metric ? window.AsOfCards.byMonth(metric) : null;
     if (!months) return metric && !Array.isArray(metric.value) ? heroOrStat(resolved, layoutItem, 'stat') : seriesCard(resolved, layoutItem, 'columns');
-    var cardFormat = metric.value_format || (metric.metadata && metric.metadata.value_format) || '';
+    var cardFormat = metric.value_format || (metric.metadata && metric.metadata.value_format) || metric.row_format || '';
     var unit = window.AsOfCards.monthUnit(metric);
     // An average card: bars are the averages (never a count), and nothing
     // is summed; the headline is the server's value.

@@ -1475,3 +1475,27 @@ describe('as-of dashboards link metric detail with asOf alone', () => {
     expect(p.exports.detailPeriod()).toEqual({ asOf: '2026-11-27' });
   });
 });
+
+describe('Still Open live check: formats and empty months', () => {
+  async function render(card, layoutCard) {
+    const layout = { cards: [Object.assign({ id: 'm', kind: 'number', metric_key: card.metric_key.split('.').slice(1).join('.') }, layoutCard)] };
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout } }), getDashboardMetricCards: jest.fn().mockResolvedValue({ data: [card] }) });
+    await p.exports.loadDashboardById('d1');
+    return p.nodes.dashboardMetricGrid.innerHTML;
+  }
+  test('with no card format, the headline uses value_format or row_format', () => {
+    const fmt = page().exports.formatMetricCardValue;
+    expect(fmt({ value: 7508521, value_format: 'currency' })).toBe('$7,508,521');
+    expect(fmt({ value: 7508521, row_format: 'currency' })).toBe('$7,508,521');
+    expect(fmt({ value: 7508521, metadata: { value_format: 'currency' } })).toBe('$7,508,521');
+    expect(fmt({ value: 7508521, format: 'number', value_format: 'currency' })).not.toContain('$');
+  });
+  test('month bars: headline and tooltip use row_format when the card has no format', async () => {
+    const card = { metric_key: 'legal_firm.sales_intake.still_open_by_stage', title: 'Still Open by Stage', data_state: 'ok', value: 7508521, row_format: 'currency',
+      metadata: { unit: 'deals', by_month: [{ month: '2026-10', label: 'October 2026', count: 3, value: 7508521 }] } };
+    const html = await render(card, { visual: 'month_bars' });
+    expect(html.split('dash-metric-card__value')[1]).toContain('$7,508,521');
+    expect(html).toContain('<title>October 2026: 3 deals · $7,508,521</title>');
+    expect(html).toContain('>Oct<');
+  });
+});
