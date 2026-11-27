@@ -59,8 +59,8 @@ describe('metadata formatter reads the enrichment shape', () => {
 
 describe('signed letter review in the Insights panel', () => {
   test('accept reads the edited values, a 409 keeps both values for the person, and Replace or Keep resolve it', () => {
-    expect(pageJs).toContain('service.collectOverrides(item)');
-    expect(pageJs).toContain('var conflict = service.conflictOf(error, row);');
+    expect(pageJs).toContain('service.collectOverrides(item, rowFor(suggestionId))');
+    expect(pageJs).toContain('var conflict = service.conflictOf(error, rowFor(suggestionId));');
     expect(pageJs).toContain("state.enrichmentConflicts[suggestionId] = { overrides: overrides, conflict: conflict };");
     expect(pageJs).toContain("action === 'overwrite'");
     expect(pageJs).toContain('{ overwrite: true }');

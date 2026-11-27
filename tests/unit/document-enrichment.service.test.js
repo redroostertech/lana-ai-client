@@ -157,8 +157,8 @@ describe('signed engagement letter: fees, payment steps and signing', () => {
     sug('f1', 'fee', { field: 'total_fee', value: 4500, format: 'currency' }, { kind: 'read_from_document', confidence: 0.92 }),
     sug('f2', 'fee', { field: 'initial_maintenance_year', value: 2027, format: 'number' }, { kind: 'matches_draft', confidence: 0.9 }),
     sug('f3', 'fee', { field: 'plan_type', value: 'Revocable trust', format: 'text' }, { kind: 'from_draft_not_read', confidence: 0.4 }),
-    sug('p1', 'payment', { payment_type: 'deposit', amount: 1500, due_date: '2026-12-01', due_date_basis: 'on_signing', estimated: false }, { kind: 'read_from_document', confidence: 0.8 }),
-    sug('p2', 'payment', { payment_type: 'final', amount: 1000, due_date: null, due_date_basis: 'when_the_plan_is_signed', estimated: true }, { kind: 'matches_draft' }),
+    sug('p1', 'payment', { payment_type: 'deposit', amount: 1500, due_date: '2026-12-01', due_date_basis: 'on_date', due_date_basis_label: 'On the date set', estimated: false }, { kind: 'read_from_document', confidence: 0.8 }),
+    sug('p2', 'payment', { payment_type: 'final', amount: 1000, due_date: null, due_date_basis: 'plan_signing', due_date_basis_label: 'When the estate plan is signed', estimated: true }, { kind: 'matches_draft', confidence: 0.7 }),
     sug('s1', 'engagement_signed', { signed_on: '2026-11-20' }, { kind: 'read_from_document', confidence: 0.95 }),
     sug('c1', 'contact', { displayName: 'Avery Stone' }, { confidence: 0.9 }),
   ] });
@@ -170,7 +170,7 @@ describe('signed engagement letter: fees, payment steps and signing', () => {
     expect(byId.f2).toMatchObject({ title: 'First maintenance year', detail: '2027', sourceNote: 'Matches the draft letter', evidence: '' });
     expect(byId.f3).toMatchObject({ title: 'Plan type', detail: 'Revocable trust', sourceNote: 'From the draft; not found in the signed copy', sourceWarning: true });
     expect(byId.p1).toMatchObject({ reviewGroup: 'payment', title: 'Deposit', detail: '$1,500 · Due Dec 1, 2026', verb: 'Save payment step' });
-    expect(byId.p2).toMatchObject({ title: 'Final payment', detail: '$1,000 · Due when the plan is signed · Estimated' });
+    expect(byId.p2).toMatchObject({ title: 'Final payment', detail: '$1,000 · When the estate plan is signed · Estimated' });
     expect(byId.s1).toMatchObject({ reviewGroup: 'engagement_signed', title: 'Engagement signed', detail: 'Signed Nov 20, 2026', verb: 'Mark signed' });
     expect(byId.f1.editors).toEqual([{ name: 'value', label: 'Total fee', format: 'currency', value: '4500' }]);
     expect(byId.p1.editors).toEqual([{ name: 'amount', label: 'Amount', format: 'currency', value: '1500' }, { name: 'due_date', label: 'Due date', format: 'date', value: '2026-12-01' }]);
@@ -203,13 +203,26 @@ describe('signed engagement letter: fees, payment steps and signing', () => {
     expect(enrichment.readOverrides([{ name: 'value', format: 'number', value: 'abc' }])).toEqual({ value: null });
   });
 
-  test('the edited inputs of one item are read from the page', () => {
-    const inputs = [{ attrs: { 'data-enrichment-override': 'amount', 'data-override-format': 'currency' }, value: '2000' },
-      { attrs: { 'data-enrichment-override': 'due_date', 'data-override-format': 'date' }, value: '2027-01-15' }];
-    inputs.forEach((i) => { i.getAttribute = (k) => i.attrs[k]; });
-    const item = { querySelectorAll: (sel) => (sel === '[data-enrichment-override]' ? inputs : []) };
-    expect(enrichment.collectOverrides(item)).toEqual({ amount: 2000, due_date: '2027-01-15' });
+  test('the edited inputs of one item are read from the page; a payment sends its basis and estimate', () => {
+    const vm = enrichment.viewModel(payload);
+    const rowOf = (id) => vm.suggestions.open.find((r) => r.id === id);
+    const itemWith = (amount, due) => {
+      const inputs = [{ attrs: { 'data-enrichment-override': 'amount', 'data-override-format': 'currency' }, value: amount },
+        { attrs: { 'data-enrichment-override': 'due_date', 'data-override-format': 'date' }, value: due }];
+      inputs.forEach((i) => { i.getAttribute = (k) => i.attrs[k]; });
+      return { querySelectorAll: (sel) => (sel === '[data-enrichment-override]' ? inputs : []) };
+    };
+    // No date set: the server's basis and estimate go back as they were.
+    expect(enrichment.collectOverrides(itemWith('1000', ''), rowOf('p2'))).toEqual({ amount: 1000, due_date: null, due_date_basis: 'plan_signing', estimated: true });
+    // The person sets a date: on_date, and no longer estimated.
+    expect(enrichment.collectOverrides(itemWith('1000', '2027-01-15'), rowOf('p2'))).toEqual({ amount: 1000, due_date: '2027-01-15', due_date_basis: 'on_date', estimated: false });
+    expect(enrichment.collectOverrides(itemWith('1500', '2026-12-01'), rowOf('p1'))).toEqual({ amount: 1500, due_date: '2026-12-01', due_date_basis: 'on_date', estimated: false });
     expect(enrichment.collectOverrides(null)).toEqual({});
+  });
+
+  test('fields are read from suggestion.proposed only', () => {
+    const vm = enrichment.viewModel(Object.assign({}, base, { suggestions: [{ id: 'x', target_kind: 'fee', status: 'suggested', field: 'total_fee', value: 9, format: 'currency', source: { kind: 'matches_draft' } }] }));
+    expect(vm.suggestions.open[0]).toMatchObject({ title: 'Fee', detail: '' });
   });
 
   test('accept sends overrides, and overwrite: true when the person chose to replace', async () => {
@@ -218,22 +231,28 @@ describe('signed engagement letter: fees, payment steps and signing', () => {
     expect(api.calls[0].payload).toEqual({ overrides: { value: 4500 }, overwrite: true });
   });
 
-  test('a 409 gives both values in plain words; anything else is not a conflict', () => {
+  test("a 409 VALUE_CONFLICT gives each field: the saved value with who set it, and this letter's value", () => {
     const vm = enrichment.viewModel(payload);
     const fee = vm.suggestions.open.find((r) => r.id === 'f1');
     const step = vm.suggestions.open.find((r) => r.id === 'p1');
-    const err = (data) => Object.assign(new Error('Conflict'), { status: 409, data });
-    expect(enrichment.conflictOf(err({ error: { code: 'CONFLICT', current_value: 5000, proposed_value: 4500 } }), fee)).toEqual({ current: '$5,000', proposed: '$4,500' });
-    expect(enrichment.conflictOf(err({ existing: { amount: 1200, due_date: '2026-11-30' }, incoming: { amount: 1500, due_date: '2026-12-01' } }), step))
-      .toEqual({ current: '$1,200 · Due Nov 30, 2026', proposed: '$1,500 · Due Dec 1, 2026' });
+    const conflict = (conflicts) => Object.assign(new Error('Conflict'), { status: 409, code: 'VALUE_CONFLICT', data: { error: { code: 'VALUE_CONFLICT', details: { conflicts } } } });
+    expect(enrichment.conflictOf(conflict([{ field: 'value', current_value: 5000, current_source: 'person', current_set_by_name: 'Avery Stone', current_set_at: '2026-11-02T15:00:00Z', incoming_value: 4500 }]), fee))
+      .toEqual({ items: [{ label: '', current: '$5,000 (by Avery Stone on Nov 2, 2026)', incoming: '$4,500' }] });
+    expect(enrichment.conflictOf(conflict([
+      { field: 'amount', current_value: 1200, current_source: 'synced', incoming_value: 1500 },
+      { field: 'due_date', current_value: '2026-11-30', current_source: 'lana', incoming_value: '2026-12-01' }]), step))
+      .toEqual({ items: [
+        { label: 'Amount', current: '$1,200 (from your connected system)', incoming: '$1,500' },
+        { label: 'Due date', current: 'Nov 30, 2026 (set by LANA)', incoming: 'Dec 1, 2026' }] });
+    expect(enrichment.conflictOf(Object.assign(new Error('x'), { status: 409, code: 'OTHER', data: {} }), fee)).toBeNull();
     expect(enrichment.conflictOf(Object.assign(new Error('x'), { status: 500 }), fee)).toBeNull();
   });
 
   test('a conflict shows both values with "Replace with this" and "Keep the current value"', () => {
     const vm = enrichment.viewModel(payload);
-    const html = enrichment.renderPanelHtml(vm, { conflicts: { f1: { current: '$5,000', proposed: '$4,500' } } });
+    const html = enrichment.renderPanelHtml(vm, { conflicts: { f1: { items: [{ label: '', current: '$5,000 (by Avery Stone on Nov 2, 2026)', incoming: '$4,500' }] } } });
     const item = html.split('data-suggestion-id="f1"').slice(1).join('data-suggestion-id="f1"').split('</li>')[0];
-    expect(item).toContain('Already saved: $5,000');
+    expect(item).toContain('Already saved: $5,000 (by Avery Stone on Nov 2, 2026)');
     expect(item).toContain('This letter: $4,500');
     expect(item).toContain('data-enrichment-action="overwrite"');
     expect(item).toContain('>Replace with this</lex-btn>');

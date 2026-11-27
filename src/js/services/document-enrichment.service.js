@@ -133,8 +133,9 @@
     return MONTHS[month - 1] + ' ' + day + ', ' + parts[0];
   }
 
+  // The fields sit under suggestion.proposed only.
   function proposedOf(suggestion) {
-    return (suggestion && suggestion.proposed) || suggestion || {};
+    return (suggestion && suggestion.proposed) || {};
   }
 
   function present(value) {
@@ -170,8 +171,10 @@
     return String(value);
   }
 
-  function paymentText(amount, dueDate, basis, estimated) {
-    var due = present(dueDate) ? 'Due ' + formatDay(dueDate) : (present(basis) ? 'Due ' + humanize(basis).toLowerCase() : '');
+  // The due date, else the server's words for when it is due
+  // (due_date_basis_label); the client never words the basis key.
+  function paymentText(amount, dueDate, basisLabel, estimated) {
+    var due = present(dueDate) ? 'Due ' + formatDay(dueDate) : (present(basisLabel) ? String(basisLabel) : '');
     return [valueText(amount, 'currency'), due, estimated ? 'Estimated' : ''].filter(Boolean).join(DOT);
   }
 
@@ -191,7 +194,8 @@
     if (kind === 'payment') {
       return {
         title: PAYMENT_LABELS[p.payment_type] || humanize(p.payment_type) || 'Payment step',
-        detail: paymentText(p.amount, p.due_date, p.due_date_basis, p.estimated === true),
+        detail: paymentText(p.amount, p.due_date, p.due_date_basis_label, p.estimated === true),
+        payment: { dueDate: p.due_date || null, dueDateBasis: p.due_date_basis || null, estimated: p.estimated === true },
         editors: [{ name: 'amount', label: 'Amount', format: 'currency', value: editorValue(p.amount) },
           { name: 'due_date', label: 'Due date', format: 'date', value: editorValue(p.due_date ? String(p.due_date).slice(0, 10) : '') }]
       };
@@ -248,7 +252,8 @@
         reviewGroup: review ? suggestion.target_kind : '',
         sourceNote: review ? (SOURCE_NOTES[sourceKind] || '') : '',
         sourceWarning: !!(review && SOURCE_WARNINGS[sourceKind]),
-        editors: review ? review.editors : []
+        editors: review ? review.editors : [],
+        payment: review && review.payment ? review.payment : null
       };
       if (review) {
         row.title = review.title;
@@ -317,8 +322,11 @@
   function renderConflict(row, conflict) {
     return '<div class="file-viewer-insights__conflict" role="alert">' +
       '<p class="file-viewer-insights__conflict-lead">A different value was saved before.</p>' +
-      '<p class="file-viewer-insights__conflict-value">Already saved: ' + escapeHtml(conflict.current) + '</p>' +
-      '<p class="file-viewer-insights__conflict-value">This letter: ' + escapeHtml(conflict.proposed) + '</p>' +
+      (conflict.items || []).map(function (item) {
+        return (item.label ? '<p class="file-viewer-insights__conflict-field">' + escapeHtml(item.label) + '</p>' : '') +
+          '<p class="file-viewer-insights__conflict-value">Already saved: ' + escapeHtml(item.current) + '</p>' +
+          '<p class="file-viewer-insights__conflict-value">This letter: ' + escapeHtml(item.incoming) + '</p>';
+      }).join('') +
       '<div class="file-viewer-insights__actions">' +
         '<lex-btn type="button" variant="primary" size="sm" data-enrichment-action="overwrite" data-suggestion-id="' + escapeHtml(row.id) + '">Replace with this</lex-btn>' +
         '<lex-btn type="button" variant="secondary" size="sm" data-enrichment-action="keep" data-suggestion-id="' + escapeHtml(row.id) + '">Keep the current value</lex-btn>' +
@@ -465,43 +473,69 @@
     return out;
   }
 
-  /** The overrides from one item's inline editors on the page. */
-  function collectOverrides(item) {
+  var ON_DATE = 'on_date';
+
+  /**
+   * The overrides from one item's inline editors on the page. A payment
+   * also sends due_date_basis and estimated: as the server sent them, or
+   * 'on_date' and not estimated once the person sets a date.
+   */
+  function collectOverrides(item, row) {
     if (!item || typeof item.querySelectorAll !== 'function') return {};
     var fields = Array.prototype.map.call(item.querySelectorAll('[data-enrichment-override]'), function (input) {
       return { name: input.getAttribute('data-enrichment-override'), format: input.getAttribute('data-override-format'), value: input.value };
     });
-    return readOverrides(fields);
+    var out = readOverrides(fields);
+    if (row && row.payment) {
+      var dated = !!out.due_date;
+      out.due_date_basis = dated ? ON_DATE : row.payment.dueDateBasis;
+      out.estimated = dated ? false : row.payment.estimated;
+    }
+    return out;
   }
 
-  function firstPresent(data, keys) {
-    for (var i = 0; i < keys.length; i += 1) {
-      if (Object.prototype.hasOwnProperty.call(data, keys[i]) && data[keys[i]] !== undefined) return data[keys[i]];
-    }
-    return undefined;
+  var CONFLICT_CODE = 'VALUE_CONFLICT';
+  var SET_BY_NOTES = { synced: '(from your connected system)', lana: '(set by LANA)' };
+
+  // The format of one accepted field on this row (fee value, amount, dates).
+  function fieldFormat(row, field) {
+    var editor = (row && row.editors ? row.editors : []).filter(function (e) { return e.name === field; })[0];
+    return editor ? editor.format : 'text';
   }
 
-  function conflictValueText(value, row) {
-    if (value && typeof value === 'object') {
-      if (row.targetKind === 'payment') return paymentText(value.amount, value.due_date, value.due_date_basis, value.estimated === true);
-      var inner = firstPresent(value, ['value', 'signed_on', 'amount']);
-      return conflictValueText(inner, row);
-    }
-    var editor = row.editors && row.editors[0];
-    return valueText(value, editor ? editor.format : 'text') || 'Nothing';
+  function fieldLabel(row, field) {
+    if (!row || !row.editors || row.editors.length < 2) return '';
+    var editor = row.editors.filter(function (e) { return e.name === field; })[0];
+    return editor ? editor.label : humanize(field);
+  }
+
+  function setByText(conflict) {
+    if (SET_BY_NOTES[conflict.current_source]) return SET_BY_NOTES[conflict.current_source];
+    if (conflict.current_source !== 'person') return '';
+    var who = conflict.current_set_by_name ? 'by ' + conflict.current_set_by_name : '';
+    var when = conflict.current_set_at ? 'on ' + formatDay(conflict.current_set_at) : '';
+    var words = [who, when].filter(Boolean).join(' ');
+    return words ? '(' + words + ')' : '';
   }
 
   /**
-   * A 409 on accept: what was saved before and what this letter says, in
-   * plain words ({ current, proposed }); null for any other error.
+   * A 409 VALUE_CONFLICT on accept (error.details.conflicts): per field,
+   * the saved value with who set it, and this letter's value, in plain
+   * words: { items: [{ label, current, incoming }] }. null for any other error.
    */
   function conflictOf(error, row) {
-    if (!error || error.status !== 409) return null;
-    var data = error.data && typeof error.data === 'object' ? error.data : {};
-    var source = data.error && typeof data.error === 'object' ? Object.assign({}, data, data.error) : data;
-    var current = firstPresent(source, ['current_value', 'existing_value', 'current', 'existing']);
-    var proposed = firstPresent(source, ['proposed_value', 'incoming_value', 'proposed', 'incoming']);
-    return { current: conflictValueText(current, row || {}), proposed: conflictValueText(proposed, row || {}) };
+    if (!error || error.status !== 409 || error.code !== CONFLICT_CODE) return null;
+    var body = error.data && error.data.error ? error.data.error : null;
+    var list = body && body.details && Array.isArray(body.details.conflicts) ? body.details.conflicts : [];
+    if (!list.length) return null;
+    return {
+      items: list.map(function (conflict) {
+        var format = fieldFormat(row, conflict.field);
+        var saved = valueText(conflict.current_value, format) || 'Nothing';
+        var by = setByText(conflict);
+        return { label: fieldLabel(row, conflict.field), current: saved + (by ? ' ' + by : ''), incoming: valueText(conflict.incoming_value, format) || 'Nothing' };
+      })
+    };
   }
 
   var CREATED_NOTES = { contact: 'Contact added.', matter_party: 'Party added to the matter.', calendar_event: 'Deadline added to the calendar.' };

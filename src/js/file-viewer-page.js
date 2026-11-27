@@ -6044,6 +6044,13 @@
   // { overrides, conflict: { current, proposed } }.
   state.enrichmentConflicts = {};
 
+  // The view model row for one open suggestion.
+  function rowFor(suggestionId) {
+    var service = enrichmentService();
+    if (!service) return null;
+    return (service.viewModel(state.enrichment).suggestions.open || []).filter(function (r) { return r.id === suggestionId; })[0] || null;
+  }
+
   function conflictTexts() {
     var out = {};
     Object.keys(state.enrichmentConflicts || {}).forEach(function (id) { out[id] = state.enrichmentConflicts[id].conflict; });
@@ -6129,13 +6136,12 @@
     try {
       if (action === 'accept' && suggestionId) {
         // Values the person edited inline (fees, payment steps, signing).
-        var overrides = service.collectOverrides(item);
+        var overrides = service.collectOverrides(item, rowFor(suggestionId));
         var accepted;
         try {
           accepted = await service.accept(api, target.matterId, target.documentId, suggestionId, overrides);
         } catch (error) {
-          var row = (service.viewModel(state.enrichment).suggestions.open || []).filter(function (r) { return r.id === suggestionId; })[0] || null;
-          var conflict = service.conflictOf(error, row);
+          var conflict = service.conflictOf(error, rowFor(suggestionId));
           if (!conflict) throw error;
           // A value was saved before: show both and let the person choose.
           state.enrichmentConflicts[suggestionId] = { overrides: overrides, conflict: conflict };
