@@ -78,3 +78,17 @@ describe('card text is fluid to the card', () => {
     expect(clamp.fluid).toContain('cqi');
   });
 });
+
+describe('the card filter bar on phones', () => {
+  test('in the stacked phone row, the search keeps its input height and spans the row under the chips', () => {
+    // In a column flex row, a flex-basis of 15rem would become the search's height (a tall oval).
+    const phone = css.slice(css.lastIndexOf('@container dash-detail (max-width: 559px) {\n  .dash-tabs-row__search'));
+    const rule = phone.slice(phone.indexOf('.dash-tabs-row__search {'), phone.indexOf('}', phone.indexOf('.dash-tabs-row__search {')));
+    expect(rule).toContain('flex: 0 0 auto');
+    expect(rule).toContain('width: 100%');
+    expect(rule).toContain('min-width: 0');
+    // Chips first, the search on its own row below them.
+    const html = fs.readFileSync(path.join(__dirname, '../../src/admin/dashboard-detail.html'), 'utf8');
+    expect(html.indexOf('id="dashboardTypeFilters"')).toBeLessThan(html.indexOf('class="dash-tabs-row__search"'));
+  });
+});

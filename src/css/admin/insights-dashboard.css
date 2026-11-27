@@ -4515,3 +4515,14 @@ button.dash-lines__label:hover,
   font-size: clamp(0.75rem, 0.65rem + 0.4cqi, 0.875rem);
   overflow-wrap: anywhere;
 }
+
+/* Phones: the card filter bar stacks (chips, then the search on its own
+   full-width row). In the stacked column the search's 15rem flex-basis
+   would become its height, so it sizes to its input instead. */
+@container dash-detail (max-width: 559px) {
+  .dash-tabs-row__search {
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
+  }
+}
