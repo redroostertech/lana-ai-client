@@ -1986,7 +1986,14 @@
 
   function paintSparkline(slot, line) {
     slot.classList.remove('mini-spark-slot--loading');
-    slot.innerHTML = window.MiniCharts.sparklineSvg(line);
+    slot.innerHTML = line ? window.MiniCharts.sparklineSvg(line) : '';
+    // A hero with no history hugs its content instead of stretching into a
+    // big empty middle.
+    var card = slot.closest ? slot.closest('.dash-metric-card') : null;
+    if (card && card.classList && card.classList.contains('dash-metric-card--hero')) {
+      if (line) card.classList.remove('dash-metric-card--no-spark');
+      else card.classList.add('dash-metric-card--no-spark');
+    }
   }
 
   var sparklineObserver = null;

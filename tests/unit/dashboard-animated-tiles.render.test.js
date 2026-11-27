@@ -35,7 +35,7 @@ function page(api = {}, user = null) {
   let source = fs.readFileSync(path.join(__dirname, '../../src/js/admin/dashboard-detail.js'), 'utf8');
   const end = source.lastIndexOf('  init();');
   source = source.slice(0, end)
-    + '  window.testExports = { renderMetricCard, formatMetricCardValue, loadMetrics, loadDashboardById, readPeriodControls, setBanner, fetchSparkline, renderMetrics, openMetricModal, worklistHtml, drawRows, variantPicks, allMetrics: function () { return allDashboardMetrics; }, cardLoads: function () { return cardLoads; } };'
+    + '  window.testExports = { renderMetricCard, formatMetricCardValue, loadMetrics, loadDashboardById, readPeriodControls, setBanner, fetchSparkline, renderMetrics, openMetricModal, worklistHtml, drawRows, paintSparkline, variantPicks, allMetrics: function () { return allDashboardMetrics; }, cardLoads: function () { return cardLoads; } };'
     + source.slice(end + '  init();'.length);
   const nodes = {};
   const document = { body: node(), addEventListener() {}, getElementById: (id) => (nodes[id] = nodes[id] || node()), querySelector: () => null, querySelectorAll: () => [] };
@@ -1130,4 +1130,25 @@ test('Form Fills per day over 30 days: the Per day tab draws 30 columns, not a s
   expect(html.split('<g class="mini-cols__group').length - 1).toBe(30);
   expect(html).not.toContain('more in the details');
   expect(html).not.toContain('mini-bars');
+});
+
+describe('a hero without history shrinks to its content', () => {
+  function slot(hero) {
+    const cardClasses = new Set(hero ? ['dash-metric-card', 'dash-metric-card--hero'] : ['dash-metric-card']);
+    const card = { classList: { add: (c) => cardClasses.add(c), remove: (c) => cardClasses.delete(c), contains: (c) => cardClasses.has(c) } };
+    return { cardClasses, innerHTML: '', classList: { remove() {} }, closest: (sel) => (sel === '.dash-metric-card' ? card : null) };
+  }
+  test('no sparkline data: the hero is marked to hug its content; with data it is not', () => {
+    const empty = slot(true);
+    page().exports.paintSparkline(empty, null);
+    expect(empty.cardClasses.has('dash-metric-card--no-spark')).toBe(true);
+    const drawn = slot(true);
+    page().exports.paintSparkline(drawn, { points: '0,1 100,2', last: { x: 100, y: 2 }, trend: 'up' });
+    expect(drawn.cardClasses.has('dash-metric-card--no-spark')).toBe(false);
+  });
+  test('the stylesheet lets that hero hug its content instead of stretching', () => {
+    const css = fs.readFileSync(path.join(__dirname, '../../src/css/admin/insights-dashboard.css'), 'utf8');
+    const rule = css.slice(css.indexOf('.dash-bento .dash-metric-card--hero.dash-metric-card--no-spark {'));
+    expect(rule.slice(0, rule.indexOf('}'))).toContain('align-self: start');
+  });
 });

@@ -4216,3 +4216,9 @@ button.dash-lines__label:hover,
 .dash-metric-card--hero .dash-callouts {
   color: inherit;
 }
+
+/* A hero with no history (no sparkline) hugs its content instead of
+   stretching to the row with an empty middle. */
+.dash-bento .dash-metric-card--hero.dash-metric-card--no-spark {
+  align-self: start;
+}
