@@ -31,7 +31,7 @@ function node(value = '') {
   };
 }
 
-function page(api = {}, user = null) {
+function page(api = {}, user = null, search = '') {
   let source = fs.readFileSync(path.join(__dirname, '../../src/js/admin/dashboard-detail.js'), 'utf8');
   const end = source.lastIndexOf('  init();');
   source = source.slice(0, end)
@@ -40,8 +40,9 @@ function page(api = {}, user = null) {
   const nodes = {};
   const document = { body: node(), addEventListener() {}, getElementById: (id) => (nodes[id] = nodes[id] || node()), querySelector: () => null, querySelectorAll: () => [] };
   const window = withDashboardScripts(withReportSharedScripts({ location: { search: '' }, setInterval() {}, addEventListener() {} }));
-  const LanaTime = { nowMs: () => 0, formatUtcDayRange: (a, b) => a + ' to ' + b, reportPresetDays: () => ({ start: '2026-01-01', end: '2026-01-31' }), MS_PER_DAY: 86400000 };
-  const Lex = { Utils: { getFirmTimezone: () => 'America/New_York' }, Nav: { getParams: () => new URLSearchParams('') } };
+  const LanaTime = { nowMs: () => 0, formatUtcDayRange: (a, b) => a + ' to ' + b, MS_PER_DAY: 86400000,
+    reportPresetDays: (preset, zone) => (preset === 'today' ? { start: zone === 'America/New_York' ? '2026-11-26' : '2026-11-27', end: '' } : { start: '2026-01-01', end: '2026-01-31' }) };
+  const Lex = { Utils: { getFirmTimezone: () => 'America/New_York' }, Nav: { getParams: () => new URLSearchParams(search), updateParams: jest.fn() } };
   window.Lex = Lex;
   window.api = { user };
   // The dashboard switcher draws into the shell's title bar, which this test has no DOM for.
@@ -50,7 +51,7 @@ function page(api = {}, user = null) {
     setTimeout: jest.fn(), clearTimeout: jest.fn(), LanaTime, Lex, api: Object.assign({ listBIDashboards: jest.fn().mockResolvedValue({ data: [] }) }, api),
     DashboardTiles: window.DashboardTiles });
   window.testExports.readPeriodControls();
-  return { exports: window.testExports, nodes };
+  return { exports: window.testExports, nodes, today: '2026-11-26', Lex };
 }
 
 describe('tiles', () => {
@@ -1262,5 +1263,38 @@ describe('live recheck: inferred values, value_key, rows path and the stat fallb
     expect(html).toContain('dash-metric-card__value');
     expect(text(html)).toContain('208');
     expect(text(html)).toContain('meetings');
+  });
+});
+
+describe('as-of dashboards (period_mode as_of)', () => {
+  function asOfPage(search, layout) {
+    const getDashboardMetricCards = jest.fn().mockResolvedValue({ data: [] });
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'Still Open', layout: Object.assign({ period_mode: 'as_of', cards: [] }, layout) } }), getDashboardMetricCards }, null, search);
+    return { p, getDashboardMetricCards };
+  }
+  test('cards are fetched with periodEnd only, the as-of day from the link, and the header says "As of"', async () => {
+    const { p, getDashboardMetricCards } = asOfPage('?id=d1&asOf=2026-10-31');
+    await p.exports.loadDashboardById('d1');
+    const params = getDashboardMetricCards.mock.calls[0][0];
+    expect(params.periodEnd).toBe('2026-10-31');
+    expect(params.periodStart).toBeUndefined();
+    expect(params.compareToPrevious).toBeUndefined();
+    expect(p.nodes.dashboardPeriodLabel.textContent).toBe('As of Oct 31, 2026');
+    expect(p.nodes.dashboardPeriodRange.hidden).toBe(true);
+    expect(p.nodes.dashboardAsOfFields.hidden).toBe(false);
+    expect(p.nodes.dashboardAsOfDay.value).toBe('2026-10-31');
+  });
+  test('with no day in the link, the day is today in the firm time zone', async () => {
+    const { p, getDashboardMetricCards } = asOfPage('?id=d1');
+    await p.exports.loadDashboardById('d1');
+    expect(getDashboardMetricCards.mock.calls[0][0].periodEnd).toBe(p.today);
+  });
+  test('a range dashboard keeps the range picker and both dates', async () => {
+    const getDashboardMetricCards = jest.fn().mockResolvedValue({ data: [] });
+    const p = page({ getBIDashboard: jest.fn().mockResolvedValue({ data: { name: 'X', layout: { cards: [] } } }), getDashboardMetricCards });
+    await p.exports.loadDashboardById('d1');
+    expect(getDashboardMetricCards.mock.calls[0][0].periodStart).toBe('2026-01-01');
+    expect(p.nodes.dashboardPeriodRange.hidden).toBe(false);
+    expect(p.nodes.dashboardAsOfFields.hidden).toBe(true);
   });
 });

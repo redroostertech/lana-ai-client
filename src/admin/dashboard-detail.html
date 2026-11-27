@@ -80,7 +80,7 @@
               <svg class="dash-period__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
             </button>
             <div id="dashboardPeriodPanel" class="dash-period__panel" role="dialog" aria-label="Choose the dates" hidden>
-              <section class="detail-period-card" aria-labelledby="dashboardPeriodHeading">
+              <section id="dashboardPeriodRange" class="detail-period-card" aria-labelledby="dashboardPeriodHeading">
               <div class="detail-period-card__presets">
               <p class="detail-period-card__label" id="dashboardPeriodHeading">Quick picks</p>
               <div id="dashboardPeriodPresets" class="detail-period-card__buttons">
@@ -101,6 +101,12 @@
                   options='[{"value":"daily","label":"Daily"},{"value":"weekly","label":"Weekly"},{"value":"monthly","label":"Monthly"},{"value":"quarterly","label":"Quarterly"},{"value":"yearly","label":"Yearly"}]'
                 ></lex-select>
               </div>
+              </section>
+              <!-- An as-of report (period_mode as_of): one day, no quick picks. -->
+              <section id="dashboardAsOfFields" class="detail-period-card" aria-label="Choose the day" hidden>
+                <div class="detail-period-card__fields">
+                  <lex-input id="dashboardAsOfDay" label="As of" type="date" name="dashboardAsOfDay"></lex-input>
+                </div>
               </section>
             </div>
           </div>
@@ -198,6 +204,7 @@
   <script src="../js/shared/dashboard-layout.js"></script>
   <script src="../js/shared/dashboard-cards.js"></script>
   <script src="../js/shared/card-visuals.js"></script>
+  <script src="../js/shared/as-of-cards.js"></script>
   <script src="../js/shared/lineage-view.js"></script>
   <script src="../js/shared/insights-breadcrumbs.js"></script>
   <script src="../js/settings-mappings.model.js"></script>

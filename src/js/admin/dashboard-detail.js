@@ -68,6 +68,8 @@
   // compare against the previous equal-length window (METRIC_GOALS_DESIGN.md
   // section 11.2). Defaults true because the page boots on a preset.
   var currentPeriodIsPreset = true;
+  // An as-of report (layout.period_mode 'as_of'): one day, not a range.
+  var asOfMode = false;
 
   function el(id) { return document.getElementById(id); }
 
@@ -144,7 +146,34 @@
   // Always a full range: when the inputs are empty, half filled or not real
   // days, the default range is used and written back into the inputs, so
   // every card and link uses the window the page shows.
+  // The as-of day on screen (else the link's, else today), written back.
+  function readAsOfControls() {
+    var input = el('dashboardAsOfDay');
+    var day = window.AsOfCards.asOfDay(input ? input.value : '', '');
+    if (!day) day = window.AsOfCards.asOfDay(getParams().get('asOf'), firmToday());
+    if (input && input.value !== day) input.value = day;
+    currentPeriod = { start: '', end: day, compareBy: 'monthly', asOf: day, label: window.AsOfCards.headerLabel(day) };
+    var pill = el('dashboardPeriodLabel');
+    if (pill) pill.textContent = currentPeriod.label;
+    return currentPeriod;
+  }
+
+  // Switches the date picker between a range and one as-of day.
+  function setAsOfMode(on) {
+    asOfMode = !!on;
+    var range = el('dashboardPeriodRange');
+    var single = el('dashboardAsOfFields');
+    if (range) range.hidden = asOfMode;
+    if (single) single.hidden = !asOfMode;
+    if (!asOfMode) {
+      var input = el('dashboardAsOfDay');
+      if (input) input.value = '';
+    }
+    return readPeriodControls();
+  }
+
   function readPeriodControls() {
+    if (asOfMode) return readAsOfControls();
     var start = el('dashboardPeriodStart');
     var end = el('dashboardPeriodEnd');
     var compare = el('dashboardPeriodType');
@@ -253,6 +282,8 @@
   function getMetricCardRequestParams(type, limit) {
     var period = readPeriodControls();
     var params = { type: type, limit: limit };
+    // An as-of report: the end day only, nothing to compare against.
+    if (asOfMode) return Object.assign(params, window.AsOfCards.cardPeriod(period.end));
     // Plain days (inclusive end), always both: the backend bounds them in
     // the firm's zone.
     params.periodStart = period.start;
@@ -2285,6 +2316,7 @@
       var metricKeys = window.DashboardCards.requestKeys(layout);
       currentDashboardMetricKeys = new Set(metricKeys.concat(metricKeys.map(function (key) { return key.split('.').pop(); })));
       currentDashboardType = type;
+      setAsOfMode(window.AsOfCards.isAsOf(dashboard));
       setBannerForDashboard(dashboard);
       setStory(dashboard);
       setActiveDashboardBreadcrumb(dashboard);
@@ -2382,6 +2414,16 @@
     if (startInput) startInput.addEventListener('lex-change', handlePeriodChange);
     if (endInput) endInput.addEventListener('lex-change', handlePeriodChange);
     if (compare) compare.addEventListener('lex-change', handlePeriodChange);
+    // The as-of day: kept in the link (?asOf=) so it opens on that day.
+    var asOfInput = el('dashboardAsOfDay');
+    if (asOfInput) {
+      asOfInput.addEventListener('lex-change', function () {
+        if (!asOfMode) return;
+        readPeriodControls();
+        if (Lex.Nav && Lex.Nav.updateParams) Lex.Nav.updateParams({ asOf: currentPeriod.end });
+        reloadDashboardMetricsForCurrentPeriod();
+      });
+    }
     initPeriodPanel();
     return initialPeriod;
   }

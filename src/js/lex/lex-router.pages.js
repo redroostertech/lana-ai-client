@@ -585,6 +585,7 @@
         'js/shared/dashboard-layout.js',
         'js/shared/dashboard-cards.js',
         'js/shared/card-visuals.js',
+        'js/shared/as-of-cards.js',
         'js/shared/lineage-view.js',
         'js/shared/insights-breadcrumbs.js',
         'js/settings-mappings.model.js',
