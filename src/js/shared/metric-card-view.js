@@ -373,18 +373,15 @@
     };
   }
 
-  // Where the second line points, when the server gives it a link: a
-  // metric key (link.metric_key or metric_key) or a page (link.href or
-  // href). null when it has none.
+  // second_line.link = { metric_key }: the list the second line opens (for
+  // example deal data completeness opening Deals Missing an Amount).
   function secondLineLink(item) {
     if (!item || typeof item !== 'object') return null;
     var holder = item.current && typeof item.current === 'object' ? item.current : item;
     var line = holder.metadata && holder.metadata.second_line;
-    if (!line || typeof line !== 'object') return null;
-    var link = line.link && typeof line.link === 'object' ? line.link : line;
-    var metricKey = typeof link.metric_key === 'string' ? link.metric_key.trim() : '';
-    var href = typeof link.href === 'string' ? link.href.trim() : '';
-    return metricKey || href ? { metricKey: metricKey, href: metricKey ? '' : href } : null;
+    var link = line && typeof line === 'object' && line.link && typeof line.link === 'object' ? line.link : null;
+    var metricKey = link && typeof link.metric_key === 'string' ? link.metric_key.trim() : '';
+    return metricKey ? { metricKey: metricKey } : null;
   }
 
   // metadata.unassigned = { won, lost, decided } (Team Member Conversion):

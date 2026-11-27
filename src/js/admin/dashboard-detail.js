@@ -888,7 +888,7 @@
     // The second line opens the list the server points it at (for example
     // deal data completeness to Deals Missing an Amount).
     var link = window.MetricCardView.secondLineLink(metric);
-    var href = link ? (link.metricKey ? recordsHref(link.metricKey) : link.href) : '';
+    var href = link ? recordsHref(link.metricKey) : '';
     return '<p class="dash-metric-card__second-line">'
       + (href ? '<button type="button" class="dash-metric-card__second-link" data-metric-detail-link="' + escapeHtml(href) + '">' + escapeHtml(text) + '</button>' : escapeHtml(text))
       + '</p>';
