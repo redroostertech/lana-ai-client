@@ -78,3 +78,19 @@ test('a fix with nothing queued does not refetch; permissions come from DataFixe
   expect(read('js/admin/metric-detail.js')).toContain('window.DataFixes.permissionsOf(payload)');
   expect(read('js/admin/metric-detail.js')).toContain('if (info.delayMs === null || info.delayMs === undefined) return;');
 });
+
+test('people breakdowns (deals by owner, team appointments, team members): refs open the person; an empty refs array does not', () => {
+  const rows = [
+    { owner_name: 'Avery Stone', value: 4, refs: [{ object: 'person', id: 'p-1', user_id: 'u-9' }] },
+    { owner_name: 'Unassigned', value: 2, refs: [] },
+    { attorney_name: 'Blake Ross', value: 3, refs: [{ object: 'person', id: 'p-2', user_id: null }] },
+  ];
+  const model = View.listBars(rows, 12);
+  expect(model.rows.map((r) => r.ref || null)).toEqual([{ object: 'person', id: 'p-1', user_id: 'u-9' }, null, { object: 'person', id: 'p-2' }]);
+  model.rows.forEach((row) => { row.key = 'legal_firm.sales_intake.deals_by_owner'; });
+  const html = Charts.breakdownHtml(model, String, { href: () => 'detail' });
+  const group = (name) => html.split('<g class="mini-cols__group').find((g) => g.includes(name));
+  expect(group('Avery Stone')).toContain('data-record-ref="person|p-1|u-9"');
+  expect(group('Unassigned')).not.toContain('data-record-ref');
+  expect(group('Blake Ross')).toContain('data-record-ref="person|p-2|"');
+});
